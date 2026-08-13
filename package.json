@@ -39,7 +39,7 @@
     "test:server": "bun test packages/server",
     "test:server:coverage": "cd packages/server && bun test --coverage",
     "test:tools": "bun test tools",
-    "test": "bun test packages/server packages/sdk tools && bun run test:client",
+    "test": "bun test packages/server packages/sdk packages/capek tools && bun run test:client",
     "sandbox": "bun packages/sandbox-cli/src/cli.ts",
     "build:vscode": "cd packages/vscode && bash scripts/build.sh",
     "package:vscode": "cd packages/vscode && bun run package",

@@ -108,6 +108,33 @@ async function setupMocks(opts: {
     getTools: mock(async () => opts.mcpTools ?? {}),
   }));
 
+  mock.module('@/agents/storage', () => ({
+    getAgentDirectory: mock(async () => null),
+  }));
+
+  mock.module('@/core/workflow', () => ({
+    executeWorkflow: mock(async () => ({ success: true })),
+    getWorkflowToolDefinition: mock(async () => null),
+  }));
+
+  mock.module('@/session-search', () => ({
+    sessionSearchToolDefinition: {
+      name: 'session_search',
+      description: 'Mock session search tool',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    executeSessionSearchTool: mock(async () => ({ success: true })),
+  }));
+
+  mock.module('@/scheduler/scheduler-tool', () => ({
+    schedulerToolDefinition: {
+      name: 'scheduler',
+      description: 'Mock scheduler tool',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    executeSchedulerTool: mock(async () => ({ success: true })),
+  }));
+
   mock.module('@/skills', () => ({
     createSkillTool: mock(async () => opts.skillTool ?? null),
     skillManageToolDefinition: {
