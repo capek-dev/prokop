@@ -3,9 +3,9 @@ import {
   getAgentDirectory,
   getMcpTools,
   getSession,
-  type AskBroadcastFn,
   type BroadcastFn,
 } from '../compat/jean2-dependencies';
+import type { AskBroadcastFn } from '../tools/ask-user-api';
 import { join } from 'path';
 import { buildExternalTools } from './tool-builders/external-tools';
 import { buildWorkspaceTools } from './tool-builders/workspace-tools';

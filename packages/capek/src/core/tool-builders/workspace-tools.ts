@@ -1,7 +1,6 @@
 import { tool, jsonSchema } from 'ai';
 import {
   buildSkillManageToolDescription,
-  createAskApi,
   createSkillTool,
   executeMemoryTool,
   executeSchedulerTool,
@@ -12,9 +11,12 @@ import {
   getSkillManageToolDefinition,
   getWorkspace,
   memoryToolDefinition,
+} from '../../compat/jean2-dependencies';
+import {
+  createAskApi,
   rejectPendingAsksByToolCallId,
   type AskBroadcastFn,
-} from '../../compat/jean2-dependencies';
+} from '../../tools/ask-user-api';
 import { interruptManager } from '../interrupt';
 import { executeWorkflow, getWorkflowToolDefinition } from '../workflow';
 import type { WorkflowInput, WorkflowResult, PermissionRiskLevel } from '@jean2/sdk';

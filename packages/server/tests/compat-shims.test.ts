@@ -47,6 +47,17 @@ const expectedValueExports: Record<string, string[]> = {
   '@/core/tool-builders/types': [],
   '@/core/tool-builders/workspace-tools': ['buildWorkspaceTools'],
   '@/tools/executor': ['executeTool'],
+  '@/tools/ask-user-api': [
+    'ASK_TIMEOUT', 'createAskApi', 'getAuthorityForPendingAsk', 'getSessionIdForPendingAsk',
+    'hasPendingAsk', 'listPendingAsksByRootSession', 'listPendingAsksBySession', 'rejectAsk',
+    'rejectPendingAsksBySession', 'rejectPendingAsksByToolCallId', 'resolveAsk',
+  ],
+  '@/tools/permission-request-manager': [
+    'PERMISSION_TIMEOUT', 'expireOldRequests', 'getPendingRequestsByRootSession',
+    'getPendingWaiterCount', 'hasPendingWaiter', 'rejectPermission',
+    'rejectPermissionsBySession', 'rejectPermissionsByToolCallId', 'requestPermission',
+    'resolvePermission',
+  ],
   '@/tools/llm-api': ['createLlmApi'],
   '@/tools/registry': ['clearCache', 'getTool', 'listTools', 'scanTools', 'stopWatching', 'watchTools'],
   '@/tools/types': [],
@@ -63,7 +74,7 @@ const expectedValueExports: Record<string, string[]> = {
   '@/sandbox/provider': ['SandboxProvider'],
 };
 
-describe('Phase 3 server compatibility shims', () => {
+describe('Phase 4 server compatibility shims', () => {
   for (const [specifier, expected] of Object.entries(expectedValueExports)) {
     test(`${specifier} preserves its HEAD value export surface`, async () => {
       const module = await import(specifier);

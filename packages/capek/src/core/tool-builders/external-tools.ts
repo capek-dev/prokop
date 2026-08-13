@@ -5,10 +5,12 @@ import { createLlmApi } from '../../tools/llm-api';
 import { createWorkspaceCapability } from '../../tools/workspace-capability';
 import {
   createAskApi,
-  getToolWorkspaceHost,
   rejectPendingAsksByToolCallId,
-  transitionToolToRunningByCallId,
   type AskBroadcastFn,
+} from '../../tools/ask-user-api';
+import {
+  getToolWorkspaceHost,
+  transitionToolToRunningByCallId,
 } from '../../compat/jean2-dependencies';
 import { interruptManager } from '../interrupt';
 import {
