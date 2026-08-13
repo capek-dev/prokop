@@ -1,4 +1,4 @@
-export const jean2CompatibilityPhase = 5 as const;
+export const jean2CompatibilityPhase = 6 as const;
 
 export {
   getJean2CompatibilityBindings,
@@ -6,6 +6,20 @@ export {
   type Jean2CompatibilityBindings,
 } from './bindings';
 export { configureStorage, getStorage } from '../storage/runtime';
+export {
+  configureRuntimeConfiguration,
+  getApiKeyForProvider,
+  getRuntimeConfiguration,
+} from '../configuration/runtime';
+export type * from '../configuration/contracts';
+export * from '../providers/registry';
+export type * from '../providers/types';
+export * from '../context';
+export * from '../memory';
+export * from '../skills';
+export * from '../session-search';
+export * from '../scheduler/host';
+export * from '../scheduler/scheduler-tool';
 export type { StorageBundle } from '../storage/contracts';
 
 export { chat, streamChat } from '../core/agent';
@@ -53,6 +67,7 @@ export * from '../tools/permission-request-manager';
 export * from '../tools/workspace-capability';
 export * from '../tools/llm-api';
 export * from '../tools/registry';
+export * from '../tools/install-manifest';
 export type * from '../tools/types';
 export * from '../tools/tool-artifact';
 export * from '../utils/errors';
@@ -60,5 +75,6 @@ export * from '../utils/truncate-tool-result';
 export * from '../utils/strip-visualization';
 export { SandboxLanguageModel } from '../sandbox/model';
 export { SandboxProvider } from '../sandbox/provider';
-export type * from '../sandbox/provider-types';
+export { SandboxController, sandboxController } from '../sandbox/controller';
+export * from '../tools/tool-source';
 export type * from '../sandbox/types';

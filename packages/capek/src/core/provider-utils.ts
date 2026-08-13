@@ -1,13 +1,7 @@
-import { findModel } from '../compat/jean2-dependencies';
 import {
-  getLLMOpenAIApiKey,
-  getLLMOpenRouterApiKey,
-  getLLMMinimaxApiKey,
-  getLLMZhipuApiKey,
-  getLLMZhipuCodingApiKey,
-  getLLMDeepseekApiKey,
+  findModel,
   getModelsConfig,
-} from '../compat/jean2-dependencies';
+} from '../configuration/runtime';
 import type { Session, Preconfig } from '@jean2/sdk';
 
 export type Provider = 'openai' | 'openrouter' | 'minimax' | 'zhipu' | 'zhipu-coding' | 'deepseek';
@@ -26,20 +20,6 @@ export function findProviderFromModel(modelId: string): string {
     if (test(modelId)) return provider;
   }
   return 'openai';
-}
-
-const apiKeyGetterMap: Record<string, () => string | undefined> = {
-  openai: getLLMOpenAIApiKey,
-  openrouter: getLLMOpenRouterApiKey,
-  minimax: getLLMMinimaxApiKey,
-  zhipu: getLLMZhipuApiKey,
-  'zhipu-coding': getLLMZhipuCodingApiKey,
-  deepseek: getLLMDeepseekApiKey,
-};
-
-export function getApiKeyForProvider(provider: string): string | undefined {
-  const getter = apiKeyGetterMap[provider];
-  return getter ? getter() : undefined;
 }
 
 export function resolveModelId(

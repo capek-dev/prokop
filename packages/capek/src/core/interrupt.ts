@@ -1,8 +1,6 @@
 import type { InterruptReason, SessionInterruptResult } from '@jean2/sdk';
-import {
-  getSandboxController,
-  isSandboxActive,
-} from '../compat/jean2-dependencies';
+import { isSandboxActive } from '../compat/jean2-dependencies';
+import { sandboxController } from '../sandbox/controller';
 import { getChildSessions, getSession, updateSession } from '../storage/runtime';
 import { rejectPendingAsksBySession } from '../tools/ask-user-api';
 
@@ -104,7 +102,7 @@ export class InterruptManager {
 
     // Reject any pending sandbox calls for this session to unblock waitForResponse()
     if (isSandboxActive()) {
-      getSandboxController().rejectAllPendingForSession(sessionId);
+      sandboxController.rejectAllPendingForSession(sessionId);
     }
 
     // Only set subagentStatus for actual subagent sessions (those with a parentId)

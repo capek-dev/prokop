@@ -4,9 +4,8 @@ import {
   broadcastSessionCreated,
   broadcastSessionUpdated,
   broadcastToSessionEvent,
-  getPreconfigOrAgent,
-  listSubagentPreconfigs,
 } from '../compat/jean2-dependencies';
+import { getPreconfigOrAgent, listSubagentPreconfigs } from '../context';
 import {
   createSession,
   getSession,

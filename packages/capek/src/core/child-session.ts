@@ -2,11 +2,11 @@ import { randomUUID } from 'crypto';
 import type { MessageWithParts, Part, TextPart, Preconfig, UserMessage, ResponseFormat, StructuredOutputData } from '@jean2/sdk';
 import {
   broadcastEvent,
-  getLLMSubagentMaxSteps,
   notifyTerminalMessage,
   sendToAskTargetsEvent,
   sendToControllerEvent,
 } from '../compat/jean2-dependencies';
+import { getLLMSubagentMaxSteps } from '../configuration/runtime';
 import {
   buildEffectiveContextHistory,
   createMessage,

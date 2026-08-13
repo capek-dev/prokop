@@ -23,7 +23,7 @@ import {
   getCompactionAutoThresholdRatio,
   getCompactionAutoReserveCapTokens,
   getCompactionAutoSafetyMarginTokens,
-} from '../compat/jean2-dependencies';
+} from '../configuration/runtime';
 
 /**
  * Compaction trigger reasons

@@ -4,8 +4,10 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { tool, jsonSchema } from 'ai';
 import {
+  configureAgentSource,
+  configurePreconfigSource,
+  configureToolSource,
   setJean2CompatibilityBindings,
-  type Jean2CompatibilityBindings,
 } from '@capekai/core/compat/jean2';
 import {
   configureStorage,
@@ -21,7 +23,6 @@ interface BindingOverrides {
   sessionNotFound?: boolean;
   subagentPreconfigs?: Preconfig[];
   mcpTools?: Record<string, import('ai').Tool>;
-  skillTool?: { name: string; tool: import('ai').Tool } | null;
   workspace?: Workspace | null;
 }
 
@@ -46,26 +47,18 @@ function configureBindings(overrides: BindingOverrides = {}): void {
     },
   };
   configureStorage(storage);
-  const bindings: Jean2CompatibilityBindings = {
-    ...jean2CompatibilityBindings,
-    config: {
-      ...jean2CompatibilityBindings.config,
-      listPreconfigs: async () => overrides.subagentPreconfigs ?? [],
-    },
-    mcp: {
-      ...jean2CompatibilityBindings.mcp,
-      getTools: async () => overrides.mcpTools ?? {},
-    },
-    skills: {
-      ...jean2CompatibilityBindings.skills,
-      createSkillTool: async () => overrides.skillTool ?? null,
-    },
-    agents: {
-      ...jean2CompatibilityBindings.agents,
-      getAgentDirectory: async () => null,
-    },
-  };
-  setJean2CompatibilityBindings(bindings);
+  setJean2CompatibilityBindings(jean2CompatibilityBindings);
+  configurePreconfigSource({
+    get: async () => null,
+    getDefault: async () => null,
+    getForAgent: async () => null,
+    list: async () => overrides.subagentPreconfigs ?? [],
+    listSubagents: async () => overrides.subagentPreconfigs ?? [],
+  });
+  configureAgentSource();
+  configureToolSource({
+    discoverTools: async () => overrides.mcpTools ?? {},
+  });
 }
 
 async function seedTool(
@@ -220,27 +213,47 @@ describe('build-tools binding integration', () => {
     expect(tools).toHaveProperty('read-file');
   });
 
-  test('merges host-owned skill and MCP tools through explicit bindings', async () => {
-    const skill = tool({
-      inputSchema: jsonSchema({ type: 'object', properties: {} }),
-      execute: async () => 'skill',
-    });
-    const mcp = tool({
-      inputSchema: jsonSchema({ type: 'object', properties: {} }),
-      execute: async () => 'mcp',
-    });
+  test('omits the scheduler tool from scheduled-run sessions', async () => {
     configureBindings({
-      workspace,
-      skillTool: { name: 'skill', tool: skill },
-      mcpTools: { 'mcp-tool': mcp },
+      sessions: {
+        scheduled: { metadata: { scheduledJobId: 'job-1' } },
+      },
+      workspace: {
+        ...workspace,
+        settings: { scheduling: { enabled: true } },
+      },
     });
 
     const tools = await buildAiSdkTools(defaultOptions({
       workspaceId: workspace.id,
       workspacePath: workspace.path,
+      sessionId: 'scheduled',
     }));
 
-    expect(tools.skill).toBe(skill);
+    expect(tools).not.toHaveProperty('scheduler');
+  });
+
+  test('merges package-owned skill and host MCP tools through explicit sources', async () => {
+    fixtureDir ??= mkdtempSync(join(tmpdir(), 'capek-build-tools-'));
+    const workspacePath = join(fixtureDir, 'workspace');
+    const skillDir = join(workspacePath, '.agents', 'skills', 'skill');
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(join(skillDir, 'SKILL.md'), '---\nname: skill\ndescription: Fixture skill\n---\nskill body');
+    const mcp = tool({
+      inputSchema: jsonSchema({ type: 'object', properties: {} }),
+      execute: async () => 'mcp',
+    });
+    configureBindings({
+      workspace: { ...workspace, path: workspacePath },
+      mcpTools: { 'mcp-tool': mcp },
+    });
+
+    const tools = await buildAiSdkTools(defaultOptions({
+      workspaceId: workspace.id,
+      workspacePath,
+    }));
+
+    expect(tools.skill).toBeDefined();
     expect(tools['mcp-tool']).toBe(mcp);
   });
 });

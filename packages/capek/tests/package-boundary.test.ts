@@ -85,8 +85,8 @@ function resolvesWithin(specifier: string, importer: string, target: string): bo
 
 describe('package boundary', () => {
   test('declared package entrypoints import by package name', () => {
-    expect(capekPackagePhase).toBe(5);
-    expect(jean2CompatibilityPhase).toBe(5);
+    expect(capekPackagePhase).toBe(6);
+    expect(jean2CompatibilityPhase).toBe(6);
     expect(typeof createInMemoryConversationStore).toBe('function');
   });
 
@@ -160,6 +160,51 @@ describe('package boundary', () => {
         }
       }
     }
+    expect(violations).toEqual([]);
+  });
+
+  test('Phase 6 package runtime does not import completed Jean2 compatibility seams', () => {
+    const phase6Names = new Set([
+      'resolveToolsPath', 'readInstallManifest',
+      'findModel', 'findModelVariant', 'getMaxOutputTokens', 'getModelsConfig',
+      'getLLMTemperature', 'getLLMMaxSteps', 'getLLMSubagentMaxSteps',
+      'getLLMBaseUrl', 'getLLMOpenAIApiKey', 'getLLMOpenRouterApiKey',
+      'getLLMMinimaxApiKey', 'getLLMZhipuApiKey', 'getLLMZhipuCodingApiKey',
+      'getLLMDeepseekApiKey', 'getCompactionModel', 'getCompactionProvider',
+      'getCompactionMaxTokens', 'getCompactionPreserveRecentToolCount',
+      'getCompactionPreserveSmallToolChars', 'getCompactionToolClearCharsThreshold',
+      'getCompactionMaxPrunedToolCount', 'getCompactionAutoThresholdRatio',
+      'getCompactionAutoReserveCapTokens', 'getCompactionAutoSafetyMarginTokens',
+      'getPreconfig', 'getDefaultPreconfig', 'getPreconfigOrAgent',
+      'listPreconfigs', 'listSubagentPreconfigs', 'getAgentDirectory',
+      'readAgentMemoryFile', 'initializeWorkspace', 'getMcpTools',
+      'memoryToolDefinition', 'executeMemoryTool', 'loadMemoryInstructions',
+      'getMemoryGuidance', 'getSkillManageToolDefinition', 'executeSkillManageTool',
+      'buildSkillManageToolDescription', 'createSkillTool', 'getSkillManageGuidance',
+      'getSessionSearchToolDefinition', 'executeSessionSearchTool',
+      'getSessionSearchGuidance', 'getSchedulerToolDefinition', 'executeSchedulerTool',
+      'buildWorkspaceSystemPrompt', 'loadInstructions', 'formatInstructions',
+      'getSandboxController',
+    ]);
+    const violations: string[] = [];
+
+    for (const path of collectSourceFiles(packageSourceRoot)) {
+      if (path.endsWith('compat/jean2-dependencies.ts')) continue;
+      const sourceFile = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true);
+      for (const statement of sourceFile.statements) {
+        if (!ts.isImportDeclaration(statement)
+          || !ts.isStringLiteral(statement.moduleSpecifier)
+          || !statement.moduleSpecifier.text.includes('compat/jean2-dependencies')) continue;
+        const bindings = statement.importClause?.namedBindings;
+        if (!bindings || !ts.isNamedImports(bindings)) continue;
+        for (const element of bindings.elements) {
+          if (phase6Names.has(element.name.text)) {
+            violations.push(`${relative(repositoryRoot, path)} imports ${element.name.text}`);
+          }
+        }
+      }
+    }
+
     expect(violations).toEqual([]);
   });
 

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { simulateReadableStream } from 'ai';
-import { getSandboxController } from '../compat/jean2-dependencies';
+import { sandboxController } from './controller';
 import { getSession } from '../storage/runtime';
 import type {
   ErrorResponse,
@@ -108,12 +108,12 @@ function wrapStreamWithCompletion(
         controller.error(error);
       } finally {
         reader.releaseLock();
-        getSandboxController().complete(callId);
+        sandboxController.complete(callId);
       }
     },
     async cancel(reason: unknown): Promise<void> {
       await stream.cancel(reason);
-      getSandboxController().complete(callId);
+      sandboxController.complete(callId);
     },
   });
 }
@@ -134,7 +134,7 @@ export class SandboxLanguageModel {
 
   async doStream(options: SandboxModelCallOptions): Promise<{ stream: ReadableStream<unknown> }> {
     const context = this.createContext(options, 'stream');
-    const response = await getSandboxController().waitForResponse(context, options.abortSignal);
+    const response = await sandboxController.waitForResponse(context, options.abortSignal);
     const stream = wrapStreamWithCompletion(this.responseToStream(response), context.callId);
 
     return { stream };
@@ -147,12 +147,12 @@ export class SandboxLanguageModel {
     warnings: [];
   }> {
     const context = this.createContext(options, 'generate');
-    const response = await getSandboxController().waitForResponse(context, options.abortSignal);
+    const response = await sandboxController.waitForResponse(context, options.abortSignal);
 
     try {
       return this.responseToGenerateResult(response);
     } finally {
-      getSandboxController().complete(context.callId);
+      sandboxController.complete(context.callId);
     }
   }
 

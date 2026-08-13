@@ -1,9 +1,9 @@
 import {
   broadcastEvent,
-  getAgentDirectory,
-  getMcpTools,
   type BroadcastFn,
 } from '../compat/jean2-dependencies';
+import { getAgentDirectory } from '../context';
+import { discoverSourceTools } from '../tools/tool-source';
 import { getSession } from '../storage/runtime';
 import type { AskBroadcastFn } from '../tools/ask-user-api';
 import { join } from 'path';
@@ -109,7 +109,7 @@ export async function buildAiSdkTools(
 
     // Phase 3: MCP tools
     try {
-      const mcpTools = await getMcpTools(workspacePath, sessionId);
+      const mcpTools = await discoverSourceTools(workspacePath, sessionId);
       Object.assign(tools, mcpTools);
     } catch (err) {
       console.error('Failed to load MCP tools:', err);

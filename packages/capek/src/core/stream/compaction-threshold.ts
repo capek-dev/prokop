@@ -4,7 +4,7 @@ import {
   getCompactionAutoSafetyMarginTokens,
   getCompactionAutoThresholdRatio,
   getMaxOutputTokens,
-} from '../../compat/jean2-dependencies';
+} from '../../configuration/runtime';
 import type { CompactionPolicy } from '../compaction';
 
 export interface AutoThresholdResult {

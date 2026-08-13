@@ -1,17 +1,14 @@
 import { tool, jsonSchema } from 'ai';
+import { executeSchedulerTool, schedulerToolDefinition } from '../../scheduler/scheduler-tool';
+import { executeSessionSearchTool, sessionSearchToolDefinition } from '../../session-search';
+import { executeMemoryTool, memoryToolDefinition } from '../../memory';
 import {
   buildSkillManageToolDescription,
   createSkillTool,
-  executeMemoryTool,
-  executeSchedulerTool,
-  executeSessionSearchTool,
   executeSkillManageTool,
-  getSchedulerToolDefinition,
-  getSessionSearchToolDefinition,
-  getSkillManageToolDefinition,
-  memoryToolDefinition,
-} from '../../compat/jean2-dependencies';
-import { getWorkspace } from '../../storage/runtime';
+  skillManageToolDefinition,
+} from '../../skills';
+import { getSession, getWorkspace } from '../../storage/runtime';
 import {
   createAskApi,
   rejectPendingAsksByToolCallId,
@@ -70,8 +67,8 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
   if (memorySettings?.enabled) {
     const permissionRisk = memorySettings.permissionRisk;
     tools['memory'] = tool({
-      description: memoryToolDefinition().description,
-      inputSchema: jsonSchema(memoryToolDefinition().inputSchema),
+      description: memoryToolDefinition.description,
+      inputSchema: jsonSchema(memoryToolDefinition.inputSchema),
       execute: async (args: Record<string, unknown>, { toolCallId }: { toolCallId: string }) => {
         const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
         try {
@@ -147,7 +144,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
     const skillManageDescription = await buildSkillManageToolDescription(join(workspacePath!, '.agents', 'skills'));
     tools['skill_manage'] = tool({
       description: skillManageDescription,
-      inputSchema: jsonSchema(getSkillManageToolDefinition().inputSchema),
+      inputSchema: jsonSchema(skillManageToolDefinition.inputSchema),
       execute: async (args: Record<string, unknown>, { toolCallId }: { toolCallId: string }) => {
         const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
         try {
@@ -186,8 +183,8 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
     const searchPermissionRisk = sessionSearchSettings.permissionRisk;
     const includeToolResults = sessionSearchSettings.includeToolResults;
     tools['session_search'] = tool({
-      description: getSessionSearchToolDefinition().description,
-      inputSchema: jsonSchema(getSessionSearchToolDefinition().inputSchema),
+      description: sessionSearchToolDefinition.description,
+      inputSchema: jsonSchema(sessionSearchToolDefinition.inputSchema),
       execute: async (args: Record<string, unknown>, { toolCallId }: { toolCallId: string }) => {
         const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
         try {
@@ -232,11 +229,12 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
 
   // ── Scheduler tool ────────────────────────────────────────
   const schedulingSettings = workspace.settings?.scheduling;
-  if (schedulingSettings?.enabled) {
+  const isScheduledRun = Boolean(getSession(sessionId)?.metadata?.scheduledJobId);
+  if (schedulingSettings?.enabled && !isScheduledRun) {
     const schedulingRisk: PermissionRiskLevel = schedulingSettings.permissionRisk ?? 'none';
     tools['scheduler'] = tool({
-      description: getSchedulerToolDefinition().description,
-      inputSchema: jsonSchema(getSchedulerToolDefinition().inputSchema),
+      description: schedulerToolDefinition.description,
+      inputSchema: jsonSchema(schedulerToolDefinition.inputSchema),
       execute: async (args: Record<string, unknown>, { toolCallId }: { toolCallId: string }) => {
         const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
         let result;

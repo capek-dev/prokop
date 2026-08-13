@@ -1,11 +1,10 @@
 import { tool, jsonSchema } from 'ai';
+import { executeMemoryTool, memoryToolDefinition } from '../../memory';
 import {
   buildSkillManageToolDescription,
-  executeMemoryTool,
   executeSkillManageTool,
-  getSkillManageToolDefinition,
-  memoryToolDefinition,
-} from '../../compat/jean2-dependencies';
+  skillManageToolDefinition,
+} from '../../skills';
 import { join } from 'path';
 import type { ToolMap } from './types';
 
@@ -34,7 +33,7 @@ Actions:
 - remove: Find an entry by oldText substring and remove it.
 
 Character limits: user=1500, memory=2500. Keep entries compact.`,
-    inputSchema: jsonSchema(memoryToolDefinition().inputSchema),
+    inputSchema: jsonSchema(memoryToolDefinition.inputSchema),
     execute: async (args: Record<string, unknown>) => {
       const result = await executeMemoryTool(args, agentDir, 'none');
       if (!result.success) {
@@ -52,7 +51,7 @@ Character limits: user=1500, memory=2500. Keep entries compact.`,
   const agentSkillManageDescription = await buildSkillManageToolDescription(agentSkillsManageDir);
   tools['agent_skill_manage'] = tool({
     description: agentSkillManageDescription,
-    inputSchema: jsonSchema(getSkillManageToolDefinition().inputSchema),
+    inputSchema: jsonSchema(skillManageToolDefinition.inputSchema),
     execute: async (args: Record<string, unknown>) => {
       const result = await executeSkillManageTool(args, agentSkillsManageDir, 'none');
       if (!result.success) {

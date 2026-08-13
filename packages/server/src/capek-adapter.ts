@@ -1,8 +1,19 @@
 import { tmpdir } from 'os';
 import { join } from 'path';
 import {
+  configureAgentSource,
+  configureInstructionSource,
+  configurePreconfigSource,
+  configureRuntimeConfiguration,
+  configureSchedulerHost,
+  configureSessionSearchHost,
+  configureToolsPath,
+  configureToolSource,
   setJean2CompatibilityBindings,
   type Jean2CompatibilityBindings,
+  type RuntimeConfiguration,
+  type SchedulerHost,
+  type SessionSearchHost,
 } from '@capekai/core/compat/jean2';
 import {
   configureStorage,
@@ -27,8 +38,6 @@ import {
 } from '@/core/broadcast';
 import { getDefaultPreconfig, getPreconfig, listPreconfigs, listSubagentPreconfigs } from '@/core/preconfig';
 import { generateSessionTitle, hasManualSessionTitle, isDefaultSessionTitle } from '@/core/session-title';
-import { formatInstructions, loadInstructions } from '@/core/instructions';
-import { buildWorkspaceSystemPrompt } from '@/core/prompts/workspace-context';
 import {
   getCompactionAutoReserveCapTokens,
   getCompactionAutoSafetyMarginTokens,
@@ -54,30 +63,11 @@ import {
   getPermissionTimeoutMs,
 } from '@/env';
 import { getTools, initializeWorkspace } from '@/mcp';
-import {
-  MEMORY_GUIDANCE,
-  executeMemoryTool,
-  loadMemoryInstructions,
-  memoryToolDefinition,
-} from '@/memory';
-import { getUploadDir } from '@/paths';
+import { getGlobalAgentsPath, getToolsDir, getUploadDir } from '@/paths';
 import { notifyPermissionRequired, notifyTerminalMessage } from '@/services/web-push/dispatch';
-import { createModelForProvider, getProvider } from '@/providers';
 import { isSandboxActive } from '@/sandbox';
-import { sandboxController } from '@/sandbox/controller';
-import { executeSchedulerTool, schedulerToolDefinition } from '@/scheduler/scheduler-tool';
-import {
-  SESSION_SEARCH_GUIDANCE,
-  executeSessionSearchTool,
-  sessionSearchToolDefinition,
-} from '@/session-search';
-import {
-  SKILL_MANAGE_GUIDANCE,
-  buildSkillManageToolDescription,
-  createSkillTool,
-  executeSkillManageTool,
-  skillManageToolDefinition,
-} from '@/skills';
+import { runScheduledJob } from '@/scheduler/runner';
+import { getMessageContentForFts, searchMessages } from '@/session-search/fts';
 import {
   addMessageToQueue,
   buildEffectiveContextHistory,
@@ -95,8 +85,11 @@ import {
   getPartsByMessage,
   getPartsBySession,
   getResponseFormat,
+  getDatabase,
   getSession,
+  getSessionsByAgent,
   getWorkspace,
+  listSessionsByWorkspace,
   listLatestMessagesWithPartsPage,
   listMessagesWithParts,
   persistStreamingPartSnapshots,
@@ -126,7 +119,13 @@ import {
   resolvePermissionRequestByRequestId,
 } from '@/store/pending-asks';
 import { createGrantFromOptions, matchGrant } from '@/store/permissions';
-import { readInstallManifest } from '@/tools/tool-install-manifest';
+import {
+  createScheduledJob,
+  deleteScheduledJob,
+  getScheduledJob,
+  listScheduledJobs,
+  updateScheduledJob,
+} from '@/store/scheduled-jobs';
 
 export const jean2StorageBundle: StorageBundle = {
   conversation: {
@@ -165,46 +164,107 @@ export const jean2StorageBundle: StorageBundle = {
   index: { syncMessage: syncMessageFts },
 };
 
+export const jean2RuntimeConfiguration: RuntimeConfiguration = {
+  findModel,
+  getMaxOutputTokens,
+  findModelVariant,
+  getModelsConfig,
+  getLLMTemperature,
+  getLLMMaxSteps,
+  getLLMSubagentMaxSteps,
+  getLLMBaseUrl,
+  getApiKey(providerId) {
+    switch (providerId) {
+      case 'openai': return getLLMOpenAIApiKey();
+      case 'openrouter': return getLLMOpenRouterApiKey();
+      case 'minimax': return getLLMMinimaxApiKey();
+      case 'zhipu': return getLLMZhipuApiKey();
+      case 'zhipu-coding': return getLLMZhipuCodingApiKey();
+      case 'deepseek': return getLLMDeepseekApiKey();
+      default: return undefined;
+    }
+  },
+  getCompactionModel,
+  getCompactionProvider,
+  getCompactionMaxTokens,
+  getCompactionPreserveRecentToolCount,
+  getCompactionPreserveSmallToolChars,
+  getCompactionToolClearCharsThreshold,
+  getCompactionMaxPrunedToolCount,
+  getCompactionAutoThresholdRatio,
+  getCompactionAutoReserveCapTokens,
+  getCompactionAutoSafetyMarginTokens,
+};
+
+export const jean2SessionSearchHost: SessionSearchHost = {
+  getWorkspace,
+  getSession,
+  listWorkspaceSessions: (workspaceId) => listSessionsByWorkspace(workspaceId, { rootOnly: true }),
+  listAgentSessions: (agentId, limit) => getSessionsByAgent(agentId, undefined, limit),
+  countSessionMessages(sessionId) {
+    return (getDatabase().query(
+      'SELECT COUNT(*) as cnt FROM messages WHERE session_id = ?',
+    ).get(sessionId) as { cnt: number }).cnt;
+  },
+  searchMessages,
+  countMessagesBefore(sessionId, timestamp) {
+    return (getDatabase().query(
+      'SELECT COUNT(*) as cnt FROM messages WHERE session_id = ? AND created_at < ?',
+    ).get(sessionId, timestamp) as { cnt: number }).cnt;
+  },
+  countMessagesAfter(sessionId, timestamp) {
+    return (getDatabase().query(
+      'SELECT COUNT(*) as cnt FROM messages WHERE session_id = ? AND created_at > ?',
+    ).get(sessionId, timestamp) as { cnt: number }).cnt;
+  },
+  getLatestMessage(sessionId) {
+    const row = getDatabase().query(
+      'SELECT id, created_at FROM messages WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
+    ).get(sessionId) as { id: string; created_at: number } | undefined;
+    return row ? { id: row.id, timestamp: row.created_at } : null;
+  },
+  getMessage(messageId, sessionId) {
+    const row = getDatabase().query(
+      'SELECT id, created_at FROM messages WHERE id = ? AND session_id = ?',
+    ).get(messageId, sessionId) as { id: string; created_at: number } | undefined;
+    return row ? { id: row.id, timestamp: row.created_at } : null;
+  },
+  listMessagesBefore(sessionId, timestamp, limit) {
+    const rows = getDatabase().query(
+      'SELECT id, role, created_at FROM messages WHERE session_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?',
+    ).all(sessionId, timestamp, limit) as Array<{ id: string; role: string; created_at: number }>;
+    return rows.map((row) => ({ id: row.id, role: row.role, timestamp: row.created_at }));
+  },
+  listMessagesAfter(sessionId, timestamp, limit) {
+    const rows = getDatabase().query(
+      'SELECT id, role, created_at FROM messages WHERE session_id = ? AND created_at > ? ORDER BY created_at ASC LIMIT ?',
+    ).all(sessionId, timestamp, limit) as Array<{ id: string; role: string; created_at: number }>;
+    return rows.map((row) => ({ id: row.id, role: row.role, timestamp: row.created_at }));
+  },
+  getMessageSummary(messageId) {
+    const row = getDatabase().query(
+      'SELECT role, created_at FROM messages WHERE id = ?',
+    ).get(messageId) as { role: string; created_at: number } | undefined;
+    if (!row) return null;
+    const { content, toolName } = getMessageContentForFts(messageId);
+    return { role: row.role, timestamp: row.created_at, content, toolName };
+  },
+};
+
+export const jean2SchedulerHost: SchedulerHost = {
+  create: createScheduledJob,
+  get: getScheduledJob,
+  list: listScheduledJobs,
+  update: updateScheduledJob,
+  delete: deleteScheduledJob,
+  trigger(job) {
+    runScheduledJob(job).catch((error: unknown) => {
+      console.error(`[scheduler-tool] Trigger of '${job.name}' failed:`, error);
+    });
+  },
+};
+
 export const jean2CompatibilityBindings = {
-  config: {
-    findModel,
-    getMaxOutputTokens,
-    findModelVariant,
-    getModelsConfig,
-    resolveToolsPath,
-    getPreconfig,
-    getDefaultPreconfig,
-    getPreconfigOrAgent,
-    listPreconfigs,
-    listSubagentPreconfigs,
-  },
-  env: {
-    getCompactionAutoThresholdRatio,
-    getCompactionAutoReserveCapTokens,
-    getCompactionAutoSafetyMarginTokens,
-    getLLMTemperature,
-    getLLMMaxSteps,
-    getLLMSubagentMaxSteps,
-    getLLMBaseUrl,
-    getLLMOpenAIApiKey,
-    getLLMOpenRouterApiKey,
-    getLLMMinimaxApiKey,
-    getLLMZhipuApiKey,
-    getLLMZhipuCodingApiKey,
-    getLLMDeepseekApiKey,
-    getJean2EnvValue,
-    getCompactionModel,
-    getCompactionProvider,
-    getCompactionMaxTokens,
-    getCompactionPreserveRecentToolCount,
-    getCompactionPreserveSmallToolChars,
-    getCompactionToolClearCharsThreshold,
-    getCompactionMaxPrunedToolCount,
-  },
-  providers: {
-    getProvider,
-    createModelForProvider,
-  },
   interaction: {
     createPendingAsk,
     removePendingAsk,
@@ -237,14 +297,6 @@ export const jean2CompatibilityBindings = {
     hasManualSessionTitle,
     generateSessionTitle,
   },
-  agents: {
-    getAgentDirectory,
-    readAgentMemoryFile,
-  },
-  mcp: {
-    initializeWorkspace,
-    getTools,
-  },
   workspace: {
     createToolWorkspaceHost: ({ workspaceId, workspacePath, additionalPaths, sessionId }) => ({
       root: workspacePath,
@@ -260,43 +312,36 @@ export const jean2CompatibilityBindings = {
         : undefined,
     }),
   },
-  tools: {
-    readInstallManifest,
-  },
-  memory: {
-    memoryToolDefinition,
-    executeMemoryTool,
-    loadMemoryInstructions,
-    MEMORY_GUIDANCE,
-  },
-  skills: {
-    skillManageToolDefinition,
-    executeSkillManageTool,
-    buildSkillManageToolDescription,
-    createSkillTool,
-    SKILL_MANAGE_GUIDANCE,
-  },
-  sessionSearch: {
-    sessionSearchToolDefinition,
-    executeSessionSearchTool,
-    SESSION_SEARCH_GUIDANCE,
-  },
-  scheduler: {
-    schedulerToolDefinition,
-    executeSchedulerTool,
-  },
-  context: {
-    buildWorkspaceSystemPrompt,
-    loadInstructions,
-    formatInstructions,
-  },
   sandbox: {
     isSandboxActive,
-    sandboxController,
   },
 } satisfies Jean2CompatibilityBindings;
 
 export function configureCapekJean2Compatibility(): void {
   configureStorage(jean2StorageBundle);
+  configureRuntimeConfiguration(jean2RuntimeConfiguration);
+  configurePreconfigSource({
+    get: getPreconfig,
+    getDefault: getDefaultPreconfig,
+    getForAgent: getPreconfigOrAgent,
+    list: listPreconfigs,
+    listSubagents: listSubagentPreconfigs,
+  });
+  configureAgentSource({
+    getDirectory: getAgentDirectory,
+    readMemoryFile: readAgentMemoryFile,
+  });
+  configureInstructionSource({ getGlobalPath: getGlobalAgentsPath });
+  configureSessionSearchHost(jean2SessionSearchHost);
+  configureSchedulerHost(jean2SchedulerHost);
+  try {
+    configureToolsPath(resolveToolsPath());
+  } catch {
+    configureToolsPath(process.env.JEAN2_TOOLS_PATH || getToolsDir());
+  }
+  configureToolSource({
+    initializeWorkspace,
+    discoverTools: getTools,
+  });
   setJean2CompatibilityBindings(jean2CompatibilityBindings);
 }

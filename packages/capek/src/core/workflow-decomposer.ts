@@ -1,5 +1,5 @@
 import { runOrchestratorSession } from './workflow-orchestrator-session';
-import { listSubagentPreconfigs } from '../compat/jean2-dependencies';
+import { listSubagentPreconfigs } from '../context';
 import type { WorkflowSubtask } from '@jean2/sdk';
 import type { BroadcastFn, BroadcastSessionFn } from '../compat/bindings';
 

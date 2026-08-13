@@ -12,6 +12,12 @@ import type {
 } from '@jean2/sdk';
 import {
   SandboxLanguageModel,
+  configureAgentSource,
+  configurePreconfigSource,
+  configureRuntimeConfiguration,
+  registerProvider,
+  resetProviders,
+  sandboxController,
   canSpawnSubagent,
   executeChildSession,
   createLlmApi,
@@ -28,7 +34,6 @@ import { synthesizeResults } from '../src/core/workflow-synthesizer';
 import {
   setJean2CompatibilityBindings,
   type Jean2CompatibilityBindings,
-  type Jean2SandboxController,
 } from '../src/compat/bindings';
 import type { StreamChatEvent } from '../src/core/retry';
 import type { ChatOptions } from '../src/core/agent';
@@ -149,7 +154,6 @@ function bindRuntime(
     },
     sandbox: {
       isSandboxActive: () => false,
-      sandboxController: {} as Jean2SandboxController,
     },
   } as unknown as Jean2CompatibilityBindings;
   for (const [group, value] of Object.entries(overrides)) {
@@ -158,6 +162,36 @@ function bindRuntime(
     bindings[key] = { ...bindings[key], ...value } as never;
   }
   setJean2CompatibilityBindings(bindings);
+  configureRuntimeConfiguration({
+    findModel: () => undefined,
+    getMaxOutputTokens: () => 32000,
+    findModelVariant: () => undefined,
+    getModelsConfig: () => ({ providers: [], defaultModel: 'test-model', defaultProvider: 'test-provider' }),
+    getLLMTemperature: () => 0.7,
+    getLLMMaxSteps: () => 10,
+    getLLMSubagentMaxSteps: () => 12,
+    getLLMBaseUrl: () => undefined,
+    getApiKey: () => undefined,
+    getCompactionModel: () => undefined,
+    getCompactionProvider: () => undefined,
+    getCompactionMaxTokens: () => 8000,
+    getCompactionPreserveRecentToolCount: () => 3,
+    getCompactionPreserveSmallToolChars: () => 200,
+    getCompactionToolClearCharsThreshold: () => 1000,
+    getCompactionMaxPrunedToolCount: () => 50,
+    getCompactionAutoThresholdRatio: () => 0.75,
+    getCompactionAutoReserveCapTokens: () => 32000,
+    getCompactionAutoSafetyMarginTokens: () => 20000,
+  });
+  configurePreconfigSource({
+    get: async () => preconfig,
+    getDefault: async () => preconfig,
+    getForAgent: async () => preconfig,
+    list: async () => [preconfig],
+    listSubagents: async () => [preconfig],
+  });
+  configureAgentSource();
+  resetProviders();
 }
 
 function createState(): RuntimeState {
@@ -248,9 +282,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
   test('treats exhausted child retry errors as execution failures', async () => {
     for (const type of ['error.rate_limit', 'error.server', 'error.timeout'] as const) {
       const state = createState();
-      bindRuntime(state, {
-        config: { getPreconfigOrAgent: async () => preconfig } as never,
-      });
+      bindRuntime(state);
       const message = `${type} exhausted`;
       const result = await executeSubagent({
         description: 'research',
@@ -400,9 +432,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
 
   test('records completed and error terminal subagent statuses', async () => {
     const completedState = createState();
-    bindRuntime(completedState, {
-      config: { getPreconfigOrAgent: async () => preconfig } as never,
-    });
+    bindRuntime(completedState);
     const completed = await executeSubagent({
       description: 'research',
       prompt: 'work',
@@ -416,9 +446,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
     expect(completedState.sessions.get(completed.task_id)?.subagentStatus).toBe('completed');
 
     const errorState = createState();
-    bindRuntime(errorState, {
-      config: { getPreconfigOrAgent: async () => preconfig } as never,
-    });
+    bindRuntime(errorState);
     const failed = await executeSubagent({
       description: 'research',
       prompt: 'work',
@@ -432,9 +460,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
 
   test('notifies onSessionCreated exactly once when resuming', async () => {
     const state = createState();
-    bindRuntime(state, {
-      config: { getPreconfigOrAgent: async () => preconfig } as never,
-    });
+    bindRuntime(state);
     const created: string[] = [];
 
     const result = await executeSubagent({
@@ -453,9 +479,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
 
   test('cancels an in-flight child execution and preserves interrupted status', async () => {
     const state = createState();
-    bindRuntime(state, {
-      config: { getPreconfigOrAgent: async () => preconfig } as never,
-    });
+    bindRuntime(state);
     const abortController = new AbortController();
     let receivedSignal: AbortSignal | undefined;
 
@@ -552,11 +576,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
   test('returns no_api_key for an unregistered provider', async () => {
     const state = createState();
     const sent: ServerMessage[] = [];
-    bindRuntime(state, {
-      config: { getPreconfigOrAgent: async () => preconfig } as never,
-      providers: { getProvider: () => undefined } as never,
-      env: { getLLMOpenAIApiKey: () => undefined } as never,
-    });
+    bindRuntime(state);
     const ws = {};
 
     await handleChat({
@@ -578,29 +598,37 @@ describe.serial('Phase 2 orchestration contracts', () => {
   test('intercepts orchestrator model calls through the sandbox boundary', async () => {
     const state = createState();
     const contexts: Array<{ sessionId?: string; mode: string }> = [];
-    const controller: Jean2SandboxController = {
-      waitForResponse: async (context) => {
-        contexts.push({ sessionId: context.sessionId, mode: context.mode });
-        return { type: 'text', content: '{"goalMet":true,"reason":"sandbox"}' };
-      },
-      complete: () => {},
-      rejectAllPendingForSession: () => [],
-    };
+    sandboxController.setAutoResponderRules([{
+      match: {},
+      response: { type: 'text', content: '{"goalMet":true,"reason":"sandbox"}' },
+    }]);
+    sandboxController.setBroadcast((event) => {
+      if (event.type === 'sandbox.history') {
+        const latest = event.entries.at(-1);
+        if (latest?.respondedAt && !latest.completedAt) {
+          contexts.push({ sessionId: latest.context.sessionId, mode: latest.context.mode });
+        }
+      }
+    });
     bindRuntime(state, {
-      providers: {
-        getProvider: () => ({}) as never,
-        createModelForProvider: async (options) => ({
-          model: new SandboxLanguageModel({
-            sessionId: options.sessionId ?? 'root',
-            modelId: options.modelId,
-            providerId: 'sandbox',
-          }) as unknown as LanguageModel,
-        }),
-      },
       sandbox: {
         isSandboxActive: () => true,
-        sandboxController: controller,
       },
+    });
+
+    registerProvider({
+      descriptor: { id: 'sandbox', displayName: 'Sandbox', authType: 'none', connectable: false },
+      getStatus: () => ({ provider: 'sandbox', connected: true }),
+      connect: async () => ({}),
+      disconnect: async () => {},
+      onTokensReceived: async () => {},
+      createModel: async (options) => ({
+        model: new SandboxLanguageModel({
+          sessionId: options.sessionId ?? 'root',
+          modelId: options.modelId,
+          providerId: 'sandbox',
+        }) as unknown as LanguageModel,
+      }),
     });
 
     const result = await runOrchestratorSession({
@@ -618,10 +646,10 @@ describe.serial('Phase 2 orchestration contracts', () => {
     expect(contexts).toEqual([{ sessionId: 'root', mode: 'stream' }]);
     expect(state.sessions.get(result.sessionId)?.subagentStatus).toBe('completed');
 
-    controller.waitForResponse = async (context) => {
-      contexts.push({ sessionId: context.sessionId, mode: context.mode });
-      return { type: 'text', content: '{"goalMet":true,"reason":"goal sandbox"}' };
-    };
+    sandboxController.setAutoResponderRules([{
+      match: {},
+      response: { type: 'text', content: '{"goalMet":true,"reason":"goal sandbox"}' },
+    }]);
     expect((await evaluateGoal({
       sessionId: 'root',
       condition: 'done',
@@ -632,10 +660,10 @@ describe.serial('Phase 2 orchestration contracts', () => {
       broadcastSessionUpdated: () => {},
     })).goalMet).toBe(true);
 
-    controller.waitForResponse = async (context) => {
-      contexts.push({ sessionId: context.sessionId, mode: context.mode });
-      return { type: 'text', content: 'tool llm answer' };
-    };
+    sandboxController.setAutoResponderRules([{
+      match: {},
+      response: { type: 'text', content: 'tool llm answer' },
+    }]);
     expect(await createLlmApi('test-model', 'test-provider', 'child').generateText({
       prompt: 'tool prompt',
     })).toBe('tool llm answer');
