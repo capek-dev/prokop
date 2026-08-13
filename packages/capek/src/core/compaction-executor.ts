@@ -1,8 +1,8 @@
 import {
   broadcastEvent,
   broadcastSessionUpdated,
-  getModelsConfig,
 } from '../compat/jean2-dependencies';
+import { getModelsConfig } from '../configuration/runtime';
 import { getMessageWithParts, getSession, updateSession } from '../storage/runtime';
 import type { BroadcastFn, BroadcastSessionFn } from '../compat/bindings';
 import {

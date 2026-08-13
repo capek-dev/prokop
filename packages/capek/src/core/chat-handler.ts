@@ -1,14 +1,12 @@
 import type { AskAuthority, ServerMessage } from '@jean2/sdk';
 import {
   generateSessionTitle,
-  getDefaultPreconfig,
-  getPreconfigOrAgent,
-  getProvider,
   hasManualSessionTitle,
   isDefaultSessionTitle,
   isSandboxActive,
   notifyTerminalMessage,
 } from '../compat/jean2-dependencies';
+import { getDefaultPreconfig, getPreconfigOrAgent } from '../context';
 import {
   addMessageToQueue,
   buildEffectiveContextHistory,
@@ -32,7 +30,9 @@ import type { AskBroadcastFn } from '../compat/bindings';
 import { executeCompaction } from './compaction-executor';
 import { runGoalLoop } from './goal-loop';
 import { interruptManager } from './interrupt';
-import { getApiKeyForProvider, resolveModelId, resolveProviderId } from './provider-utils';
+import { getApiKeyForProvider } from '../configuration/runtime';
+import { getProvider } from '../providers/registry';
+import { resolveModelId, resolveProviderId } from './provider-utils';
 import { revertToStep } from './revert';
 import { streamChatWithRetry } from './retry';
 

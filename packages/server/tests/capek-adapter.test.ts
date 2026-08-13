@@ -3,36 +3,21 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import {
   getJean2CompatibilityBindings,
+  getRuntimeConfiguration,
   interruptManager as packageInterruptManager,
 } from '@capekai/core/compat/jean2';
 import {
   configureCapekJean2Compatibility,
   jean2CompatibilityBindings,
+  jean2RuntimeConfiguration,
   jean2StorageBundle,
 } from '@/capek-adapter';
 import { interruptManager as serverInterruptManager } from '@/core/interrupt';
 import { sandboxController as packageHostController } from '@/sandbox';
 import { sandboxController as serverController } from '@/sandbox/controller';
 import { getSession } from '@/store';
-import { readInstallManifest } from '@/tools/tool-install-manifest';
 
 const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, string[]> = {
-  config: [
-    'findModel', 'getMaxOutputTokens', 'findModelVariant', 'getModelsConfig',
-    'resolveToolsPath', 'getPreconfig', 'getDefaultPreconfig', 'getPreconfigOrAgent',
-    'listPreconfigs', 'listSubagentPreconfigs',
-  ],
-  env: [
-    'getCompactionAutoThresholdRatio', 'getCompactionAutoReserveCapTokens',
-    'getCompactionAutoSafetyMarginTokens', 'getLLMTemperature', 'getLLMMaxSteps',
-    'getLLMSubagentMaxSteps', 'getLLMBaseUrl', 'getLLMOpenAIApiKey', 'getLLMOpenRouterApiKey',
-    'getLLMMinimaxApiKey', 'getLLMZhipuApiKey', 'getLLMZhipuCodingApiKey',
-    'getLLMDeepseekApiKey', 'getJean2EnvValue', 'getCompactionModel',
-    'getCompactionProvider', 'getCompactionMaxTokens',
-    'getCompactionPreserveRecentToolCount', 'getCompactionPreserveSmallToolChars',
-    'getCompactionToolClearCharsThreshold', 'getCompactionMaxPrunedToolCount',
-  ],
-  providers: ['getProvider', 'createModelForProvider'],
   interaction: [
     'createPendingAsk', 'removePendingAsk', 'removePendingAsksByToolCallId',
     'getPermissionRequestByRequestId',
@@ -48,19 +33,8 @@ const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, s
     'notifyTerminalMessage',
   ],
   titles: ['isDefaultSessionTitle', 'hasManualSessionTitle', 'generateSessionTitle'],
-  agents: ['getAgentDirectory', 'readAgentMemoryFile'],
-  mcp: ['initializeWorkspace', 'getTools'],
   workspace: ['createToolWorkspaceHost'],
-  tools: ['readInstallManifest'],
-  memory: ['memoryToolDefinition', 'executeMemoryTool', 'loadMemoryInstructions', 'MEMORY_GUIDANCE'],
-  skills: [
-    'skillManageToolDefinition', 'executeSkillManageTool',
-    'buildSkillManageToolDescription', 'createSkillTool', 'SKILL_MANAGE_GUIDANCE',
-  ],
-  sessionSearch: ['sessionSearchToolDefinition', 'executeSessionSearchTool', 'SESSION_SEARCH_GUIDANCE'],
-  scheduler: ['schedulerToolDefinition', 'executeSchedulerTool'],
-  context: ['buildWorkspaceSystemPrompt', 'loadInstructions', 'formatInstructions'],
-  sandbox: ['isSandboxActive', 'sandboxController'],
+  sandbox: ['isSandboxActive'],
 };
 
 describe('Čapek Jean2 adapter', () => {
@@ -78,7 +52,7 @@ describe('Čapek Jean2 adapter', () => {
     expect(configured).toBe(jean2CompatibilityBindings);
     expect('store' in configured).toBe(false);
     expect(jean2StorageBundle.conversation.getSession).toBe(getSession);
-    expect(configured.tools.readInstallManifest).toBe(readInstallManifest);
+    expect(getRuntimeConfiguration()).toBe(jean2RuntimeConfiguration);
   });
 
   test('constructs per-call workspace host facts without path policy callbacks', () => {
@@ -100,10 +74,8 @@ describe('Čapek Jean2 adapter', () => {
 
   test('preserves interrupt and sandbox controller singleton identity', () => {
     configureCapekJean2Compatibility();
-    const configured = getJean2CompatibilityBindings();
 
     expect(serverInterruptManager).toBe(packageInterruptManager);
     expect(packageHostController).toBe(serverController);
-    expect(configured.sandbox.sandboxController).toBe(serverController);
   });
 });

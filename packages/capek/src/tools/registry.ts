@@ -1,9 +1,9 @@
 import { readdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { watch } from 'fs';
-import { join, resolve, relative } from 'path';
+import { basename, dirname, join, resolve, relative } from 'path';
 import type { ToolDefinition, LoadedTool } from '@jean2/sdk';
-import { readInstallManifest, resolveToolsPath } from '../compat/jean2-dependencies';
+import { readInstallManifest } from './install-manifest';
 
 const toolsCache: Map<string, LoadedTool> = new Map();
 let lastScanTime = 0;
@@ -12,14 +12,20 @@ const CACHE_TTL = 60000;
 let watcher: ReturnType<typeof watch> | null = null;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let watcherToolsPath: string | null = null;
+let defaultToolsPath: string | null = null;
 
-function getDefaultToolsPath(): string {
-  return resolveToolsPath();
+export function configureToolsPath(path?: string): void {
+  defaultToolsPath = path ? resolve(path) : null;
+  clearCache();
+}
+
+function getDefaultToolsPath(): string | null {
+  return defaultToolsPath;
 }
 
 async function loadToolModule(toolDir: string): Promise<LoadedTool | null> {
-  const toolName = toolDir.split('/').pop() || '';
-  const toolsBasePath = toolDir.split('/').slice(0, -1).join('/');
+  const toolName = basename(toolDir);
+  const toolsBasePath = dirname(toolDir);
 
   const manifest = readInstallManifest(toolsBasePath, toolName);
 
@@ -123,8 +129,10 @@ function scheduleInvalidation(filePath: string): void {
 }
 
 export function watchTools(
-  toolsPath: string = getDefaultToolsPath(),
+  toolsPath: string | null = getDefaultToolsPath(),
 ): void {
+  if (!toolsPath) return;
+
   if (watcher) {
     stopWatching();
   }
@@ -168,9 +176,13 @@ export function stopWatching(): void {
 }
 
 export async function scanTools(
-  toolsPath: string = getDefaultToolsPath(),
+  toolsPath: string | null = getDefaultToolsPath(),
 ): Promise<LoadedTool[]> {
   const tools: LoadedTool[] = [];
+  if (!toolsPath) {
+    clearCache();
+    return tools;
+  }
   const absoluteToolsPath = resolve(toolsPath);
 
   try {

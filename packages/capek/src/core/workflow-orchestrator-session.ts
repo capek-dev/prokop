@@ -5,8 +5,8 @@ import {
   broadcastEvent,
   broadcastSessionCreated,
   broadcastSessionUpdated,
-  getModelsConfig,
 } from '../compat/jean2-dependencies';
+import { getModelsConfig } from '../configuration/runtime';
 import {
   createMessage,
   createPart,

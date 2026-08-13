@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { MockLanguageModelV3, convertArrayToReadableStream } from 'ai/test';
 import type { AssistantMessage, ServerMessage } from '@jean2/sdk';
 import {
-  getJean2CompatibilityBindings,
-  setJean2CompatibilityBindings,
+  registerProvider,
+  resetProviders,
 } from '@capekai/core/compat/jean2';
 import type { ModelFactoryOptions } from '@capekai/core/compat/jean2';
 import { getStorage } from '@capekai/core/storage';
@@ -51,19 +51,23 @@ function createCompactionModel(control: ModelControl): MockLanguageModelV3 {
 
 function installBindings(control: ModelControl): void {
   configureCapekJean2Compatibility();
-  const bindings = getJean2CompatibilityBindings();
+  resetProviders();
   const model = createCompactionModel(control);
-  setJean2CompatibilityBindings({
-    ...bindings,
-    providers: {
-      getProvider: () => ({}) as ReturnType<typeof bindings.providers.getProvider>,
-      createModelForProvider: async (options) => {
-        control.requestedModels.push(options);
-        if (control.modelFactoryError !== undefined) throw control.modelFactoryError;
-        return { model };
-      },
+  const createProvider = (id: string) => ({
+    descriptor: { id, displayName: id, authType: 'none' as const, connectable: false },
+    getStatus: () => ({ provider: id, connected: true }),
+    connect: async () => ({}),
+    disconnect: async () => {},
+    onTokensReceived: async () => {},
+    createModel: async (options: ModelFactoryOptions) => {
+      control.requestedModels.push(options);
+      if (control.modelFactoryError !== undefined) throw control.modelFactoryError;
+      return { model };
     },
   });
+  registerProvider(createProvider('openai'));
+  registerProvider(createProvider('minimax'));
+  registerProvider(createProvider('custom-provider'));
 }
 
 function createConversation(sessionId: string): void {
@@ -117,6 +121,7 @@ describe('package-owned compaction executor', () => {
 
   afterEach(() => {
     resetTestDatabase();
+    resetProviders();
     configureCapekJean2Compatibility();
   });
 

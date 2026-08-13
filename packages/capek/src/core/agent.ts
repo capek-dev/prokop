@@ -2,7 +2,7 @@ import { streamText, stepCountIs } from 'ai';
 import type { MessageWithParts, ToolPart, StepPart, Preconfig, MessageEvent, AssistantMessage, ResponseFormat } from '@jean2/sdk';
 import { createMessage, updateMessage, getSession, updateSession, transitionToolToInterrupted, syncMessageFts } from '../storage/runtime';
 
-import { findModel, getMaxOutputTokens } from '../compat/jean2-dependencies';
+import { findModel, getMaxOutputTokens } from '../configuration/runtime';
 import { randomUUID } from 'crypto';
 import { interruptManager } from './interrupt';
 import { broadcastSessionUpdated } from '../compat/jean2-dependencies';
@@ -13,7 +13,8 @@ import { createStepCallbacks, type CallbackEvent, type UsageEventData } from './
 import { createStreamHandlers } from './stream-handlers';
 import { convertToAiSdkMessages } from './message-utils';
 import { buildAiSdkTools, type BuildToolsOptions } from './build-tools';
-import { getAgentDirectory, initializeWorkspace } from '../compat/jean2-dependencies';
+import { getAgentDirectory } from '../context';
+import { initializeToolWorkspace } from '../tools/tool-source';
 import { resolveEffectiveSubagentTargets } from './subagent-policy';
 import { join } from 'path';
 
@@ -79,7 +80,7 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
 
   // Initialize MCP for workspace
   if (workspacePath) {
-    initializeWorkspace(workspacePath).catch((err: unknown) => {
+    initializeToolWorkspace(workspacePath).catch((err: unknown) => {
       console.error('Failed to initialize MCP:', err);
     });
   }

@@ -1,5 +1,5 @@
 import { Output, jsonSchema } from 'ai';
-import { findModel, findModelVariant, getLLMTemperature, getLLMMaxSteps } from '../../compat/jean2-dependencies';
+import { findModel, findModelVariant, getLLMTemperature, getLLMMaxSteps } from '../../configuration/runtime';
 import { buildSchemaPromptInstruction } from '../structured-output';
 import type { ResponseFormat } from '@jean2/sdk';
 

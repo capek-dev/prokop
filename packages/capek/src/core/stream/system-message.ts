@@ -1,16 +1,16 @@
 import type { Preconfig } from '@jean2/sdk';
+import { SESSION_SEARCH_GUIDANCE } from '../../session-search';
+import { loadMemoryInstructions, MEMORY_GUIDANCE } from '../../memory';
+import { SKILL_MANAGE_GUIDANCE } from '../../skills';
 import {
   buildWorkspaceSystemPrompt,
   formatInstructions,
   getAgentDirectory,
-  getMemoryGuidance,
-  getSessionSearchGuidance,
-  getSkillManageGuidance,
   loadInstructions,
-  loadMemoryInstructions,
   readAgentMemoryFile,
-} from '../../compat/jean2-dependencies';
+} from '../../context';
 import { getWorkspace } from '../../storage/runtime';
+import { join } from 'path';
 
 export interface SystemMessageOptions {
   preconfig: Preconfig;
@@ -74,19 +74,19 @@ Before saving, use list to check existing entries and avoid duplicates.`;
   if (workspaceId) {
     const workspace = getWorkspace(workspaceId);
     if (workspace?.settings?.memory?.enabled && workspacePath) {
-      const memorySection = await loadMemoryInstructions(workspacePath);
+      const memorySection = await loadMemoryInstructions(join(workspacePath, '.jean2'));
       if (memorySection) {
         systemMessage = systemMessage + '\n\n' + memorySection;
       }
-      systemMessage = systemMessage + '\n\n' + getMemoryGuidance();
+      systemMessage = systemMessage + '\n\n' + MEMORY_GUIDANCE;
     }
 
     if (workspace?.settings?.skills?.managementEnabled) {
-      systemMessage = systemMessage + '\n\n' + getSkillManageGuidance();
+      systemMessage = systemMessage + '\n\n' + SKILL_MANAGE_GUIDANCE;
     }
 
     if (workspace?.settings?.sessionSearch?.enabled) {
-      systemMessage = systemMessage + '\n\n' + getSessionSearchGuidance();
+      systemMessage = systemMessage + '\n\n' + SESSION_SEARCH_GUIDANCE;
     }
   }
 

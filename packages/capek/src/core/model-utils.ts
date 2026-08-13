@@ -1,13 +1,9 @@
 import { type LanguageModel } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
-import { findProviderFromModel, getApiKeyForProvider } from './provider-utils';
-import {
-  createModelForProvider,
-  findModel,
-  getLLMBaseUrl,
-  getProvider,
-  isSandboxActive,
-} from '../compat/jean2-dependencies';
+import { findProviderFromModel } from './provider-utils';
+import { findModel, getApiKeyForProvider, getLLMBaseUrl } from '../configuration/runtime';
+import { createModelForProvider, getProvider } from '../providers/registry';
+import { isSandboxActive } from '../compat/jean2-dependencies';
 
 export interface ModelWithMetadata {
   model: LanguageModel;
@@ -33,26 +29,23 @@ export async function getModelWithMetadata(
   const options: ModelResolutionOptions = typeof modelIdOrOptions === 'string'
     ? { modelId: modelIdOrOptions, providerId, systemPrompt }
     : (modelIdOrOptions ?? {});
-  const defaultModelId = 'gpt-4o';
-  const resolvedModelId = options.modelId || defaultModelId;
+  const resolvedModelId = options.modelId || 'gpt-4o';
+  const sandboxProvider = getProvider('sandbox');
 
   // When sandbox mode is active, route all LLM calls through the sandbox provider
-  if (isSandboxActive()) {
-    const sandboxProvider = getProvider('sandbox');
-    if (sandboxProvider) {
-      const result = await createModelForProvider({
-        modelId: resolvedModelId,
-        providerId: 'sandbox',
-        systemPrompt: options.systemPrompt || '',
-        sessionId: options.sessionId,
-      });
-      return {
-        model: result.model,
-        useProviderInstructions: result.useProviderInstructions,
-        omitMaxOutputTokens: result.omitMaxOutputTokens,
-        providerOptions: result.providerOptions,
-      };
-    }
+  if (sandboxProvider && isSandboxActive()) {
+    const result = await createModelForProvider({
+      modelId: resolvedModelId,
+      providerId: 'sandbox',
+      systemPrompt: options.systemPrompt || '',
+      sessionId: options.sessionId,
+    });
+    return {
+      model: result.model,
+      useProviderInstructions: result.useProviderInstructions,
+      omitMaxOutputTokens: result.omitMaxOutputTokens,
+      providerOptions: result.providerOptions,
+    };
   }
 
   let provider = options.providerId;
@@ -85,7 +78,7 @@ export async function getModelWithMetadata(
   const apiKey = getApiKeyForProvider(provider);
 
   if (!apiKey) {
-    throw new Error(`No API key configured for provider: ${provider}. Set LLM_${provider.toUpperCase()}_API_KEY environment variable.`);
+    throw new Error(`No API key configured for provider: ${provider}. Set JEAN2_LLM_${provider.toUpperCase()}_API_KEY environment variable.`);
   }
 
   switch (provider) {

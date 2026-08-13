@@ -75,10 +75,10 @@ export async function runScheduledJob(job: ScheduledJob): Promise<void> {
     });
   }
 
-  // Strip the schedule tool to prevent recursive scheduling
+  // Strip the scheduler tool to prevent recursive scheduling
   const safePreconfig: Preconfig = {
     ...preconfig,
-    tools: (preconfig.tools ?? []).filter(t => t !== 'schedule'),
+    tools: (preconfig.tools ?? []).filter((toolName) => toolName !== 'scheduler'),
   };
 
   console.log(`[scheduler] Running job '${job.name}' in session ${sessionId}`);
