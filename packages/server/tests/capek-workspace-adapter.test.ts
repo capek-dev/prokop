@@ -1,0 +1,57 @@
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { resolve } from 'path';
+import { createWorkspaceCapability } from '@capekai/core/compat/jean2';
+import { jean2CompatibilityBindings } from '@/capek-adapter';
+import { getWorkspace } from '@/store/workspaces';
+import { resetTestDatabase, setupTestDatabase } from '#tests/db';
+import { seedWorkspace } from '#tests/seed';
+
+describe('Čapek workspace mutation adapter', () => {
+  beforeEach(() => {
+    setupTestDatabase();
+  });
+
+  afterEach(() => {
+    resetTestDatabase();
+  });
+
+  test('adds and removes normalized paths with replace-all workspace updates', async () => {
+    seedWorkspace({
+      id: 'workspace-1',
+      path: '/workspace/project',
+      additionalPaths: ['/workspace/existing'],
+    });
+    const capability = createWorkspaceCapability(
+      jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+        workspaceId: 'workspace-1',
+        workspacePath: '/workspace/project',
+        additionalPaths: ['/workspace/existing'],
+        sessionId: 'session-1',
+      }),
+    );
+
+    expect(await capability.addWorkspacePath('/workspace/new/../added')).toBe(true);
+    expect(getWorkspace('workspace-1')?.additionalPaths).toEqual([
+      '/workspace/existing',
+      resolve('/workspace/added'),
+    ]);
+
+    expect(await capability.removeWorkspacePath('/workspace/existing')).toBe(true);
+    expect(getWorkspace('workspace-1')?.additionalPaths).toEqual([
+      resolve('/workspace/added'),
+    ]);
+  });
+
+  test('returns false when the workspace no longer exists', async () => {
+    const capability = createWorkspaceCapability(
+      jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+        workspaceId: 'missing',
+        workspacePath: '/workspace/project',
+        sessionId: 'session-1',
+      }),
+    );
+
+    expect(await capability.addWorkspacePath('/workspace/added')).toBe(false);
+    expect(await capability.removeWorkspacePath('/workspace/added')).toBe(false);
+  });
+});

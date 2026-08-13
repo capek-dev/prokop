@@ -84,8 +84,8 @@ function resolvesWithin(specifier: string, importer: string, target: string): bo
 
 describe('package boundary', () => {
   test('declared package entrypoints import by package name', () => {
-    expect(capekPackagePhase).toBe(1);
-    expect(jean2CompatibilityPhase).toBe(1);
+    expect(capekPackagePhase).toBe(3);
+    expect(jean2CompatibilityPhase).toBe(3);
   });
 
   test('external source does not import package internals', () => {
@@ -107,6 +107,18 @@ describe('package boundary', () => {
         }
       }
     }
+
+    expect(violations).toEqual([]);
+  });
+
+  test('tool workspace policy files do not import Jean2 compatibility wrappers', () => {
+    const policyFiles = [
+      resolve(packageSourceRoot, 'tools/executor.ts'),
+      resolve(packageSourceRoot, 'tools/workspace-capability.ts'),
+    ];
+    const violations = policyFiles.flatMap((path) => collectImports(path)
+      .filter((specifier) => specifier.includes('compat/jean2-dependencies'))
+      .map((specifier) => `${relative(repositoryRoot, path)} imports ${specifier}`));
 
     expect(violations).toEqual([]);
   });

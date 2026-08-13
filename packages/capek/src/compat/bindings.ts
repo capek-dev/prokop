@@ -22,6 +22,7 @@ import type {
   Workspace,
 } from '@jean2/sdk';
 import type { LlmCallContext, SandboxResponse } from '../sandbox/types';
+import type { WorkspaceCapabilityHost } from '../tools/workspace-capability';
 import type {
   ConnectableProvider,
   ModelFactoryOptions,
@@ -219,10 +220,13 @@ export interface Jean2McpBindings {
   getTools(workspacePath: string, sessionId?: string): Promise<Record<string, Tool>>;
 }
 
-export interface Jean2PathBindings {
-  getUploadDir(): string;
-  isPathWithinWorkspace(targetPath: string, workspacePath: string, additionalPaths?: string[]): boolean;
-  resolvePath(path: string, workspacePath: string): string;
+export interface Jean2WorkspaceCapabilityBindings {
+  createToolWorkspaceHost(options: {
+    workspaceId?: string;
+    workspacePath?: string;
+    additionalPaths?: string[];
+    sessionId: string;
+  }): WorkspaceCapabilityHost;
 }
 
 export interface Jean2InstallManifest {
@@ -391,7 +395,7 @@ export interface Jean2CompatibilityBindings {
   titles: Jean2TitleBindings;
   agents: Jean2AgentBindings;
   mcp: Jean2McpBindings;
-  paths: Jean2PathBindings;
+  workspace: Jean2WorkspaceCapabilityBindings;
   tools: Jean2ToolManifestBindings;
   memory: Jean2MemoryBindings;
   skills: Jean2SkillBindings;

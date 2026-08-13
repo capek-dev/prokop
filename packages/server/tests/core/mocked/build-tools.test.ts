@@ -59,7 +59,7 @@ function configureBindings(overrides: BindingOverrides = {}): void {
 
 async function seedTool(
   name: string,
-  options: { capabilities?: string[]; success?: boolean } = {},
+  options: { capabilities?: string[]; success?: boolean; inspectContext?: boolean } = {},
 ): Promise<void> {
   fixtureDir ??= mkdtempSync(join(tmpdir(), 'capek-build-tools-'));
   const toolPath = join(fixtureDir, name);
@@ -71,10 +71,12 @@ export const definition = {
   inputSchema: { type: 'object', properties: {} },
   ${options.capabilities ? `capabilities: ${JSON.stringify(options.capabilities)},` : ''}
 };
-export async function execute() {
+export async function execute(_input, ctx) {
   return ${options.success === false
     ? "{ success: false, error: 'Tool crashed' }"
-    : "{ success: true, result: 'fixture-result' }"};
+    : options.inspectContext
+      ? "{ success: true, result: { workspacePath: ctx.workspacePath, allowedPaths: ctx.allowedPaths, tempDir: ctx.fs.tempDir, additionalAllowed: ctx.isWithinWorkspace('/workspace/shared/file.txt'), siblingAllowed: ctx.isWithinWorkspace('/workspace/project-other/file.txt') } }"
+      : "{ success: true, result: 'fixture-result' }"};
 }
 `);
   await scanTools(fixtureDir);
@@ -131,6 +133,30 @@ describe('build-tools binding integration', () => {
 
     expect(tools).toHaveProperty('read-file');
     expect(result).toBe('fixture-result');
+  });
+
+  test('constructs external tool workspace capabilities through the adapter seam', async () => {
+    await seedTool('workspace-context', { inspectContext: true });
+
+    const tools = await buildAiSdkTools(defaultOptions({
+      toolNames: ['workspace-context'],
+      workspacePath: '/workspace/project',
+      additionalPaths: ['/workspace/shared'],
+      sessionId: 'session-context',
+    }));
+    const result = await tools['workspace-context']!.execute!({}, { toolCallId: 'call-context', messages: [] });
+
+    expect(result).toEqual({
+      workspacePath: '/workspace/project',
+      allowedPaths: [jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+        sessionId: 'session-context',
+      }).allowedRoots?.[0]],
+      tempDir: jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+        sessionId: 'session-context',
+      }).tempDir,
+      additionalAllowed: true,
+      siblingAllowed: false,
+    });
   });
 
   test('returns the existing error object for failed tool execution', async () => {

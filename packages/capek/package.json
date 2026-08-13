@@ -11,6 +11,10 @@
     "./compat/jean2": {
       "types": "./src/compat/jean2.ts",
       "default": "./src/compat/jean2.ts"
+    },
+    "./tool": {
+      "types": "./src/tool.ts",
+      "default": "./src/tool.ts"
     }
   },
   "dependencies": {

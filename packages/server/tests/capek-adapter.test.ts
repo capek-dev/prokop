@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import {
   getJean2CompatibilityBindings,
   interruptManager as packageInterruptManager,
@@ -49,7 +51,7 @@ const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, s
   titles: ['isDefaultSessionTitle', 'hasManualSessionTitle', 'generateSessionTitle'],
   agents: ['getAgentDirectory', 'readAgentMemoryFile'],
   mcp: ['initializeWorkspace', 'getTools'],
-  paths: ['getUploadDir', 'isPathWithinWorkspace', 'resolvePath'],
+  workspace: ['createToolWorkspaceHost'],
   tools: ['readInstallManifest'],
   memory: ['memoryToolDefinition', 'executeMemoryTool', 'loadMemoryInstructions', 'MEMORY_GUIDANCE'],
   skills: [
@@ -77,6 +79,23 @@ describe('Čapek Jean2 adapter', () => {
     expect(configured).toBe(jean2CompatibilityBindings);
     expect(configured.store.getSession).toBe(getSession);
     expect(configured.tools.readInstallManifest).toBe(readInstallManifest);
+  });
+
+  test('constructs per-call workspace host facts without path policy callbacks', () => {
+    const host = jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+      workspacePath: '/workspace/project',
+      additionalPaths: ['/workspace/shared'],
+      sessionId: 'session-1',
+    });
+
+    expect(host.root).toBe('/workspace/project');
+    expect(host.additionalRoots).toEqual(['/workspace/shared']);
+    expect(host.allowedRoots).toHaveLength(1);
+    expect(host.allowedRoots?.[0]).toContain('upload');
+    expect(host.tempDir).toBe(join(tmpdir(), 'jean2', 'session-1'));
+    expect(host.getEnvironmentValue).toBeDefined();
+    expect(host.addAdditionalRoot).toBeUndefined();
+    expect(host.removeAdditionalRoot).toBeUndefined();
   });
 
   test('preserves interrupt and sandbox controller singleton identity', () => {

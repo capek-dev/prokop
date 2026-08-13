@@ -1,19 +1,7 @@
-import { isAbsolute, join, resolve, extname } from 'path';
-import { homedir, tmpdir } from 'os';
+import { resolve, extname } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import type { ToolContext, ToolResult, LoadedTool, FileSystemApi, DirEntry, FileStat, EnvApi, ToolLogger, AskApi, LlmApi } from '@jean2/sdk';
-import {
-  getJean2EnvValue,
-  getWorkspace,
-  isPathWithinWorkspace,
-  resolvePath as sharedResolvePath,
-  updateWorkspace,
-} from '../compat/jean2-dependencies';
-
-const BLOCKED_PATHS = [
-  '/etc/', '/usr/', '/bin/', '/sbin/', '/boot/', '/dev/',
-  '/proc/', '/sys/', '/root/',
-];
+import type { WorkspaceCapability } from './workspace-capability';
 
 function createThrowingStub<T>(name: string): T {
   return new Proxy({}, {
@@ -22,12 +10,6 @@ function createThrowingStub<T>(name: string): T {
     },
   }) as T;
 }
-
-const SENSITIVE_PATTERNS = [
-  '.env', '.pem', '.key', '.ssh/', 'id_rsa', 'id_ed25519',
-  '.gitconfig', '.npmrc', 'credentials', 'secrets', 'password',
-  '.htpasswd',
-];
 
 const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
   '.ts': 'typescript', '.tsx': 'typescript', '.js': 'javascript', '.jsx': 'javascript',
@@ -45,11 +27,9 @@ const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
 export interface ExecuteToolOptions {
   tool: LoadedTool;
   args: Record<string, unknown>;
-  workspacePath?: string;
+  workspace: WorkspaceCapability;
   sessionId: string;
   workspaceId?: string;
-  allowedPaths?: string[];
-  additionalPaths?: string[];
   toolCallId?: string;
   abortSignal?: AbortSignal;
   timeout?: number;
@@ -58,8 +38,8 @@ export interface ExecuteToolOptions {
   broadcastFn?: (event: { type: string; [key: string]: unknown }) => void;
 }
 
-function createFileSystemApi(workspacePath: string, sessionId: string): FileSystemApi {
-  const tempDir = join(tmpdir(), 'jean2', sessionId);
+function createFileSystemApi(workspace: WorkspaceCapability): FileSystemApi {
+  const { tempDir } = workspace;
 
   const api: FileSystemApi = {
     tempDir,
@@ -136,13 +116,7 @@ function createFileSystemApi(workspacePath: string, sessionId: string): FileSyst
     },
 
     resolve(path: string): string {
-      if (path.startsWith('~')) {
-        return join(homedir(), path.slice(1));
-      }
-      if (isAbsolute(path)) {
-        return resolve(path);
-      }
-      return resolve(workspacePath, path);
+      return workspace.resolvePath(path);
     },
 
     detectLanguage(path: string): string {
@@ -156,37 +130,13 @@ function createFileSystemApi(workspacePath: string, sessionId: string): FileSyst
   return api;
 }
 
-function createPathHelpers(workspacePath: string, additionalPaths: string[] = []) {
-  const _allAllowedPaths = [resolve(workspacePath), ...additionalPaths.map(p => resolve(p))];
-
-  function resolvePath(path: string): string {
-    return sharedResolvePath(path, workspacePath);
-  }
-
-  function isWithinWorkspace(path: string): boolean {
-    return isPathWithinWorkspace(path, workspacePath, additionalPaths);
-  }
-
-  function isSensitivePath(path: string): boolean {
-    const lower = path.toLowerCase();
-    return SENSITIVE_PATTERNS.some(p => lower.includes(p));
-  }
-
-  function isBlockedPath(path: string): boolean {
-    const resolved = resolvePath(path);
-    return BLOCKED_PATHS.some(p => resolved.startsWith(p));
-  }
-
-  return { resolvePath, isWithinWorkspace, isSensitivePath, isBlockedPath };
-}
-
-function createEnvApi(_allowedEnv?: string[]): EnvApi {
+function createEnvApi(workspace: WorkspaceCapability): EnvApi {
   return {
     get(key: string): string | undefined {
-      return getJean2EnvValue(key) ?? process.env[key];
+      return workspace.getEnvironmentValue(key);
     },
     require(key: string): string {
-      const value = getJean2EnvValue(key) ?? process.env[key];
+      const value = workspace.getEnvironmentValue(key);
       if (!value) {
         throw new Error(`Required environment variable not set: ${key}`);
       }
@@ -213,43 +163,11 @@ function createLogger(toolName: string, sessionId: string): ToolLogger {
   };
 }
 
-function createWorkspacePathManager(workspaceId: string | undefined) {
-  async function addWorkspacePath(path: string): Promise<boolean> {
-    if (!workspaceId) return false;
-    const workspace = getWorkspace(workspaceId);
-    if (!workspace) return false;
-
-    const resolved = resolve(path);
-    if (workspace.additionalPaths.includes(resolved)) return true;
-
-    updateWorkspace(workspaceId, {
-      additionalPaths: [...workspace.additionalPaths, resolved],
-    });
-    return true;
-  }
-
-  async function removeWorkspacePath(path: string): Promise<boolean> {
-    if (!workspaceId) return false;
-    const workspace = getWorkspace(workspaceId);
-    if (!workspace) return false;
-
-    const resolved = resolve(path);
-    if (!workspace.additionalPaths.includes(resolved)) return true;
-
-    updateWorkspace(workspaceId, {
-      additionalPaths: workspace.additionalPaths.filter((p: string) => p !== resolved),
-    });
-    return true;
-  }
-
-  return { addWorkspacePath, removeWorkspacePath };
-}
-
 export async function executeTool(options: ExecuteToolOptions): Promise<ToolResult> {
   const {
     tool,
     args,
-    workspacePath,
+    workspace,
     sessionId,
     abortSignal,
     timeout = tool.definition.timeout ?? 30000,
@@ -257,8 +175,6 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
     createAskApi,
   } = options;
 
-  const effectiveWorkspace = workspacePath || process.cwd();
-  const pathHelpers = createPathHelpers(effectiveWorkspace, options.additionalPaths);
   const toolAbortController = new AbortController();
   const forwardAbort = (): void => {
     toolAbortController.abort(abortSignal?.reason);
@@ -272,18 +188,22 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
 
   const ctx: ToolContext = {
     sessionId,
-    workspacePath: effectiveWorkspace,
+    workspacePath: workspace.effectiveRoot,
     workspaceId: options.workspaceId,
     abortSignal: toolAbortController.signal,
-    allowedPaths: options.allowedPaths ?? [],
-    fs: createFileSystemApi(effectiveWorkspace, sessionId),
+    allowedPaths: workspace.allowedRoots,
+    fs: createFileSystemApi(workspace),
     llm: createLlmApi ? createLlmApi() : createThrowingStub<LlmApi>('llm'),
     ask: createAskApi ? createAskApi(options.toolCallId ?? '') : createThrowingStub<AskApi>('ask'),
-    env: createEnvApi(tool.definition.env),
+    env: createEnvApi(workspace),
     logger: createLogger(tool.definition.name, sessionId),
     fetch: globalThis.fetch.bind(globalThis),
-    ...pathHelpers,
-    ...createWorkspacePathManager(options.workspaceId),
+    resolvePath: workspace.resolvePath,
+    isWithinWorkspace: workspace.isWithinWorkspace,
+    isSensitivePath: workspace.isSensitivePath,
+    isBlockedPath: workspace.isBlockedPath,
+    addWorkspacePath: workspace.addWorkspacePath,
+    removeWorkspacePath: workspace.removeWorkspacePath,
   };
 
   const executePromise = tool.execute(args, ctx);

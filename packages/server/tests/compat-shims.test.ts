@@ -63,7 +63,7 @@ const expectedValueExports: Record<string, string[]> = {
   '@/sandbox/provider': ['SandboxProvider'],
 };
 
-describe('Phase 2 server compatibility shims', () => {
+describe('Phase 3 server compatibility shims', () => {
   for (const [specifier, expected] of Object.entries(expectedValueExports)) {
     test(`${specifier} preserves its HEAD value export surface`, async () => {
       const module = await import(specifier);

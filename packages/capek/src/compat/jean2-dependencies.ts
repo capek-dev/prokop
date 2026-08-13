@@ -36,8 +36,6 @@ export const getAttachment = (...args: Parameters<ReturnType<typeof getJean2Comp
   getJean2CompatibilityBindings().store.getAttachment(...args);
 export const getWorkspace = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getWorkspace']>) =>
   getJean2CompatibilityBindings().store.getWorkspace(...args);
-export const updateWorkspace = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['updateWorkspace']>) =>
-  getJean2CompatibilityBindings().store.updateWorkspace(...args);
 export const transitionToolToRunningByCallId = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['transitionToolToRunningByCallId']>) =>
   getJean2CompatibilityBindings().store.transitionToolToRunningByCallId(...args);
 export const getChildSessions = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getChildSessions']>) =>
@@ -90,8 +88,6 @@ export const getLLMMinimaxApiKey = () => getJean2CompatibilityBindings().env.get
 export const getLLMZhipuApiKey = () => getJean2CompatibilityBindings().env.getLLMZhipuApiKey();
 export const getLLMZhipuCodingApiKey = () => getJean2CompatibilityBindings().env.getLLMZhipuCodingApiKey();
 export const getLLMDeepseekApiKey = () => getJean2CompatibilityBindings().env.getLLMDeepseekApiKey();
-export const getJean2EnvValue = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['env']['getJean2EnvValue']>) =>
-  getJean2CompatibilityBindings().env.getJean2EnvValue(...args);
 export const getCompactionModel = () => getJean2CompatibilityBindings().env.getCompactionModel();
 export const getCompactionProvider = () => getJean2CompatibilityBindings().env.getCompactionProvider();
 export const getCompactionMaxTokens = () => getJean2CompatibilityBindings().env.getCompactionMaxTokens();
@@ -137,11 +133,8 @@ export const initializeWorkspace = (...args: Parameters<ReturnType<typeof getJea
   getJean2CompatibilityBindings().mcp.initializeWorkspace(...args);
 export const getMcpTools = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['mcp']['getTools']>) =>
   getJean2CompatibilityBindings().mcp.getTools(...args);
-export const getUploadDir = () => getJean2CompatibilityBindings().paths.getUploadDir();
-export const isPathWithinWorkspace = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['paths']['isPathWithinWorkspace']>) =>
-  getJean2CompatibilityBindings().paths.isPathWithinWorkspace(...args);
-export const resolvePath = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['paths']['resolvePath']>) =>
-  getJean2CompatibilityBindings().paths.resolvePath(...args);
+export const getToolWorkspaceHost = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['workspace']['createToolWorkspaceHost']>) =>
+  getJean2CompatibilityBindings().workspace.createToolWorkspaceHost(...args);
 export const readInstallManifest = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['tools']['readInstallManifest']>) =>
   getJean2CompatibilityBindings().tools.readInstallManifest(...args);
 export const memoryToolDefinition = () => getJean2CompatibilityBindings().memory.memoryToolDefinition;
