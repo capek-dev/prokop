@@ -3,6 +3,7 @@ import { mkdirSync, rmSync, existsSync, writeFileSync, cpSync } from 'fs';
 import { join, resolve } from 'path';
 import { tmpdir } from 'os';
 
+import { configureCapekJean2Compatibility } from '@/capek-adapter';
 import {
   scanTools,
   getTool,
@@ -21,6 +22,7 @@ describe('registry', () => {
   let toolsDir: string;
 
   beforeEach(() => {
+    configureCapekJean2Compatibility();
     tempDir = createTempDir();
     mkdirSync(tempDir, { recursive: true });
     toolsDir = join(tempDir, 'tools');

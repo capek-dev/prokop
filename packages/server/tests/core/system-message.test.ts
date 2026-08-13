@@ -1,5 +1,6 @@
-import { describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import type { Preconfig } from '@jean2/sdk';
+import { configureCapekJean2Compatibility } from '@/capek-adapter';
 import { buildSystemMessage } from '@/core/stream/system-message';
 
 const preconfig: Preconfig = {
@@ -15,6 +16,7 @@ const preconfig: Preconfig = {
 };
 
 describe('buildSystemMessage self-delegation guidance', () => {
+  beforeEach(() => configureCapekJean2Compatibility());
   test('announces self-delegation when it is available', async () => {
     const message = await buildSystemMessage({
       preconfig,

@@ -3,6 +3,7 @@ globalThis.AI_SDK_LOG_WARNINGS = false;
 import { readFileSync } from 'fs';
 
 import { createApp } from '@/app';
+import { configureCapekJean2Compatibility } from '@/capek-adapter';
 import { registerBroadcastCallback, registerSendToControllerCallback, registerBroadcastToSessionCallback, registerSendToAskTargetsCallback, sendToAskTargetsEvent } from '@/core/broadcast';
 import { handleClientMessage, type RouterContext, type ClientEntry } from '@/core/message-router';
 import {
@@ -105,6 +106,7 @@ function sendToAskTargets(sessionId: string, authority: AskAuthority, message: S
 const routerContext: RouterContext = { send, broadcast, broadcastToSession, sendToController, sendToAskTargets, clients };
 
 async function startServer(options?: ServerOptions): Promise<ServerInstance> {
+  configureCapekJean2Compatibility();
   cleanupRunningSessionsOnStartup();
   reconcileAllSessionsCompaction();
   reconcileAllOrphanedToolCalls();

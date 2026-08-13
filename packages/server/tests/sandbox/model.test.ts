@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { SandboxLanguageModel } from '@/sandbox/model';
 import { sandboxController } from '@/sandbox';
 import type { SandboxResponse } from '@/sandbox';
+import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 
 function createCallOptions() {
   return {
@@ -45,11 +46,13 @@ async function collectStreamChunks(response: SandboxResponse): Promise<unknown[]
 
 describe('SandboxLanguageModel', () => {
   beforeEach(() => {
+    setupTestDatabase();
     sandboxController.reset();
   });
 
   afterEach(() => {
     sandboxController.reset();
+    resetTestDatabase();
   });
 
   test('converts text responses into AI SDK text deltas', async () => {
