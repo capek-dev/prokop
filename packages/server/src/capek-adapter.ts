@@ -2,7 +2,7 @@ import {
   setJean2CompatibilityBindings,
   type Jean2CompatibilityBindings,
 } from '@capekai/core/compat/jean2';
-import { getAgentDirectory } from '@/agents/storage';
+import { getAgentDirectory, getPreconfigOrAgent } from '@/agents/storage';
 import { readAgentMemoryFile } from '@/agents/memory';
 import {
   findModel,
@@ -11,16 +11,18 @@ import {
   getModelsConfig,
   resolveToolsPath,
 } from '@/config';
-import { broadcastEvent, broadcastSessionUpdated } from '@/core/broadcast';
+import {
+  broadcastEvent,
+  broadcastSessionCreated,
+  broadcastSessionUpdated,
+  broadcastToSessionEvent,
+  sendToAskTargetsEvent,
+  sendToControllerEvent,
+} from '@/core/broadcast';
+import { getDefaultPreconfig, getPreconfig, listPreconfigs, listSubagentPreconfigs } from '@/core/preconfig';
+import { generateSessionTitle, hasManualSessionTitle, isDefaultSessionTitle } from '@/core/session-title';
 import { formatInstructions, loadInstructions } from '@/core/instructions';
 import { buildWorkspaceSystemPrompt } from '@/core/prompts/workspace-context';
-import {
-  canSpawnSubagent,
-  executeSubagent,
-  getSubagentToolDefinition,
-} from '@/core/subagent';
-import { resolveEffectiveSubagentTargets } from '@/core/subagent-policy';
-import { executeWorkflow, getWorkflowToolDefinition } from '@/core/workflow';
 import {
   getCompactionAutoReserveCapTokens,
   getCompactionAutoSafetyMarginTokens,
@@ -36,6 +38,7 @@ import {
   getLLMBaseUrl,
   getLLMDeepseekApiKey,
   getLLMMaxSteps,
+  getLLMSubagentMaxSteps,
   getLLMMinimaxApiKey,
   getLLMOpenAIApiKey,
   getLLMOpenRouterApiKey,
@@ -51,6 +54,7 @@ import {
   memoryToolDefinition,
 } from '@/memory';
 import { getUploadDir } from '@/paths';
+import { notifyTerminalMessage } from '@/services/web-push/dispatch';
 import { createModelForProvider, getProvider } from '@/providers';
 import { isSandboxActive } from '@/sandbox';
 import { sandboxController } from '@/sandbox/controller';
@@ -68,16 +72,25 @@ import {
   skillManageToolDefinition,
 } from '@/skills';
 import {
+  addMessageToQueue,
   buildEffectiveContextHistory,
   createMessage,
   createPart,
+  createSession,
+  deleteMessage,
+  deleteQueuedMessage,
+  getMessage,
+  getMessageWithParts,
+  getNextQueuedMessage,
   getAttachment,
   getChildSessions,
   getPart,
   getPartsByMessage,
   getPartsBySession,
+  getResponseFormat,
   getSession,
   getWorkspace,
+  listLatestMessagesWithPartsPage,
   listMessagesWithParts,
   persistStreamingPartSnapshots,
   syncMessageFts,
@@ -88,6 +101,7 @@ import {
   updateSession,
   updateWorkspace,
 } from '@/store';
+import { getWorkspaceAutoApproveSeverity } from '@/store/workspaces';
 import {
   createAskApi,
   rejectPendingAsksBySession,
@@ -98,7 +112,11 @@ import { isPathWithinWorkspace, resolvePath } from '@/utils/paths';
 
 export const jean2CompatibilityBindings = {
   store: {
+    createSession,
     createMessage,
+    getMessage,
+    getMessageWithParts,
+    deleteMessage,
     updateMessage,
     getSession,
     updateSession,
@@ -115,8 +133,14 @@ export const jean2CompatibilityBindings = {
     transitionToolToRunningByCallId,
     getChildSessions,
     listMessagesWithParts,
+    listLatestMessagesWithPartsPage,
     getPartsBySession,
     buildEffectiveContextHistory,
+    addMessageToQueue,
+    deleteQueuedMessage,
+    getNextQueuedMessage,
+    getResponseFormat,
+    getWorkspaceAutoApproveSeverity,
   },
   config: {
     findModel,
@@ -124,6 +148,11 @@ export const jean2CompatibilityBindings = {
     findModelVariant,
     getModelsConfig,
     resolveToolsPath,
+    getPreconfig,
+    getDefaultPreconfig,
+    getPreconfigOrAgent,
+    listPreconfigs,
+    listSubagentPreconfigs,
   },
   env: {
     getCompactionAutoThresholdRatio,
@@ -131,6 +160,7 @@ export const jean2CompatibilityBindings = {
     getCompactionAutoSafetyMarginTokens,
     getLLMTemperature,
     getLLMMaxSteps,
+    getLLMSubagentMaxSteps,
     getLLMBaseUrl,
     getLLMOpenAIApiKey,
     getLLMOpenRouterApiKey,
@@ -158,7 +188,17 @@ export const jean2CompatibilityBindings = {
   },
   delivery: {
     broadcastEvent,
+    broadcastSessionCreated,
     broadcastSessionUpdated,
+    broadcastToSessionEvent,
+    sendToControllerEvent,
+    sendToAskTargetsEvent,
+    notifyTerminalMessage,
+  },
+  titles: {
+    isDefaultSessionTitle,
+    hasManualSessionTitle,
+    generateSessionTitle,
   },
   agents: {
     getAgentDirectory,
@@ -175,16 +215,6 @@ export const jean2CompatibilityBindings = {
   },
   tools: {
     readInstallManifest,
-  },
-  subagents: {
-    executeSubagent,
-    getSubagentToolDefinition,
-    canSpawnSubagent,
-    resolveEffectiveSubagentTargets,
-  },
-  workflows: {
-    executeWorkflow,
-    getWorkflowToolDefinition,
   },
   memory: {
     memoryToolDefinition,

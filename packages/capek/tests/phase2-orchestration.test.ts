@@ -1,0 +1,628 @@
+import { describe, expect, test } from 'bun:test';
+import type { LanguageModel } from 'ai';
+import type {
+  AssistantMessage,
+  GoalState,
+  Message,
+  Part,
+  Preconfig,
+  ServerMessage,
+  Session,
+} from '@jean2/sdk';
+import {
+  SandboxLanguageModel,
+  canSpawnSubagent,
+  executeChildSession,
+  createLlmApi,
+  evaluateGoal,
+  executeSubagent,
+  executeWorkflow,
+  getSubagentResumeError,
+  handleChat,
+  runGoalLoop,
+  runOrchestratorSession,
+} from '../src/compat/jean2';
+import { decomposeTask } from '../src/core/workflow-decomposer';
+import { synthesizeResults } from '../src/core/workflow-synthesizer';
+import {
+  setJean2CompatibilityBindings,
+  type Jean2CompatibilityBindings,
+  type Jean2SandboxController,
+} from '../src/compat/bindings';
+import type { StreamChatEvent } from '../src/core/retry';
+import type { ChatOptions } from '../src/core/agent';
+
+const preconfig: Preconfig = {
+  id: 'research',
+  name: 'Research',
+  description: 'Research tasks',
+  systemPrompt: 'Research carefully',
+  tools: [],
+  model: null,
+  provider: null,
+  settings: null,
+  isDefault: false,
+  mode: 'subagent',
+};
+
+function session(id: string, parentId: string | null = null): Session {
+  return {
+    id,
+    workspaceId: 'workspace-1',
+    preconfigId: parentId ? 'research' : 'primary',
+    title: 'Session',
+    status: 'active',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    metadata: null,
+    parentId,
+  } as Session;
+}
+
+interface RuntimeState {
+  sessions: Map<string, Session>;
+  messages: Message[];
+  parts: Part[];
+  askTargets: ServerMessage[];
+  controllerEvents: ServerMessage[];
+  terminalMessages: AssistantMessage[];
+}
+
+function bindRuntime(state: RuntimeState, overrides: Partial<Jean2CompatibilityBindings> = {}): void {
+  const bindings = {
+    store: {
+      getSession: (id: string) => state.sessions.get(id) ?? null,
+      updateSession: (id: string, updates: Partial<Session>) => {
+        const current = state.sessions.get(id);
+        if (!current) return null;
+        const updated = { ...current, ...updates } as Session;
+        state.sessions.set(id, updated);
+        return updated;
+      },
+      createSession: (input: Session) => {
+        const created = {
+          ...input,
+          createdAt: input.createdAt ?? '2026-01-01T00:00:00.000Z',
+          updatedAt: input.updatedAt ?? '2026-01-01T00:00:00.000Z',
+        } as Session;
+        state.sessions.set(created.id, created);
+        return created;
+      },
+      createMessage: (message: Message) => {
+        state.messages.push(message);
+        return message;
+      },
+      updateMessage: (id: string, updates: Partial<Message>) => {
+        const index = state.messages.findIndex((message) => message.id === id);
+        if (index === -1) return null;
+        state.messages[index] = { ...state.messages[index], ...updates } as Message;
+        return state.messages[index];
+      },
+      createPart: (part: Part) => {
+        state.parts.push(part);
+        return part;
+      },
+      getWorkspace: () => null,
+      buildEffectiveContextHistory: () => ({ messages: [], latestCompactionBoundary: null, hasCompaction: false }),
+      listMessagesWithParts: () => [],
+      getWorkspaceAutoApproveSeverity: () => 'low' as const,
+    },
+    config: {
+      getModelsConfig: () => ({ providers: [], defaultModel: 'test-model', defaultProvider: 'test-provider' }),
+      listSubagentPreconfigs: async () => [preconfig],
+      listPreconfigs: async () => [preconfig],
+    },
+    env: { getLLMSubagentMaxSteps: () => 12 },
+    delivery: {
+      broadcastEvent: () => {},
+      broadcastSessionCreated: () => {},
+      broadcastSessionUpdated: () => {},
+      broadcastToSessionEvent: () => {},
+      sendToControllerEvent: (_sessionId: string, message: ServerMessage) => state.controllerEvents.push(message),
+      sendToAskTargetsEvent: (_sessionId: string, _authority: unknown, message: ServerMessage) => state.askTargets.push(message),
+      notifyTerminalMessage: (message: AssistantMessage) => state.terminalMessages.push(message),
+    },
+    sandbox: {
+      isSandboxActive: () => false,
+      sandboxController: {} as Jean2SandboxController,
+    },
+  } as unknown as Jean2CompatibilityBindings;
+  for (const [group, value] of Object.entries(overrides)) {
+    const key = group as keyof Jean2CompatibilityBindings;
+    bindings[key] = { ...bindings[key], ...value } as never;
+  }
+  setJean2CompatibilityBindings(bindings);
+}
+
+function createState(): RuntimeState {
+  return {
+    sessions: new Map([
+      ['root', session('root')],
+      ['child', session('child', 'root')],
+    ]),
+    messages: [],
+    parts: [],
+    askTargets: [],
+    controllerEvents: [],
+    terminalMessages: [],
+  };
+}
+
+async function* childEvents(options: ChatOptions): AsyncGenerator<StreamChatEvent> {
+  options.broadcastFn?.({
+    type: 'ask.request',
+    id: 'ask-1',
+    sessionId: 'child',
+    toolCallId: 'call-1',
+    toolName: 'question',
+    ask: { type: 'text', question: 'Approve?' },
+    createdAt: Date.now(),
+  } as never);
+  options.broadcastFn?.({
+    type: 'ask.timeout',
+    id: 'ask-1',
+    sessionId: 'child',
+    toolCallId: 'call-1',
+    createdAt: Date.now(),
+  } as never);
+  const message: AssistantMessage = {
+    id: 'assistant-1',
+    sessionId: 'child',
+    role: 'assistant',
+    status: 'completed',
+    modelId: 'test-model',
+    providerId: 'test-provider',
+    tokens: { prompt: 1, completion: 1 },
+    cost: 0,
+    createdAt: Date.now(),
+    completedAt: Date.now(),
+  };
+  yield { type: 'message.created', message };
+  yield {
+    type: 'part.created',
+    sessionId: 'child',
+    part: { id: 'text-1', messageId: message.id, type: 'text', text: '', createdAt: Date.now() },
+  };
+  yield { type: 'part.append', sessionId: 'child', partId: 'text-1', field: 'text', delta: 'done' };
+  yield { type: 'message.updated', message };
+}
+
+describe.serial('Phase 2 orchestration contracts', () => {
+  test('routes child asks to the root and captures terminal output', async () => {
+    const state = createState();
+    bindRuntime(state);
+    const delivered: ServerMessage[] = [];
+
+    const result = await executeChildSession({
+      parentSessionId: 'root',
+      childSessionId: 'child',
+      preconfig,
+      prompt: 'work',
+      broadcastToSession: (message) => delivered.push(message),
+      streamChat: childEvents as typeof import('../src/core/retry').streamChatWithRetry,
+    });
+
+    expect(state.askTargets).toHaveLength(1);
+    expect(state.askTargets[0]).toMatchObject({
+      type: 'ask.request',
+      sessionId: 'root',
+      ask: { _originSessionId: 'child' },
+    });
+    expect(state.controllerEvents[0]).toMatchObject({ type: 'ask.timeout', sessionId: 'root' });
+    expect(state.terminalMessages).toHaveLength(1);
+    expect(result.parts).toMatchObject([{ type: 'text', text: 'done' }]);
+    expect(delivered.map((message) => message.type)).toEqual([
+      'message.created',
+      'part.created',
+      'part.append',
+      'message.updated',
+    ]);
+  });
+
+  test('treats exhausted child retry errors as execution failures', async () => {
+    for (const type of ['error.rate_limit', 'error.server', 'error.timeout'] as const) {
+      const state = createState();
+      bindRuntime(state, {
+        config: { getPreconfigOrAgent: async () => preconfig } as never,
+      });
+      const message = `${type} exhausted`;
+      const result = await executeSubagent({
+        description: 'research',
+        prompt: 'work',
+        subagent_type: 'research',
+        sessionId: 'root',
+        executeChild: (options) => executeChildSession({
+          ...options,
+          streamChat: (async function* () {
+            yield { type, message } as StreamChatEvent;
+          }) as typeof import('../src/core/retry').streamChatWithRetry,
+        }),
+      });
+
+      expect(result.result).toBe('');
+      expect(result.error).toBe(message);
+      expect(state.sessions.get(result.task_id)?.subagentStatus).toBe('error');
+    }
+  });
+
+  test('uses effective history when resuming a child session', async () => {
+    const state = createState();
+    const priorMessage = { message: { id: 'prior', sessionId: 'child', role: 'user', createdAt: 1 }, parts: [] };
+    let receivedMessageCount = 0;
+    bindRuntime(state, {
+      store: {
+        buildEffectiveContextHistory: () => ({
+          messages: [priorMessage],
+          latestCompactionBoundary: null,
+          hasCompaction: false,
+        }),
+      } as never,
+    });
+
+    await executeChildSession({
+      parentSessionId: 'root',
+      childSessionId: 'child',
+      preconfig,
+      prompt: 'continue',
+      resumeFromHistory: true,
+      streamChat: (async function* (options: ChatOptions) {
+        receivedMessageCount = options.messages.length;
+        yield* [] as StreamChatEvent[];
+      }) as typeof import('../src/core/retry').streamChatWithRetry,
+    });
+
+    expect(receivedMessageCount).toBe(2);
+    expect(state.messages.at(-1)).toMatchObject({ sessionId: 'child', role: 'user' });
+  });
+
+  test('records met, failed, and cancelled goal-loop outcomes', async () => {
+    const metState = createState();
+    bindRuntime(metState);
+    const turns: string[] = [];
+    await runGoalLoop({
+      sessionId: 'root',
+      condition: 'tests pass',
+      initialPrompt: 'start',
+      maxTurns: 3,
+      runTurn: async (content) => {
+        turns.push(content);
+        return { streamCompleted: true, interrupted: false };
+      },
+      evaluate: async ({ turn }) => ({
+        goalMet: turn === 2,
+        reason: turn === 2 ? 'verified' : 'still failing',
+        remainingWork: 'fix one test',
+      }),
+    });
+    expect((metState.sessions.get('root')?.metadata?.goal as GoalState).status).toBe('met');
+    expect(turns[1]).toContain('Remaining work: fix one test');
+
+    const failedState = createState();
+    bindRuntime(failedState);
+    await runGoalLoop({
+      sessionId: 'root',
+      condition: 'done',
+      maxTurns: 2,
+      runTurn: async () => ({ streamCompleted: true, interrupted: false }),
+      evaluate: async () => ({ goalMet: false, reason: 'not yet' }),
+    });
+    expect((failedState.sessions.get('root')?.metadata?.goal as GoalState).status).toBe('failed');
+
+    const cancelledState = createState();
+    bindRuntime(cancelledState);
+    await runGoalLoop({
+      sessionId: 'root',
+      condition: 'done',
+      runTurn: async () => ({ streamCompleted: false, interrupted: true }),
+      evaluate: async () => ({ goalMet: false, reason: 'unused' }),
+    });
+    expect((cancelledState.sessions.get('root')?.metadata?.goal as GoalState).status).toBe('cancelled');
+
+    const incompleteState = createState();
+    bindRuntime(incompleteState);
+    let evaluations = 0;
+    await runGoalLoop({
+      sessionId: 'root',
+      condition: 'done',
+      runTurn: async () => ({ streamCompleted: false, interrupted: false }),
+      evaluate: async () => {
+        evaluations++;
+        return { goalMet: true, reason: 'must not run' };
+      },
+    });
+    expect((incompleteState.sessions.get('root')?.metadata?.goal as GoalState).status).toBe('failed');
+    expect(evaluations).toBe(0);
+  });
+
+  test('sanitizes decomposed targets and returns structured synthesis', async () => {
+    const state = createState();
+    bindRuntime(state);
+    const subtasks = await decomposeTask({
+      prompt: 'analyze',
+      parentSessionId: 'root',
+      runOrchestrator: async () => ({
+        text: '{}',
+        json: { subtasks: [
+          { prompt: 'valid', preconfigId: 'research' },
+          { prompt: 'invalid', preconfigId: 'invented' },
+        ] },
+        sessionId: 'decomposer',
+      }),
+    });
+    expect(subtasks.map((subtask) => subtask.preconfigId)).toEqual(['research', 'research']);
+
+    const synthesis = await synthesizeResults({
+      originalPrompt: 'analyze',
+      parentSessionId: 'root',
+      leafResults: [{ index: 0, text: 'finding' }],
+      outputSchema: { type: 'object', properties: { answer: { type: 'string' } } },
+      runOrchestrator: async (options) => {
+        expect(options.systemPrompt).toContain('finding');
+        return { text: '{"answer":"done"}', json: { answer: 'done' }, sessionId: 'synthesizer' };
+      },
+    });
+    expect(synthesis).toEqual({
+      text: '{"answer":"done"}',
+      structuredResult: { answer: 'done' },
+    });
+  });
+
+  test('records completed and error terminal subagent statuses', async () => {
+    const completedState = createState();
+    bindRuntime(completedState, {
+      config: { getPreconfigOrAgent: async () => preconfig } as never,
+    });
+    const completed = await executeSubagent({
+      description: 'research',
+      prompt: 'work',
+      subagent_type: 'research',
+      sessionId: 'root',
+      executeChild: async () => ({
+        parts: [{ id: 'result', messageId: 'assistant', type: 'text', text: 'finished', createdAt: 1 }],
+      }),
+    });
+    expect(completed.error).toBeUndefined();
+    expect(completedState.sessions.get(completed.task_id)?.subagentStatus).toBe('completed');
+
+    const errorState = createState();
+    bindRuntime(errorState, {
+      config: { getPreconfigOrAgent: async () => preconfig } as never,
+    });
+    const failed = await executeSubagent({
+      description: 'research',
+      prompt: 'work',
+      subagent_type: 'research',
+      sessionId: 'root',
+      executeChild: async () => ({ parts: [], error: 'child failed' }),
+    });
+    expect(failed.error).toBe('child failed');
+    expect(errorState.sessions.get(failed.task_id)?.subagentStatus).toBe('error');
+  });
+
+  test('notifies onSessionCreated exactly once when resuming', async () => {
+    const state = createState();
+    bindRuntime(state, {
+      config: { getPreconfigOrAgent: async () => preconfig } as never,
+    });
+    const created: string[] = [];
+
+    const result = await executeSubagent({
+      description: 'continue research',
+      prompt: 'continue',
+      subagent_type: 'research',
+      task_id: 'child',
+      sessionId: 'root',
+      onSessionCreated: (childSessionId) => created.push(childSessionId),
+      executeChild: async () => ({ parts: [] }),
+    });
+
+    expect(result.task_id).toBe('child');
+    expect(created).toEqual(['child']);
+  });
+
+  test('cancels an in-flight child execution and preserves interrupted status', async () => {
+    const state = createState();
+    bindRuntime(state, {
+      config: { getPreconfigOrAgent: async () => preconfig } as never,
+    });
+    const abortController = new AbortController();
+    let receivedSignal: AbortSignal | undefined;
+
+    const result = await executeSubagent({
+      description: 'research',
+      prompt: 'work',
+      subagent_type: 'research',
+      sessionId: 'root',
+      abortSignal: abortController.signal,
+      executeChild: async (options) => {
+        receivedSignal = options.abortSignal;
+        abortController.abort(new Error('cancelled'));
+        throw new Error('child aborted');
+      },
+    });
+
+    expect(receivedSignal).toBe(abortController.signal);
+    expect(result.error).toContain('child aborted');
+    expect(state.sessions.get(result.task_id)?.subagentStatus).toBe('interrupted');
+  });
+
+  test('executes workflow fan-out and synthesis outcomes', async () => {
+    const state = createState();
+    bindRuntime(state);
+    const result = await executeWorkflow({
+      prompt: 'analyze',
+      subtasks: [
+        { prompt: 'first', preconfigId: 'research' },
+        { prompt: 'second', preconfigId: 'research' },
+      ],
+    }, {
+      sessionId: 'root',
+      allowedSubagentIds: ['research'],
+      executeLeaf: async (input) => ({
+        task_id: input.prompt,
+        result: `result:${input.prompt}`,
+      }),
+      synthesize: async ({ leafResults }) => ({
+        text: leafResults.map((leaf) => leaf.text).join('|'),
+      }),
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.subtaskCount).toBe(2);
+    expect(result.result).toContain('result:first|result:second');
+
+    const allFailed = await executeWorkflow({
+      prompt: 'analyze',
+      subtasks: [{ prompt: 'first', preconfigId: 'research' }],
+    }, {
+      sessionId: 'root',
+      allowedSubagentIds: ['research'],
+      executeLeaf: async () => ({ task_id: 'failed', result: '', error: 'leaf failed' }),
+      synthesize: async () => ({ text: 'unused' }),
+    });
+    expect(allFailed.error).toContain('All 1 sub-agent(s) failed');
+  });
+
+  test('reports interrupted workflows before all-failed and stops scheduling new leaves', async () => {
+    const state = createState();
+    bindRuntime(state);
+    const abortController = new AbortController();
+    const started: string[] = [];
+    let releaseFirstBatch: (() => void) | undefined;
+    const firstBatchReleased = new Promise<void>((resolve) => {
+      releaseFirstBatch = resolve;
+    });
+    let firstBatchStarted = 0;
+
+    const workflowPromise = executeWorkflow({
+      prompt: 'analyze',
+      subtasks: Array.from({ length: 7 }, (_, index) => ({ prompt: `task-${index}`, preconfigId: 'research' })),
+    }, {
+      sessionId: 'root',
+      allowedSubagentIds: ['research'],
+      abortSignal: abortController.signal,
+      executeLeaf: async (input) => {
+        started.push(input.prompt);
+        firstBatchStarted++;
+        if (firstBatchStarted === 5) {
+          abortController.abort();
+          releaseFirstBatch?.();
+        }
+        await firstBatchReleased;
+        return { task_id: input.prompt, result: '', error: 'cancelled leaf' };
+      },
+      synthesize: async () => ({ text: 'must not run' }),
+    });
+
+    const result = await workflowPromise;
+    expect(started).toHaveLength(5);
+    expect(result.error).toBe('Workflow was interrupted');
+  });
+
+  test('returns no_api_key for an unregistered provider', async () => {
+    const state = createState();
+    const sent: ServerMessage[] = [];
+    bindRuntime(state, {
+      config: { getPreconfigOrAgent: async () => preconfig } as never,
+      providers: { getProvider: () => undefined } as never,
+      env: { getLLMOpenAIApiKey: () => undefined } as never,
+    });
+    const ws = {};
+
+    await handleChat({
+      send: (_socket, message) => sent.push(message),
+      broadcast: () => {},
+      broadcastToSession: () => {},
+      sendToController: () => {},
+      sendToAskTargets: () => {},
+      clients: new Map([[ws, { sessionIds: new Set<string>(), missedPings: 0 }]]),
+    }, ws, 'root', 'hello');
+
+    expect(sent).toEqual([{
+      type: 'error',
+      code: 'no_api_key',
+      message: 'No API key configured for provider: test-provider. Set JEAN2_LLM_TEST-PROVIDER_API_KEY',
+    }]);
+  });
+
+  test('intercepts orchestrator model calls through the sandbox boundary', async () => {
+    const state = createState();
+    const contexts: Array<{ sessionId?: string; mode: string }> = [];
+    const controller: Jean2SandboxController = {
+      waitForResponse: async (context) => {
+        contexts.push({ sessionId: context.sessionId, mode: context.mode });
+        return { type: 'text', content: '{"goalMet":true,"reason":"sandbox"}' };
+      },
+      complete: () => {},
+      rejectAllPendingForSession: () => [],
+    };
+    bindRuntime(state, {
+      providers: {
+        getProvider: () => ({}) as never,
+        createModelForProvider: async (options) => ({
+          model: new SandboxLanguageModel({
+            sessionId: options.sessionId ?? 'root',
+            modelId: options.modelId,
+            providerId: 'sandbox',
+          }) as unknown as LanguageModel,
+        }),
+      },
+      sandbox: {
+        isSandboxActive: () => true,
+        sandboxController: controller,
+      },
+    });
+
+    const result = await runOrchestratorSession({
+      parentSessionId: 'root',
+      title: 'Goal evaluator',
+      agentName: 'goal-evaluator',
+      systemPrompt: 'Evaluate',
+      userPrompt: 'Is it done?',
+      broadcast: () => {},
+      broadcastSessionCreated: () => {},
+      broadcastSessionUpdated: () => {},
+    });
+
+    expect(result.json).toEqual({ goalMet: true, reason: 'sandbox' });
+    expect(contexts).toEqual([{ sessionId: 'root', mode: 'stream' }]);
+    expect(state.sessions.get(result.sessionId)?.subagentStatus).toBe('completed');
+
+    controller.waitForResponse = async (context) => {
+      contexts.push({ sessionId: context.sessionId, mode: context.mode });
+      return { type: 'text', content: '{"goalMet":true,"reason":"goal sandbox"}' };
+    };
+    expect((await evaluateGoal({
+      sessionId: 'root',
+      condition: 'done',
+      turn: 1,
+      maxTurns: 2,
+      broadcast: () => {},
+      broadcastSessionCreated: () => {},
+      broadcastSessionUpdated: () => {},
+    })).goalMet).toBe(true);
+
+    controller.waitForResponse = async (context) => {
+      contexts.push({ sessionId: context.sessionId, mode: context.mode });
+      return { type: 'text', content: 'tool llm answer' };
+    };
+    expect(await createLlmApi('test-model', 'test-provider', 'child').generateText({
+      prompt: 'tool prompt',
+    })).toBe('tool llm answer');
+    expect(contexts.slice(-2)).toEqual([
+      { sessionId: 'root', mode: 'stream' },
+      { sessionId: 'child', mode: 'stream' },
+    ]);
+  });
+
+  test('enforces depth and resume ownership contracts', () => {
+    const state = createState();
+    state.sessions.set('grandchild', session('grandchild', 'child'));
+    bindRuntime(state);
+    expect(canSpawnSubagent('root')).toBe(true);
+    expect(canSpawnSubagent('child')).toBe(true);
+    expect(canSpawnSubagent('grandchild')).toBe(false);
+    const child = { parentId: 'parent-1', preconfigId: 'research' };
+    expect(getSubagentResumeError(child, 'parent-2', 'research')).toContain('does not belong');
+    expect(getSubagentResumeError(child, 'parent-1', 'coding')).toContain('not "coding"');
+  });
+});

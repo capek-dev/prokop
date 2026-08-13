@@ -6,6 +6,7 @@ import {
   createAskApi,
   getUploadDir,
   rejectPendingAsksByToolCallId,
+  transitionToolToRunningByCallId,
   type AskBroadcastFn,
 } from '../../compat/jean2-dependencies';
 import { interruptManager } from '../interrupt';
@@ -13,10 +14,9 @@ import {
   canSpawnSubagent,
   executeSubagent,
   getSubagentToolDefinition,
-  transitionToolToRunningByCallId,
   type SubagentInput,
   type SubagentOutput,
-} from '../../compat/jean2-dependencies';
+} from '../subagent';
 import { truncateToolResult } from '../../utils/truncate-tool-result';
 import { isToolAllowedInContext, type ToolExecutionScope } from '../tool-capabilities';
 import type { ToolMap } from './types';

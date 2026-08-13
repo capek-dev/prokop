@@ -1,7 +1,10 @@
 import type { Tool } from 'ai';
 import type {
   AskApi,
+  AskAuthority,
   AskRequestMessage,
+  AssistantMessage,
+  AutoApproveSeverity,
   AskTimedOutMessage,
   AttachmentKind,
   Message,
@@ -10,13 +13,12 @@ import type {
   PermissionAsk,
   PermissionRiskLevel,
   Preconfig,
+  QueuedMessage,
+  ResponseFormat,
   ScheduledJob,
   ServerMessage,
   Session,
-  ToolDefinition,
   ToolPart,
-  WorkflowInput,
-  WorkflowResult,
   Workspace,
 } from '@jean2/sdk';
 import type { LlmCallContext, SandboxResponse } from '../sandbox/types';
@@ -84,8 +86,22 @@ export interface EffectiveContextHistory {
   hasCompaction: boolean;
 }
 
+export interface TranscriptPageResult {
+  messages: MessageWithParts[];
+  pagination: {
+    hasOlder: boolean;
+    oldestSequence: number | null;
+    newestSequence: number | null;
+    limit: number;
+  };
+}
+
 export interface Jean2StoreBindings {
+  createSession(session: Omit<Session, 'createdAt' | 'updatedAt'> & { createdAt?: string; updatedAt?: string }): Session;
   createMessage(message: Message): Message;
+  getMessage(id: string): Message | null;
+  getMessageWithParts(messageId: string): MessageWithParts | null;
+  deleteMessage(messageId: string): boolean;
   updateMessage(id: string, updates: Partial<Message>, options?: { syncFts?: boolean }): Message | null;
   getSession(id: string): Session | null;
   updateSession(
@@ -108,8 +124,14 @@ export interface Jean2StoreBindings {
   transitionToolToRunningByCallId(sessionId: string, callId: string, childSessionId?: string): ToolPart | null;
   getChildSessions(parentId: string): Session[];
   listMessagesWithParts(sessionId: string): MessageWithParts[];
+  listLatestMessagesWithPartsPage(sessionId: string, limit?: number): TranscriptPageResult;
   getPartsBySession(sessionId: string): Part[];
   buildEffectiveContextHistory(sessionId: string): EffectiveContextHistory;
+  addMessageToQueue(sessionId: string, content: string, attachments?: Array<{ id: string; kind: string }>): QueuedMessage;
+  deleteQueuedMessage(id: string): boolean;
+  getNextQueuedMessage(sessionId: string): QueuedMessage | null;
+  getResponseFormat(id: string): ResponseFormat | null;
+  getWorkspaceAutoApproveSeverity(workspaceId: string): AutoApproveSeverity;
 }
 
 export interface Jean2ConfigBindings {
@@ -118,6 +140,11 @@ export interface Jean2ConfigBindings {
   findModelVariant(modelId: string, variantKey: string, providerId?: string): Record<string, unknown> | undefined;
   getModelsConfig(): Jean2ModelsConfig;
   resolveToolsPath(): string;
+  getPreconfig(id: string): Promise<Preconfig | null>;
+  getDefaultPreconfig(): Promise<Preconfig | null>;
+  getPreconfigOrAgent(id: string): Promise<Preconfig | null>;
+  listPreconfigs(): Promise<Preconfig[]>;
+  listSubagentPreconfigs(): Promise<Preconfig[]>;
 }
 
 export interface Jean2EnvBindings {
@@ -126,6 +153,7 @@ export interface Jean2EnvBindings {
   getCompactionAutoSafetyMarginTokens(): number;
   getLLMTemperature(): number;
   getLLMMaxSteps(): number;
+  getLLMSubagentMaxSteps(): number;
   getLLMBaseUrl(): string | undefined;
   getLLMOpenAIApiKey(): string | undefined;
   getLLMOpenRouterApiKey(): string | undefined;
@@ -167,7 +195,18 @@ export interface Jean2AskBindings {
 
 export interface Jean2DeliveryBindings {
   broadcastEvent(message: ServerMessage): void;
+  broadcastSessionCreated(session: Session): void;
   broadcastSessionUpdated(session: Session): void;
+  broadcastToSessionEvent(sessionId: string, message: ServerMessage): void;
+  sendToControllerEvent(sessionId: string, message: ServerMessage): void;
+  sendToAskTargetsEvent(sessionId: string, authority: AskAuthority, message: ServerMessage): void;
+  notifyTerminalMessage(message: AssistantMessage, sessionId: string): void;
+}
+
+export interface Jean2TitleBindings {
+  isDefaultSessionTitle(title: string | null | undefined): boolean;
+  hasManualSessionTitle(metadata: Record<string, unknown> | null | undefined): boolean;
+  generateSessionTitle(messages: MessageWithParts[]): Promise<string | null>;
 }
 
 export interface Jean2AgentBindings {
@@ -204,75 +243,6 @@ export interface Jean2InstallManifest {
 
 export interface Jean2ToolManifestBindings {
   readInstallManifest(toolsDir: string, toolName: string): Jean2InstallManifest | null;
-}
-
-export interface SubagentInput {
-  description: string;
-  prompt: string;
-  subagent_type: string;
-  task_id?: string;
-  sessionId: string;
-  workspaceId?: string;
-  workspacePath?: string;
-  abortSignal?: AbortSignal;
-  onSessionCreated?: (childSessionId: string) => void;
-  allowedSubagentIds?: string[];
-  broadcast?: BroadcastFn;
-  broadcastSessionCreated?: BroadcastSessionFn;
-  broadcastSessionUpdated?: BroadcastSessionFn;
-  broadcastToSession?: BroadcastFn;
-  outputSchema?: Record<string, unknown>;
-}
-
-export interface SubagentOutput {
-  task_id: string;
-  result: string;
-  error?: string;
-  structuredResult?: Record<string, unknown>;
-}
-
-export interface ResolveSubagentTargetsOptions {
-  sessionId: string;
-  canSpawnSubagents?: boolean | string[] | null;
-  allowSelfAsSubagent?: boolean;
-  currentPreconfig?: Preconfig | null;
-  maximumDepthReached?: boolean;
-}
-
-export interface Jean2SubagentBindings {
-  executeSubagent(input: SubagentInput): Promise<SubagentOutput>;
-  getSubagentToolDefinition(options: {
-    sessionId: string;
-    canSpawnSubagents: boolean | string[] | null | undefined;
-    allowSelfAsSubagent?: boolean;
-  }): Promise<ToolDefinition | null>;
-  canSpawnSubagent(sessionId: string): boolean;
-  resolveEffectiveSubagentTargets(options: ResolveSubagentTargetsOptions): Promise<Preconfig[]>;
-}
-
-export interface WorkflowExecutionOptions {
-  sessionId: string;
-  workspaceId?: string;
-  workspacePath?: string;
-  abortSignal?: AbortSignal;
-  broadcast?: BroadcastFn;
-  broadcastSessionCreated?: BroadcastSessionFn;
-  broadcastSessionUpdated?: BroadcastSessionFn;
-  broadcastToSession?: BroadcastFn;
-  allowedSubagentIds?: string[];
-}
-
-export interface WorkflowToolDefinition extends ToolDefinition {
-  allowedSubagentIds: string[];
-}
-
-export interface Jean2WorkflowBindings {
-  executeWorkflow(input: WorkflowInput, options: WorkflowExecutionOptions): Promise<WorkflowResult>;
-  getWorkflowToolDefinition(options: {
-    sessionId: string;
-    canSpawnSubagents: boolean | string[] | null | undefined;
-    allowSelfAsSubagent?: boolean;
-  }): Promise<WorkflowToolDefinition | null>;
 }
 
 export interface ToolDefinitionValue {
@@ -418,12 +388,11 @@ export interface Jean2CompatibilityBindings {
   providers: Jean2ProviderBindings;
   asks: Jean2AskBindings;
   delivery: Jean2DeliveryBindings;
+  titles: Jean2TitleBindings;
   agents: Jean2AgentBindings;
   mcp: Jean2McpBindings;
   paths: Jean2PathBindings;
   tools: Jean2ToolManifestBindings;
-  subagents: Jean2SubagentBindings;
-  workflows: Jean2WorkflowBindings;
   memory: Jean2MemoryBindings;
   skills: Jean2SkillBindings;
   sessionSearch: Jean2SessionSearchBindings;

@@ -10,13 +10,12 @@ import {
 import { jean2CompatibilityBindings } from '@/capek-adapter';
 import { buildAiSdkTools, type BuildToolsOptions } from '@/core/build-tools';
 import { clearCache, scanTools } from '@/tools/registry';
-import type { Session, ToolDefinition, Workspace } from '@jean2/sdk';
+import type { Preconfig, Session, Workspace } from '@jean2/sdk';
 
 interface BindingOverrides {
   sessions?: Record<string, Partial<Session>>;
   sessionNotFound?: boolean;
-  canSpawnSubagent?: boolean;
-  subagentDefinition?: ToolDefinition | null;
+  subagentPreconfigs?: Preconfig[];
   mcpTools?: Record<string, import('ai').Tool>;
   skillTool?: { name: string; tool: import('ai').Tool } | null;
   workspace?: Workspace | null;
@@ -38,10 +37,9 @@ function configureBindings(overrides: BindingOverrides = {}): void {
       },
       getWorkspace: () => overrides.workspace ?? null,
     },
-    subagents: {
-      ...jean2CompatibilityBindings.subagents,
-      canSpawnSubagent: () => overrides.canSpawnSubagent ?? true,
-      getSubagentToolDefinition: async () => overrides.subagentDefinition ?? null,
+    config: {
+      ...jean2CompatibilityBindings.config,
+      listPreconfigs: async () => overrides.subagentPreconfigs ?? [],
     },
     mcp: {
       ...jean2CompatibilityBindings.mcp,
@@ -97,15 +95,6 @@ function defaultOptions(overrides: Partial<BuildToolsOptions> = {}): BuildToolsO
   };
 }
 
-const taskDefinition: ToolDefinition = {
-  name: 'task',
-  description: 'Launch a subagent',
-  inputSchema: {
-    type: 'object',
-    properties: { prompt: { type: 'string' }, subagent_type: { type: 'string' } },
-  },
-};
-
 const workspace: Workspace = {
   id: 'ws-1',
   name: 'Workspace',
@@ -153,8 +142,21 @@ describe('build-tools binding integration', () => {
     expect(result).toEqual({ error: 'Tool crashed' });
   });
 
-  test('delegates subagent discovery through explicit binding operations', async () => {
-    configureBindings({ canSpawnSubagent: true, subagentDefinition: taskDefinition });
+  test('discovers subagents through the package-owned policy', async () => {
+    configureBindings({
+      subagentPreconfigs: [{
+        id: 'research',
+        name: 'Research',
+        description: 'Research tasks',
+        mode: 'subagent',
+        model: null,
+        provider: null,
+        systemPrompt: '',
+        tools: [],
+        settings: null,
+        isDefault: false,
+      }],
+    });
 
     const tools = await buildAiSdkTools(defaultOptions({ canSpawnSubagents: true }));
 
