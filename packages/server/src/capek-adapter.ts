@@ -4,6 +4,10 @@ import {
   setJean2CompatibilityBindings,
   type Jean2CompatibilityBindings,
 } from '@capekai/core/compat/jean2';
+import {
+  configureStorage,
+  type StorageBundle,
+} from '@capekai/core/storage';
 import { getAgentDirectory, getPreconfigOrAgent } from '@/agents/storage';
 import { readAgentMemoryFile } from '@/agents/memory';
 import {
@@ -102,9 +106,12 @@ import {
   updateMessage,
   updatePart,
   updateSession,
-  updateWorkspace,
 } from '@/store';
-import { getWorkspaceAutoApproveSeverity } from '@/store/workspaces';
+import {
+  addWorkspaceAdditionalPath,
+  getWorkspaceAutoApproveSeverity,
+  removeWorkspaceAdditionalPath,
+} from '@/store/workspaces';
 import {
   cancelPendingRequestsBySession,
   createPendingAsk,
@@ -121,38 +128,44 @@ import {
 import { createGrantFromOptions, matchGrant } from '@/store/permissions';
 import { readInstallManifest } from '@/tools/tool-install-manifest';
 
-export const jean2CompatibilityBindings = {
-  store: {
+export const jean2StorageBundle: StorageBundle = {
+  conversation: {
     createSession,
     createMessage,
     getMessage,
     getMessageWithParts,
     deleteMessage,
-    updateMessage,
+    updateMessage: (id, updates) => updateMessage(id, updates, { syncFts: false }),
     getSession,
     updateSession,
     transitionToolToInterrupted,
-    syncMessageFts,
     getPartsByMessage,
-    createPart,
-    updatePart,
+    createPart: (part, sessionId) => createPart(part, sessionId, { syncFts: false }),
+    updatePart: (id, updates) => updatePart(id, updates, { syncFts: false }),
     getPart,
     persistStreamingPartSnapshots,
-    getAttachment,
-    getWorkspace,
-    updateWorkspace,
     transitionToolToRunningByCallId,
     getChildSessions,
     listMessagesWithParts,
     listLatestMessagesWithPartsPage,
     getPartsBySession,
     buildEffectiveContextHistory,
-    addMessageToQueue,
-    deleteQueuedMessage,
-    getNextQueuedMessage,
-    getResponseFormat,
-    getWorkspaceAutoApproveSeverity,
   },
+  queue: {
+    addMessage: addMessageToQueue,
+    delete: deleteQueuedMessage,
+    peek: getNextQueuedMessage,
+  },
+  attachments: { get: getAttachment },
+  workspaces: {
+    get: getWorkspace,
+    getAutoApproveSeverity: getWorkspaceAutoApproveSeverity,
+  },
+  responseFormats: { get: getResponseFormat },
+  index: { syncMessage: syncMessageFts },
+};
+
+export const jean2CompatibilityBindings = {
   config: {
     findModel,
     getMaxOutputTokens,
@@ -240,26 +253,10 @@ export const jean2CompatibilityBindings = {
       tempDir: join(tmpdir(), 'jean2', sessionId),
       getEnvironmentValue: getJean2EnvValue,
       addAdditionalRoot: workspaceId
-        ? (path: string) => {
-          const workspace = getWorkspace(workspaceId);
-          if (!workspace) return false;
-          if (workspace.additionalPaths.includes(path)) return true;
-          updateWorkspace(workspaceId, {
-            additionalPaths: [...workspace.additionalPaths, path],
-          });
-          return true;
-        }
+        ? (path: string) => addWorkspaceAdditionalPath(workspaceId, path)
         : undefined,
       removeAdditionalRoot: workspaceId
-        ? (path: string) => {
-          const workspace = getWorkspace(workspaceId);
-          if (!workspace) return false;
-          if (!workspace.additionalPaths.includes(path)) return true;
-          updateWorkspace(workspaceId, {
-            additionalPaths: workspace.additionalPaths.filter((currentPath) => currentPath !== path),
-          });
-          return true;
-        }
+        ? (path: string) => removeWorkspaceAdditionalPath(workspaceId, path)
         : undefined,
     }),
   },
@@ -300,5 +297,6 @@ export const jean2CompatibilityBindings = {
 } satisfies Jean2CompatibilityBindings;
 
 export function configureCapekJean2Compatibility(): void {
+  configureStorage(jean2StorageBundle);
   setJean2CompatibilityBindings(jean2CompatibilityBindings);
 }

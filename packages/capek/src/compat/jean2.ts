@@ -1,10 +1,12 @@
-export const jean2CompatibilityPhase = 4 as const;
+export const jean2CompatibilityPhase = 5 as const;
 
 export {
   getJean2CompatibilityBindings,
   setJean2CompatibilityBindings,
   type Jean2CompatibilityBindings,
 } from './bindings';
+export { configureStorage, getStorage } from '../storage/runtime';
+export type { StorageBundle } from '../storage/contracts';
 
 export { chat, streamChat } from '../core/agent';
 export type { ChatOptions, ChatResult } from '../core/agent';

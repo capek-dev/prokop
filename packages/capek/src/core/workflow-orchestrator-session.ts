@@ -5,14 +5,16 @@ import {
   broadcastEvent,
   broadcastSessionCreated,
   broadcastSessionUpdated,
+  getModelsConfig,
+} from '../compat/jean2-dependencies';
+import {
   createMessage,
   createPart,
   createSession,
-  getModelsConfig,
   getSession,
   getWorkspaceAutoApproveSeverity,
   updateSession,
-} from '../compat/jean2-dependencies';
+} from '../storage/runtime';
 import type { BroadcastFn, BroadcastSessionFn } from '../compat/bindings';
 import { getModelWithMetadata } from './model-utils';
 import { extractJsonFromText } from './structured-output';

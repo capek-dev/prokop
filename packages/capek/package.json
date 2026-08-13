@@ -15,6 +15,10 @@
     "./tool": {
       "types": "./src/tool.ts",
       "default": "./src/tool.ts"
+    },
+    "./storage": {
+      "types": "./src/storage.ts",
+      "default": "./src/storage.ts"
     }
   },
   "dependencies": {

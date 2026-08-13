@@ -9,9 +9,9 @@ import {
   getSchedulerToolDefinition,
   getSessionSearchToolDefinition,
   getSkillManageToolDefinition,
-  getWorkspace,
   memoryToolDefinition,
 } from '../../compat/jean2-dependencies';
+import { getWorkspace } from '../../storage/runtime';
 import {
   createAskApi,
   rejectPendingAsksByToolCallId,

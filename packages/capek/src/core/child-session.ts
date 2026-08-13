@@ -2,18 +2,20 @@ import { randomUUID } from 'crypto';
 import type { MessageWithParts, Part, TextPart, Preconfig, UserMessage, ResponseFormat, StructuredOutputData } from '@jean2/sdk';
 import {
   broadcastEvent,
-  buildEffectiveContextHistory,
-  createMessage,
-  createPart,
   getLLMSubagentMaxSteps,
-  getSession,
-  getWorkspace,
   notifyTerminalMessage,
   sendToAskTargetsEvent,
   sendToControllerEvent,
+} from '../compat/jean2-dependencies';
+import {
+  buildEffectiveContextHistory,
+  createMessage,
+  createPart,
+  getSession,
+  getWorkspace,
   updateMessage,
   updateSession,
-} from '../compat/jean2-dependencies';
+} from '../storage/runtime';
 import type { AskBroadcastFn, BroadcastFn } from '../compat/bindings';
 import { classifyApiError } from '../utils/errors';
 import { streamChatWithRetry } from './retry';

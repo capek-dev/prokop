@@ -174,6 +174,44 @@ export function updateWorkspace(
   return mapRowToWorkspace(row, pathMap.get(row.id));
 }
 
+export function addWorkspaceAdditionalPath(workspaceId: string, path: string): boolean {
+  const db = getDatabase();
+  return db.transaction(() => {
+    const workspace = db.query('SELECT 1 FROM workspaces WHERE id = ?').get(workspaceId);
+    if (!workspace) return false;
+    const result = db.run(
+      'INSERT OR IGNORE INTO workspace_paths (workspace_id, path) VALUES (?, ?)',
+      [workspaceId, path],
+    );
+    if (result.changes > 0) {
+      db.run('UPDATE workspaces SET updated_at = ? WHERE id = ?', [
+        new Date().toISOString(),
+        workspaceId,
+      ]);
+    }
+    return true;
+  })();
+}
+
+export function removeWorkspaceAdditionalPath(workspaceId: string, path: string): boolean {
+  const db = getDatabase();
+  return db.transaction(() => {
+    const workspace = db.query('SELECT 1 FROM workspaces WHERE id = ?').get(workspaceId);
+    if (!workspace) return false;
+    const result = db.run(
+      'DELETE FROM workspace_paths WHERE workspace_id = ? AND path = ?',
+      [workspaceId, path],
+    );
+    if (result.changes > 0) {
+      db.run('UPDATE workspaces SET updated_at = ? WHERE id = ?', [
+        new Date().toISOString(),
+        workspaceId,
+      ]);
+    }
+    return true;
+  })();
+}
+
 export function deleteWorkspace(id: string): boolean {
   const db = getDatabase();
   const result = db.run('DELETE FROM workspaces WHERE id = ?', [id]);

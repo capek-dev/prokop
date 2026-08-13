@@ -1,11 +1,9 @@
 import type { InterruptReason, SessionInterruptResult } from '@jean2/sdk';
 import {
-  getChildSessions,
   getSandboxController,
-  getSession,
   isSandboxActive,
-  updateSession,
 } from '../compat/jean2-dependencies';
+import { getChildSessions, getSession, updateSession } from '../storage/runtime';
 import { rejectPendingAsksBySession } from '../tools/ask-user-api';
 
 interface ToolExecution {

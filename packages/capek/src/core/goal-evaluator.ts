@@ -1,5 +1,5 @@
 import type { GoalEvaluation, TextPart, ToolPart } from '@jean2/sdk';
-import { listMessagesWithParts } from '../compat/jean2-dependencies';
+import { listMessagesWithParts } from '../storage/runtime';
 import type { BroadcastFn, BroadcastSessionFn } from '../compat/bindings';
 import { runOrchestratorSession } from './workflow-orchestrator-session';
 

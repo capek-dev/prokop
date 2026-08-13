@@ -23,15 +23,15 @@ import type {
   TimeoutErrorMessage,
   ToolPart,
 } from '@jean2/sdk';
+import { broadcastSessionUpdated } from '../compat/jean2-dependencies';
 import {
-  broadcastSessionUpdated,
   getPartsByMessage,
   getSession,
   syncMessageFts,
   transitionToolToInterrupted,
   updateMessage,
   updateSession,
-} from '../compat/jean2-dependencies';
+} from '../storage/runtime';
 import { rejectPendingAsksBySession } from '../tools/ask-user-api';
 import { interruptManager } from './interrupt';
 

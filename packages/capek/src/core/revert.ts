@@ -1,4 +1,4 @@
-import { deleteMessage, listMessagesWithParts, updateMessage } from '../compat/jean2-dependencies';
+import { deleteMessage, listMessagesWithParts, updateMessage } from '../storage/runtime';
 
 interface RevertResult {
   revertedTo: { messageId: string | null; messageCount: number };

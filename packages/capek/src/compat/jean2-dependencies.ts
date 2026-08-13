@@ -2,62 +2,36 @@ import type { ServerMessage } from '@jean2/sdk';
 import { getJean2CompatibilityBindings } from './bindings';
 import type { BroadcastFn } from './bindings';
 
-export const createSession = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['createSession']>) =>
-  getJean2CompatibilityBindings().store.createSession(...args);
-export const createMessage = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['createMessage']>) =>
-  getJean2CompatibilityBindings().store.createMessage(...args);
-export const getMessage = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getMessage']>) =>
-  getJean2CompatibilityBindings().store.getMessage(...args);
-export const getMessageWithParts = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getMessageWithParts']>) =>
-  getJean2CompatibilityBindings().store.getMessageWithParts(...args);
-export const deleteMessage = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['deleteMessage']>) =>
-  getJean2CompatibilityBindings().store.deleteMessage(...args);
-export const updateMessage = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['updateMessage']>) =>
-  getJean2CompatibilityBindings().store.updateMessage(...args);
-export const getSession = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getSession']>) =>
-  getJean2CompatibilityBindings().store.getSession(...args);
-export const updateSession = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['updateSession']>) =>
-  getJean2CompatibilityBindings().store.updateSession(...args);
-export const transitionToolToInterrupted = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['transitionToolToInterrupted']>) =>
-  getJean2CompatibilityBindings().store.transitionToolToInterrupted(...args);
-export const syncMessageFts = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['syncMessageFts']>) =>
-  getJean2CompatibilityBindings().store.syncMessageFts(...args);
-export const getPartsByMessage = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getPartsByMessage']>) =>
-  getJean2CompatibilityBindings().store.getPartsByMessage(...args);
-export const createPart = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['createPart']>) =>
-  getJean2CompatibilityBindings().store.createPart(...args);
-export const updatePart = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['updatePart']>) =>
-  getJean2CompatibilityBindings().store.updatePart(...args);
-export const getPart = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getPart']>) =>
-  getJean2CompatibilityBindings().store.getPart(...args);
-export const persistStreamingPartSnapshots = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['persistStreamingPartSnapshots']>) =>
-  getJean2CompatibilityBindings().store.persistStreamingPartSnapshots(...args);
-export const getAttachment = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getAttachment']>) =>
-  getJean2CompatibilityBindings().store.getAttachment(...args);
-export const getWorkspace = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getWorkspace']>) =>
-  getJean2CompatibilityBindings().store.getWorkspace(...args);
-export const transitionToolToRunningByCallId = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['transitionToolToRunningByCallId']>) =>
-  getJean2CompatibilityBindings().store.transitionToolToRunningByCallId(...args);
-export const getChildSessions = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getChildSessions']>) =>
-  getJean2CompatibilityBindings().store.getChildSessions(...args);
-export const listMessagesWithParts = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['listMessagesWithParts']>) =>
-  getJean2CompatibilityBindings().store.listMessagesWithParts(...args);
-export const listLatestMessagesWithPartsPage = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['listLatestMessagesWithPartsPage']>) =>
-  getJean2CompatibilityBindings().store.listLatestMessagesWithPartsPage(...args);
-export const getPartsBySession = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getPartsBySession']>) =>
-  getJean2CompatibilityBindings().store.getPartsBySession(...args);
-export const buildEffectiveContextHistory = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['buildEffectiveContextHistory']>) =>
-  getJean2CompatibilityBindings().store.buildEffectiveContextHistory(...args);
-export const addMessageToQueue = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['addMessageToQueue']>) =>
-  getJean2CompatibilityBindings().store.addMessageToQueue(...args);
-export const deleteQueuedMessage = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['deleteQueuedMessage']>) =>
-  getJean2CompatibilityBindings().store.deleteQueuedMessage(...args);
-export const getNextQueuedMessage = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getNextQueuedMessage']>) =>
-  getJean2CompatibilityBindings().store.getNextQueuedMessage(...args);
-export const getResponseFormat = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getResponseFormat']>) =>
-  getJean2CompatibilityBindings().store.getResponseFormat(...args);
-export const getWorkspaceAutoApproveSeverity = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['getWorkspaceAutoApproveSeverity']>) =>
-  getJean2CompatibilityBindings().store.getWorkspaceAutoApproveSeverity(...args);
+export {
+  addMessageToQueue,
+  buildEffectiveContextHistory,
+  createMessage,
+  createPart,
+  createSession,
+  deleteMessage,
+  deleteQueuedMessage,
+  getAttachment,
+  getChildSessions,
+  getMessage,
+  getMessageWithParts,
+  getNextQueuedMessage,
+  getPart,
+  getPartsByMessage,
+  getPartsBySession,
+  getResponseFormat,
+  getSession,
+  getWorkspace,
+  getWorkspaceAutoApproveSeverity,
+  listLatestMessagesWithPartsPage,
+  listMessagesWithParts,
+  persistStreamingPartSnapshots,
+  syncMessageFts,
+  transitionToolToInterrupted,
+  transitionToolToRunningByCallId,
+  updateMessage,
+  updatePart,
+  updateSession,
+} from '../storage/runtime';
 
 export const findModel = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['config']['findModel']>) =>
   getJean2CompatibilityBindings().config.findModel(...args);

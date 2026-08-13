@@ -1,31 +1,33 @@
 import type { AskAuthority, ServerMessage } from '@jean2/sdk';
 import {
+  generateSessionTitle,
+  getDefaultPreconfig,
+  getPreconfigOrAgent,
+  getProvider,
+  hasManualSessionTitle,
+  isDefaultSessionTitle,
+  isSandboxActive,
+  notifyTerminalMessage,
+} from '../compat/jean2-dependencies';
+import {
   addMessageToQueue,
   buildEffectiveContextHistory,
   createMessage,
   createPart,
   deleteQueuedMessage,
-  generateSessionTitle,
   getAttachment,
-  getDefaultPreconfig,
   getMessage,
   getNextQueuedMessage,
   getPartsByMessage,
-  getPreconfigOrAgent,
-  getProvider,
   getResponseFormat,
   getSession,
   getWorkspace,
-  hasManualSessionTitle,
-  isDefaultSessionTitle,
-  isSandboxActive,
   listLatestMessagesWithPartsPage,
   listMessagesWithParts,
-  notifyTerminalMessage,
   updateMessage,
   updatePart,
   updateSession,
-} from '../compat/jean2-dependencies';
+} from '../storage/runtime';
 import type { AskBroadcastFn } from '../compat/bindings';
 import { executeCompaction } from './compaction-executor';
 import { runGoalLoop } from './goal-loop';

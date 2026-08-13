@@ -5,10 +5,7 @@ import type {
   AssistantMessage,
   AutoApproveSeverity,
   AskTimedOutMessage,
-  AttachmentKind,
-  Message,
   MessageWithParts,
-  Part,
   PermissionAsk,
   PermissionGrant,
   PermissionGrantOptions,
@@ -16,13 +13,9 @@ import type {
   PermissionRiskLevel,
   Ask,
   Preconfig,
-  QueuedMessage,
-  ResponseFormat,
   ScheduledJob,
   ServerMessage,
   Session,
-  ToolPart,
-  Workspace,
 } from '@jean2/sdk';
 import type { LlmCallContext, SandboxResponse } from '../sandbox/types';
 import type { WorkspaceCapabilityHost } from '../tools/workspace-capability';
@@ -62,81 +55,6 @@ export interface Jean2ModelsConfig {
   defaultProvider: string;
 }
 
-export interface StreamingPartSnapshot {
-  id: string;
-  messageId: string;
-  sessionId: string;
-  type: 'text' | 'reasoning';
-  createdAt: number;
-  text: string;
-}
-
-export interface Jean2Attachment {
-  id: string;
-  sessionId: string;
-  workspaceId: string;
-  kind: AttachmentKind;
-  filename: string;
-  mimeType: string;
-  sizeBytes: number;
-  absolutePath: string;
-  createdAt: string;
-  accessKey: string;
-}
-
-export interface EffectiveContextHistory {
-  messages: MessageWithParts[];
-  latestCompactionBoundary: string | null;
-  hasCompaction: boolean;
-}
-
-export interface TranscriptPageResult {
-  messages: MessageWithParts[];
-  pagination: {
-    hasOlder: boolean;
-    oldestSequence: number | null;
-    newestSequence: number | null;
-    limit: number;
-  };
-}
-
-export interface Jean2StoreBindings {
-  createSession(session: Omit<Session, 'createdAt' | 'updatedAt'> & { createdAt?: string; updatedAt?: string }): Session;
-  createMessage(message: Message): Message;
-  getMessage(id: string): Message | null;
-  getMessageWithParts(messageId: string): MessageWithParts | null;
-  deleteMessage(messageId: string): boolean;
-  updateMessage(id: string, updates: Partial<Message>, options?: { syncFts?: boolean }): Message | null;
-  getSession(id: string): Session | null;
-  updateSession(
-    id: string,
-    updates: Partial<Pick<Session, 'title' | 'status' | 'metadata' | 'preconfigId' | 'selectedModel' | 'selectedProvider' | 'selectedVariant' | 'promptTokens' | 'completionTokens' | 'totalTokens' | 'cacheReadTokens' | 'cacheWriteTokens' | 'noCacheTokens' | 'parentId' | 'agentName' | 'subagentStatus' | 'runningAt' | 'compacting' | 'tags' | 'autoApproveSeverity' | 'agentId'>>,
-  ): Session | null;
-  transitionToolToInterrupted(partId: string, reason: 'user_request' | 'timeout' | 'error' | 'cascade'): ToolPart | null;
-  syncMessageFts(messageId: string): void;
-  getPartsByMessage(messageId: string): Part[];
-  createPart(part: Part, sessionId: string, options?: { syncFts?: boolean }): Part;
-  updatePart(id: string, updates: Record<string, unknown>, options?: { syncFts?: boolean }): Part | null;
-  getPart(id: string): Part | null;
-  persistStreamingPartSnapshots(snapshots: StreamingPartSnapshot[]): number;
-  getAttachment(sessionId: string, attachmentId: string): Jean2Attachment | null;
-  getWorkspace(id: string): Workspace | null;
-  updateWorkspace(
-    id: string,
-    updates: { name?: string; additionalPaths?: string[]; settings?: Workspace['settings'] },
-  ): Workspace | null;
-  transitionToolToRunningByCallId(sessionId: string, callId: string, childSessionId?: string): ToolPart | null;
-  getChildSessions(parentId: string): Session[];
-  listMessagesWithParts(sessionId: string): MessageWithParts[];
-  listLatestMessagesWithPartsPage(sessionId: string, limit?: number): TranscriptPageResult;
-  getPartsBySession(sessionId: string): Part[];
-  buildEffectiveContextHistory(sessionId: string): EffectiveContextHistory;
-  addMessageToQueue(sessionId: string, content: string, attachments?: Array<{ id: string; kind: string }>): QueuedMessage;
-  deleteQueuedMessage(id: string): boolean;
-  getNextQueuedMessage(sessionId: string): QueuedMessage | null;
-  getResponseFormat(id: string): ResponseFormat | null;
-  getWorkspaceAutoApproveSeverity(workspaceId: string): AutoApproveSeverity;
-}
 
 export interface Jean2ConfigBindings {
   findModel(modelId: string, providerId?: string): Jean2ModelDefinition | undefined;
@@ -437,7 +355,6 @@ export interface Jean2SandboxBindings {
 }
 
 export interface Jean2CompatibilityBindings {
-  store: Jean2StoreBindings;
   config: Jean2ConfigBindings;
   env: Jean2EnvBindings;
   providers: Jean2ProviderBindings;

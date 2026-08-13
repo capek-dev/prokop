@@ -2,7 +2,7 @@ import type { MessageWithParts, CompactionPart, ImagePart, FilePart } from '@jea
 import type { ModelMessage } from 'ai';
 import { isTextPart, isToolPart, isImagePart, isFilePart, parseToolInput } from './part-utils';
 import { stripVisualization } from '../utils/strip-visualization';
-import { getAttachment } from '../compat/jean2-dependencies';
+import { getAttachment } from '../storage/runtime';
 
 type AiSdkContent = string | Array<{
   type: 'text' | 'tool-call' | 'tool-result' | 'image' | 'file';

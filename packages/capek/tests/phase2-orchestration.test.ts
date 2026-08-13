@@ -4,6 +4,7 @@ import type {
   AssistantMessage,
   GoalState,
   Message,
+  MessageWithParts,
   Part,
   Preconfig,
   ServerMessage,
@@ -31,6 +32,11 @@ import {
 } from '../src/compat/bindings';
 import type { StreamChatEvent } from '../src/core/retry';
 import type { ChatOptions } from '../src/core/agent';
+import {
+  configureStorage,
+  createInMemoryStorageBundle,
+  type StorageBundle,
+} from '../src/storage';
 
 const preconfig: Preconfig = {
   id: 'research',
@@ -68,9 +74,22 @@ interface RuntimeState {
   terminalMessages: AssistantMessage[];
 }
 
-function bindRuntime(state: RuntimeState, overrides: Partial<Jean2CompatibilityBindings> = {}): void {
-  const bindings = {
-    store: {
+interface RuntimeOverrides extends Partial<Jean2CompatibilityBindings> {
+  storage?: Omit<Partial<StorageBundle>, 'conversation'> & {
+    conversation?: Partial<StorageBundle['conversation']>;
+  };
+}
+
+function bindRuntime(
+  state: RuntimeState,
+  overrides: RuntimeOverrides = {},
+): void {
+  const storage = createInMemoryStorageBundle();
+  configureStorage({
+    ...storage,
+    ...overrides.storage,
+    conversation: {
+      ...storage.conversation,
       getSession: (id: string) => state.sessions.get(id) ?? null,
       updateSession: (id: string, updates: Partial<Session>) => {
         const current = state.sessions.get(id);
@@ -102,11 +121,17 @@ function bindRuntime(state: RuntimeState, overrides: Partial<Jean2CompatibilityB
         state.parts.push(part);
         return part;
       },
-      getWorkspace: () => null,
       buildEffectiveContextHistory: () => ({ messages: [], latestCompactionBoundary: null, hasCompaction: false }),
       listMessagesWithParts: () => [],
-      getWorkspaceAutoApproveSeverity: () => 'low' as const,
+      ...overrides.storage?.conversation,
     },
+    workspaces: {
+      ...storage.workspaces,
+      get: () => null,
+      getAutoApproveSeverity: () => 'low' as const,
+    },
+  });
+  const bindings = {
     config: {
       getModelsConfig: () => ({ providers: [], defaultModel: 'test-model', defaultProvider: 'test-provider' }),
       listSubagentPreconfigs: async () => [preconfig],
@@ -128,6 +153,7 @@ function bindRuntime(state: RuntimeState, overrides: Partial<Jean2CompatibilityB
     },
   } as unknown as Jean2CompatibilityBindings;
   for (const [group, value] of Object.entries(overrides)) {
+    if (group === 'storage') continue;
     const key = group as keyof Jean2CompatibilityBindings;
     bindings[key] = { ...bindings[key], ...value } as never;
   }
@@ -247,16 +273,21 @@ describe.serial('Phase 2 orchestration contracts', () => {
 
   test('uses effective history when resuming a child session', async () => {
     const state = createState();
-    const priorMessage = { message: { id: 'prior', sessionId: 'child', role: 'user', createdAt: 1 }, parts: [] };
+    const priorMessage: MessageWithParts = {
+      message: { id: 'prior', sessionId: 'child', role: 'user', createdAt: 1 },
+      parts: [],
+    };
     let receivedMessageCount = 0;
     bindRuntime(state, {
-      store: {
-        buildEffectiveContextHistory: () => ({
-          messages: [priorMessage],
-          latestCompactionBoundary: null,
-          hasCompaction: false,
-        }),
-      } as never,
+      storage: {
+        conversation: {
+          buildEffectiveContextHistory: () => ({
+            messages: [priorMessage],
+            latestCompactionBoundary: null,
+            hasCompaction: false,
+          }),
+        },
+      },
     });
 
     await executeChildSession({
@@ -267,7 +298,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
       resumeFromHistory: true,
       streamChat: (async function* (options: ChatOptions) {
         receivedMessageCount = options.messages.length;
-        yield* [] as StreamChatEvent[];
+        if (options.messages.length < 0) yield {} as StreamChatEvent;
       }) as typeof import('../src/core/retry').streamChatWithRetry,
     });
 

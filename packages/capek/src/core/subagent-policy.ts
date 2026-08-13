@@ -1,5 +1,6 @@
 import type { Preconfig, Session } from '@jean2/sdk';
-import { getSession, listPreconfigs } from '../compat/jean2-dependencies';
+import { listPreconfigs } from '../compat/jean2-dependencies';
+import { getSession } from '../storage/runtime';
 
 export type SubagentPolicyReason =
   | 'allowed'

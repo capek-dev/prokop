@@ -1,6 +1,6 @@
 import { streamText, stepCountIs } from 'ai';
 import type { MessageWithParts, ToolPart, StepPart, Preconfig, MessageEvent, AssistantMessage, ResponseFormat } from '@jean2/sdk';
-import { createMessage, updateMessage, getSession, updateSession, transitionToolToInterrupted, syncMessageFts } from '../compat/jean2-dependencies';
+import { createMessage, updateMessage, getSession, updateSession, transitionToolToInterrupted, syncMessageFts } from '../storage/runtime';
 
 import { findModel, getMaxOutputTokens } from '../compat/jean2-dependencies';
 import { randomUUID } from 'crypto';
@@ -355,7 +355,7 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
 
   yield { type: 'message.updated', message: finalMessage };
 
-  // Phase 3: Sync FTS once after all final parts and message state are persisted
+  // Sync FTS once after all final parts and message state are persisted
   syncMessageFts(messageId);
 
   if (usageData) {
