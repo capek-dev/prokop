@@ -1,3 +1,5 @@
+import { tmpdir } from 'os';
+import { join } from 'path';
 import {
   setJean2CompatibilityBindings,
   type Jean2CompatibilityBindings,
@@ -108,7 +110,6 @@ import {
   rejectPendingAsksByToolCallId,
 } from '@/tools/ask-user-api';
 import { readInstallManifest } from '@/tools/tool-install-manifest';
-import { isPathWithinWorkspace, resolvePath } from '@/utils/paths';
 
 export const jean2CompatibilityBindings = {
   store: {
@@ -208,10 +209,36 @@ export const jean2CompatibilityBindings = {
     initializeWorkspace,
     getTools,
   },
-  paths: {
-    getUploadDir,
-    isPathWithinWorkspace,
-    resolvePath,
+  workspace: {
+    createToolWorkspaceHost: ({ workspaceId, workspacePath, additionalPaths, sessionId }) => ({
+      root: workspacePath,
+      additionalRoots: additionalPaths,
+      allowedRoots: [getUploadDir()],
+      tempDir: join(tmpdir(), 'jean2', sessionId),
+      getEnvironmentValue: getJean2EnvValue,
+      addAdditionalRoot: workspaceId
+        ? (path: string) => {
+          const workspace = getWorkspace(workspaceId);
+          if (!workspace) return false;
+          if (workspace.additionalPaths.includes(path)) return true;
+          updateWorkspace(workspaceId, {
+            additionalPaths: [...workspace.additionalPaths, path],
+          });
+          return true;
+        }
+        : undefined,
+      removeAdditionalRoot: workspaceId
+        ? (path: string) => {
+          const workspace = getWorkspace(workspaceId);
+          if (!workspace) return false;
+          if (!workspace.additionalPaths.includes(path)) return true;
+          updateWorkspace(workspaceId, {
+            additionalPaths: workspace.additionalPaths.filter((currentPath) => currentPath !== path),
+          });
+          return true;
+        }
+        : undefined,
+    }),
   },
   tools: {
     readInstallManifest,

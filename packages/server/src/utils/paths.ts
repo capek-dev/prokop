@@ -1,4 +1,4 @@
-import { resolve, isAbsolute, join } from 'path';
+import { resolve, isAbsolute, join, relative, sep } from 'path';
 import { homedir } from 'os';
 
 export function expandPath(inputPath: string): string {
@@ -26,7 +26,11 @@ export function isPathWithinWorkspace(
 ): boolean {
   const resolved = resolvePath(targetPath, workspacePath);
   const allAllowed = [resolve(workspacePath), ...additionalPaths.map((p) => resolve(p))];
-  return allAllowed.some((allowed) => resolved.startsWith(allowed));
+  return allAllowed.some((allowed) => {
+    const relativePath = relative(allowed, resolved);
+    return relativePath === ''
+      || (relativePath !== '..' && !relativePath.startsWith(`..${sep}`) && !isAbsolute(relativePath));
+  });
 }
 
 /**

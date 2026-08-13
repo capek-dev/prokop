@@ -2,9 +2,10 @@ import { tool, jsonSchema } from 'ai';
 import { getTool } from '../../tools/registry';
 import { executeTool } from '../../tools/executor';
 import { createLlmApi } from '../../tools/llm-api';
+import { createWorkspaceCapability } from '../../tools/workspace-capability';
 import {
   createAskApi,
-  getUploadDir,
+  getToolWorkspaceHost,
   rejectPendingAsksByToolCallId,
   transitionToolToRunningByCallId,
   type AskBroadcastFn,
@@ -133,14 +134,18 @@ export async function buildExternalTools(options: ExternalToolsOptions): Promise
               ? createAskApi(sessionId, tcId, definition.name, broadcastFn, workspaceId, rootSessionId)
               : (() => { throw new Error('Cannot ask user: no broadcast channel available (broadcastFn not provided)'); }) as import('@jean2/sdk').AskApi;
 
+          const workspace = createWorkspaceCapability(getToolWorkspaceHost({
+            workspaceId,
+            workspacePath,
+            additionalPaths,
+            sessionId,
+          }));
           const result = await executeTool({
             tool: loadedTool,
             args,
-            workspacePath,
+            workspace,
             sessionId,
             workspaceId,
-            allowedPaths: [getUploadDir()],
-            additionalPaths: additionalPaths ?? [],
             toolCallId,
             abortSignal: toolAbortController.signal,
             timeout: definition.timeout,
