@@ -12,7 +12,8 @@ import { createStepCallbacks, type CallbackEvent, type UsageEventData } from './
 import { createStreamHandlers } from './stream-handlers';
 import { convertToAiSdkMessages } from './message-utils';
 import { buildAiSdkTools, type BuildToolsOptions } from './build-tools';
-import { getAgentDirectory, initializeWorkspace, resolveEffectiveSubagentTargets } from '../compat/jean2-dependencies';
+import { getAgentDirectory, initializeWorkspace } from '../compat/jean2-dependencies';
+import { resolveEffectiveSubagentTargets } from './subagent-policy';
 import { join } from 'path';
 
 import { classifyApiError } from '../utils/errors';

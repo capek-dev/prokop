@@ -1,337 +1,253 @@
-import { describe, test, expect, mock, afterEach } from 'bun:test';
-import type { Session } from '@jean2/sdk';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { MockLanguageModelV3, convertArrayToReadableStream } from 'ai/test';
+import type { AssistantMessage, ServerMessage } from '@jean2/sdk';
+import {
+  getJean2CompatibilityBindings,
+  setJean2CompatibilityBindings,
+} from '@capekai/core/compat/jean2';
+import type { ModelFactoryOptions } from '@capekai/core/compat/jean2';
+import { configureCapekJean2Compatibility } from '@/capek-adapter';
+import { executeCompaction, isCompactionActive } from '@/core/compaction-executor';
+import {
+  createMessage,
+  createPart,
+  createSession,
+  getSession,
+  listMessagesWithParts,
+} from '@/store';
+import { resetTestDatabase, setupTestDatabase } from '#tests/db';
+import { seedWorkspaceWithSession } from '#tests/seed';
 
-interface _ExecutorResult {
-  ok: boolean;
-  error?: string;
-  reason: string;
-  skipped?: boolean;
-  triggerMessageId?: string | null;
-  result?: {
-    tokensUsed: { prompt: number; completion: number };
-    summaryMessageId: string;
-    textParts: Array<{ id: string; messageId: string; createdAt: number; type: string; text: string }>;
-  };
+interface ModelControl {
+  modelFactoryError?: unknown;
+  wait?: Promise<void>;
+  requestedModels: ModelFactoryOptions[];
 }
 
-async function setupMocks(opts: {
-  sessions?: Map<string, Session>;
-  shouldThrow?: Error;
-}) {
-  const sessionStore = opts.sessions ?? new Map<string, Session>();
-  const sessionUpdates = new Map<string, Record<string, unknown>[]>();
-
-  mock.module('@/store', () => ({
-    getSession: mock((id: string): Session | null => sessionStore.get(id) ?? null),
-    updateSession: mock((id: string, updates: Record<string, unknown>): Session | null => {
-      const calls = sessionUpdates.get(id) ?? [];
-      calls.push(updates);
-      sessionUpdates.set(id, calls);
-      const existing = sessionStore.get(id);
-      if (!existing) return null;
-      const updated = { ...existing, ...updates };
-      sessionStore.set(id, updated);
-      return updated;
-    }),
-    listMessagesWithParts: mock((_sessionId: string) => []),
-  }));
-
-  mock.module('@/core/compaction', () => ({
-    resolveCompactionPolicy: mock(() => ({
-      modelId: null, providerId: null, maxOutputTokens: 4096,
-      overflowThresholdRatio: null, preserveRecentToolCount: 3,
-      preserveSmallToolChars: 5000, toolClearCharsThreshold: 10000,
-      maxPrunedToolCount: 50, autoThresholdRatio: 0.8,
-      autoReserveCapTokens: 0, autoSafetyMarginTokens: 0,
-    })),
-    createCompactionTrigger: mock((_sessionId: string, _reason: string) => ({
-      messageId: 'trigger-msg-1', reason: 'manual',
-    })),
-    processCompactionTask: mock(async (_sessionId: string, _triggerMessageId: string, _policy: unknown) => {
-      if (opts.shouldThrow) throw opts.shouldThrow;
+function createCompactionModel(control: ModelControl): MockLanguageModelV3 {
+  return new MockLanguageModelV3({
+    doStream: async () => {
+      if (control.wait) await control.wait;
       return {
-        tokensUsed: { prompt: 1000, completion: 200 },
-        summaryMessage: { id: 'summary-msg-1', sessionId: 'sess-1', role: 'assistant', createdAt: Date.now() },
-        textParts: [
-          { id: 'part-1', messageId: 'summary-msg-1', createdAt: Date.now(), type: 'text', text: 'Summary of conversation' },
-        ],
+        stream: convertArrayToReadableStream([
+          { type: 'stream-start', warnings: [] },
+          { type: 'text-start', id: 'summary' },
+          { type: 'text-delta', id: 'summary', delta: '## Summary\n\nCompacted conversation summary.' },
+          { type: 'text-end', id: 'summary' },
+          {
+            type: 'finish',
+            finishReason: { unified: 'stop', raw: undefined },
+            usage: {
+              inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
+              outputTokens: { total: 20, text: 20, reasoning: undefined },
+            },
+          },
+        ]),
       };
-    }),
-    persistCompactionFailure: mock((_sessionId: string, _triggerMessageId: string, _error: string, _broadcast: unknown) => {}),
-  }));
-
-  mock.module('@/config', () => ({
-    getModelsConfig: mock(() => ({
-      defaultModel: 'gpt-4o',
-      defaultProvider: 'openai',
-      models: [],
-    })),
-  }));
-
-  const { executeCompaction } = await import('@/core/compaction-executor');
-  return { executeCompaction, sessionUpdates };
+    },
+  });
 }
 
-function createMainSession(overrides: Partial<Session> = {}): Session {
-  return {
-    id: 'sess-1',
-    workspaceId: 'ws-1',
-    preconfigId: null,
-    title: 'Test Session',
-    status: 'active',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    metadata: null,
-    selectedModel: null,
-    selectedProvider: null,
-    selectedVariant: null,
-    parentId: null,
-    agentName: null,
-    subagentStatus: null,
-    runningAt: null,
-    compacting: false,
-    ...overrides,
-  };
-}
-
-describe('compaction-executor', () => {
-  afterEach(() => mock.restore());
-
-  // ── Guard: main session only ────────────────────────────────
-
-  describe('main session guard', () => {
-    test('returns error when session not found', async () => {
-      const { executeCompaction } = await setupMocks({ sessions: new Map() });
-      const result = await executeCompaction('nonexistent', 'manual');
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toBe('Compaction is only available for main sessions');
-        expect(result.skipped).toBe(true);
-        expect(result.triggerMessageId).toBeNull();
-      }
-    });
-
-    test('returns error for child session (has parentId)', async () => {
-      const sessions = new Map<string, Session>();
-      sessions.set('child-1', createMainSession({ id: 'child-1', parentId: 'parent-1' }));
-      const { executeCompaction } = await setupMocks({ sessions });
-
-      const result = await executeCompaction('child-1', 'manual');
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toBe('Compaction is only available for main sessions');
-        expect(result.skipped).toBe(true);
-      }
-    });
-  });
-
-  // ── Compacting state transitions ────────────────────────────
-
-  describe('compacting state transitions', () => {
-    test('sets compacting to true then false on success', async () => {
-      const sessions = new Map<string, Session>();
-      sessions.set('sess-1', createMainSession());
-      const { executeCompaction, sessionUpdates } = await setupMocks({ sessions });
-
-      const result = await executeCompaction('sess-1', 'manual');
-
-      expect(result.ok).toBe(true);
-      const updates = sessionUpdates.get('sess-1') ?? [];
-      const compactingTrue = updates.find(u => 'compacting' in u && u.compacting === true);
-      const compactingFalse = updates.find(u => 'compacting' in u && u.compacting === false);
-      expect(compactingTrue).toBeDefined();
-      expect(compactingFalse).toBeDefined();
-    });
-
-    test('sets compacting to false on failure', async () => {
-      const sessions = new Map<string, Session>();
-      sessions.set('sess-1', createMainSession());
-      const { executeCompaction, sessionUpdates } = await setupMocks({
-        sessions,
-        shouldThrow: new Error('LLM error'),
-      });
-
-      const result = await executeCompaction('sess-1', 'manual');
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.skipped).toBe(false);
-      }
-      const updates = sessionUpdates.get('sess-1') ?? [];
-      const compactingFalse = updates.find(u => 'compacting' in u && u.compacting === false);
-      expect(compactingFalse).toBeDefined();
-    });
-  });
-
-  // ── Policy resolution ───────────────────────────────────────
-
-  describe('policy resolution', () => {
-    test('uses session selectedModel when set', async () => {
-      const sessions = new Map<string, Session>();
-      sessions.set('sess-1', createMainSession({
-        selectedModel: 'claude-3-opus',
-        selectedProvider: 'anthropic',
-      }));
-      const { executeCompaction } = await setupMocks({ sessions });
-
-      await executeCompaction('sess-1', 'manual');
-
-      const { resolveCompactionPolicy } = await import('@/core/compaction');
-      expect(resolveCompactionPolicy).toHaveBeenCalledWith('claude-3-opus', 'anthropic');
-    });
-
-    test('uses default model when session has no selection', async () => {
-      const sessions = new Map<string, Session>();
-      sessions.set('sess-1', createMainSession({
-        selectedModel: null,
-        selectedProvider: null,
-      }));
-      const { executeCompaction } = await setupMocks({ sessions });
-
-      await executeCompaction('sess-1', 'manual');
-
-      const { resolveCompactionPolicy } = await import('@/core/compaction');
-      expect(resolveCompactionPolicy).toHaveBeenCalledWith('gpt-4o', 'openai');
-    });
-  });
-
-  // ── Successful compaction ───────────────────────────────────
-
-  describe('successful compaction', () => {
-    test('returns ok result with token usage', async () => {
-      const sessions = new Map<string, Session>();
-      sessions.set('sess-1', createMainSession());
-      const { executeCompaction } = await setupMocks({ sessions });
-
-      const result = await executeCompaction('sess-1', 'manual');
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.result!.tokensUsed).toEqual({ prompt: 1000, completion: 200 });
-        expect(result.result!.summaryMessageId).toBe('summary-msg-1');
-        expect(result.triggerMessageId).toBe('trigger-msg-1');
-        expect(result.reason).toBe('manual');
-      }
-    });
-
-    test('returns text parts in result', async () => {
-      const sessions = new Map<string, Session>();
-      sessions.set('sess-1', createMainSession());
-      const { executeCompaction } = await setupMocks({ sessions });
-
-      const result = await executeCompaction('sess-1', 'manual');
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.result!.textParts).toHaveLength(1);
-        expect(result.result!.textParts[0].text).toBe('Summary of conversation');
-      }
-    });
-
-    test('updates session tokens from compaction result', async () => {
-      const sessions = new Map<string, Session>();
-      sessions.set('sess-1', createMainSession());
-      const { executeCompaction, sessionUpdates } = await setupMocks({ sessions });
-
-      await executeCompaction('sess-1', 'manual');
-
-      const updates = sessionUpdates.get('sess-1') ?? [];
-      const tokenUpdate = updates.find(u => 'totalTokens' in u);
-      expect(tokenUpdate).toBeDefined();
-      expect(tokenUpdate!.promptTokens).toBe(1000);
-      expect(tokenUpdate!.completionTokens).toBe(200);
-      expect(tokenUpdate!.totalTokens).toBe(1200);
-    });
-  });
-
-  // ── Failed compaction ───────────────────────────────────────
-
-  describe('failed compaction', () => {
-    test('returns error result when processCompactionTask throws', async () => {
-      const sessions = new Map<string, Session>();
-      sessions.set('sess-1', createMainSession());
-      const { executeCompaction } = await setupMocks({
-        sessions,
-        shouldThrow: new Error('Model unavailable'),
-      });
-
-      const result = await executeCompaction('sess-1', 'manual');
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toBe('Model unavailable');
-        expect(result.triggerMessageId).toBe('trigger-msg-1');
-        expect(result.reason).toBe('manual');
-        expect(result.skipped).toBe(false);
-      }
-    });
-
-    test('persists compaction failure', async () => {
-      const sessions = new Map<string, Session>();
-      sessions.set('sess-1', createMainSession());
-      const { executeCompaction } = await setupMocks({
-        sessions,
-        shouldThrow: new Error('Token limit exceeded'),
-      });
-
-      await executeCompaction('sess-1', 'manual');
-
-      const { persistCompactionFailure } = await import('@/core/compaction');
-      expect(persistCompactionFailure).toHaveBeenCalledWith('sess-1', 'trigger-msg-1', 'Token limit exceeded', expect.any(Function));
-    });
-
-    test('handles non-Error thrown values', async () => {
-      const sessions = new Map<string, Session>();
-      sessions.set('sess-1', createMainSession());
-
-      mock.module('@/store', () => ({
-        getSession: mock((id: string): Session | null => sessions.get(id) ?? null),
-        updateSession: mock((id: string, updates: Record<string, unknown>): Session | null => {
-          const existing = sessions.get(id);
-          if (!existing) return null;
-          const updated = { ...existing, ...updates };
-          sessions.set(id, updated);
-          return updated;
-        }),
-        listMessagesWithParts: mock((_sessionId: string) => []),
-      }));
-
-      mock.module('@/core/compaction', () => ({
-        resolveCompactionPolicy: mock(() => ({ modelId: null, providerId: null })),
-        createCompactionTrigger: mock(() => ({ messageId: 'trigger-msg-1', reason: 'manual' })),
-        processCompactionTask: mock(async () => { throw 'string error'; }),
-        persistCompactionFailure: mock(() => {}),
-      }));
-
-      mock.module('@/config', () => ({
-        getModelsConfig: mock(() => ({ defaultModel: 'gpt-4o', defaultProvider: 'openai' })),
-      }));
-
-      const { executeCompaction } = await import('@/core/compaction-executor');
-      const result = await executeCompaction('sess-1', 'manual');
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toBe('Compaction failed');
-      }
-    });
-  });
-
-  // ── Reason propagation ──────────────────────────────────────
-
-  describe('reason propagation', () => {
-    test.each(['manual', 'auto', 'overflow'] as const)(
-      'propagates "%s" reason through result',
-      async (reason) => {
-        const sessions = new Map<string, Session>();
-        sessions.set('sess-1', createMainSession());
-        const { executeCompaction } = await setupMocks({ sessions });
-
-        const result = await executeCompaction('sess-1', reason);
-        expect(result.reason).toBe(reason);
+function installBindings(control: ModelControl): void {
+  configureCapekJean2Compatibility();
+  const bindings = getJean2CompatibilityBindings();
+  const model = createCompactionModel(control);
+  setJean2CompatibilityBindings({
+    ...bindings,
+    providers: {
+      getProvider: () => ({}) as ReturnType<typeof bindings.providers.getProvider>,
+      createModelForProvider: async (options) => {
+        control.requestedModels.push(options);
+        if (control.modelFactoryError !== undefined) throw control.modelFactoryError;
+        return { model };
       },
+    },
+  });
+}
+
+function createConversation(sessionId: string): void {
+  const userMessage = createMessage({
+    id: 'user-1',
+    sessionId,
+    role: 'user',
+    createdAt: 1,
+  });
+  createPart({
+    id: 'user-text-1',
+    messageId: userMessage.id,
+    createdAt: 1,
+    type: 'text',
+    text: 'Explain TypeScript.',
+  }, sessionId);
+  const assistantMessage = createMessage({
+    id: 'assistant-1',
+    sessionId,
+    role: 'assistant',
+    status: 'completed',
+    modelId: 'gpt-4o',
+    providerId: 'openai',
+    tokens: { prompt: 5, completion: 5 },
+    cost: 0,
+    createdAt: 2,
+    completedAt: 2,
+  } as AssistantMessage);
+  createPart({
+    id: 'assistant-text-1',
+    messageId: assistantMessage.id,
+    createdAt: 2,
+    type: 'text',
+    text: 'TypeScript adds static types.',
+  }, sessionId);
+}
+
+function noBroadcast(_message: ServerMessage): void {}
+
+describe('package-owned compaction executor', () => {
+  let sessionId: string;
+  let workspaceId: string;
+  let control: ModelControl;
+
+  beforeEach(() => {
+    setupTestDatabase();
+    ({ sessionId, workspaceId } = seedWorkspaceWithSession());
+    control = { requestedModels: [] };
+    installBindings(control);
+  });
+
+  afterEach(() => {
+    resetTestDatabase();
+    configureCapekJean2Compatibility();
+  });
+
+  test('rejects missing and child sessions without starting compaction', async () => {
+    const missing = await executeCompaction('missing', 'manual', noBroadcast, () => {});
+    expect(missing).toEqual({
+      ok: false,
+      error: 'Compaction is only available for main sessions',
+      triggerMessageId: null,
+      reason: 'manual',
+      skipped: true,
+    });
+
+    const child = createSession({
+      id: 'child-1',
+      workspaceId,
+      preconfigId: null,
+      title: 'Child',
+      status: 'active',
+      metadata: null,
+      parentId: sessionId,
+      agentName: 'child',
+    });
+    const childResult = await executeCompaction(child.id, 'manual', noBroadcast, () => {});
+    expect(childResult.ok).toBe(false);
+    expect(isCompactionActive(child.id)).toBe(false);
+  });
+
+  test('persists summary, usage, state transitions, and reason on success', async () => {
+    createConversation(sessionId);
+    const sessionUpdates: boolean[] = [];
+
+    const result = await executeCompaction(
+      sessionId,
+      'auto',
+      noBroadcast,
+      (session) => sessionUpdates.push(session.compacting === true),
     );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.reason).toBe('auto');
+    expect(result.result.tokensUsed).toMatchObject({ prompt: 10, completion: 20 });
+    expect(sessionUpdates).toEqual([true, false]);
+    expect(getSession(sessionId)).toMatchObject({
+      compacting: false,
+      promptTokens: 10,
+      completionTokens: 20,
+      totalTokens: 30,
+    });
+    const summary = listMessagesWithParts(sessionId).find(
+      ({ message }) => message.role === 'assistant' && message.summary === true,
+    );
+    expect(summary?.message.id).toBe(result.result.summaryMessageId);
+    expect(summary?.parts.find((part) => part.type === 'text')).toMatchObject({
+      text: '## Summary\n\nCompacted conversation summary.',
+    });
+  });
+
+  test('uses the session model and provider for compaction', async () => {
+    createConversation(sessionId);
+    const session = getSession(sessionId);
+    expect(session).not.toBeNull();
+    const bindings = getJean2CompatibilityBindings();
+    bindings.store.updateSession(sessionId, {
+      selectedModel: 'custom-model',
+      selectedProvider: 'custom-provider',
+    });
+
+    await executeCompaction(sessionId, 'manual', noBroadcast, () => {});
+
+    expect(control.requestedModels[0]).toMatchObject({
+      modelId: 'custom-model',
+      providerId: 'custom-provider',
+    });
+  });
+
+  test('records a failed compaction and clears compacting state', async () => {
+    createConversation(sessionId);
+    control.modelFactoryError = new Error('Model unavailable');
+
+    const result = await executeCompaction(sessionId, 'overflow', noBroadcast, () => {});
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result).toMatchObject({
+      error: 'Model unavailable',
+      reason: 'overflow',
+      skipped: false,
+    });
+    expect(result.triggerMessageId).toBeString();
+    expect(getSession(sessionId)?.compacting).toBe(false);
+    const failure = listMessagesWithParts(sessionId).find(
+      ({ message }) => message.role === 'assistant' && message.mode === 'compact_failed',
+    );
+    expect(failure?.message).toMatchObject({
+      status: 'error',
+      error: 'Model unavailable',
+      parentId: result.triggerMessageId,
+    });
+  });
+
+  test('normalizes non-Error failures', async () => {
+    createConversation(sessionId);
+    control.modelFactoryError = 'string error';
+
+    const result = await executeCompaction(sessionId, 'manual', noBroadcast, () => {});
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('Compaction failed');
+  });
+
+  test('prevents a second compaction while the first is active', async () => {
+    createConversation(sessionId);
+    let release: (() => void) | undefined;
+    control.wait = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const first = executeCompaction(sessionId, 'manual', noBroadcast, () => {});
+    while (!isCompactionActive(sessionId)) await Promise.resolve();
+    const second = await executeCompaction(sessionId, 'auto', noBroadcast, () => {});
+
+    expect(second).toEqual({
+      ok: false,
+      error: 'Compaction is already in progress for this session',
+      triggerMessageId: null,
+      reason: 'auto',
+      skipped: true,
+    });
+    release?.();
+    expect((await first).ok).toBe(true);
+    expect(isCompactionActive(sessionId)).toBe(false);
   });
 });

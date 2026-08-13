@@ -7,17 +7,16 @@ import {
   executeSchedulerTool,
   executeSessionSearchTool,
   executeSkillManageTool,
-  executeWorkflow,
   getSchedulerToolDefinition,
   getSessionSearchToolDefinition,
   getSkillManageToolDefinition,
-  getWorkflowToolDefinition,
   getWorkspace,
   memoryToolDefinition,
   rejectPendingAsksByToolCallId,
   type AskBroadcastFn,
 } from '../../compat/jean2-dependencies';
 import { interruptManager } from '../interrupt';
+import { executeWorkflow, getWorkflowToolDefinition } from '../workflow';
 import type { WorkflowInput, WorkflowResult, PermissionRiskLevel } from '@jean2/sdk';
 import { join } from 'path';
 import type { ToolMap } from './types';

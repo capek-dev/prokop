@@ -18,6 +18,23 @@ const expectedValueExports: Record<string, string[]> = {
     'getDefaultCompactionPolicy', 'persistCompactionFailure', 'processCompactionTask',
     'resolveCompactionPolicy',
   ],
+  '@/core/compaction-executor': ['executeCompaction', 'isCompactionActive'],
+  '@/core/fork': ['forkSession'],
+  '@/core/revert': ['revertToStep'],
+  '@/core/workflow-orchestrator-session': ['runOrchestratorSession'],
+  '@/core/goal-evaluator': ['buildContinuationMessage', 'evaluateGoal'],
+  '@/core/goal-loop': ['runGoalLoop'],
+  '@/core/chat-handler': ['handleChat', 'handleSessionEditMessage', 'regenerateSessionTitle'],
+  '@/core/subagent-policy': [
+    'collectSubagentAncestry', 'evaluateSubagentTarget', 'getSubagentResumeError',
+    'isSubagentSpawningDisabled', 'isValidSubagentPreconfig',
+    'isValidSubagentTargetPreconfig', 'resolveEffectiveSubagentTargets',
+  ],
+  '@/core/child-session': ['executeChildSession'],
+  '@/core/subagent': ['canSpawnSubagent', 'executeSubagent', 'getSubagentToolDefinition'],
+  '@/core/workflow-decomposer': ['decomposeTask'],
+  '@/core/workflow-synthesizer': ['synthesizeResults'],
+  '@/core/workflow': ['canSpawnSubagent', 'executeWorkflow', 'getWorkflowToolDefinition'],
   '@/core/interrupt': ['interruptManager'],
   '@/core/build-tools': ['buildAiSdkTools'],
   '@/core/tool-capabilities': ['isToolAllowedInContext', 'resolveToolExecutionScopes'],
@@ -46,7 +63,7 @@ const expectedValueExports: Record<string, string[]> = {
   '@/sandbox/provider': ['SandboxProvider'],
 };
 
-describe('Phase 1 server compatibility shims', () => {
+describe('Phase 2 server compatibility shims', () => {
   for (const [specifier, expected] of Object.entries(expectedValueExports)) {
     test(`${specifier} preserves its HEAD value export surface`, async () => {
       const module = await import(specifier);
