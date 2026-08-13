@@ -213,4 +213,65 @@ describe('streamChatWithRetry', () => {
     expect(errorEvent.code).toBe('chat_error');
     expect(callCount).toBe(1);
   });
+
+  test('does not retry after tool activity', async () => {
+    let callCount = 0;
+    const mockStream: StreamChatFn = async function* (_options: ChatOptions) {
+      callCount++;
+      yield {
+        type: 'part.created',
+        sessionId: 'test-session',
+        part: {
+          id: 'tool-part',
+          messageId: 'assistant-message',
+          type: 'tool',
+          name: 'write-file',
+          callId: 'tool-call',
+          state: { status: 'running', input: {} },
+          createdAt: 0,
+        },
+      } as StreamChatEvent;
+      throw createError({ message: 'Server error', status: 500 });
+    };
+
+    const events = await collect(streamChatWithRetry(makeOptions(), mockStream));
+
+    expect(callCount).toBe(1);
+    expect(events.map((event) => event.type)).toEqual([
+      'part.created',
+      'chat.retry',
+      'error.server',
+    ]);
+    const retryEvent = events[1];
+    expect(retryEvent.type).toBe('chat.retry');
+    if (retryEvent.type === 'chat.retry') {
+      expect(retryEvent.status).toBe('exhausted');
+      expect(retryEvent.message).toContain('used a tool');
+    }
+  });
+
+  test('cancels retry while waiting for backoff', async () => {
+    globalThis.setTimeout = originalSetTimeout;
+    // eslint-disable-next-line require-yield
+    const mockStream: StreamChatFn = async function* (options: ChatOptions) {
+      options.retryAbortController?.abort();
+      throw createError({ message: 'Server error', status: 500 });
+    };
+
+    const events = await collect(streamChatWithRetry(makeOptions({
+      modelId: 'cancellation-model',
+      providerId: 'cancellation-provider',
+    }), mockStream, {
+      baseDelayMs: 1,
+      maxDelayMs: 1,
+      jitterRatio: 0,
+    }));
+
+    expect(events.map((event) => event.type)).toEqual(['chat.retry']);
+    const retryEvent = events[0];
+    expect(retryEvent.type).toBe('chat.retry');
+    if (retryEvent.type === 'chat.retry') {
+      expect(retryEvent.status).toBe('cancelled');
+    }
+  });
 });

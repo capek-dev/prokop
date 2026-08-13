@@ -26,6 +26,7 @@
     "test:coverage": "bun test --coverage"
   },
   "dependencies": {
+    "@capekai/core": "workspace:*",
     "@ai-sdk/deepseek": "^2.0.35",
     "@ai-sdk/openai": "^3.0.84",
     "@clack/prompts": "^0.10.0",

@@ -1,12 +1,7 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
 import { interruptManager } from '@/core/interrupt';
-
-// Mock ask-user-api to avoid side effects on the real pending asks map
-mock.module('@/tools/ask-user-api', () => ({
-  rejectPendingAsksBySession: () => [],
-}));
 
 describe('InterruptManager', () => {
   let sessionId: string;

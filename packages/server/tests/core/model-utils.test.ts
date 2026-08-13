@@ -1,9 +1,17 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { configureCapekJean2Compatibility } from '@/capek-adapter';
 import { getModelWithMetadata } from '@/core/model-utils';
+import { activateSandbox, deactivateSandbox } from '@/sandbox';
+import { SandboxLanguageModel } from '@/sandbox/model';
 
 const originalOpenAIApiKey = process.env.JEAN2_LLM_OPENAI_API_KEY;
 
+beforeEach(() => {
+  configureCapekJean2Compatibility();
+});
+
 afterEach(() => {
+  deactivateSandbox();
   if (originalOpenAIApiKey === undefined) {
     delete process.env.JEAN2_LLM_OPENAI_API_KEY;
   } else {
@@ -12,6 +20,19 @@ afterEach(() => {
 });
 
 describe('getModelWithMetadata', () => {
+  test('routes the main model path through sandbox when active', async () => {
+    activateSandbox();
+
+    const result = await getModelWithMetadata({
+      modelId: 'any-model',
+      providerId: 'openai',
+      sessionId: 'main-session',
+    });
+
+    expect(result.model).toBeInstanceOf(SandboxLanguageModel);
+    expect(result.omitMaxOutputTokens).toBe(true);
+  });
+
   test('uses the OpenAI Responses connector with local storage disabled', async () => {
     process.env.JEAN2_LLM_OPENAI_API_KEY = 'test-key';
 

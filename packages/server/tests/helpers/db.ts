@@ -1,4 +1,5 @@
 import { Database } from 'bun:sqlite';
+import { configureCapekJean2Compatibility } from '@/capek-adapter';
 import { initializeSchema, DB } from '@/store';
 
 /**
@@ -27,6 +28,7 @@ export function createTestDatabase(): Database {
  *   afterEach(() => resetTestDatabase());
  */
 export function setupTestDatabase(): Database {
+  configureCapekJean2Compatibility();
   const db = createTestDatabase();
   DB.configure({ database: db });
   return db;

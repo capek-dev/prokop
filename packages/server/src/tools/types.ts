@@ -1,3 +1,1 @@
-import type { ToolDefinition, ToolResult, ToolModule, LoadedTool, ToolEnvVarStatus } from '@jean2/sdk';
-
-export type { ToolDefinition, ToolResult, ToolModule, LoadedTool, ToolEnvVarStatus };
+export type { LoadedTool, ToolDefinition, ToolEnvVarStatus, ToolModule, ToolResult } from '@capekai/core/compat/jean2';
