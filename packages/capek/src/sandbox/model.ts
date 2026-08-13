@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { simulateReadableStream } from 'ai';
-import { getSandboxController, getSession } from '../compat/jean2-dependencies';
+import { getSandboxController } from '../compat/jean2-dependencies';
+import { getSession } from '../storage/runtime';
 import type {
   ErrorResponse,
   LlmCallContext,

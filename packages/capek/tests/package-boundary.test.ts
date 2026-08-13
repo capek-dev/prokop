@@ -4,6 +4,7 @@ import { dirname, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 import { capekPackagePhase } from '@capekai/core';
 import { jean2CompatibilityPhase } from '@capekai/core/compat/jean2';
+import { createInMemoryConversationStore } from '@capekai/core/storage';
 
 const repositoryRoot = resolve(import.meta.dir, '../../..');
 const packageRoot = resolve(repositoryRoot, 'packages/capek');
@@ -84,8 +85,9 @@ function resolvesWithin(specifier: string, importer: string, target: string): bo
 
 describe('package boundary', () => {
   test('declared package entrypoints import by package name', () => {
-    expect(capekPackagePhase).toBe(4);
-    expect(jean2CompatibilityPhase).toBe(4);
+    expect(capekPackagePhase).toBe(5);
+    expect(jean2CompatibilityPhase).toBe(5);
+    expect(typeof createInMemoryConversationStore).toBe('function');
   });
 
   test('external source does not import package internals', () => {
@@ -120,6 +122,44 @@ describe('package boundary', () => {
       .filter((specifier) => specifier.includes('compat/jean2-dependencies'))
       .map((specifier) => `${relative(repositoryRoot, path)} imports ${specifier}`));
 
+    expect(violations).toEqual([]);
+  });
+
+  test('package runtime storage does not use Jean2 compatibility storage wrappers', () => {
+    const violations: string[] = [];
+    for (const path of collectSourceFiles(packageSourceRoot)) {
+      if (path.endsWith('compat/jean2-dependencies.ts')) continue;
+      for (const specifier of collectImports(path)) {
+        if (specifier.includes('compat/jean2-dependencies')) {
+          const sourceFile = ts.createSourceFile(
+            path,
+            readFileSync(path, 'utf8'),
+            ts.ScriptTarget.Latest,
+            true,
+          );
+          const declaration = sourceFile.statements.find(statement =>
+            ts.isImportDeclaration(statement)
+            && ts.isStringLiteral(statement.moduleSpecifier)
+            && statement.moduleSpecifier.text.includes('compat/jean2-dependencies'));
+          if (!declaration || !ts.isImportDeclaration(declaration)) continue;
+          const importedNames = declaration.importClause?.namedBindings
+            && ts.isNamedImports(declaration.importClause.namedBindings)
+            ? declaration.importClause.namedBindings.elements.map(element => element.name.text)
+            : [];
+          const storageNames = new Set([
+            'createSession', 'createMessage', 'getMessage', 'getMessageWithParts', 'deleteMessage',
+            'updateMessage', 'getSession', 'updateSession', 'transitionToolToInterrupted',
+            'syncMessageFts', 'getPartsByMessage', 'createPart', 'updatePart', 'getPart',
+            'persistStreamingPartSnapshots', 'getAttachment', 'getWorkspace',
+            'transitionToolToRunningByCallId', 'getChildSessions', 'listMessagesWithParts',
+            'listLatestMessagesWithPartsPage', 'getPartsBySession', 'buildEffectiveContextHistory',
+            'addMessageToQueue', 'deleteQueuedMessage', 'getNextQueuedMessage',
+            'getResponseFormat', 'getWorkspaceAutoApproveSeverity',
+          ]);
+          if (importedNames.some(name => storageNames.has(name))) violations.push(relative(repositoryRoot, path));
+        }
+      }
+    }
     expect(violations).toEqual([]);
   });
 

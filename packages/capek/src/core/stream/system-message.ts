@@ -6,11 +6,11 @@ import {
   getMemoryGuidance,
   getSessionSearchGuidance,
   getSkillManageGuidance,
-  getWorkspace,
   loadInstructions,
   loadMemoryInstructions,
   readAgentMemoryFile,
 } from '../../compat/jean2-dependencies';
+import { getWorkspace } from '../../storage/runtime';
 
 export interface SystemMessageOptions {
   preconfig: Preconfig;

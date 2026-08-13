@@ -1524,6 +1524,19 @@ describe('messages store', () => {
       }
     });
 
+    test('transitionToolToRunningByCallId prefers latest inserted equal-time pending part', () => {
+      createAssistantMsg('msg1', { status: 'streaming' });
+      const first = createToolPartPending('msg1', 'duplicate-call', 'shell', {}, sessionId);
+      const second = createToolPartPending('msg1', 'duplicate-call', 'shell', {}, sessionId);
+      const db = getDatabase();
+      db.run('UPDATE parts SET created_at = ? WHERE id IN (?, ?)', [1000, first.id, second.id]);
+
+      const result = transitionToolToRunningByCallId(sessionId, 'duplicate-call');
+
+      expect(result?.id).toBe(second.id);
+      expect((getPart(first.id) as ToolPart).state.status).toBe('pending');
+    });
+
     test('getToolPartByCallId with legacy JSON fallback', () => {
       createAssistantMsg('msg1', { status: 'streaming' });
 
@@ -1539,6 +1552,38 @@ describe('messages store', () => {
       expect(result).not.toBeNull();
       expect(result!.callId).toBe('legacy-call');
       expect(result!.name).toBe('old-tool');
+    });
+
+    test('legacy JSON fallback prefers a pending part over a newer completed part', () => {
+      createAssistantMsg('msg1', { status: 'streaming' });
+      const db = getDatabase();
+      const pending = {
+        callId: 'legacy-duplicate',
+        name: 'old-tool',
+        state: { status: 'pending', input: {} },
+      };
+      const completed = {
+        callId: 'legacy-duplicate',
+        name: 'old-tool',
+        state: {
+          status: 'completed',
+          input: {},
+          output: 'done',
+          startedAt: 1000,
+          completedAt: 1001,
+        },
+      };
+      const insert = db.prepare(
+        `INSERT INTO parts (id, message_id, session_id, type, call_id, data, created_at)
+         VALUES (?, ?, ?, 'tool', NULL, ?, ?)`,
+      );
+      insert.run('legacy-pending', 'msg1', sessionId, JSON.stringify(pending), 1000);
+      insert.run('legacy-completed', 'msg1', sessionId, JSON.stringify(completed), 2000);
+
+      const result = transitionToolToRunningByCallId(sessionId, 'legacy-duplicate');
+
+      expect(result?.id).toBe('legacy-pending');
+      expect(result?.state.status).toBe('running');
     });
 
     test('query plan uses idx_parts_session_call_id', () => {

@@ -8,7 +8,7 @@ import {
   updatePart,
   getPartsBySession,
   buildEffectiveContextHistory,
-} from '../compat/jean2-dependencies';
+} from '../storage/runtime';
 import { broadcastEvent, type BroadcastFn } from '../compat/jean2-dependencies';
 import type { MessageWithParts, CompactionPart, TextPart, AssistantMessage, ToolPart } from '@jean2/sdk';
 import { randomUUID } from 'crypto';

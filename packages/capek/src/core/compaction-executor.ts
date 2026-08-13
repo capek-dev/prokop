@@ -1,11 +1,9 @@
 import {
   broadcastEvent,
   broadcastSessionUpdated,
-  getMessageWithParts,
   getModelsConfig,
-  getSession,
-  updateSession,
 } from '../compat/jean2-dependencies';
+import { getMessageWithParts, getSession, updateSession } from '../storage/runtime';
 import type { BroadcastFn, BroadcastSessionFn } from '../compat/bindings';
 import {
   createCompactionTrigger,

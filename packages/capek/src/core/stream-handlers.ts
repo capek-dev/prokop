@@ -1,5 +1,5 @@
 import type { TextPart, ToolPart, ReasoningPart, MessageEvent } from '@jean2/sdk';
-import { createPart, updatePart, getPart, persistStreamingPartSnapshots } from '../compat/jean2-dependencies';
+import { createPart, updatePart, getPart, persistStreamingPartSnapshots } from '../storage/runtime';
 import { parseToolInput } from './part-utils';
 import { randomUUID } from 'crypto';
 
@@ -40,7 +40,7 @@ export function createStreamHandlers(ctx: StreamHandlerContext) {
   function persistText(syncFts: boolean): void {
     if (!ctx.currentTextPartId || ctx.currentText === persistence.persistedText) return;
     if (syncFts) {
-      // Final flush: use generic updatePart which also syncs FTS
+      // Final flush persists the complete text; message finalization performs explicit FTS sync.
       updatePart(ctx.currentTextPartId, { text: ctx.currentText }, { syncFts: false });
       persistence.persistedText = ctx.currentText;
       persistence.lastTextPersistedAt = Date.now();

@@ -15,7 +15,7 @@ describe('Čapek workspace mutation adapter', () => {
     resetTestDatabase();
   });
 
-  test('adds and removes normalized paths with replace-all workspace updates', async () => {
+  test('adds and removes normalized paths with atomic workspace updates', async () => {
     seedWorkspace({
       id: 'workspace-1',
       path: '/workspace/project',
@@ -39,6 +39,45 @@ describe('Čapek workspace mutation adapter', () => {
     expect(await capability.removeWorkspacePath('/workspace/existing')).toBe(true);
     expect(getWorkspace('workspace-1')?.additionalPaths).toEqual([
       resolve('/workspace/added'),
+    ]);
+  });
+
+  test('preserves independent additional-path mutations', async () => {
+    seedWorkspace({
+      id: 'workspace-1',
+      path: '/workspace/project',
+      additionalPaths: ['/workspace/existing'],
+    });
+    const first = createWorkspaceCapability(
+      jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+        workspaceId: 'workspace-1',
+        workspacePath: '/workspace/project',
+        sessionId: 'session-1',
+      }),
+    );
+    const second = createWorkspaceCapability(
+      jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+        workspaceId: 'workspace-1',
+        workspacePath: '/workspace/project',
+        sessionId: 'session-2',
+      }),
+    );
+
+    expect(await Promise.all([
+      first.addWorkspacePath('/workspace/a'),
+      second.addWorkspacePath('/workspace/b'),
+    ])).toEqual([true, true]);
+    expect(getWorkspace('workspace-1')?.additionalPaths).toEqual([
+      '/workspace/existing',
+      '/workspace/a',
+      '/workspace/b',
+    ]);
+    expect(await first.addWorkspacePath('/workspace/a')).toBe(true);
+    expect(await second.removeWorkspacePath('/workspace/missing')).toBe(true);
+    expect(getWorkspace('workspace-1')?.additionalPaths).toEqual([
+      '/workspace/existing',
+      '/workspace/a',
+      '/workspace/b',
     ]);
   });
 

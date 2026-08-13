@@ -8,10 +8,8 @@ import {
   rejectPendingAsksByToolCallId,
   type AskBroadcastFn,
 } from '../../tools/ask-user-api';
-import {
-  getToolWorkspaceHost,
-  transitionToolToRunningByCallId,
-} from '../../compat/jean2-dependencies';
+import { getToolWorkspaceHost } from '../../compat/jean2-dependencies';
+import { transitionToolToRunningByCallId } from '../../storage/runtime';
 import { interruptManager } from '../interrupt';
 import {
   canSpawnSubagent,

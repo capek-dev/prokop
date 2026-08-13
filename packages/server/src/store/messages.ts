@@ -220,7 +220,7 @@ export function createMessage(message: Message): Message {
     ],
   );
 
-  // Phase 3: Do not sync FTS on message creation. The message has no parts yet.
+  // Do not sync FTS on message creation. The message has no parts yet.
   // FTS is synced when parts are created (user text) or at assistant finalization.
 
   return message;
@@ -618,7 +618,7 @@ export function getToolPartByCallId(
        AND type = 'tool'
      ORDER BY
        CASE WHEN JSON_EXTRACT(data, '$.state.status') = 'pending' THEN 0 ELSE 1 END,
-       created_at DESC, id DESC`,
+       created_at DESC, rowid DESC`,
   ).all(sessionId, callId) as PartRow[];
 
   if (rows.length > 0) {
@@ -632,7 +632,9 @@ export function getToolPartByCallId(
        AND type = 'tool'
        AND call_id IS NULL
        AND JSON_EXTRACT(data, '$.callId') = ?
-     ORDER BY created_at DESC, id DESC
+     ORDER BY
+       CASE WHEN JSON_EXTRACT(data, '$.state.status') = 'pending' THEN 0 ELSE 1 END,
+       created_at DESC, rowid DESC
      LIMIT 1`,
   ).all(sessionId, callId) as PartRow[];
 
@@ -1160,7 +1162,7 @@ function syncMessageToFts(messageId: string): void {
 }
 
 /**
- * Exported FTS sync for explicit finalization calls (Phase 3).
+ * Exported FTS sync for explicit finalization calls.
  */
 export function syncMessageFts(messageId: string): void {
   syncMessageToFts(messageId);

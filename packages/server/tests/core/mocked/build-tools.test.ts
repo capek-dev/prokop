@@ -7,7 +7,11 @@ import {
   setJean2CompatibilityBindings,
   type Jean2CompatibilityBindings,
 } from '@capekai/core/compat/jean2';
-import { jean2CompatibilityBindings } from '@/capek-adapter';
+import {
+  configureStorage,
+  type StorageBundle,
+} from '@capekai/core/storage';
+import { jean2CompatibilityBindings, jean2StorageBundle } from '@/capek-adapter';
 import { buildAiSdkTools, type BuildToolsOptions } from '@/core/build-tools';
 import { clearCache, scanTools } from '@/tools/registry';
 import type { Preconfig, Session, Workspace } from '@jean2/sdk';
@@ -24,10 +28,10 @@ interface BindingOverrides {
 let fixtureDir: string | null = null;
 
 function configureBindings(overrides: BindingOverrides = {}): void {
-  const bindings: Jean2CompatibilityBindings = {
-    ...jean2CompatibilityBindings,
-    store: {
-      ...jean2CompatibilityBindings.store,
+  const storage: StorageBundle = {
+    ...jean2StorageBundle,
+    conversation: {
+      ...jean2StorageBundle.conversation,
       getSession: (id) => {
         if (overrides.sessionNotFound) return null;
         const session = overrides.sessions?.[id];
@@ -35,8 +39,15 @@ function configureBindings(overrides: BindingOverrides = {}): void {
           ? { id, parentId: null, metadata: null, ...session } as Session
           : { id, parentId: null, metadata: null } as Session;
       },
-      getWorkspace: () => overrides.workspace ?? null,
     },
+    workspaces: {
+      ...jean2StorageBundle.workspaces,
+      get: () => overrides.workspace ?? null,
+    },
+  };
+  configureStorage(storage);
+  const bindings: Jean2CompatibilityBindings = {
+    ...jean2CompatibilityBindings,
     config: {
       ...jean2CompatibilityBindings.config,
       listPreconfigs: async () => overrides.subagentPreconfigs ?? [],
@@ -117,6 +128,7 @@ describe('build-tools binding integration', () => {
       rmSync(fixtureDir, { recursive: true, force: true });
       fixtureDir = null;
     }
+    configureStorage(jean2StorageBundle);
     setJean2CompatibilityBindings(jean2CompatibilityBindings);
   });
 

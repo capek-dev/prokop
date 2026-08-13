@@ -18,6 +18,7 @@ import {
   requestPermission,
   resolvePermission,
 } from '../src/tools/permission-request-manager';
+import { configureStorage, createInMemoryStorageBundle } from '../src/storage';
 
 interface InteractionState {
   records: Map<string, PendingAskRecord>;
@@ -54,10 +55,15 @@ function bindInteraction(
     grant: null,
   }),
 ): void {
-  const bindings = {
-    store: {
+  const storage = createInMemoryStorageBundle();
+  configureStorage({
+    ...storage,
+    conversation: {
+      ...storage.conversation,
       getSession: () => session ?? null,
     },
+  });
+  const bindings = {
     interaction: {
       createPendingAsk: (record: Omit<PendingAskRecord, 'id'>) => {
         const created = { ...record, id: `row-${state.records.size + 1}` };

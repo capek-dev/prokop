@@ -8,6 +8,7 @@ import {
 import {
   configureCapekJean2Compatibility,
   jean2CompatibilityBindings,
+  jean2StorageBundle,
 } from '@/capek-adapter';
 import { interruptManager as serverInterruptManager } from '@/core/interrupt';
 import { sandboxController as packageHostController } from '@/sandbox';
@@ -16,16 +17,6 @@ import { getSession } from '@/store';
 import { readInstallManifest } from '@/tools/tool-install-manifest';
 
 const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, string[]> = {
-  store: [
-    'createSession', 'createMessage', 'getMessage', 'getMessageWithParts', 'deleteMessage',
-    'updateMessage', 'getSession', 'updateSession', 'transitionToolToInterrupted',
-    'syncMessageFts', 'getPartsByMessage', 'createPart', 'updatePart', 'getPart',
-    'persistStreamingPartSnapshots', 'getAttachment', 'getWorkspace', 'updateWorkspace',
-    'transitionToolToRunningByCallId', 'getChildSessions', 'listMessagesWithParts',
-    'listLatestMessagesWithPartsPage', 'getPartsBySession', 'buildEffectiveContextHistory',
-    'addMessageToQueue', 'deleteQueuedMessage', 'getNextQueuedMessage',
-    'getResponseFormat', 'getWorkspaceAutoApproveSeverity',
-  ],
   config: [
     'findModel', 'getMaxOutputTokens', 'findModelVariant', 'getModelsConfig',
     'resolveToolsPath', 'getPreconfig', 'getDefaultPreconfig', 'getPreconfigOrAgent',
@@ -85,7 +76,8 @@ describe('Čapek Jean2 adapter', () => {
     const configured = getJean2CompatibilityBindings();
 
     expect(configured).toBe(jean2CompatibilityBindings);
-    expect(configured.store.getSession).toBe(getSession);
+    expect('store' in configured).toBe(false);
+    expect(jean2StorageBundle.conversation.getSession).toBe(getSession);
     expect(configured.tools.readInstallManifest).toBe(readInstallManifest);
   });
 

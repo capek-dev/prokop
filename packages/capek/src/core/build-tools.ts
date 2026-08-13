@@ -2,9 +2,9 @@ import {
   broadcastEvent,
   getAgentDirectory,
   getMcpTools,
-  getSession,
   type BroadcastFn,
 } from '../compat/jean2-dependencies';
+import { getSession } from '../storage/runtime';
 import type { AskBroadcastFn } from '../tools/ask-user-api';
 import { join } from 'path';
 import { buildExternalTools } from './tool-builders/external-tools';

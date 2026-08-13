@@ -1,5 +1,5 @@
 import type { Session } from '@jean2/sdk';
-import { getSession } from '../compat/jean2-dependencies';
+import { getSession } from '../storage/runtime';
 
 export type ToolExecutionScope = 'subsession' | 'scheduled';
 

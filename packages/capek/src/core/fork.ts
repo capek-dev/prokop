@@ -6,7 +6,7 @@ import {
   getSession,
   getWorkspaceAutoApproveSeverity,
   listMessagesWithParts,
-} from '../compat/jean2-dependencies';
+} from '../storage/runtime';
 
 interface ForkOptions {
   sessionId: string;

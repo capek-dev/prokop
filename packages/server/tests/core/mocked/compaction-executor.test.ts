@@ -6,6 +6,7 @@ import {
   setJean2CompatibilityBindings,
 } from '@capekai/core/compat/jean2';
 import type { ModelFactoryOptions } from '@capekai/core/compat/jean2';
+import { getStorage } from '@capekai/core/storage';
 import { configureCapekJean2Compatibility } from '@/capek-adapter';
 import { executeCompaction, isCompactionActive } from '@/core/compaction-executor';
 import {
@@ -179,8 +180,7 @@ describe('package-owned compaction executor', () => {
     createConversation(sessionId);
     const session = getSession(sessionId);
     expect(session).not.toBeNull();
-    const bindings = getJean2CompatibilityBindings();
-    bindings.store.updateSession(sessionId, {
+    getStorage().conversation.updateSession(sessionId, {
       selectedModel: 'custom-model',
       selectedProvider: 'custom-provider',
     });

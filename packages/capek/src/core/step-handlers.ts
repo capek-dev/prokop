@@ -1,5 +1,5 @@
 import type { MessageEvent, StepPart } from '@jean2/sdk';
-import { createPart, updatePart } from '../compat/jean2-dependencies';
+import { createPart, updatePart } from '../storage/runtime';
 import { createStepPart } from './part-utils';
 import { randomUUID } from 'crypto';
 
