@@ -1,6 +1,6 @@
-import type { AskRequestMessage, AskTimedOutMessage, ServerMessage } from '@jean2/sdk';
+import type { ServerMessage } from '@jean2/sdk';
 import { getJean2CompatibilityBindings } from './bindings';
-import type { AskBroadcastFn, BroadcastFn } from './bindings';
+import type { BroadcastFn } from './bindings';
 
 export const createSession = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['store']['createSession']>) =>
   getJean2CompatibilityBindings().store.createSession(...args);
@@ -100,12 +100,6 @@ export const getProvider = (...args: Parameters<ReturnType<typeof getJean2Compat
   getJean2CompatibilityBindings().providers.getProvider(...args);
 export const createModelForProvider = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['providers']['createModelForProvider']>) =>
   getJean2CompatibilityBindings().providers.createModelForProvider(...args);
-export const createAskApi = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['asks']['createAskApi']>) =>
-  getJean2CompatibilityBindings().asks.createAskApi(...args);
-export const rejectPendingAsksBySession = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['asks']['rejectPendingAsksBySession']>) =>
-  getJean2CompatibilityBindings().asks.rejectPendingAsksBySession(...args);
-export const rejectPendingAsksByToolCallId = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['asks']['rejectPendingAsksByToolCallId']>) =>
-  getJean2CompatibilityBindings().asks.rejectPendingAsksByToolCallId(...args);
 export const broadcastEvent = (message: ServerMessage): void => getJean2CompatibilityBindings().delivery.broadcastEvent(message);
 export const broadcastSessionCreated = (...args: Parameters<ReturnType<typeof getJean2CompatibilityBindings>['delivery']['broadcastSessionCreated']>) =>
   getJean2CompatibilityBindings().delivery.broadcastSessionCreated(...args);
@@ -167,5 +161,4 @@ export const formatInstructions = (...args: Parameters<ReturnType<typeof getJean
 export const isSandboxActive = (): boolean => getJean2CompatibilityBindings().sandbox.isSandboxActive();
 export const getSandboxController = () => getJean2CompatibilityBindings().sandbox.sandboxController;
 
-export type { AskBroadcastFn, BroadcastFn };
-export type AskDeliveryMessage = AskRequestMessage | AskTimedOutMessage;
+export type { BroadcastFn };

@@ -7,14 +7,16 @@ import {
   executeWorkflow,
   handleChat,
   createStreamHandlers,
+  createAskApi,
+  requestPermission,
   jean2CompatibilityPhase,
   runGoalLoop,
   streamChatWithRetry,
 } from '@capekai/core/compat/jean2';
 
 describe('Jean2 compatibility runtime exports', () => {
-  test('loads implemented Phase 3 runtime through the declared package path', () => {
-    expect(jean2CompatibilityPhase).toBe(3);
+  test('loads implemented Phase 4 runtime through the declared package path', () => {
+    expect(jean2CompatibilityPhase).toBe(4);
     expect(typeof streamChatWithRetry).toBe('function');
     expect(typeof createStreamHandlers).toBe('function');
     expect(typeof buildSchemaPromptInstruction).toBe('function');
@@ -23,6 +25,8 @@ describe('Jean2 compatibility runtime exports', () => {
     expect(typeof executeChildSession).toBe('function');
     expect(typeof runGoalLoop).toBe('function');
     expect(typeof executeWorkflow).toBe('function');
+    expect(typeof createAskApi).toBe('function');
+    expect(typeof requestPermission).toBe('function');
     expect(new InterruptManager()).toBeInstanceOf(InterruptManager);
   });
 });

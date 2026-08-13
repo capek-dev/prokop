@@ -1,5 +1,5 @@
 import { getDatabase } from './index';
-import type { Ask, AskPermissionResponse } from '@jean2/sdk';
+import type { Ask } from '@jean2/sdk';
 
 // =============================================================================
 // Permission Request Lifecycle Status
@@ -47,7 +47,7 @@ export interface PendingAskRecord {
   isPermission: boolean;
   expiresAt?: number;
   resolvedAt?: number;
-  resolution?: AskPermissionResponse;
+  resolution?: unknown;
   createdAt: number;
 }
 
@@ -228,7 +228,7 @@ export function listPendingRequestsByRootSession(rootSessionId: string): Pending
 export function resolvePermissionRequest(
   id: string,
   status: 'approved' | 'denied',
-  resolution?: AskPermissionResponse,
+  resolution?: unknown,
 ): boolean {
   const db = getDatabase();
   const now = Date.now();
@@ -247,7 +247,7 @@ export function resolvePermissionRequest(
 export function resolvePermissionRequestByRequestId(
   requestId: string,
   status: 'approved' | 'denied',
-  resolution?: AskPermissionResponse,
+  resolution?: unknown,
 ): boolean {
   const db = getDatabase();
   const now = Date.now();

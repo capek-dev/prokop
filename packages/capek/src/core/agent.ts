@@ -5,7 +5,8 @@ import { createMessage, updateMessage, getSession, updateSession, transitionTool
 import { findModel, getMaxOutputTokens } from '../compat/jean2-dependencies';
 import { randomUUID } from 'crypto';
 import { interruptManager } from './interrupt';
-import { rejectPendingAsksBySession, broadcastSessionUpdated } from '../compat/jean2-dependencies';
+import { broadcastSessionUpdated } from '../compat/jean2-dependencies';
+import { rejectPendingAsksBySession } from '../tools/ask-user-api';
 import { getModelWithMetadata } from './model-utils';
 
 import { createStepCallbacks, type CallbackEvent, type UsageEventData } from './step-handlers';

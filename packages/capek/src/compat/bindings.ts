@@ -1,6 +1,5 @@
 import type { Tool } from 'ai';
 import type {
-  AskApi,
   AskAuthority,
   AskRequestMessage,
   AssistantMessage,
@@ -11,7 +10,11 @@ import type {
   MessageWithParts,
   Part,
   PermissionAsk,
+  PermissionGrant,
+  PermissionGrantOptions,
+  PermissionResource,
   PermissionRiskLevel,
+  Ask,
   Preconfig,
   QueuedMessage,
   ResponseFormat,
@@ -181,17 +184,65 @@ export type AskBroadcastFn = (message: AskRequestMessage | AskTimedOutMessage) =
 export type BroadcastFn = (message: ServerMessage) => void;
 export type BroadcastSessionFn = (session: Session) => void;
 
-export interface Jean2AskBindings {
-  createAskApi(
-    sessionId: string,
-    toolCallId: string,
-    toolName: string,
-    broadcastFn: AskBroadcastFn,
-    workspaceId?: string,
-    rootSessionId?: string,
-  ): AskApi;
-  rejectPendingAsksBySession(sessionId: string, error?: Error): string[];
-  rejectPendingAsksByToolCallId(toolCallId: string, error?: Error): string[];
+export type PermissionRequestStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'cancelled';
+
+export interface PendingAskRecord {
+  id: string;
+  requestId: string;
+  sessionId: string;
+  rootSessionId?: string;
+  originSessionId?: string;
+  workspaceId?: string;
+  toolCallId: string;
+  toolName: string;
+  ask: Ask;
+  status: PermissionRequestStatus;
+  isPermission: boolean;
+  expiresAt?: number;
+  resolvedAt?: number;
+  resolution?: unknown;
+  createdAt: number;
+}
+
+export interface MatchGrantParams {
+  workspaceId: string;
+  toolName: string;
+  resource: PermissionResource;
+  action?: string;
+  permissionKey: string;
+  rootSessionId?: string;
+}
+
+export interface CreateGrantParams {
+  workspaceId: string;
+  toolName: string;
+  resource: PermissionResource;
+  action?: string;
+  permissionKey: string;
+  grantOptions: PermissionGrantOptions;
+}
+
+export interface Jean2InteractionBindings {
+  createPendingAsk(record: Omit<PendingAskRecord, 'id'>): string;
+  removePendingAsk(id: string): void;
+  removePendingAsksByToolCallId(toolCallId: string): void;
+  getPermissionRequestByRequestId(requestId: string): PendingAskRecord | null;
+  resolvePermissionRequestByRequestId(
+    requestId: string,
+    status: 'approved' | 'denied',
+    resolution?: unknown,
+  ): boolean;
+  expirePermissionRequest(id: string): boolean;
+  expireOldPermissionRequests(maxAgeMs: number): number;
+  cancelPendingRequestsBySession(sessionId: string): number;
+  listPendingAsksBySession(sessionId: string): PendingAskRecord[];
+  listPendingAsksByRootSession(rootSessionId: string): PendingAskRecord[];
+  listPendingRequestsByRootSession(rootSessionId: string): PendingAskRecord[];
+  matchGrant(params: MatchGrantParams): { matched: boolean; grant: PermissionGrant | null };
+  createGrantFromOptions(params: CreateGrantParams): PermissionGrant | null;
+  getSessionAutoApproveSeverity(sessionId: string): AutoApproveSeverity | undefined;
+  getPermissionTimeoutMs(): number;
+  notifyPermissionRequired(requestId: string, rootSessionId: string): void;
 }
 
 export interface Jean2DeliveryBindings {
@@ -390,7 +441,7 @@ export interface Jean2CompatibilityBindings {
   config: Jean2ConfigBindings;
   env: Jean2EnvBindings;
   providers: Jean2ProviderBindings;
-  asks: Jean2AskBindings;
+  interaction: Jean2InteractionBindings;
   delivery: Jean2DeliveryBindings;
   titles: Jean2TitleBindings;
   agents: Jean2AgentBindings;

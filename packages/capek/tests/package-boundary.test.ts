@@ -84,8 +84,8 @@ function resolvesWithin(specifier: string, importer: string, target: string): bo
 
 describe('package boundary', () => {
   test('declared package entrypoints import by package name', () => {
-    expect(capekPackagePhase).toBe(3);
-    expect(jean2CompatibilityPhase).toBe(3);
+    expect(capekPackagePhase).toBe(4);
+    expect(jean2CompatibilityPhase).toBe(4);
   });
 
   test('external source does not import package internals', () => {

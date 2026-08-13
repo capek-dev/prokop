@@ -42,7 +42,15 @@ const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, s
     'getCompactionToolClearCharsThreshold', 'getCompactionMaxPrunedToolCount',
   ],
   providers: ['getProvider', 'createModelForProvider'],
-  asks: ['createAskApi', 'rejectPendingAsksBySession', 'rejectPendingAsksByToolCallId'],
+  interaction: [
+    'createPendingAsk', 'removePendingAsk', 'removePendingAsksByToolCallId',
+    'getPermissionRequestByRequestId',
+    'resolvePermissionRequestByRequestId', 'expirePermissionRequest',
+    'expireOldPermissionRequests', 'cancelPendingRequestsBySession',
+    'listPendingAsksBySession', 'listPendingAsksByRootSession',
+    'listPendingRequestsByRootSession', 'matchGrant', 'createGrantFromOptions',
+    'getSessionAutoApproveSeverity', 'getPermissionTimeoutMs', 'notifyPermissionRequired',
+  ],
   delivery: [
     'broadcastEvent', 'broadcastSessionCreated', 'broadcastSessionUpdated',
     'broadcastToSessionEvent', 'sendToControllerEvent', 'sendToAskTargetsEvent',

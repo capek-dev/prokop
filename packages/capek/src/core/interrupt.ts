@@ -4,9 +4,9 @@ import {
   getSandboxController,
   getSession,
   isSandboxActive,
-  rejectPendingAsksBySession,
   updateSession,
 } from '../compat/jean2-dependencies';
+import { rejectPendingAsksBySession } from '../tools/ask-user-api';
 
 interface ToolExecution {
   controller: AbortController;

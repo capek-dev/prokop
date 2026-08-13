@@ -1,5 +1,5 @@
 import type { Tool } from 'ai';
-import type { AskBroadcastFn } from '../../compat/jean2-dependencies';
+import type { AskBroadcastFn } from '../../tools/ask-user-api';
 
 export interface ToolBuildContext {
   sessionId: string;

@@ -1,4 +1,4 @@
-export const jean2CompatibilityPhase = 3 as const;
+export const jean2CompatibilityPhase = 4 as const;
 
 export {
   getJean2CompatibilityBindings,
@@ -46,6 +46,8 @@ export * from '../core/tool-builders/external-tools';
 export * from '../core/tool-builders/workspace-tools';
 export type * from '../core/tool-builders/types';
 export * from '../tools/executor';
+export * from '../tools/ask-user-api';
+export * from '../tools/permission-request-manager';
 export * from '../tools/workspace-capability';
 export * from '../tools/llm-api';
 export * from '../tools/registry';

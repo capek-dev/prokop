@@ -47,6 +47,7 @@ import {
   getLLMTemperature,
   getLLMZhipuApiKey,
   getLLMZhipuCodingApiKey,
+  getPermissionTimeoutMs,
 } from '@/env';
 import { getTools, initializeWorkspace } from '@/mcp';
 import {
@@ -56,7 +57,7 @@ import {
   memoryToolDefinition,
 } from '@/memory';
 import { getUploadDir } from '@/paths';
-import { notifyTerminalMessage } from '@/services/web-push/dispatch';
+import { notifyPermissionRequired, notifyTerminalMessage } from '@/services/web-push/dispatch';
 import { createModelForProvider, getProvider } from '@/providers';
 import { isSandboxActive } from '@/sandbox';
 import { sandboxController } from '@/sandbox/controller';
@@ -105,10 +106,19 @@ import {
 } from '@/store';
 import { getWorkspaceAutoApproveSeverity } from '@/store/workspaces';
 import {
-  createAskApi,
-  rejectPendingAsksBySession,
-  rejectPendingAsksByToolCallId,
-} from '@/tools/ask-user-api';
+  cancelPendingRequestsBySession,
+  createPendingAsk,
+  expireOldPermissionRequests,
+  expirePermissionRequest,
+  getPermissionRequestByRequestId,
+  listPendingAsksByRootSession,
+  listPendingAsksBySession,
+  listPendingRequestsByRootSession,
+  removePendingAsk,
+  removePendingAsksByToolCallId,
+  resolvePermissionRequestByRequestId,
+} from '@/store/pending-asks';
+import { createGrantFromOptions, matchGrant } from '@/store/permissions';
 import { readInstallManifest } from '@/tools/tool-install-manifest';
 
 export const jean2CompatibilityBindings = {
@@ -182,10 +192,23 @@ export const jean2CompatibilityBindings = {
     getProvider,
     createModelForProvider,
   },
-  asks: {
-    createAskApi,
-    rejectPendingAsksBySession,
-    rejectPendingAsksByToolCallId,
+  interaction: {
+    createPendingAsk,
+    removePendingAsk,
+    removePendingAsksByToolCallId,
+    getPermissionRequestByRequestId,
+    resolvePermissionRequestByRequestId,
+    expirePermissionRequest,
+    expireOldPermissionRequests,
+    cancelPendingRequestsBySession,
+    listPendingAsksBySession,
+    listPendingAsksByRootSession,
+    listPendingRequestsByRootSession,
+    matchGrant,
+    createGrantFromOptions,
+    getSessionAutoApproveSeverity: (sessionId: string) => getSession(sessionId)?.autoApproveSeverity ?? undefined,
+    getPermissionTimeoutMs,
+    notifyPermissionRequired,
   },
   delivery: {
     broadcastEvent,
