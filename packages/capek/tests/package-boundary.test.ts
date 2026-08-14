@@ -86,8 +86,8 @@ function resolvesWithin(specifier: string, importer: string, target: string): bo
 
 describe('package boundary', () => {
   test('declared package entrypoints import by package name', () => {
-    expect(capekPackagePhase).toBe(7);
-    expect(jean2CompatibilityPhase).toBe(7);
+    expect(capekPackagePhase).toBe(8);
+    expect(jean2CompatibilityPhase).toBe(8);
     expect(typeof createAgent).toBe('function');
     expect(typeof createInMemoryConversationStore).toBe('function');
   });
@@ -99,7 +99,7 @@ describe('package boundary', () => {
     expect('streamChatWithRetry' in rootApi).toBe(false);
   });
 
-  test('Phase 7 runtime uses package-owned host seams', () => {
+  test('Phase 8 runtime uses package-owned host seams', () => {
     const violations = collectSourceFiles(packageSourceRoot)
       .filter((path) => !path.includes(`${sep}compat${sep}`))
       .flatMap((path) => collectImports(path)
@@ -182,7 +182,7 @@ describe('package boundary', () => {
     expect(violations).toEqual([]);
   });
 
-  test('Phase 7 package runtime does not import completed Jean2 compatibility seams', () => {
+  test('Phase 8 package runtime does not import completed Jean2 compatibility seams', () => {
     const phase6Names = new Set([
       'resolveToolsPath', 'readInstallManifest',
       'findModel', 'findModelVariant', 'getMaxOutputTokens', 'getModelsConfig',
@@ -223,6 +223,23 @@ describe('package boundary', () => {
         }
       }
     }
+
+    expect(violations).toEqual([]);
+  });
+
+  test('package runtime imports no Jean2 delivery or hosting modules', () => {
+    const forbiddenModuleFragments = [
+      'core/broadcast',
+      'core/message-router',
+      'core/router-context',
+      'services/notification',
+      'services/web-push',
+    ];
+    const violations = collectSourceFiles(packageSourceRoot)
+      .filter((path) => !path.includes(`${sep}compat${sep}`))
+      .flatMap((path) => collectImports(path)
+        .filter((specifier) => forbiddenModuleFragments.some((fragment) => specifier.includes(fragment)))
+        .map((specifier) => `${relative(repositoryRoot, path)} imports ${specifier}`));
 
     expect(violations).toEqual([]);
   });

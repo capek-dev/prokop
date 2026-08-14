@@ -27,11 +27,7 @@ const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, s
     'listPendingRequestsByRootSession', 'matchGrant', 'createGrantFromOptions',
     'getSessionAutoApproveSeverity', 'getPermissionTimeoutMs', 'notifyPermissionRequired',
   ],
-  delivery: [
-    'broadcastEvent', 'broadcastSessionCreated', 'broadcastSessionUpdated',
-    'broadcastToSessionEvent', 'sendToControllerEvent', 'sendToAskTargetsEvent',
-    'notifyTerminalMessage',
-  ],
+  delivery: ['emit'],
   titles: ['isDefaultSessionTitle', 'hasManualSessionTitle', 'generateSessionTitle'],
   workspace: ['createToolWorkspaceHost'],
   sandbox: ['isSandboxActive'],

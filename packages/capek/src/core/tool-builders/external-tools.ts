@@ -95,7 +95,7 @@ export async function buildExternalTools(options: ExternalToolsOptions): Promise
               onSessionCreated: (childSessionId: string) => {
                 const updatedPart = transitionToolToRunningByCallId(sessionId, toolCallId, childSessionId);
                 if (updatedPart) {
-                  broadcast({ type: 'part.updated', sessionId, part: updatedPart });
+                  broadcast({ kind: 'part', action: 'updated', sessionId, part: updatedPart });
                 }
               },
               allowedSubagentIds,

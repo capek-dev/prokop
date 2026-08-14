@@ -88,13 +88,13 @@ export async function executeCompaction(
     triggerMessageId = trigger.messageId;
     const triggerMsg = getMessageWithParts(trigger.messageId);
     if (triggerMsg) {
-      broadcast({ type: 'message.created', message: triggerMsg.message });
-      for (const part of triggerMsg.parts) broadcast({ type: 'part.created', sessionId, part });
+      broadcast({ kind: 'message', action: 'created', message: triggerMsg.message });
+      for (const part of triggerMsg.parts) broadcast({ kind: 'part', action: 'created', sessionId, part });
     }
 
     const result = await processCompactionTask(sessionId, trigger.messageId, policy, undefined, abortSignal);
-    broadcast({ type: 'message.created', message: result.summaryMessage });
-    for (const part of result.textParts) broadcast({ type: 'part.created', sessionId, part });
+    broadcast({ kind: 'message', action: 'created', message: result.summaryMessage });
+    for (const part of result.textParts) broadcast({ kind: 'part', action: 'created', sessionId, part });
 
     const completedSession = updateSession(sessionId, {
       promptTokens: result.tokensUsed.prompt,

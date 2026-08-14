@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { AssistantMessage, Preconfig, ServerMessage } from '@jean2/sdk';
+import type { ServerWebSocket } from 'bun';
 import {
   executeChildSession,
   runOrchestratorSession,
@@ -41,16 +42,16 @@ const testPreconfig: Omit<Preconfig, 'id'> & { id: string } = {
 };
 
 interface TestContext {
-  ctx: Jean2RouterContext<object>;
+  ctx: Jean2RouterContext;
   sent: ServerMessage[];
   broadcastToSession: ServerMessage[];
-  ws: object;
+  ws: ServerWebSocket;
 }
 
 function createRouterContext(): TestContext {
   const sent: ServerMessage[] = [];
   const broadcastToSession: ServerMessage[] = [];
-  const ws = {};
+  const ws = {} as ServerWebSocket;
   return {
     ws,
     sent,

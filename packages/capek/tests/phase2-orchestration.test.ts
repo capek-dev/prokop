@@ -7,7 +7,6 @@ import type {
   MessageWithParts,
   Part,
   Preconfig,
-  ServerMessage,
   Session,
 } from '@jean2/sdk';
 import {
@@ -26,6 +25,7 @@ import {
   executeWorkflow,
   getSubagentResumeError,
   handleChat,
+  regenerateSessionTitle,
   runGoalLoop,
   runOrchestratorSession,
 } from '../src/compat/jean2';
@@ -36,6 +36,7 @@ import {
   type Jean2CompatibilityBindings,
 } from '../src/compat/bindings';
 import type { StreamChatEvent } from '../src/core/retry';
+import type { RuntimeDelivery, RuntimeEvent } from '../src/runtime/events';
 import type { ChatOptions } from '../src/core/agent';
 import {
   configureStorage,
@@ -74,15 +75,16 @@ interface RuntimeState {
   sessions: Map<string, Session>;
   messages: Message[];
   parts: Part[];
-  askTargets: ServerMessage[];
-  controllerEvents: ServerMessage[];
+  askTargets: RuntimeEvent[];
+  controllerEvents: RuntimeEvent[];
   terminalMessages: AssistantMessage[];
 }
 
-interface RuntimeOverrides extends Partial<Jean2CompatibilityBindings> {
+interface RuntimeOverrides extends Omit<Partial<Jean2CompatibilityBindings>, 'delivery'> {
   storage?: Omit<Partial<StorageBundle>, 'conversation'> & {
     conversation?: Partial<StorageBundle['conversation']>;
   };
+  delivery?: Partial<Jean2CompatibilityBindings['delivery']>;
 }
 
 function bindRuntime(
@@ -126,8 +128,22 @@ function bindRuntime(
         state.parts.push(part);
         return part;
       },
-      buildEffectiveContextHistory: () => ({ messages: [], latestCompactionBoundary: null, hasCompaction: false }),
-      listMessagesWithParts: () => [],
+      buildEffectiveContextHistory: (sessionId: string) => ({
+        messages: state.messages
+          .filter((message) => message.sessionId === sessionId)
+          .map((message) => ({
+            message,
+            parts: state.parts.filter((part) => part.messageId === message.id),
+          })),
+        latestCompactionBoundary: null,
+        hasCompaction: false,
+      }),
+      listMessagesWithParts: (sessionId: string) => state.messages
+        .filter((message) => message.sessionId === sessionId)
+        .map((message) => ({
+          message,
+          parts: state.parts.filter((part) => part.messageId === message.id),
+        })),
       ...overrides.storage?.conversation,
     },
     workspaces: {
@@ -143,14 +159,38 @@ function bindRuntime(
       listPreconfigs: async () => [preconfig],
     },
     env: { getLLMSubagentMaxSteps: () => 12 },
+    interaction: {
+      createPendingAsk: () => 'ask-1',
+      removePendingAsk: () => {},
+      removePendingAsksByToolCallId: () => {},
+      getPermissionRequestByRequestId: () => null,
+      resolvePermissionRequestByRequestId: () => false,
+      expirePermissionRequest: () => false,
+      expireOldPermissionRequests: () => 0,
+      cancelPendingRequestsBySession: () => 0,
+      listPendingAsksBySession: () => [],
+      listPendingAsksByRootSession: () => [],
+      listPendingRequestsByRootSession: () => [],
+      matchGrant: () => ({ matched: false, grant: null }),
+      createGrantFromOptions: () => null,
+      getSessionAutoApproveSeverity: () => undefined,
+      getPermissionTimeoutMs: () => 1000,
+      notifyPermissionRequired: () => {},
+    },
     delivery: {
-      broadcastEvent: () => {},
-      broadcastSessionCreated: () => {},
-      broadcastSessionUpdated: () => {},
-      broadcastToSessionEvent: () => {},
-      sendToControllerEvent: (_sessionId: string, message: ServerMessage) => state.controllerEvents.push(message),
-      sendToAskTargetsEvent: (_sessionId: string, _authority: unknown, message: ServerMessage) => state.askTargets.push(message),
-      notifyTerminalMessage: (message: AssistantMessage) => state.terminalMessages.push(message),
+      emit: ({ audience, event }: RuntimeDelivery) => {
+        if (audience.scope === 'ask_targets') state.askTargets.push(event);
+        if (audience.scope === 'controller') state.controllerEvents.push(event);
+        if (event.kind === 'terminal') state.terminalMessages.push(event.message);
+      },
+    },
+    titles: {
+      isDefaultSessionTitle: () => false,
+      hasManualSessionTitle: () => false,
+      generateSessionTitle: async () => null,
+    },
+    workspace: {
+      createToolWorkspaceHost: () => ({ tempDir: '/tmp' }),
     },
     sandbox: {
       isSandboxActive: () => false,
@@ -208,6 +248,13 @@ function createState(): RuntimeState {
   };
 }
 
+function requestContext(onDelivery: (delivery: RuntimeDelivery<object>) => void = () => {}) {
+  return {
+    emit: onDelivery,
+    attachOriginToSession: () => {},
+  };
+}
+
 async function* childEvents(options: ChatOptions): AsyncGenerator<StreamChatEvent> {
   options.broadcastFn?.({
     type: 'ask.request',
@@ -251,7 +298,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
   test('routes child asks to the root and captures terminal output', async () => {
     const state = createState();
     bindRuntime(state);
-    const delivered: ServerMessage[] = [];
+    const delivered: RuntimeEvent[] = [];
 
     const result = await executeChildSession({
       parentSessionId: 'root',
@@ -264,18 +311,19 @@ describe.serial('Phase 2 orchestration contracts', () => {
 
     expect(state.askTargets).toHaveLength(1);
     expect(state.askTargets[0]).toMatchObject({
-      type: 'ask.request',
+      kind: 'ask',
+      action: 'requested',
       sessionId: 'root',
       ask: { _originSessionId: 'child' },
     });
-    expect(state.controllerEvents[0]).toMatchObject({ type: 'ask.timeout', sessionId: 'root' });
+    expect(state.controllerEvents[0]).toMatchObject({ kind: 'ask', action: 'timed_out', sessionId: 'root' });
     expect(state.terminalMessages).toHaveLength(1);
     expect(result.parts).toMatchObject([{ type: 'text', text: 'done' }]);
-    expect(delivered.map((message) => message.type)).toEqual([
-      'message.created',
-      'part.created',
-      'part.append',
-      'message.updated',
+    expect(delivered.map((event) => [event.kind, 'action' in event ? event.action : undefined])).toEqual([
+      ['message', 'created'],
+      ['part', 'created'],
+      ['part', 'append'],
+      ['message', 'updated'],
     ]);
   });
 
@@ -573,23 +621,197 @@ describe.serial('Phase 2 orchestration contracts', () => {
     expect(result.error).toBe('Workflow was interrupted');
   });
 
+  test('persists user content before delivery and terminal messages before notification', async () => {
+    const state = createState();
+    const order: string[] = [];
+    bindRuntime(state, {
+      storage: {
+        conversation: {
+          updateMessage: (id, updates) => {
+            const index = state.messages.findIndex((message) => message.id === id);
+            if (index === -1) return null;
+            state.messages[index] = { ...state.messages[index], ...updates } as Message;
+            if (state.messages[index].role === 'assistant' && state.messages[index].status === 'completed') {
+              order.push('terminal.persisted');
+            }
+            return state.messages[index];
+          },
+        },
+      },
+      delivery: {
+        emit: ({ event }) => {
+          if (event.kind === 'terminal') order.push('terminal.notified');
+        },
+      },
+      sandbox: {
+        isSandboxActive: () => true,
+      },
+    });
+    sandboxController.setAutoResponderRules([{
+      match: { mode: 'stream' },
+      response: { type: 'text', content: 'done' },
+      maxUses: 1,
+    }]);
+    registerProvider({
+      descriptor: { id: 'sandbox', displayName: 'Sandbox', authType: 'none', connectable: false },
+      getStatus: () => ({ provider: 'sandbox', connected: true }),
+      connect: async () => ({}),
+      disconnect: async () => {},
+      onTokensReceived: async () => {},
+      createModel: async (options) => ({
+        model: new SandboxLanguageModel({
+          sessionId: options.sessionId ?? 'root',
+          modelId: options.modelId,
+          providerId: 'sandbox',
+        }) as unknown as LanguageModel,
+      }),
+    });
+    state.sessions.set('root', { ...state.sessions.get('root')!, selectedProvider: 'sandbox' });
+    const ws = {};
+
+    await handleChat(requestContext(({ event }) => {
+      if (event.kind === 'message' && event.action === 'created' && event.message.role === 'user') {
+        expect(state.messages.some((stored) => stored.id === event.message.id)).toBe(true);
+        order.push('user-message.delivered');
+      }
+      if (event.kind === 'part' && event.action === 'created' && event.part.type === 'text' && event.part.text === 'hello') {
+        expect(state.parts.some((stored) => stored.id === event.part.id)).toBe(true);
+        order.push('user-part.delivered');
+      }
+    }), ws, 'root', 'hello');
+
+    expect(order).toContain('user-message.delivered');
+    expect(order).toContain('user-part.delivered');
+    expect(order.indexOf('terminal.persisted')).toBeLessThan(order.indexOf('terminal.notified'));
+  });
+
+  test('delivers main-turn usage before persisting session usage', async () => {
+    const state = createState();
+    const order: string[] = [];
+    bindRuntime(state, {
+      storage: {
+        conversation: {
+          updateSession: (id, updates) => {
+            const current = state.sessions.get(id);
+            if (!current) return null;
+            if (updates.promptTokens !== undefined) order.push('usage.persisted');
+            const updated = { ...current, ...updates } as Session;
+            state.sessions.set(id, updated);
+            return updated;
+          },
+        },
+      },
+      sandbox: {
+        isSandboxActive: () => true,
+      },
+    });
+    sandboxController.setAutoResponderRules([{
+      match: { mode: 'stream' },
+      response: { type: 'text', content: 'done' },
+      maxUses: 1,
+    }]);
+    registerProvider({
+      descriptor: { id: 'sandbox', displayName: 'Sandbox', authType: 'none', connectable: false },
+      getStatus: () => ({ provider: 'sandbox', connected: true }),
+      connect: async () => ({}),
+      disconnect: async () => {},
+      onTokensReceived: async () => {},
+      createModel: async (options) => ({
+        model: new SandboxLanguageModel({
+          sessionId: options.sessionId ?? 'root',
+          modelId: options.modelId,
+          providerId: 'sandbox',
+        }) as unknown as LanguageModel,
+      }),
+    });
+    state.sessions.set('root', { ...state.sessions.get('root')!, selectedProvider: 'sandbox' });
+    const ws = {};
+
+    await handleChat(requestContext(({ event }) => {
+      if (event.kind === 'usage') order.push('usage.delivered');
+    }), ws, 'root', 'hello');
+
+    expect(order).toContain('usage.delivered');
+    expect(order.indexOf('usage.delivered')).toBeLessThan(order.indexOf('usage.persisted'));
+  });
+
+  test('delivers queue sending before deletion and title rename after persistence', async () => {
+    const state = createState();
+    const order: string[] = [];
+    const queued = [{ id: 'queued-1', sessionId: 'root', content: 'second', createdAt: 1, position: 0 }];
+    bindRuntime(state, {
+      storage: {
+        queue: {
+          addMessage: () => queued[0],
+          peek: () => queued[0] ?? null,
+          delete: (id) => {
+            order.push(`queue.deleted:${id}`);
+            queued.splice(0, 1);
+            return true;
+          },
+        },
+      },
+      titles: {
+        isDefaultSessionTitle: () => true,
+        hasManualSessionTitle: () => false,
+        generateSessionTitle: async () => 'Persisted title',
+      },
+      sandbox: {
+        isSandboxActive: () => true,
+      },
+    });
+    sandboxController.setAutoResponderRules([{
+      match: { mode: 'stream' },
+      response: { type: 'text', content: 'done' },
+      maxUses: 2,
+    }]);
+    registerProvider({
+      descriptor: { id: 'sandbox', displayName: 'Sandbox', authType: 'none', connectable: false },
+      getStatus: () => ({ provider: 'sandbox', connected: true }),
+      connect: async () => ({}),
+      disconnect: async () => {},
+      onTokensReceived: async () => {},
+      createModel: async (options) => ({
+        model: new SandboxLanguageModel({
+          sessionId: options.sessionId ?? 'root',
+          modelId: options.modelId,
+          providerId: 'sandbox',
+        }) as unknown as LanguageModel,
+      }),
+    });
+    state.sessions.set('root', { ...state.sessions.get('root')!, selectedProvider: 'sandbox' });
+    const ws = {};
+    const ctx = requestContext(({ event }) => {
+      if (event.kind === 'queue' && event.action === 'sending') {
+        expect(queued[0]?.id).toBe(event.queueId);
+        order.push(`queue.delivered:${event.queueId}`);
+      }
+      if (event.kind === 'session' && event.action === 'renamed') {
+        expect(state.sessions.get('root')?.title).toBe(event.session.title);
+        order.push('title.delivered');
+      }
+    });
+
+    await handleChat(ctx, ws, 'root', 'first');
+    await regenerateSessionTitle(ctx, ws, 'root', { force: true });
+
+    expect(order.indexOf('queue.delivered:queued-1')).toBeLessThan(order.indexOf('queue.deleted:queued-1'));
+    expect(order).toContain('title.delivered');
+  });
+
   test('returns no_api_key for an unregistered provider', async () => {
     const state = createState();
-    const sent: ServerMessage[] = [];
+    const sent: RuntimeEvent[] = [];
     bindRuntime(state);
     const ws = {};
 
-    await handleChat({
-      send: (_socket, message) => sent.push(message),
-      broadcast: () => {},
-      broadcastToSession: () => {},
-      sendToController: () => {},
-      sendToAskTargets: () => {},
-      clients: new Map([[ws, { sessionIds: new Set<string>(), missedPings: 0 }]]),
-    }, ws, 'root', 'hello');
+    await handleChat(requestContext(({ audience, event }) => {
+      if (audience.scope === 'origin') sent.push(event);
+    }), ws, 'root', 'hello');
 
     expect(sent).toEqual([{
-      type: 'error',
+      kind: 'failure',
+      category: 'generic',
       code: 'no_api_key',
       message: 'No API key configured for provider: test-provider. Set JEAN2_LLM_TEST-PROVIDER_API_KEY',
     }]);

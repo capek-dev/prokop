@@ -381,8 +381,8 @@ export async function executeSubagent(input: SubagentInput): Promise<SubagentOut
       variant: subagentPreconfig.variant ?? undefined,
       broadcast: broadcastFn,
       abortSignal,
-      broadcastToSession: broadcastToSessionFn ?? ((msg: import('@jean2/sdk').ServerMessage) => {
-        broadcastToSessionEvent(sessionId, msg);
+      broadcastToSession: broadcastToSessionFn ?? ((event: Parameters<BroadcastFn>[0]) => {
+        broadcastToSessionEvent(sessionId, event);
       }),
       ...(responseFormat ? { responseFormat } : {}),
     });

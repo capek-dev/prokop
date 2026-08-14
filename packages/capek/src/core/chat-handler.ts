@@ -1,10 +1,11 @@
-import type { AskAuthority, ServerMessage } from '@jean2/sdk';
+import type { ResponseFormat } from '@jean2/sdk';
 import {
+  emitRuntimeEvent,
   generateSessionTitle,
   hasManualSessionTitle,
   isDefaultSessionTitle,
   isSandboxActive,
-  notifyTerminalMessage,
+  emitTerminal,
 } from '../runtime/host-dependencies';
 import { getDefaultPreconfig, getPreconfigOrAgent } from '../context';
 import {
@@ -27,6 +28,7 @@ import {
   updateSession,
 } from '../storage/runtime';
 import type { AskBroadcastFn } from '../runtime/host';
+import type { RuntimeDelivery, RuntimeEvent, RuntimeEventContext } from '../runtime/events';
 import { executeCompaction } from './compaction-executor';
 import { runGoalLoop } from './goal-loop';
 import { interruptManager } from './interrupt';
@@ -36,18 +38,20 @@ import { resolveModelId, resolveProviderId } from './provider-utils';
 import { revertToStep } from './revert';
 import { streamChatWithRetry } from './retry';
 
-export interface Jean2RouterClientEntry {
-  sessionIds: Set<string>;
-  missedPings: number;
+export type RuntimeRequestContext<Origin = unknown> = RuntimeEventContext<Origin>;
+
+function deliver<Origin>(ctx: RuntimeRequestContext<Origin>, audience: RuntimeDelivery<Origin>['audience'], event: RuntimeEvent): void {
+  const delivery: RuntimeDelivery<Origin> = { audience, event };
+  ctx.observe?.(delivery);
+  ctx.emit(delivery);
 }
 
-export interface Jean2RouterContext<WebSocket = unknown> {
-  send: (ws: WebSocket, msg: ServerMessage) => void;
-  broadcast: (message: ServerMessage, excludeWs?: WebSocket) => void;
-  broadcastToSession: (sessionId: string, message: ServerMessage, excludeWs?: WebSocket) => void;
-  sendToController: (sessionId: string, message: ServerMessage) => void;
-  sendToAskTargets: (sessionId: string, authority: AskAuthority, message: ServerMessage) => void;
-  clients: Map<WebSocket, Jean2RouterClientEntry>;
+function deliverToOrigin<Origin>(ctx: RuntimeRequestContext<Origin>, origin: Origin, event: RuntimeEvent): void {
+  deliver(ctx, { scope: 'origin', origin }, event);
+}
+
+function deliverToSession<Origin>(ctx: RuntimeRequestContext<Origin>, sessionId: string, event: RuntimeEvent): void {
+  deliver(ctx, { scope: 'session', sessionId }, event);
 }
 
 // ── Compaction failure tracking ────────────────────────────────
@@ -110,8 +114,8 @@ function findReplayText(sessionId: string): string | null {
   return null;
 }
 
-async function drainQueue<WebSocket>(
-  ctx: Jean2RouterContext<WebSocket>,
+async function drainQueue<Origin>(
+  ctx: RuntimeRequestContext<Origin>,
   sessionId: string,
 ): Promise<{ content: string; attachments?: Array<{ id: string; kind: string }> } | null> {
   const nextMsg = getNextQueuedMessage(sessionId);
@@ -120,8 +124,9 @@ async function drainQueue<WebSocket>(
     return null;
   }
 
-  ctx.broadcastToSession(sessionId, {
-    type: 'queue.sending',
+  deliverToSession(ctx, sessionId, {
+    kind: 'queue',
+    action: 'sending',
     sessionId,
     queueId: nextMsg.id,
   });
@@ -149,9 +154,9 @@ interface ChatTurnResult {
   retryAfterMs?: number;
 }
 
-async function runSingleChatTurn<WebSocket>(
-  ctx: Jean2RouterContext<WebSocket>,
-  ws: WebSocket,
+async function runSingleChatTurn<Origin>(
+  ctx: RuntimeRequestContext<Origin>,
+  origin: Origin,
   sessionId: string,
   content: string,
   preconfig: NonNullable<Awaited<ReturnType<typeof getPreconfigOrAgent>>>,
@@ -161,7 +166,7 @@ async function runSingleChatTurn<WebSocket>(
   additionalPaths: string[] | undefined,
   session: NonNullable<ReturnType<typeof getSession>>,
   attachments?: Array<{ id: string; kind: string }>,
-  responseFormat?: import('@jean2/sdk').ResponseFormat,
+  responseFormat?: ResponseFormat,
   existingUserMessageId?: string,
 ): Promise<ChatTurnResult> {
   let userMsgId: string;
@@ -189,9 +194,9 @@ async function runSingleChatTurn<WebSocket>(
     };
     createPart(textPart, sessionId);
 
-    ctx.broadcastToSession(sessionId, { type: 'message.created', message: userMessage });
-    ctx.broadcastToSession(sessionId, { type: 'part.created', sessionId, part: textPart });
-    void regenerateSessionTitle(ctx, ws, sessionId);
+    deliverToSession(ctx, sessionId, { kind: 'message', action: 'created', message: userMessage });
+    deliverToSession(ctx, sessionId, { kind: 'part', action: 'created', sessionId, part: textPart });
+    void regenerateSessionTitle(ctx, origin, sessionId);
   }
 
   if (attachments && attachments.length > 0) {
@@ -212,7 +217,7 @@ async function runSingleChatTurn<WebSocket>(
           mimeType: attachmentRecord.mimeType,
         };
         createPart(imagePart, sessionId);
-        ctx.broadcastToSession(sessionId, { type: 'part.created', sessionId, part: imagePart });
+        deliverToSession(ctx, sessionId, { kind: 'part', action: 'created', sessionId, part: imagePart });
       } else {
         const filePart = {
           id: partId,
@@ -224,7 +229,7 @@ async function runSingleChatTurn<WebSocket>(
           filename: attachmentRecord.filename,
         };
         createPart(filePart, sessionId);
-        ctx.broadcastToSession(sessionId, { type: 'part.created', sessionId, part: filePart });
+        deliverToSession(ctx, sessionId, { kind: 'part', action: 'created', sessionId, part: filePart });
       }
     }
   }
@@ -234,11 +239,24 @@ async function runSingleChatTurn<WebSocket>(
   const askBroadcastFn: AskBroadcastFn = (message) => {
     if (message.type === 'ask.request') {
       const authority = message.authority ?? { visibilityScope: 'controller_only' as const, resolutionMode: 'controller_only' as const };
-      ctx.sendToAskTargets(sessionId, authority, message as ServerMessage);
-    } else if (message.type === 'ask.timeout') {
-      ctx.sendToController(sessionId, message as ServerMessage);
+      deliver(ctx, { scope: 'ask_targets', sessionId, authority }, {
+        kind: 'ask',
+        action: 'requested',
+        sessionId: message.sessionId,
+        toolCallId: message.toolCallId,
+        toolName: message.toolName,
+        ask: message.ask,
+        requestId: message.requestId,
+        authority: message.authority,
+      });
     } else {
-      ctx.broadcast(message as ServerMessage);
+      deliver(ctx, { scope: 'controller', sessionId }, {
+        kind: 'ask',
+        action: 'timed_out',
+        sessionId: message.sessionId,
+        toolCallId: message.toolCallId,
+        requestId: message.requestId,
+      });
     }
   };
 
@@ -262,32 +280,39 @@ async function runSingleChatTurn<WebSocket>(
     })) {
       switch (event.type) {
         case 'message.created':
-          ctx.broadcastToSession(sessionId, event);
+          deliverToSession(ctx, sessionId, { kind: 'message', action: 'created', message: event.message });
           break;
 
         case 'message.updated':
           updateMessage(event.message.id, event.message, { syncFts: false });
           if (event.message.role === 'assistant' && event.message.mode !== 'retry_failed') {
-            notifyTerminalMessage(event.message, sessionId);
+            emitTerminal(event.message, sessionId);
           }
-          ctx.broadcastToSession(sessionId, event);
+          deliverToSession(ctx, sessionId, { kind: 'message', action: 'updated', message: event.message });
           break;
 
         case 'part.created':
-          ctx.broadcastToSession(sessionId, event);
+          deliverToSession(ctx, sessionId, { kind: 'part', action: 'created', sessionId, part: event.part });
           break;
 
         case 'part.updated':
-          ctx.broadcastToSession(sessionId, event);
+          deliverToSession(ctx, sessionId, { kind: 'part', action: 'updated', sessionId, part: event.part });
           break;
 
         case 'part.append':
-          ctx.broadcastToSession(sessionId, event);
+          deliverToSession(ctx, sessionId, {
+            kind: 'part',
+            action: 'append',
+            sessionId,
+            partId: event.partId,
+            field: event.field,
+            delta: event.delta,
+          });
           break;
 
         case 'usage': {
-          ctx.broadcastToSession(sessionId, {
-            type: 'chat.usage',
+          deliverToSession(ctx, sessionId, {
+            kind: 'usage',
             sessionId,
             usage: event.usage,
             model: event.model,
@@ -309,15 +334,26 @@ async function runSingleChatTurn<WebSocket>(
           break;
 
         case 'chat.retry':
-          ctx.broadcastToSession(sessionId, event);
+          deliverToSession(ctx, sessionId, {
+            kind: 'retry',
+            sessionId: event.sessionId,
+            status: event.status,
+            attempt: event.retryNumber,
+            maxAttempts: event.maxRetries,
+            errorType: event.errorType,
+            message: event.message,
+            delayMs: event.delayMs,
+            retryAt: event.retryAt,
+          });
           if (event.status === 'cancelled') {
             retryCancelled = true;
           }
           break;
 
         case 'error.rate_limit':
-          ctx.send(ws, {
-            type: 'error.rate_limit',
+          deliverToOrigin(ctx, origin, {
+            kind: 'failure',
+            category: 'rate_limit',
             code: 'rate_limit',
             message: event.message,
             retryAfterMs: event.retryAfterMs,
@@ -336,8 +372,9 @@ async function runSingleChatTurn<WebSocket>(
           };
 
         case 'error.server':
-          ctx.send(ws, {
-            type: 'error.server',
+          deliverToOrigin(ctx, origin, {
+            kind: 'failure',
+            category: 'server',
             code: 'server_error',
             message: event.message,
             retryAfterMs: event.retryAfterMs,
@@ -356,8 +393,9 @@ async function runSingleChatTurn<WebSocket>(
           };
 
         case 'error.timeout':
-          ctx.send(ws, {
-            type: 'error.timeout',
+          deliverToOrigin(ctx, origin, {
+            kind: 'failure',
+            category: 'timeout',
             code: 'timeout',
             message: event.message,
             retryAfterMs: event.retryAfterMs,
@@ -376,8 +414,9 @@ async function runSingleChatTurn<WebSocket>(
           };
 
         case 'error':
-          ctx.send(ws, {
-            type: 'error',
+          deliverToOrigin(ctx, origin, {
+            kind: 'failure',
+            category: 'generic',
             code: event.code,
             message: event.message,
             sessionId,
@@ -394,8 +433,9 @@ async function runSingleChatTurn<WebSocket>(
           };
 
         case 'error.auth':
-          ctx.send(ws, {
-            type: 'error',
+          deliverToOrigin(ctx, origin, {
+            kind: 'failure',
+            category: 'generic',
             code: 'authentication',
             message: event.message,
           });
@@ -424,8 +464,9 @@ async function runSingleChatTurn<WebSocket>(
         }
 
         case 'error.invalid_request':
-          ctx.send(ws, {
-            type: 'error',
+          deliverToOrigin(ctx, origin, {
+            kind: 'failure',
+            category: 'generic',
             code: 'invalid_request',
             message: event.message,
           });
@@ -461,7 +502,7 @@ async function runSingleChatTurn<WebSocket>(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Chat failed';
     console.error('Unexpected chat error:', err);
-    ctx.send(ws, { type: 'error', code: 'chat_error', message });
+    deliverToOrigin(ctx, origin, { kind: 'failure', category: 'generic', code: 'chat_error', message });
     return {
       streamCompleted: false,
       interrupted: false,
@@ -475,9 +516,9 @@ async function runSingleChatTurn<WebSocket>(
   }
 }
 
-export async function regenerateSessionTitle<WebSocket>(
-  ctx: Jean2RouterContext<WebSocket>,
-  ws: WebSocket,
+export async function regenerateSessionTitle<Origin>(
+  ctx: RuntimeRequestContext<Origin>,
+  origin: Origin,
   sessionId: string,
   options?: { force?: boolean },
 ): Promise<void> {
@@ -505,26 +546,38 @@ export async function regenerateSessionTitle<WebSocket>(
     const title = await generateSessionTitle(messages);
     if (!title) {
       console.warn('[session-title] Skipping title update: no title generated', sessionId);
-      ctx.send(ws, { type: 'error', code: 'title_generation_error', message: 'Could not generate a title from the conversation.', sessionId });
+      deliverToOrigin(ctx, origin, {
+        kind: 'failure',
+        category: 'generic',
+        code: 'title_generation_error',
+        message: 'Could not generate a title from the conversation.',
+        sessionId,
+      });
       return;
     }
     const updated = updateSession(sessionId, { title });
     if (updated) {
       console.info('[session-title] Updated session title', { sessionId, title });
-      ctx.broadcastToSession(sessionId, { type: 'session.renamed', session: updated });
+      deliverToSession(ctx, sessionId, { kind: 'session', action: 'renamed', session: updated });
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn('[session-title] Failed to generate session title', { sessionId, message });
-    ctx.send(ws, { type: 'error', code: 'title_generation_error', message: `Title generation failed: ${message}`, sessionId });
+    deliverToOrigin(ctx, origin, {
+      kind: 'failure',
+      category: 'generic',
+      code: 'title_generation_error',
+      message: `Title generation failed: ${message}`,
+      sessionId,
+    });
   }
 }
 
 // ── Chat handler ───────────────────────────────────────────────
 
-export async function handleChat<WebSocket>(
-  ctx: Jean2RouterContext<WebSocket>,
-  ws: WebSocket,
+export async function handleChat<Origin>(
+  ctx: RuntimeRequestContext<Origin>,
+  origin: Origin,
   sessionId: string,
   content: string,
   attachments?: Array<{ id: string; kind: string }>,
@@ -534,24 +587,24 @@ export async function handleChat<WebSocket>(
 ): Promise<void> {
   const session = getSession(sessionId);
   if (!session) {
-    ctx.send(ws, { type: 'error', code: 'not_found', message: 'Session not found' });
+    deliverToOrigin(ctx, origin, { kind: 'failure', category: 'generic', code: 'not_found', message: 'Session not found' });
     return;
   }
 
   if (session.status === 'closed') {
-    ctx.send(ws, { type: 'error', code: 'session_closed', message: 'Cannot send messages to an archived session. Reopen it first.' });
+    deliverToOrigin(ctx, origin, {
+      kind: 'failure',
+      category: 'generic',
+      code: 'session_closed',
+      message: 'Cannot send messages to an archived session. Reopen it first.',
+    });
     return;
   }
 
   if (interruptManager.isSessionActive(sessionId)) {
     const queuedMessage = addMessageToQueue(sessionId, content, attachments);
-    const existingEntry = ctx.clients.get(ws);
-    if (existingEntry) {
-      existingEntry.sessionIds.add(sessionId);
-    } else {
-      ctx.clients.set(ws, { sessionIds: new Set([sessionId]), missedPings: 0 });
-    }
-    ctx.send(ws, { type: 'queue.added', sessionId, message: queuedMessage });
+    ctx.attachOriginToSession(origin, sessionId);
+    deliverToOrigin(ctx, origin, { kind: 'queue', action: 'added', sessionId, message: queuedMessage });
     return;
   }
 
@@ -564,7 +617,7 @@ export async function handleChat<WebSocket>(
     : await getDefaultPreconfig();
 
   if (!preconfig) {
-    ctx.send(ws, { type: 'error', code: 'no_preconfig', message: 'No preconfig found' });
+    deliverToOrigin(ctx, origin, { kind: 'failure', category: 'generic', code: 'no_preconfig', message: 'No preconfig found' });
     return;
   }
 
@@ -576,7 +629,12 @@ export async function handleChat<WebSocket>(
   const isConnectableProvider = getProvider(provider) !== undefined;
   if (!apiKey && !isConnectableProvider) {
     const envKey = `JEAN2_LLM_${provider.toUpperCase()}_API_KEY`;
-    ctx.send(ws, { type: 'error', code: 'no_api_key', message: `No API key configured for provider: ${provider}. Set ${envKey}` });
+    deliverToOrigin(ctx, origin, {
+      kind: 'failure',
+      category: 'generic',
+      code: 'no_api_key',
+      message: `No API key configured for provider: ${provider}. Set ${envKey}`,
+    });
     return;
   }
 
@@ -597,10 +655,10 @@ export async function handleChat<WebSocket>(
         initialPrompt: content,
         maxTurns: goalMaxTurns,
         abortSignal: goalAbortController.signal,
-        broadcast: ctx.broadcast,
+        broadcast: emitRuntimeEvent,
         runTurn: async (turnContent: string) => {
           const result = await runSingleChatTurn(
-            ctx, ws, sessionId, turnContent, preconfig, modelId, provider,
+            ctx, origin, sessionId, turnContent, preconfig, modelId, provider,
             workspacePath, additionalPaths, session, undefined, responseFormat,
           );
           return {
@@ -622,7 +680,7 @@ export async function handleChat<WebSocket>(
   while (true) {
     const result = await runSingleChatTurn(
       ctx,
-      ws,
+      origin,
       sessionId,
       currentContent,
       preconfig,
@@ -637,7 +695,12 @@ export async function handleChat<WebSocket>(
 
     if (result.contextOverflow) {
       if (overflowRetryDepth >= 1) {
-        ctx.send(ws, { type: 'error', code: 'context_overflow', message: result.errorMessage ?? 'Context overflow' });
+        deliverToOrigin(ctx, origin, {
+          kind: 'failure',
+          category: 'generic',
+          code: 'context_overflow',
+          message: result.errorMessage ?? 'Context overflow',
+        });
         return;
       }
 
@@ -659,7 +722,12 @@ export async function handleChat<WebSocket>(
         }
       }
 
-      ctx.send(ws, { type: 'error', code: 'context_overflow', message: result.errorMessage ?? 'Context overflow' });
+      deliverToOrigin(ctx, origin, {
+        kind: 'failure',
+        category: 'generic',
+        code: 'context_overflow',
+        message: result.errorMessage ?? 'Context overflow',
+      });
       return;
     }
 
@@ -710,44 +778,75 @@ export async function handleChat<WebSocket>(
   }
 }
 
-export async function handleSessionEditMessage<WebSocket>(
-  ctx: Jean2RouterContext<WebSocket>,
-  ws: WebSocket,
+export async function handleSessionEditMessage<Origin>(
+  ctx: RuntimeRequestContext<Origin>,
+  origin: Origin,
   msg: { sessionId: string; messageId: string; content: string },
 ): Promise<void> {
   try {
     const session = getSession(msg.sessionId);
     if (!session) {
-      ctx.send(ws, { type: 'error', code: 'not_found', message: 'Session not found', sessionId: msg.sessionId });
+      deliverToOrigin(ctx, origin, {
+        kind: 'failure',
+        category: 'generic',
+        code: 'not_found',
+        message: 'Session not found',
+        sessionId: msg.sessionId,
+      });
       return;
     }
 
     if (session.status === 'closed') {
-      ctx.send(ws, { type: 'error', code: 'session_closed', message: 'Cannot edit messages in an archived session.', sessionId: msg.sessionId });
+      deliverToOrigin(ctx, origin, {
+        kind: 'failure',
+        category: 'generic',
+        code: 'session_closed',
+        message: 'Cannot edit messages in an archived session.',
+        sessionId: msg.sessionId,
+      });
       return;
     }
 
     if (interruptManager.isSessionActive(msg.sessionId)) {
-      ctx.send(ws, { type: 'error', code: 'session_busy', message: 'Cannot edit while the session is streaming.', sessionId: msg.sessionId });
+      deliverToOrigin(ctx, origin, {
+        kind: 'failure',
+        category: 'generic',
+        code: 'session_busy',
+        message: 'Cannot edit while the session is streaming.',
+        sessionId: msg.sessionId,
+      });
       return;
     }
 
     const target = getMessage(msg.messageId);
     if (!target || target.sessionId !== msg.sessionId || target.role !== 'user') {
-      ctx.send(ws, { type: 'error', code: 'invalid_message', message: 'Only user messages can be edited.', sessionId: msg.sessionId });
+      deliverToOrigin(ctx, origin, {
+        kind: 'failure',
+        category: 'generic',
+        code: 'invalid_message',
+        message: 'Only user messages can be edited.',
+        sessionId: msg.sessionId,
+      });
       return;
     }
 
     const parts = getPartsByMessage(msg.messageId);
     const textPart = parts.find((p) => p.type === 'text');
     if (!textPart || textPart.type !== 'text') {
-      ctx.send(ws, { type: 'error', code: 'invalid_message', message: 'Message has no editable text.', sessionId: msg.sessionId });
+      deliverToOrigin(ctx, origin, {
+        kind: 'failure',
+        category: 'generic',
+        code: 'invalid_message',
+        message: 'Message has no editable text.',
+        sessionId: msg.sessionId,
+      });
       return;
     }
     const updatedPart = updatePart(textPart.id, { text: msg.content });
     if (updatedPart) {
-      ctx.broadcastToSession(msg.sessionId, {
-        type: 'part.updated',
+      deliverToSession(ctx, msg.sessionId, {
+        kind: 'part',
+        action: 'updated',
         sessionId: msg.sessionId,
         part: updatedPart,
       });
@@ -760,8 +859,9 @@ export async function handleSessionEditMessage<WebSocket>(
     });
 
     const currentState = listLatestMessagesWithPartsPage(msg.sessionId, 50);
-    ctx.broadcastToSession(msg.sessionId, {
-      type: 'session.state',
+    deliverToSession(ctx, msg.sessionId, {
+      kind: 'session',
+      action: 'state',
       sessionId: msg.sessionId,
       messages: currentState.messages,
     });
@@ -774,7 +874,13 @@ export async function handleSessionEditMessage<WebSocket>(
       ? await getPreconfigOrAgent(session.preconfigId)
       : await getDefaultPreconfig();
     if (!preconfig) {
-      ctx.send(ws, { type: 'error', code: 'no_preconfig', message: 'No preconfig found', sessionId: msg.sessionId });
+      deliverToOrigin(ctx, origin, {
+        kind: 'failure',
+        category: 'generic',
+        code: 'no_preconfig',
+        message: 'No preconfig found',
+        sessionId: msg.sessionId,
+      });
       return;
     }
 
@@ -783,7 +889,7 @@ export async function handleSessionEditMessage<WebSocket>(
 
     await runSingleChatTurn(
       ctx,
-      ws,
+      origin,
       msg.sessionId,
       msg.content,
       preconfig,
@@ -798,6 +904,12 @@ export async function handleSessionEditMessage<WebSocket>(
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Edit failed';
-    ctx.send(ws, { type: 'error', code: 'edit_error', message, sessionId: msg.sessionId });
+    deliverToOrigin(ctx, origin, {
+      kind: 'failure',
+      category: 'generic',
+      code: 'edit_error',
+      message,
+      sessionId: msg.sessionId,
+    });
   }
 }
