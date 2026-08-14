@@ -2,6 +2,11 @@ import type { Hono } from 'hono';
 import { validate } from './validate';
 import type { SessionStatus } from '@jean2/sdk';
 import {
+  DEFAULT_TOOL_OUTPUT_PAGE_CHARS,
+  MAX_TOOL_OUTPUT_PAGE_CHARS,
+  isToolOutputArtifactId,
+} from '@capekai/core/storage';
+import {
   createSession,
   getSession,
   listSessions,
@@ -13,6 +18,7 @@ import {
   listTagsByWorkspace,
   listLatestMessagesWithPartsPage,
   listMessagesWithPartsBeforeSequence,
+  getToolOutputArtifactPage,
 } from '@/store';
 import {
   getAttachmentByKey,
@@ -175,6 +181,33 @@ export function registerSessionRoutes(app: Hono): void {
       messages: result.messages,
       pagination: result.pagination,
     });
+  });
+
+  app.get('/api/sessions/:id/tool-output-artifacts/:artifactId', async (c) => {
+    const sessionId = c.req.param('id');
+    if (!getSession(sessionId)) throw new NotFoundError('Session not found');
+    const artifactId = c.req.param('artifactId');
+    if (!isToolOutputArtifactId(artifactId)) {
+      throw new BadRequestError('artifactId must be a UUID');
+    }
+
+    const offsetParam = c.req.query('offset');
+    const limitParam = c.req.query('limit');
+    if (offsetParam !== undefined && (!/^\d+$/.test(offsetParam) || !Number.isSafeInteger(Number(offsetParam)))) {
+      throw new BadRequestError('offset must be a non-negative integer');
+    }
+    if (limitParam !== undefined && (!/^\d+$/.test(limitParam) || !Number.isSafeInteger(Number(limitParam)))) {
+      throw new BadRequestError(`limit must be an integer between 1 and ${MAX_TOOL_OUTPUT_PAGE_CHARS}`);
+    }
+    const offset = offsetParam === undefined ? 0 : Number(offsetParam);
+    const limit = limitParam === undefined ? DEFAULT_TOOL_OUTPUT_PAGE_CHARS : Number(limitParam);
+    if (limit < 1 || limit > MAX_TOOL_OUTPUT_PAGE_CHARS) {
+      throw new BadRequestError(`limit must be an integer between 1 and ${MAX_TOOL_OUTPUT_PAGE_CHARS}`);
+    }
+
+    const page = getToolOutputArtifactPage(sessionId, artifactId, offset, limit);
+    if (!page) throw new NotFoundError('Tool output artifact not found');
+    return c.json(page);
   });
 
   app.get('/api/sessions/:id/attachments', async (c) => {

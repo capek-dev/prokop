@@ -33,6 +33,7 @@ import {
   createPart,
   getMessageWithParts,
   getSession,
+  getToolOutputArtifactPage,
   updateSession,
   withStorage,
 } from '../storage/runtime';
@@ -255,6 +256,20 @@ class StandaloneAgent implements Agent {
 
   async resume(sessionId: string, input?: AgentInput, options?: RunOptions): Promise<AgentResult> {
     return this.#start(sessionId, input, options, false);
+  }
+
+  async retrieveToolOutput(
+    sessionId: string,
+    artifactId: string,
+    options: { offset?: number; limit?: number } = {},
+  ) {
+    if (this.#closed) throw new Error('Agent is closed');
+    return this.#scope(() => getToolOutputArtifactPage(
+      sessionId,
+      artifactId,
+      options.offset,
+      options.limit,
+    ));
   }
 
   async interrupt(): Promise<void> {

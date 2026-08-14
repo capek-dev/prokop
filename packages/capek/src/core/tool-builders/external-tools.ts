@@ -18,7 +18,6 @@ import {
   type SubagentInput,
   type SubagentOutput,
 } from '../subagent';
-import { truncateToolResult } from '../../utils/truncate-tool-result';
 import { isToolAllowedInContext, type ToolExecutionScope } from '../tool-capabilities';
 import type { ToolMap } from './types';
 import type { BroadcastFn } from '../../runtime/host-dependencies';
@@ -157,13 +156,11 @@ export async function buildExternalTools(options: ExternalToolsOptions): Promise
             return { error: result.error ?? 'Tool execution failed' };
           }
 
-          const toolOutput = truncateToolResult(result.result, sessionId, name, workspace.tempDir);
-
-          if (result.visualization && toolOutput && typeof toolOutput === 'object') {
-            return { ...toolOutput as Record<string, unknown>, _visualization: result.visualization };
+          if (result.visualization && result.result && typeof result.result === 'object') {
+            return { ...result.result as Record<string, unknown>, _visualization: result.visualization };
           }
 
-          return toolOutput;
+          return result.result;
         } finally {
           interruptManager.unregisterToolExecution(sessionId, toolCallId);
           rejectPendingAsksByToolCallId(toolCallId);

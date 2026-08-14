@@ -96,6 +96,40 @@ export interface ConversationStore {
   transitionToolToInterrupted(partId: string, reason: 'user_request' | 'timeout' | 'error' | 'cascade'): ToolPart | null;
 }
 
+export type ToolOutputArtifactFormat = 'json' | 'text';
+
+export interface ToolOutputArtifact {
+  id: string;
+  sessionId: string;
+  workspaceId?: string;
+  toolCallId: string;
+  toolName: string;
+  content: string;
+  format: ToolOutputArtifactFormat;
+  size: number;
+  createdAt: number;
+}
+
+export type CreateToolOutputArtifact = Omit<ToolOutputArtifact, 'id' | 'size' | 'createdAt'>;
+
+export interface ToolOutputArtifactPage {
+  artifactId: string;
+  toolCallId: string;
+  toolName: string;
+  format: ToolOutputArtifactFormat;
+  content: string;
+  offset: number;
+  limit: number;
+  totalChars: number;
+  nextOffset: number | null;
+  complete: boolean;
+}
+
+export interface ToolOutputArtifactStore {
+  create(input: CreateToolOutputArtifact): ToolOutputArtifact;
+  getPage(sessionId: string, artifactId: string, offset?: number, limit?: number): ToolOutputArtifactPage | null;
+}
+
 export interface MessageQueueStore {
   addMessage(sessionId: string, content: string, attachments?: Array<{ id: string; kind: string }>): QueuedMessage;
   peek(sessionId: string): QueuedMessage | null;
@@ -122,6 +156,7 @@ export interface ConversationIndex {
 
 export interface StorageBundle {
   conversation: ConversationStore;
+  toolOutputArtifacts: ToolOutputArtifactStore;
   queue: MessageQueueStore;
   attachments: AttachmentStore;
   workspaces: WorkspaceStore;

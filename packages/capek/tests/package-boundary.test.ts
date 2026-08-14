@@ -86,8 +86,8 @@ function resolvesWithin(specifier: string, importer: string, target: string): bo
 
 describe('package boundary', () => {
   test('declared package entrypoints import by package name', () => {
-    expect(capekPackagePhase).toBe(8);
-    expect(jean2CompatibilityPhase).toBe(8);
+    expect(capekPackagePhase).toBe(9);
+    expect(jean2CompatibilityPhase).toBe(9);
     expect(typeof createAgent).toBe('function');
     expect(typeof createInMemoryConversationStore).toBe('function');
   });

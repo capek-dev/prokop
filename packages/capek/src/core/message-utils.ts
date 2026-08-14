@@ -3,6 +3,7 @@ import type { ModelMessage } from 'ai';
 import { isTextPart, isToolPart, isImagePart, isFilePart, parseToolInput } from './part-utils';
 import { stripVisualization } from '../utils/strip-visualization';
 import { getAttachment } from '../storage/runtime';
+import { isToolOutputArtifactReference, RETRIEVE_TOOL_OUTPUT_NAME } from '../tools/tool-output-artifacts';
 
 type AiSdkContent = string | Array<{
   type: 'text' | 'tool-call' | 'tool-result' | 'image' | 'file';
@@ -99,11 +100,21 @@ export async function convertToAiSdkMessages(
           const isSkillTool = toolPart.name === 'skill';
 
           if (isCompacted && !isSkillTool) {
+            const output = stripVisualization(toolPart.state.output);
+            const value = isToolOutputArtifactReference(output)
+              ? {
+                ...output,
+                preview: '[Old tool result content cleared]',
+                message: `[Old tool result content cleared] Exact output remains available with ${RETRIEVE_TOOL_OUTPUT_NAME} using artifactId ${output.artifactId}.`,
+              }
+              : '[Old tool result content cleared]';
             toolResultBlocks.push({
               type: 'tool-result' as const,
               toolCallId: toolPart.callId,
               toolName: toolPart.name,
-              output: { type: 'text' as const, value: '[Old tool result content cleared]' },
+              output: isToolOutputArtifactReference(output)
+                ? { type: 'json' as const, value }
+                : { type: 'text' as const, value },
             });
           } else {
             toolResultBlocks.push({

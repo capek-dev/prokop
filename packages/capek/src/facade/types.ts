@@ -1,4 +1,5 @@
 import type { Part } from '@jean2/sdk';
+import type { ToolOutputArtifactPage } from '../storage/contracts';
 export type { AgentStorageOption } from '../storage/options';
 
 export type AgentInput = string | { text: string };
@@ -50,6 +51,11 @@ export interface Agent {
   run(input: AgentInput, options?: RunOptions): Promise<AgentResult>;
   stream(input: AgentInput, options?: RunOptions): AsyncIterable<AgentEvent>;
   resume(sessionId: string, input?: AgentInput, options?: RunOptions): Promise<AgentResult>;
+  retrieveToolOutput(
+    sessionId: string,
+    artifactId: string,
+    options?: { offset?: number; limit?: number },
+  ): Promise<ToolOutputArtifactPage | null>;
   interrupt(): Promise<void>;
   close(): Promise<void>;
 }

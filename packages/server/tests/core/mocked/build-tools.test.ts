@@ -125,9 +125,17 @@ describe('build-tools binding integration', () => {
     setJean2CompatibilityBindings(jean2CompatibilityBindings);
   });
 
-  test('returns no tools when no sources are enabled', async () => {
+  test('exposes only intrinsic artifact retrieval when no sources are enabled', async () => {
     const tools = await buildAiSdkTools(defaultOptions());
-    expect(tools).toEqual({});
+    expect(Object.keys(tools)).toEqual(['retrieve-tool-output']);
+  });
+
+  test('keeps intrinsic artifact retrieval callable without preconfig migration', async () => {
+    const tools = await buildAiSdkTools(defaultOptions());
+    expect(await tools['retrieve-tool-output']!.execute!(
+      { artifactId: 'not-a-uuid' },
+      { toolCallId: 'call-retrieve', messages: [] },
+    )).toEqual({ error: 'Tool output artifact not found' });
   });
 
   test('loads and executes a real package registry tool', async () => {
@@ -254,6 +262,8 @@ describe('build-tools binding integration', () => {
     }));
 
     expect(tools.skill).toBeDefined();
-    expect(tools['mcp-tool']).toBe(mcp);
+    expect(tools['mcp-tool']).toBeDefined();
+    expect(tools['mcp-tool']).not.toBe(mcp);
+    expect(await tools['mcp-tool']!.execute!({}, { toolCallId: 'call-mcp', messages: [] })).toBe('mcp');
   });
 });

@@ -10,6 +10,7 @@ import {
   createFilePermissionAsk,
   getEffectiveShellCommandIdentity,
 } from '@jean2/sdk';
+import { retrieveToolOutputStandardTool } from './tool-output-artifacts';
 
 const STANDARD_TOOL_PATH = 'builtin:@capekai/core';
 const SKIP_NAMES = new Set(['node_modules', '.git', 'dist', 'build', 'target', 'vendor', '.venv', 'coverage']);
@@ -570,6 +571,7 @@ const standardTools = new Map([
   grep,
   shell,
   question,
+  retrieveToolOutputStandardTool,
 ].map((entry) => [entry.definition.name, entry]));
 
 export const STANDARD_TOOL_NAMES = [...standardTools.keys()];

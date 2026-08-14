@@ -137,6 +137,38 @@ describe('convertToAiSdkMessages', () => {
     expect(result[1].role).toBe('tool');
   });
 
+  test('preserves legacy temporary-file artifact fields for non-compacted rows', async () => {
+    const legacyOutput = {
+      content: 'legacy preview',
+      _persisted: true,
+      _filePath: '/tmp/jean2/session-1/read-file-1.json',
+      _originalSize: 60_000,
+    };
+    const messages: MessageWithParts[] = [{
+      message: {
+        id: 'm1', sessionId: 's1', role: 'assistant', createdAt: 0,
+        status: 'completed', modelId: 'gpt-4o', providerId: 'openai',
+        tokens: { prompt: 0, completion: 0 }, cost: 0,
+      },
+      parts: [{
+        id: 'p1', messageId: 'm1', createdAt: 0, type: 'tool', callId: 'call-1',
+        name: 'read-file',
+        state: {
+          status: 'completed',
+          input: {},
+          output: legacyOutput,
+          startedAt: 100,
+          completedAt: 200,
+        },
+      } as ToolPart],
+    }];
+
+    const result = await convertToAiSdkMessages(messages);
+    const toolResult = result.find(entry => entry.role === 'tool');
+    const content = toolResult?.content as Array<{ type: string; output?: { value?: unknown } }>;
+    expect(content.find(entry => entry.type === 'tool-result')?.output?.value).toEqual(legacyOutput);
+  });
+
   test('compacted tool outputs show "[Old tool result content cleared]"', async () => {
     const messages: MessageWithParts[] = [
       {
@@ -166,6 +198,49 @@ describe('convertToAiSdkMessages', () => {
     const content = toolResult!.content as Array<{ type: string; output?: unknown }>;
     const toolResultBlock = content.find((c: Record<string, unknown>) => c.type === 'tool-result');
     expect(toolResultBlock).toBeDefined();
+    expect((toolResultBlock?.output as { value: unknown }).value).toBe('[Old tool result content cleared]');
+  });
+
+  test('compacted artifact outputs preserve the legacy marker and retrieval reference', async () => {
+    const artifactId = '123e4567-e89b-42d3-a456-426614174000';
+    const messages: MessageWithParts[] = [{
+      message: {
+        id: 'm1', sessionId: 's1', role: 'assistant', createdAt: 0,
+        status: 'completed', modelId: 'gpt-4o', providerId: 'openai',
+        tokens: { prompt: 0, completion: 0 }, cost: 0,
+      },
+      parts: [{
+        id: 'p1', messageId: 'm1', createdAt: 0, type: 'tool', callId: 'call-1',
+        name: 'read-file',
+        state: {
+          status: 'completed',
+          input: {},
+          output: {
+            type: 'tool-output-artifact',
+            artifactId,
+            preview: 'preview',
+            format: 'text',
+            totalChars: 60_000,
+            complete: false,
+            message: 'retrievable',
+            _visualization: { type: 'none' },
+          },
+          startedAt: 100,
+          completedAt: 200,
+          compactedAt: 12345,
+        },
+      } as ToolPart],
+    }];
+
+    const result = await convertToAiSdkMessages(messages);
+    const toolResult = result.find(entry => entry.role === 'tool');
+    const content = toolResult?.content as Array<{ type: string; output?: { value?: unknown } }>;
+    const value = content.find(entry => entry.type === 'tool-result')?.output?.value as Record<string, unknown>;
+    expect(value.artifactId).toBe(artifactId);
+    expect(value.preview).toBe('[Old tool result content cleared]');
+    expect(value.message).toContain('retrieve-tool-output');
+    expect(value.message).toContain(artifactId);
+    expect(value).not.toHaveProperty('_visualization');
   });
 
   test('pending/running/interrupted tools synthesize error results', async () => {
