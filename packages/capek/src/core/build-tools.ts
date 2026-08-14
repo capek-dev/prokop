@@ -4,6 +4,11 @@ import {
 } from '../runtime/host-dependencies';
 import { getAgentDirectory } from '../context';
 import { discoverSourceTools } from '../tools/tool-source';
+import {
+  buildRetrieveToolOutputAiTool,
+  RETRIEVE_TOOL_OUTPUT_NAME,
+  wrapToolsWithOutputPolicy,
+} from '../tools/tool-output-artifacts';
 import { getSession } from '../storage/runtime';
 import type { AskBroadcastFn } from '../tools/ask-user-api';
 import { join } from 'path';
@@ -122,5 +127,6 @@ export async function buildAiSdkTools(
     Object.assign(tools, agentTools);
   }
 
-  return tools;
+  tools[RETRIEVE_TOOL_OUTPUT_NAME] = buildRetrieveToolOutputAiTool(sessionId);
+  return wrapToolsWithOutputPolicy(tools, { sessionId, workspaceId });
 }

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import { Database } from 'bun:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -6,9 +7,13 @@ import type { Message, Session, ToolPart } from '@jean2/sdk';
 import {
   createInMemoryConversationStore,
   createInMemoryMessageQueueStore,
+  createInMemoryToolOutputArtifactStore,
   createSqliteConversationStore,
+  createSqliteToolOutputArtifactStore,
+  MAX_TOOL_OUTPUT_PAGE_CHARS,
   type ClosableStore,
   type ConversationStore,
+  type ToolOutputArtifactStore,
 } from '@capekai/core/storage';
 
 const temporaryDirectories: string[] = [];
@@ -191,6 +196,57 @@ runConversationContract('SQLite conversation store', () => {
   return createSqliteConversationStore({ path: join(directory, 'conversation.sqlite') });
 });
 
+function runToolOutputArtifactContract(name: string, createStore: () => ToolOutputArtifactStore & Partial<ClosableStore>): void {
+  describe(name, () => {
+    test('enforces opaque session scope and bounded character pages', () => {
+      const store = createStore();
+      const artifact = store.create({
+        sessionId: 'root',
+        workspaceId: 'workspace-1',
+        toolCallId: 'call-1',
+        toolName: 'synthetic',
+        content: 'x'.repeat(MAX_TOOL_OUTPUT_PAGE_CHARS + 5),
+        format: 'text',
+      });
+
+      expect(artifact.id).toMatch(/^[0-9a-f-]{36}$/);
+      expect(artifact.size).toBe(MAX_TOOL_OUTPUT_PAGE_CHARS + 5);
+      expect(store.getPage('root', 'malformed')).toBeNull();
+      expect(store.getPage('other', artifact.id)).toBeNull();
+      expect(store.getPage('root', crypto.randomUUID())).toBeNull();
+      expect(store.getPage('root', artifact.id, 0, MAX_TOOL_OUTPUT_PAGE_CHARS * 2)).toMatchObject({
+        offset: 0,
+        limit: MAX_TOOL_OUTPUT_PAGE_CHARS,
+        totalChars: MAX_TOOL_OUTPUT_PAGE_CHARS + 5,
+        nextOffset: MAX_TOOL_OUTPUT_PAGE_CHARS,
+        complete: false,
+      });
+      expect(store.getPage('root', artifact.id, MAX_TOOL_OUTPUT_PAGE_CHARS, 10)).toMatchObject({
+        content: 'xxxxx',
+        nextOffset: null,
+        complete: true,
+      });
+      expect(store.getPage('root', artifact.id, Number.MAX_SAFE_INTEGER, 10)).toMatchObject({
+        content: '',
+        offset: MAX_TOOL_OUTPUT_PAGE_CHARS + 5,
+        complete: true,
+      });
+      store.close?.();
+    });
+  });
+}
+
+runToolOutputArtifactContract('in-memory tool output artifact store', createInMemoryToolOutputArtifactStore);
+runToolOutputArtifactContract('SQLite tool output artifact store', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'capek-artifact-storage-'));
+  temporaryDirectories.push(directory);
+  const path = join(directory, 'conversation.sqlite');
+  const conversation = createSqliteConversationStore({ path });
+  conversation.createSession(session('root'));
+  conversation.close();
+  return createSqliteToolOutputArtifactStore({ path });
+});
+
 describe('storage persistence and queue contracts', () => {
   test('creates missing parent directories for SQLite paths', () => {
     const directory = mkdtempSync(join(tmpdir(), 'capek-nested-storage-'));
@@ -219,6 +275,33 @@ describe('storage persistence and queue contracts', () => {
     expect(reopened.listMessagesWithParts('root').map(entry => entry.message.id)).toEqual(['first', 'second']);
     expect(reopened.getChildSessions('root').map(child => child.id)).toEqual(['child-a']);
     reopened.close();
+  });
+
+  test('reopens SQLite artifacts and cascades them with session deletion', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'capek-artifact-reopen-'));
+    temporaryDirectories.push(directory);
+    const path = join(directory, 'conversation.sqlite');
+    const conversation = createSqliteConversationStore({ path });
+    conversation.createSession(session('root'));
+    const first = createSqliteToolOutputArtifactStore({ path });
+    const artifact = first.create({
+      sessionId: 'root',
+      toolCallId: 'call-1',
+      toolName: 'synthetic',
+      content: 'exact',
+      format: 'text',
+    });
+    first.close();
+
+    const reopened = createSqliteToolOutputArtifactStore({ path });
+    expect(reopened.getPage('root', artifact.id)?.content).toBe('exact');
+    const db = new Database(path, { strict: true });
+    db.exec('PRAGMA foreign_keys = ON');
+    db.run('DELETE FROM capek_sessions WHERE id = ?', ['root']);
+    db.close();
+    expect(reopened.getPage('root', artifact.id)).toBeNull();
+    reopened.close();
+    conversation.close();
   });
 
   test('peeks then deletes queued messages in FIFO order', () => {

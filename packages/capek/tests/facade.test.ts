@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createAgent } from '@capekai/core';
@@ -38,6 +38,7 @@ describe('createAgent facade', () => {
       'run',
       'stream',
       'resume',
+      'retrieveToolOutput',
       'interrupt',
       'close',
     ]);
@@ -462,7 +463,7 @@ describe('createAgent facade', () => {
     await agent.close();
   });
 
-  test('persists large tool results under the scoped capability temp directory', async () => {
+  test('persists large tool results as scoped artifacts retrievable through the Agent API', async () => {
     const root = await workspace();
     await writeFile(join(root, 'large.txt'), `${'x'.repeat(60_000)}\n`);
     const agent = createAgent({
@@ -482,11 +483,15 @@ describe('createAgent facade', () => {
     if (!toolPart || toolPart.type !== 'tool' || toolPart.state.status !== 'completed') {
       throw new Error('Expected completed grep tool part');
     }
-    const output = toolPart.state.output as { _filePath: string };
+    const output = toolPart.state.output as { artifactId: string; preview: string; totalChars: number };
 
-    expect(output._filePath).toStartWith(join(tmpdir(), 'capek'));
-    expect(output._filePath).not.toStartWith(join(tmpdir(), 'jean2'));
-    expect(await readFile(output._filePath, 'utf-8')).toContain('large.txt');
+    expect(output.artifactId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(output.preview).toHaveLength(10_000);
+    expect(JSON.stringify(output)).not.toContain(root);
+    const page = await agent.retrieveToolOutput(result.sessionId, output.artifactId, { limit: 20_000 });
+    expect(page?.content).toContain('large.txt');
+    expect(page?.totalChars).toBe(output.totalChars);
+    expect(await agent.retrieveToolOutput('other-session', output.artifactId)).toBeNull();
     await agent.close();
   });
 

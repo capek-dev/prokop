@@ -1,6 +1,7 @@
 import type { ConversationStore, StorageBundle } from './contracts';
 import { createInMemoryStorageBundle } from './memory';
 import { createSqliteConversationStore } from './sqlite';
+import { createSqliteToolOutputArtifactStore } from './tool-output-artifacts';
 
 export type AgentStorageOption =
   | ConversationStore
@@ -48,9 +49,16 @@ export function createAgentStorage(option?: AgentStorageOption): AgentStorageCom
       };
     }
     const conversation = createSqliteConversationStore({ path: option.path });
+    const toolOutputArtifacts = createSqliteToolOutputArtifactStore({ path: option.path });
     return {
-      storage: composeConversationStore(conversation),
-      close: () => conversation.close(),
+      storage: {
+        ...composeConversationStore(conversation),
+        toolOutputArtifacts,
+      },
+      close: () => {
+        toolOutputArtifacts.close();
+        conversation.close();
+      },
     };
   }
 

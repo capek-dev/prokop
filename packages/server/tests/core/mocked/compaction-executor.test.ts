@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { MockLanguageModelV3, convertArrayToReadableStream } from 'ai/test';
-import type { AssistantMessage } from '@jean2/sdk';
+import type { AssistantMessage, ToolPart } from '@jean2/sdk';
 import {
   getJean2CompatibilityBindings,
   getRuntimeConfiguration,
@@ -16,11 +16,15 @@ import type {
 import { getStorage } from '@capekai/core/storage';
 import { configureCapekJean2Compatibility } from '@/capek-adapter';
 import { executeCompaction, isCompactionActive } from '@/core/compaction-executor';
+import { convertToAiSdkMessages } from '@/core/message-utils';
 import {
   createMessage,
   createPart,
   createSession,
+  createToolOutputArtifact,
+  getPart,
   getSession,
+  getToolOutputArtifactPage,
   listMessagesWithParts,
 } from '@/store';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
@@ -89,6 +93,10 @@ function executeWithBindings(
       ...runtimeConfiguration,
       getCompactionModel: () => undefined,
       getCompactionProvider: () => undefined,
+      getCompactionPreserveRecentToolCount: () => 0,
+      getCompactionPreserveSmallToolChars: () => 0,
+      getCompactionToolClearCharsThreshold: () => 0,
+      getCompactionMaxPrunedToolCount: () => 100,
     },
     () => withJean2CompatibilityBindings(
       {
@@ -210,6 +218,54 @@ describe('package-owned compaction executor', () => {
     expect(summary?.parts.find((part) => part.type === 'text')).toMatchObject({
       text: '## Summary\n\nCompacted conversation summary.',
     });
+  });
+
+  test('preserves artifact retrieval after compacting tool output', async () => {
+    createConversation(sessionId);
+    const assistant = listMessagesWithParts(sessionId).find(({ message }) => message.id === 'assistant-1');
+    if (!assistant) throw new Error('Expected assistant message');
+    const artifact = createToolOutputArtifact({
+      sessionId,
+      workspaceId,
+      toolCallId: 'call-1',
+      toolName: 'read-file',
+      content: 'x'.repeat(30_000),
+      format: 'text',
+    });
+    createPart({
+      id: 'tool-1',
+      messageId: assistant.message.id,
+      createdAt: 3,
+      type: 'tool',
+      callId: 'call-1',
+      name: 'read-file',
+      state: {
+        status: 'completed',
+        input: { path: 'large.txt' },
+        output: {
+          type: 'tool-output-artifact',
+          artifactId: artifact.id,
+          preview: 'x'.repeat(10_000),
+          format: 'text',
+          totalChars: artifact.size,
+          complete: false,
+          message: `Exact output is available with retrieve-tool-output using artifactId ${artifact.id}.`,
+        },
+        startedAt: 2,
+        completedAt: 3,
+      },
+    } as ToolPart, sessionId);
+
+    const result = await executeWithBindings(providers, sessionId, 'manual', noBroadcast, () => {});
+
+    expect(result.ok).toBe(true);
+    const compacted = getPart('tool-1') as ToolPart;
+    expect(compacted.state).toHaveProperty('compactedAt');
+    expect(getToolOutputArtifactPage(sessionId, artifact.id, 0, 20)?.content).toBe('x'.repeat(20));
+    const modelMessages = await convertToAiSdkMessages(listMessagesWithParts(sessionId));
+    expect(JSON.stringify(modelMessages)).toContain('[Old tool result content cleared]');
+    expect(JSON.stringify(modelMessages)).toContain(artifact.id);
+    expect(JSON.stringify(modelMessages)).toContain('retrieve-tool-output');
   });
 
   test('uses the session model and provider for compaction', async () => {

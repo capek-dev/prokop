@@ -185,6 +185,26 @@ export function initializeSchema(db: Database): void {
   db.run('CREATE INDEX IF NOT EXISTS idx_sessions_root_workspace_status_updated ON sessions(workspace_id, status, updated_at DESC, id DESC) WHERE parent_id IS NULL');
 
   db.run(`
+    CREATE TABLE IF NOT EXISTS tool_output_artifacts (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      workspace_id TEXT,
+      tool_call_id TEXT NOT NULL,
+      tool_name TEXT NOT NULL,
+      content TEXT NOT NULL,
+      format TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.run('CREATE INDEX IF NOT EXISTS idx_tool_output_artifacts_session_created ON tool_output_artifacts(session_id, created_at, id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_tool_output_artifacts_session_call ON tool_output_artifacts(session_id, tool_call_id)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_tool_output_artifacts_workspace ON tool_output_artifacts(workspace_id)');
+
+  db.run(`
     CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
@@ -722,6 +742,7 @@ export * from './workspaces';
 export * from './permissions';
 export * from './queued-messages';
 export * from './terminal-sessions';
+export * from './tool-output-artifacts';
 
 // Re-export session cleanup functions for workspace deletion
 export { cleanupSessionOutputDir, cleanupSessionsOutputDirs, cleanupWorkspaceSessionsOutputDirs, deleteSessionsByWorkspace } from './sessions';

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createAgent } from '@capekai/core';
@@ -74,16 +74,28 @@ describe('createAgent storage options', () => {
     expect(closeCount).toBe(0);
   });
 
-  test('reopens SQLite and resumes the same session', async () => {
+  test('reopens SQLite and resumes the same session with retrievable artifacts', async () => {
     const workspace = await root();
     const path = join(workspace, 'agent.db');
+    await writeFile(join(workspace, 'large.txt'), `${'x'.repeat(60_000)}\n`);
     const first = createAgent({
       model: 'openai/gpt-4o-mini',
       workspace,
       storage: { type: 'sqlite', path },
-      sandbox: { rules: [{ match: { mode: 'stream' }, response: { type: 'text', content: 'stored' } }] },
+      sandbox: {
+        rules: [{
+          match: { mode: 'stream', hasToolResults: false },
+          response: { type: 'tool-call', toolName: 'grep', args: { pattern: 'x', path: workspace } },
+          maxUses: 1,
+        }],
+      },
     });
-    const initial = await first.run('persist this');
+    const initial = await first.run('persist this', { maxSteps: 3 });
+    const toolPart = initial.parts.find((part) => part.type === 'tool' && part.name === 'grep');
+    if (!toolPart || toolPart.type !== 'tool' || toolPart.state.status !== 'completed') {
+      throw new Error('Expected completed grep tool part');
+    }
+    const artifactId = (toolPart.state.output as { artifactId: string }).artifactId;
     await first.close();
 
     const reopened = createAgent({
@@ -92,11 +104,13 @@ describe('createAgent storage options', () => {
       storage: { type: 'sqlite', path },
       sandbox: { rules: [{ match: { mode: 'stream' }, response: { type: 'text', content: 'resumed' } }] },
     });
+    expect((await reopened.retrieveToolOutput(initial.sessionId, artifactId))?.content).toContain('large.txt');
     const resumed = await reopened.resume(initial.sessionId, 'continue');
 
     expect(resumed.status).toBe('completed');
     expect(resumed.text).toBe('resumed');
     expect(resumed.sessionId).toBe(initial.sessionId);
+    expect((await reopened.retrieveToolOutput(initial.sessionId, artifactId))?.content).toContain('large.txt');
     await reopened.close();
   });
 

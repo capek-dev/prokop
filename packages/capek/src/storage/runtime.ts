@@ -95,6 +95,10 @@ export const transitionToolToRunningByCallId = (...args: Parameters<StorageBundl
 export const transitionToolToInterrupted = (...args: Parameters<StorageBundle['conversation']['transitionToolToInterrupted']>) =>
   activeStorage().conversation.transitionToolToInterrupted(...args);
 export const syncMessageFts = (messageId: string): void => activeStorage().index.syncMessage(messageId);
+export const createToolOutputArtifact = (...args: Parameters<StorageBundle['toolOutputArtifacts']['create']>) =>
+  activeStorage().toolOutputArtifacts.create(...args);
+export const getToolOutputArtifactPage = (...args: Parameters<StorageBundle['toolOutputArtifacts']['getPage']>) =>
+  activeStorage().toolOutputArtifacts.getPage(...args);
 export const addMessageToQueue = (...args: Parameters<StorageBundle['queue']['addMessage']>) =>
   activeStorage().queue.addMessage(...args);
 export const getNextQueuedMessage = (...args: Parameters<StorageBundle['queue']['peek']>) =>

@@ -8,6 +8,7 @@ import type {
   ToolPart,
   Workspace,
 } from '@jean2/sdk';
+import { createInMemoryToolOutputArtifactStore } from './tool-output-artifacts';
 import type {
   AttachmentRecord,
   AttachmentStore,
@@ -314,6 +315,7 @@ export function createInMemoryStorageBundle(records: InMemoryAuxiliaryRecords = 
   const index: ConversationIndex = { syncMessage: () => {} };
   return {
     conversation: createInMemoryConversationStore(),
+    toolOutputArtifacts: createInMemoryToolOutputArtifactStore(),
     queue: createInMemoryMessageQueueStore({ attachments: attachmentStore }),
     attachments: attachmentStore,
     workspaces: workspaceStore,

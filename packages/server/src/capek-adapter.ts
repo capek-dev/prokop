@@ -85,6 +85,7 @@ import {
   listSessionsByWorkspace,
   listLatestMessagesWithPartsPage,
   listMessagesWithParts,
+  jean2ToolOutputArtifactStore,
   persistStreamingPartSnapshots,
   syncMessageFts,
   transitionToolToInterrupted,
@@ -143,6 +144,7 @@ export const jean2StorageBundle: StorageBundle = {
     getPartsBySession,
     buildEffectiveContextHistory,
   },
+  toolOutputArtifacts: jean2ToolOutputArtifactStore,
   queue: {
     addMessage: addMessageToQueue,
     delete: deleteQueuedMessage,

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AskApi, ToolResult } from '@jean2/sdk';
 import { executeTool } from '../src/tools/executor';
 import { getStandardTool, STANDARD_TOOL_NAMES } from '../src/tools/standard-tools';
 import { createWorkspaceCapability } from '../src/tools/workspace-capability';
-import { truncateToolResult } from '../src/utils/truncate-tool-result';
+import { createInMemoryStorageBundle, withStorage } from '@capekai/core/storage';
 
 const roots: string[] = [];
 
@@ -45,7 +45,7 @@ async function runTool(
 }
 
 describe('bundled standard tools', () => {
-  test('contains the exact Phase 7 set without exact-output retrieval', () => {
+  test('contains the exact Phase 9 set with scoped output retrieval', () => {
     expect(STANDARD_TOOL_NAMES).toEqual([
       'read-file',
       'write-file',
@@ -57,6 +57,7 @@ describe('bundled standard tools', () => {
       'grep',
       'shell',
       'question',
+      'retrieve-tool-output',
     ]);
     expect(getStandardTool('retrieve-exact-tool-output')).toBeNull();
   });
@@ -125,28 +126,42 @@ describe('bundled standard tools', () => {
     });
   });
 
-  test('reads persisted output from the exact scoped temp directory without permission', async () => {
+  test('retrieves bounded output in the implicit session scope without permission', async () => {
     const root = await createRoot();
-    const tempDir = join(root, '.tmp');
-    const truncated = truncateToolResult(
-      { content: 'x'.repeat(60_000) },
-      'standard-tools-test',
-      'large-tool',
-      tempDir,
-    ) as { _filePath: string };
+    const storage = createInMemoryStorageBundle();
+    const artifact = storage.toolOutputArtifacts.create({
+      sessionId: 'standard-tools-test',
+      toolCallId: 'large-call',
+      toolName: 'large-tool',
+      content: 'x'.repeat(30_000),
+      format: 'text',
+    });
 
-    expect(dirname(truncated._filePath)).toBe(tempDir);
-    const read = await runTool(
-      root,
-      'read-file',
-      { path: truncated._filePath },
-      (async () => {
-        throw new Error('Scoped temp read must not request permission');
-      }) as unknown as AskApi,
-    );
+    await withStorage(storage, async () => {
+      const page = await runTool(
+        root,
+        'retrieve-tool-output',
+        { artifactId: artifact.id, offset: 10, limit: 25_000 },
+        (async () => {
+          throw new Error('Retrieval must not request permission');
+        }) as unknown as AskApi,
+      );
+      expect(page.success).toBe(true);
+      expect(page.result).toMatchObject({
+        artifactId: artifact.id,
+        offset: 10,
+        limit: 20_000,
+        totalChars: 30_000,
+        nextOffset: 20_010,
+        complete: false,
+      });
+    });
 
-    expect(read.success).toBe(true);
-    expect((read.result as { content: string }).content).toContain('"content":"xxx');
+    const otherSessionStorage = createInMemoryStorageBundle();
+    await withStorage(otherSessionStorage, async () => {
+      const missing = await runTool(root, 'retrieve-tool-output', { artifactId: artifact.id });
+      expect(missing).toEqual({ success: false, error: 'Tool output artifact not found' });
+    });
   });
 
   test('defaults grep to the workspace and reads single-file gitignore from its parent', async () => {
