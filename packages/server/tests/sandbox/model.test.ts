@@ -61,16 +61,21 @@ describe('SandboxLanguageModel', () => {
       content: 'Hello from sandbox',
     });
 
-    expect(chunks).toHaveLength(4);
+    expect(chunks).toHaveLength(5);
 
-    const [start, delta, end, finish] = chunks as Array<Record<string, unknown>>;
+    const [start, firstDelta, secondDelta, end, finish] = chunks as Array<Record<string, unknown>>;
     expect(start.type).toBe('text-start');
     expect(typeof start.id).toBe('string');
 
-    expect(delta).toEqual({
+    expect(firstDelta).toEqual({
       type: 'text-delta',
       id: start.id,
-      delta: 'Hello from sandbox',
+      delta: 'Hello fro',
+    });
+    expect(secondDelta).toEqual({
+      type: 'text-delta',
+      id: start.id,
+      delta: 'm sandbox',
     });
 
     expect(end).toEqual({

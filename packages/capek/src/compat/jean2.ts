@@ -3,6 +3,7 @@ export const jean2CompatibilityPhase = 8 as const;
 export {
   getJean2CompatibilityBindings,
   setJean2CompatibilityBindings,
+  withJean2CompatibilityBindings,
   type Jean2CompatibilityBindings,
 } from './bindings';
 export { configureStorage, getStorage } from '../storage/runtime';
@@ -10,6 +11,7 @@ export {
   configureRuntimeConfiguration,
   getApiKeyForProvider,
   getRuntimeConfiguration,
+  withRuntimeConfiguration,
 } from '../configuration/runtime';
 export type * from '../configuration/contracts';
 export * from '../providers/registry';
@@ -25,7 +27,11 @@ export type { RuntimeAudience, RuntimeDelivery, RuntimeEvent, RuntimeEventContex
 
 export { chat, streamChat } from '../core/agent';
 export type { ChatOptions, ChatResult } from '../core/agent';
-export { streamChatWithRetry } from '../core/retry';
+export {
+  createRetryCircuitState,
+  streamChatWithRetry,
+  withRetryCircuitState,
+} from '../core/retry';
 export type { StreamChatEvent, StreamChatFn, StreamRetryPolicy } from '../core/retry';
 export { InterruptManager, interruptManager } from '../core/interrupt';
 export * from '../core/compaction';

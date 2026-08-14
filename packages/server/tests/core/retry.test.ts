@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
+import { createRetryCircuitState, withRetryCircuitState } from '@capekai/core/compat/jean2';
 import { streamChatWithRetry } from '@/core/retry';
 import type { StreamChatFn, StreamChatEvent } from '@/core/retry';
 import type { ChatOptions } from '@/core/agent';
@@ -63,11 +64,13 @@ function makeOptions(overrides: Partial<ChatOptions> = {}): ChatOptions {
 
 /** Collect all events from an async generator into an array. */
 async function collect(gen: AsyncGenerator<StreamChatEvent>): Promise<StreamChatEvent[]> {
-  const events: StreamChatEvent[] = [];
-  for await (const event of gen) {
-    events.push(event);
-  }
-  return events;
+  return withRetryCircuitState(createRetryCircuitState(), async () => {
+    const events: StreamChatEvent[] = [];
+    for await (const event of gen) {
+      events.push(event);
+    }
+    return events;
+  });
 }
 
 describe('streamChatWithRetry', () => {

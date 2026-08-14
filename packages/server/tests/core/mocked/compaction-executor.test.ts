@@ -2,10 +2,17 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { MockLanguageModelV3, convertArrayToReadableStream } from 'ai/test';
 import type { AssistantMessage } from '@jean2/sdk';
 import {
-  registerProvider,
-  resetProviders,
+  getJean2CompatibilityBindings,
+  getRuntimeConfiguration,
+  withJean2CompatibilityBindings,
+  withProviderOverrides,
+  withRuntimeConfiguration,
 } from '@capekai/core/compat/jean2';
-import type { ModelFactoryOptions, RuntimeEvent } from '@capekai/core/compat/jean2';
+import type {
+  ConnectableProvider,
+  ModelFactoryOptions,
+  RuntimeEvent,
+} from '@capekai/core/compat/jean2';
 import { getStorage } from '@capekai/core/storage';
 import { configureCapekJean2Compatibility } from '@/capek-adapter';
 import { executeCompaction, isCompactionActive } from '@/core/compaction-executor';
@@ -49,9 +56,8 @@ function createCompactionModel(control: ModelControl): MockLanguageModelV3 {
   });
 }
 
-function installBindings(control: ModelControl): void {
+function installBindings(control: ModelControl): Map<string, ConnectableProvider> {
   configureCapekJean2Compatibility();
-  resetProviders();
   const model = createCompactionModel(control);
   const createProvider = (id: string) => ({
     descriptor: { id, displayName: id, authType: 'none' as const, connectable: false },
@@ -65,9 +71,33 @@ function installBindings(control: ModelControl): void {
       return { model };
     },
   });
-  registerProvider(createProvider('openai'));
-  registerProvider(createProvider('minimax'));
-  registerProvider(createProvider('custom-provider'));
+  return new Map([
+    ['openai', createProvider('openai')],
+    ['minimax', createProvider('minimax')],
+    ['custom-provider', createProvider('custom-provider')],
+  ]);
+}
+
+function executeWithBindings(
+  providers: ReadonlyMap<string, ConnectableProvider>,
+  ...args: Parameters<typeof executeCompaction>
+): ReturnType<typeof executeCompaction> {
+  const bindings = getJean2CompatibilityBindings();
+  const runtimeConfiguration = getRuntimeConfiguration();
+  return withRuntimeConfiguration(
+    {
+      ...runtimeConfiguration,
+      getCompactionModel: () => undefined,
+      getCompactionProvider: () => undefined,
+    },
+    () => withJean2CompatibilityBindings(
+      {
+        ...bindings,
+        sandbox: { isSandboxActive: () => false },
+      },
+      () => withProviderOverrides(providers, () => executeCompaction(...args)),
+    ),
+  );
 }
 
 function createConversation(sessionId: string): void {
@@ -111,22 +141,22 @@ describe('package-owned compaction executor', () => {
   let sessionId: string;
   let workspaceId: string;
   let control: ModelControl;
+  let providers: ReadonlyMap<string, ConnectableProvider>;
 
   beforeEach(() => {
     setupTestDatabase();
     ({ sessionId, workspaceId } = seedWorkspaceWithSession());
     control = { requestedModels: [] };
-    installBindings(control);
+    providers = installBindings(control);
   });
 
   afterEach(() => {
     resetTestDatabase();
-    resetProviders();
     configureCapekJean2Compatibility();
   });
 
   test('rejects missing and child sessions without starting compaction', async () => {
-    const missing = await executeCompaction('missing', 'manual', noBroadcast, () => {});
+    const missing = await executeWithBindings(providers, 'missing', 'manual', noBroadcast, () => {});
     expect(missing).toEqual({
       ok: false,
       error: 'Compaction is only available for main sessions',
@@ -145,7 +175,7 @@ describe('package-owned compaction executor', () => {
       parentId: sessionId,
       agentName: 'child',
     });
-    const childResult = await executeCompaction(child.id, 'manual', noBroadcast, () => {});
+    const childResult = await executeWithBindings(providers, child.id, 'manual', noBroadcast, () => {});
     expect(childResult.ok).toBe(false);
     expect(isCompactionActive(child.id)).toBe(false);
   });
@@ -154,7 +184,8 @@ describe('package-owned compaction executor', () => {
     createConversation(sessionId);
     const sessionUpdates: boolean[] = [];
 
-    const result = await executeCompaction(
+    const result = await executeWithBindings(
+      providers,
       sessionId,
       'auto',
       noBroadcast,
@@ -190,7 +221,7 @@ describe('package-owned compaction executor', () => {
       selectedProvider: 'custom-provider',
     });
 
-    await executeCompaction(sessionId, 'manual', noBroadcast, () => {});
+    await executeWithBindings(providers, sessionId, 'manual', noBroadcast, () => {});
 
     expect(control.requestedModels[0]).toMatchObject({
       modelId: 'custom-model',
@@ -202,7 +233,7 @@ describe('package-owned compaction executor', () => {
     createConversation(sessionId);
     control.modelFactoryError = new Error('Model unavailable');
 
-    const result = await executeCompaction(sessionId, 'overflow', noBroadcast, () => {});
+    const result = await executeWithBindings(providers, sessionId, 'overflow', noBroadcast, () => {});
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
@@ -227,7 +258,7 @@ describe('package-owned compaction executor', () => {
     createConversation(sessionId);
     control.modelFactoryError = 'string error';
 
-    const result = await executeCompaction(sessionId, 'manual', noBroadcast, () => {});
+    const result = await executeWithBindings(providers, sessionId, 'manual', noBroadcast, () => {});
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe('Compaction failed');
@@ -240,9 +271,9 @@ describe('package-owned compaction executor', () => {
       release = resolve;
     });
 
-    const first = executeCompaction(sessionId, 'manual', noBroadcast, () => {});
+    const first = executeWithBindings(providers, sessionId, 'manual', noBroadcast, () => {});
     while (!isCompactionActive(sessionId)) await Promise.resolve();
-    const second = await executeCompaction(sessionId, 'auto', noBroadcast, () => {});
+    const second = await executeWithBindings(providers, sessionId, 'auto', noBroadcast, () => {});
 
     expect(second).toEqual({
       ok: false,
