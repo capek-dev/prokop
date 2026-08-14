@@ -1,4 +1,4 @@
-export const jean2CompatibilityPhase = 7 as const;
+export const jean2CompatibilityPhase = 8 as const;
 
 export {
   getJean2CompatibilityBindings,
@@ -21,6 +21,7 @@ export * from '../session-search';
 export * from '../scheduler/host';
 export * from '../scheduler/scheduler-tool';
 export type { StorageBundle } from '../storage/contracts';
+export type { RuntimeAudience, RuntimeDelivery, RuntimeEvent, RuntimeEventContext, RuntimeEventSink } from '../runtime/events';
 
 export { chat, streamChat } from '../core/agent';
 export type { ChatOptions, ChatResult } from '../core/agent';
@@ -36,7 +37,7 @@ export { buildContinuationMessage, evaluateGoal } from '../core/goal-evaluator';
 export { runGoalLoop } from '../core/goal-loop';
 export type { RunTurnFn } from '../core/goal-loop';
 export { handleChat, handleSessionEditMessage, regenerateSessionTitle } from '../core/chat-handler';
-export type { Jean2RouterClientEntry, Jean2RouterContext } from '../core/chat-handler';
+export type { RuntimeRequestContext } from '../core/chat-handler';
 export * from '../core/subagent-policy';
 export { executeChildSession } from '../core/child-session';
 export * from '../core/subagent';

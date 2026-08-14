@@ -15,8 +15,8 @@ import {
 } from '@capekai/core/compat/jean2';
 
 describe('Jean2 compatibility runtime exports', () => {
-  test('loads implemented Phase 7 runtime through the declared package path', () => {
-    expect(jean2CompatibilityPhase).toBe(7);
+  test('loads implemented Phase 8 runtime through the declared package path', () => {
+    expect(jean2CompatibilityPhase).toBe(8);
     expect(typeof streamChatWithRetry).toBe('function');
     expect(typeof createStreamHandlers).toBe('function');
     expect(typeof buildSchemaPromptInstruction).toBe('function');

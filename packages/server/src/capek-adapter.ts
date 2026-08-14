@@ -28,14 +28,7 @@ import {
   getModelsConfig,
   resolveToolsPath,
 } from '@/config';
-import {
-  broadcastEvent,
-  broadcastSessionCreated,
-  broadcastSessionUpdated,
-  broadcastToSessionEvent,
-  sendToAskTargetsEvent,
-  sendToControllerEvent,
-} from '@/core/broadcast';
+import { deliverCapekEvent } from '@/capek-event-adapter';
 import { getDefaultPreconfig, getPreconfig, listPreconfigs, listSubagentPreconfigs } from '@/core/preconfig';
 import { generateSessionTitle, hasManualSessionTitle, isDefaultSessionTitle } from '@/core/session-title';
 import {
@@ -64,7 +57,7 @@ import {
 } from '@/env';
 import { getTools, initializeWorkspace } from '@/mcp';
 import { getGlobalAgentsPath, getToolsDir, getUploadDir } from '@/paths';
-import { notifyPermissionRequired, notifyTerminalMessage } from '@/services/web-push/dispatch';
+import { notifyPermissionRequired } from '@/services/web-push/dispatch';
 import { isSandboxActive } from '@/sandbox';
 import { runScheduledJob } from '@/scheduler/runner';
 import { getMessageContentForFts, searchMessages } from '@/session-search/fts';
@@ -284,13 +277,7 @@ export const jean2CompatibilityBindings = {
     notifyPermissionRequired,
   },
   delivery: {
-    broadcastEvent,
-    broadcastSessionCreated,
-    broadcastSessionUpdated,
-    broadcastToSessionEvent,
-    sendToControllerEvent,
-    sendToAskTargetsEvent,
-    notifyTerminalMessage,
+    emit: deliverCapekEvent,
   },
   titles: {
     isDefaultSessionTitle,

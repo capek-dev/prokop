@@ -1,6 +1,8 @@
-import type { ServerMessage } from '@jean2/sdk';
+import type { Session } from '@jean2/sdk';
 import { getRuntimeHost } from './host';
-import type { BroadcastFn } from './host';
+import type { RuntimeAudience, RuntimeDelivery, RuntimeEvent } from './events';
+
+type HostRuntimeAudience = Exclude<RuntimeAudience, { scope: 'origin' }>;
 
 export {
   addMessageToQueue,
@@ -33,19 +35,36 @@ export {
   updateSession,
 } from '../storage/runtime';
 
-export const broadcastEvent = (message: ServerMessage): void => getRuntimeHost().delivery.broadcastEvent(message);
-export const broadcastSessionCreated = (...args: Parameters<ReturnType<typeof getRuntimeHost>['delivery']['broadcastSessionCreated']>) =>
-  getRuntimeHost().delivery.broadcastSessionCreated(...args);
-export const broadcastSessionUpdated = (...args: Parameters<ReturnType<typeof getRuntimeHost>['delivery']['broadcastSessionUpdated']>) =>
-  getRuntimeHost().delivery.broadcastSessionUpdated(...args);
-export const broadcastToSessionEvent = (...args: Parameters<ReturnType<typeof getRuntimeHost>['delivery']['broadcastToSessionEvent']>) =>
-  getRuntimeHost().delivery.broadcastToSessionEvent(...args);
-export const sendToControllerEvent = (...args: Parameters<ReturnType<typeof getRuntimeHost>['delivery']['sendToControllerEvent']>) =>
-  getRuntimeHost().delivery.sendToControllerEvent(...args);
-export const sendToAskTargetsEvent = (...args: Parameters<ReturnType<typeof getRuntimeHost>['delivery']['sendToAskTargetsEvent']>) =>
-  getRuntimeHost().delivery.sendToAskTargetsEvent(...args);
-export const notifyTerminalMessage = (...args: Parameters<ReturnType<typeof getRuntimeHost>['delivery']['notifyTerminalMessage']>) =>
-  getRuntimeHost().delivery.notifyTerminalMessage(...args);
+export function emitRuntimeEvent(event: RuntimeEvent, audience: HostRuntimeAudience = { scope: 'global' }): void {
+  const delivery: RuntimeDelivery = { event, audience };
+  const host = getRuntimeHost().delivery;
+  host.observe?.(delivery);
+  host.emit(delivery);
+}
+
+export const emitSessionCreated = (session: Session): void =>
+  emitRuntimeEvent({ kind: 'session', action: 'created', session });
+export const emitSessionUpdated = (session: Session): void =>
+  emitRuntimeEvent({ kind: 'session', action: 'updated', session });
+export const emitToSession = (sessionId: string, event: RuntimeEvent): void =>
+  emitRuntimeEvent(event, { scope: 'session', sessionId });
+export const emitToController = (sessionId: string, event: RuntimeEvent): void =>
+  emitRuntimeEvent(event, { scope: 'controller', sessionId });
+export const emitToAskTargets = (
+  sessionId: string,
+  authority: Extract<RuntimeAudience, { scope: 'ask_targets' }>['authority'],
+  event: RuntimeEvent,
+): void => emitRuntimeEvent(event, { scope: 'ask_targets', sessionId, authority });
+export const emitTerminal = (message: Extract<RuntimeEvent, { kind: 'terminal' }>['message'], sessionId: string): void =>
+  emitRuntimeEvent({ kind: 'terminal', message, sessionId }, { scope: 'host' });
+
+export const broadcastEvent = emitRuntimeEvent;
+export const broadcastSessionCreated = emitSessionCreated;
+export const broadcastSessionUpdated = emitSessionUpdated;
+export const broadcastToSessionEvent = emitToSession;
+export const sendToControllerEvent = emitToController;
+export const sendToAskTargetsEvent = emitToAskTargets;
+export const notifyTerminalMessage = emitTerminal;
 export const isDefaultSessionTitle = (...args: Parameters<ReturnType<typeof getRuntimeHost>['titles']['isDefaultSessionTitle']>) =>
   getRuntimeHost().titles.isDefaultSessionTitle(...args);
 export const hasManualSessionTitle = (...args: Parameters<ReturnType<typeof getRuntimeHost>['titles']['hasManualSessionTitle']>) =>
@@ -56,4 +75,4 @@ export const getToolWorkspaceHost = (...args: Parameters<ReturnType<typeof getRu
   getRuntimeHost().workspace.createToolWorkspaceHost(...args);
 export const isSandboxActive = (): boolean => getRuntimeHost().sandbox.isSandboxActive();
 
-export type { BroadcastFn };
+export type { RuntimeEventSink, RuntimeEventSink as BroadcastFn } from './events';

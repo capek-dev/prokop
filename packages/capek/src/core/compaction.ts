@@ -645,6 +645,6 @@ export function persistCompactionFailure(
 
   createPart(textPart, sessionId);
 
-  broadcast({ type: 'message.created', message: assistantMessage });
-  broadcast({ type: 'part.created', sessionId, part: textPart });
+  broadcast({ kind: 'message', action: 'created', message: assistantMessage });
+  broadcast({ kind: 'part', action: 'created', sessionId, part: textPart });
 }

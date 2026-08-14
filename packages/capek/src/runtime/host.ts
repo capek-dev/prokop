@@ -1,23 +1,24 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type {
   Ask,
-  AskAuthority,
   AskRequestMessage,
   AskTimedOutMessage,
-  AssistantMessage,
   AutoApproveSeverity,
   MessageWithParts,
   PermissionGrant,
   PermissionGrantOptions,
   PermissionResource,
-  ServerMessage,
   Session,
 } from '@jean2/sdk';
 import type { WorkspaceCapabilityHost } from '../tools/workspace-capability';
+import type { RuntimeDelivery, RuntimeEvent } from './events';
 
-export type AskBroadcastFn = (message: AskRequestMessage | AskTimedOutMessage) => void;
-export type BroadcastFn = (message: ServerMessage) => void;
-export type BroadcastSessionFn = (session: Session) => void;
+export type AskEventSink = (message: AskRequestMessage | AskTimedOutMessage) => void;
+export type RuntimeEventSink = (event: RuntimeEvent) => void;
+export type SessionEventSink = (session: Session) => void;
+export type AskBroadcastFn = AskEventSink;
+export type BroadcastFn = RuntimeEventSink;
+export type BroadcastSessionFn = SessionEventSink;
 export type PermissionRequestStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'cancelled';
 
 export interface PendingAskRecord {
@@ -76,13 +77,8 @@ export interface InteractionHost {
 }
 
 export interface DeliveryHost {
-  broadcastEvent(message: ServerMessage): void;
-  broadcastSessionCreated(session: Session): void;
-  broadcastSessionUpdated(session: Session): void;
-  broadcastToSessionEvent(sessionId: string, message: ServerMessage): void;
-  sendToControllerEvent(sessionId: string, message: ServerMessage): void;
-  sendToAskTargetsEvent(sessionId: string, authority: AskAuthority, message: ServerMessage): void;
-  notifyTerminalMessage(message: AssistantMessage, sessionId: string): void;
+  emit(delivery: RuntimeDelivery): void;
+  observe?(delivery: RuntimeDelivery): void;
 }
 
 export interface TitleHost {

@@ -78,8 +78,8 @@ export async function runOrchestratorSession(options: OrchestratorSessionOptions
     const userTextPart: TextPart = { id: randomUUID(), messageId: userMsgId, createdAt: Date.now(), type: 'text', text: userPrompt };
     createMessage(userMessage);
     createPart(userTextPart, session.id);
-    broadcast({ type: 'message.created', message: userMessage });
-    broadcast({ type: 'part.created', sessionId: session.id, part: userTextPart });
+    broadcast({ kind: 'message', action: 'created', message: userMessage });
+    broadcast({ kind: 'part', action: 'created', sessionId: session.id, part: userTextPart });
 
     const { model, omitMaxOutputTokens, providerOptions, useProviderInstructions } = await getModelWithMetadata({
       modelId,
@@ -124,8 +124,8 @@ export async function runOrchestratorSession(options: OrchestratorSessionOptions
     };
     createMessage(assistantMessage);
     createPart(assistantTextPart, session.id);
-    broadcast({ type: 'message.created', message: assistantMessage });
-    broadcast({ type: 'part.created', sessionId: session.id, part: assistantTextPart });
+    broadcast({ kind: 'message', action: 'created', message: assistantMessage });
+    broadcast({ kind: 'part', action: 'created', sessionId: session.id, part: assistantTextPart });
     updateSession(session.id, { subagentStatus: 'completed' });
     const updatedSession = getSession(session.id);
     if (updatedSession) broadcastSessUpdated(updatedSession);

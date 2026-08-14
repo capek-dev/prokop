@@ -142,15 +142,28 @@ export async function executeChildSession(options: {
         },
       };
       const authority = message.authority ?? { visibilityScope: 'controller_only' as const, resolutionMode: 'controller_only' as const };
-      sendToAskTargetsEvent(rootSessionId, authority, rewritten as import('@jean2/sdk').ServerMessage);
+      sendToAskTargetsEvent(rootSessionId, authority, {
+        kind: 'ask',
+        action: 'requested',
+        sessionId: rewritten.sessionId,
+        toolCallId: rewritten.toolCallId,
+        toolName: rewritten.toolName,
+        ask: rewritten.ask,
+        requestId: rewritten.requestId,
+        authority: rewritten.authority,
+      });
     } else if (message.type === 'ask.timeout') {
       const rewritten = {
         ...message,
         sessionId: rootSessionId,
       };
-      sendToControllerEvent(rootSessionId, rewritten as import('@jean2/sdk').ServerMessage);
-    } else {
-      broadcastFn(message as import('@jean2/sdk').ServerMessage);
+      sendToControllerEvent(rootSessionId, {
+        kind: 'ask',
+        action: 'timed_out',
+        sessionId: rewritten.sessionId,
+        toolCallId: rewritten.toolCallId,
+        requestId: rewritten.requestId,
+      });
     }
   };
 
@@ -171,18 +184,25 @@ export async function executeChildSession(options: {
       ...(responseFormat ? { responseFormat } : {}),
     })) {
     if (event.type === 'message.created') {
-      broadcastToSessionFn(event);
+      broadcastToSessionFn({ kind: 'message', action: 'created', message: event.message });
     } else if (event.type === 'part.created') {
       finalParts.push(event.part);
-      broadcastToSessionFn(event);
+      broadcastToSessionFn({ kind: 'part', action: 'created', sessionId: event.sessionId, part: event.part });
     } else if (event.type === 'part.append' && event.field === 'text') {
       const part = finalParts.find(p => p.id === event.partId);
       if (part && part.type === 'text') {
         part.text = (part.text || '') + event.delta;
       }
-      broadcastToSessionFn(event);
+      broadcastToSessionFn({
+        kind: 'part',
+        action: 'append',
+        sessionId: event.sessionId,
+        partId: event.partId,
+        field: event.field,
+        delta: event.delta,
+      });
     } else if (event.type === 'part.updated') {
-      broadcastToSessionFn(event);
+      broadcastToSessionFn({ kind: 'part', action: 'updated', sessionId: event.sessionId, part: event.part });
     } else if (event.type === 'message.updated' && event.message.role === 'assistant') {
       // Capture structured output if present on the final message
       if ('structuredOutput' in event.message && event.message.structuredOutput) {
@@ -192,7 +212,7 @@ export async function executeChildSession(options: {
       if (event.message.mode !== 'retry_failed') {
         notifyTerminalMessage(event.message, childSessionId);
       }
-      broadcastToSessionFn(event);
+      broadcastToSessionFn({ kind: 'message', action: 'updated', message: event.message });
     } else if (event.type === 'usage') {
       const currentSession = getSession(childSessionId);
       if (currentSession) {
@@ -206,14 +226,24 @@ export async function executeChildSession(options: {
         });
       }
       broadcastToSessionFn({
-        type: 'chat.usage',
+        kind: 'usage',
         sessionId: childSessionId,
         usage: event.usage,
         model: event.model,
         variant: event.variant ?? undefined,
       });
     } else if (event.type === 'chat.retry') {
-      broadcastToSessionFn(event);
+      broadcastToSessionFn({
+        kind: 'retry',
+        sessionId: event.sessionId,
+        status: event.status,
+        attempt: event.retryNumber,
+        maxAttempts: event.maxRetries,
+        errorType: event.errorType,
+        message: event.message,
+        delayMs: event.delayMs,
+        retryAt: event.retryAt,
+      });
     } else if (event.type === 'error.rate_limit') {
       error ??= event.message;
       console.warn(`[Child Session ${childSessionId}] Rate limited after retries: ${event.message}`);

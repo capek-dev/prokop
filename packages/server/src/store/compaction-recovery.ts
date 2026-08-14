@@ -8,8 +8,10 @@
 import { getDatabase } from './index';
 import { updateSession, getSession } from './sessions';
 import { findOrphanedCompactionTriggers } from './messages';
+import type { RuntimeEventSink } from '@capekai/core/compat/jean2';
+import { mapCapekEventToServerMessage } from '@/capek-event-adapter';
 import { persistCompactionFailure } from '@/core/compaction';
-import { broadcastEvent, broadcastSessionUpdated, type BroadcastSessionFn, type BroadcastFn } from '@/core/broadcast';
+import { broadcastEvent, broadcastSessionUpdated, type BroadcastSessionFn } from '@/core/broadcast';
 import { isCompactionActive } from '@/core/compaction-executor';
 
 export interface ReconcileOptions {
@@ -35,8 +37,11 @@ export function reconcileSessionCompaction(sessionId: string, options: Reconcile
   const { broadcast = true } = options;
   const db = getDatabase();
 
-  const broadcastFn: BroadcastFn = broadcast
-    ? broadcastEvent
+  const broadcastFn: RuntimeEventSink = broadcast
+    ? (event) => {
+      const message = mapCapekEventToServerMessage(event);
+      if (message) broadcastEvent(message);
+    }
     : () => {};
   const broadcastSessUpdate: BroadcastSessionFn = broadcast
     ? broadcastSessionUpdated

@@ -91,13 +91,7 @@ export function createStandaloneBindings(options: StandaloneBindingsOptions): Ru
       notifyPermissionRequired: () => {},
     },
     delivery: {
-      broadcastEvent: () => {},
-      broadcastSessionCreated: () => {},
-      broadcastSessionUpdated: () => {},
-      broadcastToSessionEvent: () => {},
-      sendToControllerEvent: () => {},
-      sendToAskTargetsEvent: () => {},
-      notifyTerminalMessage: () => {},
+      emit: () => {},
     },
     titles: {
       isDefaultSessionTitle: () => true,

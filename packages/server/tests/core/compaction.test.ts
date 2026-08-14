@@ -10,7 +10,8 @@ import {
 } from '@/core/compaction';
 import type { GenerateSummaryFn } from '@/core/compaction';
 import { createMessage, createPart, listMessagesWithParts, getPartsBySession } from '@/store';
-import type { AssistantMessage, CompactionPart, ToolPart, ServerMessage } from '@jean2/sdk';
+import type { AssistantMessage, CompactionPart, ToolPart } from '@jean2/sdk';
+import type { RuntimeEvent } from '@capekai/core/compat/jean2';
 
 function createFakeGenerateSummary(overrides: {
   text?: string;
@@ -32,8 +33,8 @@ function createFakeGenerateSummary(overrides: {
 
 describe('compaction', () => {
   let sessionId: string;
-  const broadcastMessages: ServerMessage[] = [];
-  const broadcastFn = (msg: ServerMessage) => broadcastMessages.push(msg);
+  const broadcastMessages: RuntimeEvent[] = [];
+  const broadcastFn = (event: RuntimeEvent) => broadcastMessages.push(event);
 
   beforeEach(() => {
     setupTestDatabase();
@@ -497,9 +498,8 @@ describe('compaction', () => {
       persistCompactionFailure(sessionId, 'trigger-1', 'Timeout', broadcastFn);
 
       expect(broadcastMessages.length).toBeGreaterThanOrEqual(2);
-      const types = broadcastMessages.map((m) => m.type);
-      expect(types).toContain('message.created');
-      expect(types).toContain('part.created');
+      expect(broadcastMessages).toContainEqual(expect.objectContaining({ kind: 'message', action: 'created' }));
+      expect(broadcastMessages).toContainEqual(expect.objectContaining({ kind: 'part', action: 'created' }));
     });
   });
 });

@@ -1,4 +1,4 @@
-export const capekPackagePhase = 7 as const;
+export const capekPackagePhase = 8 as const;
 
 export { createAgent } from './facade/create-agent';
 export type {
@@ -12,3 +12,10 @@ export type {
   RunOptions,
   UsageSummary,
 } from './facade/types';
+export type {
+  RuntimeAudience,
+  RuntimeDelivery,
+  RuntimeEvent,
+  RuntimeEventContext,
+  RuntimeEventSink,
+} from './runtime/events';

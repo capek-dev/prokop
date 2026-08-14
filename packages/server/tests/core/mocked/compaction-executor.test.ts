@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { MockLanguageModelV3, convertArrayToReadableStream } from 'ai/test';
-import type { AssistantMessage, ServerMessage } from '@jean2/sdk';
+import type { AssistantMessage } from '@jean2/sdk';
 import {
   registerProvider,
   resetProviders,
 } from '@capekai/core/compat/jean2';
-import type { ModelFactoryOptions } from '@capekai/core/compat/jean2';
+import type { ModelFactoryOptions, RuntimeEvent } from '@capekai/core/compat/jean2';
 import { getStorage } from '@capekai/core/storage';
 import { configureCapekJean2Compatibility } from '@/capek-adapter';
 import { executeCompaction, isCompactionActive } from '@/core/compaction-executor';
@@ -105,7 +105,7 @@ function createConversation(sessionId: string): void {
   }, sessionId);
 }
 
-function noBroadcast(_message: ServerMessage): void {}
+function noBroadcast(_event: RuntimeEvent): void {}
 
 describe('package-owned compaction executor', () => {
   let sessionId: string;
