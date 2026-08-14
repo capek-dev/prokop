@@ -220,7 +220,7 @@ describe('build-tools binding integration', () => {
       },
       workspace: {
         ...workspace,
-        settings: { scheduling: { enabled: true } },
+        settings: { scheduling: { enabled: true, permissionRisk: 'medium' } },
       },
     });
 

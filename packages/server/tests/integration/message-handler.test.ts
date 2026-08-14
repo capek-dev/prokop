@@ -1,4 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { MockLanguageModelV3, convertArrayToReadableStream } from 'ai/test';
+import { withProviderOverrides } from '@capekai/core/compat/jean2';
+import type { ConnectableProvider, ModelFactoryOptions } from '@capekai/core/compat/jean2';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
 import { seedWorkspaceWithSession } from '#tests/seed';
@@ -28,31 +31,46 @@ import type { AssistantMessage, ToolPart, ServerMessage } from '@jean2/sdk';
 
 const broadcastMock = createMockBroadcast();
 
-mock.module('@/core/model-utils', () => {
-  const { MockLanguageModelV3, convertArrayToReadableStream } = require('ai/test');
-  return {
-    getModelWithMetadata: async () => ({
-      model: new MockLanguageModelV3({
-        doStream: async () => ({
-          stream: convertArrayToReadableStream([
-            { type: 'stream-start', warnings: [] },
-            { type: 'text-start', id: 'summary' },
-            { type: 'text-delta', id: 'summary', delta: '## Summary\n\nCompacted conversation summary.' },
-            { type: 'text-end', id: 'summary' },
-            {
-              type: 'finish',
-              finishReason: { unified: 'stop', raw: undefined },
-              usage: {
-                inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
-                outputTokens: { total: 20, text: 20, reasoning: undefined },
-              },
-            },
-          ]),
-        }),
-      }),
-    }),
-  };
+const compactionModel = new MockLanguageModelV3({
+  doStream: async () => ({
+    stream: convertArrayToReadableStream([
+      { type: 'stream-start', warnings: [] },
+      { type: 'text-start', id: 'summary' },
+      { type: 'text-delta', id: 'summary', delta: '## Summary\n\nCompacted conversation summary.' },
+      { type: 'text-end', id: 'summary' },
+      {
+        type: 'finish',
+        finishReason: { unified: 'stop', raw: undefined },
+        usage: {
+          inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
+          outputTokens: { total: 20, text: 20, reasoning: undefined },
+        },
+      },
+    ]),
+  }),
 });
+
+function createCompactionProvider(id: string): ConnectableProvider {
+  return {
+    descriptor: { id, displayName: id, authType: 'none', connectable: false },
+    getStatus: () => ({ provider: id, connected: true }),
+    connect: async () => ({}),
+    disconnect: async () => {},
+    onTokensReceived: async () => {},
+    createModel: async (_options: ModelFactoryOptions) => ({ model: compactionModel }),
+  };
+}
+
+const compactionProviders = new Map<string, ConnectableProvider>([
+  ['openai', createCompactionProvider('openai')],
+  ['minimax', createCompactionProvider('minimax')],
+]);
+
+function executeCompactionWithModel(
+  ...args: Parameters<typeof executeCompaction>
+): ReturnType<typeof executeCompaction> {
+  return withProviderOverrides(compactionProviders, () => executeCompaction(...args));
+}
 
 mock.module('@/config', () => ({
   findModel: () => ({ providerId: 'openai' }),
@@ -221,7 +239,7 @@ describe('Integration: WebSocket message handlers', () => {
       addTextPart('msg4', 'It adds static types.');
       broadcastMock.clear();
 
-      const result = await executeCompaction(sessionId, 'manual');
+      const result = await executeCompactionWithModel(sessionId, 'manual');
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -256,7 +274,7 @@ describe('Integration: WebSocket message handlers', () => {
         agentName: null,
       });
 
-      const result = await executeCompaction(childSession.id, 'manual');
+      const result = await executeCompactionWithModel(childSession.id, 'manual');
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.skipped).toBe(true);
@@ -265,7 +283,7 @@ describe('Integration: WebSocket message handlers', () => {
     });
 
     test('compaction on empty session returns error', async () => {
-      const result = await executeCompaction(sessionId, 'manual');
+      const result = await executeCompactionWithModel(sessionId, 'manual');
       expect(result.ok).toBe(false);
     });
 
@@ -276,7 +294,7 @@ describe('Integration: WebSocket message handlers', () => {
       addTextPart('msg2', 'Hi');
       broadcastMock.clear();
 
-      await executeCompaction(sessionId, 'manual');
+      await executeCompactionWithModel(sessionId, 'manual');
 
       /* eslint-disable @typescript-eslint/no-explicit-any */
       const sessionUpdates = broadcastMock.messages.filter(

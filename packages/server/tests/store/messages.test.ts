@@ -38,7 +38,7 @@ import { getDatabase } from '@/store';
 import { revertToStep } from '@/core/revert';
 import { forkSession } from '@/core/fork';
 import { createTestSession } from '#tests/factories';
-import type { AssistantMessage, Part } from '@jean2/sdk';
+import type { AssistantMessage, Part, ToolPart } from '@jean2/sdk';
 
 function makeSession(overrides: { id: string; workspaceId: string; title: string; status: 'active' | 'closed' }) {
   const { createdAt: _c, updatedAt: _u, ...defaults } = createTestSession(overrides);
