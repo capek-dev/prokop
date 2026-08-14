@@ -1,10 +1,10 @@
 import {
   broadcastEvent,
   broadcastSessionUpdated,
-} from '../compat/jean2-dependencies';
+} from '../runtime/host-dependencies';
 import { getModelsConfig } from '../configuration/runtime';
 import { getMessageWithParts, getSession, updateSession } from '../storage/runtime';
-import type { BroadcastFn, BroadcastSessionFn } from '../compat/bindings';
+import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
 import {
   createCompactionTrigger,
   persistCompactionFailure,
@@ -49,6 +49,7 @@ export async function executeCompaction(
   reason: CompactionTriggerReason,
   broadcast: BroadcastFn = broadcastEvent,
   broadcastSessUpdate: BroadcastSessionFn = broadcastSessionUpdated,
+  abortSignal?: AbortSignal,
 ): Promise<CompactionExecutorResult | CompactionExecutorError> {
   if (activeCompactionSessions.has(sessionId)) {
     return {
@@ -91,7 +92,7 @@ export async function executeCompaction(
       for (const part of triggerMsg.parts) broadcast({ type: 'part.created', sessionId, part });
     }
 
-    const result = await processCompactionTask(sessionId, trigger.messageId, policy);
+    const result = await processCompactionTask(sessionId, trigger.messageId, policy, undefined, abortSignal);
     broadcast({ type: 'message.created', message: result.summaryMessage });
     for (const part of result.textParts) broadcast({ type: 'part.created', sessionId, part });
 

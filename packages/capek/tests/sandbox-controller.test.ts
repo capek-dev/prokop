@@ -43,6 +43,22 @@ describe('package sandbox controller', () => {
     await expect(waiting).rejects.toMatchObject({ name: 'AbortError' });
   });
 
+  test('uses a catch-all rule for stream and generate calls', async () => {
+    const controller = new SandboxController([{
+      match: {},
+      response: { type: 'text', content: 'fallback' },
+    }]);
+
+    await expect(controller.waitForResponse(context({ mode: 'stream' }))).resolves.toEqual({
+      type: 'text',
+      content: 'fallback',
+    });
+    await expect(controller.waitForResponse(context({ mode: 'generate' }))).resolves.toEqual({
+      type: 'text',
+      content: 'fallback',
+    });
+  });
+
   test('preserves auto-responder matching and maxUses', async () => {
     const controller = new SandboxController([{
       match: { mode: 'generate', depth: [1], hasToolResults: true },

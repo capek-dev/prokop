@@ -1,4 +1,6 @@
 import { Database } from 'bun:sqlite';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import type { Message, MessageWithParts, Part, Session, ToolPart } from '@jean2/sdk';
 import type {
   ClosableStore,
@@ -27,6 +29,7 @@ function clone<T>(value: T): T {
 }
 
 export function createSqliteConversationStore(options: { path: string }): SqliteConversationStore {
+  mkdirSync(dirname(options.path), { recursive: true });
   const db = new Database(options.path, { create: true, strict: true });
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA foreign_keys = ON');
@@ -89,6 +92,7 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
     parts: getPartsByMessage(row.id),
   }));
 
+  let closed = false;
   const store: SqliteConversationStore = {
     createSession(input) {
       const now = new Date().toISOString();
@@ -302,6 +306,8 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
       }) as ToolPart;
     },
     close() {
+      if (closed) return;
+      closed = true;
       db.close();
     },
   };

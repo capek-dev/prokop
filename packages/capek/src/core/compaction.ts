@@ -9,7 +9,7 @@ import {
   getPartsBySession,
   buildEffectiveContextHistory,
 } from '../storage/runtime';
-import { broadcastEvent, type BroadcastFn } from '../compat/jean2-dependencies';
+import { broadcastEvent, type BroadcastFn } from '../runtime/host-dependencies';
 import type { MessageWithParts, CompactionPart, TextPart, AssistantMessage, ToolPart } from '@jean2/sdk';
 import { randomUUID } from 'crypto';
 import {
@@ -354,7 +354,7 @@ function markToolsAsCompacted(
  * Abstracts away model resolution and the generateText/streamText call.
  */
 export interface GenerateSummaryFn {
-  (prompt: string, policy: CompactionPolicy, sessionId: string): Promise<{
+  (prompt: string, policy: CompactionPolicy, sessionId: string, abortSignal?: AbortSignal): Promise<{
     text: string;
     usage: {
       prompt: number;
@@ -377,6 +377,7 @@ async function defaultGenerateSummary(
   prompt: string,
   policy: CompactionPolicy,
   sessionId: string,
+  abortSignal?: AbortSignal,
 ): Promise<{
   text: string;
   usage: {
@@ -405,6 +406,7 @@ async function defaultGenerateSummary(
   const stream = aiStreamText({
     model,
     prompt,
+    abortSignal,
     maxOutputTokens: omitMaxOutputTokens ? undefined : policy.maxOutputTokens,
     providerOptions: providerOptions as unknown as Parameters<typeof aiStreamText>[0]['providerOptions'],
   });
@@ -448,6 +450,7 @@ export async function processCompactionTask(
   triggerMessageId: string,
   policy: CompactionPolicy,
   generateSummaryFn?: GenerateSummaryFn,
+  abortSignal?: AbortSignal,
 ): Promise<CompactionTaskResult> {
   // Get the trigger message
   const allMessages = listMessagesWithParts(sessionId);
@@ -527,7 +530,12 @@ export async function processCompactionTask(
   console.log('[compaction] modelId:', policy.modelId, 'providerId:', policy.providerId);
 
   const generateSummary = generateSummaryFn ?? defaultGenerateSummary;
-  const { text: summary, usage, effectiveModelId, effectiveProviderId } = await generateSummary(prompt, policy, sessionId);
+  const { text: summary, usage, effectiveModelId, effectiveProviderId } = await generateSummary(
+    prompt,
+    policy,
+    sessionId,
+    abortSignal,
+  );
 
   const now = Date.now();
   const msgId = randomUUID();

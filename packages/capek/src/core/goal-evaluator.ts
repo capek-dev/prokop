@@ -1,6 +1,6 @@
 import type { GoalEvaluation, TextPart, ToolPart } from '@jean2/sdk';
 import { listMessagesWithParts } from '../storage/runtime';
-import type { BroadcastFn, BroadcastSessionFn } from '../compat/bindings';
+import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
 import { runOrchestratorSession } from './workflow-orchestrator-session';
 
 const MAX_TRANSCRIPT_MESSAGES = 20;

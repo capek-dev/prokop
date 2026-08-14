@@ -6,7 +6,7 @@ import type {
   AskTimedOutMessage,
   ClientCapability,
 } from '@jean2/sdk';
-import { getJean2CompatibilityBindings } from '../compat/bindings';
+import { getRuntimeHost } from '../runtime/host';
 import {
   rejectPermissionsBySession,
   rejectPermissionsByToolCallId,
@@ -38,7 +38,7 @@ const DEFAULT_ASK_AUTHORITY: AskAuthority = {
 export type AskBroadcastFn = (message: AskRequestMessage | AskTimedOutMessage) => void;
 
 function interaction() {
-  return getJean2CompatibilityBindings().interaction;
+  return getRuntimeHost().interaction;
 }
 
 function resolveAuthorityForAsk(request: Ask): AskAuthority {

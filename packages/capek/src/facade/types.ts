@@ -1,0 +1,55 @@
+import type { Part } from '@jean2/sdk';
+export type { AgentStorageOption } from '../storage/options';
+
+export type AgentInput = string | { text: string };
+
+export interface RunOptions {
+  signal?: AbortSignal;
+  maxSteps?: number;
+}
+
+export type AgentPart = Part;
+
+export interface UsageSummary {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  noCacheTokens?: number;
+}
+
+export interface AgentError {
+  code: string;
+  message: string;
+  retryable?: boolean;
+}
+
+export interface AgentResult {
+  status: 'completed' | 'failed' | 'interrupted';
+  text: string;
+  parts: AgentPart[];
+  usage?: UsageSummary;
+  structuredOutput?: unknown;
+  error?: AgentError;
+  sessionId: string;
+}
+
+export type AgentEvent =
+  | { type: 'session.started'; sessionId: string }
+  | { type: 'message'; sessionId: string; messageId: string; status: 'streaming' | 'completed' | 'failed' | 'interrupted' }
+  | { type: 'part'; sessionId: string; part: AgentPart }
+  | { type: 'part.append'; sessionId: string; partId: string; field: 'text' | 'reasoning'; delta: string }
+  | { type: 'usage'; sessionId: string; usage: UsageSummary }
+  | { type: 'retry'; sessionId: string; status: 'scheduled' | 'started' | 'cancelled' | 'exhausted'; retryNumber: number; maxRetries: number; message: string }
+  | { type: 'compaction'; sessionId: string; status: 'started' | 'completed' | 'failed'; error?: AgentError }
+  | { type: 'error'; sessionId: string; error: AgentError }
+  | { type: 'result'; result: AgentResult };
+
+export interface Agent {
+  run(input: AgentInput, options?: RunOptions): Promise<AgentResult>;
+  stream(input: AgentInput, options?: RunOptions): AsyncIterable<AgentEvent>;
+  resume(sessionId: string, input?: AgentInput, options?: RunOptions): Promise<AgentResult>;
+  interrupt(): Promise<void>;
+  close(): Promise<void>;
+}

@@ -9,4 +9,5 @@ export {
   createSqliteConversationStore,
   type SqliteConversationStore,
 } from './storage/sqlite';
-export { configureStorage, getStorage } from './storage/runtime';
+export { createAgentStorage, type AgentStorageComposition, type AgentStorageOption } from './storage/options';
+export { configureStorage, getStorage, withStorage } from './storage/runtime';

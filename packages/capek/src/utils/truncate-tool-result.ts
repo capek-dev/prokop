@@ -10,6 +10,7 @@ export function truncateToolResult(
   result: unknown,
   sessionId: string,
   toolName: string,
+  outputDir: string = path.join(JEAN2_TEMP_DIR, sessionId),
 ): unknown {
   const serialized = JSON.stringify(result);
 
@@ -17,7 +18,7 @@ export function truncateToolResult(
     return result;
   }
 
-  const dir = path.join(JEAN2_TEMP_DIR, sessionId);
+  const dir = outputDir;
   mkdirSync(dir, { recursive: true });
 
   const sanitizedToolName = toolName.replace(/[^a-zA-Z0-9_-]/g, '_');

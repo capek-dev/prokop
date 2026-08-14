@@ -1,0 +1,126 @@
+import { join } from 'node:path';
+import type {
+  AutoApproveSeverity,
+  PermissionGrant,
+  ServerMessage,
+} from '@jean2/sdk';
+import type {
+  PendingAskRecord,
+  RuntimeHost,
+} from '../runtime/host';
+
+interface StandaloneBindingsOptions {
+  workspace: string;
+  sandboxActive: boolean;
+  tempRoot: string;
+}
+
+export function createStandaloneBindings(options: StandaloneBindingsOptions): RuntimeHost {
+  const pending = new Map<string, PendingAskRecord>();
+  const recordIdByRequest = new Map<string, string>();
+  let sequence = 0;
+
+  const records = (): PendingAskRecord[] => [...pending.values()];
+  const byRequest = (requestId: string): PendingAskRecord | null => {
+    const id = recordIdByRequest.get(requestId);
+    return id ? pending.get(id) ?? null : null;
+  };
+
+  return {
+    interaction: {
+      createPendingAsk(record) {
+        const id = `standalone-ask-${++sequence}`;
+        pending.set(id, { ...record, id });
+        recordIdByRequest.set(record.requestId, id);
+        return id;
+      },
+      removePendingAsk(id) {
+        const record = pending.get(id);
+        if (record) recordIdByRequest.delete(record.requestId);
+        pending.delete(id);
+      },
+      removePendingAsksByToolCallId(toolCallId) {
+        for (const record of records()) {
+          if (record.toolCallId === toolCallId) {
+            pending.delete(record.id);
+            recordIdByRequest.delete(record.requestId);
+          }
+        }
+      },
+      getPermissionRequestByRequestId: byRequest,
+      resolvePermissionRequestByRequestId(requestId, status, resolution) {
+        const record = byRequest(requestId);
+        if (!record || record.status !== 'pending') return false;
+        pending.set(record.id, { ...record, status, resolution, resolvedAt: Date.now() });
+        return true;
+      },
+      expirePermissionRequest(id) {
+        const record = pending.get(id);
+        if (!record || record.status !== 'pending') return false;
+        pending.set(id, { ...record, status: 'expired', resolvedAt: Date.now() });
+        return true;
+      },
+      expireOldPermissionRequests(maxAgeMs) {
+        const cutoff = Date.now() - maxAgeMs;
+        let count = 0;
+        for (const record of records()) {
+          if (record.status === 'pending' && record.createdAt < cutoff) {
+            pending.set(record.id, { ...record, status: 'expired', resolvedAt: Date.now() });
+            count += 1;
+          }
+        }
+        return count;
+      },
+      cancelPendingRequestsBySession(sessionId) {
+        let count = 0;
+        for (const record of records()) {
+          if (record.sessionId === sessionId && record.status === 'pending') {
+            pending.set(record.id, { ...record, status: 'cancelled', resolvedAt: Date.now() });
+            count += 1;
+          }
+        }
+        return count;
+      },
+      listPendingAsksBySession: (sessionId) => records().filter((record) => record.sessionId === sessionId && record.status === 'pending'),
+      listPendingAsksByRootSession: (rootSessionId) => records().filter((record) => record.rootSessionId === rootSessionId && record.status === 'pending'),
+      listPendingRequestsByRootSession: (rootSessionId) => records().filter((record) => record.rootSessionId === rootSessionId && record.status === 'pending'),
+      matchGrant: () => ({ matched: false, grant: null }),
+      createGrantFromOptions: () => null as PermissionGrant | null,
+      getSessionAutoApproveSeverity: () => undefined as AutoApproveSeverity | undefined,
+      getPermissionTimeoutMs: () => 30 * 60 * 1000,
+      notifyPermissionRequired: () => {},
+    },
+    delivery: {
+      broadcastEvent: () => {},
+      broadcastSessionCreated: () => {},
+      broadcastSessionUpdated: () => {},
+      broadcastToSessionEvent: () => {},
+      sendToControllerEvent: () => {},
+      sendToAskTargetsEvent: () => {},
+      notifyTerminalMessage: () => {},
+    },
+    titles: {
+      isDefaultSessionTitle: () => true,
+      hasManualSessionTitle: () => false,
+      generateSessionTitle: async () => null,
+    },
+    workspace: {
+      createToolWorkspaceHost({ workspacePath, additionalPaths, sessionId }) {
+        return {
+          root: workspacePath ?? options.workspace,
+          additionalRoots: additionalPaths,
+          allowedRoots: [],
+          tempDir: join(options.tempRoot, sessionId),
+          getEnvironmentValue: (key) => process.env[key],
+        };
+      },
+    },
+    sandbox: {
+      isSandboxActive: () => options.sandboxActive,
+    },
+  };
+}
+
+export function isAskRequest(message: ServerMessage): message is Extract<ServerMessage, { type: 'ask.request' }> {
+  return message.type === 'ask.request';
+}

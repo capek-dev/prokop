@@ -5,7 +5,7 @@ import {
   notifyTerminalMessage,
   sendToAskTargetsEvent,
   sendToControllerEvent,
-} from '../compat/jean2-dependencies';
+} from '../runtime/host-dependencies';
 import { getLLMSubagentMaxSteps } from '../configuration/runtime';
 import {
   buildEffectiveContextHistory,
@@ -16,7 +16,7 @@ import {
   updateMessage,
   updateSession,
 } from '../storage/runtime';
-import type { AskBroadcastFn, BroadcastFn } from '../compat/bindings';
+import type { AskBroadcastFn, BroadcastFn } from '../runtime/host';
 import { classifyApiError } from '../utils/errors';
 import { streamChatWithRetry } from './retry';
 

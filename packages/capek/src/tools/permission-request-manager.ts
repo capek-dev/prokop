@@ -13,8 +13,8 @@ import {
   SHELL_DANGEROUS_COMMANDS,
   SHELL_FILESYSTEM_COMMANDS,
 } from '@jean2/sdk';
-import { getJean2CompatibilityBindings } from '../compat/bindings';
-import type { PendingAskRecord } from '../compat/bindings';
+import { getRuntimeHost } from '../runtime/host';
+import type { PendingAskRecord } from '../runtime/host';
 
 interface PermissionWaiter {
   resolve: (value: unknown) => void;
@@ -41,7 +41,7 @@ const RISK_ORDER: PermissionRiskLevel[] = ['none', 'low', 'medium', 'high', 'cri
 const VALID_GRANT_SCOPES: GrantScope[] = ['once', 'session', 'workspace'];
 
 function interaction() {
-  return getJean2CompatibilityBindings().interaction;
+  return getRuntimeHost().interaction;
 }
 
 function isRiskAtOrBelow(risk: PermissionRiskLevel, max: PermissionRiskLevel): boolean {

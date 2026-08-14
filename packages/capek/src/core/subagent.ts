@@ -4,7 +4,7 @@ import {
   broadcastSessionCreated,
   broadcastSessionUpdated,
   broadcastToSessionEvent,
-} from '../compat/jean2-dependencies';
+} from '../runtime/host-dependencies';
 import { getPreconfigOrAgent, listSubagentPreconfigs } from '../context';
 import {
   createSession,
@@ -12,7 +12,7 @@ import {
   getWorkspaceAutoApproveSeverity,
   updateSession,
 } from '../storage/runtime';
-import type { BroadcastFn, BroadcastSessionFn } from '../compat/bindings';
+import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
 import { executeChildSession } from './child-session';
 import { resolveModelId, resolveProviderId } from './provider-utils';
 import {

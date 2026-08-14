@@ -1,5 +1,5 @@
 import { runOrchestratorSession } from './workflow-orchestrator-session';
-import type { BroadcastFn, BroadcastSessionFn } from '../compat/bindings';
+import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
 
 
 /** Result from a single leaf agent execution. */
