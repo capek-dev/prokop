@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type {
   AutoResponderRule,
   LlmCallContext,
@@ -192,3 +193,12 @@ export class SandboxController {
 }
 
 export const sandboxController = new SandboxController();
+const scopedSandboxController = new AsyncLocalStorage<SandboxController>();
+
+export function getSandboxController(): SandboxController {
+  return scopedSandboxController.getStore() ?? sandboxController;
+}
+
+export function withSandboxController<T>(controller: SandboxController, callback: () => T): T {
+  return scopedSandboxController.run(controller, callback);
+}

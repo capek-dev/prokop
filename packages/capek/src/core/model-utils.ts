@@ -1,9 +1,9 @@
 import { type LanguageModel } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
-import { findProviderFromModel } from './provider-utils';
+import { findProviderFromModel, parseModelSpecifier } from './provider-utils';
 import { findModel, getApiKeyForProvider, getLLMBaseUrl } from '../configuration/runtime';
 import { createModelForProvider, getProvider } from '../providers/registry';
-import { isSandboxActive } from '../compat/jean2-dependencies';
+import { isSandboxActive } from '../runtime/host-dependencies';
 
 export interface ModelWithMetadata {
   model: LanguageModel;
@@ -29,7 +29,9 @@ export async function getModelWithMetadata(
   const options: ModelResolutionOptions = typeof modelIdOrOptions === 'string'
     ? { modelId: modelIdOrOptions, providerId, systemPrompt }
     : (modelIdOrOptions ?? {});
-  const resolvedModelId = options.modelId || 'gpt-4o';
+  const requestedModelId = options.modelId || 'gpt-4o';
+  const parsedSpecifier = parseModelSpecifier(requestedModelId);
+  const resolvedModelId = parsedSpecifier.modelId;
   const sandboxProvider = getProvider('sandbox');
 
   // When sandbox mode is active, route all LLM calls through the sandbox provider
@@ -48,7 +50,7 @@ export async function getModelWithMetadata(
     };
   }
 
-  let provider = options.providerId;
+  let provider = options.providerId ?? parsedSpecifier.providerId;
   let model = resolvedModelId;
 
   if (!provider) {
@@ -78,7 +80,8 @@ export async function getModelWithMetadata(
   const apiKey = getApiKeyForProvider(provider);
 
   if (!apiKey) {
-    throw new Error(`No API key configured for provider: ${provider}. Set JEAN2_LLM_${provider.toUpperCase()}_API_KEY environment variable.`);
+    const envName = provider.toUpperCase().replaceAll('-', '_');
+    throw new Error(`No API key configured for provider: ${provider}. Set ${envName}_API_KEY or JEAN2_LLM_${envName}_API_KEY.`);
   }
 
   switch (provider) {

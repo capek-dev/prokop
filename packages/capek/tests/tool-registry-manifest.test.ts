@@ -11,8 +11,10 @@ import {
   clearCache,
   configureToolsPath,
   getTool,
+  listTools,
   scanTools,
   stopWatching,
+  withToolRegistryResolver,
 } from '../src/tools/registry';
 
 const root = join(process.cwd(), '.tmp-capek-tool-registry');
@@ -66,6 +68,57 @@ describe('installed tool registry', () => {
     configureToolsPath();
 
     expect(await scanTools()).toEqual([]);
+  });
+
+  test('does not expose standalone builtins through the installed registry', async () => {
+    configureToolsPath(root);
+    await scanTools();
+
+    expect(await getTool('read-file')).toBeNull();
+    expect(await listTools()).toEqual([]);
+  });
+
+  test('isolates scoped tools from installed tools', async () => {
+    const toolDir = join(root, 'read-file');
+    await mkdir(toolDir, { recursive: true });
+    await writeTool(join(toolDir, 'tool.ts'), 'read-file');
+    configureToolsPath(root);
+    await scanTools();
+    const fallback = {
+      definition: { name: 'fallback', description: 'fallback', inputSchema: { type: 'object', properties: {} } },
+      execute: async () => ({ success: true }),
+      path: 'builtin:test',
+    };
+
+    await withToolRegistryResolver({
+      get: (name) => name === 'read-file' || name === 'fallback' ? fallback : null,
+      list: () => [fallback],
+    }, async () => {
+      expect((await getTool('read-file'))?.path).toBe('builtin:test');
+      expect((await getTool('fallback'))?.path).toBe('builtin:test');
+      expect((await listTools()).map((tool) => tool.name)).toEqual(['fallback']);
+    });
+
+    expect(await getTool('fallback')).toBeNull();
+    expect((await getTool('read-file'))?.path).toBe(toolDir);
+  });
+
+  test('clearCache forces a configured-path rescan', async () => {
+    const toolDir = join(root, 'before-clear');
+    await mkdir(toolDir, { recursive: true });
+    await writeTool(join(toolDir, 'tool.ts'), 'before-clear');
+    configureToolsPath(root);
+    await scanTools();
+    expect((await getTool('before-clear'))?.definition.name).toBe('before-clear');
+
+    await rm(toolDir, { recursive: true, force: true });
+    const replacementDir = join(root, 'after-clear');
+    await mkdir(replacementDir, { recursive: true });
+    await writeTool(join(replacementDir, 'tool.ts'), 'after-clear');
+    clearCache();
+
+    expect(await getTool('before-clear')).toBeNull();
+    expect((await getTool('after-clear'))?.definition.name).toBe('after-clear');
   });
 
   test('prefers manifest entry over tool.js and tool.ts', async () => {

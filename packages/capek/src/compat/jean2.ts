@@ -1,4 +1,4 @@
-export const jean2CompatibilityPhase = 6 as const;
+export const jean2CompatibilityPhase = 7 as const;
 
 export {
   getJean2CompatibilityBindings,

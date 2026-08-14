@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
-import { capekPackagePhase } from '@capekai/core';
+import * as rootApi from '@capekai/core';
+import { capekPackagePhase, createAgent } from '@capekai/core';
 import { jean2CompatibilityPhase } from '@capekai/core/compat/jean2';
 import { createInMemoryConversationStore } from '@capekai/core/storage';
 
@@ -85,9 +86,27 @@ function resolvesWithin(specifier: string, importer: string, target: string): bo
 
 describe('package boundary', () => {
   test('declared package entrypoints import by package name', () => {
-    expect(capekPackagePhase).toBe(6);
-    expect(jean2CompatibilityPhase).toBe(6);
+    expect(capekPackagePhase).toBe(7);
+    expect(jean2CompatibilityPhase).toBe(7);
+    expect(typeof createAgent).toBe('function');
     expect(typeof createInMemoryConversationStore).toBe('function');
+  });
+
+  test('root exports only the facade and package marker values', () => {
+    expect(Object.keys(rootApi).sort()).toEqual(['capekPackagePhase', 'createAgent']);
+    expect('handleChat' in rootApi).toBe(false);
+    expect('setJean2CompatibilityBindings' in rootApi).toBe(false);
+    expect('streamChatWithRetry' in rootApi).toBe(false);
+  });
+
+  test('Phase 7 runtime uses package-owned host seams', () => {
+    const violations = collectSourceFiles(packageSourceRoot)
+      .filter((path) => !path.includes(`${sep}compat${sep}`))
+      .flatMap((path) => collectImports(path)
+        .filter((specifier) => specifier.includes('compat/'))
+        .map((specifier) => `${relative(repositoryRoot, path)} imports ${specifier}`));
+
+    expect(violations).toEqual([]);
   });
 
   test('external source does not import package internals', () => {
@@ -163,7 +182,7 @@ describe('package boundary', () => {
     expect(violations).toEqual([]);
   });
 
-  test('Phase 6 package runtime does not import completed Jean2 compatibility seams', () => {
+  test('Phase 7 package runtime does not import completed Jean2 compatibility seams', () => {
     const phase6Names = new Set([
       'resolveToolsPath', 'readInstallManifest',
       'findModel', 'findModelVariant', 'getMaxOutputTokens', 'getModelsConfig',

@@ -1,7 +1,7 @@
 import { runOrchestratorSession } from './workflow-orchestrator-session';
 import { listSubagentPreconfigs } from '../context';
 import type { WorkflowSubtask } from '@jean2/sdk';
-import type { BroadcastFn, BroadcastSessionFn } from '../compat/bindings';
+import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
 
 const MAX_SUBTASKS = 50;
 

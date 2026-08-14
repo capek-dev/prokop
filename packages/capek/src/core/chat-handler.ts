@@ -5,7 +5,7 @@ import {
   isDefaultSessionTitle,
   isSandboxActive,
   notifyTerminalMessage,
-} from '../compat/jean2-dependencies';
+} from '../runtime/host-dependencies';
 import { getDefaultPreconfig, getPreconfigOrAgent } from '../context';
 import {
   addMessageToQueue,
@@ -26,7 +26,7 @@ import {
   updatePart,
   updateSession,
 } from '../storage/runtime';
-import type { AskBroadcastFn } from '../compat/bindings';
+import type { AskBroadcastFn } from '../runtime/host';
 import { executeCompaction } from './compaction-executor';
 import { runGoalLoop } from './goal-loop';
 import { interruptManager } from './interrupt';

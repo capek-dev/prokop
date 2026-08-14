@@ -8,7 +8,7 @@ import {
   rejectPendingAsksByToolCallId,
   type AskBroadcastFn,
 } from '../../tools/ask-user-api';
-import { getToolWorkspaceHost } from '../../compat/jean2-dependencies';
+import { getToolWorkspaceHost } from '../../runtime/host-dependencies';
 import { transitionToolToRunningByCallId } from '../../storage/runtime';
 import { interruptManager } from '../interrupt';
 import {
@@ -21,7 +21,7 @@ import {
 import { truncateToolResult } from '../../utils/truncate-tool-result';
 import { isToolAllowedInContext, type ToolExecutionScope } from '../tool-capabilities';
 import type { ToolMap } from './types';
-import type { BroadcastFn } from '../../compat/jean2-dependencies';
+import type { BroadcastFn } from '../../runtime/host-dependencies';
 
 export interface ExternalToolsOptions {
   toolNames: string[];
@@ -157,7 +157,7 @@ export async function buildExternalTools(options: ExternalToolsOptions): Promise
             return { error: result.error ?? 'Tool execution failed' };
           }
 
-          const toolOutput = truncateToolResult(result.result, sessionId, name);
+          const toolOutput = truncateToolResult(result.result, sessionId, name, workspace.tempDir);
 
           if (result.visualization && toolOutput && typeof toolOutput === 'object') {
             return { ...toolOutput as Record<string, unknown>, _visualization: result.visualization };

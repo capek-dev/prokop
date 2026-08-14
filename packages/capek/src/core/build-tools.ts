@@ -1,7 +1,7 @@
 import {
   broadcastEvent,
   type BroadcastFn,
-} from '../compat/jean2-dependencies';
+} from '../runtime/host-dependencies';
 import { getAgentDirectory } from '../context';
 import { discoverSourceTools } from '../tools/tool-source';
 import { getSession } from '../storage/runtime';

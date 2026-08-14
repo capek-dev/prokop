@@ -61,11 +61,30 @@ describe('runtime configuration', () => {
     configureRuntimeConfiguration();
     expect(getMaxOutputTokens()).toBe(32000);
     expect(findProviderFromModel('org/model')).toBe('openrouter');
+    expect(findProviderFromModel('openai/gpt-4o-mini')).toBe('openai');
     expect(findProviderFromModel('MiniMax-M2')).toBe('minimax');
     expect(findProviderFromModel('deepseek-chat')).toBe('deepseek');
     expect(findProviderFromModel('unknown')).toBe('openai');
     if (previous === undefined) delete process.env.JEAN2_LLM_MAX_TOKENS;
     else process.env.JEAN2_LLM_MAX_TOKENS = previous;
+  });
+
+  test('normalizes explicit provider and model specifiers', async () => {
+    const model = {} as LanguageModel;
+    registerProvider({
+      descriptor: { id: 'openai', displayName: 'OpenAI', authType: 'none', connectable: true },
+      getStatus: () => ({ provider: 'openai', connected: true }),
+      connect: async () => ({}),
+      disconnect: async () => {},
+      onTokensReceived: async () => {},
+      createModel: async (options) => {
+        expect(options.providerId).toBe('openai');
+        expect(options.modelId).toBe('gpt-4o-mini');
+        return { model };
+      },
+    });
+
+    expect((await getModelWithMetadata({ modelId: 'openai/gpt-4o-mini' })).model).toBe(model);
   });
 
   test('resolves the existing default model without Jean2 bindings', async () => {

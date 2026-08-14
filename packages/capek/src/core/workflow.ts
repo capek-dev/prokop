@@ -4,7 +4,7 @@ import { executeSubagent, canSpawnSubagent, type SubagentInput, type SubagentOut
 import { resolveEffectiveSubagentTargets } from './subagent-policy';
 import { decomposeTask } from './workflow-decomposer';
 import { synthesizeResults, type LeafResult } from './workflow-synthesizer';
-import type { BroadcastFn, BroadcastSessionFn } from '../compat/bindings';
+import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
 
 export { canSpawnSubagent };
 

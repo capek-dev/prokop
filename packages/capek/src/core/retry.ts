@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ChatOptions } from './agent';
 import type { UsageEventData } from './step-handlers';
 import {
@@ -23,7 +24,7 @@ import type {
   TimeoutErrorMessage,
   ToolPart,
 } from '@jean2/sdk';
-import { broadcastSessionUpdated } from '../compat/jean2-dependencies';
+import { broadcastSessionUpdated } from '../runtime/host-dependencies';
 import {
   getPartsByMessage,
   getSession,
@@ -57,7 +58,7 @@ export interface StreamRetryPolicy {
   jitterRatio?: number;
 }
 
-interface CircuitState {
+export interface CircuitState {
   failures: number;
   lastFailureAt: number;
   openUntil: number;
@@ -71,6 +72,19 @@ const CIRCUIT_FAILURE_THRESHOLD = 3;
 const CIRCUIT_FAILURE_WINDOW_MS = 60_000;
 const CIRCUIT_COOLDOWN_MS = 30_000;
 const circuitStates = new Map<string, CircuitState>();
+const scopedCircuitStates = new AsyncLocalStorage<Map<string, CircuitState>>();
+
+function activeCircuitStates(): Map<string, CircuitState> {
+  return scopedCircuitStates.getStore() ?? circuitStates;
+}
+
+export function createRetryCircuitState(): Map<string, CircuitState> {
+  return new Map<string, CircuitState>();
+}
+
+export function withRetryCircuitState<T>(state: Map<string, CircuitState>, callback: () => T): T {
+  return scopedCircuitStates.run(state, callback);
+}
 
 class RetryDelayAbortedError extends Error {
   constructor() {
@@ -84,18 +98,19 @@ function getCircuitKey(options: ChatOptions): string {
 }
 
 function getOpenCircuitRemainingMs(key: string): number {
-  const state = circuitStates.get(key);
+  const states = activeCircuitStates();
+  const state = states.get(key);
   if (!state) return 0;
 
   const now = Date.now();
   if (state.openUntil === 0) {
     if (now - state.lastFailureAt > CIRCUIT_FAILURE_WINDOW_MS) {
-      circuitStates.delete(key);
+      states.delete(key);
     }
     return 0;
   }
   if (state.openUntil <= now) {
-    circuitStates.delete(key);
+    states.delete(key);
     return 0;
   }
   return state.openUntil - now;
@@ -103,7 +118,8 @@ function getOpenCircuitRemainingMs(key: string): number {
 
 function recordCircuitFailure(key: string): boolean {
   const now = Date.now();
-  const previous = circuitStates.get(key);
+  const states = activeCircuitStates();
+  const previous = states.get(key);
   const previousFailures = previous && now - previous.lastFailureAt <= CIRCUIT_FAILURE_WINDOW_MS
     ? previous.failures
     : 0;
@@ -111,12 +127,12 @@ function recordCircuitFailure(key: string): boolean {
   const openUntil = failures >= CIRCUIT_FAILURE_THRESHOLD
     ? now + CIRCUIT_COOLDOWN_MS
     : 0;
-  circuitStates.set(key, { failures, lastFailureAt: now, openUntil });
+  states.set(key, { failures, lastFailureAt: now, openUntil });
   return openUntil > 0;
 }
 
 function resetCircuit(key: string): void {
-  circuitStates.delete(key);
+  activeCircuitStates().delete(key);
 }
 
 function toRetryErrorType(type: ApiErrorType): ChatRetryErrorType {

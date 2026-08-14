@@ -192,6 +192,18 @@ runConversationContract('SQLite conversation store', () => {
 });
 
 describe('storage persistence and queue contracts', () => {
+  test('creates missing parent directories for SQLite paths', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'capek-nested-storage-'));
+    temporaryDirectories.push(directory);
+    const store = createSqliteConversationStore({
+      path: join(directory, 'missing', 'nested', 'conversation.sqlite'),
+    });
+
+    store.createSession(session('root'));
+    expect(store.getSession('root')?.id).toBe('root');
+    store.close();
+  });
+
   test('reopens SQLite and resumes sequence, child, and transcript state', () => {
     const directory = mkdtempSync(join(tmpdir(), 'capek-reopen-'));
     temporaryDirectories.push(directory);

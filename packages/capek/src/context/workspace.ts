@@ -28,16 +28,16 @@ You are operating in: ${workspacePath}
 All file operations support three path types:
 
 1. **Relative Paths** (RECOMMENDED for workspace files)
-   - Input: "packages/server/src/app.ts"
-   - Resolves to: "${workspacePath}/packages/server/src/app.ts"
+   - Input: "src/app.ts"
+   - Resolves to: "${workspacePath}/src/app.ts"
 
 2. **Absolute Paths**
-   - Input: "/Users/cherry/kx/jean2/packages/server/src/app.ts"
+   - Input: "${workspacePath}/src/app.ts"
    - Used as-is
 
 3. **Home Paths**
    - Input: "~/Documents/file.txt"
-   - Expands to: "/Users/cherry/Documents/file.txt"
+   - Expands relative to the current user's home directory
 
 ### Default Behaviors
 

@@ -1,32 +1,42 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { RuntimeConfiguration } from './contracts';
 import { createDefaultRuntimeConfiguration } from './defaults';
 
 let configuration = createDefaultRuntimeConfiguration();
+const scopedConfiguration = new AsyncLocalStorage<RuntimeConfiguration>();
+
+function activeConfiguration(): RuntimeConfiguration {
+  return scopedConfiguration.getStore() ?? configuration;
+}
+
+export function withRuntimeConfiguration<T>(value: RuntimeConfiguration, callback: () => T): T {
+  return scopedConfiguration.run(value, callback);
+}
 
 export function configureRuntimeConfiguration(value?: RuntimeConfiguration): void {
   configuration = value ?? createDefaultRuntimeConfiguration();
 }
 
 export function getRuntimeConfiguration(): RuntimeConfiguration {
-  return configuration;
+  return activeConfiguration();
 }
 
-export const findModel = (...args: Parameters<RuntimeConfiguration['findModel']>) => configuration.findModel(...args);
-export const getMaxOutputTokens = (...args: Parameters<RuntimeConfiguration['getMaxOutputTokens']>) => configuration.getMaxOutputTokens(...args);
-export const findModelVariant = (...args: Parameters<RuntimeConfiguration['findModelVariant']>) => configuration.findModelVariant(...args);
-export const getModelsConfig = () => configuration.getModelsConfig();
-export const getLLMTemperature = () => configuration.getLLMTemperature();
-export const getLLMMaxSteps = () => configuration.getLLMMaxSteps();
-export const getLLMSubagentMaxSteps = () => configuration.getLLMSubagentMaxSteps();
-export const getLLMBaseUrl = () => configuration.getLLMBaseUrl();
-export const getApiKeyForProvider = (providerId: string) => configuration.getApiKey(providerId);
-export const getCompactionModel = () => configuration.getCompactionModel();
-export const getCompactionProvider = () => configuration.getCompactionProvider();
-export const getCompactionMaxTokens = () => configuration.getCompactionMaxTokens();
-export const getCompactionPreserveRecentToolCount = () => configuration.getCompactionPreserveRecentToolCount();
-export const getCompactionPreserveSmallToolChars = () => configuration.getCompactionPreserveSmallToolChars();
-export const getCompactionToolClearCharsThreshold = () => configuration.getCompactionToolClearCharsThreshold();
-export const getCompactionMaxPrunedToolCount = () => configuration.getCompactionMaxPrunedToolCount();
-export const getCompactionAutoThresholdRatio = () => configuration.getCompactionAutoThresholdRatio();
-export const getCompactionAutoReserveCapTokens = () => configuration.getCompactionAutoReserveCapTokens();
-export const getCompactionAutoSafetyMarginTokens = () => configuration.getCompactionAutoSafetyMarginTokens();
+export const findModel = (...args: Parameters<RuntimeConfiguration['findModel']>) => activeConfiguration().findModel(...args);
+export const getMaxOutputTokens = (...args: Parameters<RuntimeConfiguration['getMaxOutputTokens']>) => activeConfiguration().getMaxOutputTokens(...args);
+export const findModelVariant = (...args: Parameters<RuntimeConfiguration['findModelVariant']>) => activeConfiguration().findModelVariant(...args);
+export const getModelsConfig = () => activeConfiguration().getModelsConfig();
+export const getLLMTemperature = () => activeConfiguration().getLLMTemperature();
+export const getLLMMaxSteps = () => activeConfiguration().getLLMMaxSteps();
+export const getLLMSubagentMaxSteps = () => activeConfiguration().getLLMSubagentMaxSteps();
+export const getLLMBaseUrl = () => activeConfiguration().getLLMBaseUrl();
+export const getApiKeyForProvider = (providerId: string) => activeConfiguration().getApiKey(providerId);
+export const getCompactionModel = () => activeConfiguration().getCompactionModel();
+export const getCompactionProvider = () => activeConfiguration().getCompactionProvider();
+export const getCompactionMaxTokens = () => activeConfiguration().getCompactionMaxTokens();
+export const getCompactionPreserveRecentToolCount = () => activeConfiguration().getCompactionPreserveRecentToolCount();
+export const getCompactionPreserveSmallToolChars = () => activeConfiguration().getCompactionPreserveSmallToolChars();
+export const getCompactionToolClearCharsThreshold = () => activeConfiguration().getCompactionToolClearCharsThreshold();
+export const getCompactionMaxPrunedToolCount = () => activeConfiguration().getCompactionMaxPrunedToolCount();
+export const getCompactionAutoThresholdRatio = () => activeConfiguration().getCompactionAutoThresholdRatio();
+export const getCompactionAutoReserveCapTokens = () => activeConfiguration().getCompactionAutoReserveCapTokens();
+export const getCompactionAutoSafetyMarginTokens = () => activeConfiguration().getCompactionAutoSafetyMarginTokens();

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { simulateReadableStream } from 'ai';
-import { sandboxController } from './controller';
+import { getSandboxController } from './controller';
 import { getSession } from '../storage/runtime';
 import type {
   ErrorResponse,
@@ -108,12 +108,12 @@ function wrapStreamWithCompletion(
         controller.error(error);
       } finally {
         reader.releaseLock();
-        sandboxController.complete(callId);
+        getSandboxController().complete(callId);
       }
     },
     async cancel(reason: unknown): Promise<void> {
       await stream.cancel(reason);
-      sandboxController.complete(callId);
+      getSandboxController().complete(callId);
     },
   });
 }
@@ -134,7 +134,7 @@ export class SandboxLanguageModel {
 
   async doStream(options: SandboxModelCallOptions): Promise<{ stream: ReadableStream<unknown> }> {
     const context = this.createContext(options, 'stream');
-    const response = await sandboxController.waitForResponse(context, options.abortSignal);
+    const response = await getSandboxController().waitForResponse(context, options.abortSignal);
     const stream = wrapStreamWithCompletion(this.responseToStream(response), context.callId);
 
     return { stream };
@@ -147,12 +147,12 @@ export class SandboxLanguageModel {
     warnings: [];
   }> {
     const context = this.createContext(options, 'generate');
-    const response = await sandboxController.waitForResponse(context, options.abortSignal);
+    const response = await getSandboxController().waitForResponse(context, options.abortSignal);
 
     try {
       return this.responseToGenerateResult(response);
     } finally {
-      sandboxController.complete(context.callId);
+      getSandboxController().complete(context.callId);
     }
   }
 
@@ -187,9 +187,13 @@ export class SandboxLanguageModel {
     switch (response.type) {
       case 'text': {
         const textId = randomUUID();
+        const splitAt = Math.max(1, Math.floor(response.content.length / 2));
+        const textChunks = response.content.length > 1
+          ? [response.content.slice(0, splitAt), response.content.slice(splitAt)]
+          : [response.content];
         chunks.push(
           { type: 'text-start', id: textId },
-          { type: 'text-delta', id: textId, delta: response.content },
+          ...textChunks.map((delta) => ({ type: 'text-delta', id: textId, delta })),
           { type: 'text-end', id: textId },
         );
         break;

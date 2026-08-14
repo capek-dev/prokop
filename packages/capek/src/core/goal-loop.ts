@@ -1,7 +1,7 @@
 import type { GoalState } from '@jean2/sdk';
-import { broadcastSessionUpdated } from '../compat/jean2-dependencies';
+import { broadcastSessionUpdated } from '../runtime/host-dependencies';
 import { getSession, updateSession } from '../storage/runtime';
-import type { BroadcastFn, BroadcastSessionFn } from '../compat/bindings';
+import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
 import { buildContinuationMessage, evaluateGoal } from './goal-evaluator';
 
 function updateGoalState(
