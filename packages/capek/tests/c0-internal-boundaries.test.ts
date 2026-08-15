@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import {
   evaluateRules,
+  isWithin,
   parseImports,
   scanDirectory,
   type DependencyRule,
@@ -24,6 +25,37 @@ const leafConcerns = [
   'session-search',
   'scheduler',
 ];
+
+const kernelSourceRoot = dir('kernel');
+
+/**
+ * Strict kernel self-containment check: every import must be a local
+ * relative specifier (starting with '.') that resolves inside the kernel
+ * directory. Bare imports, package roots, @/ aliases, require calls, and
+ * dynamic imports that do not resolve within the kernel are all violations.
+ * The shared rule engine cannot express a catch-all bare-import rejection,
+ * so this check is evaluated locally in this test file.
+ */
+function kernelStrictViolations(files: ScannedFile[]): string[] {
+  const violations: string[] = [];
+  for (const file of files) {
+    for (const imp of parseImports(file.sourceText, file.path)) {
+      if (!imp.specifier.startsWith('.')) {
+        violations.push(
+          `${relative(repositoryRoot, file.path)} imports ${imp.specifier} (${imp.kind}) [rule: kernel-strict-self-containment]`,
+        );
+        continue;
+      }
+      const resolved = resolve(dirname(file.path), imp.specifier);
+      if (!isWithin(resolved, kernelSourceRoot)) {
+        violations.push(
+          `${relative(repositoryRoot, file.path)} imports ${imp.specifier} (${imp.kind}) resolves outside kernel [rule: kernel-strict-self-containment]`,
+        );
+      }
+    }
+  }
+  return violations;
+}
 
 const c0Rules: DependencyRule[] = [
   {
@@ -106,6 +138,21 @@ const c0Rules: DependencyRule[] = [
       'packages/capek/src/sandbox/provider-types.ts': ['../providers/types'],
     },
   },
+  {
+    name: 'kernel-purity',
+    rationale: 'The kernel is dependency-free: no external AI/runtime libraries, no Jean2 or Capek package roots, no Bun or Node product APIs, and no imports outside its own directory.',
+    appliesTo: [dir('kernel')],
+    allowedResolvedDirs: 'own-concern',
+    forbiddenSpecifiers: [
+      { prefix: '@ai-sdk/' },
+      { exact: 'ai' },
+      { prefix: '@jean2/' },
+      { exact: 'hono' },
+      { prefix: 'bun:' },
+      { prefix: 'node:' },
+      { exact: '@capekai/core' },
+    ],
+  },
 ];
 
 describe('C0 internal dependency boundaries', () => {
@@ -185,5 +232,80 @@ describe('C0 internal dependency boundaries', () => {
     ]);
     expect(result.staleExceptions.some((message) => message.includes('tools/tool-output-artifacts.ts'))).toBe(true);
     expect(result.staleExceptions.some((message) => message.includes('tools/llm-api.ts'))).toBe(false);
+  });
+
+  test('kernel purity flags product and external imports', () => {
+    const synthetic: ScannedFile[] = [
+      {
+        path: resolve(packageSourceRoot, 'kernel/impure.ts'),
+        sourceText: [
+          "import { createAgent } from '../facade/create-agent';",
+          "import { aliased } from '@/facade/other';",
+          "import { generateText } from 'ai';",
+          "import { session } from '@jean2/sdk';",
+          "import { Database } from 'bun:sqlite';",
+          "import { readFile } from 'node:fs';",
+          "const cap = require('@capekai/core');",
+          "const dyn = await import('hono');",
+          '',
+        ].join('\n'),
+      },
+      {
+        path: resolve(packageSourceRoot, 'kernel/pure.ts'),
+        sourceText: "import type { ServiceKey } from './types';\n",
+      },
+    ];
+
+    const result = evaluateRules(synthetic, packageSourceRoot, repositoryRoot, c0Rules);
+
+    expect(result.violations).toEqual([
+      'packages/capek/src/kernel/impure.ts imports ../facade/create-agent (value) [rule: kernel-purity]',
+      'packages/capek/src/kernel/impure.ts imports @/facade/other (value) [rule: kernel-purity]',
+      'packages/capek/src/kernel/impure.ts imports ai (value) [rule: kernel-purity]',
+      'packages/capek/src/kernel/impure.ts imports @jean2/sdk (value) [rule: kernel-purity]',
+      'packages/capek/src/kernel/impure.ts imports bun:sqlite (value) [rule: kernel-purity]',
+      'packages/capek/src/kernel/impure.ts imports node:fs (value) [rule: kernel-purity]',
+      'packages/capek/src/kernel/impure.ts imports @capekai/core (require) [rule: kernel-purity]',
+      'packages/capek/src/kernel/impure.ts imports hono (dynamic) [rule: kernel-purity]',
+    ]);
+    // The synthetic scan omits files referenced by other rules' named
+    // exceptions, so only kernel-related staleness is asserted here.
+    expect(result.staleExceptions.filter((message) => message.includes('kernel'))).toEqual([]);
+  });
+
+  test('kernel strict self-containment passes on the current kernel source', () => {
+    expect(kernelStrictViolations(scanDirectory(kernelSourceRoot))).toEqual([]);
+  });
+
+  test('kernel strict self-containment rejects alias, dynamic import, require, and package-root imports', () => {
+    const synthetic: ScannedFile[] = [
+      {
+        path: resolve(kernelSourceRoot, 'impure.ts'),
+        sourceText: [
+          "import { createAgent } from '@/facade/create-agent';",
+          "import { z } from 'zod';",
+          "const cap = require('@capekai/core');",
+          "const dyn = await import('@jean2/sdk');",
+          "import { generateText } from 'ai';",
+          "import { Database } from 'bun:sqlite';",
+          "import { readFile } from 'node:fs';",
+          '',
+        ].join('\n'),
+      },
+      {
+        path: resolve(kernelSourceRoot, 'pure.ts'),
+        sourceText: "import type { ServiceKey } from './types';\n",
+      },
+    ];
+
+    expect(kernelStrictViolations(synthetic)).toEqual([
+      'packages/capek/src/kernel/impure.ts imports @/facade/create-agent (value) [rule: kernel-strict-self-containment]',
+      'packages/capek/src/kernel/impure.ts imports zod (value) [rule: kernel-strict-self-containment]',
+      'packages/capek/src/kernel/impure.ts imports @capekai/core (require) [rule: kernel-strict-self-containment]',
+      'packages/capek/src/kernel/impure.ts imports @jean2/sdk (dynamic) [rule: kernel-strict-self-containment]',
+      'packages/capek/src/kernel/impure.ts imports ai (value) [rule: kernel-strict-self-containment]',
+      'packages/capek/src/kernel/impure.ts imports bun:sqlite (value) [rule: kernel-strict-self-containment]',
+      'packages/capek/src/kernel/impure.ts imports node:fs (value) [rule: kernel-strict-self-containment]',
+    ]);
   });
 });
