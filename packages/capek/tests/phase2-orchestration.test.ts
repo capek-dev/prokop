@@ -685,6 +685,76 @@ describe.serial('Phase 2 orchestration contracts', () => {
     expect(order.indexOf('terminal.persisted')).toBeLessThan(order.indexOf('terminal.notified'));
   });
 
+  test('orders terminal persistence, host notification, message.updated, and usage delivery', async () => {
+    const state = createState();
+    const order: string[] = [];
+    bindRuntime(state, {
+      storage: {
+        conversation: {
+          updateMessage: (id, updates) => {
+            const index = state.messages.findIndex((message) => message.id === id);
+            if (index === -1) return null;
+            state.messages[index] = { ...state.messages[index], ...updates } as Message;
+            if (state.messages[index].role === 'assistant' && state.messages[index].status === 'completed') {
+              order.push('terminal.persisted');
+            }
+            return state.messages[index];
+          },
+          updateSession: (id, updates) => {
+            const current = state.sessions.get(id);
+            if (!current) return null;
+            if (updates.promptTokens !== undefined) order.push('usage.persisted');
+            const updated = { ...current, ...updates } as Session;
+            state.sessions.set(id, updated);
+            return updated;
+          },
+        },
+      },
+      delivery: {
+        emit: ({ event }) => {
+          if (event.kind === 'terminal') order.push('terminal.notified');
+        },
+      },
+      sandbox: {
+        isSandboxActive: () => true,
+      },
+    });
+    sandboxController.setAutoResponderRules([{
+      match: { mode: 'stream' },
+      response: { type: 'text', content: 'done' },
+      maxUses: 1,
+    }]);
+    registerProvider({
+      descriptor: { id: 'sandbox', displayName: 'Sandbox', authType: 'none', connectable: false },
+      getStatus: () => ({ provider: 'sandbox', connected: true }),
+      connect: async () => ({}),
+      disconnect: async () => {},
+      onTokensReceived: async () => {},
+      createModel: async (options) => ({
+        model: new SandboxLanguageModel({
+          sessionId: options.sessionId ?? 'root',
+          modelId: options.modelId,
+          providerId: 'sandbox',
+        }) as unknown as LanguageModel,
+      }),
+    });
+    state.sessions.set('root', { ...state.sessions.get('root')!, selectedProvider: 'sandbox' });
+    const ws = {};
+
+    await handleChat(requestContext(({ event }) => {
+      if (event.kind === 'message' && event.action === 'updated') order.push('message.updated.delivered');
+      if (event.kind === 'usage') order.push('usage.delivered');
+    }), ws, 'root', 'hello');
+
+    expect(order).toContain('terminal.persisted');
+    expect(order).toContain('terminal.notified');
+    expect(order).toContain('message.updated.delivered');
+    expect(order.indexOf('terminal.persisted')).toBeLessThan(order.indexOf('terminal.notified'));
+    expect(order.indexOf('terminal.notified')).toBeLessThan(order.indexOf('message.updated.delivered'));
+    expect(order.indexOf('message.updated.delivered')).toBeLessThan(order.lastIndexOf('usage.delivered'));
+    expect(order.lastIndexOf('usage.delivered')).toBeLessThan(order.lastIndexOf('usage.persisted'));
+  });
+
   test('delivers main-turn usage before persisting session usage', async () => {
     const state = createState();
     const order: string[] = [];
