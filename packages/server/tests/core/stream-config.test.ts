@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { configureCapekJean2Compatibility } from '@/capek-adapter';
-import { buildStreamConfig } from '@/core/stream/stream-config';
+import { buildStreamConfig } from '@capekai/core/compat/jean2';
 
 describe('buildStreamConfig provider options', () => {
   beforeEach(() => configureCapekJean2Compatibility());

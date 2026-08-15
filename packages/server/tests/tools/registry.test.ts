@@ -9,7 +9,7 @@ import {
   getTool,
   listTools,
   clearCache,
-} from '@/tools/registry';
+} from '@capekai/core/compat/jean2';
 
 const FIXTURE_DIR = resolve(import.meta.dir, 'fixtures', 'test-fixture-tool');
 

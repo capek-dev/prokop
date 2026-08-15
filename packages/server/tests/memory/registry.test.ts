@@ -14,7 +14,7 @@ import {
   removeEntry,
   USER_CHAR_LIMIT,
   MEMORY_CHAR_LIMIT,
-} from '@/memory/registry';
+} from '@capekai/core/compat/jean2';
 
 describe('memory registry', () => {
   let testDir: string;
@@ -346,13 +346,13 @@ describe('memory registry', () => {
 
   describe('formatEntriesForDisplay', () => {
     test('formats entries with numeric indices', () => {
-      const { formatEntriesForDisplay } = require('@/memory/registry');
+      const { formatEntriesForDisplay } = require('@capekai/core/compat/jean2');
       const result = formatEntriesForDisplay(['- Alpha', '- Beta', '- Gamma']);
       expect(result).toEqual(['[0] Alpha', '[1] Beta', '[2] Gamma']);
     });
 
     test('returns empty array for no entries', () => {
-      const { formatEntriesForDisplay } = require('@/memory/registry');
+      const { formatEntriesForDisplay } = require('@capekai/core/compat/jean2');
       const result = formatEntriesForDisplay([]);
       expect(result).toEqual([]);
     });
@@ -362,7 +362,7 @@ describe('memory registry', () => {
 
   describe('listEntries', () => {
     test('returns empty entries for non-existent file', async () => {
-      const { listEntries } = require('@/memory/registry');
+      const { listEntries } = require('@capekai/core/compat/jean2');
       const result = await listEntries(testDir, 'memory');
       expect(result.success).toBe(true);
       expect(result.result.entries).toEqual([]);
@@ -371,7 +371,7 @@ describe('memory registry', () => {
     });
 
     test('returns formatted entries with usage', async () => {
-      const { listEntries } = require('@/memory/registry');
+      const { listEntries } = require('@capekai/core/compat/jean2');
       writeMemoryFile('memory', '- First\n- Second');
       const result = await listEntries(testDir, 'memory');
       expect(result.success).toBe(true);

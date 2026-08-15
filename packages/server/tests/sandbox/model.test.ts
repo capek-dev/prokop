@@ -1,7 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { SandboxLanguageModel } from '@/sandbox/model';
-import { sandboxController } from '@/sandbox';
-import type { SandboxResponse } from '@/sandbox';
+import { SandboxLanguageModel, sandboxController, type SandboxResponse } from '@capekai/core/compat/jean2';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 
 function createCallOptions() {

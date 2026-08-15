@@ -10,8 +10,7 @@
  */
 import type { GmailProviderConfig, ProviderStatus } from '@jean2/sdk';
 import { broadcastEvent } from '@/core/broadcast';
-import { registerProvider } from './registry';
-import type { ConnectableProvider, TokenResponse } from './registry';
+import { registerProvider, type ConnectableProvider, type TokenResponse } from '@capekai/core/compat/jean2';
 import { loadProviderConfig, saveProviderConfig, deleteProviderConfig } from './storage';
 import {
   registerOAuthConfig,

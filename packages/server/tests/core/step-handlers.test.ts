@@ -3,7 +3,7 @@ import type { StepPart } from '@jean2/sdk';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
 import { createMessage } from '@/store/messages';
-import { createStepCallbacks, type StepCallbacksContext } from '@/core/step-handlers';
+import { createStepCallbacks, type StepCallbacksContext } from '@capekai/core/compat/jean2';
 
 describe('step-handlers', () => {
   let sessionId: string;

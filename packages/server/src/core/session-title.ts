@@ -1,7 +1,7 @@
 import { streamText } from 'ai';
 import type { MessageWithParts } from '@jean2/sdk';
 import { getModelsConfig, findModel } from '@/config';
-import { getModelWithMetadata } from '@/core/model-utils';
+import { getModelWithMetadata } from '@capekai/core/compat/jean2';
 
 const DEFAULT_SESSION_TITLES = new Set(['new session', 'new']);
 const MAX_CONTEXT_CHARS = 12000;

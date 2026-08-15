@@ -14,8 +14,8 @@ import {
   type StorageBundle,
 } from '@capekai/core/storage';
 import { jean2CompatibilityBindings, jean2StorageBundle } from '@/capek-adapter';
-import { buildAiSdkTools, type BuildToolsOptions } from '@/core/build-tools';
-import { clearCache, scanTools } from '@/tools/registry';
+import { buildAiSdkTools, type BuildToolsOptions } from '@capekai/core/compat/jean2';
+import { clearCache, scanTools } from '@capekai/core/compat/jean2';
 import type { Preconfig, Session, Workspace } from '@jean2/sdk';
 
 interface BindingOverrides {

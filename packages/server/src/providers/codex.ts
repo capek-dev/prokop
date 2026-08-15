@@ -4,8 +4,7 @@
  */
 import type { LanguageModel } from 'ai';
 import type { CodexProviderConfig, ProviderStatus } from '@jean2/sdk';
-import { registerProvider } from './registry';
-import type { ConnectableProvider, TokenResponse } from './registry';
+import { registerProvider, type ConnectableProvider, type TokenResponse } from '@capekai/core/compat/jean2';
 import { loadProviderConfig, saveProviderConfig, deleteProviderConfig } from './storage';
 import {
   registerOAuthConfig,

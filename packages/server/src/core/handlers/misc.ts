@@ -1,11 +1,9 @@
 import type { ServerWebSocket } from 'bun';
 import type { RouterContext } from '../router-context';
 import { handleClientRegistration, getClientIdForWs } from '../client-registry';
-import { resolveAsk, getSessionIdForPendingAsk, getAuthorityForPendingAsk } from '@/tools/ask-user-api';
+import { resolveAsk, getSessionIdForPendingAsk, getAuthorityForPendingAsk, sandboxController, type SandboxRespondMessage } from '@capekai/core/compat/jean2';
 import { getControlState } from '../session-control-registry';
 import { checkAskResponseEligibility } from '../capability-router';
-import { sandboxController } from '@/sandbox';
-import type { SandboxRespondMessage } from '@/sandbox';
 import type {
   ClientRegisterMessage,
   AskResponseMessage,

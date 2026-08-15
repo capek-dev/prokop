@@ -7,8 +7,8 @@ import {
   createCompactionTrigger,
   processCompactionTask,
   persistCompactionFailure,
-} from '@/core/compaction';
-import type { GenerateSummaryFn } from '@/core/compaction';
+} from '@capekai/core/compat/jean2';
+import type { GenerateSummaryFn } from '@capekai/core/compat/jean2';
 import { createMessage, createPart, listMessagesWithParts, getPartsBySession } from '@/store';
 import type { AssistantMessage, CompactionPart, ToolPart } from '@jean2/sdk';
 import type { RuntimeEvent } from '@capekai/core/compat/jean2';

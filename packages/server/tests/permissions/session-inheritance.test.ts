@@ -5,7 +5,7 @@ import { seedWorkspace, seedSession } from '#tests/seed';
 import {
   requestPermission,
   resolvePermission,
-} from '@/tools/permission-request-manager';
+} from '@capekai/core/compat/jean2';
 import {
   getWorkspaceGrants,
 } from '@/store/permissions';

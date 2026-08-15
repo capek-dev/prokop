@@ -12,7 +12,7 @@ import {
   touchConnection,
 } from '@/core/client-registry';
 import { handleConnectionDisconnect as handleControlDisconnect, sweepExpiredGrace, clearStaleTakeoverRequests, buildControlUpdatedMessage, getParticipantConnections, getControllerConnections } from '@/core/session-control-registry';
-import { scanTools } from '@/tools';
+import { scanTools } from '@capekai/core/compat/jean2';
 import { closeDatabase } from '@/store';
 import { backfillFts } from '@/session-search/fts';
 import type { ServerMessage, ClientMessage, AskAuthority } from '@jean2/sdk';

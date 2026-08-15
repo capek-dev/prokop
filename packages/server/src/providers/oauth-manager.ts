@@ -7,8 +7,7 @@
  */
 import type { OAuthProviderConfig, OAuthRedirectStrategy } from '@jean2/sdk';
 import { broadcastEvent } from '@/core/broadcast';
-import type { TokenResponse } from './registry';
-import { getProvider, getProviderStatus } from './registry';
+import { getProvider, getProviderStatus, type TokenResponse } from '@capekai/core/compat/jean2';
 
 export interface OAuthTokenRefreshErrorData {
   providerId: string;

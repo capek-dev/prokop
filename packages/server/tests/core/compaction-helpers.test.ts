@@ -3,7 +3,7 @@ import {
   buildConversationText,
   formatOutput,
   estimateToolOutputSize,
-} from '@/core/compaction';
+} from '@capekai/core/compat/jean2';
 import type { MessageWithParts, ToolPart, TextPart } from '@jean2/sdk';
 
 // ---------------------------------------------------------------------------

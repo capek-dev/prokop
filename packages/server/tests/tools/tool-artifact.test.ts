@@ -11,7 +11,7 @@ import {
   extractArtifact,
   validateArtifactStructure,
   ArtifactError,
-} from '@/tools/tool-artifact';
+} from '@capekai/core/compat/jean2';
 
 const FIXTURE_DIR = resolve(import.meta.dir, 'fixtures', 'test-fixture-tool');
 

@@ -6,7 +6,7 @@ import {
   isFilePart,
   parseToolInput,
   createStepPart,
-} from '@/core/part-utils';
+} from '@capekai/core/compat/jean2';
 import type { Part } from '@jean2/sdk';
 
 describe('type guards', () => {

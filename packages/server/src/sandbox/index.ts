@@ -1,7 +1,4 @@
-import { registerProvider } from '@/providers';
-import { sandboxController } from '@/sandbox/controller';
-import { SandboxProvider } from '@/sandbox/provider';
-import type { AutoResponderRule, SandboxControlEvent } from '@/sandbox/types';
+import { registerProvider, sandboxController, SandboxProvider, type AutoResponderRule, type SandboxControlEvent } from '@capekai/core/compat/jean2';
 
 const defaultAutoResponderRules: AutoResponderRule[] = [
   {
@@ -32,7 +29,7 @@ export function activateSandbox(
     sandboxController.setBroadcast(broadcastFn);
   }
 
-  console.log('[Sandbox] Activated — all LLM calls will be intercepted');
+  console.log('[Sandbox] Activated: all LLM calls will be intercepted');
 }
 
 export function deactivateSandbox(): void {
@@ -43,6 +40,3 @@ export function deactivateSandbox(): void {
 export function isSandboxActive(): boolean {
   return active;
 }
-
-export { sandboxController } from '@/sandbox/controller';
-export type * from '@/sandbox/types';

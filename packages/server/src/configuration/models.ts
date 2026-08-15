@@ -3,7 +3,7 @@ import { atomicWriteFile } from '@/configuration/files';
 import { existsSync, readFileSync } from 'fs';
 import { ConfigurationNotFoundError, ConfigurationValidationError, ConfigurationConflictError } from '@/configuration/errors';
 import { getJean2EnvValue } from '@/env';
-import { getProviderStatus } from '@/providers';
+import { getProviderStatus } from '@capekai/core/compat/jean2';
 import type {
   ModelsConfigResponse,
   ModelRuntimeStatus,

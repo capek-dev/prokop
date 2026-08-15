@@ -12,7 +12,7 @@ import {
 } from '@/store';
 import { getWorkspaceAutoApproveSeverity } from '@/store/workspaces';
 import { getPreconfigOrAgent, isAgentSync } from '@/agents/storage';
-import { interruptManager } from '@/core/interrupt';
+import { interruptManager } from '@capekai/core/compat/jean2';
 import { broadcastSessionCreatedExclude } from '@/core/broadcast';
 import { checkControllerGate } from '../session-control-registry';
 import {
@@ -38,7 +38,7 @@ import type {
 import {
   ASK_TIMEOUT,
   getAuthorityForPendingAsk,
-} from '@/tools/ask-user-api';
+} from '@capekai/core/compat/jean2';
 import {
   listAllPendingAsks,
   cleanupAllPendingAsks,

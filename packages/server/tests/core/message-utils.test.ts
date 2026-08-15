@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
-import { convertToAiSdkMessages } from '@/core/message-utils';
+import { convertToAiSdkMessages } from '@capekai/core/compat/jean2';
 import type { MessageWithParts, AssistantMessage, ToolPart, CompactionPart } from '@jean2/sdk';
 
 describe('convertToAiSdkMessages', () => {
