@@ -9,7 +9,7 @@ import {
   rejectPermissionsBySession,
   getPendingRequestsByRootSession,
   hasPendingWaiter,
-} from '@/tools/permission-request-manager';
+} from '@capekai/core/compat/jean2';
 import { listPendingAsksBySession } from '@/store/pending-asks';
 import {
   getWorkspaceGrants,

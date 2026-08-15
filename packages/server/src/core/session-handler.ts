@@ -5,9 +5,7 @@ import {
 import {
   listLatestMessagesWithPartsPage,
 } from '@/store';
-import { executeCompaction } from '@/core/compaction-executor';
-import { revertToStep } from '@/core/revert';
-import { forkSession } from '@/core/fork';
+import { executeCompaction, revertToStep, forkSession } from '@capekai/core/compat/jean2';
 import type { RouterContext } from './router-context';
 import type { SessionCompactMessage, SessionRevertMessage, SessionForkMessage } from '@jean2/sdk';
 

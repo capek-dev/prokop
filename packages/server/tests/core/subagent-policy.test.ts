@@ -9,7 +9,7 @@ import {
   isSubagentSpawningDisabled,
   isValidSubagentPreconfig,
   isValidSubagentTargetPreconfig,
-} from '@/core/subagent-policy';
+} from '@capekai/core/compat/jean2';
 
 function evaluate(options: {
   target: string;

@@ -10,9 +10,9 @@ import { updateSession, getSession } from './sessions';
 import { findOrphanedCompactionTriggers } from './messages';
 import type { RuntimeEventSink } from '@capekai/core/compat/jean2';
 import { mapCapekEventToServerMessage } from '@/capek-event-adapter';
-import { persistCompactionFailure } from '@/core/compaction';
+import { persistCompactionFailure } from '@capekai/core/compat/jean2';
 import { broadcastEvent, broadcastSessionUpdated, type BroadcastSessionFn } from '@/core/broadcast';
-import { isCompactionActive } from '@/core/compaction-executor';
+import { isCompactionActive } from '@capekai/core/compat/jean2';
 
 export interface ReconcileOptions {
   /**

@@ -8,7 +8,7 @@ import {
   writeInstallManifest,
   getManifestPath,
   type InstallManifest,
-} from '@/tools/tool-install-manifest';
+} from '@capekai/core/compat/jean2';
 
 const FIXTURE_MANIFEST: InstallManifest = {
   toolName: 'test-tool',

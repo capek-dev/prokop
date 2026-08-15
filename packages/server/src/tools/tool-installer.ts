@@ -3,15 +3,13 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import type { LoadedTool } from '@jean2/sdk';
 import { resolveToolsPath, getDefaultToolsPath } from '@/config';
-import { clearCache as clearToolsCache } from './registry';
-import { downloadArtifact, verifyChecksum, extractArtifact, validateArtifactStructure, ArtifactError } from './tool-artifact';
+import { clearCache as clearToolsCache, downloadArtifact, verifyChecksum, extractArtifact, validateArtifactStructure, ArtifactError, readInstallManifest, writeInstallManifest, type InstallManifest } from '@capekai/core/compat/jean2';
 import { installDependencies, NpmInstallError } from './tool-npm-installer';
-import { readInstallManifest, writeInstallManifest, type InstallManifest } from './tool-install-manifest';
 import { bundleTool } from './tool-bundler';
 
 const VERSION_FILE = 'VERSION';
 
-export type { InstallManifest } from './tool-install-manifest';
+export type { InstallManifest } from '@capekai/core/compat/jean2';
 
 export interface InstallResult {
   success: boolean;

@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { validate } from './validate';
-import { listTools, getTool } from '@/tools';
+import { listTools, getTool } from '@capekai/core/compat/jean2';
 import * as toolEnv from '@/configuration/tool-env';
 import {
   ConfigurationValidationError,

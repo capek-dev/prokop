@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { buildContinuationMessage } from '@/core/goal-evaluator';
+import { buildContinuationMessage } from '@capekai/core/compat/jean2';
 
 describe('goal continuation', () => {
   test('preserves evaluator reason and remaining work', () => {

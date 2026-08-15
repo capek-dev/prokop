@@ -26,6 +26,7 @@ import { registerFileRoutes } from '@/routes/files';
 import { registerToolRoutes } from '@/routes/tools';
 import { registerMcpRoutes } from '@/routes/mcp';
 import { registerConfigRoutes } from '@/routes/config';
+import '@/providers';
 import { registerSandboxRoutes } from '@/sandbox/routes';
 import { registerResponseFormatRoutes } from '@/routes/response-formats';
 import { registerSchedulerRoutes } from '@/routes/scheduler';

@@ -1,6 +1,3 @@
-export * from './types';
-export { scanTools, getTool, listTools, clearCache, watchTools, stopWatching } from './registry';
-export { executeTool, type ExecuteToolOptions } from './executor';
 export * from './tool-repository';
 export {
   installTool,
@@ -12,10 +9,8 @@ export {
   getToolInstallDir,
   getToolsBaseDir,
   getDefaultToolsBaseDir,
-  clearCache as clearInstallerCache,
   type InstallResult,
   type InstalledTool,
-  type InstallManifest,
   type RemoveResult,
 } from './tool-installer';
 export {

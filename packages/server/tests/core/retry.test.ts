@@ -1,9 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { createRetryCircuitState, withRetryCircuitState } from '@capekai/core/compat/jean2';
-import { streamChatWithRetry } from '@/core/retry';
-import type { StreamChatFn, StreamChatEvent } from '@/core/retry';
-import type { ChatOptions } from '@/core/agent';
+import { streamChatWithRetry, type StreamChatFn, type StreamChatEvent, type ChatOptions } from '@capekai/core/compat/jean2';
 
 // Helper to create AI-SDK-compatible errors
 function createError(overrides: {

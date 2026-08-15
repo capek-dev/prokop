@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
-import { isSandboxActive, sandboxController } from '@/sandbox';
-import type { AutoResponderRule, SandboxResponse } from '@/sandbox';
+import { sandboxController, type AutoResponderRule, type SandboxResponse } from '@capekai/core/compat/jean2';
+import { isSandboxActive } from '@/sandbox';
 
 interface AutoResponderRequestBody {
   rules?: AutoResponderRule[];

@@ -21,11 +21,7 @@ import {
   deleteQueuedMessage,
   getNextQueuedMessage,
 } from '@/store';
-import { executeCompaction } from '@/core/compaction-executor';
-import { revertToStep } from '@/core/revert';
-import { forkSession } from '@/core/fork';
-import { interruptManager } from '@/core/interrupt';
-import { resolveAsk, createAskApi } from '@/tools/ask-user-api';
+import { executeCompaction, revertToStep, forkSession, interruptManager, resolveAsk, createAskApi } from '@capekai/core/compat/jean2';
 import { getWorkspaceGrants, revokeGrant, revokeAllWorkspaceGrants } from '@/store/permissions';
 import type { AssistantMessage, ToolPart, ServerMessage } from '@jean2/sdk';
 

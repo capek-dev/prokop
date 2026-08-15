@@ -1,6 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { classifyApiError, withRetry, ApiErrorType } from '@/utils/errors';
-import type { ClassifiedError } from '@/utils/errors';
+import { classifyApiError, withRetry, ApiErrorType, type ClassifiedError } from '@capekai/core/compat/jean2';
 
 describe('classifyApiError', () => {
   test('classifies timeout errors by name', () => {

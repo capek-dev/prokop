@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { createTestSession, createTestUserMessage, createTestTextPart } from '#tests/factories';
 import { createSession, createMessage, createPart, createWorkspace } from '@/store';
-import { executeSessionSearchTool } from '@/session-search/session-search-tool';
+import { executeSessionSearchTool } from '@capekai/core/compat/jean2';
 
 describe('session_search tool', () => {
   let workspaceId: string;

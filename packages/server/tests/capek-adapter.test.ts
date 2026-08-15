@@ -4,7 +4,6 @@ import { join } from 'path';
 import {
   getJean2CompatibilityBindings,
   getRuntimeConfiguration,
-  interruptManager as packageInterruptManager,
 } from '@capekai/core/compat/jean2';
 import {
   configureCapekJean2Compatibility,
@@ -12,9 +11,6 @@ import {
   jean2RuntimeConfiguration,
   jean2StorageBundle,
 } from '@/capek-adapter';
-import { interruptManager as serverInterruptManager } from '@/core/interrupt';
-import { sandboxController as packageHostController } from '@/sandbox';
-import { sandboxController as serverController } from '@/sandbox/controller';
 import { getSession } from '@/store';
 
 const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, string[]> = {
@@ -66,12 +62,5 @@ describe('Čapek Jean2 adapter', () => {
     expect(host.getEnvironmentValue).toBeDefined();
     expect(host.addAdditionalRoot).toBeUndefined();
     expect(host.removeAdditionalRoot).toBeUndefined();
-  });
-
-  test('preserves interrupt and sandbox controller singleton identity', () => {
-    configureCapekJean2Compatibility();
-
-    expect(serverInterruptManager).toBe(packageInterruptManager);
-    expect(packageHostController).toBe(serverController);
   });
 });

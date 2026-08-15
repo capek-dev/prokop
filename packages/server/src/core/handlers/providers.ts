@@ -1,6 +1,6 @@
 import type { ServerWebSocket } from 'bun';
 import type { RouterContext } from '../router-context';
-import * as providerManager from '@/providers';
+import { connectProvider, disconnectProvider, getProviderStatus } from '@capekai/core/compat/jean2';
 import type { ProviderConnectMessage, ProviderDisconnectMessage } from '@jean2/sdk';
 
 export async function handleProviderConnect(
@@ -9,10 +9,10 @@ export async function handleProviderConnect(
   msg: ProviderConnectMessage,
 ): Promise<void> {
   try {
-    const result = await providerManager.connectProvider(msg.provider, {
+    const result = await connectProvider(msg.provider, {
       redirectStrategy: msg.redirectStrategy as 'client_redirect' | 'manual_paste' | 'server_callback' | undefined,
     });
-    const status = await providerManager.getProviderStatus(msg.provider);
+    const status = await getProviderStatus(msg.provider);
     ctx.broadcast({
       type: 'provider.status',
       provider: msg.provider,
@@ -39,7 +39,7 @@ export async function handleProviderDisconnect(
   msg: ProviderDisconnectMessage,
 ): Promise<void> {
   try {
-    await providerManager.disconnectProvider(msg.provider);
+    await disconnectProvider(msg.provider);
     ctx.broadcast({
       type: 'provider.connected',
       provider: msg.provider,

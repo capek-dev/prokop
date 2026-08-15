@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
-import { createErrorEvent } from '@/core/error-handling';
-import { classifyApiError } from '@/utils/errors';
+import { createErrorEvent } from '@capekai/core/compat/jean2';
+import { classifyApiError } from '@capekai/core/compat/jean2';
 
 describe('createErrorEvent', () => {
   test('creates auth error event for authentication errors', () => {

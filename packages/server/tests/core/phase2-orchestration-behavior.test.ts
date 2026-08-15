@@ -6,10 +6,9 @@ import {
   runOrchestratorSession,
 } from '@capekai/core/compat/jean2';
 import { handleChat, handleSessionEditMessage, type Jean2RouterContext } from '@/core/chat-handler';
-import { executeCompaction } from '@/core/compaction-executor';
-import { interruptManager } from '@/core/interrupt';
+import { executeCompaction, interruptManager, sandboxController } from '@capekai/core/compat/jean2';
 import { createPreconfig } from '@/core/preconfig';
-import { activateSandbox, deactivateSandbox, sandboxController } from '@/sandbox';
+import { activateSandbox, deactivateSandbox } from '@/sandbox';
 import {
   addMessageToQueue,
   createAttachment,

@@ -15,8 +15,8 @@ import type {
 } from '@capekai/core/compat/jean2';
 import { getStorage } from '@capekai/core/storage';
 import { configureCapekJean2Compatibility } from '@/capek-adapter';
-import { executeCompaction, isCompactionActive } from '@/core/compaction-executor';
-import { convertToAiSdkMessages } from '@/core/message-utils';
+import { executeCompaction, isCompactionActive } from '@capekai/core/compat/jean2';
+import { convertToAiSdkMessages } from '@capekai/core/compat/jean2';
 import {
   createMessage,
   createPart,

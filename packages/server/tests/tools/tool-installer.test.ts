@@ -13,7 +13,7 @@ import {
   isToolInstalled,
   getInstalledToolVersion,
 } from '@/tools/tool-installer';
-import { readInstallManifest } from '@/tools/tool-install-manifest';
+import { readInstallManifest } from '@capekai/core/compat/jean2';
 
 const FIXTURE_DIR = resolve(import.meta.dir, 'fixtures', 'test-fixture-tool');
 const BROKEN_FIXTURE_DIR = resolve(import.meta.dir, 'fixtures', 'test-fixture-broken');
