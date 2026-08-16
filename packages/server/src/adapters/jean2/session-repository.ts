@@ -2,7 +2,9 @@ import {
   createSession,
   deleteSession,
   getSession,
+  getSessionsByAgent,
   listSessions,
+  listSessionsByWorkspace,
   listSessionsGrouped,
   listSessionPageGrouped,
   listTagsByWorkspace,
@@ -145,6 +147,14 @@ export function createJean2SessionRepository(): SessionRepositoryPort {
 
     listSessions(status?: SessionStatus): Session[] {
       return listSessions(status);
+    },
+
+    listSessionsByWorkspace(workspaceId, options): Session[] {
+      return listSessionsByWorkspace(workspaceId, options);
+    },
+
+    listSessionsByAgent(agentId: string, limit?: number): Session[] {
+      return getSessionsByAgent(agentId, undefined, limit);
     },
 
     listSessionsGrouped(workspaceIds, options) {

@@ -4,6 +4,7 @@ import { existsSync } from 'fs';
 import matter from 'gray-matter';
 import type { Preconfig, PreconfigMode } from '@jean2/sdk';
 import { getPreconfigsDir as getPreconfigsDirPath } from '@/paths';
+import { knownSubagentIds, sanitizeCanSpawnSubagentsIds } from '@/domains/agents';
 import { DEFAULT_PREAMBLES } from './defaults';
 
 // ── Slug utilities ─────────────────────────────────────────────
@@ -197,29 +198,26 @@ function parsePreconfigMd(content: string): Preconfig {
 
 /**
  * Validate canSpawnSubagents arrays against known subagent IDs.
- * This is a post-processing step to avoid circular dependencies.
+ * This is a post-processing step to avoid circular dependencies. The
+ * subagent-target classification and id sanitization rules live in the
+ * agents domain (`@/domains/agents`); this caller keeps its pre-S4
+ * reaction: warn about unknown ids, filter them, and disable spawning when
+ * no valid ids remain.
  */
 async function validatePreconfigs(preconfigs: Preconfig[]): Promise<Preconfig[]> {
   // Build a set of known subagent IDs from the preconfigs list
-  const knownSubagentIds = new Set(
-    preconfigs
-      .filter(p => {
-        const mode = p.mode ?? 'primary';
-        return mode === 'subagent' || mode === 'both';
-      })
-      .map(p => p.id)
-  );
+  const knownSubagentIdsSet = knownSubagentIds(preconfigs);
 
   // Validate each preconfig's canSpawnSubagents array
   for (const preconfig of preconfigs) {
     if (Array.isArray(preconfig.canSpawnSubagents)) {
-      const validIds = preconfig.canSpawnSubagents.filter(id => {
-        if (!knownSubagentIds.has(id)) {
-          console.warn(`[preconfig] Unknown subagent ID "${id}" in canSpawnSubagents for "${preconfig.id}"`);
-          return false;
-        }
-        return true;
-      });
+      const { validIds, invalidIds } = sanitizeCanSpawnSubagentsIds(
+        preconfig.canSpawnSubagents,
+        knownSubagentIdsSet,
+      );
+      for (const id of invalidIds) {
+        console.warn(`[preconfig] Unknown subagent ID "${id}" in canSpawnSubagents for "${preconfig.id}"`);
+      }
 
       if (validIds.length === 0) {
         console.warn(`[preconfig] canSpawnSubagents for "${preconfig.id}" has no valid IDs, disabling subagent spawning`);

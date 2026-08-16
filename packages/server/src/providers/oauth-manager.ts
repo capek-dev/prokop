@@ -8,35 +8,22 @@
 import type { OAuthProviderConfig, OAuthRedirectStrategy } from '@jean2/sdk';
 import { broadcastEvent } from '@/core/broadcast';
 import { getProvider, getProviderStatus, type TokenResponse } from '@capekai/core/compat/jean2';
+import {
+  buildAuthorizationUrl,
+  buildTokenExchangeParams,
+  buildTokenRefreshParams,
+  generateOAuthFlowId,
+  generateOAuthState,
+  generatePkceCodes,
+  OAUTH_FLOW_TIMEOUT_MS,
+  OAuthTokenRefreshError,
+  parseOAuthErrorBody,
+  type PkceCodes,
+} from '@/domains/provider-accounts';
 
-export interface OAuthTokenRefreshErrorData {
-  providerId: string;
-  status: number;
-  code?: string;
-  description?: string;
-}
-
-export class OAuthTokenRefreshError extends Error {
-  readonly providerId: string;
-  readonly status: number;
-  readonly code?: string;
-  readonly description?: string;
-
-  constructor({ providerId, status, code, description }: OAuthTokenRefreshErrorData) {
-    const details = [code, description].filter(Boolean).join(': ');
-    super(`Token refresh failed for ${providerId}: ${status}${details ? ` - ${details}` : ''}`);
-    this.name = 'OAuthTokenRefreshError';
-    this.providerId = providerId;
-    this.status = status;
-    this.code = code;
-    this.description = description;
-  }
-}
-
-interface PkceCodes {
-  verifier: string;
-  challenge: string;
-}
+export {
+  OAuthTokenRefreshError,
+} from '@/domains/provider-accounts';
 
 interface PendingFlow {
   providerId: string;
@@ -62,29 +49,6 @@ interface LocalServerEntry {
 
 /** Localhost callback servers, keyed by port. Multiple providers can share a port if they use different paths. */
 const localServers = new Map<number, LocalServerEntry>();
-
-function generateRandomString(length: number): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-  const bytes = crypto.getRandomValues(new Uint8Array(length));
-  return Array.from(bytes)
-    .map((b) => chars[b % chars.length])
-    .join('');
-}
-
-function base64UrlEncode(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  const binary = String.fromCharCode(...bytes);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function generatePKCE(): Promise<PkceCodes> {
-  const verifier = generateRandomString(43);
-  const encoder = new TextEncoder();
-  const data = encoder.encode(verifier);
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  const challenge = base64UrlEncode(hash);
-  return { verifier, challenge };
-}
 
 /**
  * Register an OAuth configuration for a provider.
@@ -240,9 +204,9 @@ export async function initiateOAuthFlow(
     throw new Error(`No OAuth configuration registered for provider: ${providerId}`);
   }
 
-  const pkce = await generatePKCE();
-  const state = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)).buffer);
-  const flowId = base64UrlEncode(crypto.getRandomValues(new Uint8Array(16)).buffer);
+  const pkce = await generatePkceCodes();
+  const state = generateOAuthState();
+  const flowId = generateOAuthFlowId();
 
   const redirectUri = config.redirectUri;
 
@@ -251,24 +215,11 @@ export async function initiateOAuthFlow(
     ensureLocalServer(redirectUri);
   }
 
-  const authorizationUrl = new URL(config.authorizeUrl);
-  authorizationUrl.searchParams.set('response_type', 'code');
-  authorizationUrl.searchParams.set('client_id', config.clientId);
-  authorizationUrl.searchParams.set('redirect_uri', redirectUri);
-  authorizationUrl.searchParams.set('scope', config.scopes);
-  authorizationUrl.searchParams.set('state', state);
-  authorizationUrl.searchParams.set('code_challenge', pkce.challenge);
-  authorizationUrl.searchParams.set('code_challenge_method', 'S256');
-
-  if (config.extraAuthParams) {
-    for (const [key, value] of Object.entries(config.extraAuthParams)) {
-      authorizationUrl.searchParams.set(key, value);
-    }
-  }
+  const authorizationUrl = buildAuthorizationUrl(config, state, pkce.challenge);
 
   const timeout = setTimeout(() => {
     pendingFlows.delete(flowId);
-  }, 5 * 60 * 1000);
+  }, OAUTH_FLOW_TIMEOUT_MS);
 
   pendingFlows.set(flowId, {
     providerId,
@@ -438,14 +389,7 @@ export async function refreshTokens(
     throw new Error(`No OAuth configuration for provider: ${providerId}`);
   }
 
-  const refreshParams: Record<string, string> = {
-    grant_type: 'refresh_token',
-    refresh_token: refreshToken,
-    client_id: config.clientId,
-  };
-  if (config.clientSecret) {
-    refreshParams.client_secret = config.clientSecret;
-  }
+  const refreshParams = buildTokenRefreshParams(config, refreshToken);
 
   const response = await fetch(config.tokenUrl, {
     method: 'POST',
@@ -455,21 +399,7 @@ export async function refreshTokens(
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');
-    let code: string | undefined;
-    let description: string | undefined;
-
-    try {
-      const errorBody = JSON.parse(errorText) as unknown;
-      if (typeof errorBody === 'object' && errorBody !== null) {
-        const errorRecord = errorBody as Record<string, unknown>;
-        code = typeof errorRecord.error === 'string' ? errorRecord.error : undefined;
-        description = typeof errorRecord.error_description === 'string'
-          ? errorRecord.error_description
-          : undefined;
-      }
-    } catch {
-      // Ignore non-JSON error bodies.
-    }
+    const { code, description } = parseOAuthErrorBody(errorText);
 
     throw new OAuthTokenRefreshError({
       providerId,
@@ -488,16 +418,7 @@ async function exchangeCodeForTokens(
   redirectUri: string,
   pkce: PkceCodes,
 ): Promise<TokenResponse> {
-  const exchangeParams: Record<string, string> = {
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: redirectUri,
-    client_id: config.clientId,
-    code_verifier: pkce.verifier,
-  };
-  if (config.clientSecret) {
-    exchangeParams.client_secret = config.clientSecret;
-  }
+  const exchangeParams = buildTokenExchangeParams(config, code, redirectUri, pkce.verifier);
 
   const response = await fetch(config.tokenUrl, {
     method: 'POST',

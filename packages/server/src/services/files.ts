@@ -4,7 +4,7 @@ import { extname, join } from 'path';
 import fg from 'fast-glob';
 import ignore from 'ignore';
 import type { FileEntry } from '@jean2/sdk';
-import { isPathWithinWorkspace } from '@/utils/paths';
+import { isPathWithinWorkspace } from '@/domains/workspaces';
 
 export { isPathWithinWorkspace };
 

@@ -43,7 +43,7 @@ import {
   prepareAndLaunchClient,
   type ClientLauncher,
 } from '@/services/client-launcher';
-import { startScheduler, stopScheduler } from '@/scheduler';
+import { startScheduler, stopScheduler, installSchedulerRuntime } from '@/scheduler';
 import { startPushRetryScheduler, stopPushRetryScheduler, cleanupPushData } from '@/services/web-push/retry-scheduler';
 
 export interface ServerOptions {
@@ -59,7 +59,8 @@ export interface ServerInstance {
 async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   configureCapekJean2Compatibility();
   const application = createWiredApplication();
-  installWireApplication({ session: application.session, control: application.control });
+  installWireApplication({ session: application.session, control: application.control, providers: application.providers, notifications: application.notifications });
+  installSchedulerRuntime(application.schedulerTicker);
   cleanupRunningSessionsOnStartup();
   reconcileAllSessionsCompaction();
   reconcileAllOrphanedToolCalls();

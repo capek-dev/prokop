@@ -41,12 +41,13 @@ export interface TransportControllerPorts {
 }
 
 /**
- * Transport control port adapter (S3).
+ * Transport control port adapter (S3, S4 policy ownership).
  *
- * The controller gate and claim/release/takeover policy stay implemented in
- * the transport control registry until S4. This module exposes those exact
- * functions through the application port contracts; use cases never import
- * the registry directly.
+ * The controller gate and claim/release/takeover policy live in the named
+ * controller domain (`@/domains/controllers`) and are applied by the
+ * transport control registry. This module exposes the registry functions
+ * through the application port contracts; use cases never import the
+ * registry or the domain directly.
  */
 export function createTransportControllerPorts(): TransportControllerPorts {
   const gate: ControllerGatePort<ConnectionId> = {

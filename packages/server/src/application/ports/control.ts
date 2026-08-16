@@ -1,56 +1,53 @@
 import type {
   ControllerGatedAction,
   ServerMessage,
-  SessionControlState,
   SessionControlUpdateReason,
   TakeoverDecision,
 } from '@jean2/sdk';
 
 /**
- * Controller gate rejection, structural copy of the transport registry
- * rejection. The policy implementation stays in the transport control
- * registry until S4; the gate port exposes it to use cases unchanged.
+ * Inward-facing controller ports (S4). The claim/release/takeover policy,
+ * the controller gate decision, and the ask routing policy now live in the
+ * named controller domain (`@/domains/controllers`). This module re-exports
+ * the domain contracts so transport implementors depend on the application
+ * layer only, and keeps the port interfaces the use cases consume.
  */
-export interface ControllerGateRejection {
-  sessionId: string;
-  action: ControllerGatedAction;
-  code: 'not_controller' | 'session_uncontrolled' | 'registration_required';
-  message: string;
-  control: SessionControlState;
-}
+export * from '@/domains/controllers';
+
+/** Compatibility alias: the pre-S4 port name for the domain action result. */
+export type SessionControlActionResult = import('@/domains/controllers').ControlActionResult;
 
 export interface ControllerGatePort<Origin> {
   checkControllerGate(
     sessionId: string,
     action: ControllerGatedAction,
     origin: Origin,
-  ): ControllerGateRejection | null;
+  ): import('@/domains/controllers').ControllerGateRejection | null;
 }
 
-export type SessionControlActionResult =
-  | { success: true; controlState: SessionControlState; transitionReason: SessionControlUpdateReason }
-  | { success: false; error: string; code: string; controlState: SessionControlState };
-
-export interface SessionResumeControlResult {
-  controlState: SessionControlState;
-  transitionReason: SessionControlUpdateReason | null;
-}
-
-/**
- * Session control operations port. The claim/release/takeover state machine
- * stays in the transport control registry; use cases only orchestrate the
- * outcome delivery in the exact current order.
- */
 export interface SessionControlPort<Origin> {
-  claim(sessionId: string, origin: Origin): SessionControlActionResult;
-  release(sessionId: string, origin: Origin): SessionControlActionResult;
-  requestTakeover(sessionId: string, origin: Origin, autoApprove: boolean): SessionControlActionResult;
+  claim(
+    sessionId: string,
+    origin: Origin,
+  ): import('@/domains/controllers').ControlActionResult;
+  release(
+    sessionId: string,
+    origin: Origin,
+  ): import('@/domains/controllers').ControlActionResult;
+  requestTakeover(
+    sessionId: string,
+    origin: Origin,
+    autoApprove: boolean,
+  ): import('@/domains/controllers').ControlActionResult;
   respondTakeover(
     sessionId: string,
     origin: Origin,
     requesterClientId: string,
     decision: TakeoverDecision,
-  ): SessionControlActionResult;
-  resumeControl(sessionId: string, origin: Origin): SessionResumeControlResult;
+  ): import('@/domains/controllers').ControlActionResult;
+  resumeControl(
+    sessionId: string,
+    origin: Origin,
+  ): import('@/domains/controllers').SessionResumeControlResult;
   buildControlUpdatedMessage(sessionId: string, reason: SessionControlUpdateReason): ServerMessage;
 }

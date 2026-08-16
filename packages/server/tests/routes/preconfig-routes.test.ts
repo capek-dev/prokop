@@ -19,6 +19,20 @@ mock.module('@/configuration/preconfigs', () => ({
 
 const { registerConfigRoutes } = await import('@/routes/config');
 
+function fakeProviders() {
+  return {
+    list: () => [],
+    status: () => ({ provider: '', connected: false }),
+    connect: async () => ({ result: {}, status: { provider: '', connected: false } }),
+    disconnect: async () => {},
+    completeOAuth: async () => ({ providerId: '' }),
+    serverCallback: async () => ({ body: '', status: 200, contentType: 'text/html' }),
+    listCredentials: () => ({ providers: [] }),
+    setCredential: async () => ({ provider: '', configured: false }),
+    clearCredential: async () => ({ provider: '', configured: false }),
+  };
+}
+
 describe('preconfig routes', () => {
   afterEach(() => {
     createValidatedPreconfig.mockClear();
@@ -28,7 +42,7 @@ describe('preconfig routes', () => {
 
   test('forwards allowSelfAsSubagent on create and update', async () => {
     const app = new Hono();
-    registerConfigRoutes(app);
+    registerConfigRoutes(app, fakeProviders());
 
     const createResponse = await app.request('/api/preconfigs', {
       method: 'POST',

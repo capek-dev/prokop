@@ -57,8 +57,8 @@ export function handleRespondTakeoverMessage(
 }
 
 // Compatibility re-exports: the pre-S3 handler module exposed the gate
-// check and rejection delivery. The gate policy stays in the control
-// registry until S4; the application uses the same functions through the
-// gate port.
+// check and rejection delivery. The gate policy lives in the controller
+// domain (`@/domains/controllers`), applied by the control registry; the
+// application uses the same functions through the gate port.
 export { checkControllerGate } from '../control-registry';
 export { sendGateRejection } from '../router-context';

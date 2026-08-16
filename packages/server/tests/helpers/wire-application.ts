@@ -11,5 +11,5 @@ import { installWireApplication } from '@/transport/websocket/application';
  */
 export function installTestWireApplication(): void {
   const application = createWiredApplication();
-  installWireApplication({ session: application.session, control: application.control });
+  installWireApplication({ session: application.session, control: application.control, providers: application.providers, notifications: application.notifications });
 }

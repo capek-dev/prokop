@@ -1,20 +1,22 @@
 import type { Hono } from 'hono';
 import { validate } from './validate';
-import { getWorkspace } from '@/store';
-import * as mcp from '@/mcp';
+import type { McpHttpApplication } from '@/application/mcp';
 import { NotFoundError } from '@/utils/http-errors';
 import { mcpServerNameSchema } from './schemas';
 
-export function registerMcpRoutes(app: Hono): void {
+/**
+ * S5 MCP routes. Input validation and wire presentation stay here; every
+ * operation invokes the MCP application use cases. The route imports no
+ * store or MCP implementation modules.
+ */
+export function registerMcpRoutes(app: Hono, application: McpHttpApplication): void {
   app.get('/api/workspaces/:id/mcp/status', async (c) => {
     const workspaceId = c.req.param('id');
-    const workspace = getWorkspace(workspaceId);
-    if (!workspace) {
+    const result = await application.status(workspaceId);
+    if (result.kind === 'workspace_not_found') {
       throw new NotFoundError('Workspace not found');
     }
-
-    const status = await mcp.getAllServerStatus(workspace.path);
-    return c.json({ status });
+    return c.json({ status: result.status });
   });
 
   app.post(
@@ -23,19 +25,15 @@ export function registerMcpRoutes(app: Hono): void {
     async (c) => {
       const workspaceId = c.req.param('id');
       const { name } = c.req.valid('json');
-      const workspace = getWorkspace(workspaceId);
-      if (!workspace) {
+
+      const result = await application.connect(workspaceId, name);
+      if (result.kind === 'workspace_not_found') {
         throw new NotFoundError('Workspace not found');
       }
-
-      const config = await mcp.getMcpServers(workspace.path);
-      const serverConfig = config[name];
-      if (!serverConfig) {
+      if (result.kind === 'server_not_found') {
         throw new NotFoundError('MCP server not found in config');
       }
-
-      const status = await mcp.connectServer(workspace.path, name, serverConfig);
-      return c.json({ status });
+      return c.json({ status: result.status });
     },
   );
 
@@ -45,26 +43,24 @@ export function registerMcpRoutes(app: Hono): void {
     async (c) => {
       const workspaceId = c.req.param('id');
       const { name } = c.req.valid('json');
-      const workspace = getWorkspace(workspaceId);
-      if (!workspace) {
+
+      const result = await application.disconnect(workspaceId, name);
+      if (result.kind === 'workspace_not_found') {
         throw new NotFoundError('Workspace not found');
       }
-
-      const status = await mcp.disconnectServer(workspace.path, name);
-      return c.json({ status });
+      // Preserves the pre-S5 wire shape exactly: the disconnect response
+      // carries a `status` property whose value was always undefined, so
+      // the JSON body is `{}`.
+      return c.json({ status: undefined });
     },
   );
 
   app.post('/api/workspaces/:id/mcp/restart', async (c) => {
     const workspaceId = c.req.param('id');
-    const workspace = getWorkspace(workspaceId);
-    if (!workspace) {
+    const result = await application.restart(workspaceId);
+    if (result.kind === 'workspace_not_found') {
       throw new NotFoundError('Workspace not found');
     }
-
-    await mcp.shutdownWorkspace(workspace.path);
-    await mcp.initializeWorkspace(workspace.path);
-    const status = await mcp.getAllServerStatus(workspace.path);
-    return c.json({ status });
+    return c.json({ status: result.status });
   });
 }

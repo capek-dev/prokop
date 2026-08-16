@@ -7,75 +7,45 @@ import {
   ConfigurationValidationError,
 } from './errors';
 import type { ProviderCredentialStatus, ProviderCredentialsResponse } from '@jean2/sdk';
+import {
+  getSupportedProviderCredential,
+  mergeEnvLine,
+  PROVIDER_CREDENTIALS,
+  removeEnvLine,
+  validateApiKeyValue,
+} from '@/domains/provider-accounts';
 
 function getEnvFilePathForModule(): string {
   return getEnvFilePath();
 }
 
-const PROVIDER_CREDENTIALS: Array<{ provider: string; envKey: string }> = [
-  { provider: 'minimax', envKey: 'JEAN2_LLM_MINIMAX_API_KEY' },
-  { provider: 'openai', envKey: 'JEAN2_LLM_OPENAI_API_KEY' },
-  { provider: 'openrouter', envKey: 'JEAN2_LLM_OPENROUTER_API_KEY' },
-  { provider: 'zhipu', envKey: 'JEAN2_LLM_ZHIPU_API_KEY' },
-  { provider: 'zhipu-coding', envKey: 'JEAN2_LLM_ZHIPU_CODING_API_KEY' },
-  { provider: 'deepseek', envKey: 'JEAN2_LLM_DEEPSEEK_API_KEY' },
-];
-
-export function getSupportedProvider(provider: string): { provider: string; envKey: string } | undefined {
-  return PROVIDER_CREDENTIALS.find(p => p.provider === provider);
-}
+export { getSupportedProviderCredential };
 
 export function listProviderCredentials(): ProviderCredentialsResponse {
-  const providers = PROVIDER_CREDENTIALS.map(({ provider, envKey }) => ({
-    provider,
-    configured: isProviderConfigured(envKey),
-  }));
-
-  return { providers };
+  return {
+    providers: PROVIDER_CREDENTIALS.map(({ provider, envKey }) => ({
+      provider,
+      configured: isProviderConfigured(envKey),
+    })),
+  };
 }
 
 export async function setProviderCredential(provider: string, apiKey: string): Promise<ProviderCredentialStatus> {
-  const cred = getSupportedProvider(provider);
+  const cred = getSupportedProviderCredential(provider);
   if (!cred) {
     throw new ConfigurationNotFoundError('provider', provider);
   }
 
-  if (!apiKey || typeof apiKey !== 'string' || apiKey.trim() === '') {
-    throw new ConfigurationValidationError('API key must be a non-empty string');
+  const validationError = validateApiKeyValue(apiKey);
+  if (validationError) {
+    throw new ConfigurationValidationError(validationError);
   }
 
   try {
     const content = await readFileSafe(getEnvFilePathForModule());
-    const lines = content ? content.split('\n') : [];
-    const targetKey = cred.envKey;
-    const targetValue = apiKey.trim();
-    let keyFound = false;
+    const merged = mergeEnvLine(content, cred.envKey, apiKey.trim());
 
-    const updatedLines = lines.map(line => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) {
-        return line;
-      }
-
-      const eqIndex = trimmed.indexOf('=');
-      if (eqIndex === -1) {
-        return line;
-      }
-
-      const key = trimmed.slice(0, eqIndex).trim();
-      if (key === targetKey) {
-        keyFound = true;
-        return `${targetKey}=${targetValue}`;
-      }
-
-      return line;
-    });
-
-    if (!keyFound) {
-      updatedLines.push(`${targetKey}=${targetValue}`);
-    }
-
-    await atomicWriteFile(getEnvFilePathForModule(), updatedLines.join('\n') + '\n');
+    await atomicWriteFile(getEnvFilePathForModule(), merged.content);
     reloadJean2Env();
 
     return { provider, configured: true };
@@ -86,7 +56,7 @@ export async function setProviderCredential(provider: string, apiKey: string): P
 }
 
 export async function clearProviderCredential(provider: string): Promise<ProviderCredentialStatus> {
-  const cred = getSupportedProvider(provider);
+  const cred = getSupportedProviderCredential(provider);
   if (!cred) {
     throw new ConfigurationNotFoundError('provider', provider);
   }
@@ -98,25 +68,9 @@ export async function clearProviderCredential(provider: string): Promise<Provide
       return { provider, configured: false };
     }
 
-    const lines = content.split('\n');
-    const targetKey = cred.envKey;
+    const updated = removeEnvLine(content, cred.envKey);
 
-    const updatedLines = lines.filter(line => {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) {
-        return true;
-      }
-
-      const eqIndex = trimmed.indexOf('=');
-      if (eqIndex === -1) {
-        return true;
-      }
-
-      const key = trimmed.slice(0, eqIndex).trim();
-      return key !== targetKey;
-    });
-
-    await atomicWriteFile(getEnvFilePathForModule(), updatedLines.join('\n') + '\n');
+    await atomicWriteFile(getEnvFilePathForModule(), updated);
     reloadJean2Env();
 
     return { provider, configured: false };

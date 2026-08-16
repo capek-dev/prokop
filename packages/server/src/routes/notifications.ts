@@ -1,30 +1,22 @@
 import type { Hono } from 'hono';
 import { validate } from './validate';
-import {
-  upsertPushSubscription,
-  updatePushSubscriptionPreferences,
-  deletePushSubscription,
-} from '@/store';
-import { getVapidCredentials, isWebPushAvailable } from '@/services/web-push/credentials';
-import { getPermissionTimeoutMs } from '@/env';
+import type { NotificationsApplication } from '@/application/notifications';
 import { NotFoundError } from '@/utils/http-errors';
 import { upsertSubscriptionSchema, updateSubscriptionPreferencesSchema } from './schemas';
 
-export function registerNotificationRoutes(app: Hono): void {
+/**
+ * S4 notification routes. Input validation and wire presentation stay here;
+ * every operation invokes the notifications application use cases. The
+ * route imports no store, web-push, or environment modules.
+ */
+export function registerNotificationRoutes(app: Hono, application: NotificationsApplication): void {
   /**
    * GET /api/notifications/config
    * Returns public notification configuration: VAPID public key and
    * the configurable permission timeout.
    */
   app.get('/api/notifications/config', (c) => {
-    const available = isWebPushAvailable();
-    const creds = available ? getVapidCredentials() : null;
-
-    return c.json({
-      available,
-      vapidPublicKey: creds?.publicKey ?? '',
-      permissionTimeoutMs: getPermissionTimeoutMs(),
-    });
+    return c.json(application.getConfig());
   });
 
   /**
@@ -36,7 +28,7 @@ export function registerNotificationRoutes(app: Hono): void {
     validate('json', upsertSubscriptionSchema),
     (c) => {
       const body = c.req.valid('json');
-      const subscription = upsertPushSubscription({
+      const subscription = application.upsertSubscription({
         clientId: body.clientId,
         clientServerId: body.clientServerId,
         clientOrigin: body.clientOrigin,
@@ -64,7 +56,7 @@ export function registerNotificationRoutes(app: Hono): void {
     (c) => {
       const id = c.req.param('id');
       const body = c.req.valid('json');
-      const subscription = updatePushSubscriptionPreferences(id, body.preferences);
+      const subscription = application.updatePreferences(id, body.preferences);
       if (!subscription) {
         throw new NotFoundError('Subscription not found');
       }
@@ -78,7 +70,7 @@ export function registerNotificationRoutes(app: Hono): void {
    */
   app.delete('/api/notifications/subscriptions/:id', (c) => {
     const id = c.req.param('id');
-    deletePushSubscription(id);
+    application.deleteSubscription(id);
     return c.json({ success: true });
   });
 }
