@@ -21,6 +21,7 @@ import { compactionPolicyPlugin } from './compaction-policy';
 import { permissionPolicyPlugin } from './permission-policy';
 import { workspacePolicyPlugin } from './workspace-policy';
 import { toolOutputPolicyPlugin } from './tool-output-policy';
+import { defaultAgentDriverPlugin } from './default-agent-driver';
 import { CODING_CAPABILITY_KEYS } from './coding-capabilities';
 import { codingToolResolverPlugin } from './tool-catalog';
 import {
@@ -56,6 +57,7 @@ export const FACADE_AGENT_PLUGIN_IDS = [
   'facade.storage',
   'facade.runtime-configuration',
   'facade.runtime-host',
+  'facade.agent-driver',
   'facade.retry-policy',
   'facade.compaction-policy',
   'facade.permission-policy',
@@ -74,6 +76,7 @@ export function createFacadeAgentPlugins(values: FacadeScopeValues): readonly Ca
     storageValuePlugin('facade.storage', values.storage),
     runtimeConfigurationValuePlugin('facade.runtime-configuration', values.configuration),
     runtimeHostValuePlugin('facade.runtime-host', values.host),
+    defaultAgentDriverPlugin('facade.agent-driver'),
     // C6: the agent scope owns the retry policy (and its circuit state)
     // instead of the facade's pre-C6 per-agent withRetryCircuitState wrap.
     retryPolicyPlugin('facade.retry-policy'),

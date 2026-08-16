@@ -23,7 +23,10 @@ import {
   type AgentScopeHandle,
   type FacadeComposition,
 } from '../plugins/compose';
-import { capekToolResolverKey } from '../plugins/service-keys';
+import { capekAgentDriverKey, capekToolResolverKey } from '../plugins/service-keys';
+import { createAgentRuntime } from '../runtime/agent-runtime';
+import type { AgentDriver } from '../runtime/agent-runtime';
+import type { DefaultDriverInput } from '../runtime/default-agent-driver';
 import { createAgentStorage } from '../storage/options';
 import { codingAgentBundle } from '../bundles/coding-agent';
 import {
@@ -364,15 +367,30 @@ class StandaloneAgent implements Agent {
     this.#activeSessionId = sessionId;
     const runAbort = new AbortController();
     this.#activeAbort = runAbort;
-    const promise = this.#scope((agentScope) => this.#perform(
-      agentScope,
-      sessionId,
-      input,
-      options,
-      createNewSession,
-      emit,
-      runAbort.signal,
-    ));
+    const promise = this.#scope(async (agentScope) => {
+      const driver = agentScope.require(capekAgentDriverKey);
+      const runtime = createAgentRuntime<DefaultDriverInput<AgentResult>, AgentResult>({
+        agentScope,
+        driver: driver as AgentDriver<DefaultDriverInput<AgentResult>, AgentResult>,
+      });
+      return runtime.run(sessionId, {
+        advance: async (context) => ({
+          result: await this.#perform(
+            agentScope,
+            sessionId,
+            input,
+            options,
+            createNewSession,
+            emit,
+            context.signal,
+          ),
+          continuation: 'complete',
+        }),
+      }, {
+        signal: runAbort.signal,
+        cancellationReason: 'agent interrupted',
+      });
+    });
     this.#activePromise = promise;
     const clearActive = (): void => {
       if (!runAbort.signal.aborted) runAbort.abort(new Error('Agent run settled'));

@@ -1054,6 +1054,26 @@ describe('C0 internal dependency boundaries', () => {
     expect(violations).toEqual([]);
   });
 
+  test('the C7 runtime spine imports only kernel and runtime contracts', () => {
+    const runtimeRoot = dir('runtime');
+    const spineFiles = new Set(['agent-runtime.ts', 'default-agent-driver.ts']);
+    const files = scanDirectory(runtimeRoot).filter((file) =>
+      spineFiles.has(relative(runtimeRoot, file.path)));
+    const violations: string[] = [];
+
+    for (const file of files) {
+      for (const imported of parseImports(file.sourceText, file.path)) {
+        const resolved = resolveLocalSpecifier(imported.specifier, file.path, packageSourceRoot);
+        if (!resolved || (!isWithin(resolved, runtimeRoot) && !isWithin(resolved, kernelSourceRoot))) {
+          violations.push(`${relative(packageSourceRoot, file.path)} imports ${imported.specifier}`);
+        }
+      }
+    }
+
+    expect(files).toHaveLength(2);
+    expect(violations).toEqual([]);
+  });
+
   test('kernel strict self-containment rejects alias, dynamic import, require, and package-root imports', () => {
     const synthetic: ScannedFile[] = [
       {
