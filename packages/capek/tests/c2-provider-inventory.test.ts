@@ -301,7 +301,7 @@ describe('C2 provider inventory', () => {
       'current.subagent-domain',
       'current.workflow-domain',
     ];
-    const expectedPluginIds = sortedIds.filter((id) => !domainIds.includes(id));
+    const expectedPluginIds = sortedIds.filter((id) => !domainIds.includes(id) && id !== 'current.compaction-policy' && id !== 'current.permission-policy');
     expectedPluginIds.splice(expectedPluginIds.indexOf('current.storage') + 1, 0, ...[
       'current.goal-domain',
       'current.memory-domain',
@@ -318,14 +318,32 @@ describe('C2 provider inventory', () => {
       0,
       'current.workflow-domain',
     );
+    // The C6 compaction provider requires the runtime configuration service
+    // (env translation at composition), so it activates right after it
+    // instead of its alphabetical position.
+    expectedPluginIds.splice(
+      expectedPluginIds.indexOf('current.runtime-configuration') + 1,
+      0,
+      'current.compaction-policy',
+    );
+    // The C6 permission policy requires the runtime host (permission timeout
+    // translation at composition), so it activates right after it instead of
+    // its alphabetical position.
+    expectedPluginIds.splice(
+      expectedPluginIds.indexOf('current.runtime-host') + 1,
+      0,
+      'current.permission-policy',
+    );
     expect(snapshot.plugins.map((plugin) => plugin.id)).toEqual(expectedPluginIds);
     // 4 process services + 9 current agent services (storage, runtime
     // configuration, runtime host, context sources, context sections,
     // orchestrator session, tool source, sandbox controller, provider
-    // overrides) + 6 coding capability services + the seven C5 domain
-    // services (goal, memory, session-search, scheduler, skills, subagent,
-    // workflow) installed by the current composition.
-    expect(snapshot.services).toHaveLength(26);
+    // overrides) + the C6 agent-scoped retry policy, compaction service,
+    // permission policy and permission runtime, workspace policy, and
+    // tool-output policy + 6 coding capability services + the seven C5
+    // domain services (goal, memory, session-search, scheduler, skills,
+    // subagent, workflow) installed by the current composition.
+    expect(snapshot.services).toHaveLength(32);
 
     const serialized = JSON.stringify(snapshot);
     expect(serialized).not.toContain('getApiKey');
@@ -422,7 +440,24 @@ describe('C2 agent scope entry', () => {
     const facadePlugins = agentScope.snapshot().plugins
       .filter((plugin) => plugin.id.startsWith('facade.'))
       .map((plugin) => plugin.id);
-    expect(facadePlugins).toEqual([...FACADE_AGENT_PLUGIN_IDS].sort());
+    // The C6 compaction provider requires the runtime configuration service
+    // (env translation at composition), so activation lands after it instead
+    // of the alphabetical position. The permission policy requires the
+    // runtime host for the same reason.
+    const expectedFacadeIds: string[] = [...FACADE_AGENT_PLUGIN_IDS]
+      .filter((id) => id !== 'facade.compaction-policy' && id !== 'facade.permission-policy')
+      .sort();
+    expectedFacadeIds.splice(
+      expectedFacadeIds.indexOf('facade.runtime-configuration') + 1,
+      0,
+      'facade.compaction-policy',
+    );
+    expectedFacadeIds.splice(
+      expectedFacadeIds.indexOf('facade.runtime-host') + 1,
+      0,
+      'facade.permission-policy',
+    );
+    expect(facadePlugins).toEqual(expectedFacadeIds);
 
     await agentScope.dispose();
   });

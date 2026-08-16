@@ -8,6 +8,12 @@
 import { withRuntimeConfiguration } from '../configuration/runtime';
 import { setDefaultContextAssembler, withContextAssembler } from '../context/assembler';
 import { withContextSources } from '../context/sources';
+import { withRetryPolicy } from '../retry/policy';
+import { withCompactionService } from '../compaction/policy';
+import { withAskPermissionPolicy } from '../permission/policy';
+import { withPermissionRuntimeService } from '../permission/runtime';
+import { withWorkspaceService } from '../workspace/policy';
+import { withToolOutputService } from '../tool-output/policy';
 import { createAgentScope, createProcessScope } from '../kernel/kernel';
 import type { AgentScopeHandle, ProcessScopeHandle } from '../kernel/types';
 import { withProviderOverrides } from '../providers/registry';
@@ -31,6 +37,12 @@ import {
   capekProviderOverridesKey,
   capekRuntimeConfigurationKey,
   capekRuntimeHostKey,
+  capekRetryPolicyKey,
+  capekCompactionServiceKey,
+  capekPermissionPolicyKey,
+  capekPermissionRuntimeKey,
+  capekWorkspacePolicyKey,
+  capekToolOutputPolicyKey,
   capekSandboxControllerKey,
   capekStorageKey,
   capekToolResolverKey,
@@ -144,6 +156,12 @@ export function enterAgentScope<T>(scope: AgentScopeHandle, callback: () => T): 
   const storage = scope.require(capekStorageKey);
   const configuration = scope.require(capekRuntimeConfigurationKey);
   const host = scope.require(capekRuntimeHostKey);
+  const retryPolicy = scope.require(capekRetryPolicyKey);
+  const compactionService = scope.require(capekCompactionServiceKey);
+  const permissionPolicy = scope.require(capekPermissionPolicyKey);
+  const permissionRuntime = scope.require(capekPermissionRuntimeKey);
+  const workspacePolicy = scope.require(capekWorkspacePolicyKey);
+  const toolOutputPolicy = scope.require(capekToolOutputPolicyKey);
   const contextSources = scope.require(capekContextSourcesKey);
   const providerOverrides = scope.require(capekProviderOverridesKey);
   const toolSource = scope.require(capekToolSourceKey);
@@ -160,19 +178,27 @@ export function enterAgentScope<T>(scope: AgentScopeHandle, callback: () => T): 
     }
   }
 
+  const resolveTools = toolResolver === undefined
+    ? (inner: () => T): T => withToolSource(toolSource, () =>
+      withSandboxController(sandboxController, inner))
+    : (inner: () => T): T => withToolRegistryResolver(toolResolver, () =>
+      withToolSource(toolSource, () =>
+        withSandboxController(sandboxController, inner)));
+
   return withContributedDomainToolPayloads(domainToolPayloads, () =>
     withContextAssembler(contextAssembler, () =>
-      withStorage(storage, () =>
-        withRuntimeConfiguration(configuration, () =>
-          withRuntimeHost(host, () =>
-            withContextSources(contextSources, () =>
-              withProviderOverrides(providerOverrides, () =>
-                (toolResolver === undefined
-                  ? (inner: () => T): T => withToolSource(toolSource, () =>
-                    withSandboxController(sandboxController, inner))
-                  : (inner: () => T): T => withToolRegistryResolver(toolResolver, () =>
-                    withToolSource(toolSource, () =>
-                      withSandboxController(sandboxController, inner))))(callback))))))));
+      withRetryPolicy(retryPolicy, () =>
+        withCompactionService(compactionService, () =>
+          withAskPermissionPolicy(permissionPolicy, () =>
+            withPermissionRuntimeService(permissionRuntime, () =>
+              withWorkspaceService(workspacePolicy, () =>
+                withToolOutputService(toolOutputPolicy, () =>
+                  withStorage(storage, () =>
+                    withRuntimeConfiguration(configuration, () =>
+                      withRuntimeHost(host, () =>
+                        withContextSources(contextSources, () =>
+                          withProviderOverrides(providerOverrides, () =>
+                            resolveTools(callback))))))))))))));
 }
 
 export type {

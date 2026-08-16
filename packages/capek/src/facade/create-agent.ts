@@ -13,12 +13,7 @@ import type {
 } from '@jean2/sdk';
 import { executeCompaction } from '../core/compaction-executor';
 import { interruptManager } from '../core/interrupt';
-import {
-  createRetryCircuitState,
-  streamChatWithRetry,
-  withRetryCircuitState,
-  type StreamChatEvent,
-} from '../core/retry';
+import { streamChatWithRetry, type StreamChatEvent } from '../core/retry';
 import { SandboxController } from '../sandbox/controller';
 import { SandboxProvider } from '../sandbox/provider';
 import type { AutoResponderRule, SandboxControlEvent } from '../sandbox/types';
@@ -199,7 +194,6 @@ class StandaloneAgent implements Agent {
   #selection: ReturnType<typeof resolveFacadeModel>;
   #configuration: ReturnType<typeof createFacadeConfiguration>;
   #bindings: ReturnType<typeof createStandaloneBindings>;
-  #retryCircuitState = createRetryCircuitState();
   #providerOverrides = new Map([['sandbox', new SandboxProvider()]]);
   #terminal: TerminalInteraction;
   #tempRoot: string;
@@ -625,8 +619,7 @@ class StandaloneAgent implements Agent {
 
   #scope<T>(callback: (agentScope: AgentScopeHandle) => T | Promise<T>): Promise<T> {
     return this.#composition.then(({ agentScope }) =>
-      withRetryCircuitState(this.#retryCircuitState, () =>
-        enterAgentScope(agentScope, () => callback(agentScope))));
+      enterAgentScope(agentScope, () => callback(agentScope)));
   }
 
   #handleAsk(message: ServerMessage, lifecycleSignal: AbortSignal): void {
