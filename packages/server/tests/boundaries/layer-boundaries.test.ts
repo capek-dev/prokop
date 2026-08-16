@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 import {
   evaluateRules,
   parseImports,
@@ -19,6 +19,8 @@ const domainsDir = resolve(serverSourceRoot, 'domains');
 const infrastructureDir = resolve(serverSourceRoot, 'infrastructure');
 const adaptersDir = resolve(serverSourceRoot, 'adapters');
 const adaptersCapekDir = resolve(adaptersDir, 'capek');
+const routesDir = resolve(serverSourceRoot, 'routes');
+const utilsDir = resolve(serverSourceRoot, 'utils');
 const layerDirs = [bootstrapDir, transportDir, applicationDir, domainsDir, infrastructureDir, adaptersDir];
 const infrastructureSqliteDir = resolve(infrastructureDir, 'sqlite');
 
@@ -29,15 +31,18 @@ const honoMatchers: SpecifierMatcher[] = [
 ];
 
 const compatBarrelExceptions: Record<string, string[]> = {
-  'packages/server/src/capek-adapter.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/capek-event-adapter.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/adapters/capek/ask-authority.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/adapters/capek/bindings.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/adapters/capek/context-sources.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/adapters/capek/events.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/adapters/capek/execution.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/adapters/capek/runtime-configuration.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/adapters/capek/scheduler.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/adapters/capek/session-search.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/adapters/capek/tool-source.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/adapters/capek/types.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/configuration/models.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/configuration/tool-env.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/core/chat-handler.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/core/handlers/misc.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/core/handlers/providers.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/core/handlers/session-lifecycle.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/core/session-handler.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/core/session-title.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/index.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/providers/codex.ts': ['@capekai/core/compat/jean2'],
@@ -50,24 +55,48 @@ const compatBarrelExceptions: Record<string, string[]> = {
   'packages/server/src/scheduler/runner.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/store/compaction-recovery.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/tools/tool-installer.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/transport/websocket/handlers/misc.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/transport/websocket/handlers/providers.ts': ['@capekai/core/compat/jean2'],
 };
 
-const serverWebSocketExceptions: Record<string, string[]> = {
-  'packages/server/src/index.ts': ['bun'],
-  'packages/server/src/core/chat-handler.ts': ['bun'],
-  'packages/server/src/core/client-registry.ts': ['bun'],
-  'packages/server/src/core/message-router.ts': ['bun'],
-  'packages/server/src/core/router-context.ts': ['bun'],
-  'packages/server/src/core/session-control-registry.ts': ['bun'],
-  'packages/server/src/core/session-handler.ts': ['bun'],
-  'packages/server/src/core/handlers/control.ts': ['bun'],
-  'packages/server/src/core/handlers/misc.ts': ['bun'],
-  'packages/server/src/core/handlers/permissions.ts': ['bun'],
-  'packages/server/src/core/handlers/providers.ts': ['bun'],
-  'packages/server/src/core/handlers/queue.ts': ['bun'],
-  'packages/server/src/core/handlers/session-lifecycle.ts': ['bun'],
-  'packages/server/src/services/terminal/event-manager.ts': ['bun'],
-  'packages/server/src/services/terminal/manager.ts': ['bun'],
+// S2 exit gate: zero non-transport ServerWebSocket exceptions remain.
+const serverWebSocketExceptions: Record<string, string[]> = {};
+
+const layerAdaptersLegacyExceptions: Record<string, string[]> = {
+  'packages/server/src/adapters/capek/context-sources.ts': [
+    '@/agents/storage', '@/agents/memory', '@/core/preconfig', '@/paths',
+  ],
+  'packages/server/src/adapters/capek/events.ts': [
+    '@/core/broadcast', '@/services/web-push/dispatch',
+  ],
+  'packages/server/src/adapters/capek/interaction.ts': [
+    '@/store/pending-asks', '@/store/permissions', '@/store', '@/env',
+    '@/services/web-push/dispatch',
+  ],
+  'packages/server/src/adapters/capek/runtime-configuration.ts': [
+    '@/config', '@/env',
+  ],
+  'packages/server/src/adapters/capek/sandbox.ts': ['@/sandbox'],
+  'packages/server/src/adapters/capek/scheduler.ts': [
+    '@/store/scheduled-jobs', '@/scheduler/runner',
+  ],
+  'packages/server/src/adapters/capek/session-search.ts': [
+    '@/store', '@/session-search/fts',
+  ],
+  'packages/server/src/adapters/capek/storage.ts': [
+    '@/store', '@/store/workspaces',
+  ],
+  'packages/server/src/adapters/capek/titles.ts': ['@/core/session-title'],
+  'packages/server/src/adapters/capek/tool-source.ts': [
+    '@/config', '@/mcp', '@/paths',
+  ],
+  'packages/server/src/adapters/capek/workspace.ts': [
+    '@/paths', '@/env', '@/store/workspaces',
+  ],
+  'packages/server/src/adapters/jean2/session-repository.ts': [
+    '@/store', '@/store/pending-asks', '@/store/workspaces', '@/agents/storage',
+    '@/core/session-title',
+  ],
 };
 
 const sqliteExceptions: Record<string, string[]> = {
@@ -80,6 +109,61 @@ const aiSdkExceptions: Record<string, string[]> = {
   'packages/server/src/mcp/manager.ts': ['ai'],
   'packages/server/src/mcp/converter.ts': ['ai'],
   'packages/server/src/providers/codex.ts': ['ai', '@ai-sdk/openai'],
+};
+
+// S2 exact per-file exceptions for transport wire handlers and terminal
+// adapters that still import legacy implementations. S3 retired the session
+// lifecycle, queue, control, chat, and session handler entries; the
+// permission, provider, misc, and terminal entries stay deferred until S4/S5.
+const layerTransportLegacyExceptions: Record<string, string[]> = {
+  'packages/server/src/transport/websocket/handlers/misc.ts': [
+    '@capekai/core/compat/jean2', '@/core/capability-router', '@/services/web-push/dispatch',
+  ],
+  'packages/server/src/transport/websocket/handlers/permissions.ts': ['@/store/permissions'],
+  'packages/server/src/transport/websocket/handlers/providers.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/transport/terminal/manager.ts': ['@/store/terminal-sessions'],
+};
+
+// S3 exact per-file exceptions for HTTP route files that S3 does not own.
+// routes/sessions.ts must not appear here: the session routes are migrated
+// to the session HTTP application. The remaining entries stay until their
+// owning phase (S4/S5 and the deferred route slices).
+const layerHttpRoutesLegacyExceptions: Record<string, string[]> = {
+  'packages/server/src/routes/agents.ts': ['@/agents/storage', '@/agents/memory'],
+  'packages/server/src/routes/config.ts': [
+    '@/configuration/provider-credentials', '@/configuration/models',
+    '@/configuration/models-sync', '@/configuration/prompts', '@/configuration/preconfigs',
+    '@capekai/core/compat/jean2', '@/providers/oauth-manager', '@/prompts/registry',
+  ],
+  'packages/server/src/routes/files.ts': [
+    '@/store', '@/services/files', '@/services/filePreview',
+    '@/services/gitStatus', '@/services/fileMutations',
+  ],
+  'packages/server/src/routes/maintenance.ts': ['@/store/cleanup'],
+  'packages/server/src/routes/mcp.ts': ['@/store', '@/mcp'],
+  'packages/server/src/routes/notifications.ts': [
+    '@/store', '@/services/web-push/credentials', '@/env',
+  ],
+  'packages/server/src/routes/response-formats.ts': ['@/store'],
+  'packages/server/src/routes/scheduler.ts': ['@/store/scheduled-jobs', '@/store/workspaces', '@/scheduler/runner'],
+  'packages/server/src/routes/tools.ts': ['@capekai/core/compat/jean2', '@/configuration/tool-env', '@/configuration/errors'],
+  'packages/server/src/routes/workspaces.ts': ['@/store', '@/paths', '@/services/terminal', '@/mcp'],
+};
+
+// S3 per-file exceptions for transport presentation helpers still living at
+// legacy paths. The session route file uses the shared zod validation,
+// session schemas, and HTTP error presenters; none of these import store or
+// Capek implementations.
+const layerTransportHttpPresentationExceptions: Record<string, string[]> = {
+  'packages/server/src/transport/http/routes/sessions.ts': [
+    '@/routes/validate', '@/routes/schemas', '@/utils/http-errors',
+  ],
+};
+
+// S3 per-file exception: the bootstrap composition root reads the takeover
+// configuration until configuration moves to infrastructure in S5.
+const layerBootstrapExceptions: Record<string, string[]> = {
+  'packages/server/src/bootstrap/application.ts': ['@/env'],
 };
 
 const globalBaselineRules: DependencyRule[] = [
@@ -127,10 +211,11 @@ const layerRules: DependencyRule[] = [
     rationale: 'Bootstrap composes the six layers; relative imports must stay inside the layer directories.',
     appliesTo: [bootstrapDir],
     allowedResolvedDirs: layerDirs,
+    exceptions: layerBootstrapExceptions,
   },
   {
     name: 'layer-transport',
-    rationale: 'Transport may invoke application services. No SQLite, AI SDK, or Capek implementation imports.',
+    rationale: 'Transport may invoke application services. No SQLite, AI SDK, or Capek implementation imports. S3 retired the session wire handler exceptions; permission, provider, misc, and terminal entries stay deferred, and the session route file keeps presentation-helper exceptions only.',
     appliesTo: [transportDir],
     forbiddenSpecifiers: [
       { exact: 'bun:sqlite' },
@@ -139,6 +224,10 @@ const layerRules: DependencyRule[] = [
       { prefix: '@capekai/core' },
     ],
     allowedResolvedDirs: [transportDir, applicationDir],
+    exceptions: {
+      ...layerTransportLegacyExceptions,
+      ...layerTransportHttpPresentationExceptions,
+    },
   },
   {
     name: 'layer-application',
@@ -171,9 +260,10 @@ const layerRules: DependencyRule[] = [
   },
   {
     name: 'layer-adapters',
-    rationale: 'Adapters translate Capek contracts and Jean2 ports. No transport imports.',
+    rationale: 'Adapters translate Capek contracts and Jean2 ports. No transport imports. S1 focused adapters keep exact temporary exceptions for their legacy implementation paths.',
     appliesTo: [adaptersDir],
     allowedResolvedDirs: [adaptersDir, applicationDir, domainsDir],
+    exceptions: layerAdaptersLegacyExceptions,
   },
   {
     name: 'layer-adapters-capek-only',
@@ -181,6 +271,19 @@ const layerRules: DependencyRule[] = [
     appliesTo: [adaptersDir],
     forbiddenSpecifiers: [{ prefix: '@capekai/core' }],
     allowedInDirs: [adaptersCapekDir],
+  },
+  {
+    name: 'layer-http-routes',
+    rationale: 'HTTP routes invoke application use cases. No SQLite, AI SDK, or Capek implementation imports. S3 migrated the session routes; the other route files keep exact per-file legacy exceptions until their owning phase.',
+    appliesTo: [routesDir],
+    forbiddenSpecifiers: [
+      { exact: 'bun:sqlite' },
+      { exact: 'ai' },
+      { prefix: '@ai-sdk/' },
+      { prefix: '@capekai/core' },
+    ],
+    allowedResolvedDirs: [routesDir, transportDir, applicationDir, utilsDir],
+    exceptions: layerHttpRoutesLegacyExceptions,
   },
 ];
 
@@ -240,6 +343,7 @@ describe('server layer boundaries', () => {
     );
 
     expect(result.violations).toEqual([]);
+    expect(result.staleExceptions).toEqual([]);
   });
 
   test('transport layer flags storage, AI SDK, Capek, and SQLite imports', () => {
@@ -478,8 +582,78 @@ describe('server layer boundaries', () => {
     ]);
 
     expect(result.violations).toEqual([
+      'packages/server/src/core/chat-handler.ts imports bun (type) [rule: bun-server-websocket-transport-only]',
       'packages/server/src/something/new-socket-file.ts imports bun (type) [rule: bun-server-websocket-transport-only]',
       'packages/server/src/something/new-aliased-socket-file.ts imports bun (type) [rule: bun-server-websocket-transport-only]',
     ]);
+  });
+
+  test('S2 gate: no source file outside transport imports ServerWebSocket and no exceptions remain', () => {
+    expect(serverWebSocketExceptions).toEqual({});
+
+    const result = evaluateRules(
+      scanDirectory(serverSourceRoot),
+      serverSourceRoot,
+      repositoryRoot,
+      [globalBaselineRules[1]],
+    );
+
+    expect(result.violations).toEqual([]);
+    expect(result.staleExceptions).toEqual([]);
+  });
+
+  test('S2 gate: transport bun imports are confined to the socket and terminal adapters', () => {
+    const allowedTransportBunFiles = [
+      'packages/server/src/transport/websocket/bun-adapter.ts',
+      'packages/server/src/transport/terminal/event-manager.ts',
+      'packages/server/src/transport/terminal/manager.ts',
+    ];
+
+    const bunImports = scanDirectory(serverSourceRoot)
+      .flatMap((file) => parseImports(file.sourceText, file.path).map((imp) => ({ file, imp })))
+      .filter(({ imp }) => imp.specifier === 'bun' && imp.names.includes('ServerWebSocket'));
+
+    const filesWithBun = bunImports.map(({ file }) => relative(repositoryRoot, file.path));
+    expect(filesWithBun.sort()).toEqual(allowedTransportBunFiles.sort());
+  });
+
+  test('S3 gate: session and control wire handlers import neither store nor Capek implementations', () => {
+    const s3HandlerFiles = [
+      'packages/server/src/transport/websocket/chat-handler.ts',
+      'packages/server/src/transport/websocket/session-handler.ts',
+      'packages/server/src/transport/websocket/message-router.ts',
+      'packages/server/src/transport/websocket/handlers/control.ts',
+      'packages/server/src/transport/websocket/handlers/queue.ts',
+      'packages/server/src/transport/websocket/handlers/session-lifecycle.ts',
+      'packages/server/src/transport/http/routes/sessions.ts',
+    ];
+
+    for (const repoFile of s3HandlerFiles) {
+      expect(Object.keys(layerTransportLegacyExceptions)).not.toContain(repoFile);
+      const compatList = compatBarrelExceptions[repoFile] ?? [];
+      expect(compatList).toEqual([]);
+    }
+
+    expect(layerTransportHttpPresentationExceptions['packages/server/src/transport/http/routes/sessions.ts']).toEqual([
+      '@/routes/validate', '@/routes/schemas', '@/utils/http-errors',
+    ]);
+
+    const imports = scanDirectory(serverSourceRoot)
+      .flatMap((file) => parseImports(file.sourceText, file.path).map((imp) => ({ file, imp })));
+
+    const offenders: string[] = [];
+    for (const { file, imp } of imports) {
+      const repoFile = relative(repositoryRoot, file.path);
+      if (!s3HandlerFiles.includes(repoFile)) continue;
+      if (imp.specifier === '@/store' || imp.specifier.startsWith('@/store/')) {
+        offenders.push(`${repoFile} imports ${imp.specifier}`);
+      }
+      if (imp.specifier.startsWith('@capekai/core')) {
+        offenders.push(`${repoFile} imports ${imp.specifier}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+
+    expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain('packages/server/src/routes/sessions.ts');
   });
 });

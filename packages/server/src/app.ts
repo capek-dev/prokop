@@ -18,6 +18,7 @@ import { getClientEnabled } from '@/env';
 import { ensurePromptsDir } from '@/prompts/registry';
 import { VERSION } from '@/version';
 import { HttpError } from '@/utils/http-errors';
+import { createWiredApplication, type WiredApplication } from '@/bootstrap/application';
 
 // Route modules
 import { registerSessionRoutes } from '@/routes/sessions';
@@ -34,7 +35,9 @@ import { registerAgentRoutes } from '@/routes/agents';
 import { registerMaintenanceRoutes } from '@/routes/maintenance';
 import { registerNotificationRoutes } from '@/routes/notifications';
 
-export function createApp() {
+export function createApp(application?: WiredApplication) {
+  const wired = application ?? createWiredApplication();
+
   // Ensure prompts directory exists
   ensurePromptsDir();
 
@@ -110,7 +113,7 @@ export function createApp() {
   // Route Modules
   // ============================================================================
 
-  registerSessionRoutes(app);
+  registerSessionRoutes(app, wired.http);
   registerWorkspaceRoutes(app);
   registerFileRoutes(app);
   registerToolRoutes(app);
