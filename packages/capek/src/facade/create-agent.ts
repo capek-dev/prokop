@@ -11,9 +11,6 @@ import type {
   Preconfig,
   ServerMessage,
 } from '@jean2/sdk';
-import { withRuntimeHost } from '../runtime/host';
-import { withRuntimeConfiguration } from '../configuration/runtime';
-import { withContextSources } from '../context';
 import { executeCompaction } from '../core/compaction-executor';
 import { interruptManager } from '../core/interrupt';
 import {
@@ -22,11 +19,18 @@ import {
   withRetryCircuitState,
   type StreamChatEvent,
 } from '../core/retry';
-import { withProviderOverrides } from '../providers/registry';
-import { SandboxController, withSandboxController } from '../sandbox/controller';
+import { SandboxController } from '../sandbox/controller';
 import { SandboxProvider } from '../sandbox/provider';
 import type { AutoResponderRule, SandboxControlEvent } from '../sandbox/types';
+import {
+  createFacadeAgentComposition,
+  enterAgentScope,
+  type AgentScopeHandle,
+  type FacadeComposition,
+} from '../plugins/compose';
+import { capekToolResolverKey } from '../plugins/service-keys';
 import { createAgentStorage } from '../storage/options';
+import { codingAgentBundle } from '../bundles/coding-agent';
 import {
   buildEffectiveContextHistory,
   createMessage,
@@ -35,12 +39,8 @@ import {
   getSession,
   getToolOutputArtifactPage,
   updateSession,
-  withStorage,
 } from '../storage/runtime';
 import { rejectAsk, resolveAsk } from '../tools/ask-user-api';
-import { withToolRegistryResolver } from '../tools/registry';
-import { getStandardTool, listStandardTools, STANDARD_TOOL_NAMES } from '../tools/standard-tools';
-import { withToolSource } from '../tools/tool-source';
 import { createFacadeConfiguration, resolveFacadeModel } from './configuration';
 import { createStandaloneBindings } from './standalone-bindings';
 import type {
@@ -176,6 +176,19 @@ export function createAgent(options: CreateAgentOptions): Agent {
   return new StandaloneAgent(options);
 }
 
+/** Internal symbol accessor attached to facade agents so focused tests can
+ * inspect the composed scopes. It is intentionally not part of the public
+ * `Agent` interface and never appears in enumerations. */
+const FACADE_COMPOSITION_ACCESSOR = Symbol.for('capek.facade.composition-accessor');
+
+export function getFacadeComposition(agent: Agent): Promise<FacadeComposition> {
+  const accessor = (agent as unknown as Record<PropertyKey, unknown>)[FACADE_COMPOSITION_ACCESSOR];
+  if (typeof accessor !== 'function') {
+    throw new Error('getFacadeComposition requires an agent created by createAgent');
+  }
+  return accessor() as Promise<FacadeComposition>;
+}
+
 class StandaloneAgent implements Agent {
   #workspace: string;
   #prompt: string;
@@ -190,6 +203,8 @@ class StandaloneAgent implements Agent {
   #providerOverrides = new Map([['sandbox', new SandboxProvider()]]);
   #terminal: TerminalInteraction;
   #tempRoot: string;
+  #composition: Promise<FacadeComposition>;
+  #scopeDisposed = false;
   #activeSessionId: string | null = null;
   #activePromise: Promise<AgentResult> | null = null;
   #activeAbort: AbortController | null = null;
@@ -222,6 +237,24 @@ class StandaloneAgent implements Agent {
       sandboxActive: this.#sandboxActive,
       tempRoot: this.#tempRoot,
     });
+    this.#composition = createFacadeAgentComposition({
+      storage: this.#storage.storage,
+      configuration: this.#configuration,
+      host: this.#bindings,
+      contextSources: {},
+      toolSource: {},
+      codingPlugins: codingAgentBundle(),
+      sandboxController: this.#sandboxController,
+      providerOverrides: this.#providerOverrides,
+    });
+    // An idle agent must never surface an unhandled rejection when scope
+    // composition fails. run/close and the test accessor await this same
+    // promise and still observe the original rejection.
+    void this.#composition.catch(() => {});
+    Object.defineProperty(this, FACADE_COMPOSITION_ACCESSOR, {
+      value: (): Promise<FacadeComposition> => this.#composition,
+      enumerable: false,
+    });
   }
 
   async run(input: AgentInput, options?: RunOptions): Promise<AgentResult> {
@@ -232,7 +265,11 @@ class StandaloneAgent implements Agent {
   stream(input: AgentInput, options?: RunOptions): AsyncIterable<AgentEvent> {
     const sessionId = randomUUID();
     const channel = new EventChannel(() => {
-      void this.#interruptSession(sessionId);
+      // Interrupting an already-closed agent is a no-op; the catch keeps an
+      // abandoned iterator from surfacing a fire-and-forget rejection when
+      // composition failed. Active-run cancellation still aborts through
+      // interruptSession before the catch applies.
+      void this.#interruptSession(sessionId).catch(() => {});
     });
     void this.#start(sessionId, input, options, true, (event) => channel.push(event))
       .then((result) => channel.push({ type: 'result', result }))
@@ -294,6 +331,15 @@ class StandaloneAgent implements Agent {
         }
       }
       await activePromise?.catch(() => {});
+      if (!this.#scopeDisposed) {
+        this.#scopeDisposed = true;
+        try {
+          const { agentScope } = await this.#composition;
+          await agentScope.dispose();
+        } catch (error: unknown) {
+          cleanupError ??= error;
+        }
+      }
       if (!this.#storageClosed) {
         this.#storageClosed = true;
         try {
@@ -324,7 +370,8 @@ class StandaloneAgent implements Agent {
     this.#activeSessionId = sessionId;
     const runAbort = new AbortController();
     this.#activeAbort = runAbort;
-    const promise = this.#scope(() => this.#perform(
+    const promise = this.#scope((agentScope) => this.#perform(
+      agentScope,
       sessionId,
       input,
       options,
@@ -346,6 +393,7 @@ class StandaloneAgent implements Agent {
   }
 
   async #perform(
+    agentScope: AgentScopeHandle,
     sessionId: string,
     input: AgentInput | undefined,
     options: RunOptions | undefined,
@@ -378,9 +426,7 @@ class StandaloneAgent implements Agent {
       name: 'Capek',
       description: 'Standalone Capek agent',
       systemPrompt: this.#prompt,
-      tools: this.#interaction === false
-        ? STANDARD_TOOL_NAMES.filter((name) => name !== 'question')
-        : STANDARD_TOOL_NAMES,
+      tools: this.#effectiveToolNames(agentScope),
       model: this.#selection.modelId,
       provider: this.#selection.providerId,
       settings: null,
@@ -557,24 +603,30 @@ class StandaloneAgent implements Agent {
     };
   }
 
+  #effectiveToolNames(agentScope: AgentScopeHandle): string[] {
+    const resolver = agentScope.require(capekToolResolverKey);
+    const names = resolver.list().map((entry) => entry.definition.name);
+    return this.#interaction === false
+      ? names.filter((name) => name !== 'question')
+      : names;
+  }
+
   async #interruptSession(sessionId: string): Promise<void> {
     if (this.#activeSessionId === sessionId) {
       this.#activeAbort?.abort(new Error('Agent interrupted'));
       this.#terminal.close();
+    } else if (this.#closed) {
+      // The run already settled during close; nothing is left to interrupt
+      // and the composed scope may already be disposed.
+      return;
     }
     await this.#scope(() => interruptManager.interruptSession(sessionId));
   }
 
-  #scope<T>(callback: () => T): T {
-    return withStorage(this.#storage.storage, () =>
-      withRuntimeConfiguration(this.#configuration, () =>
-        withRuntimeHost(this.#bindings, () =>
-          withContextSources({}, () =>
-            withRetryCircuitState(this.#retryCircuitState, () =>
-              withProviderOverrides(this.#providerOverrides, () =>
-                withToolRegistryResolver({ get: getStandardTool, list: listStandardTools }, () =>
-                  withToolSource({}, () =>
-                    withSandboxController(this.#sandboxController, callback)))))))));
+  #scope<T>(callback: (agentScope: AgentScopeHandle) => T | Promise<T>): Promise<T> {
+    return this.#composition.then(({ agentScope }) =>
+      withRetryCircuitState(this.#retryCircuitState, () =>
+        enterAgentScope(agentScope, () => callback(agentScope))));
   }
 
   #handleAsk(message: ServerMessage, lifecycleSignal: AbortSignal): void {

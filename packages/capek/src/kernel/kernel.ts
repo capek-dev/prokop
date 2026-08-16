@@ -1,7 +1,8 @@
 /**
- * Kernel creation API. This is an internal composition entry point beside
- * the current configuration path. It is intentionally not wired into
- * createAgent and not exported from the package root.
+ * Kernel creation API. This is an internal composition entry point used by
+ * the C2 plugin layer. The kernel is not exported from the package root;
+ * `createAgent()` composes through `src/plugins`, never by importing the
+ * kernel directly.
  */
 
 import { LifecycleError } from './errors';

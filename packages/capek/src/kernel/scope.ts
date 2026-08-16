@@ -530,8 +530,14 @@ export abstract class ScopeBase implements PluginContextHost {
     return collectEffectiveProjections(this);
   }
 
-  buildContext(): Promise<readonly ProvidedContextSection[]> {
-    return buildContextSections(this);
+  async buildContext<TData = unknown>(data?: TData): Promise<readonly ProvidedContextSection[]> {
+    if (this.status !== 'active') {
+      throw new LifecycleError(`cannot build context: the ${this.kind} scope is ${this.status}`);
+    }
+    if (data !== undefined && (typeof data !== 'object' || data === null)) {
+      throw new MalformedPluginError('context assembly data must be an object when provided');
+    }
+    return buildContextSections(this, data);
   }
 
   // Structural views used by diagnostics and validation.
@@ -570,6 +576,10 @@ export abstract class ScopeBase implements PluginContextHost {
 
   get cleanupBarrierCount(): number {
     return this.barriers.filter((barrier) => !barrier.removed).length;
+  }
+
+  get childCount(): number {
+    return this.children.length;
   }
 
   effectiveServiceInfos(): Map<string, ParentServiceInfo> {
@@ -617,6 +627,11 @@ export abstract class ScopeBase implements PluginContextHost {
     this.children.push(child);
   }
 
+  removeChild(child: ScopeBase): void {
+    const index = this.children.indexOf(child);
+    if (index !== -1) this.children.splice(index, 1);
+  }
+
   // Disposal.
 
   dispose(): Promise<void> {
@@ -633,6 +648,12 @@ export abstract class ScopeBase implements PluginContextHost {
   protected async performDispose(): Promise<void> {
     this.status = 'disposing';
     const failures: DisposalFailure[] = [];
+
+    // Unlink from the parent so a disposed scope is not retained. Parent
+    // disposal iterates a copy of its children, so this mutation is safe
+    // while the parent is disposing, and concurrent child disposal settles
+    // through the shared dispose promise.
+    this.parent?.removeChild(this);
 
     for (const child of [...this.children].reverse()) {
       try {

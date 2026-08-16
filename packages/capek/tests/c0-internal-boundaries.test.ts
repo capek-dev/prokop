@@ -102,11 +102,6 @@ const c0Rules: DependencyRule[] = [
     appliesTo: [dir('core')],
     forbiddenResolvedDirs: [dir('memory'), dir('skills'), dir('session-search'), dir('scheduler')],
     exceptions: {
-      'packages/capek/src/core/stream/system-message.ts': [
-        '../../session-search',
-        '../../memory',
-        '../../skills',
-      ],
       'packages/capek/src/core/tool-builders/agent-tools.ts': [
         '../../memory',
         '../../skills',
@@ -118,6 +113,12 @@ const c0Rules: DependencyRule[] = [
         '../../skills',
       ],
     },
+  },
+  {
+    name: 'core-no-plugins',
+    rationale: 'The turn-execution core consumes contracts only. The fixed context builder and provider values live in plugins; a core import of plugins would reintroduce the fixed builder or optional-domain coupling that C3 removed from the runtime path.',
+    appliesTo: [dir('core')],
+    forbiddenResolvedDirs: [dir('plugins')],
   },
   {
     name: 'core-no-sandbox',
@@ -152,6 +153,50 @@ const c0Rules: DependencyRule[] = [
       { prefix: 'node:' },
       { exact: '@capekai/core' },
     ],
+  },
+  {
+    name: 'plugins-no-compat-or-facade',
+    rationale: 'The C2 plugin layer wraps current seam contracts and must not import the migration barrel or the facade; compat and the facade compose on top of plugins.',
+    appliesTo: [dir('plugins')],
+    forbiddenResolvedDirs: [dir('compat'), dir('facade')],
+  },
+  {
+    name: 'plugins-no-core',
+    rationale: 'C2 provider plugins wrap current seam contracts only; the turn-execution core is composed later and must not be imported by plugins.',
+    appliesTo: [dir('plugins')],
+    forbiddenResolvedDirs: [dir('core')],
+  },
+  {
+    name: 'facade-composes-through-plugins',
+    rationale: 'The facade composes the agent scope through the plugins layer; importing the kernel directly would bypass the service-key contracts.',
+    appliesTo: [dir('facade')],
+    forbiddenResolvedDirs: [dir('kernel')],
+  },
+  {
+    name: 'core-no-kernel',
+    rationale: 'The kernel is a composition-only concern; the turn-execution core must not import it.',
+    appliesTo: [dir('core')],
+    forbiddenResolvedDirs: [dir('kernel')],
+  },
+  {
+    name: 'internal-composition-narrow',
+    rationale: 'The internal package subpath re-exports only the plugins composition surface, never product domains.',
+    appliesTo: [dir('internal')],
+    allowedResolvedDirs: [dir('plugins')],
+  },
+  {
+    name: 'facade-core-no-standard-tool-list',
+    rationale: 'The runtime core and the facade consume effective contributed tools. The fixed standard tool list is installed coding-bundle behavior in the plugins and bundles layers only.',
+    appliesTo: [dir('facade'), dir('core')],
+    forbiddenSpecifiers: [
+      { exact: '../tools/standard-tools' },
+    ],
+  },
+  {
+    name: 'bundles-compose-plugins-and-kernel',
+    rationale: 'Bundles are ordinary TypeScript composition over the plugin and kernel layers only; they must not reach into the runtime core, facade, or compat.',
+    appliesTo: [dir('bundles')],
+    allowedResolvedDirs: [dir('plugins'), dir('kernel')],
   },
 ];
 
@@ -275,6 +320,45 @@ describe('C0 internal dependency boundaries', () => {
 
   test('kernel strict self-containment passes on the current kernel source', () => {
     expect(kernelStrictViolations(scanDirectory(kernelSourceRoot))).toEqual([]);
+  });
+
+  test('the runtime core builds context only through the assembler contract', () => {
+    const coreFiles = scanDirectory(dir('core'));
+    const agentSource = coreFiles.find((file) => file.path.endsWith('core/agent.ts'));
+    expect(agentSource).toBeDefined();
+    const agentImports = parseImports(agentSource!.sourceText, agentSource!.path);
+    expect(agentImports.some((imp) =>
+      imp.specifier === '../context/assembler' && imp.names.includes('getContextAssembler'))).toBe(true);
+
+    const violations: string[] = [];
+    for (const file of coreFiles) {
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        if (imp.specifier.includes('system-message') || imp.specifier.includes('legacy-system-message')) {
+          violations.push(
+            `${relative(repositoryRoot, file.path)} imports ${imp.specifier} (${imp.kind}) [rule: core-assembler-contract-only]`,
+          );
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  test('the runtime core and facade never import the hardcoded standard tool list', () => {
+    const files = [
+      ...scanDirectory(dir('core')),
+      ...scanDirectory(dir('facade')),
+    ];
+    const violations: string[] = [];
+    for (const file of files) {
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        if (imp.specifier.includes('standard-tools')) {
+          violations.push(
+            `${relative(repositoryRoot, file.path)} imports ${imp.specifier} (${imp.kind}) [rule: facade-core-no-standard-tool-list]`,
+          );
+        }
+      }
+    }
+    expect(violations).toEqual([]);
   });
 
   test('kernel strict self-containment rejects alias, dynamic import, require, and package-root imports', () => {

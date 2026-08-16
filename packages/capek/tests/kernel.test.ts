@@ -3027,3 +3027,80 @@ describe('exit gate: synthetic composition of current services', () => {
     await processScope.dispose();
   });
 });
+
+describe('child unregistration on disposal', () => {
+  test('disposing one child removes only that child and keeps active siblings', async () => {
+    const log: string[] = [];
+    const processScope = await createProcessScope([
+      valueProvider('process.p', valueService, 'p', log),
+    ]);
+    const agentA = await createAgentScope(processScope, [
+      valueProvider('agent.a', agentService, 'a', log),
+    ]);
+    const agentB = await createAgentScope(processScope, [
+      valueProvider('agent.b', agentService, 'b', log),
+    ]);
+
+    expect(processScope.childCount).toBe(2);
+    await agentA.dispose();
+    expect(processScope.childCount).toBe(1);
+
+    // The surviving sibling remains functional and is the only child left.
+    expect(agentB.require(agentService).label).toBe('b');
+    await agentB.dispose();
+    expect(processScope.childCount).toBe(0);
+    await processScope.dispose();
+
+    expect(log.filter((entry) => entry.startsWith('dispose:'))).toEqual([
+      'dispose:agent.a',
+      'dispose:agent.b',
+      'dispose:process.p',
+    ]);
+  });
+
+  test('parent disposal disposes only remaining children in reverse creation order', async () => {
+    const log: string[] = [];
+    const processScope = await createProcessScope([
+      valueProvider('process.p', valueService, 'p', log),
+    ]);
+    const agentA = await createAgentScope(processScope, [
+      valueProvider('agent.a', agentService, 'a', log),
+    ]);
+    const agentB = await createAgentScope(processScope, [
+      valueProvider('agent.b', agentService, 'b', log),
+    ]);
+
+    await agentA.dispose();
+    await processScope.dispose();
+
+    expect(processScope.childCount).toBe(0);
+    expect(agentB.snapshot().status).toBe('disposed');
+    expect(log.filter((entry) => entry.startsWith('dispose:'))).toEqual([
+      'dispose:agent.a',
+      'dispose:agent.b',
+      'dispose:process.p',
+    ]);
+  });
+
+  test('concurrent child and parent disposal settles safely with exactly one disposal each', async () => {
+    const log: string[] = [];
+    const processScope = await createProcessScope([
+      valueProvider('process.p', valueService, 'p', log),
+    ]);
+    const agentScope = await createAgentScope(processScope, [
+      valueProvider('agent.c', agentService, 'c', log),
+    ]);
+
+    const results = await Promise.allSettled([
+      processScope.dispose(),
+      agentScope.dispose(),
+      agentScope.dispose(),
+    ]);
+
+    expect(results.map((result) => result.status)).toEqual(['fulfilled', 'fulfilled', 'fulfilled']);
+    expect(processScope.childCount).toBe(0);
+    expect(agentScope.snapshot().status).toBe('disposed');
+    expect(log.filter((entry) => entry === 'dispose:agent.c')).toHaveLength(1);
+    expect(log.filter((entry) => entry === 'dispose:process.p')).toHaveLength(1);
+  });
+});

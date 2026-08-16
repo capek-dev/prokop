@@ -84,17 +84,23 @@ export type ContextPhase =
   | 'capabilities'
   | 'task';
 
-export interface ContextBuildContext {
+/** The build-time context handed to a section provider. `data` carries the
+ * opaque assembly options the caller passed to `buildContext(data?)`; the
+ * kernel validates only that it is an object when present and never reads
+ * its fields, so it stays dependency-free. Product layers type the data
+ * through the `TData` parameter and validate the concrete shape. */
+export interface ContextBuildContext<TData = unknown> {
   readonly kind: RuntimeScope;
+  readonly data?: TData;
 }
 
 /** A context section contribution. Null omits the section without changing
  * the ordering of the others. */
-export interface ContextSectionContribution {
+export interface ContextSectionContribution<TData = unknown> {
   readonly id: string;
   readonly phase: ContextPhase;
   readonly order: number;
-  provide(context: ContextBuildContext): string | null | Promise<string | null>;
+  provide(context: ContextBuildContext<TData>): string | null | Promise<string | null>;
 }
 
 export type RunTerminalOutcome = 'completed' | 'failed' | 'cancelled';
@@ -271,6 +277,17 @@ export interface PluginContext {
   optional<T>(key: ServiceKey<T>): T | undefined;
   contributeTool(contribution: ToolContribution): Disposable;
   contributeContext(contribution: ContextSectionContribution): Disposable;
+  /** The effective tool contributions of the current scope chain in
+   * deterministic order, including contributions registered earlier in
+   * setup. Narrow like buildContext: plugins never receive the scope
+   * handle just to inspect tools. */
+  listTools(): readonly EffectiveTool[];
+  /** Assembles the effective context sections of the current scope chain in
+   * deterministic order, including sections registered earlier in setup.
+   * Narrow by design: plugins never receive the scope handle just to build
+   * context. The optional `data` is passed through to section providers as
+   * `ContextBuildContext.data` after the kernel validates it is an object. */
+  buildContext<TData = unknown>(data?: TData): Promise<readonly ProvidedContextSection[]>;
   contributeListener(contribution: EventListenerContribution): Disposable;
   contributeCapabilityGuard(contribution: CapabilityGuardContribution): Disposable;
   contributeProjection(contribution: ProjectionContribution): Disposable;
@@ -305,6 +322,9 @@ export interface ScopeHandle {
   readonly kind: RuntimeScope;
   readonly scopeId: string;
   readonly parent: ScopeHandle | null;
+  /** Live child scopes. A disposed child unregisters from its parent, so
+   * this never retains closed scopes. */
+  readonly childCount: number;
   require<T>(key: ServiceKey<T>): T;
   optional<T>(key: ServiceKey<T>): T | undefined;
   snapshot(): ScopeDiagnosticsSnapshot;
@@ -312,7 +332,11 @@ export interface ScopeHandle {
   listContextSections(): readonly EffectiveContextSection[];
   listCapabilityGuards(): readonly CapabilityGuardDiagnostic[];
   listProjections(): readonly ProjectionDiagnostic[];
-  buildContext(): Promise<readonly ProvidedContextSection[]>;
+  /** Assembles effective context sections in deterministic order. Null
+   * sections are omitted without shifting the others. The optional `data`
+   * must be an object when present and is passed through to every section
+   * provider as `ContextBuildContext.data`. */
+  buildContext<TData = unknown>(data?: TData): Promise<readonly ProvidedContextSection[]>;
   dispose(): Promise<void>;
 }
 

@@ -7,7 +7,7 @@ import {
   configureInstructionSource,
   configurePreconfigSource,
 } from '../src/compat/jean2';
-import { buildSystemMessage } from '../src/core/stream/system-message';
+import { buildSystemMessage } from '../src/plugins/legacy-system-message';
 import { configureStorage, createInMemoryStorageBundle } from '../src/storage';
 
 const preconfig = {

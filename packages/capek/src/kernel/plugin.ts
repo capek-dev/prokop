@@ -17,9 +17,11 @@ import type {
   CompositionDiagnostics,
   ContextSectionContribution,
   Disposable,
+  EffectiveTool,
   EventListenerContribution,
   PluginContext,
   ProjectionContribution,
+  ProvidedContextSection,
   RuntimeScope,
   ScopeDiagnosticsSnapshot,
   ServiceKey,
@@ -46,6 +48,8 @@ export interface PluginContextHost {
   registerProjection(pluginId: string, contribution: ProjectionContribution): Disposable;
   registerBarrier(pluginId: string, barrier: CleanupBarrier): Disposable;
   resolveService<T>(key: ServiceKey<T>): T | undefined;
+  listTools(): readonly EffectiveTool[];
+  buildContext<TData = unknown>(data?: TData): Promise<readonly ProvidedContextSection[]>;
   snapshot(): ScopeDiagnosticsSnapshot;
 }
 
@@ -145,6 +149,14 @@ export class PluginContextImpl implements PluginContext {
     const registration = this.host.registerContextSection(this.plugin.id, contribution);
     this.disposers.push(registration);
     return registration;
+  }
+
+  listTools(): readonly EffectiveTool[] {
+    return this.host.listTools();
+  }
+
+  buildContext<TData = unknown>(data?: TData): Promise<readonly ProvidedContextSection[]> {
+    return this.host.buildContext(data);
   }
 
   contributeListener(contribution: EventListenerContribution): Disposable {

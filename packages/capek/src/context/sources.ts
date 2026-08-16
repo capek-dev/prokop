@@ -26,7 +26,7 @@ export interface InstructionSource {
   getGlobalPath(): string | undefined;
 }
 
-interface ContextSources {
+export interface ContextSources {
   preconfigs: PreconfigSource;
   agents: AgentSource;
   instructions: InstructionSource;
@@ -53,6 +53,10 @@ const scopedSources = new AsyncLocalStorage<ContextSources>();
 
 function activeSources(): ContextSources {
   return scopedSources.getStore() ?? { preconfigs, agents, instructions };
+}
+
+export function getContextSources(): ContextSources {
+  return activeSources();
 }
 
 export function withContextSources<T>(
