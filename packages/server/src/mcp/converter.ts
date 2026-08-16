@@ -1,4 +1,4 @@
-import { dynamicTool, jsonSchema, type Tool, type JSONSchema7 } from 'ai';
+import { createCapabilityTool, type CapabilityTool } from '@capekai/core/compat/jean2';
 import { CallToolResultSchema, type Tool as MCPToolDef } from '@modelcontextprotocol/sdk/types.js';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
@@ -20,18 +20,18 @@ export async function convertMcpTool(
   serverName: string,
   timeout: number,
   _sessionId: string,
-): Promise<Tool> {
+): Promise<CapabilityTool> {
   const inputSchema = mcpTool.inputSchema;
-  const schema: JSONSchema7 = {
-    ...(inputSchema as JSONSchema7),
+  const schema: Record<string, unknown> = {
+    ...inputSchema,
     type: 'object',
-    properties: (inputSchema.properties ?? {}) as JSONSchema7['properties'],
+    properties: inputSchema.properties ?? {},
     additionalProperties: false,
   };
 
-  return dynamicTool({
+  return createCapabilityTool({
     description: mcpTool.description ?? `MCP tool from ${serverName}`,
-    inputSchema: jsonSchema(schema),
+    inputSchema: schema,
     execute: async (args: unknown) => {
       const result = await client.callTool(
         {

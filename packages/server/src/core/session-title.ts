@@ -1,7 +1,6 @@
-import { streamText } from 'ai';
 import type { MessageWithParts } from '@jean2/sdk';
+import { runTextModel } from '@capekai/core/compat/jean2';
 import { getModelsConfig, findModel } from '@/config';
-import { getModelWithMetadata } from '@capekai/core/compat/jean2';
 
 const DEFAULT_SESSION_TITLES = new Set(['new session', 'new']);
 const MAX_CONTEXT_CHARS = 12000;
@@ -74,22 +73,14 @@ export async function generateSessionTitle(messages: MessageWithParts[]): Promis
 
   const config = getModelsConfig();
   const providerId = config.defaultProvider || findModel(config.defaultModel)?.providerId;
-  const { model, omitMaxOutputTokens, providerOptions, useProviderInstructions } = await getModelWithMetadata({
+  const text = await runTextModel({
     modelId: config.defaultModel,
     providerId,
     systemPrompt: TITLE_SYSTEM_PROMPT,
-  });
-
-  const stream = streamText({
-    model,
-    system: useProviderInstructions ? undefined : TITLE_SYSTEM_PROMPT,
     prompt: `Generate a title for this conversation:\n\n<chat>\n${conversation}\n</chat>`,
-    ...(omitMaxOutputTokens ? {} : { maxOutputTokens: 20000 }),
+    maxOutputTokens: 20000,
     temperature: 0.5,
-    providerOptions: providerOptions as Parameters<typeof streamText>[0]['providerOptions'],
   });
-
-  const text = await stream.text;
   const title = normalizeTitle(text);
   if (title) return title;
 

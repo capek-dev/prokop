@@ -2,9 +2,13 @@
  * Codex (ChatGPT) OAuth provider.
  * Uses the generalized OAuth manager for PKCE + authorization code flow.
  */
-import type { LanguageModel } from 'ai';
 import type { CodexProviderConfig, ProviderStatus } from '@jean2/sdk';
-import { registerProvider, type ConnectableProvider, type TokenResponse } from '@capekai/core/compat/jean2';
+import {
+  createOpenAiResponsesModel,
+  registerProvider,
+  type ConnectableProvider,
+  type TokenResponse,
+} from '@capekai/core/compat/jean2';
 import { loadProviderConfig, saveProviderConfig, deleteProviderConfig } from './storage';
 import {
   registerOAuthConfig,
@@ -164,23 +168,13 @@ const codexProvider: ConnectableProvider = {
       throw new Error('Codex not connected. Please connect your ChatGPT subscription in Settings.');
     }
     const codexFetch = await createCodexFetch(config);
-    const { createOpenAI } = await import('@ai-sdk/openai');
-    const openai = createOpenAI({
+    return createOpenAiResponsesModel({
+      modelId: options.modelId,
       apiKey: OAUTH_DUMMY_KEY,
       fetch: codexFetch,
+      systemPrompt: options.systemPrompt,
+      sessionId: options.sessionId,
     });
-    return {
-      model: openai.responses(options.modelId) as unknown as LanguageModel,
-      useProviderInstructions: true,
-      omitMaxOutputTokens: true,
-      providerOptions: {
-        openai: {
-          instructions: options.systemPrompt || 'You are a helpful assistant.',
-          promptCacheKey: options.sessionId,
-          store: false,
-        },
-      },
-    };
   },
 };
 

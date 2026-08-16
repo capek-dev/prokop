@@ -45,6 +45,8 @@ const compatBarrelExceptions: Record<string, string[]> = {
   'packages/server/src/configuration/tool-env.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/core/session-title.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/index.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/mcp/converter.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/mcp/manager.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/providers/codex.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/providers/gmail.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/providers/oauth-manager.ts': ['@capekai/core/compat/jean2'],
@@ -242,7 +244,7 @@ const globalBaselineRules: DependencyRule[] = [
   },
   {
     name: 'no-direct-ai-sdk',
-    rationale: 'Model invocation belongs to Capek. Server AI SDK imports are temporary exceptions; new imports fail.',
+    rationale: 'Model construction and invocation belong to Capek. Server AI SDK imports are forbidden.',
     appliesTo: [serverSourceRoot],
     forbiddenSpecifiers: [
       { exact: 'ai' },

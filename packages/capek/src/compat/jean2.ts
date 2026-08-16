@@ -89,6 +89,7 @@ export * from '../core/step-handlers';
 export * from '../core/message-utils';
 export * from '../core/part-utils';
 export * from '../core/model-utils';
+export * from '../adapters/ai-sdk';
 export * from '../core/provider-utils';
 export * from '../core/error-handling';
 export * from '../core/structured-output';
