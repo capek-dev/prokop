@@ -29,6 +29,8 @@ export {
   createJean2McpLifecyclePort,
   createJean2McpWorkspacePort,
 } from './mcp';
+export { createJean2FilesApplicationPort } from './files';
+export { createJean2TerminalSessionPort } from './terminal';
 export { createJean2OAuthFlowPort } from './oauth';
 export { createJean2ProviderCredentialPort } from './provider-credentials';
 export { getJean2NotificationsApplication } from './notifications';

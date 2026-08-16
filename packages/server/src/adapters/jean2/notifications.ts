@@ -2,29 +2,13 @@ import { getPermissionTimeoutMs } from '@/env';
 import { getSession } from '@/store/sessions';
 import { getScheduledJob } from '@/store/scheduled-jobs';
 import { getPermissionRequestByRequestId } from '@/store/pending-asks';
-import {
-  deletePushSubscription,
-  deleteAllOldDeliveries,
-  deleteOldDeliveries,
-  deleteStaleSubscription,
-  getDeliveriesDueForRetry,
-  getPushSubscriptionForDispatch,
-  listEnabledSubscriptionsForEvent,
-  markDeliveryDelivered,
-  markDeliveryExhausted,
-  markDeliveryFailed,
-  markDeliveryRetryable,
-  reserveDelivery,
-  updatePushSubscriptionPreferences,
-  upsertPushSubscription,
-} from '@/store/web-push';
-import { getVapidCredentials, isWebPushAvailable, sendWebPush } from '@/services/web-push/credentials';
+import { createNotificationRepository } from '@/infrastructure/sqlite/notification-repository';
+import { createWebPushSender } from '@/infrastructure/web-push/sender';
 import { canNotifyForSession as scheduledSessionCanNotify } from '@/domains/scheduling/notifications';
 import {
   createNotificationsApplication,
   type NotificationsApplication,
 } from '@/application/notifications';
-import type { NotificationSenderPort, NotificationStorePort } from '@/application/ports/notifications';
 
 /**
  * Jean2 notification adapter (S4/S5). Wires the notification application to
@@ -42,34 +26,8 @@ export function getJean2NotificationsApplication(): NotificationsApplication {
     return singleton;
   }
 
-  const store: NotificationStorePort = {
-    upsertSubscription: upsertPushSubscription,
-    updatePreferences: updatePushSubscriptionPreferences,
-    deleteSubscription: deletePushSubscription,
-    listEnabledForEvent: listEnabledSubscriptionsForEvent,
-    getForDispatch: getPushSubscriptionForDispatch,
-    reserveDelivery,
-    markDelivered: markDeliveryDelivered,
-    markFailed: markDeliveryFailed,
-    markRetryable: markDeliveryRetryable,
-    markExhausted: markDeliveryExhausted,
-    deleteStaleSubscription,
-    getDueForRetry: getDeliveriesDueForRetry,
-    deleteOldDeliveries,
-    deleteAllOldDeliveries,
-  };
-
-  const sender: NotificationSenderPort = {
-    send: sendWebPush,
-    config() {
-      const available = isWebPushAvailable();
-      const creds = available ? getVapidCredentials() : null;
-      return {
-        available,
-        vapidPublicKey: creds?.publicKey ?? '',
-      };
-    },
-  };
+  const store = createNotificationRepository();
+  const sender = createWebPushSender();
 
   singleton = createNotificationsApplication({
     store,

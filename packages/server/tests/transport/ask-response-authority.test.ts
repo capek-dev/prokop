@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, test } from 'bun:test';
 import type { AskAuthority, AskResponse, ServerMessage } from '@jean2/sdk';
 import type { ClientMessage } from '@jean2/sdk';
 import { handleClientMessage } from '@/transport/websocket/message-router';
+import { installWireApplication } from '@/transport/websocket/application';
 import {
   handleClientRegistration,
   registerConnection,
@@ -17,7 +18,15 @@ import type { ClientEntry, RouterContext } from '@/transport/websocket/router-co
 // capability-router eligibility policy. Only the Capek pending-ask lookup and
 // resolution entrypoint is simulated, so designated and first-eligible
 // authorities (which current ask producers do not emit) are reachable.
+//
+// bun's mock.module is process-wide and never restored between test files, so
+// every override here is TRANSPARENT: it only wins for toolCallIds this file
+// explicitly seeds in askState (cleared in afterEach); everything else
+// delegates to the real barrel. The real-machinery suites sharing this
+// process (ask-response-endtoend.test.ts) therefore keep the real runtime.
 // ---------------------------------------------------------------------------
+
+const realBarrel = await import('@capekai/core/compat/jean2');
 
 const askState = {
   sessionByTool: new Map<string, string>(),
@@ -25,37 +34,34 @@ const askState = {
   resolveCalls: [] as Array<{ toolCallId: string; response: unknown; requestId?: string }>,
 };
 
-const ackState = {
-  calls: [] as Array<{ eventId: string; sessionId: string; clientId: string }>,
-};
-
 mock.module('@capekai/core/compat/jean2', () => ({
-  ASK_TIMEOUT: 300_000,
+  ...realBarrel,
   resolveAsk: (toolCallId: string, response: unknown, requestId?: string) => {
     askState.resolveCalls.push({ toolCallId, response, requestId });
-    return false;
+    const seeded = askState.sessionByTool.has(toolCallId);
+    const resolved = seeded
+      ? false
+      : realBarrel.resolveAsk(toolCallId, response, requestId);
+    return resolved;
   },
-  getSessionIdForPendingAsk: (toolCallId: string) => askState.sessionByTool.get(toolCallId) ?? null,
-  getAuthorityForPendingAsk: (toolCallId: string) => askState.authorityByTool.get(toolCallId),
-  sandboxController: { respond: () => {} },
-  interruptManager: {
-    isSessionActive: () => false,
-    interruptSession: async () => ({ success: true, interruptedTools: [] }),
-  },
-  handleChat: async () => {},
-  handleSessionEditMessage: async () => {},
-  regenerateSessionTitle: async () => {},
-  connectProvider: async () => ({}),
-  disconnectProvider: async () => {},
-  getProviderStatus: async () => ({ connected: false }),
+  getSessionIdForPendingAsk: (toolCallId: string, requestId?: string) =>
+    askState.sessionByTool.get(toolCallId)
+      ?? realBarrel.getSessionIdForPendingAsk(toolCallId, requestId),
+  getAuthorityForPendingAsk: (toolCallId: string) =>
+    askState.authorityByTool.get(toolCallId)
+      ?? realBarrel.getAuthorityForPendingAsk(toolCallId),
 }));
 
-mock.module('@/services/web-push/dispatch', () => ({
-  acknowledgePendingNotification: (eventId: string, sessionId: string, clientId: string) => {
-    ackState.calls.push({ eventId, sessionId, clientId });
-    return true;
-  },
-}));
+// handleNotificationAcknowledge delegates to the wired notifications
+// application (S3). Acknowledge delegation is covered by
+// notification-ack-handler.test.ts; here a neutral application keeps the
+// handler from throwing when no suite has installed one yet.
+installWireApplication({
+  session: {} as never,
+  control: {} as never,
+  providers: {} as never,
+  notifications: { acknowledgePendingNotification: () => false } as never,
+});
 
 const sockets: unknown[] = [];
 
@@ -85,7 +91,6 @@ afterEach(() => {
   askState.sessionByTool.clear();
   askState.authorityByTool.clear();
   askState.resolveCalls.length = 0;
-  ackState.calls.length = 0;
 });
 
 function registerClient(clientId: string, capabilities: string[] = []): ConnectionId {
@@ -296,6 +301,19 @@ describe('transport ask.response authority routing', () => {
   });
 
   test('notification acknowledgement resolves the client id from the opaque connection id', async () => {
+    const acks: Array<{ eventId: string; sessionId: string; clientId: string }> = [];
+    installWireApplication({
+      session: {} as never,
+      control: {} as never,
+      providers: {} as never,
+      notifications: {
+        acknowledgePendingNotification: (eventId: string, sessionId: string, clientId: string) => {
+          acks.push({ eventId, sessionId, clientId });
+          return true;
+        },
+      } as never,
+    });
+
     const clientAId = registerClient('client-a');
     const unregisteredId = registerUnregisteredConnection();
     const { ctx, sent } = makeContext();
@@ -305,7 +323,7 @@ describe('transport ask.response authority routing', () => {
       eventId: 'evt-1',
       sessionId: 'session-1',
     });
-    expect(ackState.calls).toEqual([
+    expect(acks).toEqual([
       { eventId: 'evt-1', sessionId: 'session-1', clientId: 'client-a' },
     ]);
 
@@ -314,7 +332,7 @@ describe('transport ask.response authority routing', () => {
       eventId: 'evt-2',
       sessionId: 'session-1',
     });
-    expect(ackState.calls).toHaveLength(1);
+    expect(acks).toHaveLength(1);
     expect(sent).toEqual([]);
   });
 });

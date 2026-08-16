@@ -45,6 +45,10 @@ import {
 } from '@/services/client-launcher';
 import { startScheduler, stopScheduler, installSchedulerRuntime } from '@/scheduler';
 import { startPushRetryScheduler, stopPushRetryScheduler, cleanupPushData } from '@/services/web-push/retry-scheduler';
+import {
+  startProviderAccountLifecycle,
+  stopProviderAccountLifecycle,
+} from '@/providers';
 
 export interface ServerOptions {
   port?: number;
@@ -160,6 +164,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   // Start the scheduler tick loop (catches jobs that became due while offline)
   startScheduler();
   startPushRetryScheduler();
+  startProviderAccountLifecycle();
 
   let clientLauncher: ClientLauncher | undefined;
 
@@ -197,6 +202,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     transport.stopTimers();
     stopScheduler();
     stopPushRetryScheduler();
+    stopProviderAccountLifecycle();
     clientLauncher?.stop();
     server.stop();
     getTerminalManager().destroyAllSessions();

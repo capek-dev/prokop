@@ -1,20 +1,43 @@
+/**
+ * Files route (S5 filesystem isolation). Invokes only the files application
+ * use cases plus presentation validation and HTTP errors. No store,
+ * service, or path-utils imports remain; the route's legacy exceptions are
+ * retired with AST gates.
+ */
+
 import type { Hono } from 'hono';
 import { accessSync, constants } from 'fs';
-import { join, dirname, resolve, isAbsolute, relative, sep } from 'path';
+import { dirname, isAbsolute, join, resolve } from 'path';
 import { homedir } from 'os';
-import { getWorkspace } from '@/store';
-import { listDirectory, searchFiles, isPathWithinWorkspace } from '@/services/files';
-import { getFilePreview } from '@/services/filePreview';
-import { getGitStatus, attachGitStatusToEntries, getGitFileDiff } from '@/services/gitStatus';
-import { readEditableFile, saveFile } from '@/services/fileMutations';
+import type { FilesApplication } from '@/application/files';
 import { validate } from './validate';
 import { saveFileSchema } from './schemas';
 import type { SaveFileRequest } from '@jean2/sdk';
 
-import { NotFoundError, BadRequestError, ForbiddenError } from '@/utils/http-errors';
-import { expandPath, resolveRoot } from '@/utils/paths';
+import { BadRequestError, ForbiddenError, HttpError, NotFoundError } from '@/utils/http-errors';
 
-export function registerFileRoutes(app: Hono): void {
+/** Maps the application/infrastructure plain errors and passes everything
+ * else through, preserving the exact pre-slice status codes and messages.
+ * Known sentinel messages keep their mappings; unknown errors propagate to
+ * the Hono 500 path instead of being converted to a not-found. */
+function mapApplicationError(err: unknown): never {
+  if (err instanceof HttpError) {
+    throw err;
+  }
+  const message = err instanceof Error ? err.message : 'Unknown error';
+  if (message === 'Workspace not found' || message === 'Path not found') {
+    throw new NotFoundError(message);
+  }
+  if (message === 'Cannot preview a directory') {
+    throw new BadRequestError(message);
+  }
+  if (message === 'Path outside workspace') {
+    throw new ForbiddenError(message);
+  }
+  throw err;
+}
+
+export function registerFileRoutes(app: Hono, files: FilesApplication): void {
   app.get('/api/workspaces/:id/files', async (c) => {
     const workspaceId = c.req.param('id');
     const path = c.req.query('path') || '';
@@ -23,49 +46,23 @@ export function registerFileRoutes(app: Hono): void {
     const showHidden = c.req.query('showHidden') !== 'false';
     const rootQuery = c.req.query('root');
 
-    const workspace = getWorkspace(workspaceId);
-    if (!workspace) {
-      throw new NotFoundError('Workspace not found');
-    }
-
-    const { root, isMain } = resolveRoot(workspace, rootQuery);
-
     try {
-      if (search) {
-        const files = await searchFiles(root, search, limit, showHidden, c.req.raw.signal);
-        if (c.req.raw.signal.aborted) return new Response(null, { status: 499 });
-        return c.json({ files, currentPath: '', mode: 'search', root, isMain });
-      }
-
-      const fullPath = join(root, path);
-
-      if (!isPathWithinWorkspace(fullPath, workspace.path, workspace.additionalPaths)) {
-        throw new ForbiddenError('Path outside workspace');
-      }
-
-      const files = await listDirectory(fullPath, showHidden);
-
-      let gitStatus;
-      try {
-        gitStatus = await getGitStatus(root);
-      } catch {
-        gitStatus = null;
-      }
-
-      const filesWithGit = gitStatus
-        ? attachGitStatusToEntries(files, fullPath, gitStatus)
-        : files;
-
-      return c.json({
-        files: filesWithGit,
-        currentPath: path,
-        mode: 'browse',
-        root,
-        isMain,
-        git: gitStatus?.availability,
+      const result = await files.list(workspaceId, {
+        path,
+        search,
+        limit,
+        showHidden,
+        root: rootQuery,
+        signal: c.req.raw.signal,
       });
-    } catch (_err: unknown) {
-      throw new NotFoundError('Path not found');
+
+      if (search && c.req.raw.signal.aborted) {
+        return new Response(null, { status: 499 });
+      }
+
+      return c.json(result);
+    } catch (err) {
+      mapApplicationError(err);
     }
   });
 
@@ -73,46 +70,11 @@ export function registerFileRoutes(app: Hono): void {
     const workspaceId = c.req.param('id');
     const rootQuery = c.req.query('root');
 
-    const workspace = getWorkspace(workspaceId);
-    if (!workspace) {
-      throw new NotFoundError('Workspace not found');
-    }
-
-    const { root } = resolveRoot(workspace, rootQuery);
-
     try {
-      const gitStatus = await getGitStatus(root);
-      const resolvedRoot = resolve(root);
-      const gitRoot = gitStatus.availability.root;
-
-      const files = Array.from(gitStatus.files.entries())
-        .filter(([, summary]) => summary.status !== 'ignored')
-        .flatMap(([filePath, summary]) => {
-          // Convert repo-relative path to selected-root-relative path.
-          let rootRelative: string | null = filePath;
-          if (gitRoot) {
-            const abs = resolve(gitRoot, filePath.split('/').join(sep));
-            const rel = relative(resolvedRoot, abs);
-            // Skip files outside the selected root.
-            if (rel.startsWith('..') || isAbsolute(rel)) rootRelative = null;
-            else rootRelative = rel.split(sep).join('/');
-          }
-          if (rootRelative === null) return [];
-          return [{ path: rootRelative, git: summary }];
-        })
-        .sort((a, b) => a.path.localeCompare(b.path));
-
-      return c.json({
-        availability: gitStatus.availability,
-        files,
-        root,
-      });
-    } catch (_err: unknown) {
-      return c.json({
-        availability: { available: false, reason: 'git_error' as const },
-        files: [],
-        root,
-      });
+      const status = await files.gitStatus(workspaceId, rootQuery);
+      return c.json(status);
+    } catch (err) {
+      mapApplicationError(err);
     }
   });
 
@@ -125,25 +87,11 @@ export function registerFileRoutes(app: Hono): void {
       throw new BadRequestError('Path query parameter is required');
     }
 
-    const workspace = getWorkspace(workspaceId);
-    if (!workspace) {
-      throw new NotFoundError('Workspace not found');
-    }
-
-    const { root } = resolveRoot(workspace, rootQuery);
-
     try {
-      const preview = await getFilePreview(root, path, workspace.additionalPaths);
+      const preview = await files.previewFile(workspaceId, path, rootQuery);
       return c.json(preview);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      if (message === 'Cannot preview a directory') {
-        throw new BadRequestError(message);
-      }
-      if (message === 'Path outside workspace') {
-        throw new ForbiddenError(message);
-      }
-      throw new NotFoundError(message);
+      mapApplicationError(err);
     }
   });
 
@@ -156,13 +104,12 @@ export function registerFileRoutes(app: Hono): void {
       throw new BadRequestError('Path query parameter is required');
     }
 
-    const workspace = getWorkspace(workspaceId);
-    if (!workspace) {
-      throw new NotFoundError('Workspace not found');
+    try {
+      const file = await files.readEditableFile(workspaceId, path, rootQuery);
+      return c.json(file);
+    } catch (err) {
+      mapApplicationError(err);
     }
-
-    const file = await readEditableFile(workspace, path, rootQuery);
-    return c.json(file);
   });
 
   app.put(
@@ -172,13 +119,12 @@ export function registerFileRoutes(app: Hono): void {
       const workspaceId = c.req.param('id');
       const body = c.req.valid('json') as SaveFileRequest;
 
-      const workspace = getWorkspace(workspaceId);
-      if (!workspace) {
-        throw new NotFoundError('Workspace not found');
+      try {
+        const result = await files.saveFile(workspaceId, body);
+        return c.json(result);
+      } catch (err) {
+        mapApplicationError(err);
       }
-
-      const result = await saveFile(workspace, body);
-      return c.json(result);
     },
   );
 
@@ -191,29 +137,30 @@ export function registerFileRoutes(app: Hono): void {
       throw new BadRequestError('Path query parameter is required');
     }
 
-    const workspace = getWorkspace(workspaceId);
-    if (!workspace) {
-      throw new NotFoundError('Workspace not found');
+    try {
+      const diff = await files.gitDiff(workspaceId, path, rootQuery);
+      return c.json(diff);
+    } catch (err) {
+      mapApplicationError(err);
     }
-
-    const { root } = resolveRoot(workspace, rootQuery);
-    const diff = await getGitFileDiff(root, path, workspace.additionalPaths);
-    return c.json(diff);
   });
 
   app.get('/api/fs/browse', async (c) => {
     // When no path is provided (or it's empty), default to home directory.
     const path = c.req.query('path') || homedir();
-    // Expand ~ to homedir, and resolve to absolute. Relative paths are
-    // anchored to homedir (not process.cwd()) so browse/parent navigation
-    // stays consistent with the default regardless of dev vs production.
-    const expanded = path.startsWith('~') ? expandPath(path) : path;
+    // Expand ~ through the C6 workspace path policy and resolve to absolute.
+    // Relative paths and `~user`-style inputs anchor exactly like the
+    // pre-slice browse helper (relative joins homedir, `~user` resolves
+    // against the process cwd).
+    const expanded = path.startsWith('~')
+      ? files.expandPathFor(path)
+      : path;
     const resolvedPath = resolve(isAbsolute(expanded) ? expanded : join(homedir(), expanded));
     const isRoot = resolvedPath === dirname(resolvedPath);
 
     try {
-      const files = await listDirectory(resolvedPath);
-      return c.json({ files, currentPath: resolvedPath, mode: 'browse', isRoot });
+      const listed = await files.listDirectoryOnly(resolvedPath);
+      return c.json({ files: listed, currentPath: resolvedPath, mode: 'browse', isRoot });
     } catch (_err: unknown) {
       return c.json({ error: 'Bad Request', message: 'Cannot access path' }, 400);
     }
@@ -229,8 +176,8 @@ export function registerFileRoutes(app: Hono): void {
     const isRoot = resolvedPath === parent;
 
     try {
-      const files = await listDirectory(parent);
-      return c.json({ files, currentPath: resolve(parent), mode: 'browse', isRoot });
+      const listed = await files.listDirectoryOnly(parent);
+      return c.json({ files: listed, currentPath: resolve(parent), mode: 'browse', isRoot });
     } catch (_err: unknown) {
       return c.json({ error: 'Bad Request', message: 'Cannot access path' }, 400);
     }

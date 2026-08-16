@@ -115,4 +115,7 @@ export interface WorkspaceDirectoryPort {
 
 export interface WorkspacePathConfigPort {
   workspacesDir(): string;
+  /** Expands `~` and resolves the input path (Capek workspace policy via
+   * the path policy adapter; C6 step 4). */
+  expandPath(path: string): string;
 }

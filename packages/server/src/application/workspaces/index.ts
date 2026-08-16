@@ -17,7 +17,6 @@ import type {
   WorkspaceTerminalSession,
 } from '../ports/workspace';
 import {
-  expandPath,
   workspaceNameOrDefault,
 } from '@/domains/workspaces';
 
@@ -178,7 +177,7 @@ export function createWorkspaceApplication(deps: WorkspaceApplicationDeps): Work
 
       // Create directory if it doesn't exist
       try {
-        const expandedPath = expandPath(path);
+        const expandedPath = deps.paths.expandPath(path);
         deps.directory.mkdir(expandedPath);
         path = expandedPath;
       } catch (err) {
@@ -190,7 +189,7 @@ export function createWorkspaceApplication(deps: WorkspaceApplicationDeps): Work
       const validatedPaths: string[] = [];
       if (Array.isArray(input.additionalPaths)) {
         for (const p of input.additionalPaths) {
-          const expanded = expandPath(p);
+          const expanded = deps.paths.expandPath(p);
           if (deps.directory.exists(expanded)) {
             validatedPaths.push(expanded);
           }
@@ -217,7 +216,7 @@ export function createWorkspaceApplication(deps: WorkspaceApplicationDeps): Work
       let validatedPaths: string[] | undefined;
       if (Array.isArray(updates.additionalPaths)) {
         validatedPaths = updates.additionalPaths
-          .map((p: string) => expandPath(p))
+          .map((p: string) => deps.paths.expandPath(p))
           .filter((p: string) => deps.directory.exists(p));
       }
 

@@ -115,7 +115,7 @@ export function createApp(application?: WiredApplication) {
 
   registerSessionRoutes(app, wired.http);
   registerWorkspaceRoutes(app, wired.workspaces);
-  registerFileRoutes(app);
+  registerFileRoutes(app, wired.files);
   registerToolRoutes(app, wired.tools);
   registerMcpRoutes(app, wired.mcp);
   registerConfigRoutes(app, wired.providers);

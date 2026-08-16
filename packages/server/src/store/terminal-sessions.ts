@@ -1,111 +1,58 @@
+/**
+ * Terminal session store compat forwarder (S5 PTY/terminal persistence
+ * isolation). Keeps every pre-slice export identity; SQL and row mapping
+ * now live in `infrastructure/sqlite/terminal-session-repository.ts`. The
+ * startup and stale cleanup behavior is exactly the pre-slice one, delegated
+ * through the repository over the current store database accessor.
+ */
+
 import { getDatabase } from './index';
+import { createTerminalSessionRepository } from '@/infrastructure/sqlite/terminal-session-repository';
+import type {
+  CreateTerminalSessionInput,
+  TerminalSessionRow,
+} from '@/application/ports/terminal';
 
-export interface TerminalSessionRow {
-  id: string;
-  workspace_id: string;
-  cwd: string;
-  shell: string;
-  title: string;
-  status: 'running' | 'exited' | 'destroyed';
-  exit_code: number | null;
-  pid: number | null;
-  cols: number;
-  rows: number;
-  created_at: number;
-  last_activity_at: number;
-  destroyed_at: number | null;
-}
+export type { CreateTerminalSessionInput, TerminalSessionRow };
 
-export function createTerminalSession(session: {
-  id: string;
-  workspaceId: string;
-  cwd: string;
-  shell: string;
-  pid: number;
-  cols: number;
-  rows: number;
-}): void {
-  const now = Date.now();
-  getDatabase().run(
-    `INSERT INTO terminal_sessions (id, workspace_id, cwd, shell, pid, cols, rows, title, status, created_at, last_activity_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'main', 'running', ?, ?)`,
-    [
-      session.id,
-      session.workspaceId,
-      session.cwd,
-      session.shell,
-      session.pid,
-      session.cols,
-      session.rows,
-      now,
-      now,
-    ]
-  );
+const repository = createTerminalSessionRepository(() => getDatabase());
+
+export function createTerminalSession(session: CreateTerminalSessionInput): void {
+  repository.createTerminalSession(session);
 }
 
 export function updateTerminalSessionTitle(id: string, title: string): void {
-  getDatabase().run(
-    `UPDATE terminal_sessions SET title = ? WHERE id = ?`,
-    [title, id]
-  );
+  repository.updateTerminalSessionTitle(id, title);
 }
 
 export function updateTerminalSessionActivity(id: string): void {
-  const now = Date.now();
-  getDatabase().run(
-    `UPDATE terminal_sessions SET last_activity_at = ? WHERE id = ?`,
-    [now, id]
-  );
+  repository.updateTerminalSessionActivity(id);
 }
 
 export function markTerminalSessionExited(id: string, exitCode: number): void {
-  const now = Date.now();
-  getDatabase().run(
-    `UPDATE terminal_sessions SET status = 'exited', exit_code = ?, last_activity_at = ? WHERE id = ?`,
-    [exitCode, now, id]
-  );
+  repository.markTerminalSessionExited(id, exitCode);
 }
 
 export function markTerminalSessionDestroyed(id: string): void {
-  const now = Date.now();
-  getDatabase().run(
-    `UPDATE terminal_sessions SET status = 'destroyed', destroyed_at = ?, last_activity_at = ? WHERE id = ?`,
-    [now, now, id]
-  );
+  repository.markTerminalSessionDestroyed(id);
 }
 
 export function getTerminalSession(id: string): TerminalSessionRow | null {
-  const row = getDatabase().query(
-    `SELECT * FROM terminal_sessions WHERE id = ?`
-  ).get(id) as TerminalSessionRow | undefined;
-  return row ?? null;
+  return repository.getTerminalSession(id);
 }
 
 export function listTerminalSessions(workspaceId: string): TerminalSessionRow[] {
-  return getDatabase().query(
-    `SELECT * FROM terminal_sessions WHERE workspace_id = ? ORDER BY created_at ASC`
-  ).all(workspaceId) as TerminalSessionRow[];
+  return repository.listTerminalSessions(workspaceId);
 }
 
 export function listActiveTerminalSessions(workspaceId: string): TerminalSessionRow[] {
-  return getDatabase().query(
-    `SELECT * FROM terminal_sessions WHERE workspace_id = ? AND status IN ('running', 'exited') ORDER BY created_at ASC`
-  ).all(workspaceId) as TerminalSessionRow[];
+  return repository.listActiveTerminalSessions(workspaceId);
 }
 
 export function cleanupStaleTerminalSessions(): number {
-  const cutoff = Date.now() - 60 * 60 * 1000;
-  const result = getDatabase().run(
-    `DELETE FROM terminal_sessions WHERE status = 'destroyed' AND destroyed_at < ?`,
-    [cutoff]
-  );
-  return result.changes;
+  return repository.cleanupStaleTerminalSessions();
 }
 
 export function cleanupRunningSessionsOnStartup(): number {
-  const result = getDatabase().run(
-    `UPDATE terminal_sessions SET status = 'destroyed', destroyed_at = ? WHERE status = 'running'`,
-    [Date.now()]
-  );
-  return result.changes;
+  return repository.cleanupRunningSessionsOnStartup();
 }
