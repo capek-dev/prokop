@@ -55,7 +55,8 @@
     "#tests/mocks": "./tests/helpers/mocks.ts",
     "#tests/seed": "./tests/helpers/seed.ts",
     "#tests/test-dir": "./tests/helpers/test-dir.ts",
-    "#tests/mock-ws": "./tests/helpers/mock-ws.ts"
+    "#tests/mock-ws": "./tests/helpers/mock-ws.ts",
+    "#tests/wire-application": "./tests/helpers/wire-application.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.3.11",

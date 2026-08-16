@@ -26,6 +26,9 @@ import {
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
 import { resetTestDataDir, setupTestDataDir } from '#tests/test-dir';
+import { installTestWireApplication } from '#tests/wire-application';
+
+installTestWireApplication();
 
 const testPreconfig: Omit<Preconfig, 'id'> & { id: string } = {
   id: 'phase2-test',

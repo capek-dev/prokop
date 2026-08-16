@@ -1,13 +1,21 @@
 import { randomUUID } from 'node:crypto';
 import {
   buildToolOutputArtifactPage,
+  DEFAULT_TOOL_OUTPUT_PAGE_CHARS,
   isToolOutputArtifactId,
+  MAX_TOOL_OUTPUT_PAGE_CHARS,
   type CreateToolOutputArtifact,
   type ToolOutputArtifact,
   type ToolOutputArtifactPage,
   type ToolOutputArtifactStore,
 } from '@capekai/core/storage';
 import { getDatabase } from './index';
+
+export {
+  DEFAULT_TOOL_OUTPUT_PAGE_CHARS,
+  MAX_TOOL_OUTPUT_PAGE_CHARS,
+  isToolOutputArtifactId,
+};
 
 interface ArtifactRow {
   id: string;
