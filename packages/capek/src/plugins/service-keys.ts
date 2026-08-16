@@ -32,6 +32,8 @@ import type { SessionSearchHost } from '../session-search/host';
 import type { StorageBundle } from '../storage/contracts';
 import type { ToolRegistryResolver } from '../tools/registry';
 import type { ToolSourceLifecycle } from '../tools/tool-source';
+import type { AgentDriver } from '../runtime/agent-runtime';
+import type { DefaultDriverInput } from '../runtime/default-agent-driver';
 
 /** Current `providers/registry.ts` surface. `createModelForProvider` is the
  * model factory seam; a separate model-service contract is a C7 concern. */
@@ -125,6 +127,11 @@ export const capekProviderOverridesKey = serviceKey<ReadonlyMap<string, Connecta
  * the runtime core resolves it through `getContextAssembler()`. */
 export const capekContextAssemblerKey = serviceKey<ContextAssembler>(
   'capek.context-assembler',
+  'agent',
+);
+
+export const capekAgentDriverKey = serviceKey<AgentDriver<DefaultDriverInput<unknown>, unknown>>(
+  'capek.agent-driver',
   'agent',
 );
 

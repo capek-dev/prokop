@@ -65,6 +65,7 @@ import { compactionPolicyPlugin } from './compaction-policy';
 import { permissionPolicyPlugin } from './permission-policy';
 import { workspacePolicyPlugin } from './workspace-policy';
 import { toolOutputPolicyPlugin } from './tool-output-policy';
+import { defaultAgentDriverPlugin } from './default-agent-driver';
 
 /** Plugin ids are deterministic and stable; diagnostics and tests rely on
  * them. The list mirrors the plugin construction order below. */
@@ -79,6 +80,7 @@ export const CURRENT_AGENT_PLUGIN_IDS = [
   'current.storage',
   'current.runtime-configuration',
   'current.runtime-host',
+  'current.agent-driver',
   'current.retry-policy',
   'current.compaction-policy',
   'current.permission-policy',
@@ -113,6 +115,7 @@ export function currentAgentPlugins(): readonly CapekPlugin<unknown>[] {
     storageValuePlugin('current.storage', getStorage()),
     runtimeConfigurationValuePlugin('current.runtime-configuration', getRuntimeConfiguration()),
     runtimeHostValuePlugin('current.runtime-host', getRuntimeHost()),
+    defaultAgentDriverPlugin('current.agent-driver'),
     retryPolicyPlugin('current.retry-policy'),
     compactionPolicyPlugin('current.compaction-policy'),
     permissionPolicyPlugin('current.permission-policy'),

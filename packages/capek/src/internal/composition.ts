@@ -19,6 +19,7 @@ export type {
   ProcessScopeHandle,
 } from '../plugins/compose';
 export {
+  capekAgentDriverKey,
   capekContextAssemblerKey,
   capekContextSourcesKey,
   capekInstalledToolRegistryKey,
