@@ -18,6 +18,12 @@ import type { RuntimeConfiguration } from '../configuration/contracts';
 import type { ContextSources } from '../context/sources';
 import type { ContextAssembler } from '../context/assembler';
 export type { ContextAssembler, ContextAssemblyData } from '../context/assembler';
+import type { RetryPolicy } from '../retry/policy';
+import type { CompactionService } from '../compaction/policy';
+import type { AskPermissionPolicyService } from '../permission/contracts';
+import type { PermissionRuntimeService } from '../permission/contracts';
+import type { WorkspaceService } from '../workspace/contracts';
+import type { ToolOutputArtifactService } from '../tool-output/contracts';
 import type { ConnectableProvider, ConnectOptions, ConnectResult, ModelFactoryOptions, ModelFactoryResult } from '../providers/types';
 import type { BroadcastFn, BroadcastSessionFn, RuntimeHost } from '../runtime/host';
 import type { SandboxController } from '../sandbox/controller';
@@ -158,6 +164,83 @@ export const capekOrchestratorSessionKey = serviceKey<OrchestratorSessionContrac
   'agent',
 );
 
+/**
+ * C6 retry policy service. Agent-scoped because circuit state must be
+ * isolated per composed agent: two facade agents must never share circuit
+ * failures. The contract and default provider live in `retry/policy.ts`;
+ * the stream loop resolves the active policy through `getRetryPolicy()`.
+ * Unscoped consumers keep the process-default fallback.
+ */
+export const capekRetryPolicyKey = serviceKey<RetryPolicy>(
+  'capek.retry-policy',
+  'agent',
+);
+
+/**
+ * C6 compaction service. Agent-scoped because policy options are translated
+ * from the composed runtime configuration at composition time, and the
+ * failure cooldown plus the concurrency guard must be isolated per composed
+ * agent. The contract and default provider live in `compaction/policy.ts`;
+ * the executor and chat handler resolve the active service through
+ * `getCompactionService()`. Unscoped consumers keep the process-default
+ * fallback with live configuration reads.
+ */
+export const capekCompactionServiceKey = serviceKey<CompactionService>(
+  'capek.compaction-service',
+  'agent',
+);
+
+/**
+ * C6 permission policy service. Agent-scoped because pending asks, waiters,
+ * timers, and the frozen timeout options must be isolated per composed
+ * agent. The contract and default provider live in `permission/`;
+ * `tools/ask-user-api.ts` and `tools/permission-request-manager.ts` are the
+ * pinned compatibility forwarders. Unscoped consumers keep the
+ * process-default fallback with live timeout reads.
+ */
+export const capekPermissionPolicyKey = serviceKey<AskPermissionPolicyService>(
+  'capek.permission-policy',
+  'agent',
+);
+
+/**
+ * C6 permission runtime service. Agent-scoped because the pending-ask and
+ * waiter registries plus their timers must be isolated per composed agent.
+ * NON-REPLACEABLE: the runtime owns request-id routing, validation
+ * enforcement, raw-audit denial, and canonical grant construction; the
+ * replaceable `capek.permission-policy` advice provider sits behind it.
+ */
+export const capekPermissionRuntimeKey = serviceKey<PermissionRuntimeService>(
+  'capek.permission-runtime',
+  'agent',
+);
+
+/**
+ * C6 workspace policy service. Agent-scoped because the frozen path inputs
+ * (blocked paths, sensitive patterns, home directory) belong to the
+ * composed profile. The contract and default provider live in `workspace/`;
+ * `tools/workspace-capability.ts` is the pinned compatibility forwarder and
+ * the Jean2 server fulfills the inward-facing workspace path port through
+ * the compat barrel. Unscoped consumers keep the process-default fallback.
+ */
+export const capekWorkspacePolicyKey = serviceKey<WorkspaceService>(
+  'capek.workspace-policy',
+  'agent',
+);
+
+/**
+ * C6 tool-output policy service. Agent-scoped because the frozen bounding
+ * and truncation thresholds plus the wrap WeakSet belong to the composed
+ * profile. The contract and default provider live in `tool-output/`;
+ * `tools/tool-output-artifacts.ts` and `utils/truncate-tool-result.ts` are
+ * the pinned compatibility forwarders. Unscoped consumers keep the
+ * process-default fallback.
+ */
+export const capekToolOutputPolicyKey = serviceKey<ToolOutputArtifactService>(
+  'capek.tool-output-policy',
+  'agent',
+);
+
 /** Every required service key in the C2 inventory. */
 export const C2_SERVICE_KEYS = [
   capekStorageKey,
@@ -185,6 +268,12 @@ export const C2_REQUIRED_AGENT_KEYS = [
   capekSandboxControllerKey,
   capekProviderOverridesKey,
   capekContextAssemblerKey,
+  capekRetryPolicyKey,
+  capekCompactionServiceKey,
+  capekPermissionPolicyKey,
+  capekPermissionRuntimeKey,
+  capekWorkspacePolicyKey,
+  capekToolOutputPolicyKey,
 ] as const;
 
 export const C2_PROCESS_KEYS = [

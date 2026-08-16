@@ -56,6 +56,19 @@ export type { StreamChatEvent, StreamChatFn, StreamRetryPolicy } from '../core/r
 export { InterruptManager, interruptManager } from '../core/interrupt';
 export * from '../core/compaction';
 export * from '../core/compaction-executor';
+/**
+ * C6 step 2 temporary store-wiring seam. The reconciliation decisions moved
+ * from the Jean2 store into the Capek compaction domain; these deps-based
+ * entrypoints exist only so `store/compaction-recovery.ts` can wire the
+ * inward-facing port to the domain while keeping its pre-slice export
+ * identities. The WithDeps names cannot be confused with the old store
+ * signatures (sessionId, options). Retired with the store compat path.
+ */
+export {
+  reconcileAllSessionsCompaction as reconcileAllSessionsCompactionWithDeps,
+  reconcileSessionCompaction as reconcileSessionCompactionWithDeps,
+} from '../compaction/recovery';
+export type { CompactionRecoveryDeps } from '../compaction/recovery';
 export { forkSession } from '../core/fork';
 export { revertToStep } from '../core/revert';
 export * from '../core/workflow-orchestrator-session';
@@ -92,6 +105,41 @@ export * from '../tools/executor';
 export * from '../tools/ask-user-api';
 export * from '../tools/permission-request-manager';
 export * from '../tools/workspace-capability';
+export {
+  createWorkspaceService,
+  expandPath,
+  getWorkspaceService,
+  isInsideUnselectedAdditionalRoot,
+  isPathInside,
+  isPathWithinWorkspace,
+  resolveCandidatePath,
+  resolvePath,
+  resolveRootForQuery,
+  selectEditableRoot,
+  withWorkspaceService,
+} from '../workspace/policy';
+export type {
+  WorkspacePolicy,
+  WorkspacePolicyOptions,
+  WorkspaceService,
+} from '../workspace/contracts';
+export {
+  createToolOutputService,
+  getToolOutputService,
+  isToolOutputArtifactReference,
+  RETRIEVE_TOOL_OUTPUT_NAME,
+  TOOL_OUTPUT_PREVIEW_CHARS,
+  TOOL_OUTPUT_THRESHOLD_CHARS,
+  truncateToolResult,
+  withToolOutputService,
+} from '../tool-output/policy';
+export type {
+  ToolOutputArtifactReference,
+  ToolOutputArtifactService,
+  ToolOutputFallback,
+  ToolOutputPolicyContext,
+  ToolOutputPolicyOptions,
+} from '../tool-output/contracts';
 export * from '../tools/llm-api';
 export * from '../tools/registry';
 export * from '../tools/install-manifest';

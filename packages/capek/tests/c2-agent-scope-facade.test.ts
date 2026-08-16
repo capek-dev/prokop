@@ -82,22 +82,30 @@ describe('createAgent through the agent scope', () => {
 
     const snapshot = agentScope.snapshot();
     // C4 adds the six coding capability services on top of the C2
-    // inventory (4 process services plus 9 facade services). The C5
-    // subagent domain is not part of the facade base composition: facade
+    // inventory (4 process services plus 15 facade services, including the
+    // C6 agent-scoped retry policy, compaction service, permission policy
+    // and permission runtime, workspace policy, and tool-output policy). The
+    // C5 subagent domain is not part of the facade base composition: facade
     // profiles install optional domains explicitly.
-    expect(snapshot.services).toHaveLength(19);
+    expect(snapshot.services).toHaveLength(25);
     const facadeServices = snapshot.services.filter((service) =>
       service.providerPluginId.startsWith('facade.'));
     expect(facadeServices.map((service) => service.providerPluginId).sort()).toEqual([
+      'facade.compaction-policy',
       'facade.context-sections',
       'facade.context-sources',
+      'facade.permission-policy',
+      'facade.permission-policy',
       'facade.provider-overrides',
+      'facade.retry-policy',
       'facade.runtime-configuration',
       'facade.runtime-host',
       'facade.sandbox-controller',
       'facade.storage',
+      'facade.tool-output-policy',
       'facade.tool-resolver',
       'facade.tool-source',
+      'facade.workspace-policy',
     ]);
 
     await agent.close();

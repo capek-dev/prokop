@@ -14,6 +14,7 @@ import {
   streamChatWithRetry,
 } from '@capekai/core/compat/jean2';
 import { setJean2CompatibilityBindings } from '../src/compat/bindings';
+import * as jean2Compat from '@capekai/core/compat/jean2';
 import {
   getContributedDomainToolPayloads,
   getDomainToolFallback,
@@ -88,6 +89,17 @@ describe('Jean2 compatibility runtime exports', () => {
     expect(typeof createAskApi).toBe('function');
     expect(typeof requestPermission).toBe('function');
     expect(new InterruptManager()).toBeInstanceOf(InterruptManager);
+  });
+
+  test('the recovery wiring seam is deps-based and the old store signatures stay absent', () => {
+    // The pre-slice store module owned the options-only signatures
+    // (sessionId, options); the compat barrel never exported them and must
+    // not start now. The C6 step 2 wiring seam is the narrow WithDeps pair
+    // only, clearly named so it cannot be confused with the old signatures.
+    expect('reconcileSessionCompaction' in jean2Compat).toBe(false);
+    expect('reconcileAllSessionsCompaction' in jean2Compat).toBe(false);
+    expect(typeof jean2Compat.reconcileSessionCompactionWithDeps).toBe('function');
+    expect(typeof jean2Compat.reconcileAllSessionsCompactionWithDeps).toBe('function');
   });
 });
 

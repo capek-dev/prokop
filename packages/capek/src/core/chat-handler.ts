@@ -29,6 +29,7 @@ import {
 } from '../storage/runtime';
 import type { AskBroadcastFn } from '../runtime/host';
 import type { RuntimeDelivery, RuntimeEvent, RuntimeEventContext } from '../runtime/events';
+import { getCompactionService } from './compaction';
 import { executeCompaction } from './compaction-executor';
 import { runGoalLoop } from './goal-loop';
 import { interruptManager } from './interrupt';
@@ -54,65 +55,7 @@ function deliverToSession<Origin>(ctx: RuntimeRequestContext<Origin>, sessionId:
   deliver(ctx, { scope: 'session', sessionId }, event);
 }
 
-// ── Compaction failure tracking ────────────────────────────────
-
-const compactionFailureTracker = new Map<string, { count: number; lastFailureAt: number }>();
-const COMPACTION_FAILURE_COOLDOWN_MS = 60_000;
-const COMPACTION_MAX_CONSECUTIVE_FAILURES = 2;
-
-function shouldSkipCompaction(sessionId: string): boolean {
-  const tracker = compactionFailureTracker.get(sessionId);
-  if (!tracker) return false;
-
-  const elapsed = Date.now() - tracker.lastFailureAt;
-  if (elapsed > COMPACTION_FAILURE_COOLDOWN_MS) {
-    compactionFailureTracker.delete(sessionId);
-    return false;
-  }
-
-  return tracker.count >= COMPACTION_MAX_CONSECUTIVE_FAILURES;
-}
-
-function recordCompactionFailure(sessionId: string): void {
-  const existing = compactionFailureTracker.get(sessionId);
-  if (existing) {
-    existing.count++;
-    existing.lastFailureAt = Date.now();
-  } else {
-    compactionFailureTracker.set(sessionId, { count: 1, lastFailureAt: Date.now() });
-  }
-}
-
-function clearCompactionFailure(sessionId: string): void {
-  compactionFailureTracker.delete(sessionId);
-}
-
 // ── Chat helpers ───────────────────────────────────────────────
-
-function findReplayText(sessionId: string): string | null {
-  const allMessages = listMessagesWithParts(sessionId);
-
-  for (let i = allMessages.length - 2; i >= 0; i--) {
-    const m = allMessages[i];
-    if (m.message.role !== 'user') continue;
-    if (m.parts.every((p) => p.type === 'compaction')) continue;
-
-    const texts: string[] = [];
-    for (const p of m.parts) {
-      if (p.type === 'text' && p.text !== undefined) {
-        if (!p.text.startsWith('Continue:') && !p.text.startsWith('Continue from')) {
-          texts.push(p.text);
-        }
-      }
-    }
-    const text = texts.join(' ').trim();
-    if (text) {
-      return `Replay: ${text}`;
-    }
-  }
-
-  return null;
-}
 
 async function drainQueue<Origin>(
   ctx: RuntimeRequestContext<Origin>,
@@ -707,17 +650,17 @@ export async function handleChat<Origin>(
       const currentSession = getSession(sessionId);
       const isMainSession = currentSession && !currentSession.parentId;
 
-      if (isMainSession && !shouldSkipCompaction(sessionId)) {
-        const replayText = findReplayText(sessionId);
+      if (isMainSession && !getCompactionService().shouldSkipCompaction(sessionId)) {
+        const replayText = getCompactionService().buildReplayText(sessionId);
         const execResult = await executeCompaction(sessionId, 'overflow');
 
         if (execResult.ok) {
-          clearCompactionFailure(sessionId);
+          getCompactionService().clearCompactionFailure(sessionId);
           overflowRetryDepth++;
           currentContent = replayText ?? 'Continue from where we left off, using the compacted context.';
           continue;
         } else if (!execResult.skipped) {
-          recordCompactionFailure(sessionId);
+          getCompactionService().recordCompactionFailure(sessionId);
           console.warn(`[handleChat] Overflow compaction failed for session ${sessionId}: ${execResult.error}`);
         }
       }
@@ -746,12 +689,12 @@ export async function handleChat<Origin>(
 
     if (result.streamCompleted && result.needsAutoCompaction) {
       const currentSession = getSession(sessionId);
-      if (currentSession && !currentSession.parentId && !shouldSkipCompaction(sessionId)) {
+      if (currentSession && !currentSession.parentId && !getCompactionService().shouldSkipCompaction(sessionId)) {
         const execResult = await executeCompaction(sessionId, 'auto');
         if (execResult.ok) {
-          clearCompactionFailure(sessionId);
+          getCompactionService().clearCompactionFailure(sessionId);
         } else if (!execResult.skipped) {
-          recordCompactionFailure(sessionId);
+          getCompactionService().recordCompactionFailure(sessionId);
           console.warn(`[handleChat] Auto-compaction failed for session ${sessionId}: ${execResult.error}`);
         }
       }

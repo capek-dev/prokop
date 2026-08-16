@@ -18,7 +18,7 @@ import {
 } from '../storage/runtime';
 import type { AskBroadcastFn, BroadcastFn } from '../runtime/host';
 import { classifyApiError } from '../utils/errors';
-import { streamChatWithRetry } from '../core/retry';
+import { streamChatWithRetry } from '../retry/stream-chat';
 
 export async function executeChildSession(options: {
   parentSessionId: string;

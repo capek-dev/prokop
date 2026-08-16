@@ -60,6 +60,11 @@ import {
   storageValuePlugin,
   toolSourceValuePlugin,
 } from './value-plugins';
+import { retryPolicyPlugin } from './retry-policy';
+import { compactionPolicyPlugin } from './compaction-policy';
+import { permissionPolicyPlugin } from './permission-policy';
+import { workspacePolicyPlugin } from './workspace-policy';
+import { toolOutputPolicyPlugin } from './tool-output-policy';
 
 /** Plugin ids are deterministic and stable; diagnostics and tests rely on
  * them. The list mirrors the plugin construction order below. */
@@ -74,6 +79,11 @@ export const CURRENT_AGENT_PLUGIN_IDS = [
   'current.storage',
   'current.runtime-configuration',
   'current.runtime-host',
+  'current.retry-policy',
+  'current.compaction-policy',
+  'current.permission-policy',
+  'current.workspace-policy',
+  'current.tool-output-policy',
   'current.context-sources',
   'current.context-sections',
   'current.orchestrator-session',
@@ -103,6 +113,11 @@ export function currentAgentPlugins(): readonly CapekPlugin<unknown>[] {
     storageValuePlugin('current.storage', getStorage()),
     runtimeConfigurationValuePlugin('current.runtime-configuration', getRuntimeConfiguration()),
     runtimeHostValuePlugin('current.runtime-host', getRuntimeHost()),
+    retryPolicyPlugin('current.retry-policy'),
+    compactionPolicyPlugin('current.compaction-policy'),
+    permissionPolicyPlugin('current.permission-policy'),
+    workspacePolicyPlugin('current.workspace-policy'),
+    toolOutputPolicyPlugin('current.tool-output-policy'),
     contextSourcesValuePlugin('current.context-sources', getContextSources()),
     createContextSectionsPlugin('current.context-sections', {
       includeSelfDelegationGuidance: false,
