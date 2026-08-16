@@ -1,5 +1,5 @@
 import type { PermissionAsk, PermissionRiskLevel, Session } from '@jean2/sdk';
-import { getSessionSearchHost } from './host';
+import { getSessionSearchHost, type SessionSearchHost } from './host';
 
 export const sessionSearchToolDefinition = {
   name: 'session_search',
@@ -48,8 +48,20 @@ export interface SessionSearchResult {
   error?: string;
 }
 
+/** Unscoped execution path: reads the configured module-level host, exactly
+ * like the pre-C5 tool. */
 export async function executeSessionSearchTool(input: Record<string, unknown>, workspaceId: string, currentSessionId: string, includeToolResults: boolean, risk: PermissionRiskLevel, askFn?: (ask: PermissionAsk) => Promise<unknown>, agentId?: string | null): Promise<SessionSearchResult> {
-  const host = getSessionSearchHost();
+  return runSessionSearch(getSessionSearchHost(), input, workspaceId, currentSessionId, includeToolResults, risk, askFn, agentId);
+}
+
+/** Composed execution path: the domain plugin captures the process-scoped
+ * host service at setup and passes it here, so composed execution never
+ * reads the mutable module-global host accessor. */
+export async function executeSessionSearchToolWithHost(host: SessionSearchHost, input: Record<string, unknown>, workspaceId: string, currentSessionId: string, includeToolResults: boolean, risk: PermissionRiskLevel, askFn?: (ask: PermissionAsk) => Promise<unknown>, agentId?: string | null): Promise<SessionSearchResult> {
+  return runSessionSearch(host, input, workspaceId, currentSessionId, includeToolResults, risk, askFn, agentId);
+}
+
+async function runSessionSearch(host: SessionSearchHost, input: Record<string, unknown>, workspaceId: string, currentSessionId: string, includeToolResults: boolean, risk: PermissionRiskLevel, askFn?: (ask: PermissionAsk) => Promise<unknown>, agentId?: string | null): Promise<SessionSearchResult> {
   const workspace = host.getWorkspace(workspaceId);
   if (!workspace) return { success: false, mode: 'search', title: 'Workspace not found', error: 'Workspace not found' };
   const query = input.query as string | undefined;
@@ -59,18 +71,17 @@ export async function executeSessionSearchTool(input: Record<string, unknown>, w
   if (scope === 'agent' && !agentId) {
     return { success: false, mode: action === 'read' ? 'read' : action === 'list' ? 'list' : 'search', title: 'Agent scope unavailable', error: 'Agent scope requires an agent session' };
   }
-  if (action === 'list') return executeList(workspaceId, currentSessionId, input, scope, agentId);
+  if (action === 'list') return executeList(host, workspaceId, currentSessionId, input, scope, agentId);
   if (risk !== 'none' && askFn) {
     const approved = await askFn({ type: 'permission', question: query ? `Allow searching workspace sessions for "${query.slice(0, 100)}"?` : 'Allow reading session context?', description: `Tool: session_search\nWorkspace: ${workspace.name}${query ? `\nQuery: ${query.slice(0, 200)}` : ''}\nScope: ${scope}`, risk, resource: 'session', action: 'read' });
     if (!approved) return { success: false, mode: 'search', title: 'Permission denied', error: 'USER_REJECTION' };
   }
-  if (query) return executeSearch(query, scope, workspaceId, currentSessionId, includeToolResults, input, agentId);
-  if (sessionId) return executeReadAround(sessionId, input.aroundMessageId as string | undefined, workspaceId, input, agentId);
+  if (query) return executeSearch(host, query, scope, workspaceId, currentSessionId, includeToolResults, input, agentId);
+  if (sessionId) return executeReadAround(host, sessionId, input.aroundMessageId as string | undefined, workspaceId, input, agentId);
   return { success: false, mode: 'search', title: 'Invalid arguments', error: 'Provide "action": "list" to enumerate sessions, "query" for search mode, or "sessionId" for read-around mode.' };
 }
 
-function executeList(workspaceId: string, currentSessionId: string, input: Record<string, unknown>, scope: string, agentId?: string | null): SessionSearchResult {
-  const host = getSessionSearchHost();
+function executeList(host: SessionSearchHost, workspaceId: string, currentSessionId: string, input: Record<string, unknown>, scope: string, agentId?: string | null): SessionSearchResult {
   const limit = Math.min(Math.max((input.limit as number) || 10, 1), 20);
   let sessions: Session[];
   let label: string;
@@ -87,8 +98,7 @@ function executeList(workspaceId: string, currentSessionId: string, input: Recor
   return { success: true, mode: 'list', title: `${sessions.length} session${sessions.length === 1 ? '' : 's'} (${label})`, sessions: entries };
 }
 
-function executeSearch(query: string, scope: string, workspaceId: string, currentSessionId: string, includeTools: boolean, input: Record<string, unknown>, agentId?: string | null): SessionSearchResult {
-  const host = getSessionSearchHost();
+function executeSearch(host: SessionSearchHost, query: string, scope: string, workspaceId: string, currentSessionId: string, includeTools: boolean, input: Record<string, unknown>, agentId?: string | null): SessionSearchResult {
   const limit = Math.min(Math.max((input.limit as number) || 5, 1), 20);
   const sort = ((input.sort as string) || 'relevance') as 'relevance' | 'newest' | 'oldest';
   let roles = (input.roleFilter as string[] | undefined) ?? (includeTools ? ['user', 'assistant', 'tool'] : ['user', 'assistant']);
@@ -102,8 +112,7 @@ function executeSearch(query: string, scope: string, workspaceId: string, curren
   };
 }
 
-function executeReadAround(sessionId: string, anchorId: string | undefined, workspaceId: string, input: Record<string, unknown>, agentId?: string | null): SessionSearchResult {
-  const host = getSessionSearchHost();
+function executeReadAround(host: SessionSearchHost, sessionId: string, anchorId: string | undefined, workspaceId: string, input: Record<string, unknown>, agentId?: string | null): SessionSearchResult {
   const session = host.getSession(sessionId);
   if (!session) return { success: false, mode: 'read', title: 'Session not found', error: 'Session not found' };
   if (session.workspaceId !== workspaceId && !(agentId && session.agentId === agentId)) return { success: false, mode: 'read', title: 'Access denied', error: 'Session does not belong to current workspace or agent' };

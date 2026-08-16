@@ -1,13 +1,20 @@
 import { tool, jsonSchema } from 'ai';
-import { executeMemoryTool, memoryToolDefinition } from '../../memory';
 import {
-  buildSkillManageToolDescription,
-  executeSkillManageTool,
-  skillManageToolDefinition,
-} from '../../skills';
-import { join } from 'path';
+  getContributedDomainToolPayloads,
+  getDomainToolFallback,
+  type DomainToolPayload,
+} from '../../runtime/domain-tool-source';
 import type { ToolMap } from './types';
 
+/**
+ * C5 memory and skills domain tools (agent phase). The pre-C5 builder
+ * imported the memory and skills implementations directly; it now consumes
+ * the agent-scoped domain payloads through the generic
+ * contributed-domain-tool seam (`agent_memory`, `agent_skill_manage`), with
+ * the explicitly installed fallbacks covering the unscoped path. The agent
+ * directory gate stays here: agent tools build only when an agent directory
+ * exists for the session preconfig.
+ */
 export interface AgentToolsOptions {
   agentDir: string;
 }
@@ -16,58 +23,48 @@ export async function buildAgentTools(options: AgentToolsOptions): Promise<ToolM
   const { agentDir } = options;
   const tools: ToolMap = {};
 
-  tools['agent_memory'] = tool({
-    description: `Persist your PERSONAL knowledge that travels with you across all workspaces.
+  const scopedDomainPayloads = getContributedDomainToolPayloads();
+  const domainPayload = (name: string): DomainToolPayload | null =>
+    scopedDomainPayloads === null
+      ? getDomainToolFallback(name)
+      : scopedDomainPayloads.get(name) ?? null;
 
-Use target="user" for cross-workspace user preferences (how this person likes to work).
-Use target="memory" for accumulated work knowledge (lessons, patterns, techniques from any project).
+  const agentMemoryPayload = domainPayload('agent_memory');
+  if (agentMemoryPayload) {
+    tools['agent_memory'] = tool({
+      description: agentMemoryPayload.description,
+      inputSchema: jsonSchema(agentMemoryPayload.inputSchema),
+      execute: async (args: Record<string, unknown>) =>
+        agentMemoryPayload.execute(args, {
+          workspaceId: '',
+          sessionId: '',
+          ask: async () => {
+            throw new Error('Cannot ask user: no broadcast channel available');
+          },
+          agentDir,
+        }),
+    });
+  }
 
-This is YOUR personal memory. It is separate from the workspace memory tool.
-- Use "memory" (workspace) for project-specific facts about the current codebase.
-- Use "agent_memory" (this tool) for cross-project knowledge that applies everywhere.
-
-Actions:
-- list: Read current entries and char usage. Requires target only.
-- add: Append a new bullet entry. Requires content.
-- replace: Find an entry by oldText substring and replace it.
-- remove: Find an entry by oldText substring and remove it.
-
-Character limits: user=1500, memory=2500. Keep entries compact.`,
-    inputSchema: jsonSchema(memoryToolDefinition.inputSchema),
-    execute: async (args: Record<string, unknown>) => {
-      const result = await executeMemoryTool(args, agentDir, 'none');
-      if (!result.success) {
-        return { error: result.error ?? 'Agent memory operation failed' };
-      }
-      const r = result.result!;
-      return {
-        title: r.action === 'list' ? `Agent memory list (${r.target})` : 'Agent memory updated',
-        ...r,
-      };
-    },
+  const agentSkillManagePayload = domainPayload('agent_skill_manage');
+  const agentSkillManageDefinition = await agentSkillManagePayload?.resolveDefinition?.('', {
+    agentDir,
   });
-
-  const agentSkillsManageDir = join(agentDir, 'skills');
-  const agentSkillManageDescription = await buildSkillManageToolDescription(agentSkillsManageDir);
-  tools['agent_skill_manage'] = tool({
-    description: agentSkillManageDescription,
-    inputSchema: jsonSchema(skillManageToolDefinition.inputSchema),
-    execute: async (args: Record<string, unknown>) => {
-      const result = await executeSkillManageTool(args, agentSkillsManageDir, 'none');
-      if (!result.success) {
-        return { error: result.error ?? 'Agent skill management failed' };
-      }
-      return {
-        title: result.title,
-        action: result.action,
-        name: result.name,
-        description: result.description,
-        path: result.path,
-        summary: result.summary,
-        skills: result.skills,
-      };
-    },
-  });
+  if (agentSkillManagePayload && agentSkillManageDefinition) {
+    tools['agent_skill_manage'] = tool({
+      description: agentSkillManageDefinition.description,
+      inputSchema: jsonSchema(agentSkillManageDefinition.inputSchema),
+      execute: async (args: Record<string, unknown>) =>
+        agentSkillManagePayload.execute(args, {
+          workspaceId: '',
+          sessionId: '',
+          ask: async () => {
+            throw new Error('Cannot ask user: no broadcast channel available');
+          },
+          agentDir,
+        }),
+    });
+  }
 
   return tools;
 }

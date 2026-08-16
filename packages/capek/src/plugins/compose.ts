@@ -11,6 +11,12 @@ import { withContextSources } from '../context/sources';
 import { createAgentScope, createProcessScope } from '../kernel/kernel';
 import type { AgentScopeHandle, ProcessScopeHandle } from '../kernel/types';
 import { withProviderOverrides } from '../providers/registry';
+import {
+  DOMAIN_TOOL_PAYLOAD_FIELD,
+  isDomainToolPayload,
+  withContributedDomainToolPayloads,
+  type DomainToolPayload,
+} from '../runtime/domain-tool-source';
 import { withRuntimeHost } from '../runtime/host';
 import { withSandboxController } from '../sandbox/controller';
 import { withStorage } from '../storage/runtime';
@@ -128,6 +134,11 @@ export async function createFacadeAgentComposition(
  * through the context-assembler ALS runtime, so ordered context assembly
  * always resolves this exact scope, even across async suspensions and
  * interleaved scopes.
+ *
+ * Contributed domain tool payloads are seeded generically from the scope's
+ * visible tool contributions carrying `DOMAIN_TOOL_PAYLOAD_FIELD`; an empty
+ * map means a composed scope without domain payloads, which disables the
+ * unscoped legacy fallbacks for the callback duration.
  */
 export function enterAgentScope<T>(scope: AgentScopeHandle, callback: () => T): T {
   const storage = scope.require(capekStorageKey);
@@ -140,18 +151,28 @@ export function enterAgentScope<T>(scope: AgentScopeHandle, callback: () => T): 
   const toolResolver = scope.optional(capekToolResolverKey);
   const contextAssembler = scope.require(capekContextAssemblerKey);
 
-  return withContextAssembler(contextAssembler, () =>
-    withStorage(storage, () =>
-      withRuntimeConfiguration(configuration, () =>
-        withRuntimeHost(host, () =>
-          withContextSources(contextSources, () =>
-            withProviderOverrides(providerOverrides, () =>
-              (toolResolver === undefined
-                ? (inner: () => T): T => withToolSource(toolSource, () =>
-                  withSandboxController(sandboxController, inner))
-                : (inner: () => T): T => withToolRegistryResolver(toolResolver, () =>
-                  withToolSource(toolSource, () =>
-                    withSandboxController(sandboxController, inner))))(callback)))))));
+  const domainToolPayloads = new Map<string, DomainToolPayload>();
+  for (const tool of scope.listTools()) {
+    if (!tool.visible) continue;
+    const candidate = tool.definition[DOMAIN_TOOL_PAYLOAD_FIELD];
+    if (isDomainToolPayload(candidate) && candidate.name === tool.definition.name) {
+      domainToolPayloads.set(candidate.name, candidate);
+    }
+  }
+
+  return withContributedDomainToolPayloads(domainToolPayloads, () =>
+    withContextAssembler(contextAssembler, () =>
+      withStorage(storage, () =>
+        withRuntimeConfiguration(configuration, () =>
+          withRuntimeHost(host, () =>
+            withContextSources(contextSources, () =>
+              withProviderOverrides(providerOverrides, () =>
+                (toolResolver === undefined
+                  ? (inner: () => T): T => withToolSource(toolSource, () =>
+                    withSandboxController(sandboxController, inner))
+                  : (inner: () => T): T => withToolRegistryResolver(toolResolver, () =>
+                    withToolSource(toolSource, () =>
+                      withSandboxController(sandboxController, inner))))(callback))))))));
 }
 
 export type {

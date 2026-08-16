@@ -9,6 +9,17 @@ import { fixedBuilderContextAssembler } from '../plugins/legacy-system-message';
 
 setDefaultContextAssembler(fixedBuilderContextAssembler);
 
+// Explicit unscoped session-search, scheduler, task, workflow, memory, and
+// skills tool fallback installation. No module-load registration: the Jean2
+// compatibility bindings installation (server bootstrap) and focused tests
+// call these directly.
+export { installSchedulerToolFallback } from '../plugins/scheduler-domain';
+export { installSessionSearchToolFallback } from '../plugins/session-search-domain';
+export { installTaskToolFallback } from '../plugins/subagent-domain';
+export { installWorkflowToolFallback } from '../plugins/workflow-domain';
+export { installMemoryToolFallback } from '../plugins/memory-domain';
+export { installSkillsToolFallback } from '../plugins/skills-domain';
+
 export {
   getJean2CompatibilityBindings,
   setJean2CompatibilityBindings,

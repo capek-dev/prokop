@@ -4,6 +4,7 @@ import {
   evaluateRules,
   isWithin,
   parseImports,
+  resolveLocalSpecifier,
   scanDirectory,
   type DependencyRule,
   type ScannedFile,
@@ -68,7 +69,7 @@ const c0Rules: DependencyRule[] = [
     name: 'facade-no-compat-or-optional-domains',
     rationale: 'The facade composes core services and must not depend on the migration barrel or optional domain plugins.',
     appliesTo: [dir('facade')],
-    forbiddenResolvedDirs: [dir('compat'), dir('memory'), dir('skills'), dir('session-search'), dir('scheduler')],
+    forbiddenResolvedDirs: [dir('compat'), dir('memory'), dir('skills'), dir('session-search'), dir('scheduler'), dir('subagent'), dir('workflow'), dir('goals')],
   },
   {
     name: 'compat-no-facade',
@@ -98,20 +99,163 @@ const c0Rules: DependencyRule[] = [
   },
   {
     name: 'core-no-optional-domains',
-    rationale: 'Optional domains are plugins; core must not import memory, skills, session-search, or scheduler.',
+    rationale: 'Optional domains are plugins; core must not import memory, skills, session-search, or scheduler implementations. The C5 slices converted the tool builders to the generic contributed-domain-tool seam, so zero exceptions remain; the subagent, workflow, and goal forwarder edges are pinned by their own dedicated gates.',
     appliesTo: [dir('core')],
     forbiddenResolvedDirs: [dir('memory'), dir('skills'), dir('session-search'), dir('scheduler')],
+  },
+  {
+    name: 'plugins-no-session-search-ownership',
+    rationale: 'C5 moved session-search tool and guidance ownership to the session-search domain plugin. Plugin modules must not import the guidance constant or the tool implementation from the session-search domain; the host seam stays process-scoped and is unaffected. Two narrow exceptions remain: the fixed legacy system-message adapter keeps the guidance constant import for byte-identical compat output, and the session-search domain plugin module owns the tool wiring.',
+    appliesTo: [dir('plugins')],
+    forbiddenSpecifiers: [
+      { prefix: '../session-search', name: 'SESSION_SEARCH_GUIDANCE' },
+      { prefix: '../session-search', name: 'sessionSearchToolDefinition' },
+      { prefix: '../session-search', name: 'executeSessionSearchTool' },
+    ],
     exceptions: {
-      'packages/capek/src/core/tool-builders/agent-tools.ts': [
-        '../../memory',
-        '../../skills',
+      'packages/capek/src/plugins/legacy-system-message.ts': ['../session-search'],
+      'packages/capek/src/plugins/session-search-domain.ts': [
+        '../session-search',
+        '../session-search/session-search-tool',
       ],
-      'packages/capek/src/core/tool-builders/workspace-tools.ts': [
-        '../../scheduler/scheduler-tool',
-        '../../session-search',
-        '../../memory',
-        '../../skills',
+    },
+  },
+  {
+    name: 'plugins-no-scheduler-ownership',
+    rationale: 'C5 moved scheduler tool ownership to the scheduler domain plugin. Plugin modules must not import the tool implementation from the scheduler domain; the host seam stays process-scoped and is unaffected. The scheduler domain plugin module owns the tool wiring.',
+    appliesTo: [dir('plugins')],
+    forbiddenSpecifiers: [
+      { prefix: '../scheduler', name: 'schedulerToolDefinition' },
+      { prefix: '../scheduler', name: 'executeSchedulerTool' },
+      { prefix: '../scheduler', name: 'executeSchedulerToolWithHost' },
+    ],
+    exceptions: {
+      'packages/capek/src/plugins/scheduler-domain.ts': [
+        '../scheduler/scheduler-tool',
       ],
+    },
+  },
+  {
+    name: 'plugins-no-subagent-ownership',
+    rationale: 'C5 moved the task tool, ancestry policy, child-session execution, and self-delegation guidance ownership to the subagent domain plugin. Plugin modules must not import the task tool implementation or the guidance constant from the subagent domain. Two narrow exceptions remain: the fixed legacy system-message adapter keeps the guidance constant import for byte-identical compat output, and the subagent domain plugin module owns the tool wiring.',
+    appliesTo: [dir('plugins')],
+    forbiddenSpecifiers: [
+      { prefix: '../subagent', name: 'getSubagentToolDefinition' },
+      { prefix: '../subagent', name: 'executeSubagent' },
+      { prefix: '../subagent', name: 'executeSubagentWithDeps' },
+      { prefix: '../subagent', name: 'selfDelegationGuidance' },
+    ],
+    exceptions: {
+      'packages/capek/src/plugins/legacy-system-message.ts': ['../subagent/guidance'],
+      'packages/capek/src/plugins/subagent-domain.ts': [
+        '../subagent/child-session',
+        '../subagent/guidance',
+        '../subagent/policy',
+        '../subagent/task-tool',
+      ],
+    },
+  },
+  {
+    name: 'subagent-domain-no-core',
+    rationale: 'The subagent domain owns the task tool and child-session execution. Its only core edges are the turn-execution retry stream (child-session) and the model/provider resolution helpers (task-tool), which stay in core until their owning phases (C6/C7). Any other core import is a violation.',
+    appliesTo: [dir('subagent')],
+    forbiddenResolvedDirs: [dir('core')],
+    exceptions: {
+      'packages/capek/src/subagent/child-session.ts': ['../core/retry'],
+      'packages/capek/src/subagent/task-tool.ts': ['../core/provider-utils'],
+    },
+  },
+  {
+    name: 'workflow-domain-no-core',
+    rationale: 'The workflow domain owns decomposition, leaf fan-out, synthesis, and the shared orchestrator model-turn implementation. Its only core edges are the model construction and structured-output helpers used by the orchestrator session, which stay in core until C7. Any other core import is a violation.',
+    appliesTo: [dir('workflow')],
+    forbiddenResolvedDirs: [dir('core')],
+    exceptions: {
+      'packages/capek/src/workflow/orchestrator-session.ts': [
+        '../core/model-utils',
+        '../core/structured-output',
+      ],
+    },
+  },
+  {
+    name: 'goals-domain-no-core',
+    rationale: 'The goal domain owns the evaluator model turn and the persistent goal loop. Its only core edge is the pinned orchestrator-session compatibility forwarder used by the unscoped evaluator path; the composed path consumes the shared capek.orchestrator-session contract through the plugin. Any other core import is a violation.',
+    appliesTo: [dir('goals')],
+    forbiddenResolvedDirs: [dir('core')],
+    exceptions: {
+      'packages/capek/src/goals/evaluator.ts': ['../core/workflow-orchestrator-session'],
+    },
+  },
+  {
+    name: 'plugins-no-goal-ownership',
+    rationale: 'C5 moved the goal evaluator and goal loop implementation ownership to the goal domain plugin. Plugin modules must not import the goal domain implementation except the goal domain plugin itself.',
+    appliesTo: [dir('plugins')],
+    forbiddenSpecifiers: [
+      { prefix: '../goals', name: 'evaluateGoal' },
+      { prefix: '../goals', name: 'evaluateGoalWithDeps' },
+      { prefix: '../goals', name: 'runGoalLoop' },
+      { prefix: '../goals', name: 'runGoalLoopWithDeps' },
+      { prefix: '../goals', name: 'buildContinuationMessage' },
+    ],
+    exceptions: {
+      'packages/capek/src/plugins/goal-domain.ts': ['../goals'],
+    },
+  },
+  {
+    name: 'plugins-no-memory-ownership',
+    rationale: 'C5 moved the memory tool payloads and memory context sections ownership to the memory domain plugin. Plugin modules must not import the memory implementation except the memory domain plugin itself and the fixed legacy adapters that reproduce the pre-C5 builder byte-for-byte.',
+    appliesTo: [dir('plugins')],
+    forbiddenSpecifiers: [
+      { prefix: '../memory', name: 'executeMemoryTool' },
+      { prefix: '../memory', name: 'memoryToolDefinition' },
+      { prefix: '../memory', name: 'MEMORY_GUIDANCE' },
+      { prefix: '../memory', name: 'loadMemoryInstructions' },
+    ],
+    exceptions: {
+      'packages/capek/src/plugins/memory-domain.ts': ['../memory'],
+      'packages/capek/src/plugins/legacy-system-message.ts': ['../memory'],
+      'packages/capek/src/plugins/context-sections.ts': ['../memory'],
+    },
+  },
+  {
+    name: 'plugins-no-skills-ownership',
+    rationale: 'C5 moved the skill tool payloads and the skill-management guidance ownership to the skills domain plugin. Plugin modules must not import the skills implementation except the skills domain plugin itself and the fixed legacy adapters that reproduce the pre-C5 builder byte-for-byte.',
+    appliesTo: [dir('plugins')],
+    forbiddenSpecifiers: [
+      { prefix: '../skills', name: 'executeSkillTool' },
+      { prefix: '../skills', name: 'buildSkillToolDefinition' },
+      { prefix: '../skills', name: 'createSkillTool' },
+      { prefix: '../skills', name: 'buildSkillManageToolDescription' },
+      { prefix: '../skills', name: 'executeSkillManageTool' },
+      { prefix: '../skills', name: 'skillManageToolDefinition' },
+      { prefix: '../skills', name: 'SKILL_MANAGE_GUIDANCE' },
+    ],
+    exceptions: {
+      'packages/capek/src/plugins/skills-domain.ts': ['../skills'],
+      'packages/capek/src/plugins/legacy-system-message.ts': ['../skills'],
+      'packages/capek/src/plugins/context-sections.ts': ['../skills'],
+    },
+  },
+  {
+    name: 'plugins-no-workflow-ownership',
+    rationale: 'C5 moved the workflow tool, decomposition, synthesis, and orchestrator-session implementation ownership to the workflow domain plugin. Plugin modules must not import the workflow domain implementation except the workflow domain plugin itself and the orchestrator-session provider bridge, which pins the named shared contract to the current implementation.',
+    appliesTo: [dir('plugins')],
+    forbiddenSpecifiers: [
+      { prefix: '../workflow', name: 'executeWorkflow' },
+      { prefix: '../workflow', name: 'executeWorkflowWithDeps' },
+      { prefix: '../workflow', name: 'getWorkflowToolDefinition' },
+      { prefix: '../workflow', name: 'resolveWorkflowToolDefinitionWithDeps' },
+      { prefix: '../workflow', name: 'buildWorkflowToolDefinition' },
+      { prefix: '../workflow', name: 'decomposeTask' },
+      { prefix: '../workflow', name: 'decomposeTaskWithDeps' },
+      { prefix: '../workflow', name: 'synthesizeResults' },
+      { prefix: '../workflow', name: 'synthesizeResultsWithDeps' },
+      { prefix: '../workflow', name: 'runOrchestratorSession' },
+      { prefix: '../workflow', name: 'canSpawnSubagent' },
+    ],
+    exceptions: {
+      'packages/capek/src/plugins/workflow-domain.ts': ['../workflow/execution'],
+      'packages/capek/src/plugins/orchestrator-session.ts': ['../workflow/orchestrator-session'],
     },
   },
   {
@@ -354,6 +498,209 @@ describe('C0 internal dependency boundaries', () => {
         if (imp.specifier.includes('standard-tools')) {
           violations.push(
             `${relative(repositoryRoot, file.path)} imports ${imp.specifier} (${imp.kind}) [rule: facade-core-no-standard-tool-list]`,
+          );
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  test('the runtime core never imports the concrete session-search domain', () => {
+    const violations: string[] = [];
+    for (const file of scanDirectory(dir('core'))) {
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        const resolved = resolveLocalSpecifier(imp.specifier, file.path, packageSourceRoot);
+        if (resolved !== null && isWithin(resolved, dir('session-search'))) {
+          violations.push(
+            `${relative(repositoryRoot, file.path)} imports ${imp.specifier} (${imp.kind}) [rule: core-no-session-search-domain]`,
+          );
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  test('the runtime core never imports the concrete scheduler domain', () => {
+    const violations: string[] = [];
+    for (const file of scanDirectory(dir('core'))) {
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        const resolved = resolveLocalSpecifier(imp.specifier, file.path, packageSourceRoot);
+        if (resolved !== null && isWithin(resolved, dir('scheduler'))) {
+          violations.push(
+            `${relative(repositoryRoot, file.path)} imports ${imp.specifier} (${imp.kind}) [rule: core-no-scheduler-domain]`,
+          );
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  test('the runtime core imports the concrete subagent domain only through the three compatibility forwarders', () => {
+    const forwarderFiles = new Set([
+      'packages/capek/src/core/subagent.ts',
+      'packages/capek/src/core/subagent-policy.ts',
+      'packages/capek/src/core/child-session.ts',
+    ]);
+    const violations: string[] = [];
+    for (const file of scanDirectory(dir('core'))) {
+      const repoFile = relative(repositoryRoot, file.path);
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        const resolved = resolveLocalSpecifier(imp.specifier, file.path, packageSourceRoot);
+        if (resolved !== null && isWithin(resolved, dir('subagent'))) {
+          if (forwarderFiles.has(repoFile)) continue;
+          violations.push(
+            `${repoFile} imports ${imp.specifier} (${imp.kind}) [rule: core-no-subagent-domain]`,
+          );
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  test('the subagent domain forwarders re-export the domain implementation', () => {
+    const files = [
+      'packages/capek/src/core/subagent.ts',
+      'packages/capek/src/core/subagent-policy.ts',
+      'packages/capek/src/core/child-session.ts',
+    ];
+    for (const repoFile of files) {
+      const file = scanDirectory(dir('core')).find((candidate) => relative(repositoryRoot, candidate.path) === repoFile);
+      expect(file, repoFile).toBeDefined();
+      const imports = parseImports(file!.sourceText, file!.path);
+      const resolved = imports.filter((imp) => {
+        const target = resolveLocalSpecifier(imp.specifier, file!.path, packageSourceRoot);
+        return target !== null && isWithin(target, dir('subagent'));
+      });
+      expect(resolved.length, repoFile).toBe(1);
+    }
+  });
+
+  test('the runtime core imports the concrete workflow domain only through the four compatibility forwarders', () => {
+    const forwarderFiles = new Set([
+      'packages/capek/src/core/workflow.ts',
+      'packages/capek/src/core/workflow-decomposer.ts',
+      'packages/capek/src/core/workflow-synthesizer.ts',
+      'packages/capek/src/core/workflow-orchestrator-session.ts',
+    ]);
+    const violations: string[] = [];
+    for (const file of scanDirectory(dir('core'))) {
+      const repoFile = relative(repositoryRoot, file.path);
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        const resolved = resolveLocalSpecifier(imp.specifier, file.path, packageSourceRoot);
+        if (resolved !== null && isWithin(resolved, dir('workflow'))) {
+          if (forwarderFiles.has(repoFile)) continue;
+          violations.push(
+            `${repoFile} imports ${imp.specifier} (${imp.kind}) [rule: core-no-workflow-domain]`,
+          );
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  test('the workflow domain forwarders re-export the domain implementation', () => {
+    const files = [
+      'packages/capek/src/core/workflow.ts',
+      'packages/capek/src/core/workflow-decomposer.ts',
+      'packages/capek/src/core/workflow-synthesizer.ts',
+      'packages/capek/src/core/workflow-orchestrator-session.ts',
+    ];
+    for (const repoFile of files) {
+      const file = scanDirectory(dir('core')).find((candidate) => relative(repositoryRoot, candidate.path) === repoFile);
+      expect(file, repoFile).toBeDefined();
+      const imports = parseImports(file!.sourceText, file!.path);
+      const resolved = imports.filter((imp) => {
+        const target = resolveLocalSpecifier(imp.specifier, file!.path, packageSourceRoot);
+        return target !== null && isWithin(target, dir('workflow'));
+      });
+      expect(resolved.length, repoFile).toBe(1);
+    }
+  });
+
+  test('the workflow domain consumes the subagent domain only through the task-tool and policy contracts', () => {
+    const allowedEdges: Record<string, string[]> = {
+      'packages/capek/src/workflow/execution.ts': [
+        '../subagent/task-tool',
+        '../subagent/policy',
+      ],
+    };
+    const violations: string[] = [];
+    for (const file of scanDirectory(dir('workflow'))) {
+      const repoFile = relative(repositoryRoot, file.path);
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        const resolved = resolveLocalSpecifier(imp.specifier, file.path, packageSourceRoot);
+        if (resolved === null || !isWithin(resolved, dir('subagent'))) continue;
+        if ((allowedEdges[repoFile] ?? []).includes(imp.specifier)) continue;
+        violations.push(
+          `${repoFile} imports ${imp.specifier} (${imp.kind}) [rule: workflow-subagent-contract-only]`,
+        );
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  test('the runtime core imports no memory or skills implementation', () => {
+    const violations: string[] = [];
+    for (const file of scanDirectory(dir('core'))) {
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        const resolved = resolveLocalSpecifier(imp.specifier, file.path, packageSourceRoot);
+        if (resolved === null) continue;
+        if (isWithin(resolved, dir('memory')) || isWithin(resolved, dir('skills'))) {
+          violations.push(
+            `${relative(repositoryRoot, file.path)} imports ${imp.specifier} (${imp.kind}) [rule: core-no-memory-skills]`,
+          );
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  test('the runtime core imports the concrete goal domain only through the two compatibility forwarders', () => {
+    const forwarderFiles = new Set([
+      'packages/capek/src/core/goal-evaluator.ts',
+      'packages/capek/src/core/goal-loop.ts',
+    ]);
+    const violations: string[] = [];
+    for (const file of scanDirectory(dir('core'))) {
+      const repoFile = relative(repositoryRoot, file.path);
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        const resolved = resolveLocalSpecifier(imp.specifier, file.path, packageSourceRoot);
+        if (resolved !== null && isWithin(resolved, dir('goals'))) {
+          if (forwarderFiles.has(repoFile)) continue;
+          violations.push(
+            `${repoFile} imports ${imp.specifier} (${imp.kind}) [rule: core-no-goal-domain]`,
+          );
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  test('the goal domain forwarders re-export the domain implementation', () => {
+    const files = [
+      'packages/capek/src/core/goal-evaluator.ts',
+      'packages/capek/src/core/goal-loop.ts',
+    ];
+    for (const repoFile of files) {
+      const file = scanDirectory(dir('core')).find((candidate) => relative(repositoryRoot, candidate.path) === repoFile);
+      expect(file, repoFile).toBeDefined();
+      const imports = parseImports(file!.sourceText, file!.path);
+      const resolved = imports.filter((imp) => {
+        const target = resolveLocalSpecifier(imp.specifier, file!.path, packageSourceRoot);
+        return target !== null && isWithin(target, dir('goals'));
+      });
+      expect(resolved.length, repoFile).toBe(1);
+    }
+  });
+
+  test('the goal domain imports no workflow implementation code', () => {
+    const violations: string[] = [];
+    for (const file of scanDirectory(dir('goals'))) {
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        const resolved = resolveLocalSpecifier(imp.specifier, file.path, packageSourceRoot);
+        if (resolved !== null && isWithin(resolved, dir('workflow'))) {
+          violations.push(
+            `${relative(repositoryRoot, file.path)} imports ${imp.specifier} (${imp.kind}) [rule: goal-no-workflow-implementation]`,
           );
         }
       }

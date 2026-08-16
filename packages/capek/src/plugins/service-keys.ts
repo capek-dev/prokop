@@ -19,7 +19,7 @@ import type { ContextSources } from '../context/sources';
 import type { ContextAssembler } from '../context/assembler';
 export type { ContextAssembler, ContextAssemblyData } from '../context/assembler';
 import type { ConnectableProvider, ConnectOptions, ConnectResult, ModelFactoryOptions, ModelFactoryResult } from '../providers/types';
-import type { RuntimeHost } from '../runtime/host';
+import type { BroadcastFn, BroadcastSessionFn, RuntimeHost } from '../runtime/host';
 import type { SandboxController } from '../sandbox/controller';
 import type { SchedulerHost } from '../scheduler/host';
 import type { SessionSearchHost } from '../session-search/host';
@@ -119,6 +119,42 @@ export const capekProviderOverridesKey = serviceKey<ReadonlyMap<string, Connecta
  * the runtime core resolves it through `getContextAssembler()`. */
 export const capekContextAssemblerKey = serviceKey<ContextAssembler>(
   'capek.context-assembler',
+  'agent',
+);
+
+/**
+ * C5 shared optional-domain model-turn service contract. The workflow and
+ * goals slices both run short visible model turns (decomposer, synthesizer,
+ * goal evaluator) through this contract; the workflow slice named it and
+ * `plugins/orchestrator-session.ts` provides the current implementation
+ * (`workflow/orchestrator-session.ts`), so the goals slice consumes the
+ * same service without owning workflow code.
+ */
+export interface OrchestratorSessionContractOptions {
+  parentSessionId: string;
+  title: string;
+  agentName: string;
+  systemPrompt: string;
+  userPrompt: string;
+  maxTokens?: number;
+  abortSignal?: AbortSignal;
+  broadcast?: BroadcastFn;
+  broadcastSessionCreated?: BroadcastSessionFn;
+  broadcastSessionUpdated?: BroadcastSessionFn;
+}
+
+export interface OrchestratorSessionContractResult {
+  text: string;
+  json: Record<string, unknown> | null;
+  sessionId: string;
+}
+
+export interface OrchestratorSessionContract {
+  run(options: OrchestratorSessionContractOptions): Promise<OrchestratorSessionContractResult>;
+}
+
+export const capekOrchestratorSessionKey = serviceKey<OrchestratorSessionContract>(
+  'capek.orchestrator-session',
   'agent',
 );
 

@@ -82,7 +82,9 @@ describe('createAgent through the agent scope', () => {
 
     const snapshot = agentScope.snapshot();
     // C4 adds the six coding capability services on top of the C2
-    // inventory (4 process services plus 9 facade services).
+    // inventory (4 process services plus 9 facade services). The C5
+    // subagent domain is not part of the facade base composition: facade
+    // profiles install optional domains explicitly.
     expect(snapshot.services).toHaveLength(19);
     const facadeServices = snapshot.services.filter((service) =>
       service.providerPluginId.startsWith('facade.'));
