@@ -4,10 +4,21 @@ import { tmpdir } from 'os';
 import type { LoadedTool } from '@jean2/sdk';
 import { resolveToolsPath, getDefaultToolsPath } from '@/config';
 import { clearCache as clearToolsCache, downloadArtifact, verifyChecksum, extractArtifact, validateArtifactStructure, ArtifactError, readInstallManifest, writeInstallManifest, type InstallManifest } from '@capekai/core/compat/jean2';
+import {
+  buildSourceInstallManifest,
+  buildUrlInstallManifest,
+  defaultEntry,
+  isPreviousEntry,
+  isStagingEntry,
+  readVersionValue,
+  requireArtifactPackageJson,
+  toolInstallDir,
+  validateToolModuleExports,
+  VERSION_FILE,
+  type ToolInstallManifest,
+} from '@/domains/tool-installation';
 import { installDependencies, NpmInstallError } from './tool-npm-installer';
 import { bundleTool } from './tool-bundler';
-
-const VERSION_FILE = 'VERSION';
 
 export type { InstallManifest } from '@capekai/core/compat/jean2';
 
@@ -39,7 +50,7 @@ function ensureToolsDir(toolsDir: string): string {
 }
 
 function getToolDir(toolsDir: string, toolName: string): string {
-  return join(toolsDir, toolName);
+  return toolInstallDir(toolsDir, toolName);
 }
 
 function readVersion(toolDir: string): string | null {
@@ -48,7 +59,7 @@ function readVersion(toolDir: string): string | null {
     return null;
   }
   try {
-    return readFileSync(versionPath, 'utf-8').trim() || null;
+    return readVersionValue(readFileSync(versionPath, 'utf-8'));
   } catch {
     return null;
   }
@@ -57,16 +68,7 @@ function readVersion(toolDir: string): string | null {
 async function validateToolModule(modulePath: string): Promise<{ name: string }> {
   try {
     const module = await import(modulePath);
-
-    if (!module.definition || typeof module.execute !== 'function') {
-      throw new Error('Tool must export "definition" and "execute"');
-    }
-
-    const name = module.definition.name;
-    if (!name) {
-      throw new Error('tool.definition.name is required');
-    }
-
+    const name = validateToolModuleExports(module);
     return { name };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -144,18 +146,16 @@ export async function installTool(
 
   const version = readVersion(stagingDir);
 
-  const manifest: InstallManifest = {
+  const manifest: ToolInstallManifest = buildSourceInstallManifest({
     toolName,
-    toolVersion: version,
+    version,
     installedAt: new Date().toISOString(),
     sourcePath,
-    entry: existsSync(toolJsPath) ? 'tool.js' : 'tool.ts',
-    runtime: 'bun',
-    installStrategy: 'source+npm',
+    entry: defaultEntry(existsSync(toolJsPath)),
     sdkVersion,
     sdkIntegrity,
-  };
-  writeInstallManifest(stagingDir, manifest);
+  });
+  writeInstallManifest(stagingDir, manifest as unknown as InstallManifest);
 
   if (existsSync(finalDir)) {
     const backupDir = finalDir + '.previous';
@@ -228,7 +228,7 @@ export async function installToolFromUrl(
     const extractedRoot = await extractArtifact(archivePath, tempDir);
 
     const validation = validateArtifactStructure(extractedRoot, entry);
-    if (!validation.hasPackageJson) {
+    if (!requireArtifactPackageJson(validation)) {
       return {
         success: false,
         toolName,
@@ -298,21 +298,19 @@ export async function installToolFromUrl(
       },
     });
 
-    const version = readVersion(stagingDir);
+  const version = readVersion(stagingDir);
 
-    const manifest: InstallManifest = {
-      toolName: resolvedToolName,
-      toolVersion: version,
-      installedAt: new Date().toISOString(),
-      sourceUrl: url,
-      artifactSha256,
-      entry: bundledEntry,
-      runtime: 'bun',
-      installStrategy: 'source+npm+bundle',
-      sdkVersion: sdkVersionFromUrl,
-      sdkIntegrity: sdkIntegrityFromUrl,
-    };
-    writeInstallManifest(stagingDir, manifest);
+  const manifest: ToolInstallManifest = buildUrlInstallManifest({
+    toolName: resolvedToolName,
+    version,
+    installedAt: new Date().toISOString(),
+    sourceUrl: url,
+    artifactSha256,
+    entry: bundledEntry,
+    sdkVersion: sdkVersionFromUrl,
+    sdkIntegrity: sdkIntegrityFromUrl,
+  });
+  writeInstallManifest(stagingDir, manifest as unknown as InstallManifest);
 
     if (existsSync(finalDir)) {
       const backupDir = finalDir + '.previous';
@@ -392,17 +390,7 @@ async function resolveToolNameFromModule(
 
   try {
     const module = await import(modulePath);
-
-    if (!module.definition || typeof module.execute !== 'function') {
-      throw new Error('Tool must export "definition" and "execute"');
-    }
-
-    const name = module.definition.name;
-    if (!name) {
-      throw new Error('tool.definition.name is required');
-    }
-
-    return name;
+    return validateToolModuleExports(module);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`Module validation failed: ${message}`, { cause: err });
@@ -452,7 +440,7 @@ export async function getInstalledTools(
 
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      if (entry.name.endsWith('.staging') || entry.name.endsWith('.previous')) continue;
+      if (isStagingEntry(entry.name) || isPreviousEntry(entry.name)) continue;
 
       const toolName = entry.name;
       const toolDir = join(toolsDir, toolName);

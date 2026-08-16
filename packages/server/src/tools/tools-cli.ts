@@ -16,20 +16,20 @@ import {
 
 const INTERACTIVE_INSTALL_VISIBLE_ITEMS = 10;
 
+import {
+  excludeInstalledTools,
+  selectRecommendedTools,
+  validateInstallOptions,
+} from '@/domains/tool-installation';
+
+export {
+  excludeInstalledTools,
+  selectRecommendedTools,
+  validateInstallOptions,
+};
+
 function pluralize(count: number, singular: string, plural?: string): string {
   return count === 1 ? singular : (plural || `${singular}s`);
-}
-
-export function excludeInstalledTools(
-  tools: RepositoryTool[],
-  installedNames: Iterable<string>,
-): RepositoryTool[] {
-  const installedSet = new Set(installedNames);
-  return tools.filter((tool) => !installedSet.has(tool.name));
-}
-
-export function selectRecommendedTools(tools: RepositoryTool[]): RepositoryTool[] {
-  return tools.filter((tool) => tool.recommended === true);
 }
 
 export interface ListOptions {
@@ -120,19 +120,6 @@ export interface CliInstallOptions {
   all?: boolean;
   recommended?: boolean;
   force?: boolean;
-}
-
-export function validateInstallOptions(options: CliInstallOptions): string | null {
-  const hasNames = (options.names?.length ?? 0) > 0;
-
-  if (options.all && options.recommended) {
-    return 'Cannot combine --all with --recommended.';
-  }
-  if (hasNames && (options.all || options.recommended)) {
-    return 'Cannot combine tool names with --all or --recommended.';
-  }
-
-  return null;
 }
 
 interface TaskResult {

@@ -1,18 +1,26 @@
 import type { RouterContext } from '../router-context';
 import type { ConnectionId } from '../connection-id';
-import { connectProvider, disconnectProvider, getProviderStatus } from '@capekai/core/compat/jean2';
+import { requireWireApplication } from '../application';
 import type { ProviderConnectMessage, ProviderDisconnectMessage } from '@jean2/sdk';
 
+/**
+ * Provider wire handlers (S4). The provider account and OAuth use cases
+ * live in the providers application behind the registry and OAuth ports;
+ * these handlers only map outcomes to the exact wire broadcast/error
+ * shapes.
+ */
 export async function handleProviderConnect(
   ctx: RouterContext<ConnectionId>,
   _ws: ConnectionId,
   msg: ProviderConnectMessage,
 ): Promise<void> {
   try {
-    const result = await connectProvider(msg.provider, {
-      redirectStrategy: msg.redirectStrategy as 'client_redirect' | 'manual_paste' | 'server_callback' | undefined,
-    });
-    const status = await getProviderStatus(msg.provider);
+    const { result, status } = await requireWireApplication().providers.connect(
+      msg.provider,
+      {
+        redirectStrategy: msg.redirectStrategy as 'client_redirect' | 'manual_paste' | 'server_callback' | undefined,
+      },
+    );
     ctx.broadcast({
       type: 'provider.status',
       provider: msg.provider,
@@ -39,7 +47,7 @@ export async function handleProviderDisconnect(
   msg: ProviderDisconnectMessage,
 ): Promise<void> {
   try {
-    await disconnectProvider(msg.provider);
+    await requireWireApplication().providers.disconnect(msg.provider);
     ctx.broadcast({
       type: 'provider.connected',
       provider: msg.provider,

@@ -9,13 +9,56 @@ import {
   configureJean2Storage,
   configureJean2ToolSource,
 } from '@/adapters/capek';
+import type { Jean2SchedulerHostDeps } from '@/adapters/capek/scheduler';
+import { jean2StorageBundle } from '@/adapters/capek/storage';
+import type { Jean2SessionSearchHostDeps } from '@/adapters/capek/session-search';
+import { createJean2ScheduledJobExecution } from '@/adapters/jean2/scheduled-job-execution';
+import { createJean2SessionRepository } from '@/adapters/jean2/session-repository';
+import { createScheduledJobRepository } from '@/infrastructure/sqlite/scheduled-job-repository';
+import { createSessionSearchQueryRepository } from '@/infrastructure/sqlite/session-search-query-repository';
+import { getDatabase } from '@/store';
+
+/** S5 session-search host dependencies. The query port is the SQLite
+ * infrastructure repository with an injected store accessor; session and
+ * workspace lookups come from the existing repository and storage adapter
+ * implementations. */
+function createSessionSearchHostDeps(): Jean2SessionSearchHostDeps {
+  const sessionRepository = createJean2SessionRepository();
+  return {
+    // Bootstrap is the composition root: it injects the concrete store
+    // accessor; the repository holds no module-global connection state.
+    query: createSessionSearchQueryRepository(() => getDatabase()),
+    sessions: {
+      getSession: (id) => sessionRepository.getSession(id),
+      listWorkspaceSessions: (workspaceId) =>
+        sessionRepository.listSessionsByWorkspace(workspaceId, { rootOnly: true }),
+      listAgentSessions: (agentId, limit) =>
+        sessionRepository.listSessionsByAgent(agentId, limit),
+    },
+    workspaces: {
+      getWorkspace: (id) => jean2StorageBundle.workspaces.get(id),
+    },
+  };
+}
+
+/** S4/S5 scheduler host dependencies. The repository is the SQLite
+ * infrastructure implementation with an injected store accessor; execution
+ * delegates to the current runner through the focused Jean2 adapter. */
+function createSchedulerHostDeps(): Jean2SchedulerHostDeps {
+  return {
+    repository: createScheduledJobRepository(() => getDatabase()),
+    execution: createJean2ScheduledJobExecution(),
+  };
+}
 
 /**
  * Explicit Jean2 server composition root.
  *
  * This module assembles the focused Čapek adapters in the order established by
  * the legacy adapter composition. It owns ordering only; every adapter value,
- * fallback, and policy rule lives in its focused `adapters/capek` module.
+ * fallback, and policy rule lives in its focused `adapters/capek` module. The
+ * session-search host must be configured before the compatibility bindings so
+ * the explicit unscoped fallback captures the configured host.
  */
 export function createRuntime(): void {
   configureJean2Storage();
@@ -23,8 +66,8 @@ export function createRuntime(): void {
   configureJean2PreconfigSource();
   configureJean2AgentSource();
   configureJean2InstructionSource();
-  configureJean2SessionSearchHost();
-  configureJean2SchedulerHost();
+  configureJean2SessionSearchHost(createSessionSearchHostDeps());
+  configureJean2SchedulerHost(createSchedulerHostDeps());
   configureJean2ToolSource();
   configureJean2Bindings();
 }

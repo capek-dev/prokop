@@ -114,16 +114,16 @@ export function createApp(application?: WiredApplication) {
   // ============================================================================
 
   registerSessionRoutes(app, wired.http);
-  registerWorkspaceRoutes(app);
+  registerWorkspaceRoutes(app, wired.workspaces);
   registerFileRoutes(app);
-  registerToolRoutes(app);
-  registerMcpRoutes(app);
-  registerConfigRoutes(app);
+  registerToolRoutes(app, wired.tools);
+  registerMcpRoutes(app, wired.mcp);
+  registerConfigRoutes(app, wired.providers);
   registerResponseFormatRoutes(app);
-  registerSchedulerRoutes(app);
-  registerAgentRoutes(app);
+  registerSchedulerRoutes(app, wired.scheduling);
+  registerAgentRoutes(app, wired.agents);
   registerMaintenanceRoutes(app);
-  registerNotificationRoutes(app);
+  registerNotificationRoutes(app, wired.notifications);
   if (process.env.JEAN2_SANDBOX === 'true') {
     registerSandboxRoutes(app);
   }

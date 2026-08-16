@@ -133,6 +133,17 @@ export interface SessionRepositoryPort {
   updateSession(id: string, updates: SessionUpdateInput): Session | null;
   deleteSession(id: string): boolean;
   listSessions(status?: SessionStatus): Session[];
+  /** Workspace sessions, updated_at descending; optional status and
+   * root-only (parent_id IS NULL) filters. Delegates verbatim to the
+   * current store query. */
+  listSessionsByWorkspace(
+    workspaceId: string,
+    options?: { status?: SessionStatus; rootOnly?: boolean },
+  ): Session[];
+  /** Root sessions only (parent_id IS NULL), updated_at descending,
+   * optional limit. Delegates verbatim to the current store query; no
+   * store SQL changes. */
+  listSessionsByAgent(agentId: string, limit?: number): Session[];
   listSessionsGrouped(
     workspaceIds: string[],
     options?: { status?: SessionStatus; rootOnly?: boolean },

@@ -1,5 +1,11 @@
 import { getDatabase } from './index';
 import type { Workspace, WorkspaceSettings, AutoApproveSeverity } from '@jean2/sdk';
+import {
+  autoApproveSeverityOf,
+  DEFAULT_WORKSPACE_SETTINGS,
+  isAgentHomeWorkspace,
+  mapWorkspaceRecord,
+} from '@/domains/workspaces';
 
 interface WorkspaceRow {
   id: string;
@@ -20,34 +26,16 @@ export interface CreateWorkspaceInput {
   settings?: WorkspaceSettings;
 }
 
-const DEFAULT_SETTINGS: WorkspaceSettings = { autoApproveSeverity: 'low' };
+const DEFAULT_SETTINGS = DEFAULT_WORKSPACE_SETTINGS;
 
 /** Resolve the auto-approve severity for a workspace, defaulting to 'low'. */
 export function getWorkspaceAutoApproveSeverity(workspaceId: string): AutoApproveSeverity {
   const workspace = getWorkspace(workspaceId);
-  return workspace?.settings.autoApproveSeverity ?? 'low';
-}
-
-function parseSettings(raw: string | null): WorkspaceSettings {
-  if (!raw) return { ...DEFAULT_SETTINGS };
-  try {
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-  } catch {
-    return { ...DEFAULT_SETTINGS };
-  }
+  return autoApproveSeverityOf(workspace);
 }
 
 function mapRowToWorkspace(row: WorkspaceRow, additionalPaths?: string[]): Workspace {
-  return {
-    id: row.id,
-    name: row.name,
-    path: row.path,
-    isVirtual: row.is_virtual === 1,
-    additionalPaths: additionalPaths ?? [],
-    settings: parseSettings(row.settings),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  return mapWorkspaceRecord(row, additionalPaths);
 }
 
 function batchLoadWorkspacePaths(workspaceIds: string[]): Map<string, string[]> {
@@ -124,7 +112,7 @@ export function listWorkspaces(): Workspace[] {
   const pathMap = batchLoadWorkspacePaths(rows.map(r => r.id));
   return rows
     .map(row => mapRowToWorkspace(row, pathMap.get(row.id)))
-    .filter(w => !w.settings?.isAgentHome);
+    .filter(w => !isAgentHomeWorkspace(w.settings));
 }
 
 export function listAgentHomeWorkspaces(): Workspace[] {
@@ -133,7 +121,7 @@ export function listAgentHomeWorkspaces(): Workspace[] {
   const pathMap = batchLoadWorkspacePaths(rows.map(r => r.id));
   return rows
     .map(row => mapRowToWorkspace(row, pathMap.get(row.id)))
-    .filter(w => w.settings?.isAgentHome === true);
+    .filter(w => isAgentHomeWorkspace(w.settings));
 }
 
 export function updateWorkspace(

@@ -1,19 +1,36 @@
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import { join } from 'path';
-import { AGENTS_DIR } from './storage';
+import { createAgentsApplication, type AgentsApplication } from '@/application/agents';
+import {
+  createJean2AgentPreconfigPort,
+  createJean2AgentWorkspacePort,
+} from '@/adapters/jean2';
+import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
+import { getDataDir } from '@/paths';
+
+/**
+ * S4 compatibility module. The agent memory file policy moved to the agents
+ * application (`application/agents`) over the directory port; this module
+ * keeps every pre-S4 export identity. Removed when consumers migrate.
+ */
+
+let application: AgentsApplication | null = null;
+
+function getApplication(): AgentsApplication {
+  if (!application) {
+    application = createAgentsApplication({
+      dataDir: () => getDataDir(),
+      directory: createAgentDirectoryPort(),
+      workspaces: createJean2AgentWorkspacePort(),
+      preconfigs: createJean2AgentPreconfigPort(),
+    });
+  }
+  return application;
+}
 
 export async function readAgentMemoryFile(
   agentId: string,
   filename: 'USER.md' | 'MEMORY.md',
 ): Promise<string | null> {
-  const filePath = join(AGENTS_DIR, agentId, filename);
-  if (!existsSync(filePath)) return null;
-  try {
-    return await readFile(filePath, 'utf-8');
-  } catch {
-    return null;
-  }
+  return getApplication().readAgentMemoryFile(agentId, filename);
 }
 
 export async function writeAgentMemoryFile(
@@ -21,19 +38,11 @@ export async function writeAgentMemoryFile(
   filename: 'USER.md' | 'MEMORY.md',
   content: string,
 ): Promise<void> {
-  const filePath = join(AGENTS_DIR, agentId, filename);
-  const dir = join(AGENTS_DIR, agentId);
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true });
-  }
-  await writeFile(filePath, content, 'utf-8');
+  return getApplication().writeAgentMemoryFile(agentId, filename, content);
 }
 
 export async function getAgentMemory(agentId: string): Promise<{ user: string; memory: string }> {
-  return {
-    user: (await readAgentMemoryFile(agentId, 'USER.md')) ?? '',
-    memory: (await readAgentMemoryFile(agentId, 'MEMORY.md')) ?? '',
-  };
+  return getApplication().getAgentMemory(agentId);
 }
 
 export async function updateAgentMemory(
@@ -41,6 +50,5 @@ export async function updateAgentMemory(
   target: 'user' | 'memory',
   content: string,
 ): Promise<void> {
-  const filename = target === 'user' ? 'USER.md' : 'MEMORY.md';
-  await writeAgentMemoryFile(agentId, filename, content);
+  return getApplication().updateAgentMemory(agentId, target, content);
 }

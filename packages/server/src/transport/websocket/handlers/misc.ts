@@ -1,9 +1,10 @@
 import type { RouterContext } from '../router-context';
 import type { ConnectionId } from '../connection-id';
-import { handleClientRegistration, getClientIdForConnection, getConnectionById } from '../connection-registry';
+import { handleClientRegistration, getClientByClientId, getClientIdForConnection, getConnectionById } from '../connection-registry';
 import { resolveAsk, getSessionIdForPendingAsk, getAuthorityForPendingAsk, sandboxController, type SandboxRespondMessage } from '@capekai/core/compat/jean2';
 import { getControlState } from '../control-registry';
-import { checkAskResponseEligibility } from '@/core/capability-router';
+import { requireWireApplication } from '../application';
+import { checkAskResponseEligibility } from '@/application/ports/control';
 import type {
   ClientRegisterMessage,
   AskResponseMessage,
@@ -11,7 +12,6 @@ import type {
   NotificationAcknowledgeMessage,
   PongMessage,
 } from '@jean2/sdk';
-import { acknowledgePendingNotification } from '@/services/web-push/dispatch';
 
 export function handleClientRegister(
   ctx: RouterContext<ConnectionId>,
@@ -43,7 +43,7 @@ export function handleNotificationAcknowledge(
     return;
   }
 
-  acknowledgePendingNotification(msg.eventId, msg.sessionId, clientId);
+  requireWireApplication().notifications.acknowledgePendingNotification(msg.eventId, msg.sessionId, clientId);
 }
 
 export function handleAskResponse(
@@ -75,12 +75,14 @@ export function handleAskResponse(
       return;
     }
 
-    const eligibility = checkAskResponseEligibility(
-      senderClientId ?? '',
-      askSessionId,
-      controlState.controllerClientId,
-      askAuthority,
-    );
+    const eligibility = checkAskResponseEligibility({
+      clientId: senderClientId ?? '',
+      capabilities: senderClientId
+        ? (getClientByClientId(senderClientId)?.capabilities ?? [])
+        : [],
+      controllerClientId: controlState.controllerClientId ?? null,
+      authority: askAuthority,
+    });
 
     if (!eligibility.eligible) {
       ctx.send(ws, {

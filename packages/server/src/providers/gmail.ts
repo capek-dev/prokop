@@ -18,6 +18,12 @@ import {
   refreshTokens,
   OAuthTokenRefreshError,
 } from './oauth-manager';
+import {
+  applyGmailRefresh,
+  buildGmailConfig,
+  GMAIL_REAUTH_REQUIRED_MESSAGE,
+  gmailStatusFromConfig,
+} from '@/domains/provider-accounts';
 
 const GMAIL_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GMAIL_REDIRECT_URI = 'http://localhost:1455/oauth/gmail/callback';
@@ -30,7 +36,7 @@ const GMAIL_SCOPES = [
 const REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
 // How often to check whether a refresh is needed.
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-const REAUTH_REQUIRED_MESSAGE = 'Gmail authorization expired or was revoked. Reconnect Gmail to continue.';
+const REAUTH_REQUIRED_MESSAGE = GMAIL_REAUTH_REQUIRED_MESSAGE;
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let isRefreshing = false;
@@ -86,13 +92,7 @@ async function refreshGmailTokenIfNeeded(force = false): Promise<void> {
   isRefreshing = true;
   try {
     const tokens = await refreshTokens('gmail', config.refresh);
-    config.access = tokens.access_token;
-    // Google may rotate refresh tokens, so update if a new one is provided.
-    if (tokens.refresh_token) {
-      config.refresh = tokens.refresh_token;
-    }
-    config.expires = Date.now() + (tokens.expires_in ?? 3600) * 1000;
-    delete config.reauthRequired;
+    applyGmailRefresh(config, tokens, Date.now());
     saveProviderConfig('gmail', config);
     console.debug('[gmail] Token refreshed proactively');
   } catch (err: unknown) {
@@ -151,30 +151,7 @@ const gmailProvider: ConnectableProvider = {
   },
 
   getStatus(): ProviderStatus {
-    const config = loadProviderConfig<GmailProviderConfig>('gmail');
-    if (!config) {
-      return { provider: 'gmail', connected: false };
-    }
-    if (config.reauthRequired) {
-      return {
-        provider: 'gmail',
-        connected: false,
-        reauthRequired: true,
-        error: REAUTH_REQUIRED_MESSAGE,
-        connectedAt: config.connectedAt,
-        displayName: 'Gmail',
-        authType: 'oauth',
-        connectable: true,
-      };
-    }
-    return {
-      provider: 'gmail',
-      connected: true,
-      connectedAt: config.connectedAt,
-      displayName: 'Gmail',
-      authType: 'oauth',
-      connectable: true,
-    };
+    return gmailStatusFromConfig(loadProviderConfig<GmailProviderConfig>('gmail'));
   },
 
   async connect(options) {
@@ -202,29 +179,7 @@ const gmailProvider: ConnectableProvider = {
   },
 
   async onTokensReceived(tokens: TokenResponse): Promise<void> {
-    // Extract email from the id_token JWT payload if present.
-    let email: string | undefined;
-    if (tokens.id_token) {
-      try {
-        const parts = tokens.id_token.split('.');
-        if (parts.length === 3) {
-          const claims = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-          email = claims.email;
-        }
-      } catch {
-        // id_token parsing is best-effort.
-      }
-    }
-
-    const config: GmailProviderConfig = {
-      type: 'oauth',
-      provider: 'gmail',
-      access: tokens.access_token,
-      refresh: tokens.refresh_token,
-      expires: Date.now() + (tokens.expires_in ?? 3600) * 1000,
-      ...(email && { email }),
-      connectedAt: new Date().toISOString(),
-    };
+    const config = buildGmailConfig(tokens, Date.now());
     saveProviderConfig('gmail', config);
     startBackgroundRefresh();
   },

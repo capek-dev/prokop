@@ -18,6 +18,12 @@ import {
   NotFoundError,
   PayloadTooLargeError,
 } from '@/utils/http-errors';
+import {
+  isInsideUnselectedAdditionalRoot,
+  isPathInside,
+  resolveCandidatePath,
+  selectEditableRoot,
+} from '@/domains/workspaces';
 
 import { getLanguageForPath, getMimeTypeForPath } from '@/services/filePreview';
 
@@ -27,34 +33,11 @@ interface WorkspaceLike {
 }
 
 function resolveSelectedRoot(workspace: WorkspaceLike, rootQuery?: string): string {
-  const mainRoot = resolve(workspace.path);
-  if (!rootQuery) return mainRoot;
-
-  const requestedRoot = resolve(rootQuery);
-  const allowedRoots = [mainRoot, ...workspace.additionalPaths.map((path) => resolve(path))];
-  if (!allowedRoots.includes(requestedRoot)) {
+  const selection = selectEditableRoot(workspace, rootQuery);
+  if (!selection.valid) {
     throw new BadRequestError('Invalid workspace root');
   }
-
-  return requestedRoot;
-}
-
-/** Separator-aware containment check so `/foo` does not match `/foobar`. */
-function isInside(child: string, parent: string): boolean {
-  if (child === parent) return true;
-  if (parent === sep) return true;
-  return child.startsWith(parent + sep);
-}
-
-function isInsideUnselectedAdditionalRoot(
-  candidate: string,
-  selectedRoot: string,
-  additionalPaths: string[],
-): boolean {
-  return additionalPaths.some((path) => {
-    const additionalRoot = resolve(path);
-    return additionalRoot !== selectedRoot && isInside(candidate, additionalRoot);
-  });
+  return selection.root;
 }
 
 /** SHA-256 hex digest of exact file bytes. */
@@ -68,8 +51,7 @@ function hashBytes(buf: Uint8Array): string {
  * anchored to the selected root (consistent with the preview route).
  */
 function resolveCandidate(root: string, inputPath: string): string {
-  const normalized = inputPath.replace(/\\/g, '/');
-  return isAbsolute(normalized) ? resolve(normalized) : resolve(join(root, normalized));
+  return resolveCandidatePath(root, inputPath);
 }
 
 /** Canonicalize the selected root via realpath so symlinked roots resolve correctly. */
@@ -107,7 +89,7 @@ export async function readEditableFile(
   const candidate = resolveCandidate(root, inputPath);
 
   if (
-    !isInside(candidate, lexicalRoot)
+    !isPathInside(candidate, lexicalRoot)
     || (
       isAbsolute(inputPath)
       && isInsideUnselectedAdditionalRoot(candidate, lexicalRoot, workspace.additionalPaths)
@@ -124,7 +106,7 @@ export async function readEditableFile(
   } catch {
     throw new NotFoundError('File not found');
   }
-  if (!isInside(realPath, canonicalRoot)) {
+  if (!isPathInside(realPath, canonicalRoot)) {
     throw new ForbiddenError('Path outside workspace');
   }
 
@@ -221,7 +203,7 @@ export async function saveFile(
   const rootRelative = toRootRelative(candidate, root);
 
   if (
-    !isInside(candidate, lexicalRoot)
+    !isPathInside(candidate, lexicalRoot)
     || (
       isAbsolute(input.path)
       && isInsideUnselectedAdditionalRoot(candidate, lexicalRoot, workspace.additionalPaths)
@@ -249,7 +231,7 @@ export async function saveFile(
   } catch {
     throw new NotFoundError('File not found');
   }
-  if (!isInside(realTarget, canonicalRoot)) {
+  if (!isPathInside(realTarget, canonicalRoot)) {
     throw new ForbiddenError('Path outside workspace');
   }
 
@@ -260,7 +242,7 @@ export async function saveFile(
   } catch {
     throw new NotFoundError('File not found');
   }
-  if (!isInside(realParent, canonicalRoot)) {
+  if (!isPathInside(realParent, canonicalRoot)) {
     throw new ForbiddenError('Path outside workspace');
   }
 

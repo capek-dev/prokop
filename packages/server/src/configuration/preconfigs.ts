@@ -6,6 +6,10 @@ import {
   updatePreconfig,
   deletePreconfig,
 } from '@/core/preconfig';
+import {
+  firstUnknownSubagentId,
+  knownSubagentIds,
+} from '@/domains/agents';
 import { getAllModels } from '@/config';
 import {
   ConfigurationNotFoundError,
@@ -195,11 +199,6 @@ export function validateModelReference(modelId: string | null): string | null {
   return null;
 }
 
-function isValidSubagent(preconfig: Preconfig): boolean {
-  const mode = preconfig.mode ?? 'primary';
-  return mode === 'subagent' || mode === 'both';
-}
-
 function validateCanSpawnSubagentsForSet(
   allPreconfigs: Preconfig[],
   targetPreconfig: Preconfig
@@ -208,17 +207,7 @@ function validateCanSpawnSubagentsForSet(
     return null;
   }
 
-  const validSubagentIds = new Set(
-    allPreconfigs
-      .filter(p => isValidSubagent(p))
-      .map(p => p.id)
-  );
+  const validSubagentIds = knownSubagentIds(allPreconfigs);
 
-  for (const subagentId of targetPreconfig.canSpawnSubagents) {
-    if (!validSubagentIds.has(subagentId)) {
-      return subagentId;
-    }
-  }
-
-  return null;
+  return firstUnknownSubagentId(targetPreconfig.canSpawnSubagents, validSubagentIds);
 }

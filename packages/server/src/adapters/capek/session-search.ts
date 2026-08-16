@@ -2,70 +2,71 @@ import {
   configureSessionSearchHost,
   type SessionSearchHost,
 } from '@capekai/core/compat/jean2';
-import {
-  getDatabase,
-  getSession,
-  getSessionsByAgent,
-  getWorkspace,
-  listSessionsByWorkspace,
-} from '@/store';
-import { getMessageContentForFts, searchMessages } from '@/session-search/fts';
+import type { Session, Workspace } from '@jean2/sdk';
+import type { SessionSearchQueryPort } from '@/application/ports/session-search';
 
+/** S5 Capek session-search adapter: translates `SessionSearchHost` calls
+ * onto the query port plus session and workspace lookups. No store, SQL, or
+ * infrastructure imports; the composition root injects concrete deps. */
+export interface Jean2SessionSearchHostSessionAccess {
+  getSession(id: string): Session | null;
+  listWorkspaceSessions(workspaceId: string): Session[];
+  listAgentSessions(agentId: string, limit: number): Session[];
+}
+
+export interface Jean2SessionSearchHostWorkspaceAccess {
+  getWorkspace(id: string): Workspace | null;
+}
+
+export interface Jean2SessionSearchHostDeps {
+  query: SessionSearchQueryPort;
+  sessions: Jean2SessionSearchHostSessionAccess;
+  workspaces: Jean2SessionSearchHostWorkspaceAccess;
+}
+
+let activeDeps: Jean2SessionSearchHostDeps | null = null;
+
+/** Module-level host identity preserved for the S1 forwarding path. Null
+ * deps answer with the Capek empty-host semantics (null, zero, empty lists). */
 export const jean2SessionSearchHost: SessionSearchHost = {
-  getWorkspace,
-  getSession,
-  listWorkspaceSessions: (workspaceId) => listSessionsByWorkspace(workspaceId, { rootOnly: true }),
-  listAgentSessions: (agentId, limit) => getSessionsByAgent(agentId, undefined, limit),
-  countSessionMessages(sessionId) {
-    return (getDatabase().query(
-      'SELECT COUNT(*) as cnt FROM messages WHERE session_id = ?',
-    ).get(sessionId) as { cnt: number }).cnt;
-  },
-  searchMessages,
-  countMessagesBefore(sessionId, timestamp) {
-    return (getDatabase().query(
-      'SELECT COUNT(*) as cnt FROM messages WHERE session_id = ? AND created_at < ?',
-    ).get(sessionId, timestamp) as { cnt: number }).cnt;
-  },
-  countMessagesAfter(sessionId, timestamp) {
-    return (getDatabase().query(
-      'SELECT COUNT(*) as cnt FROM messages WHERE session_id = ? AND created_at > ?',
-    ).get(sessionId, timestamp) as { cnt: number }).cnt;
-  },
-  getLatestMessage(sessionId) {
-    const row = getDatabase().query(
-      'SELECT id, created_at FROM messages WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
-    ).get(sessionId) as { id: string; created_at: number } | undefined;
-    return row ? { id: row.id, timestamp: row.created_at } : null;
-  },
-  getMessage(messageId, sessionId) {
-    const row = getDatabase().query(
-      'SELECT id, created_at FROM messages WHERE id = ? AND session_id = ?',
-    ).get(messageId, sessionId) as { id: string; created_at: number } | undefined;
-    return row ? { id: row.id, timestamp: row.created_at } : null;
-  },
-  listMessagesBefore(sessionId, timestamp, limit) {
-    const rows = getDatabase().query(
-      'SELECT id, role, created_at FROM messages WHERE session_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT ?',
-    ).all(sessionId, timestamp, limit) as Array<{ id: string; role: string; created_at: number }>;
-    return rows.map((row) => ({ id: row.id, role: row.role, timestamp: row.created_at }));
-  },
-  listMessagesAfter(sessionId, timestamp, limit) {
-    const rows = getDatabase().query(
-      'SELECT id, role, created_at FROM messages WHERE session_id = ? AND created_at > ? ORDER BY created_at ASC LIMIT ?',
-    ).all(sessionId, timestamp, limit) as Array<{ id: string; role: string; created_at: number }>;
-    return rows.map((row) => ({ id: row.id, role: row.role, timestamp: row.created_at }));
-  },
-  getMessageSummary(messageId) {
-    const row = getDatabase().query(
-      'SELECT role, created_at FROM messages WHERE id = ?',
-    ).get(messageId) as { role: string; created_at: number } | undefined;
-    if (!row) return null;
-    const { content, toolName } = getMessageContentForFts(messageId);
-    return { role: row.role, timestamp: row.created_at, content, toolName };
-  },
+  getWorkspace: (id) => activeDeps?.workspaces.getWorkspace(id) ?? null,
+  getSession: (id) => activeDeps?.sessions.getSession(id) ?? null,
+  listWorkspaceSessions: (workspaceId) => activeDeps?.sessions.listWorkspaceSessions(workspaceId) ?? [],
+  listAgentSessions: (agentId, limit) => activeDeps?.sessions.listAgentSessions(agentId, limit) ?? [],
+  countSessionMessages: (sessionId) => activeDeps?.query.countSessionMessages(sessionId) ?? 0,
+  searchMessages: (options) => activeDeps?.query.searchMessages(options) ?? [],
+  countMessagesBefore: (sessionId, timestamp) => activeDeps?.query.countMessagesBefore(sessionId, timestamp) ?? 0,
+  countMessagesAfter: (sessionId, timestamp) => activeDeps?.query.countMessagesAfter(sessionId, timestamp) ?? 0,
+  getLatestMessage: (sessionId) => activeDeps?.query.getLatestMessage(sessionId) ?? null,
+  getMessage: (messageId, sessionId) => activeDeps?.query.getMessage(messageId, sessionId) ?? null,
+  listMessagesBefore: (sessionId, timestamp, limit) =>
+    activeDeps?.query.listMessagesBefore(sessionId, timestamp, limit) ?? [],
+  listMessagesAfter: (sessionId, timestamp, limit) =>
+    activeDeps?.query.listMessagesAfter(sessionId, timestamp, limit) ?? [],
+  getMessageSummary: (messageId) => activeDeps?.query.getMessageSummary(messageId) ?? null,
 };
 
-export function configureJean2SessionSearchHost(): void {
+export function createJean2SessionSearchHost(deps: Jean2SessionSearchHostDeps): SessionSearchHost {
+  return {
+    getWorkspace: (id) => deps.workspaces.getWorkspace(id),
+    getSession: (id) => deps.sessions.getSession(id),
+    listWorkspaceSessions: (workspaceId) => deps.sessions.listWorkspaceSessions(workspaceId),
+    listAgentSessions: (agentId, limit) => deps.sessions.listAgentSessions(agentId, limit),
+    countSessionMessages: (sessionId) => deps.query.countSessionMessages(sessionId),
+    searchMessages: (options) => deps.query.searchMessages(options),
+    countMessagesBefore: (sessionId, timestamp) => deps.query.countMessagesBefore(sessionId, timestamp),
+    countMessagesAfter: (sessionId, timestamp) => deps.query.countMessagesAfter(sessionId, timestamp),
+    getLatestMessage: (sessionId) => deps.query.getLatestMessage(sessionId),
+    getMessage: (messageId, sessionId) => deps.query.getMessage(messageId, sessionId),
+    listMessagesBefore: (sessionId, timestamp, limit) => deps.query.listMessagesBefore(sessionId, timestamp, limit),
+    listMessagesAfter: (sessionId, timestamp, limit) => deps.query.listMessagesAfter(sessionId, timestamp, limit),
+    getMessageSummary: (messageId) => deps.query.getMessageSummary(messageId),
+  };
+}
+
+/** Passing deps configures them; no-arg call resets to empty-host defaults
+ * so tests can restore a deterministic state after fake-deps wiring. */
+export function configureJean2SessionSearchHost(deps?: Jean2SessionSearchHostDeps): void {
+  activeDeps = deps ?? null;
   configureSessionSearchHost(jean2SessionSearchHost);
 }

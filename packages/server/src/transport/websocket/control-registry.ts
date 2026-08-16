@@ -1,63 +1,99 @@
-import type { SessionControlState, SessionControlStatus, SessionControlUpdateReason, TakeoverDecision, ControllerGatedAction, ServerMessage } from '@jean2/sdk';
+import type {
+  ControllerGatedAction,
+  ServerMessage,
+  SessionControlState,
+  SessionControlUpdateReason,
+  TakeoverDecision,
+} from '@jean2/sdk';
+import {
+  applyAutoClaim,
+  applyClaim,
+  applyGraceEntry,
+  applyGraceExpiry,
+  applyGraceReattach,
+  applyRelease,
+  applyRequestTakeover,
+  applyRespondTakeover,
+  applyResume,
+  applyTakeoverAutoApprove,
+  decideControllerGate,
+  decideDisconnectTransition,
+  decideStaleTakeover,
+  isAutoClaimEligible,
+  isGraceExpired,
+  makeUncontrolledRecord,
+  recordToState,
+  type ControllerGateRejection,
+  type ControlActionResult,
+  type ControllerRecord,
+  type SessionResumeControlResult,
+} from '@/application/ports/control';
 import { getConnectionById, getClientIdForConnection, getClientByClientId, getConnectionsForClient, type RegisteredConnection } from './connection-registry';
 import type { ConnectionId } from './connection-id';
 
-// Constants
-
-const GRACE_DURATION_MS = 15_000;
+/**
+ * Transport controller registry (S4). The controller and participant
+ * registries, connection lookups, console logs, and sweep scheduling stay
+ * here; every claim/release/takeover/gate/grace decision is delegated to
+ * the named controller domain through the application port layer.
+ */
 
 // Types
 
-export interface SessionControlRecord {
-  sessionId: string;
-  controllerClientId: string | null;
-  controllerConnectionId: ConnectionId | null;
-  status: SessionControlStatus;
-  acquiredAt: number | null;
-  lastHeartbeatAt: number | null;
-  leaseExpiresAt: number | null;
-  pendingTakeover: {
-    requestedByClientId: string;
-    requestedAt: number;
-  } | null;
-}
+export type SessionControlRecord = ControllerRecord;
 
 export interface SessionParticipantEntry {
   clientId: string;
   connectionIds: Set<ConnectionId>;
 }
 
+export type { ControllerGateRejection, ControlActionResult, SessionResumeControlResult };
+
 // Registries
 
-const controlBySessionId = new Map<string, SessionControlRecord>();
+const controlBySessionId = new Map<string, ControllerRecord>();
 const participantsBySessionId = new Map<string, Map<string, SessionParticipantEntry>>();
 
 // Control state helpers
 
 function makeUncontrolledState(sessionId: string): SessionControlState {
-  return {
-    sessionId,
-    controllerClientId: null,
-    controllerConnectionId: null,
-    acquiredAt: null,
-    lastHeartbeatAt: null,
-    leaseExpiresAt: null,
-    status: 'uncontrolled',
-    pendingTakeover: null,
-  };
+  return recordToState(makeUncontrolledRecord(sessionId));
 }
 
-function recordToState(record: SessionControlRecord): SessionControlState {
-  return {
-    sessionId: record.sessionId,
-    controllerClientId: record.controllerClientId,
-    controllerConnectionId: record.controllerConnectionId,
-    acquiredAt: record.acquiredAt,
-    lastHeartbeatAt: record.lastHeartbeatAt,
-    leaseExpiresAt: record.leaseExpiresAt,
-    status: record.status,
-    pendingTakeover: record.pendingTakeover,
-  };
+function ensureControlRecord(sessionId: string): ControllerRecord {
+  let record = controlBySessionId.get(sessionId);
+  if (!record) {
+    record = makeUncontrolledRecord(sessionId);
+    controlBySessionId.set(sessionId, record);
+  }
+  return record;
+}
+
+export function getControlState(sessionId: string): SessionControlState {
+  const record = controlBySessionId.get(sessionId);
+  if (!record) return makeUncontrolledState(sessionId);
+  return recordToState(record);
+}
+
+export function isControlled(sessionId: string): boolean {
+  const record = controlBySessionId.get(sessionId);
+  return record?.status === 'controlled' && record.controllerClientId !== null;
+}
+
+export function isController(sessionId: string, clientId: string): boolean {
+  const record = controlBySessionId.get(sessionId);
+  return record?.controllerClientId === clientId && record?.status === 'controlled';
+}
+
+export function isControllingClient(sessionId: string, clientId: string): boolean {
+  const record = controlBySessionId.get(sessionId);
+  return record?.controllerClientId === clientId;
+}
+
+export function isControllerConnection(sessionId: string, connectionId: ConnectionId): boolean {
+  const clientId = getClientIdForConnection(connectionId);
+  if (!clientId) return false;
+  return isController(sessionId, clientId);
 }
 
 // Participant management
@@ -106,62 +142,7 @@ export function getParticipantClientIds(sessionId: string): string[] {
   return Array.from(participants.keys());
 }
 
-// Control registry
-
-function ensureControlRecord(sessionId: string): SessionControlRecord {
-  let record = controlBySessionId.get(sessionId);
-  if (!record) {
-    record = {
-      sessionId,
-      controllerClientId: null,
-      controllerConnectionId: null,
-      status: 'uncontrolled',
-      acquiredAt: null,
-      lastHeartbeatAt: null,
-      leaseExpiresAt: null,
-      pendingTakeover: null,
-    };
-    controlBySessionId.set(sessionId, record);
-  }
-  return record;
-}
-
-export function getControlState(sessionId: string): SessionControlState {
-  const record = controlBySessionId.get(sessionId);
-  if (!record) return makeUncontrolledState(sessionId);
-  return recordToState(record);
-}
-
-export function isControlled(sessionId: string): boolean {
-  const record = controlBySessionId.get(sessionId);
-  return record?.status === 'controlled' && record.controllerClientId !== null;
-}
-
-export function isController(sessionId: string, clientId: string): boolean {
-  const record = controlBySessionId.get(sessionId);
-  return record?.controllerClientId === clientId && record?.status === 'controlled';
-}
-
-export function isControllingClient(sessionId: string, clientId: string): boolean {
-  const record = controlBySessionId.get(sessionId);
-  return record?.controllerClientId === clientId;
-}
-
-export function isControllerConnection(sessionId: string, connectionId: ConnectionId): boolean {
-  const clientId = getClientIdForConnection(connectionId);
-  if (!clientId) return false;
-  return isController(sessionId, clientId);
-}
-
 // Controller gate
-
-export interface ControllerGateRejection {
-  sessionId: string;
-  action: ControllerGatedAction;
-  code: 'not_controller' | 'session_uncontrolled' | 'registration_required';
-  message: string;
-  control: SessionControlState;
-}
 
 export function checkControllerGate(
   sessionId: string,
@@ -169,33 +150,8 @@ export function checkControllerGate(
   connectionId: ConnectionId,
 ): ControllerGateRejection | null {
   const record = controlBySessionId.get(sessionId);
-
-  if (!record || record.status === 'uncontrolled') {
-    return null;
-  }
-
   const clientId = getClientIdForConnection(connectionId);
-  if (!clientId) {
-    return {
-      sessionId,
-      action,
-      code: 'registration_required',
-      message: 'Client must be registered to perform this action',
-      control: getControlState(sessionId),
-    };
-  }
-
-  if (record.controllerClientId === clientId) {
-    return null;
-  }
-
-  return {
-    sessionId,
-    action,
-    code: 'not_controller',
-    message: 'Only the current controller can perform this action',
-    control: getControlState(sessionId),
-  };
+  return decideControllerGate(record, clientId, sessionId, action);
 }
 
 // Auto-claim
@@ -203,7 +159,7 @@ export function checkControllerGate(
 export function isEligibleForAutoClaim(clientId: string): boolean {
   const client = getClientByClientId(clientId);
   if (!client) return false;
-  return client.interactionMode === 'human' || client.interactionMode === 'hybrid';
+  return isAutoClaimEligible(client.interactionMode);
 }
 
 export function tryAutoClaim(
@@ -212,42 +168,27 @@ export function tryAutoClaim(
   connectionId: ConnectionId,
 ): SessionControlState {
   const record = ensureControlRecord(sessionId);
+  const eligible = isEligibleForAutoClaim(clientId);
+  const previousStatus = record.status;
 
-  if (record.status !== 'uncontrolled') {
-    return recordToState(record);
+  const state = applyAutoClaim(record, clientId, connectionId, Date.now(), eligible);
+
+  if (record.status !== previousStatus) {
+    console.log(
+      `[control] Auto-claim: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
+    );
   }
 
-  if (!isEligibleForAutoClaim(clientId)) {
-    return recordToState(record);
-  }
-
-  const now = Date.now();
-  record.controllerClientId = clientId;
-  record.controllerConnectionId = connectionId;
-  record.status = 'controlled';
-  record.acquiredAt = now;
-  record.lastHeartbeatAt = now;
-  record.leaseExpiresAt = null;
-  record.pendingTakeover = null;
-
-  console.log(
-    `[control] Auto-claim: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
-  );
-
-  return recordToState(record);
+  return state;
 }
 
 // Grace management
 
 export function enterGrace(sessionId: string): void {
   const record = controlBySessionId.get(sessionId);
-  if (!record) return;
-  if (record.status !== 'controlled') return;
-
   const now = Date.now();
-  record.status = 'grace';
-  record.leaseExpiresAt = now + GRACE_DURATION_MS;
-  record.controllerConnectionId = null;
+  const entered = applyGraceEntry(record, now);
+  if (!entered || !record) return;
 
   console.log(
     `[control] Grace entered: sessionId=${sessionId} controllerClientId=${record.controllerClientId} expiresAt=${record.leaseExpiresAt}`,
@@ -260,20 +201,8 @@ export function tryReattachDuringGrace(
   connectionId: ConnectionId,
 ): boolean {
   const record = controlBySessionId.get(sessionId);
-  if (!record) return false;
-  if (record.status !== 'grace') return false;
-  if (record.controllerClientId !== clientId) return false;
-
-  const now = Date.now();
-  if (record.leaseExpiresAt !== null && now > record.leaseExpiresAt) {
-    expireGrace(sessionId);
-    return false;
-  }
-
-  record.status = 'controlled';
-  record.controllerConnectionId = connectionId;
-  record.lastHeartbeatAt = now;
-  record.leaseExpiresAt = null;
+  const reattached = applyGraceReattach(record, clientId, connectionId, Date.now());
+  if (!reattached || !record) return false;
 
   console.log(
     `[control] Grace reattach: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
@@ -285,26 +214,15 @@ export function tryReattachDuringGrace(
 export function expireGrace(sessionId: string): void {
   const record = controlBySessionId.get(sessionId);
   if (!record) return;
-  if (record.status !== 'grace') return;
 
   console.log(
     `[control] Grace expired: sessionId=${sessionId} previousController=${record.controllerClientId}`,
   );
 
-  record.controllerClientId = null;
-  record.controllerConnectionId = null;
-  record.status = 'uncontrolled';
-  record.acquiredAt = null;
-  record.lastHeartbeatAt = null;
-  record.leaseExpiresAt = null;
-  record.pendingTakeover = null;
+  applyGraceExpiry(record);
 }
 
 // Control action handlers
-
-export type ControlActionResult =
-  | { success: true; controlState: SessionControlState; transitionReason: SessionControlUpdateReason }
-  | { success: false; error: string; code: string; controlState: SessionControlState };
 
 export function handleClaim(
   sessionId: string,
@@ -312,67 +230,25 @@ export function handleClaim(
 ): ControlActionResult {
   const conn = getConnectionById(connectionId);
   const clientId = conn?.clientId ?? null;
+  const eligible = clientId ? isEligibleForAutoClaim(clientId) : false;
+  const record = clientId ? ensureControlRecord(sessionId) : controlBySessionId.get(sessionId);
+  const wasUncontrolled = record?.status === 'uncontrolled';
 
-  if (!clientId) {
-    return {
-      success: false,
-      error: 'Client must be registered before claiming control',
-      code: 'registration_required',
-      controlState: getControlState(sessionId),
-    };
-  }
+  const result = applyClaim(record, sessionId, clientId, connectionId, Date.now(), eligible);
 
-  const record = ensureControlRecord(sessionId);
-
-  if (record.status === 'uncontrolled') {
-    const previousStatus = record.status;
-    tryAutoClaim(sessionId, clientId, connectionId);
-    if (record.status !== previousStatus) {
-      return {
-        success: true,
-        controlState: recordToState(record),
-        transitionReason: 'claimed',
-      };
-    }
-    return {
-      success: false,
-      error: 'Claim failed \u2014 client may not be eligible',
-      code: 'not_eligible',
-      controlState: recordToState(record),
-    };
-  }
-
-  if (record.status === 'controlled' && record.controllerClientId === clientId) {
-    return {
-      success: true,
-      controlState: recordToState(record),
-      transitionReason: 'claimed',
-    };
-  }
-
-  if (record.status === 'grace' && record.controllerClientId === clientId) {
-    const reattached = tryReattachDuringGrace(sessionId, clientId, connectionId);
-    if (reattached) {
-      return {
-        success: true,
-        controlState: recordToState(record),
-        transitionReason: 'grace_reattached',
-      };
+  if (result.success) {
+    if (result.transitionReason === 'claimed' && wasUncontrolled) {
+      console.log(
+        `[control] Auto-claim: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
+      );
+    } else if (result.transitionReason === 'grace_reattached') {
+      console.log(
+        `[control] Grace reattach: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
+      );
     }
   }
 
-  return {
-    success: false,
-    error: record.status === 'controlled'
-      ? 'Session is already controlled by another client'
-      : record.status === 'grace'
-        ? 'Session is in grace period for another client'
-        : record.status === 'takeover_requested'
-          ? 'A takeover request is already pending for this session'
-          : 'Cannot claim control in current state',
-    code: 'already_controlled',
-    controlState: recordToState(record),
-  };
+  return result;
 }
 
 export function handleRelease(
@@ -381,61 +257,17 @@ export function handleRelease(
 ): ControlActionResult {
   const conn = getConnectionById(connectionId);
   const clientId = conn?.clientId ?? null;
-
-  if (!clientId) {
-    return {
-      success: false,
-      error: 'Client must be registered before releasing control',
-      code: 'registration_required',
-      controlState: getControlState(sessionId),
-    };
-  }
-
   const record = controlBySessionId.get(sessionId);
-  if (!record) {
-    return {
-      success: false,
-      error: 'No control record for this session',
-      code: 'not_controller',
-      controlState: makeUncontrolledState(sessionId),
-    };
+
+  const result = applyRelease(record, sessionId, clientId);
+
+  if (result.success) {
+    console.log(
+      `[control] Release: clientId=${clientId} sessionId=${sessionId}`,
+    );
   }
 
-  if (record.controllerClientId !== clientId) {
-    return {
-      success: false,
-      error: 'Only the current controller can release control',
-      code: 'not_controller',
-      controlState: recordToState(record),
-    };
-  }
-
-  if (record.status !== 'controlled') {
-    return {
-      success: false,
-      error: `Cannot release control from status '${record.status}'`,
-      code: 'invalid_state',
-      controlState: recordToState(record),
-    };
-  }
-
-  console.log(
-    `[control] Release: clientId=${clientId} sessionId=${sessionId}`,
-  );
-
-  record.controllerClientId = null;
-  record.controllerConnectionId = null;
-  record.status = 'uncontrolled';
-  record.acquiredAt = null;
-  record.lastHeartbeatAt = null;
-  record.leaseExpiresAt = null;
-  record.pendingTakeover = null;
-
-  return {
-    success: true,
-    controlState: recordToState(record),
-    transitionReason: 'released',
-  };
+  return result;
 }
 
 export function handleRequestTakeover(
@@ -445,97 +277,22 @@ export function handleRequestTakeover(
 ): ControlActionResult {
   const conn = getConnectionById(connectionId);
   const clientId = conn?.clientId ?? null;
-
-  if (!clientId) {
-    return {
-      success: false,
-      error: 'Client must be registered before requesting takeover',
-      code: 'registration_required',
-      controlState: getControlState(sessionId),
-    };
-  }
-
   const record = controlBySessionId.get(sessionId);
-  if (!record) {
-    return {
-      success: false,
-      error: 'No control record for this session',
-      code: 'session_uncontrolled',
-      controlState: makeUncontrolledState(sessionId),
-    };
-  }
+  const previousController = record?.controllerClientId ?? null;
 
-  if (record.controllerClientId === clientId) {
-    return {
-      success: false,
-      error: 'You already control this session',
-      code: 'already_controller',
-      controlState: recordToState(record),
-    };
-  }
+  const result = applyRequestTakeover(record, sessionId, clientId, Date.now(), autoApprove);
 
-  if (record.status !== 'controlled') {
-    if (record.status === 'uncontrolled') {
-      return {
-        success: false,
-        error: 'Session is uncontrolled \u2014 use claim instead',
-        code: 'session_uncontrolled',
-        controlState: recordToState(record),
-      };
-    }
-    if (record.status === 'takeover_requested') {
-      return {
-        success: false,
-        error: 'A takeover request is already pending for this session',
-        code: 'takeover_pending',
-        controlState: recordToState(record),
-      };
-    }
-    return {
-      success: false,
-      error: `Cannot request takeover from status '${record.status}'`,
-      code: 'invalid_state',
-      controlState: recordToState(record),
-    };
-  }
-
-  const now = Date.now();
-
-  if (autoApprove) {
+  if (result.success && result.transitionReason === 'takeover_auto_approved') {
     console.log(
-      `[control] Takeover auto-approved (env): newController=${clientId} previousController=${record.controllerClientId} sessionId=${sessionId}`,
+      `[control] Takeover auto-approved (env): newController=${clientId} previousController=${previousController} sessionId=${sessionId}`,
     );
-
-    record.controllerClientId = clientId;
-    record.controllerConnectionId = null;
-    record.acquiredAt = now;
-    record.lastHeartbeatAt = now;
-    record.leaseExpiresAt = null;
-    record.status = 'controlled';
-    record.pendingTakeover = null;
-
-    return {
-      success: true,
-      controlState: recordToState(record),
-      transitionReason: 'takeover_auto_approved',
-    };
+  } else if (result.success && result.transitionReason === 'takeover_requested') {
+    console.log(
+      `[control] Takeover requested: requesterClientId=${clientId} sessionId=${sessionId} controllerClientId=${previousController}`,
+    );
   }
 
-  record.status = 'takeover_requested';
-  record.pendingTakeover = {
-    requestedByClientId: clientId,
-    requestedAt: now,
-  };
-
-  console.log(
-    `[control] Takeover requested: requesterClientId=${clientId} sessionId=${sessionId} controllerClientId=${record.controllerClientId}`,
-  );
-
-  return {
-    success: true,
-    controlState: recordToState(record),
-    transitionReason: 'takeover_requested',
-  };
+  return result;
 }
 
 export function handleRespondTakeover(
@@ -546,92 +303,24 @@ export function handleRespondTakeover(
 ): ControlActionResult {
   const conn = getConnectionById(connectionId);
   const clientId = conn?.clientId ?? null;
-
-  if (!clientId) {
-    return {
-      success: false,
-      error: 'Client must be registered before responding to takeover',
-      code: 'registration_required',
-      controlState: getControlState(sessionId),
-    };
-  }
-
   const record = controlBySessionId.get(sessionId);
-  if (!record) {
-    return {
-      success: false,
-      error: 'No control record for this session',
-      code: 'session_uncontrolled',
-      controlState: makeUncontrolledState(sessionId),
-    };
-  }
 
-  if (record.controllerClientId !== clientId) {
-    return {
-      success: false,
-      error: 'Only the current controller can respond to takeover requests',
-      code: 'not_controller',
-      controlState: recordToState(record),
-    };
-  }
+  const result = applyRespondTakeover(record, sessionId, clientId, requesterClientId, decision, Date.now());
 
-  if (record.status !== 'takeover_requested') {
-    return {
-      success: false,
-      error: 'No takeover request is pending for this session',
-      code: 'no_takeover_pending',
-      controlState: recordToState(record),
-    };
-  }
-
-  if (!record.pendingTakeover || record.pendingTakeover.requestedByClientId !== requesterClientId) {
-    return {
-      success: false,
-      error: 'Takeover request does not match the specified requester',
-      code: 'takeover_mismatch',
-      controlState: recordToState(record),
-    };
-  }
-
-  const now = Date.now();
-
-  if (decision === 'approve') {
+  if (result.success && result.transitionReason === 'takeover_approved') {
     console.log(
       `[control] Takeover approved: newController=${requesterClientId} previousController=${clientId} sessionId=${sessionId}`,
     );
-
-    record.controllerClientId = requesterClientId;
-    record.controllerConnectionId = null;
-    record.acquiredAt = now;
-    record.lastHeartbeatAt = now;
-    record.leaseExpiresAt = null;
-    record.status = 'controlled';
-    record.pendingTakeover = null;
-
-    return {
-      success: true,
-      controlState: recordToState(record),
-      transitionReason: 'takeover_approved',
-    };
+  } else if (result.success && result.transitionReason === 'takeover_denied') {
+    console.log(
+      `[control] Takeover denied: requesterClientId=${requesterClientId} controllerClientId=${clientId} sessionId=${sessionId}`,
+    );
   }
 
-  console.log(
-    `[control] Takeover denied: requesterClientId=${requesterClientId} controllerClientId=${clientId} sessionId=${sessionId}`,
-  );
-
-  record.status = 'controlled';
-  record.pendingTakeover = null;
-
-  return {
-    success: true,
-    controlState: recordToState(record),
-    transitionReason: 'takeover_denied',
-  };
+  return result;
 }
 
 // Stale takeover cleanup
-
-const TAKEOVER_REQUEST_TIMEOUT_MS = 60_000;
 
 export interface StaleTakeoverResult {
   sessionId: string;
@@ -643,27 +332,28 @@ export function clearStaleTakeoverRequests(): StaleTakeoverResult[] {
   const results: StaleTakeoverResult[] = [];
 
   controlBySessionId.forEach((record, sessionId) => {
-    if (
-      record.status === 'takeover_requested' &&
-      record.pendingTakeover &&
-      now - record.pendingTakeover.requestedAt > TAKEOVER_REQUEST_TIMEOUT_MS
-    ) {
-      if (clientHasActiveConnections(record.controllerClientId ?? '')) {
-        console.log(
-          `[control] Stale takeover cleared (controller alive): sessionId=${sessionId} requester=${record.pendingTakeover.requestedByClientId}`,
-        );
+    const controllerAlive = clientHasActiveConnections(record.controllerClientId ?? '');
+    const decision = decideStaleTakeover(record, now, controllerAlive);
+    if (decision === null) return;
 
-        record.status = 'controlled';
-        record.pendingTakeover = null;
-        results.push({ sessionId, reason: 'takeover_denied' });
-      } else {
-        console.log(
-          `[control] Stale takeover cleared (controller gone): sessionId=${sessionId} requester=${record.pendingTakeover.requestedByClientId}`,
-        );
-
-        autoApproveTakeover(sessionId);
-        results.push({ sessionId, reason: 'takeover_auto_approved' });
-      }
+    const requester = record.pendingTakeover?.requestedByClientId;
+    if (decision === 'clear_denied') {
+      console.log(
+        `[control] Stale takeover cleared (controller alive): sessionId=${sessionId} requester=${requester}`,
+      );
+      record.status = 'controlled';
+      record.pendingTakeover = null;
+      results.push({ sessionId, reason: 'takeover_denied' });
+    } else {
+      console.log(
+        `[control] Stale takeover cleared (controller gone): sessionId=${sessionId} requester=${requester}`,
+      );
+      const previousController = record.controllerClientId;
+      applyTakeoverAutoApprove(record, now);
+      console.log(
+        `[control] Takeover auto-approved: newController=${record.controllerClientId} previousController=${previousController} sessionId=${sessionId}`,
+      );
+      results.push({ sessionId, reason: 'takeover_auto_approved' });
     }
   });
 
@@ -678,26 +368,16 @@ function autoApproveTakeover(sessionId: string): void {
 
   const now = Date.now();
   const newControllerClientId = record.pendingTakeover.requestedByClientId;
+  const previousController = record.controllerClientId;
+
+  applyTakeoverAutoApprove(record, now);
 
   console.log(
-    `[control] Takeover auto-approved: newController=${newControllerClientId} previousController=${record.controllerClientId} sessionId=${sessionId}`,
+    `[control] Takeover auto-approved: newController=${newControllerClientId} previousController=${previousController} sessionId=${sessionId}`,
   );
-
-  record.controllerClientId = newControllerClientId;
-  record.controllerConnectionId = null;
-  record.acquiredAt = now;
-  record.lastHeartbeatAt = now;
-  record.leaseExpiresAt = null;
-  record.status = 'controlled';
-  record.pendingTakeover = null;
 }
 
 // Session resume integration
-
-export interface SessionResumeControlResult {
-  controlState: SessionControlState;
-  transitionReason: SessionControlUpdateReason | null;
-}
 
 export function handleSessionResume(
   sessionId: string,
@@ -712,27 +392,20 @@ export function handleSessionResume(
   }
 
   const record = ensureControlRecord(sessionId);
-  let transitionReason: SessionControlUpdateReason | null = null;
+  const eligible = clientId ? isEligibleForAutoClaim(clientId) : false;
+  const result = applyResume(record, clientId, connectionId, Date.now(), eligible);
 
-  if (clientId) {
-    if (record.status === 'grace' && record.controllerClientId === clientId) {
-      const reattached = tryReattachDuringGrace(sessionId, clientId, connectionId);
-      if (reattached) {
-        transitionReason = 'grace_reattached';
-      }
-    } else if (record.status === 'uncontrolled') {
-      const previousStatus = record.status;
-      tryAutoClaim(sessionId, clientId, connectionId);
-      if (record.status !== previousStatus) {
-        transitionReason = 'auto_claimed';
-      }
-    }
+  if (result.transitionReason === 'grace_reattached') {
+    console.log(
+      `[control] Grace reattach: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
+    );
+  } else if (result.transitionReason === 'auto_claimed') {
+    console.log(
+      `[control] Auto-claim: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
+    );
   }
 
-  return {
-    controlState: recordToState(record),
-    transitionReason,
-  };
+  return result;
 }
 
 // Disconnect cleanup
@@ -753,7 +426,6 @@ export function handleConnectionDisconnect(connectionId: ConnectionId): Disconne
   const { clientId, activeSessionIds } = conn;
   const transitions: DisconnectTransition[] = [];
 
-  // Process grace/takeover for every session this connection was participating in
   for (const activeSessionId of activeSessionIds) {
     if (clientId) {
       removeParticipant(activeSessionId, connectionId, clientId);
@@ -761,15 +433,14 @@ export function handleConnectionDisconnect(connectionId: ConnectionId): Disconne
       const participants = participantsBySessionId.get(activeSessionId);
       const clientEntry = participants?.get(clientId);
       if (!clientEntry || clientEntry.connectionIds.size === 0) {
-        if (isController(activeSessionId, clientId)) {
+        const record = controlBySessionId.get(activeSessionId);
+        const decision = decideDisconnectTransition(record, clientId);
+        if (decision === 'grace') {
           enterGrace(activeSessionId);
           transitions.push({ sessionId: activeSessionId, reason: 'grace_entered' });
-        } else if (isControllingClient(activeSessionId, clientId)) {
-          const record = controlBySessionId.get(activeSessionId);
-          if (record?.status === 'takeover_requested') {
-            autoApproveTakeover(activeSessionId);
-            transitions.push({ sessionId: activeSessionId, reason: 'takeover_auto_approved' });
-          }
+        } else if (decision === 'takeover_auto_approved') {
+          autoApproveTakeover(activeSessionId);
+          transitions.push({ sessionId: activeSessionId, reason: 'takeover_auto_approved' });
         }
       }
     }
@@ -793,11 +464,7 @@ export function sweepExpiredGrace(): string[] {
   const expired: string[] = [];
 
   controlBySessionId.forEach((record, sessionId) => {
-    if (
-      record.status === 'grace' &&
-      record.leaseExpiresAt !== null &&
-      now > record.leaseExpiresAt
-    ) {
+    if (isGraceExpired(record, now)) {
       expireGrace(sessionId);
       expired.push(sessionId);
     }

@@ -1,12 +1,10 @@
 import type { Hono } from 'hono';
 import { validate } from './validate';
-import * as providerCredentials from '@/configuration/provider-credentials';
 import * as modelsConfig from '@/configuration/models';
 import * as modelsSync from '@/configuration/models-sync';
 import * as promptsConfig from '@/configuration/prompts';
 import * as preconfigsConfig from '@/configuration/preconfigs';
-import { getConnectableProviders, connectProvider, getProviderStatus, disconnectProvider } from '@capekai/core/compat/jean2';
-import { completeOAuthFlow, handleServerCallback } from '@/providers/oauth-manager';
+import type { ProvidersApplication } from '@/application/providers';
 import { listPrompts } from '@/prompts/registry';
 import {
   createPreconfigSchema,
@@ -20,7 +18,7 @@ import {
   looseObjectSchema,
 } from './schemas';
 
-export function registerConfigRoutes(app: Hono): void {
+export function registerConfigRoutes(app: Hono, providers: ProvidersApplication): void {
   // ============================================================================
   // Preconfigs API (validated)
   // ============================================================================
@@ -135,11 +133,7 @@ export function registerConfigRoutes(app: Hono): void {
   // ============================================================================
 
   app.get('/api/providers', async (c) => {
-    const allProviders = getConnectableProviders();
-    const providerStatuses = allProviders.map(p => ({
-      ...p.descriptor,
-      ...p.getStatus(),
-    }));
+    const providerStatuses = providers.list();
     return c.json({ providers: providerStatuses });
   });
 
@@ -149,10 +143,9 @@ export function registerConfigRoutes(app: Hono): void {
     async (c) => {
       const providerId = c.req.param('providerId');
       const body = c.req.valid('json');
-      const result = await connectProvider(providerId, {
+      const { result, status } = await providers.connect(providerId, {
         redirectStrategy: body.redirectStrategy,
       });
-      const status = await getProviderStatus(providerId);
       return c.json({
         authorizationUrl: result.authorizationUrl,
         flowId: result.flowId,
@@ -165,13 +158,13 @@ export function registerConfigRoutes(app: Hono): void {
 
   app.get('/api/providers/:providerId/status', async (c) => {
     const providerId = c.req.param('providerId');
-    const status = await getProviderStatus(providerId);
+    const status = providers.status(providerId);
     return c.json({ status });
   });
 
   app.delete('/api/providers/:providerId', async (c) => {
     const providerId = c.req.param('providerId');
-    await disconnectProvider(providerId);
+    await providers.disconnect(providerId);
     return c.json({ success: true });
   });
 
@@ -180,7 +173,7 @@ export function registerConfigRoutes(app: Hono): void {
     validate('json', oauthCallbackSchema),
     async (c) => {
       const body = c.req.valid('json');
-      const result = await completeOAuthFlow(
+      const result = await providers.completeOAuth(
         body.flowId,
         body.code,
         body.state ?? '',
@@ -193,7 +186,11 @@ export function registerConfigRoutes(app: Hono): void {
   app.get('/api/providers/:providerId/oauth/callback', async (c) => {
     const providerId = c.req.param('providerId');
     const url = new URL(c.req.url);
-    return await handleServerCallback(providerId, url);
+    const result = await providers.serverCallback(providerId, url);
+    return new Response(result.body, {
+      status: result.status,
+      headers: { 'Content-Type': result.contentType },
+    });
   });
 
   // ============================================================================
@@ -201,7 +198,7 @@ export function registerConfigRoutes(app: Hono): void {
   // ============================================================================
 
   app.get('/api/config/providers', (c) => {
-    const result = providerCredentials.listProviderCredentials();
+    const result = providers.listCredentials();
     return c.json(result);
   });
 
@@ -211,14 +208,14 @@ export function registerConfigRoutes(app: Hono): void {
     async (c) => {
       const provider = c.req.param('provider');
       const body = c.req.valid('json');
-      const result = await providerCredentials.setProviderCredential(provider, body.apiKey ?? '');
+      const result = await providers.setCredential(provider, body.apiKey ?? '');
       return c.json(result);
     },
   );
 
   app.delete('/api/config/providers/:provider', (c) => {
     const provider = c.req.param('provider');
-    const result = providerCredentials.clearProviderCredential(provider);
+    const result = providers.clearCredential(provider);
     return c.json(result);
   });
 

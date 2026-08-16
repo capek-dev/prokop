@@ -7,8 +7,9 @@ import {
   resolveMaxSatisfying,
   extractIntegrity,
 } from '@/services/npm-utils';
+import { PROTECTED_SDK_PACKAGE } from '@/domains/tool-installation';
 
-const PROTECTED_DEPENDENCIES = ['@jean2/sdk'];
+const PROTECTED_DEPENDENCIES = [PROTECTED_SDK_PACKAGE];
 
 export class NpmInstallError extends Error {
   constructor(message: string) {

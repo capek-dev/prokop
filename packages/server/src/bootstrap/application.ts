@@ -1,30 +1,92 @@
 import {
+  createAgentsApplication,
+  createMcpHttpApplication,
+  createProvidersApplication,
+  createSchedulingHttpApplication,
+  createSchedulingTicker,
   createSessionApplication,
   createSessionControlApplication,
   createSessionHttpApplication,
+  createToolsHttpApplication,
+  createWorkspaceApplication,
+  type AgentsApplication,
+  type McpHttpApplication,
+  type NotificationsApplication,
+  type ProvidersApplication,
+  type SchedulingHttpApplication,
+  type SchedulingTicker,
   type SessionApplication,
   type SessionControlApplication,
   type SessionHttpApplication,
+  type ToolsHttpApplication,
+  type WorkspaceApplication,
 } from '@/application';
-import { createJean2AskAuthorityPort, createJean2SessionExecution } from '@/adapters/capek';
-import { createJean2PendingAskPort, createJean2SessionRepository } from '@/adapters/jean2';
+import {
+  createJean2AskAuthorityPort,
+  createJean2ProviderRegistryPort,
+  createJean2SessionExecution,
+  jean2StorageBundle,
+} from '@/adapters/capek';
+import {
+  createJean2AgentPreconfigPort,
+  createJean2AgentWorkspacePort,
+  createJean2McpLifecyclePort,
+  createJean2McpWorkspacePort,
+  createJean2OAuthFlowPort,
+  createJean2PendingAskPort,
+  createJean2ProviderCredentialPort,
+  createJean2ScheduledJobExecution,
+  createJean2ScheduledJobRepository,
+  createJean2SessionRepository,
+  createJean2ToolCatalogPort,
+  createJean2ToolEnvironmentPort,
+  createJean2WorkspaceCleanupPort,
+  getJean2NotificationsApplication,
+  createJean2WorkspaceDirectoryPort,
+  createJean2WorkspacePathConfigPort,
+  createJean2WorkspacePinnedPort,
+  createJean2WorkspaceRepositoryPort,
+  createJean2WorkspaceSessionListingPort,
+  createJean2WorkspaceTerminalPort,
+} from '@/adapters/jean2';
 import { createTransportControllerPorts } from '@/transport/websocket/control-port';
 import { getAutoApproveTakeover } from '@/env';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
+import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
+import { getDataDir } from '@/paths';
 
 export interface WiredApplication {
   session: SessionApplication<ConnectionId>;
   control: SessionControlApplication<ConnectionId>;
   http: SessionHttpApplication;
+  scheduling: SchedulingHttpApplication;
+  /** The wired tick loop; the server startup path installs it into the
+   * legacy `scheduler` entrypoint before calling `startScheduler()`. */
+  schedulerTicker: SchedulingTicker;
+  /** The wired agent promotion, home, and memory use cases (S4). */
+  agents: AgentsApplication;
+  /** The wired workspace record and cleanup use cases (S4). */
+  workspaces: WorkspaceApplication;
+  /** The wired tools catalog and environment use cases (S4). */
+  tools: ToolsHttpApplication;
+  /** The wired MCP lifecycle use cases (S5). */
+  mcp: McpHttpApplication;
+  /** The wired provider account and OAuth use cases (S4). */
+  providers: ProvidersApplication;
+  /** The wired notification reservation and delivery use cases (S4). */
+  notifications: NotificationsApplication;
 }
 
 /**
- * Wired application composition (S3).
+ * Wired application composition (S3, extended by the S4 scheduling slice).
  *
  * Assembles the session and control use cases with concrete Jean2 ports:
  * the store-backed repository adapter, the Capek compat execution adapter,
  * the transport-owned controller gate and control registry, and the current
- * takeover configuration. Bootstrap installs this into the transport layer;
+ * takeover configuration. The S4 scheduling slice adds the scheduled-job
+ * HTTP use cases and the tick loop over the store-backed scheduled-job
+ * repository adapter, the storage workspace lookup, and the current runner
+ * execution adapter. Bootstrap installs this into the transport layer;
  * use cases never import store or Capek implementations themselves.
  */
 export function createWiredApplication(): WiredApplication {
@@ -50,5 +112,56 @@ export function createWiredApplication(): WiredApplication {
 
   const http = createSessionHttpApplication(repository);
 
-  return { session, control, http };
+  const schedulingRepository = createJean2ScheduledJobRepository();
+  const schedulingExecution = createJean2ScheduledJobExecution();
+
+  const scheduling = createSchedulingHttpApplication({
+    repository: schedulingRepository,
+    workspaces: {
+      getWorkspace: (id) => jean2StorageBundle.workspaces.get(id),
+    },
+    execution: schedulingExecution,
+  });
+
+  const schedulerTicker = createSchedulingTicker({
+    repository: schedulingRepository,
+    execution: schedulingExecution,
+  });
+
+  const agents = createAgentsApplication({
+    dataDir: () => getDataDir(),
+    directory: createAgentDirectoryPort(),
+    workspaces: createJean2AgentWorkspacePort(),
+    preconfigs: createJean2AgentPreconfigPort(),
+  });
+
+  const workspaces = createWorkspaceApplication({
+    repository: createJean2WorkspaceRepositoryPort(),
+    sessions: createJean2WorkspaceSessionListingPort(),
+    pinned: createJean2WorkspacePinnedPort(),
+    terminals: createJean2WorkspaceTerminalPort(),
+    cleanup: createJean2WorkspaceCleanupPort(),
+    directory: createJean2WorkspaceDirectoryPort(),
+    paths: createJean2WorkspacePathConfigPort(),
+  });
+
+  const tools = createToolsHttpApplication({
+    catalog: createJean2ToolCatalogPort(),
+    environment: createJean2ToolEnvironmentPort(),
+  });
+
+  const mcp = createMcpHttpApplication({
+    lifecycle: createJean2McpLifecyclePort(),
+    workspaces: createJean2McpWorkspacePort(),
+  });
+
+  const providers = createProvidersApplication({
+    registry: createJean2ProviderRegistryPort(),
+    oauth: createJean2OAuthFlowPort(),
+    credentials: createJean2ProviderCredentialPort(),
+  });
+
+  const notifications = getJean2NotificationsApplication();
+
+  return { session, control, http, scheduling, schedulerTicker, agents, workspaces, tools, mcp, providers, notifications };
 }

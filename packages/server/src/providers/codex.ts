@@ -12,36 +12,15 @@ import {
   refreshTokens,
   getDefaultRedirectUri,
 } from './oauth-manager';
+import {
+  applyCodexRefresh,
+  buildCodexConfig,
+  CODEX_OAUTH_DUMMY_KEY,
+  codexStatusFromConfig,
+} from '@/domains/provider-accounts';
 
 const CODEX_API_ENDPOINT = 'https://chatgpt.com/backend-api/codex/responses';
-const OAUTH_DUMMY_KEY = 'codex-oauth-dummy-key';
-
-interface IdTokenClaims {
-  chatgpt_account_id?: string;
-  organizations?: Array<{ id: string }>;
-  email?: string;
-  'https://api.openai.com/auth'?: {
-    chatgpt_account_id?: string;
-  };
-}
-
-function parseJwtClaims(token: string): IdTokenClaims | undefined {
-  const parts = token.split('.');
-  if (parts.length !== 3) return undefined;
-  try {
-    return JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-  } catch {
-    return undefined;
-  }
-}
-
-function extractAccountId(claims: IdTokenClaims): string | undefined {
-  return (
-    claims.chatgpt_account_id ||
-    claims['https://api.openai.com/auth']?.chatgpt_account_id ||
-    claims.organizations?.[0]?.id
-  );
-}
+const OAUTH_DUMMY_KEY = CODEX_OAUTH_DUMMY_KEY;
 
 // Register Codex OAuth config with the generalized manager
 registerOAuthConfig('codex', {
@@ -66,19 +45,7 @@ async function getCodexConfig(): Promise<CodexProviderConfig | null> {
   if (config.expires < Date.now()) {
     try {
       const tokens = await refreshTokens('codex', config.refresh);
-      config.access = tokens.access_token;
-      config.refresh = tokens.refresh_token;
-      config.expires = Date.now() + (tokens.expires_in ?? 3600) * 1000;
-
-      if (tokens.id_token) {
-        const claims = parseJwtClaims(tokens.id_token);
-        if (claims) {
-          const accountId = extractAccountId(claims);
-          if (accountId) {
-            config.accountId = accountId;
-          }
-        }
-      }
+      applyCodexRefresh(config, tokens, Date.now());
 
       saveProviderConfig('codex', config);
     } catch (err: unknown) {
@@ -93,14 +60,11 @@ async function getCodexConfig(): Promise<CodexProviderConfig | null> {
 }
 
 function getCodexStatus(): { connected: boolean; connectedAt?: string; accountId?: string } {
-  const config = loadProviderConfig<CodexProviderConfig>('codex');
-  if (!config) {
-    return { connected: false };
-  }
+  const status = codexStatusFromConfig(loadProviderConfig<CodexProviderConfig>('codex'));
   return {
-    connected: true,
-    connectedAt: config.connectedAt,
-    accountId: config.accountId,
+    connected: status.connected,
+    connectedAt: status.connectedAt,
+    accountId: status.accountId,
   };
 }
 
@@ -190,16 +154,7 @@ const codexProvider: ConnectableProvider = {
   },
 
   async onTokensReceived(tokens: TokenResponse): Promise<void> {
-    const accountId = tokens.id_token ? extractAccountId(parseJwtClaims(tokens.id_token) ?? {}) : undefined;
-    const config: CodexProviderConfig = {
-      type: 'oauth',
-      provider: 'codex',
-      access: tokens.access_token,
-      refresh: tokens.refresh_token,
-      expires: Date.now() + (tokens.expires_in ?? 3600) * 1000,
-      ...(accountId && { accountId }),
-      connectedAt: new Date().toISOString(),
-    };
+    const config = buildCodexConfig(tokens, Date.now());
     saveProviderConfig('codex', config);
   },
 
