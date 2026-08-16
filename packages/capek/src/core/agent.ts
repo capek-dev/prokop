@@ -13,6 +13,7 @@ import { createStepCallbacks, type CallbackEvent, type UsageEventData } from './
 import { createStreamHandlers } from './stream-handlers';
 import { convertToAiSdkMessages } from './message-utils';
 import { buildAiSdkTools, type BuildToolsOptions } from './build-tools';
+import { getContextAssembler } from '../context/assembler';
 import { getAgentDirectory } from '../context';
 import { initializeToolWorkspace } from '../tools/tool-source';
 import { resolveEffectiveSubagentTargets } from './subagent-policy';
@@ -21,7 +22,6 @@ import { join } from 'path';
 import { classifyApiError } from '../utils/errors';
 import { createErrorEvent, type ErrorEvent } from './error-handling';
 import type { CompactionPolicy } from './compaction';
-import { buildSystemMessage } from './stream/system-message';
 import { computeAutoThreshold } from './stream/compaction-threshold';
 import { buildStreamConfig } from './stream/stream-config';
 import { extractFinalizationData } from './stream/finalization';
@@ -130,8 +130,8 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
       allowSelfAsSubagent: true,
     })).some((candidate: { id: string }) => candidate.id === preconfig.id);
 
-  // Build system message
-  const systemMessage = await buildSystemMessage({
+  // Build system message through the ordered context assembler contract
+  const systemMessage = await getContextAssembler().build({
     preconfig,
     workspacePath,
     workspaceId,

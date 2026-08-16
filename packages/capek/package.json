@@ -12,6 +12,10 @@
       "types": "./src/compat/jean2.ts",
       "default": "./src/compat/jean2.ts"
     },
+    "./internal/composition": {
+      "types": "./src/internal/composition.ts",
+      "default": "./src/internal/composition.ts"
+    },
     "./tool": {
       "types": "./src/tool.ts",
       "default": "./src/tool.ts"

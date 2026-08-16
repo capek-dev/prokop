@@ -11,6 +11,7 @@ import {
 } from '../tools/tool-output-artifacts';
 import { getSession } from '../storage/runtime';
 import type { AskBroadcastFn } from '../tools/ask-user-api';
+import { hasScopedToolRegistryResolver } from '../tools/registry';
 import { join } from 'path';
 import { buildExternalTools } from './tool-builders/external-tools';
 import { buildWorkspaceTools } from './tool-builders/workspace-tools';
@@ -127,6 +128,12 @@ export async function buildAiSdkTools(
     Object.assign(tools, agentTools);
   }
 
-  tools[RETRIEVE_TOOL_OUTPUT_NAME] = buildRetrieveToolOutputAiTool(sessionId);
+  // The unscoped legacy Jean2 path keeps the unconditional retrieval
+  // injection. Under a scoped contributed resolver, retrieval is an
+  // ordinary contributed tool: it enters through toolNames -> resolver ->
+  // buildExternalTools exactly when its contribution is visible.
+  if (!hasScopedToolRegistryResolver()) {
+    tools[RETRIEVE_TOOL_OUTPUT_NAME] = buildRetrieveToolOutputAiTool(sessionId);
+  }
   return wrapToolsWithOutputPolicy(tools, { sessionId, workspaceId });
 }

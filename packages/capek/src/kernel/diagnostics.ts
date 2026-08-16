@@ -292,9 +292,11 @@ export function buildSnapshot(view: ScopeStateView): ScopeDiagnosticsSnapshot {
 }
 
 /** Assembles effective context sections in deterministic order. Null
- * sections are omitted without shifting the other sections. */
+ * sections are omitted without shifting the other sections. The optional
+ * `data` is passed through to every provider as `ContextBuildContext.data`. */
 export async function buildContextSections(
   view: ScopeStateView,
+  data?: unknown,
 ): Promise<ProvidedContextSection[]> {
   const chain = chainOf(view);
   const provided: ProvidedContextSection[] = [];
@@ -304,7 +306,7 @@ export async function buildContextSections(
     if (contribution === undefined) {
       continue;
     }
-    const content = await contribution.provide({ kind: section.scopeKind });
+    const content = await contribution.provide({ kind: section.scopeKind, data });
     if (content === null) {
       continue;
     }

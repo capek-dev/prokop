@@ -25,6 +25,14 @@ export function withToolRegistryResolver<T>(resolver: ToolRegistryResolver, call
   return scopedResolver.run(resolver, callback);
 }
 
+/** True when an ambient scoped tool resolver is installed. The legacy
+ * unscoped execution path keeps its unconditional builtin-tool injection;
+ * scoped compositions resolve every tool, including retrieve-tool-output,
+ * through their resolver instead. */
+export function hasScopedToolRegistryResolver(): boolean {
+  return scopedResolver.getStore() !== undefined;
+}
+
 export function configureToolsPath(path?: string): void {
   defaultToolsPath = path ? resolve(path) : null;
   clearCache();

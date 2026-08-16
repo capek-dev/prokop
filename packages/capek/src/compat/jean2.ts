@@ -1,5 +1,14 @@
 export const jean2CompatibilityPhase = 9 as const;
 
+// The ALS compatibility runtime falls back to the fixed legacy builder until
+// a composed agent scope seeds its ordered assembler. Installed here so the
+// Jean2 server path (which runs outside enterAgentScope) keeps the exact
+// pre-C3 system-message behavior byte-for-byte.
+import { setDefaultContextAssembler } from '../context/assembler';
+import { fixedBuilderContextAssembler } from '../plugins/legacy-system-message';
+
+setDefaultContextAssembler(fixedBuilderContextAssembler);
+
 export {
   getJean2CompatibilityBindings,
   setJean2CompatibilityBindings,
@@ -63,7 +72,7 @@ export * from '../core/tool-capabilities';
 export * from '../core/stream/compaction-threshold';
 export * from '../core/stream/finalization';
 export * from '../core/stream/stream-config';
-export * from '../core/stream/system-message';
+export * from '../plugins/legacy-system-message';
 export * from '../core/tool-builders/agent-tools';
 export * from '../core/tool-builders/external-tools';
 export * from '../core/tool-builders/workspace-tools';

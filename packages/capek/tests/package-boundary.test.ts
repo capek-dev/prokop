@@ -5,6 +5,7 @@ import ts from 'typescript';
 import * as rootApi from '@capekai/core';
 import { capekPackagePhase, createAgent } from '@capekai/core';
 import { jean2CompatibilityPhase } from '@capekai/core/compat/jean2';
+import * as compositionApi from '@capekai/core/internal/composition';
 import { createInMemoryConversationStore } from '@capekai/core/storage';
 
 const repositoryRoot = resolve(import.meta.dir, '../../..');
@@ -97,6 +98,35 @@ describe('package boundary', () => {
     expect('handleChat' in rootApi).toBe(false);
     expect('setJean2CompatibilityBindings' in rootApi).toBe(false);
     expect('streamChatWithRetry' in rootApi).toBe(false);
+  });
+
+  test('internal composition subpath exposes exactly the narrow composition surface', () => {
+    expect(Object.keys(compositionApi).sort()).toEqual([
+      'C2_PROCESS_KEYS',
+      'C2_REQUIRED_AGENT_KEYS',
+      'C2_SERVICE_KEYS',
+      'capekContextAssemblerKey',
+      'capekContextSourcesKey',
+      'capekInstalledToolRegistryKey',
+      'capekProviderOverridesKey',
+      'capekProviderRegistryKey',
+      'capekRuntimeConfigurationKey',
+      'capekRuntimeHostKey',
+      'capekSandboxControllerKey',
+      'capekSchedulerHostKey',
+      'capekSessionSearchHostKey',
+      'capekStorageKey',
+      'capekToolResolverKey',
+      'capekToolSourceKey',
+      'createCurrentAgentScope',
+      'createCurrentProcessScope',
+      'enterAgentScope',
+    ].sort());
+    expect(typeof compositionApi.createCurrentProcessScope).toBe('function');
+    expect(typeof compositionApi.createCurrentAgentScope).toBe('function');
+    expect(typeof compositionApi.enterAgentScope).toBe('function');
+    expect(typeof compositionApi.capekStorageKey.id).toBe('string');
+    expect(typeof compositionApi.capekContextAssemblerKey.id).toBe('string');
   });
 
   test('Phase 8 runtime uses package-owned host seams', () => {
