@@ -1,5 +1,6 @@
 import {
   createAgentsApplication,
+  createFilesApplication,
   createMcpHttpApplication,
   createProvidersApplication,
   createSchedulingHttpApplication,
@@ -10,6 +11,7 @@ import {
   createToolsHttpApplication,
   createWorkspaceApplication,
   type AgentsApplication,
+  type FilesApplication,
   type McpHttpApplication,
   type NotificationsApplication,
   type ProvidersApplication,
@@ -30,6 +32,7 @@ import {
 import {
   createJean2AgentPreconfigPort,
   createJean2AgentWorkspacePort,
+  createJean2FilesApplicationPort,
   createJean2McpLifecyclePort,
   createJean2McpWorkspacePort,
   createJean2OAuthFlowPort,
@@ -49,6 +52,8 @@ import {
   createJean2WorkspaceSessionListingPort,
   createJean2WorkspaceTerminalPort,
 } from '@/adapters/jean2';
+import { installTerminalSessionStore } from '@/transport/terminal';
+import { createJean2TerminalSessionPort } from '@/adapters/jean2/terminal';
 import { createTransportControllerPorts } from '@/transport/websocket/control-port';
 import { getAutoApproveTakeover } from '@/env';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
@@ -75,6 +80,8 @@ export interface WiredApplication {
   providers: ProvidersApplication;
   /** The wired notification reservation and delivery use cases (S4). */
   notifications: NotificationsApplication;
+  /** The wired files list/search/preview/edit/git use cases (S5). */
+  files: FilesApplication;
 }
 
 /**
@@ -163,5 +170,9 @@ export function createWiredApplication(): WiredApplication {
 
   const notifications = getJean2NotificationsApplication();
 
-  return { session, control, http, scheduling, schedulerTicker, agents, workspaces, tools, mcp, providers, notifications };
+  const files = createFilesApplication(createJean2FilesApplicationPort());
+
+  installTerminalSessionStore(createJean2TerminalSessionPort());
+
+  return { session, control, http, scheduling, schedulerTicker, agents, workspaces, tools, mcp, providers, notifications, files };
 }

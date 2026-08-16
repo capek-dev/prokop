@@ -193,6 +193,7 @@ function makeFakes(state: FakeState) {
 
   const paths: WorkspacePathConfigPort = {
     workspacesDir: () => '/data/workspaces',
+    expandPath: (path) => path,
   };
 
   return { repository, sessions, pinned, terminals, cleanup, directory, paths };

@@ -20,35 +20,17 @@ import {
   parseOAuthErrorBody,
   type PkceCodes,
 } from '@/domains/provider-accounts';
+import { OAuthFlowState } from '@/infrastructure/oauth/oauth-flow-state';
 
 export {
   OAuthTokenRefreshError,
 } from '@/domains/provider-accounts';
 
-interface PendingFlow {
-  providerId: string;
-  state: string;
-  pkce: PkceCodes;
-  redirectUri: string;
-  timeout: ReturnType<typeof setTimeout>;
-}
-
-/** Per-provider OAuth configuration registry. */
-const oauthConfigs = new Map<string, OAuthProviderConfig>();
-
-/** Active pending OAuth flows, keyed by flowId. */
-const pendingFlows = new Map<string, PendingFlow>();
-
-interface LocalServerEntry {
-  server: ReturnType<typeof Bun.serve>;
-  /** Registered callback paths (e.g. "/auth/callback", "/oauth/gmail/callback"). */
-  paths: Set<string>;
-  /** Reference count of active flows using this server. */
-  activeFlows: number;
-}
-
-/** Localhost callback servers, keyed by port. Multiple providers can share a port if they use different paths. */
-const localServers = new Map<number, LocalServerEntry>();
+const oauthState = new OAuthFlowState({
+  handleLocalhostCallback,
+});
+const oauthConfigs = oauthState.configs;
+const pendingFlows = oauthState.pending;
 
 /**
  * Register an OAuth configuration for a provider.
@@ -66,54 +48,6 @@ export function getDefaultRedirectUri(providerId: string): string {
   return config?.redirectUri ?? `http://localhost:1455/oauth/${providerId}/callback`;
 }
 
-/**
- * Start a localhost HTTP server on the port from the redirect URI.
- * Handles the OAuth callback automatically by matching the state parameter.
- */
-function ensureLocalServer(redirectUri: string): void {
-  const parsed = new URL(redirectUri);
-  if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') return;
-  const port = parseInt(parsed.port, 10);
-  if (!port || isNaN(port)) return;
-
-  const path = parsed.pathname;
-  const existing = localServers.get(port);
-
-  if (existing) {
-    existing.paths.add(path);
-    existing.activeFlows++;
-    return;
-  }
-
-  const paths = new Set<string>([path]);
-  const server = Bun.serve({
-    port,
-    fetch(req) {
-      const url = new URL(req.url);
-      if (paths.has(url.pathname)) {
-        return handleLocalhostCallback(url);
-      }
-      return new Response('Not found', { status: 404 });
-    },
-  });
-
-  localServers.set(port, { server, paths, activeFlows: 1 });
-}
-
-function stopLocalServerForPath(redirectUri: string): void {
-  const parsed = new URL(redirectUri);
-  const port = parseInt(parsed.port, 10);
-  if (!port || isNaN(port)) return;
-
-  const entry = localServers.get(port);
-  if (!entry) return;
-
-  entry.activeFlows--;
-  if (entry.activeFlows <= 0) {
-    entry.server.stop();
-    localServers.delete(port);
-  }
-}
 
 /**
  * Handle a callback received by the localhost server.
@@ -172,7 +106,7 @@ async function handleLocalhostCallback(url: URL): Promise<Response> {
     const flow = pendingFlows.get(matchedFlowId);
     const redirectUri = flow?.redirectUri ?? '';
     const result = await completeOAuthFlow(matchedFlowId, code, state, redirectUri);
-    stopLocalServerForPath(redirectUri);
+    oauthState.stopLocalServerForPath(redirectUri);
     void result;
     return new Response(HTML_SUCCESS, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -212,7 +146,7 @@ export async function initiateOAuthFlow(
 
   // For localhost redirect URIs, start a local callback server
   if (redirectStrategy === 'client_redirect') {
-    ensureLocalServer(redirectUri);
+    oauthState.ensureLocalServer(redirectUri);
   }
 
   const authorizationUrl = buildAuthorizationUrl(config, state, pkce.challenge);
@@ -380,6 +314,10 @@ export async function handleServerCallback(
 /**
  * Refresh an access token using a refresh token.
  */
+export function disposeOAuthFlows(): void {
+  oauthState.dispose();
+}
+
 export async function refreshTokens(
   providerId: string,
   refreshToken: string,

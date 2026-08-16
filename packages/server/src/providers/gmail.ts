@@ -102,7 +102,7 @@ async function refreshGmailTokenIfNeeded(force = false): Promise<void> {
     if (err instanceof OAuthTokenRefreshError && err.code === 'invalid_grant') {
       config.reauthRequired = true;
       saveProviderConfig('gmail', config);
-      stopBackgroundRefresh();
+      stopGmailBackgroundRefresh();
       broadcastEvent({
         type: 'provider.status',
         provider: 'gmail',
@@ -116,7 +116,7 @@ async function refreshGmailTokenIfNeeded(force = false): Promise<void> {
   }
 }
 
-function startBackgroundRefresh(): void {
+export function startGmailBackgroundRefresh(): void {
   if (refreshTimer) return;
 
   // Do an immediate refresh check on startup, then set the interval.
@@ -127,17 +127,18 @@ function startBackgroundRefresh(): void {
   }, CHECK_INTERVAL_MS);
 }
 
-function stopBackgroundRefresh(): void {
+export function stopGmailBackgroundRefresh(): void {
   if (refreshTimer) {
     clearInterval(refreshTimer);
     refreshTimer = null;
   }
 }
 
-// Start background refresh if Gmail is already connected from a previous session.
-const savedGmailConfig = loadProviderConfig<GmailProviderConfig>('gmail');
-if (savedGmailConfig && !savedGmailConfig.reauthRequired) {
-  startBackgroundRefresh();
+export function startGmailProviderLifecycle(): void {
+  const savedGmailConfig = loadProviderConfig<GmailProviderConfig>('gmail');
+  if (savedGmailConfig && !savedGmailConfig.reauthRequired) {
+    startGmailBackgroundRefresh();
+  }
 }
 
 const gmailProvider: ConnectableProvider = {
@@ -174,14 +175,14 @@ const gmailProvider: ConnectableProvider = {
   },
 
   async disconnect() {
-    stopBackgroundRefresh();
+    stopGmailBackgroundRefresh();
     deleteProviderConfig('gmail');
   },
 
   async onTokensReceived(tokens: TokenResponse): Promise<void> {
     const config = buildGmailConfig(tokens, Date.now());
     saveProviderConfig('gmail', config);
-    startBackgroundRefresh();
+    startGmailBackgroundRefresh();
   },
 };
 

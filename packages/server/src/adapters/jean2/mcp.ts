@@ -1,4 +1,4 @@
-import * as mcp from '@/mcp';
+import { createMcpLifecycle } from '@/infrastructure/mcp/lifecycle';
 import { getWorkspace } from '@/store/workspaces';
 import type { McpLifecyclePort, McpWorkspacePort } from '@/application/ports/mcp';
 
@@ -10,18 +10,7 @@ import type { McpLifecyclePort, McpWorkspacePort } from '@/application/ports/mcp
  */
 
 export function createJean2McpLifecyclePort(): McpLifecyclePort {
-  return {
-    initializeWorkspace: mcp.initializeWorkspace,
-    shutdownWorkspace: mcp.shutdownWorkspace,
-    connectServer: mcp.connectServer,
-    disconnectServer: mcp.disconnectServer,
-    getServerStatus: mcp.getServerStatus,
-    getAllServerStatus: mcp.getAllServerStatus,
-    getTools: mcp.getTools as unknown as McpLifecyclePort['getTools'],
-    startAuth: mcp.startAuth,
-    finishAuth: mcp.finishAuth,
-    getMcpServers: mcp.getMcpServers,
-  };
+  return createMcpLifecycle();
 }
 
 export function createJean2McpWorkspacePort(): McpWorkspacePort {

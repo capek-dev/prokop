@@ -5,11 +5,7 @@ type TerminalSocket = ServerWebSocket<unknown>;
 import type { IPty, IExitEvent } from 'bun-pty';
 import { spawn } from 'bun-pty';
 import { encodeFrame, OPCODES } from './frames';
-import {
-  createTerminalSession,
-  markTerminalSessionExited,
-  markTerminalSessionDestroyed,
-} from '@/store/terminal-sessions';
+import type { TerminalSessionStorePort } from '@/application/ports/terminal';
 import type { TerminalSessionInfo } from '@jean2/sdk';
 import type { TerminalEventManager } from './event-manager';
 
@@ -51,11 +47,13 @@ export class TerminalManager {
   private wsToSessionId = new WeakMap<TerminalSocket, string>();
   private _eventManager: TerminalEventManager | null = null;
   private _getEventManager: (() => TerminalEventManager) | null = null;
+  private _store: TerminalSessionStorePort | null = null;
 
   private readonly maxSessionsPerWorkspace: number;
   private readonly maxBufferBytes: number;
 
-  constructor() {
+  constructor(store?: TerminalSessionStorePort) {
+    this._store = store ?? null;
     this.maxSessionsPerWorkspace = parseInt(process.env.JEAN2_TERMINAL_MAX_SESSIONS || '10', 10);
     this.maxBufferBytes = parseInt(process.env.JEAN2_TERMINAL_BUFFER_BYTES || String(5 * 1024 * 1024), 10);
     this.startExitedSessionCleanup();
@@ -63,6 +61,10 @@ export class TerminalManager {
 
   setEventManagerGetter(getter: () => TerminalEventManager): void {
     this._getEventManager = getter;
+  }
+
+  setStorePort(store: TerminalSessionStorePort): void {
+    this._store = store;
   }
 
   private get eventManager(): TerminalEventManager {
@@ -73,6 +75,13 @@ export class TerminalManager {
       this._eventManager = this._getEventManager();
     }
     return this._eventManager;
+  }
+
+  private get store(): TerminalSessionStorePort {
+    if (!this._store) {
+      throw new Error('TerminalManager: store port not set');
+    }
+    return this._store;
   }
 
   createSession(
@@ -232,7 +241,7 @@ export class TerminalManager {
       }
       this.eventManager.broadcastSessionInfo(workspaceId, this.getSessionInfo(session), 'created');
 
-      createTerminalSession({
+      this.store.createTerminalSession({
         id: sessionId,
         workspaceId,
         cwd,
@@ -247,7 +256,7 @@ export class TerminalManager {
         if (s) {
           s.status = 'exited';
           s.exitCode = event.exitCode;
-          markTerminalSessionExited(sessionId, event.exitCode);
+          this.store.markTerminalSessionExited(sessionId, event.exitCode);
           this.eventManager.broadcastSessionInfo(s.workspaceId, this.getSessionInfo(s), 'exited');
 
           if (s.clients.size > 0) {
@@ -399,7 +408,7 @@ export class TerminalManager {
 
     session.clients.clear();
     this.sessions.delete(sessionId);
-    markTerminalSessionDestroyed(sessionId);
+    this.store.markTerminalSessionDestroyed(sessionId);
   }
 
   destroyAllSessions(): void {

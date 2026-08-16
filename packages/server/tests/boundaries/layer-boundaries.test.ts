@@ -52,6 +52,7 @@ const compatBarrelExceptions: Record<string, string[]> = {
   'packages/server/src/sandbox/index.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/sandbox/routes.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/scheduler/runner.ts': ['@capekai/core/compat/jean2'],
+  'packages/server/src/adapters/capek/workspace-paths.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/store/compaction-recovery.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/tools/tool-installer.ts': ['@capekai/core/compat/jean2'],
   'packages/server/src/transport/websocket/handlers/misc.ts': ['@capekai/core/compat/jean2'],
@@ -95,6 +96,9 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
   'packages/server/src/adapters/jean2/scheduled-job-execution.ts': [
     '@/scheduler/runner',
   ],
+  'packages/server/src/adapters/jean2/terminal.ts': [
+    '@/store', '@/infrastructure/sqlite/terminal-session-repository',
+  ],
   'packages/server/src/adapters/jean2/agent-workspace.ts': [
     '@/core/preconfig', '@/store/workspaces',
   ],
@@ -102,9 +106,7 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
     '@/store/workspaces', '@/store/sessions', '@/store/pinned-messages',
     '@/store/scheduled-jobs', '@/services/terminal', '@/mcp', '@/paths',
   ],
-  'packages/server/src/adapters/jean2/tool-distribution.ts': [
-    '@/config', '@/tools/tool-installer', '@/tools/tool-repository',
-  ],
+
   'packages/server/src/adapters/jean2/tools.ts': [
     '@/configuration/tool-env', '@/configuration/errors',
   ],
@@ -115,11 +117,20 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
     '@/configuration/provider-credentials',
   ],
   'packages/server/src/adapters/jean2/mcp.ts': [
-    '@/mcp', '@/store/workspaces',
+    '@/infrastructure/mcp/lifecycle', '@/store/workspaces',
+  ],
+  'packages/server/src/adapters/jean2/files.ts': [
+    '@/store', '@/infrastructure/filesystem/workspace-files',
+    '@/infrastructure/filesystem/file-preview',
+    '@/infrastructure/filesystem/file-mutations',
+    '@/infrastructure/filesystem/git-status',
   ],
   'packages/server/src/adapters/jean2/notifications.ts': [
-    '@/store/web-push', '@/services/web-push/credentials',
+    '@/infrastructure/sqlite/notification-repository', '@/infrastructure/web-push/sender',
     '@/store/sessions', '@/store/scheduled-jobs', '@/store/pending-asks', '@/env',
+  ],
+  'packages/server/src/adapters/jean2/tool-distribution.ts': [
+    '@/infrastructure/tools/distribution',
   ],
 };
 
@@ -135,19 +146,18 @@ const aiSdkExceptions: Record<string, string[]> = {
   'packages/server/src/providers/codex.ts': ['ai', '@ai-sdk/openai'],
 };
 
-// S2 exact per-file exceptions for transport wire handlers and terminal
-// adapters that still import legacy implementations. S3 retired the session
-// lifecycle, queue, control, chat, and session handler entries; S4 retired
-// the misc handler's capability-router import (the ask eligibility policy
-// now lives in the controller domain via the application port layer). The
-// permission, provider, and terminal entries stay deferred until their
-// owning slices.
+// S2 exact per-file exceptions for transport wire handlers that still
+// import legacy implementations. S3 retired the session lifecycle, queue,
+// control, chat, and session handler entries; S4 retired the misc handler's
+// capability-router import (the ask eligibility policy now lives in the
+// controller domain via the application port layer). The permission and
+// provider entries stay deferred until their owning slices; the terminal
+// manager entry was retired by the S5 PTY/terminal persistence slice.
 const layerTransportLegacyExceptions: Record<string, string[]> = {
   'packages/server/src/transport/websocket/handlers/misc.ts': [
     '@capekai/core/compat/jean2',
   ],
   'packages/server/src/transport/websocket/handlers/permissions.ts': ['@/store/permissions'],
-  'packages/server/src/transport/terminal/manager.ts': ['@/store/terminal-sessions'],
 };
 
 // S3 exact per-file exceptions for HTTP route files that S3 does not own.
@@ -159,10 +169,6 @@ const layerHttpRoutesLegacyExceptions: Record<string, string[]> = {
     '@/configuration/models',
     '@/configuration/models-sync', '@/configuration/prompts', '@/configuration/preconfigs',
     '@/prompts/registry',
-  ],
-  'packages/server/src/routes/files.ts': [
-    '@/store', '@/services/files', '@/services/filePreview',
-    '@/services/gitStatus', '@/services/fileMutations',
   ],
   'packages/server/src/routes/maintenance.ts': ['@/store/cleanup'],
   'packages/server/src/routes/response-formats.ts': ['@/store'],
@@ -185,6 +191,29 @@ const layerTransportHttpPresentationExceptions: Record<string, string[]> = {
 const layerBootstrapExceptions: Record<string, string[]> = {
   'packages/server/src/bootstrap/application.ts': ['@/env', '@/paths'],
   'packages/server/src/bootstrap/create-runtime.ts': ['@/store'],
+};
+
+// S5 filesystem isolation: the filesystem infrastructure moves the exact
+// pre-slice implementation. It owns no adapter imports; the two utility
+// imports (binary detection and the HTTP error hierarchy used by editable
+// file mutations) are the only exceptions, pinned by the S5 gate below.
+const layerInfrastructureExceptions: Record<string, string[]> = {
+  'packages/server/src/infrastructure/filesystem/file-preview.ts': ['@/utils/binaryDetection'],
+  'packages/server/src/infrastructure/filesystem/file-mutations.ts': [
+    '@/utils/binaryDetection', '@/utils/http-errors',
+  ],
+  'packages/server/src/infrastructure/filesystem/git-status.ts': ['@/utils/binaryDetection'],
+  'packages/server/src/infrastructure/mcp/lifecycle.ts': ['@/mcp'],
+  'packages/server/src/infrastructure/providers/provider-config-files.ts': ['@/paths'],
+  'packages/server/src/infrastructure/providers/provider-credential-files.ts': [
+    '@/configuration/errors', '@/configuration/files', '@/env', '@/paths',
+  ],
+  'packages/server/src/infrastructure/session-search/fts-projector.ts': ['@/session-search/fts'],
+  'packages/server/src/infrastructure/sqlite/notification-repository.ts': ['@/store/web-push'],
+  'packages/server/src/infrastructure/tools/distribution.ts': [
+    '@/config', '@/tools/tool-installer', '@/tools/tool-repository',
+  ],
+  'packages/server/src/infrastructure/web-push/sender.ts': ['@/services/web-push/credentials'],
 };
 
 const globalBaselineRules: DependencyRule[] = [
@@ -278,6 +307,7 @@ const layerRules: DependencyRule[] = [
     rationale: 'Infrastructure implements ports. It may import domains and application ports but not transport route handlers.',
     appliesTo: [infrastructureDir],
     allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir],
+    exceptions: layerInfrastructureExceptions,
   },
   {
     name: 'layer-adapters',
@@ -859,6 +889,49 @@ describe('server layer boundaries', () => {
     ].sort());
   });
 
+  test('S5 gate: the compaction-recovery store compatibility module wires only the capek domain, ports, broadcasts, and store queries', () => {
+    // Temporary S5 compatibility path: store -> compat wiring -> Capek
+    // compaction recovery domain. The reconciliation decisions left the
+    // store in C6 step 2; this module keeps export identities and wires the
+    // inward-facing port over the store queries plus the transport
+    // broadcast adapters.
+    const compatPath = resolve(serverSourceRoot, 'store/compaction-recovery.ts');
+    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === compatPath);
+    expect(file).toBeDefined();
+
+    const imports = parseImports(file!.sourceText, file!.path);
+    expect([...new Set(imports.map((imp) => imp.specifier))].sort()).toEqual([
+      '@capekai/core/compat/jean2',
+      '@/application/ports/session',
+      '@/capek-event-adapter',
+      '@/core/broadcast',
+      './messages',
+      './sessions',
+    ].sort());
+
+    // The module must delegate to the Capek domain functions; the decision
+    // logic no longer lives in the store.
+    const sourceText = file!.sourceText;
+    expect(sourceText).toContain('reconcileSessionCompactionWithDeps');
+    expect(sourceText).toContain('reconcileAllSessionsCompactionWithDeps');
+    expect(sourceText).toContain('reconcileSessionWithDeps');
+    expect(sourceText).toContain('reconcileAllSessionsWithDeps');
+    // The pre-slice ReconcileOptions identity stays local to the store
+    // module instead of re-exporting a new compat-barrel type.
+    expect(sourceText).toContain('export interface ReconcileOptions');
+  });
+
+  test('S5 gate: the compaction recovery port is fulfilled without SQL crossing into the capek domain', () => {
+    // The inward-facing port lives with the other session ports; the Capek
+    // domain depends on deps only. The server store remains the current
+    // query provider until S6.
+    const portsPath = resolve(applicationDir, 'ports/session.ts');
+    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === portsPath);
+    expect(file).toBeDefined();
+    expect(file!.sourceText).toContain('export interface CompactionRecoveryPort');
+    expect(file!.sourceText).toContain('listOrphanedCompactionTriggers(sessionId: string): Message[]');
+  });
+
   test('S4 gate: web-push dispatch consumes the scheduling domain notification policy', () => {
     // The scheduled-run eligibility policy is shared with the scheduling
     // domain through the Jean2 notification adapter; the compat dispatch
@@ -1100,6 +1173,113 @@ describe('server layer boundaries', () => {
     ).toBe(true);
   });
 
+  test('S5 gate: the tool-output artifact store module wraps only the capek storage contract and the database accessor', () => {
+    // The artifact SQLite store holds no product policy: ID validation and
+    // page assembly come from @capekai/core/storage (the mandatory
+    // invariants), and the module only maps rows and issues SQL.
+    const storePath = resolve(serverSourceRoot, 'store/tool-output-artifacts.ts');
+    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === storePath);
+    expect(file).toBeDefined();
+
+    const imports = parseImports(file!.sourceText, file!.path);
+    expect(imports.map((imp) => imp.specifier).sort()).toEqual([
+      '@capekai/core/storage',
+      './index',
+      'node:crypto',
+    ].sort());
+    expect(file!.sourceText).not.toContain('Math.min(limit');
+    expect(file!.sourceText).not.toContain('slice(');
+  });
+
+  test('S5 gate: the sessions and messages store compat modules forward to the infrastructure repositories', () => {
+    // Session/message SQL moved to infrastructure/sqlite in this category.
+    // The compat modules keep every pre-slice export identity and only wire
+    // the temporary side-effect hooks around the repositories. No SQL may
+    // remain in the compat layer.
+    const sessionsPath = resolve(serverSourceRoot, 'store/sessions.ts');
+    const messagesPath = resolve(serverSourceRoot, 'store/messages.ts');
+    for (const [label, path, expectedSpecifiers, forbiddenFragments] of [
+      [
+        'sessions',
+        sessionsPath,
+        [
+          '@/application/ports/session-message',
+          '@/infrastructure/sqlite/session-repository',
+          '@/session-search/fts',
+          './attachments',
+          './index',
+          './workspaces',
+          '@jean2/sdk',
+          'fs',
+          'node:os',
+          'node:path',
+        ],
+        ['INSERT INTO', 'SELECT * FROM', 'CREATE TABLE'],
+      ],
+      [
+        'messages',
+        messagesPath,
+        [
+          '@/application/ports/session-message',
+          '@/infrastructure/session-search/fts-projector',
+          '@/infrastructure/sqlite/message-repository',
+          './index',
+          './sessions',
+          '@jean2/sdk',
+        ],
+        ['INSERT INTO', 'SELECT * FROM', 'CREATE TABLE'],
+      ],
+    ] as const) {
+      const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === path);
+      expect(file, label).toBeDefined();
+
+      const imports = parseImports(file!.sourceText, file!.path);
+      expect(
+        [...new Set(imports.map((imp) => imp.specifier))].sort(),
+        label,
+      ).toEqual([...expectedSpecifiers].sort());
+      for (const fragment of forbiddenFragments) {
+        expect(file!.sourceText, `${label} must not contain ${fragment}`).not.toContain(fragment);
+      }
+      // The compat layer delegates through the repository factory.
+      if (label === 'sessions') {
+        expect(file!.sourceText).toContain('createSessionRepository');
+      } else {
+        expect(file!.sourceText).toContain('createMessageRepository');
+      }
+    }
+  });
+
+  test('S5 gate: the infrastructure session and message repositories import only the inward port and SQLite types', () => {
+    for (const path of [
+      resolve(infrastructureSqliteDir, 'session-repository.ts'),
+      resolve(infrastructureSqliteDir, 'message-repository.ts'),
+      resolve(infrastructureSqliteDir, 'session-message-schema.ts'),
+    ]) {
+      const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === path);
+      expect(file).toBeDefined();
+
+      const imports = parseImports(file!.sourceText, file!.path);
+      const specifiers = [...new Set(imports.map((imp) => imp.specifier))].sort();
+      if (path.endsWith('session-message-schema.ts')) {
+        expect(specifiers).toEqual(['bun:sqlite']);
+      } else {
+        expect(specifiers).toEqual([
+          '@/application/ports/session-message',
+          '@jean2/sdk',
+          'bun:sqlite',
+        ]);
+        // The Database import is type-only; no runtime SQLite API leaks
+        // beyond the injected accessor.
+        const sqliteImports = imports.filter((imp) => imp.specifier === 'bun:sqlite');
+        expect(sqliteImports.every((imp) => imp.kind === 'type')).toBe(true);
+      }
+      // Infrastructure owns no store or FTS implementation imports.
+      expect(file!.sourceText).not.toContain("@/store");
+      expect(file!.sourceText).not.toContain("@/session-search");
+    }
+  });
+
   test('S4 gate: the workspaces route invokes only the workspace application and presentation helpers', () => {
     expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain(
       'packages/server/src/routes/workspaces.ts',
@@ -1149,13 +1329,14 @@ describe('server layer boundaries', () => {
     ]);
   });
 
-  test('S4 gate: the jean2 workspace adapter imports only the store, terminal, mcp, and paths implementations', () => {
+  test('S4 gate: the jean2 workspace adapter imports only the store, terminal, mcp, paths, and policy implementations', () => {
     const adapterPath = resolve(adaptersDir, 'jean2/workspace.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
+      '@/adapters/capek/workspace-paths',
       '@/application/ports/workspace',
       '@/mcp',
       '@/paths',
@@ -1168,13 +1349,10 @@ describe('server layer boundaries', () => {
     ].sort());
   });
 
-  test('S4 gate: the workspace domain imports only SDK types, path, os, and sibling modules', () => {
+  test('S4 gate: the workspace domain imports only SDK types and sibling modules', () => {
     const allowedSpecifiers = [
       '@jean2/sdk',
-      'os',
-      'path',
       './record',
-      './file-access',
       './index',
     ];
     const violations: string[] = [];
@@ -1200,21 +1378,23 @@ describe('server layer boundaries', () => {
     expect(workspaceViolations).toEqual([]);
   });
 
-  test('S4 gate: the path utils module re-exports the workspace domain file-access policy', () => {
+  test('S5 gate: the path utils module re-exports the Capek workspace policy through the adapter port', () => {
     const utilsPath = resolve(serverSourceRoot, 'utils/paths.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === utilsPath);
     expect(file).toBeDefined();
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports).toHaveLength(1);
-    expect(imports[0].specifier).toBe('@/domains/workspaces');
-    expect(imports[0].kind).toBe('export-from');
-    expect(imports[0].names.sort()).toEqual(
-      ['expandPath', 'isPathWithinWorkspace', 'resolvePath', 'resolveRootForQuery'].sort(),
-    );
+    expect(imports[0].specifier).toBe('@/adapters/capek/workspace-paths');
+    expect(imports[0].kind).toBe('value');
+    const sourceText = file!.sourceText;
+    expect(sourceText).toContain('expandPath = workspacePathPolicyPort.expandPath');
+    expect(sourceText).toContain('isPathWithinWorkspace = workspacePathPolicyPort.isPathWithinWorkspace');
+    expect(sourceText).toContain('resolvePath = workspacePathPolicyPort.resolvePath');
+    expect(sourceText).toContain('resolveRoot = workspacePathPolicyPort.resolveRootForQuery');
   });
 
-  test('S4 gate: file mutations consume the workspace domain file-access policy', () => {
+  test('S5 gate: file mutations consume the Capek workspace policy through the adapter port', () => {
     const mutationsPath = resolve(serverSourceRoot, 'services/fileMutations.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === mutationsPath);
     expect(file).toBeDefined();
@@ -1222,12 +1402,211 @@ describe('server layer boundaries', () => {
     const imports = parseImports(file!.sourceText, file!.path);
     expect(
       imports.some((imp) =>
-        imp.specifier === '@/domains/workspaces'
-        && imp.names.includes('isPathInside')
-        && imp.names.includes('selectEditableRoot')
-        && imp.names.includes('resolveCandidatePath')
+        imp.specifier === '@/adapters/capek/workspace-paths'
+        && imp.names.includes('workspacePathPolicyPort')
       ),
     ).toBe(true);
+    expect(
+      imports.some((imp) => imp.specifier === '@/infrastructure/filesystem/file-mutations'),
+    ).toBe(true);
+    expect(imports.some((imp) => imp.specifier === '@/domains/workspaces')).toBe(false);
+    // The editable ops are built once over the policy and the exact
+    // pre-slice operations stay in the infrastructure module.
+    expect(file!.sourceText).toContain('createEditableFileOps(workspacePathPolicyPort)');
+    const infraPath = resolve(infrastructureDir, 'filesystem/file-mutations.ts');
+    const infraFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === infraPath);
+    expect(infraFile).toBeDefined();
+    expect(infraFile!.sourceText).toContain('isPathInside');
+    expect(infraFile!.sourceText).toContain('selectEditableRoot');
+    expect(infraFile!.sourceText).toContain('resolveCandidatePath');
+  });
+
+  test('S5 gate: file preview containment resolves through the Capek workspace policy', () => {
+    const previewPath = resolve(serverSourceRoot, 'services/filePreview.ts');
+    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === previewPath);
+    expect(file).toBeDefined();
+
+    const sourceText = file!.sourceText;
+    expect(sourceText).toContain('createFilePreview(workspacePathPolicyPort)');
+    expect(sourceText).not.toContain('fullPath.startsWith(allowed)');
+
+    const infraPath = resolve(infrastructureDir, 'filesystem/file-preview.ts');
+    const infraFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === infraPath);
+    expect(infraFile).toBeDefined();
+    expect(infraFile!.sourceText).toContain('containment.isPathWithinWorkspace');
+    expect(infraFile!.sourceText).not.toContain('fullPath.startsWith(allowed)');
+  });
+
+  test('S5 gate: the files route invokes only the files application and presentation helpers', () => {
+    expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain(
+      'packages/server/src/routes/files.ts',
+    );
+
+    const routePath = resolve(routesDir, 'files.ts');
+    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === routePath);
+    expect(file).toBeDefined();
+    const imports = parseImports(file!.sourceText, file!.path);
+
+    const allowedSpecifiers = [
+      'hono',
+      'fs',
+      'os',
+      'path',
+      '@jean2/sdk',
+      '@/application/files',
+      '@/utils/http-errors',
+      './schemas',
+      './validate',
+    ];
+    expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
+
+    const forbiddenPrefixes = ['@/store', '@/services', '@/utils/paths'];
+    for (const imp of imports) {
+      for (const prefix of forbiddenPrefixes) {
+        expect(imp.specifier.startsWith(prefix)).toBe(false);
+      }
+    }
+    expect(file!.sourceText).toContain('registerFileRoutes(app: Hono, files: FilesApplication)');
+  });
+
+  test('S5 gate: the files route flags store and service imports', () => {
+    const files: ScannedFile[] = [
+      {
+        path: resolve(routesDir, 'files.ts'),
+        sourceText: [
+          "import { getWorkspace } from '@/store';",
+          "import { listDirectory } from '@/services/files';",
+        ].join('\n'),
+      },
+    ];
+
+    const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
+
+    expect(result.violations).toEqual([
+      'packages/server/src/routes/files.ts imports @/store (value) [rule: layer-http-routes]',
+      'packages/server/src/routes/files.ts imports @/services/files (value) [rule: layer-http-routes]',
+    ]);
+  });
+
+  test('S5 gate: the jean2 files adapter imports only the store, the workspace path policy, and the filesystem infrastructure', () => {
+    const adapterPath = resolve(adaptersDir, 'jean2/files.ts');
+    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
+    expect(file).toBeDefined();
+
+    const imports = parseImports(file!.sourceText, file!.path);
+    expect(imports.map((imp) => imp.specifier).sort()).toEqual([
+      '@/adapters/capek/workspace-paths',
+      '@/application/ports/files',
+      '@/infrastructure/filesystem/file-mutations',
+      '@/infrastructure/filesystem/file-preview',
+      '@/infrastructure/filesystem/git-status',
+      '@/infrastructure/filesystem/workspace-files',
+      '@/store',
+    ].sort());
+  });
+
+  test('S5 gate: the files application imports only its port, SDK types, and path helpers', () => {
+    const filesPath = resolve(applicationDir, 'files/index.ts');
+    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === filesPath);
+    expect(file).toBeDefined();
+
+    const imports = parseImports(file!.sourceText, file!.path);
+    expect(imports.map((imp) => imp.specifier).sort()).toEqual([
+      '@jean2/sdk',
+      '../ports/files',
+      'path',
+    ].sort());
+    expect(file!.sourceText).not.toContain("@/store");
+    expect(file!.sourceText).not.toContain("@/services");
+  });
+
+  test('S5 gate: the filesystem infrastructure modules import only utilities, binaries, and their siblings', () => {
+    const expectedImports: Record<string, string[]> = {
+      'packages/server/src/infrastructure/filesystem/workspace-files.ts': [
+        '@jean2/sdk', 'fast-glob', 'fs', 'fs/promises', 'ignore', 'path',
+      ],
+      'packages/server/src/infrastructure/filesystem/file-preview.ts': [
+        '@jean2/sdk', '@/utils/binaryDetection', 'fs/promises', 'path',
+      ],
+      'packages/server/src/infrastructure/filesystem/file-mutations.ts': [
+        '@jean2/sdk', '@/utils/binaryDetection', '@/utils/http-errors',
+        './file-preview', 'crypto', 'fs/promises', 'path',
+      ],
+      'packages/server/src/infrastructure/filesystem/git-status.ts': [
+        '@jean2/sdk', '@/utils/binaryDetection', './file-preview', 'fs/promises', 'path',
+      ],
+    };
+
+    for (const [repoFile, specifiers] of Object.entries(expectedImports)) {
+      const file = scanDirectory(serverSourceRoot).find((candidate) =>
+        relative(repositoryRoot, candidate.path) === repoFile);
+      expect(file, repoFile).toBeDefined();
+      const imports = parseImports(file!.sourceText, file!.path);
+      expect([...new Set(imports.map((imp) => imp.specifier))].sort(), repoFile)
+        .toEqual([...specifiers].sort());
+      expect(file!.sourceText).not.toContain("@/adapters");
+      expect(file!.sourceText).not.toContain("@/store");
+    }
+
+    // The narrow infrastructure exceptions must match the observed imports
+    // exactly; no broader exception may be recorded.
+    expect(Object.keys(layerInfrastructureExceptions)
+      .filter((path) => path.startsWith('packages/server/src/infrastructure/filesystem/'))
+      .sort()).toEqual([
+      'packages/server/src/infrastructure/filesystem/file-mutations.ts',
+      'packages/server/src/infrastructure/filesystem/file-preview.ts',
+      'packages/server/src/infrastructure/filesystem/git-status.ts',
+    ]);
+  });
+
+  test('S5 gate: the terminal manager keeps PTY and transport ownership and persists through the port', () => {
+    const managerPath = resolve(transportDir, 'terminal/manager.ts');
+    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === managerPath);
+    expect(file).toBeDefined();
+
+    const imports = parseImports(file!.sourceText, file!.path);
+    expect(
+      imports.some((imp) =>
+        imp.specifier === '@/application/ports/terminal'
+        && imp.names.includes('TerminalSessionStorePort')
+      ),
+    ).toBe(true);
+    // The manager must not reach into the store.
+    expect(imports.some((imp) => imp.specifier.startsWith('@/store'))).toBe(false);
+    // PTY/transport ownership stays here: bun websocket types and the
+    // bun-pty spawn remain (the local getDefaultShell selection is kept).
+    expect(imports.some((imp) => imp.specifier === 'bun')).toBe(true);
+    expect(
+      imports.some((imp) => imp.specifier === 'bun-pty' && imp.names.includes('spawn')),
+    ).toBe(true);
+  });
+
+  test('S5 gate: the terminal sessions store compat module forwards to the infrastructure repository with no SQL', () => {
+    const storePath = resolve(serverSourceRoot, 'store/terminal-sessions.ts');
+    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === storePath);
+    expect(file).toBeDefined();
+
+    const imports = parseImports(file!.sourceText, file!.path);
+    expect(
+      imports.some((imp) =>
+        imp.specifier === '@/infrastructure/sqlite/terminal-session-repository'
+      ),
+    ).toBe(true);
+    expect(file!.sourceText).not.toContain('SELECT * FROM');
+    expect(file!.sourceText).not.toContain('INSERT INTO');
+  });
+
+  test('S5 gate: the infrastructure terminal repository imports only the inward port and SQLite types', () => {
+    const repoPath = resolve(infrastructureSqliteDir, 'terminal-session-repository.ts');
+    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === repoPath);
+    expect(file).toBeDefined();
+
+    const imports = parseImports(file!.sourceText, file!.path);
+    expect(imports.map((imp) => imp.specifier).sort()).toEqual([
+      '@/application/ports/terminal',
+      'bun:sqlite',
+    ]);
+    expect(imports.some((imp) => imp.specifier === 'bun:sqlite' && imp.kind !== 'type')).toBe(false);
   });
 
   test('S4 gate: the tools route invokes only the tools application and presentation helpers', () => {
@@ -1391,7 +1770,7 @@ describe('server layer boundaries', () => {
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
       '@/application/ports/mcp',
-      '@/mcp',
+      '@/infrastructure/mcp/lifecycle',
       '@/store/workspaces',
     ].sort());
   });
@@ -1403,9 +1782,7 @@ describe('server layer boundaries', () => {
     const distributionImports = parseImports(distributionFile!.sourceText, distributionFile!.path);
     expect(distributionImports.map((imp) => imp.specifier).sort()).toEqual([
       '@/application/ports/tool-distribution',
-      '@/config',
-      '@/tools/tool-installer',
-      '@/tools/tool-repository',
+      '@/infrastructure/tools/distribution',
     ].sort());
 
     const toolsPath = resolve(adaptersDir, 'jean2/tools.ts');
@@ -1569,7 +1946,7 @@ describe('server layer boundaries', () => {
       ),
     ).toBe(true);
 
-    const credentialsPath = resolve(serverSourceRoot, 'configuration/provider-credentials.ts');
+    const credentialsPath = resolve(serverSourceRoot, 'infrastructure/providers/provider-credential-files.ts');
     const credentialsFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === credentialsPath);
     expect(credentialsFile).toBeDefined();
     const credentialsImports = parseImports(credentialsFile!.sourceText, credentialsFile!.path);
@@ -1650,14 +2027,13 @@ describe('server layer boundaries', () => {
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
       '@/application/notifications',
-      '@/application/ports/notifications',
       '@/domains/scheduling/notifications',
       '@/env',
-      '@/services/web-push/credentials',
+      '@/infrastructure/sqlite/notification-repository',
+      '@/infrastructure/web-push/sender',
       '@/store/pending-asks',
       '@/store/scheduled-jobs',
       '@/store/sessions',
-      '@/store/web-push',
     ].sort());
   });
 

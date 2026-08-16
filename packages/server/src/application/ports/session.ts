@@ -198,6 +198,25 @@ export interface SessionRepositoryPort {
 }
 
 /**
+ * Inward-facing compaction recovery port (S5, paired with C6 step 2). The
+ * Capek compaction domain owns the reconciliation decisions; the current
+ * Jean2 store fulfills this port with its queries. Shapes are SDK structural
+ * copies; no SQL crosses the boundary.
+ */
+export interface CompactionRecoveryPort {
+  /** True when the session's compacting flag is set (a stuck state). */
+  isSessionCompacting(sessionId: string): boolean;
+  /** Clears the stuck compacting flag and returns the updated session, or
+   * null when the session no longer exists. */
+  clearSessionCompacting(sessionId: string): Session | null;
+  /** Orphaned compaction triggers: user messages with a compaction part and
+   * no assistant outcome (assistant message with parentId pointing at it). */
+  listOrphanedCompactionTriggers(sessionId: string): Message[];
+  /** All session ids for startup-wide reconciliation. */
+  listSessionIds(): string[];
+}
+
+/**
  * Pending ask persistence. The implementation stays in the store until S4;
  * use cases only orchestrate the existing cleanup and sync order.
  */

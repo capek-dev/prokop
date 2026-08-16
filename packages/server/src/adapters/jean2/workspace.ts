@@ -27,6 +27,7 @@ import { deleteScheduledJobsByWorkspace } from '@/store/scheduled-jobs';
 import { getTerminalManager } from '@/services/terminal';
 import { shutdownWorkspace } from '@/mcp';
 import { getWorkspacesDir } from '@/paths';
+import { workspacePathPolicyPort } from '@/adapters/capek/workspace-paths';
 import type {
   WorkspaceCleanupPort,
   WorkspaceDirectoryPort,
@@ -117,5 +118,6 @@ export function createJean2WorkspaceDirectoryPort(): WorkspaceDirectoryPort {
 export function createJean2WorkspacePathConfigPort(): WorkspacePathConfigPort {
   return {
     workspacesDir: getWorkspacesDir,
+    expandPath: (path) => workspacePathPolicyPort.expandPath(path),
   };
 }
