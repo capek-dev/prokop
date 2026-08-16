@@ -31,6 +31,12 @@ import {
   resetSharedProcessScopeForTests,
 } from '../src/plugins/compose';
 import { capekToolResolverKey } from '../src/plugins/service-keys';
+import { CURRENT_SCHEDULER_DOMAIN_PLUGIN_ID } from '../src/plugins/scheduler-domain';
+import { CURRENT_SESSION_SEARCH_DOMAIN_PLUGIN_ID } from '../src/plugins/session-search-domain';
+import { CURRENT_SUBAGENT_DOMAIN_PLUGIN_ID } from '../src/plugins/subagent-domain';
+import { CURRENT_WORKFLOW_DOMAIN_PLUGIN_ID } from '../src/plugins/workflow-domain';
+import { CURRENT_MEMORY_DOMAIN_PLUGIN_ID } from '../src/plugins/memory-domain';
+import { CURRENT_SKILLS_DOMAIN_PLUGIN_ID } from '../src/plugins/skills-domain';
 import { configureRuntimeHost, type RuntimeHost } from '../src/runtime/host';
 import { SandboxController } from '../src/sandbox/controller';
 import { createInMemoryStorageBundle } from '../src/storage/memory';
@@ -223,17 +229,36 @@ describe('retrieve-tool-output assembly branches', () => {
 });
 
 describe('current Jean2 composition representation', () => {
-  test('installs the coding capability plugins and exposes the exact standard contributed inventory', async () => {
+  test('installs the coding capability plugins plus the C5 domain plugins with the exact contributed inventory', async () => {
     configureRuntimeHost(minimalHost());
     const processScope = await createCurrentProcessScope();
     const agentScope = await createCurrentAgentScope(processScope);
 
     const tools = agentScope.listTools();
-    expect(tools.map((tool) => tool.definition.name as string)).toEqual([...STANDARD_TOOL_NAMES]);
+    expect(tools.map((tool) => tool.definition.name as string)).toEqual([
+      ...STANDARD_TOOL_NAMES,
+      'task',
+      'skill',
+      'memory',
+      'workflow',
+      'skill_manage',
+      'session_search',
+      'scheduler',
+      'agent_memory',
+      'agent_skill_manage',
+    ]);
     for (const tool of tools) {
       expect(tool.visible).toBe(true);
       expect(tool.hiddenReasons).toEqual([]);
-      expect(tool.pluginId.startsWith('coding.')).toBe(true);
+      expect(
+        tool.pluginId.startsWith('coding.')
+        || tool.pluginId === CURRENT_SESSION_SEARCH_DOMAIN_PLUGIN_ID
+        || tool.pluginId === CURRENT_SCHEDULER_DOMAIN_PLUGIN_ID
+        || tool.pluginId === CURRENT_SUBAGENT_DOMAIN_PLUGIN_ID
+        || tool.pluginId === CURRENT_WORKFLOW_DOMAIN_PLUGIN_ID
+        || tool.pluginId === CURRENT_MEMORY_DOMAIN_PLUGIN_ID
+        || tool.pluginId === CURRENT_SKILLS_DOMAIN_PLUGIN_ID,
+      ).toBe(true);
     }
     expect(agentScope.optional(capekToolResolverKey)).toBeUndefined();
 

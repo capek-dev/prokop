@@ -2,6 +2,7 @@ import type { Preconfig } from '@jean2/sdk';
 import { SESSION_SEARCH_GUIDANCE } from '../session-search';
 import { loadMemoryInstructions, MEMORY_GUIDANCE } from '../memory';
 import { SKILL_MANAGE_GUIDANCE } from '../skills';
+import { selfDelegationGuidance } from '../subagent/guidance';
 import {
   buildWorkspaceSystemPrompt,
   formatInstructions,
@@ -11,7 +12,12 @@ import {
 } from '../context';
 import { getWorkspace } from '../storage/runtime';
 import { join } from 'path';
-import type { ContextAssembler } from '../context/assembler';
+import {
+  validateContextAssemblyData,
+  type ContextAssembler,
+  type ContextAssemblyData,
+} from '../context/assembler';
+import type { ContextSectionContribution } from '../kernel/types';
 
 /**
  * Fixed system-message builder, byte-frozen as the C3 legacy adapter.
@@ -40,6 +46,24 @@ export const fixedBuilderContextAssembler: ContextAssembler = {
   build: (data) => buildSystemMessage(data),
 };
 
+/** The legacy session-search guidance contribution, kept for facade and
+ * legacy compositions that reproduce the fixed builder byte-for-byte. The
+ * C5 domain plugin owns this section in the current Jean2 composition;
+ * `createContextSectionsPlugin` includes it only when its
+ * `includeSessionSearchGuidance` option stays at the legacy default. */
+export const legacySessionSearchGuidanceSection: ContextSectionContribution<ContextAssemblyData> = {
+  id: 'session-search-guidance',
+  phase: 'workspace',
+  order: 50,
+  provide: (context) => {
+    const data = validateContextAssemblyData(context.data);
+    if (!data.workspaceId) return null;
+    return getWorkspace(data.workspaceId)?.settings?.sessionSearch?.enabled
+      ? SESSION_SEARCH_GUIDANCE
+      : null;
+  },
+};
+
 export const AGENT_MEMORY_SKILLS_GUIDANCE = `You have personal memory and skills that travel with you across all workspaces.
 
 MEMORY:
@@ -53,11 +77,20 @@ SKILLS:
 
 Before saving, use list to check existing entries and avoid duplicates.`;
 
-export function selfDelegationGuidance(preconfigId: string): string {
-  return `SELF-DELEGATION:
-- You may use the task tool with subagent_type "${preconfigId}" to delegate work to a fresh instance of yourself.
-- This permission applies only to the immediate child. Reusing "${preconfigId}" later in the same ancestry chain is blocked.`;
-}
+/** The legacy self-delegation guidance contribution, kept for facade and
+ * legacy compositions that reproduce the fixed builder byte-for-byte. The
+ * C5 subagent domain plugin owns this section in the current Jean2 and
+ * facade compositions; `createContextSectionsPlugin` includes it only when
+ * its `includeSelfDelegationGuidance` option stays at the legacy default. */
+export const legacySelfDelegationGuidanceSection: ContextSectionContribution<ContextAssemblyData> = {
+  id: 'self-delegation',
+  phase: 'identity',
+  order: 50,
+  provide: (context) => {
+    const data = validateContextAssemblyData(context.data);
+    return data.selfDelegationAvailable ? selfDelegationGuidance(data.preconfig.id) : null;
+  },
+};
 
 export async function buildSystemMessage(options: SystemMessageOptions): Promise<string> {
   const { preconfig, workspacePath, workspaceId, additionalPaths } = options;

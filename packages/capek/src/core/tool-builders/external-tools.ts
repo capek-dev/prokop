@@ -12,12 +12,10 @@ import { getToolWorkspaceHost } from '../../runtime/host-dependencies';
 import { transitionToolToRunningByCallId } from '../../storage/runtime';
 import { interruptManager } from '../interrupt';
 import {
-  canSpawnSubagent,
-  executeSubagent,
-  getSubagentToolDefinition,
-  type SubagentInput,
-  type SubagentOutput,
-} from '../subagent';
+  getContributedDomainToolPayloads,
+  getDomainToolFallback,
+  type DomainToolPayload,
+} from '../../runtime/domain-tool-source';
 import { isToolAllowedInContext, type ToolExecutionScope } from '../tool-capabilities';
 import type { ToolMap } from './types';
 import type { BroadcastFn } from '../../runtime/host-dependencies';
@@ -59,58 +57,24 @@ export async function buildExternalTools(options: ExternalToolsOptions): Promise
 
   const canSpawn = canSpawnSubagents === true
     || (Array.isArray(canSpawnSubagents) && canSpawnSubagents.length > 0);
-  const shouldIncludeTask = canSpawnSubagent(sessionId) && !toolNames.includes('task') && canSpawn;
   const allowedSubagentIds = Array.isArray(canSpawnSubagents) ? canSpawnSubagents : undefined;
-  const subagentDefinition = shouldIncludeTask
-    ? await getSubagentToolDefinition({
-      sessionId,
-      canSpawnSubagents,
-      allowSelfAsSubagent,
-    })
-    : null;
-  const builtInAgentTools = subagentDefinition ? ['task'] : [];
-  const effectiveToolNames = [...toolNames, ...builtInAgentTools];
 
-  for (const name of effectiveToolNames) {
-    if (name === 'task') {
-      if (!subagentDefinition) continue;
+  // The task tool is owned by the C5 subagent domain plugin. Composed scopes
+  // provide its payload through the generic contributed-domain-tool seam;
+  // the unscoped path uses the explicitly installed legacy fallback. The
+  // domain owns the depth gate (isEnabled); the preconfig spawn policy and
+  // the 'task'-name guard stay here because they arrive per build.
+  const scopedDomainPayloads = getContributedDomainToolPayloads();
+  const taskPayload: DomainToolPayload | null = scopedDomainPayloads === null
+    ? getDomainToolFallback('task')
+    : scopedDomainPayloads.get('task') ?? null;
+  const shouldIncludeTask = taskPayload !== null
+    && !toolNames.includes('task')
+    && canSpawn
+    && taskPayload.isEnabled?.(workspaceId ?? '', sessionId) === true;
 
-      tools[name] = tool({
-        description: subagentDefinition.description,
-        inputSchema: jsonSchema(subagentDefinition.inputSchema),
-        execute: async (args: Record<string, unknown>, { toolCallId }: { toolCallId: string }) => {
-          const toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
-
-          try {
-            const subagentInput: SubagentInput = {
-              description: args.description as string,
-              prompt: args.prompt as string,
-              subagent_type: args.subagent_type as string,
-              task_id: args.task_id as string | undefined,
-              sessionId,
-              workspaceId,
-              workspacePath,
-              abortSignal: toolAbortController.signal,
-              onSessionCreated: (childSessionId: string) => {
-                const updatedPart = transitionToolToRunningByCallId(sessionId, toolCallId, childSessionId);
-                if (updatedPart) {
-                  broadcast({ kind: 'part', action: 'updated', sessionId, part: updatedPart });
-                }
-              },
-              allowedSubagentIds,
-              ...(args.outputSchema ? { outputSchema: args.outputSchema as Record<string, unknown> } : {}),
-            };
-
-            const result = await executeSubagent(subagentInput);
-            return result as SubagentOutput;
-          } finally {
-            interruptManager.unregisterToolExecution(sessionId, toolCallId);
-          }
-        },
-      });
-      continue;
-    }
-
+  // Phase 1a: registry tools in toolNames order, exactly as pre-C5.
+  for (const name of toolNames) {
     const loadedTool = await getTool(name);
     if (!loadedTool) continue;
 
@@ -167,6 +131,47 @@ export async function buildExternalTools(options: ExternalToolsOptions): Promise
         }
       },
     });
+  }
+
+  // Phase 1b: the task tool after the registry tools, preserving the exact
+  // pre-C5 build order. The dynamic description and schema come from the
+  // payload's per-build resolver (composed deps or the legacy fallback).
+  if (shouldIncludeTask && taskPayload) {
+    const taskDefinition = await taskPayload.resolveDefinition?.(sessionId, {
+      canSpawnSubagents,
+      allowSelfAsSubagent,
+    });
+    if (taskDefinition) {
+      tools['task'] = tool({
+        description: taskDefinition.description,
+        inputSchema: jsonSchema(taskDefinition.inputSchema),
+        execute: async (args: Record<string, unknown>, { toolCallId }: { toolCallId: string }) => {
+          const toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
+
+          try {
+            return await taskPayload.execute(args, {
+              workspaceId: workspaceId ?? '',
+              sessionId,
+              ask: async () => {
+                throw new Error('Cannot ask user: no broadcast channel available (broadcastFn not provided)');
+              },
+              workspacePath,
+              abortSignal: toolAbortController.signal,
+              onSessionCreated: (childSessionId: string) => {
+                const updatedPart = transitionToolToRunningByCallId(sessionId, toolCallId, childSessionId);
+                if (updatedPart) {
+                  broadcast({ kind: 'part', action: 'updated', sessionId, part: updatedPart });
+                }
+              },
+              allowedSubagentIds,
+              broadcast,
+            });
+          } finally {
+            interruptManager.unregisterToolExecution(sessionId, toolCallId);
+          }
+        },
+      });
+    }
   }
 
   return tools;

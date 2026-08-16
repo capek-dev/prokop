@@ -1,5 +1,5 @@
 import type { PermissionAsk, PermissionRiskLevel, ScheduleConfig, ScheduleKind, ScheduledJob, UpdateScheduledJobInput } from '@jean2/sdk';
-import { getSchedulerHost } from './host';
+import { getSchedulerHost, type SchedulerHost } from './host';
 
 export const schedulerToolDefinition = {
   name: 'scheduler',
@@ -73,7 +73,20 @@ function parseSchedule(raw: Record<string, unknown>): { kind: ScheduleKind; conf
   return { error: `Unknown schedule type: ${type}` };
 }
 
+/** Unscoped execution path: reads the configured module-level host, exactly
+ * like the pre-C5 tool. */
 export async function executeSchedulerTool(input: Record<string, unknown>, workspaceId: string, currentSessionId: string, risk: PermissionRiskLevel, askFn?: (ask: PermissionAsk) => Promise<unknown>): Promise<SchedulerToolResult> {
+  return runScheduler(getSchedulerHost(), input, workspaceId, currentSessionId, risk, askFn);
+}
+
+/** Composed execution path: the domain plugin captures the process-scoped
+ * host service at setup and passes it here, so composed execution never
+ * reads the mutable module-global host accessor. */
+export async function executeSchedulerToolWithHost(host: SchedulerHost, input: Record<string, unknown>, workspaceId: string, currentSessionId: string, risk: PermissionRiskLevel, askFn?: (ask: PermissionAsk) => Promise<unknown>): Promise<SchedulerToolResult> {
+  return runScheduler(host, input, workspaceId, currentSessionId, risk, askFn);
+}
+
+async function runScheduler(host: SchedulerHost, input: Record<string, unknown>, workspaceId: string, currentSessionId: string, risk: PermissionRiskLevel, askFn?: (ask: PermissionAsk) => Promise<unknown>): Promise<SchedulerToolResult> {
   const action = input.action as string;
   if (action !== 'list' && risk !== 'none' && askFn) {
     const verb = ({ create: 'create', update: 'update', pause: 'pause', resume: 'resume', trigger: 'trigger', remove: 'delete' } as Record<string, string>)[action] || action;
@@ -84,13 +97,13 @@ export async function executeSchedulerTool(input: Record<string, unknown>, works
   }
   try {
     switch (action) {
-      case 'create': return create(input, workspaceId, currentSessionId);
-      case 'list': { const jobs = getSchedulerHost().list(workspaceId); return { success: true, action, title: `${jobs.length} scheduled job${jobs.length === 1 ? '' : 's'}`, jobs }; }
-      case 'update': return update(input, workspaceId);
-      case 'pause': return stateChange(input, workspaceId, 'paused');
-      case 'resume': return stateChange(input, workspaceId, 'active');
-      case 'trigger': return trigger(input, workspaceId);
-      case 'remove': return remove(input, workspaceId);
+      case 'create': return create(input, workspaceId, currentSessionId, host);
+      case 'list': { const jobs = host.list(workspaceId); return { success: true, action, title: `${jobs.length} scheduled job${jobs.length === 1 ? '' : 's'}`, jobs }; }
+      case 'update': return update(input, workspaceId, host);
+      case 'pause': return stateChange(input, workspaceId, 'paused', host);
+      case 'resume': return stateChange(input, workspaceId, 'active', host);
+      case 'trigger': return trigger(input, workspaceId, host);
+      case 'remove': return remove(input, workspaceId, host);
       default: return { success: false, action, title: 'Invalid action', error: `Unknown action: ${action}` };
     }
   } catch (error: unknown) {
@@ -99,7 +112,7 @@ export async function executeSchedulerTool(input: Record<string, unknown>, works
   }
 }
 
-function create(input: Record<string, unknown>, workspaceId: string, sessionId: string): SchedulerToolResult {
+function create(input: Record<string, unknown>, workspaceId: string, sessionId: string, host: SchedulerHost): SchedulerToolResult {
   const name = input.name as string;
   const prompt = input.prompt as string;
   const schedule = input.schedule as Record<string, unknown>;
@@ -108,7 +121,7 @@ function create(input: Record<string, unknown>, workspaceId: string, sessionId: 
   if (!schedule || typeof schedule !== 'object') return { success: false, action: 'create', title: 'Validation error', error: 'schedule is required' };
   const parsed = parseSchedule(schedule);
   if ('error' in parsed) return { success: false, action: 'create', title: 'Validation error', error: parsed.error };
-  const job = getSchedulerHost().create(workspaceId, { name: name.trim(), prompt: prompt.trim(), scheduleKind: parsed.kind, scheduleConfig: parsed.config, repeatLimit: input.repeatLimit as number | null | undefined, reuseSession: input.reuseSession as boolean | undefined, includeHistory: input.includeHistory as boolean | undefined, originSessionId: sessionId, autoApproveSeverity: input.autoApproveSeverity as ScheduledJob['autoApproveSeverity'], notificationsEnabled: input.notificationsEnabled as boolean | undefined });
+  const job = host.create(workspaceId, { name: name.trim(), prompt: prompt.trim(), scheduleKind: parsed.kind, scheduleConfig: parsed.config, repeatLimit: input.repeatLimit as number | null | undefined, reuseSession: input.reuseSession as boolean | undefined, includeHistory: input.includeHistory as boolean | undefined, originSessionId: sessionId, autoApproveSeverity: input.autoApproveSeverity as ScheduledJob['autoApproveSeverity'], notificationsEnabled: input.notificationsEnabled as boolean | undefined });
   return { success: true, action: 'create', title: `Scheduled job "${job.name}" created`, job };
 }
 function wrongWorkspace(job: ScheduledJob, workspaceId: string, action: string): SchedulerToolResult | null {
@@ -117,10 +130,9 @@ function wrongWorkspace(job: ScheduledJob, workspaceId: string, action: string):
     : { success: false, action, title: 'Access denied', error: 'Job does not belong to this workspace' };
 }
 
-function update(input: Record<string, unknown>, workspaceId: string): SchedulerToolResult {
+function update(input: Record<string, unknown>, workspaceId: string, host: SchedulerHost): SchedulerToolResult {
   const id = input.jobId as string;
   if (!id) return { success: false, action: 'update', title: 'Validation error', error: 'jobId is required' };
-  const host = getSchedulerHost();
   const existing = host.get(id);
   if (!existing) return { success: false, action: 'update', title: 'Not found', error: `Job ${id} not found` };
   const denied = wrongWorkspace(existing, workspaceId, 'update');
@@ -135,22 +147,22 @@ function update(input: Record<string, unknown>, workspaceId: string): SchedulerT
   const job = host.update(id, updates);
   return job ? { success: true, action: 'update', title: `Scheduled job "${job.name}" updated`, job } : { success: false, action: 'update', title: 'Update failed', error: 'Failed to update job' };
 }
-function stateChange(input: Record<string, unknown>, workspaceId: string, state: 'active' | 'paused'): SchedulerToolResult {
-  const id = input.jobId as string; const action = input.action as string; const host = getSchedulerHost();
+function stateChange(input: Record<string, unknown>, workspaceId: string, state: 'active' | 'paused', host: SchedulerHost): SchedulerToolResult {
+  const id = input.jobId as string; const action = input.action as string;
   if (!id) return { success: false, action, title: 'Validation error', error: 'jobId is required' };
   const existing = host.get(id); if (!existing) return { success: false, action, title: 'Not found', error: `Job ${id} not found` };
   const denied = wrongWorkspace(existing, workspaceId, action); if (denied) return denied;
   return { success: true, action, title: `Job "${existing.name}" ${state === 'paused' ? 'paused' : 'resumed'}`, job: host.update(id, { state }) ?? undefined };
 }
-function trigger(input: Record<string, unknown>, workspaceId: string): SchedulerToolResult {
-  const id = input.jobId as string; const host = getSchedulerHost();
+function trigger(input: Record<string, unknown>, workspaceId: string, host: SchedulerHost): SchedulerToolResult {
+  const id = input.jobId as string;
   if (!id) return { success: false, action: 'trigger', title: 'Validation error', error: 'jobId is required' };
   const job = host.get(id); if (!job) return { success: false, action: 'trigger', title: 'Not found', error: `Job ${id} not found` };
   const denied = wrongWorkspace(job, workspaceId, 'trigger'); if (denied) return denied;
   host.trigger(job); return { success: true, action: 'trigger', title: `Job "${job.name}" triggered`, jobId: id };
 }
-function remove(input: Record<string, unknown>, workspaceId: string): SchedulerToolResult {
-  const id = input.jobId as string; const host = getSchedulerHost();
+function remove(input: Record<string, unknown>, workspaceId: string, host: SchedulerHost): SchedulerToolResult {
+  const id = input.jobId as string;
   if (!id) return { success: false, action: 'remove', title: 'Validation error', error: 'jobId is required' };
   const job = host.get(id); if (!job) return { success: false, action: 'remove', title: 'Not found', error: `Job ${id} not found` };
   const denied = wrongWorkspace(job, workspaceId, 'remove'); if (denied) return denied;

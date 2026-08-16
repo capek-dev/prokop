@@ -16,6 +16,12 @@ import {
   type TitleHost,
   type WorkspaceCapabilityBindings,
 } from '../runtime/host';
+import { installSchedulerToolFallback } from '../plugins/scheduler-domain';
+import { installSessionSearchToolFallback } from '../plugins/session-search-domain';
+import { installTaskToolFallback } from '../plugins/subagent-domain';
+import { installWorkflowToolFallback } from '../plugins/workflow-domain';
+import { installMemoryToolFallback } from '../plugins/memory-domain';
+import { installSkillsToolFallback } from '../plugins/skills-domain';
 
 export type Jean2InteractionBindings = InteractionHost;
 export type Jean2DeliveryBindings = DeliveryHost;
@@ -34,8 +40,20 @@ export type {
   PermissionRequestStatus,
 };
 
+/** Installing the Jean2 compatibility bindings also installs the unscoped
+ * session-search, scheduler, task, workflow, memory, and skills tool
+ * fallbacks for the legacy buildAiSdkTools path. This is the explicit
+ * compatibility configuration path the server bootstrap calls
+ * (`configureJean2Bindings` -> this function); nothing registers at module
+ * load. Idempotent. */
 export function setJean2CompatibilityBindings(value: Jean2CompatibilityBindings): void {
   configureRuntimeHost(value);
+  installSessionSearchToolFallback();
+  installSchedulerToolFallback();
+  installTaskToolFallback();
+  installWorkflowToolFallback();
+  installMemoryToolFallback();
+  installSkillsToolFallback();
 }
 
 export function withJean2CompatibilityBindings<T>(value: Jean2CompatibilityBindings, callback: () => T): T {

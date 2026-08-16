@@ -65,6 +65,10 @@ export function createFacadeAgentPlugins(values: FacadeScopeValues): readonly Ca
     runtimeConfigurationValuePlugin('facade.runtime-configuration', values.configuration),
     runtimeHostValuePlugin('facade.runtime-host', values.host),
     contextSourcesValuePlugin('facade.context-sources', values.contextSources),
+    // Facade context parity: the facade keeps the legacy self-delegation and
+    // session-search guidance sections (the C5 domain plugins own them only
+    // in the current Jean2 composition), so context-sections stays at its
+    // pre-C5 defaults here.
     createContextSectionsPlugin('facade.context-sections'),
     toolSourceValuePlugin('facade.tool-source', values.toolSource),
     values.toolResolver === undefined

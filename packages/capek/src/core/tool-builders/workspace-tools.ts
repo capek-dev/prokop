@@ -1,23 +1,17 @@
 import { tool, jsonSchema } from 'ai';
-import { executeSchedulerTool, schedulerToolDefinition } from '../../scheduler/scheduler-tool';
-import { executeSessionSearchTool, sessionSearchToolDefinition } from '../../session-search';
-import { executeMemoryTool, memoryToolDefinition } from '../../memory';
 import {
-  buildSkillManageToolDescription,
-  createSkillTool,
-  executeSkillManageTool,
-  skillManageToolDefinition,
-} from '../../skills';
-import { getSession, getWorkspace } from '../../storage/runtime';
+  getContributedDomainToolPayloads,
+  getDomainToolFallback,
+  type DomainToolPayload,
+} from '../../runtime/domain-tool-source';
+import { getWorkspace } from '../../storage/runtime';
 import {
   createAskApi,
   rejectPendingAsksByToolCallId,
   type AskBroadcastFn,
 } from '../../tools/ask-user-api';
 import { interruptManager } from '../interrupt';
-import { executeWorkflow, getWorkflowToolDefinition } from '../workflow';
-import type { WorkflowInput, WorkflowResult, PermissionRiskLevel } from '@jean2/sdk';
-import { join } from 'path';
+import type { WorkflowInput, PermissionRiskLevel } from '@jean2/sdk';
 import type { ToolMap } from './types';
 
 export interface WorkspaceToolsOptions {
@@ -54,41 +48,65 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
   const workspace = getWorkspace(workspaceId);
   if (!workspace) return tools;
 
+  // The generic contributed-domain-tool payload map is resolved once and
+  // shared by the skill, memory, workflow, skill_manage, session_search,
+  // and scheduler builders: null means the unscoped path (registered
+  // fallbacks may apply), an empty map means a composed scope without
+  // domain payloads (fallbacks disabled).
+  const scopedDomainPayloads = getContributedDomainToolPayloads();
+  const domainPayload = (name: string): DomainToolPayload | null =>
+    scopedDomainPayloads === null
+      ? getDomainToolFallback(name)
+      : scopedDomainPayloads.get(name) ?? null;
+
   // ── Skill tool ────────────────────────────────────────────
   if (workspacePath) {
-    const skillTool = await createSkillTool(workspacePath, allowedSkills, sessionId, agentSkillsDir);
-    if (skillTool) {
-      tools[skillTool.name] = skillTool.tool;
+    const skillPayload = domainPayload('skill');
+    const skillDefinition = await skillPayload?.resolveDefinition?.(sessionId, {
+      workspacePath,
+      allowedSkills,
+      agentSkillsDir,
+    });
+    if (skillPayload && skillDefinition) {
+      tools['skill'] = tool({
+        description: skillDefinition.description,
+        inputSchema: jsonSchema(skillDefinition.inputSchema),
+        execute: async (args: Record<string, unknown>) =>
+          skillPayload.execute(args, {
+            workspaceId,
+            sessionId,
+            ask: async () => {
+              throw new Error('Cannot ask user: no broadcast channel available');
+            },
+            agentId,
+            workspacePath,
+            allowedSkills,
+            agentSkillsDir,
+          }),
+      });
     }
   }
 
   // ── Memory tool ───────────────────────────────────────────
+  const memoryPayload = domainPayload('memory');
   const memorySettings = workspace.settings?.memory;
-  if (memorySettings?.enabled) {
+  if (memoryPayload && memorySettings?.enabled) {
     const permissionRisk = memorySettings.permissionRisk;
     tools['memory'] = tool({
-      description: memoryToolDefinition.description,
-      inputSchema: jsonSchema(memoryToolDefinition.inputSchema),
+      description: memoryPayload.description,
+      inputSchema: jsonSchema(memoryPayload.inputSchema),
       execute: async (args: Record<string, unknown>, { toolCallId }: { toolCallId: string }) => {
         const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
         try {
           const askApi = createAskApiOrThrow(sessionId, toolCallId, 'memory', broadcastFn, workspaceId, rootSessionId);
-          const result = await executeMemoryTool(
-            args,
-            join(workspacePath!, '.jean2'),
+          return await memoryPayload.execute(args, {
+            workspaceId,
+            sessionId,
+            ask: (ask: import('@jean2/sdk').Ask) => askApi(ask),
+            agentId,
+            workspacePath,
             permissionRisk,
-            async (ask: import('@jean2/sdk').Ask) => askApi(ask),
-          );
-
-          if (!result.success) {
-            return { error: result.error ?? 'Memory operation failed', ...(result.entries ? { entries: result.entries } : {}), ...(result.usage ? { usage: result.usage } : {}) };
-          }
-
-          const r = result.result!;
-          return {
-            title: r.action === 'list' ? `Memory list (${r.target})` : 'Memory updated',
-            ...r,
-          };
+          });
         } finally {
           interruptManager.unregisterToolExecution(sessionId, toolCallId);
           rejectPendingAsksByToolCallId(toolCallId);
@@ -97,11 +115,16 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
     });
   }
 
-  // ── Workflow tool ─────────────────────────────────────────
+  // ── Workflow tool ─────────────────────────────────────────────
+  // Same generic domain seam as session_search and scheduler: the domain
+  // payload owns the depth gate (isEnabled) and the dynamic definition
+  // (allowed leaf agent list); the workspace settings gate stays here, and
+  // the allowed-subagent list is captured at build time from the resolved
+  // definition exactly like pre-C5.
+  const workflowPayload = domainPayload('workflow');
   const workflowSettings = workspace.settings?.workflow;
-  if (workflowSettings?.enabled && canSpawn) {
-    const workflowDefinition = await getWorkflowToolDefinition({
-      sessionId,
+  if (workflowSettings?.enabled && canSpawn && workflowPayload?.isEnabled?.(workspaceId, sessionId) === true) {
+    const workflowDefinition = await workflowPayload.resolveDefinition?.(sessionId, {
       canSpawnSubagents,
       allowSelfAsSubagent,
     });
@@ -120,15 +143,22 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
               ...(args.outputSchema ? { outputSchema: args.outputSchema as Record<string, unknown> } : {}),
             } as WorkflowInput;
 
-            const result = await executeWorkflow(workflowInput, {
-              sessionId,
+            return await workflowPayload.execute(
+              workflowInput as unknown as Record<string, unknown>,
+              {
               workspaceId,
+              sessionId,
+              ask: broadcastFn
+                ? (ask: import('@jean2/sdk').Ask) =>
+                  createAskApi(sessionId, toolCallId, workflowPayload.name, broadcastFn, workspaceId, rootSessionId)(ask)
+                : async () => {
+                  throw new Error('Cannot ask user: no broadcast channel available');
+                },
+              agentId,
               workspacePath,
               abortSignal: toolAbortController.signal,
               allowedSubagentIds: workflowDefinition.allowedSubagentIds,
             });
-
-            return result as WorkflowResult;
           } finally {
             interruptManager.unregisterToolExecution(sessionId, toolCallId);
           }
@@ -138,87 +168,63 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
   }
 
   // ── Skill management tool ─────────────────────────────────
+  const skillManagePayload = domainPayload('skill_manage');
   const skillSettings = workspace.settings?.skills;
-  if (skillSettings?.managementEnabled) {
+  if (skillManagePayload && skillSettings?.managementEnabled) {
     const permissionRisk = skillSettings.permissionRisk;
-    const skillManageDescription = await buildSkillManageToolDescription(join(workspacePath!, '.agents', 'skills'));
-    tools['skill_manage'] = tool({
-      description: skillManageDescription,
-      inputSchema: jsonSchema(skillManageToolDefinition.inputSchema),
-      execute: async (args: Record<string, unknown>, { toolCallId }: { toolCallId: string }) => {
-        const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
-        try {
-          const askApi = createAskApiOrThrow(sessionId, toolCallId, 'skill_manage', broadcastFn, workspaceId, rootSessionId);
-          const result = await executeSkillManageTool(
-            args,
-            join(workspacePath!, '.agents', 'skills'),
-            permissionRisk,
-            async (ask: import('@jean2/sdk').Ask) => askApi(ask),
-          );
-
-          if (!result.success) {
-            return { error: result.error ?? 'Skill management operation failed' };
-          }
-
-          return {
-            title: result.title,
-            action: result.action,
-            name: result.name,
-            description: result.description,
-            path: result.path,
-            summary: result.summary,
-            skills: result.skills,
-          };
-        } finally {
-          interruptManager.unregisterToolExecution(sessionId, toolCallId);
-          rejectPendingAsksByToolCallId(toolCallId);
-        }
-      },
+    const skillManageDefinition = await skillManagePayload.resolveDefinition?.(sessionId, {
+      workspacePath,
     });
+    if (skillManageDefinition) {
+      tools['skill_manage'] = tool({
+        description: skillManageDefinition.description,
+        inputSchema: jsonSchema(skillManageDefinition.inputSchema),
+        execute: async (args: Record<string, unknown>, { toolCallId }: { toolCallId: string }) => {
+          const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
+          try {
+            const askApi = createAskApiOrThrow(sessionId, toolCallId, 'skill_manage', broadcastFn, workspaceId, rootSessionId);
+            return await skillManagePayload.execute(args, {
+              workspaceId,
+              sessionId,
+              ask: (ask: import('@jean2/sdk').Ask) => askApi(ask),
+              agentId,
+              workspacePath,
+              permissionRisk,
+            });
+          } finally {
+            interruptManager.unregisterToolExecution(sessionId, toolCallId);
+            rejectPendingAsksByToolCallId(toolCallId);
+          }
+        },
+      });
+    }
   }
 
   // ── Session search tool ───────────────────────────────────
-  const sessionSearchSettings = workspace.settings?.sessionSearch;
-  if (sessionSearchSettings?.enabled) {
-    const searchPermissionRisk = sessionSearchSettings.permissionRisk;
-    const includeToolResults = sessionSearchSettings.includeToolResults;
+  // The domain payload owns the settings gate (isEnabled) and the executor;
+  // the settings values the executor needs are captured here at build time
+  // exactly like pre-C5 and passed through the execution context.
+  const sessionSearchPayload = domainPayload('session_search');
+  const searchSettings = workspace.settings?.sessionSearch;
+  if (sessionSearchPayload && sessionSearchPayload.isEnabled?.(workspaceId, sessionId) === true) {
     tools['session_search'] = tool({
-      description: sessionSearchToolDefinition.description,
-      inputSchema: jsonSchema(sessionSearchToolDefinition.inputSchema),
+      description: sessionSearchPayload.description,
+      inputSchema: jsonSchema(sessionSearchPayload.inputSchema as Record<string, unknown>),
       execute: async (args: Record<string, unknown>, { toolCallId }: { toolCallId: string }) => {
         const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
         try {
-          const askApi = createAskApiOrThrow(sessionId, toolCallId, 'session_search', broadcastFn, workspaceId, rootSessionId);
-          const result = await executeSessionSearchTool(
+          const askApi = createAskApiOrThrow(sessionId, toolCallId, sessionSearchPayload.name, broadcastFn, workspaceId, rootSessionId);
+          return await sessionSearchPayload.execute(
             args,
-            workspaceId,
-            sessionId,
-            includeToolResults,
-            searchPermissionRisk,
-            async (ask: import('@jean2/sdk').Ask) => askApi(ask),
-            agentId,
+            {
+              workspaceId,
+              sessionId,
+              ask: (ask: import('@jean2/sdk').Ask) => askApi(ask),
+              agentId,
+              permissionRisk: searchSettings?.permissionRisk,
+              includeToolResults: searchSettings?.includeToolResults === true,
+            },
           );
-
-          if (!result.success) {
-            return { error: result.error ?? 'Session search failed' };
-          }
-
-          return {
-            success: result.success,
-            mode: result.mode,
-            title: result.title,
-            ...(result.sessions !== undefined && { sessions: result.sessions }),
-            ...(result.query !== undefined && { query: result.query }),
-            ...(result.scope !== undefined && { scope: result.scope }),
-            ...(result.results !== undefined && { results: result.results }),
-            ...(result.sessionId !== undefined && { sessionId: result.sessionId }),
-            ...(result.sessionTitle !== undefined && { sessionTitle: result.sessionTitle }),
-            ...(result.anchorMessageId !== undefined && { anchorMessageId: result.anchorMessageId }),
-            ...(result.anchorInferred !== undefined && { anchorInferred: result.anchorInferred }),
-            ...(result.messagesBefore !== undefined && { messagesBefore: result.messagesBefore }),
-            ...(result.messagesAfter !== undefined && { messagesAfter: result.messagesAfter }),
-            ...(result.messages !== undefined && { messages: result.messages }),
-          };
         } finally {
           interruptManager.unregisterToolExecution(sessionId, toolCallId);
           rejectPendingAsksByToolCallId(toolCallId);
@@ -228,41 +234,35 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
   }
 
   // ── Scheduler tool ────────────────────────────────────────
-  const schedulingSettings = workspace.settings?.scheduling;
-  const isScheduledRun = Boolean(getSession(sessionId)?.metadata?.scheduledJobId);
-  if (schedulingSettings?.enabled && !isScheduledRun) {
-    const schedulingRisk: PermissionRiskLevel = schedulingSettings.permissionRisk ?? 'none';
+  // Same generic domain seam as session_search: the domain payload owns the
+  // workspace settings gate plus the current-session scheduled-job recursion
+  // gate (isEnabled) and the executor; the permission risk is captured here
+  // at build time exactly like pre-C5 and passed through the execution
+  // context.
+  const schedulerPayload = domainPayload('scheduler');
+  if (schedulerPayload && schedulerPayload.isEnabled?.(workspaceId, sessionId) === true) {
+    const schedulingRisk: PermissionRiskLevel = workspace.settings?.scheduling?.permissionRisk ?? 'none';
     tools['scheduler'] = tool({
-      description: schedulerToolDefinition.description,
-      inputSchema: jsonSchema(schedulerToolDefinition.inputSchema),
+      description: schedulerPayload.description,
+      inputSchema: jsonSchema(schedulerPayload.inputSchema as Record<string, unknown>),
       execute: async (args: Record<string, unknown>, { toolCallId }: { toolCallId: string }) => {
         const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
-        let result;
         try {
-          const askApi = createAskApiOrThrow(sessionId, toolCallId, 'scheduler', broadcastFn, workspaceId, rootSessionId);
-          result = await executeSchedulerTool(
+          const askApi = createAskApiOrThrow(sessionId, toolCallId, schedulerPayload.name, broadcastFn, workspaceId, rootSessionId);
+          return await schedulerPayload.execute(
             args,
-            workspaceId,
-            sessionId,
-            schedulingRisk,
-            async (ask: import('@jean2/sdk').Ask) => askApi(ask),
+            {
+              workspaceId,
+              sessionId,
+              ask: (ask: import('@jean2/sdk').Ask) => askApi(ask),
+              agentId,
+              permissionRisk: schedulingRisk,
+            },
           );
         } finally {
           interruptManager.unregisterToolExecution(sessionId, toolCallId);
           rejectPendingAsksByToolCallId(toolCallId);
         }
-
-        if (!result.success) {
-          return { error: result.error ?? 'Scheduler operation failed' };
-        }
-
-        return {
-          action: result.action,
-          title: result.title,
-          ...(result.job && { job: result.job }),
-          ...(result.jobs && { jobs: result.jobs }),
-          ...(result.jobId && { jobId: result.jobId }),
-        };
       },
     });
   }

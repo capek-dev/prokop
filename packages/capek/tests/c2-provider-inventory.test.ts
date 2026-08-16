@@ -288,12 +288,44 @@ describe('C2 provider inventory', () => {
     const snapshot = agentScope.snapshot();
     expect(snapshot.kind).toBe('agent');
     expect(snapshot.parentKind).toBe('process');
-    expect(snapshot.plugins.map((plugin) => plugin.id)).toEqual(
-      [...CURRENT_AGENT_PLUGIN_IDS].sort(),
+    // Kernel activation is topologically sorted by plugin id; the C5 domain
+    // plugins declare the storage service dependency, so they activate right
+    // after storage instead of their alphabetical position.
+    const sortedIds = [...CURRENT_AGENT_PLUGIN_IDS].sort();
+    const domainIds = [
+      'current.goal-domain',
+      'current.memory-domain',
+      'current.scheduler-domain',
+      'current.session-search-domain',
+      'current.skills-domain',
+      'current.subagent-domain',
+      'current.workflow-domain',
+    ];
+    const expectedPluginIds = sortedIds.filter((id) => !domainIds.includes(id));
+    expectedPluginIds.splice(expectedPluginIds.indexOf('current.storage') + 1, 0, ...[
+      'current.goal-domain',
+      'current.memory-domain',
+      'current.scheduler-domain',
+      'current.session-search-domain',
+      'current.skills-domain',
+      'current.subagent-domain',
+    ]);
+    // The workflow domain requires the subagent domain service and the
+    // orchestrator-session contract, so its deterministic activation order
+    // lands after tool-source, which is after its subagent dependency.
+    expectedPluginIds.splice(
+      expectedPluginIds.indexOf('current.tool-source') + 1,
+      0,
+      'current.workflow-domain',
     );
-    // 4 process services + 8 current agent services + 6 coding capability
-    // services installed by the C4 current composition.
-    expect(snapshot.services).toHaveLength(18);
+    expect(snapshot.plugins.map((plugin) => plugin.id)).toEqual(expectedPluginIds);
+    // 4 process services + 9 current agent services (storage, runtime
+    // configuration, runtime host, context sources, context sections,
+    // orchestrator session, tool source, sandbox controller, provider
+    // overrides) + 6 coding capability services + the seven C5 domain
+    // services (goal, memory, session-search, scheduler, skills, subagent,
+    // workflow) installed by the current composition.
+    expect(snapshot.services).toHaveLength(26);
 
     const serialized = JSON.stringify(snapshot);
     expect(serialized).not.toContain('getApiKey');
