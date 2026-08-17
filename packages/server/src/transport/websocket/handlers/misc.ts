@@ -46,19 +46,32 @@ export function handleNotificationAcknowledge(
   requireWireApplication().notifications.acknowledgePendingNotification(msg.eventId, msg.sessionId, clientId);
 }
 
-export function handleAskResponse(
+export interface AskResponseDependencies {
+  resolveAsk(toolCallId: string, response: unknown, requestId?: string): boolean;
+  getSessionIdForPendingAsk(toolCallId: string, requestId?: string): string | null;
+  getAuthorityForPendingAsk(toolCallId: string): AskAuthority | undefined;
+}
+
+const askResponseDependencies: AskResponseDependencies = {
+  resolveAsk,
+  getSessionIdForPendingAsk,
+  getAuthorityForPendingAsk,
+};
+
+export function handleAskResponseWithDependencies(
   ctx: RouterContext<ConnectionId>,
   ws: ConnectionId,
   msg: AskResponseMessage,
+  dependencies: AskResponseDependencies,
 ): void {
   const { toolCallId, response, requestId } = msg;
-  const askSessionId = getSessionIdForPendingAsk(toolCallId, requestId);
+  const askSessionId = dependencies.getSessionIdForPendingAsk(toolCallId, requestId);
   if (askSessionId) {
     const controlState = getControlState(askSessionId);
     const senderClientId = getClientIdForConnection(ws);
 
     const askAuthority: AskAuthority =
-      getAuthorityForPendingAsk(toolCallId) ?? {
+      dependencies.getAuthorityForPendingAsk(toolCallId) ?? {
         visibilityScope: 'controller_only',
         resolutionMode: 'controller_only',
       };
@@ -96,7 +109,15 @@ export function handleAskResponse(
       return;
     }
   }
-  resolveAsk(toolCallId, response, requestId);
+  dependencies.resolveAsk(toolCallId, response, requestId);
+}
+
+export function handleAskResponse(
+  ctx: RouterContext<ConnectionId>,
+  ws: ConnectionId,
+  msg: AskResponseMessage,
+): void {
+  handleAskResponseWithDependencies(ctx, ws, msg, askResponseDependencies);
 }
 
 export function handleSandboxRespond(
