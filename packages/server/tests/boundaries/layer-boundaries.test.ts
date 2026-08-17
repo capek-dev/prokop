@@ -141,12 +141,7 @@ const sqliteExceptions: Record<string, string[]> = {
   'packages/server/src/store/response-formats.ts': ['bun:sqlite'],
 };
 
-const aiSdkExceptions: Record<string, string[]> = {
-  'packages/server/src/core/session-title.ts': ['ai'],
-  'packages/server/src/mcp/manager.ts': ['ai'],
-  'packages/server/src/mcp/converter.ts': ['ai'],
-  'packages/server/src/providers/codex.ts': ['ai', '@ai-sdk/openai'],
-};
+const aiSdkExceptions: Record<string, string[]> = {};
 
 // S2 exact per-file exceptions for transport wire handlers that still
 // import legacy implementations. S3 retired the session lifecycle, queue,
