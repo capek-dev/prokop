@@ -1,11 +1,15 @@
 import type { AskAuthority, ClientCapability } from '@jean2/sdk';
-import { getClientByClientId, getConnectionsForClient, getAllClients } from './client-registry';
+import {
+  getClientByClientId,
+  getConnectionsForClient,
+  getAllClients,
+  type RegisteredConnection,
+} from '@/transport/websocket/connection-registry';
 import {
   getParticipantClientIds,
   getControllerConnections,
   getParticipantConnections,
-} from './session-control-registry';
-import type { RegisteredConnection } from './client-registry';
+} from '@/transport/websocket/control-registry';
 import {
   carrierHasCapabilities,
   checkAskResponseEligibility as checkAskResponseEligibilityWithInput,

@@ -1,4 +1,4 @@
-import { getPermissionTimeoutMs } from '@/env';
+import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { getSession } from '@/store/sessions';
 import { getScheduledJob } from '@/store/scheduled-jobs';
 import { getPermissionRequestByRequestId } from '@/store/pending-asks';

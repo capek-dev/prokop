@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { Hono } from 'hono';
+import type { ConfigurationApplication } from '@/application/configuration';
 import type { ProvidersApplication } from '@/application/providers';
 import type { ProviderDescriptor } from '@jean2/sdk';
 
@@ -72,7 +73,7 @@ function makeFakeApplication(overrides: Partial<ProvidersApplication> = {}): Pro
 
 function makeApp(application: ProvidersApplication): Hono {
   const app = new Hono();
-  registerConfigRoutes(app, application);
+  registerConfigRoutes(app, application, {} as ConfigurationApplication);
   return app;
 }
 

@@ -1,11 +1,7 @@
 import type { Hono } from 'hono';
 import { validate } from './validate';
-import * as modelsConfig from '@/configuration/models';
-import * as modelsSync from '@/configuration/models-sync';
-import * as promptsConfig from '@/configuration/prompts';
-import * as preconfigsConfig from '@/configuration/preconfigs';
+import type { ConfigurationApplication } from '@/application/configuration';
 import type { ProvidersApplication } from '@/application/providers';
-import { listPrompts } from '@/prompts/registry';
 import {
   createPreconfigSchema,
   updatePreconfigSchema,
@@ -18,13 +14,17 @@ import {
   looseObjectSchema,
 } from './schemas';
 
-export function registerConfigRoutes(app: Hono, providers: ProvidersApplication): void {
+export function registerConfigRoutes(
+  app: Hono,
+  providers: ProvidersApplication,
+  configuration: ConfigurationApplication,
+): void {
   // ============================================================================
   // Preconfigs API (validated)
   // ============================================================================
 
   app.get('/api/preconfigs', async (c) => {
-    const preconfigs = await preconfigsConfig.listValidatedPreconfigs();
+    const preconfigs = await configuration.preconfigs.listValidatedPreconfigs();
     return c.json({ preconfigs });
   });
 
@@ -34,7 +34,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
     async (c) => {
       const body = c.req.valid('json');
       const format = body.format === 'md' ? 'md' : undefined;
-      const preconfig = await preconfigsConfig.createValidatedPreconfig({
+      const preconfig = await configuration.preconfigs.createValidatedPreconfig({
         id: body.id,
         name: body.name || 'Custom Preconfig',
         description: body.description || '',
@@ -56,7 +56,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
 
   app.get('/api/preconfigs/:id', async (c) => {
     const id = c.req.param('id');
-    const preconfig = await preconfigsConfig.listValidatedPreconfigs()
+    const preconfig = await configuration.preconfigs.listValidatedPreconfigs()
       .then(ps => ps.find(p => p.id === id));
     if (!preconfig) {
       return c.json({ error: 'not_found', message: 'Preconfig not found' }, 404);
@@ -70,7 +70,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
     async (c) => {
       const id = c.req.param('id');
       const body = c.req.valid('json');
-      const preconfig = await preconfigsConfig.updateValidatedPreconfig(id, {
+      const preconfig = await configuration.preconfigs.updateValidatedPreconfig(id, {
         name: body.name,
         description: body.description,
         systemPrompt: body.systemPrompt,
@@ -93,7 +93,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
 
   app.delete('/api/preconfigs/:id', async (c) => {
     const id = c.req.param('id');
-    await preconfigsConfig.deleteValidatedPreconfig(id);
+    await configuration.preconfigs.deleteValidatedPreconfig(id);
     return c.json({ success: true });
   });
 
@@ -103,7 +103,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
 
   app.get('/api/prompts', async (c) => {
     try {
-      const prompts = await listPrompts();
+      const prompts = await configuration.prompts.listPrompts();
       return c.json({ prompts });
     } catch (_error) {
       return c.json({ prompts: [] });
@@ -116,7 +116,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
 
   app.get('/api/models', async (c) => {
     try {
-      const configResponse = modelsConfig.getModelsConfigWithStatus();
+      const configResponse = configuration.models.getModelsConfigWithStatus();
       const models = configResponse.providers.flatMap((provider) => provider.models);
       return c.json({
         models,
@@ -224,7 +224,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
   // ============================================================================
 
   app.get('/api/config/models', (c) => {
-    const result = modelsConfig.getModelsConfigWithStatus();
+    const result = configuration.models.getModelsConfigWithStatus();
     return c.json(result);
   });
 
@@ -233,7 +233,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
     validate('json', looseObjectSchema),
     async (c) => {
       const body = c.req.valid('json');
-      const result = await modelsConfig.createProvider(body as unknown as Parameters<typeof modelsConfig.createProvider>[0]);
+      const result = await configuration.models.createProvider(body as never);
       return c.json(result, 201);
     },
   );
@@ -244,14 +244,14 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
     async (c) => {
       const providerId = c.req.param('providerId');
       const body = c.req.valid('json');
-      const result = await modelsConfig.updateProvider(providerId, body);
+      const result = await configuration.models.updateProvider(providerId, body);
       return c.json(result);
     },
   );
 
   app.delete('/api/config/models/providers/:providerId', async (c) => {
     const providerId = c.req.param('providerId');
-    const result = await modelsConfig.deleteProvider(providerId);
+    const result = await configuration.models.deleteProvider(providerId);
     return c.json(result);
   });
 
@@ -261,7 +261,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
     async (c) => {
       const providerId = c.req.param('providerId');
       const body = c.req.valid('json');
-      const result = await modelsConfig.createModel(providerId, body as unknown as Parameters<typeof modelsConfig.createModel>[1]);
+      const result = await configuration.models.createModel(providerId, body as never);
       return c.json(result, 201);
     },
   );
@@ -273,7 +273,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
       const providerId = c.req.param('providerId');
       const modelId = c.req.param('modelId');
       const body = c.req.valid('json');
-      const result = await modelsConfig.updateModel(providerId, modelId, body);
+      const result = await configuration.models.updateModel(providerId, modelId, body);
       return c.json(result);
     },
   );
@@ -281,7 +281,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
   app.delete('/api/config/models/providers/:providerId/models/:modelId', async (c) => {
     const providerId = c.req.param('providerId');
     const modelId = c.req.param('modelId');
-    const result = await modelsConfig.deleteModel(providerId, modelId);
+    const result = await configuration.models.deleteModel(providerId, modelId);
     return c.json(result);
   });
 
@@ -291,7 +291,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
     async (c) => {
       const body = c.req.valid('json');
       const mode = body.mode === 'override' ? 'override' as const : 'merge' as const;
-      const result = await modelsSync.syncModels(mode);
+      const result = await configuration.models.syncModels(mode);
       return c.json(result);
     },
   );
@@ -301,7 +301,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
     validate('json', looseObjectSchema),
     async (c) => {
       const body = c.req.valid('json');
-      const result = await modelsConfig.setDefaults(body as unknown as Parameters<typeof modelsConfig.setDefaults>[0]);
+      const result = await configuration.models.setDefaults(body as never);
       return c.json(result);
     },
   );
@@ -311,13 +311,13 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
   // ============================================================================
 
   app.get('/api/config/prompts', async (c) => {
-    const prompts = await promptsConfig.listPromptConfigs();
+    const prompts = await configuration.prompts.listPromptConfigs();
     return c.json({ prompts });
   });
 
   app.get('/api/config/prompts/:name', async (c) => {
     const name = c.req.param('name');
-    const prompt = await promptsConfig.getPromptConfig(name);
+    const prompt = await configuration.prompts.getPromptConfig(name);
     return c.json(prompt);
   });
 
@@ -326,7 +326,7 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
     validate('json', createPromptSchema),
     async (c) => {
       const body = c.req.valid('json');
-      const prompt = await promptsConfig.createPromptConfig(body as unknown as Parameters<typeof promptsConfig.createPromptConfig>[0]);
+      const prompt = await configuration.prompts.createPromptConfig(body as never);
       return c.json(prompt, 201);
     },
   );
@@ -337,14 +337,14 @@ export function registerConfigRoutes(app: Hono, providers: ProvidersApplication)
     async (c) => {
       const name = c.req.param('name');
       const body = c.req.valid('json');
-      const prompt = await promptsConfig.updatePromptConfig(name, body as unknown as Parameters<typeof promptsConfig.updatePromptConfig>[1]);
+      const prompt = await configuration.prompts.updatePromptConfig(name, body as never);
       return c.json(prompt);
     },
   );
 
   app.delete('/api/config/prompts/:name', async (c) => {
     const name = c.req.param('name');
-    await promptsConfig.deletePromptConfig(name);
+    await configuration.prompts.deletePromptConfig(name);
     return c.json({ success: true });
   });
 }

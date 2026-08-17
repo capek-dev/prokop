@@ -12,13 +12,13 @@ import {
   installToolFromUrl,
   isToolInstalled,
   removeTool,
-} from '@/tools/tool-installer';
+} from './tool-installer';
 import {
   collectEnvVars,
   fetchRepository,
   fetchRepositoryWithVersions,
   getToolByName,
-} from '@/tools/tool-repository';
+} from './tool-repository';
 
 export function createToolDistribution(): ToolDistributionPort {
   return {

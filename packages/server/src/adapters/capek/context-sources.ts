@@ -13,8 +13,8 @@ import {
   getPreconfig,
   listPreconfigs,
   listSubagentPreconfigs,
-} from '@/core/preconfig';
-import { getGlobalAgentsPath } from '@/paths';
+} from '@/infrastructure/configuration/preconfig';
+import { getGlobalAgentsPath } from '@/infrastructure/runtime/paths';
 
 export const jean2PreconfigSource: PreconfigSource = {
   get: getPreconfig,

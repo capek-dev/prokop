@@ -6,7 +6,7 @@ import { tmpdir } from 'os';
 import {
   installDependencies,
   NpmInstallError,
-} from '@/tools/tool-npm-installer';
+} from '@/infrastructure/tools/tool-npm-installer';
 
 function createTempDir(): string {
   return join(tmpdir(), `jean2-test-npm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);

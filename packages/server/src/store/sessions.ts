@@ -11,7 +11,7 @@ import { getDatabase } from './index';
 import type { Session, SessionStatus, Workspace } from '@jean2/sdk';
 import { getWorkspace } from './workspaces';
 import { deleteAttachmentsForSession, deleteAttachmentsForWorkspace } from './attachments';
-import { removeSessionFromFts } from '@/session-search/fts';
+import { removeSessionFromFts } from '@/infrastructure/session-search/fts';
 import { rmSync, existsSync } from 'fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -52,7 +52,7 @@ function buildHooks(): SessionMessageRepositoryHooks {
   return {
     events: {
       publish(event) {
-        if (event.type === 'session.deleted') removeSessionFromFts(event.sessionId);
+        if (event.type === 'session.deleted') removeSessionFromFts(getDatabase(), event.sessionId);
       },
     },
     deleteAttachmentsForSession,

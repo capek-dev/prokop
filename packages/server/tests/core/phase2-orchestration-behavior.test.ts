@@ -3,7 +3,8 @@ import type { AssistantMessage, Preconfig, ServerMessage } from '@jean2/sdk';
 import type { ServerWebSocket } from 'bun';
 import { runOrchestratorSession } from '@capekai/core/internal/execution';
 import { executeChildSession } from '@capekai/core/internal/providers';
-import { handleChat, handleSessionEditMessage, type Jean2RouterContext } from '@/core/chat-handler';
+import { handleChat, handleSessionEditMessage } from '@/transport/websocket/chat-handler';
+import type { RouterContext } from '@/transport/websocket/router-context';
 import { executeCompaction, interruptManager } from '@capekai/core/internal/execution';
 import { sandboxController } from '@capekai/core/internal/sandbox';
 import { createPreconfig } from '@/core/preconfig';
@@ -43,7 +44,7 @@ const testPreconfig: Omit<Preconfig, 'id'> & { id: string } = {
 };
 
 interface TestContext {
-  ctx: Jean2RouterContext;
+  ctx: RouterContext<unknown>;
   sent: ServerMessage[];
   broadcastToSession: ServerMessage[];
   ws: ServerWebSocket;

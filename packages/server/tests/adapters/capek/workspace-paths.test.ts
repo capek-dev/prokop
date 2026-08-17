@@ -6,7 +6,10 @@ import { Hono } from 'hono';
 import { createWorkspacePathPolicyPort } from '@/adapters/capek/workspace-paths';
 import { createFilesApplication } from '@/application/files';
 import { createJean2FilesApplicationPort } from '@/adapters/jean2/files';
-import { getFilePreview } from '@/services/filePreview';
+import { workspacePathPolicyPort } from '@/adapters/capek/workspace-paths';
+import { createFilePreview } from '@/infrastructure/filesystem/file-preview';
+
+const getFilePreview = createFilePreview(workspacePathPolicyPort);
 import { registerFileRoutes } from '@/routes/files';
 import { HttpError } from '@/utils/http-errors';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';

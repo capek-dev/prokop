@@ -5,7 +5,7 @@ import {
   getPromptsDir,
   getEnvFilePath,
   getGlobalAgentsPath,
-} from '@/paths';
+} from '@/infrastructure/runtime/paths';
 
 import {
   getConfigPath,
@@ -18,7 +18,7 @@ import {
   clearModelsCache,
 } from '@/config';
 import { runMigrations } from '@/store';
-import { initializePreconfigs, migrateUuidPreconfigs } from '@/core/preconfig';
+import { initializePreconfigs, migrateUuidPreconfigs } from '@/infrastructure/configuration/preconfig';
 import defaultModelsJson from '@/config/models.json';
 import { installRecommendedTools } from '@/tools';
 

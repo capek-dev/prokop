@@ -12,7 +12,7 @@ import {
   getInstalledTools,
   isToolInstalled,
   getInstalledToolVersion,
-} from '@/tools/tool-installer';
+} from '@/infrastructure/tools/tool-installer';
 import { readInstallManifest } from '@capekai/core/internal/tools';
 
 const FIXTURE_DIR = resolve(import.meta.dir, 'fixtures', 'test-fixture-tool');

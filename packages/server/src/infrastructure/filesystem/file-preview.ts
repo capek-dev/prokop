@@ -13,7 +13,7 @@ import {
   FILE_PREVIEW_MAX_BYTES,
   isBinaryExtension,
   isBinaryFile,
-} from '@/utils/binaryDetection';
+} from './binary-detection';
 
 const CODE_EXTENSIONS: Record<string, string> = {
   ts: 'typescript',

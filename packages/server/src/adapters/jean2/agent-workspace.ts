@@ -1,5 +1,5 @@
 import type { AgentPreconfigPort, AgentWorkspacePort } from '@/application/ports/agents';
-import { getPreconfig } from '@/core/preconfig';
+import { getPreconfig } from '@/infrastructure/configuration/preconfig';
 import { createWorkspace, deleteWorkspace, updateWorkspace } from '@/store/workspaces';
 
 /**

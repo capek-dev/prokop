@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 // packages/server/src/cli.ts
 
-import '@/env';  // This loads .env automatically
+import '@/infrastructure/runtime/environment';  // This loads .env automatically
 
 import { startServer, type ServerOptions } from '@/index';
 import { runClientCommand } from '@/services/client-launcher';
 import { isInitialized } from '@/config';
-import { getDatabasePath } from '@/env';
+import { getDatabasePath } from '@/infrastructure/runtime/environment';
 import {
   startDaemon,
   stopDaemon,

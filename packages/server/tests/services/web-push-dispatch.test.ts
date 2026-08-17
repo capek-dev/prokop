@@ -9,6 +9,7 @@ import {
 } from '@/store/web-push';
 import { createScheduledJob, deleteScheduledJob } from '@/store/scheduled-jobs';
 import { createPendingAsk } from '@/store/pending-asks';
+import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
 
 const validKeys = { p256dh: 'p256dh-value', auth: 'auth-value' };
 const validEndpoint = 'https://fcm.googleapis.com/fcm/send/abc';
@@ -123,10 +124,10 @@ describe('web-push dispatch service', () => {
       },
     }));
 
-    const { dispatchNotification } = await import('@/services/web-push/dispatch');
+    const app = getJean2NotificationsApplication();
 
     // Dynamically import to get the mocked version
-    await dispatchNotification({
+    await app.dispatch({
       eventId: 'message:test:completed',
       eventType: 'session_completed',
       sessionId: 'session-1',
@@ -143,17 +144,17 @@ describe('web-push dispatch service', () => {
       preferences: { completion: false, permission: true },
     }));
 
-    const { dispatchNotification } = await import('@/services/web-push/dispatch');
+    const app = getJean2NotificationsApplication();
 
     // Completion event should find zero enabled subscriptions
-    await dispatchNotification({
+    await app.dispatch({
       eventId: 'message:skip:completed',
       eventType: 'session_completed',
       sessionId: 'session-1',
     });
 
     // Permission event should find the one enabled subscription
-    await dispatchNotification({
+    await app.dispatch({
       eventId: 'permission:perm1',
       eventType: 'permission_required',
       sessionId: 'session-1',
@@ -172,7 +173,7 @@ describe('web-push dispatch service', () => {
       }));
       const session = seedSession('ws1', { parentId: null });
 
-      const { notifyTerminalMessage, acknowledgePendingNotification } = await import('@/services/web-push/dispatch');
+      const app = getJean2NotificationsApplication();
 
       const msg = {
         id: 'msg-normal-1',
@@ -187,10 +188,10 @@ describe('web-push dispatch service', () => {
         completedAt: Date.now(),
       };
 
-      notifyTerminalMessage(msg, session.id);
+      app.notifyTerminalMessage(msg, session.id);
 
       const eventId = 'message:msg-normal-1:completed';
-      const acked = acknowledgePendingNotification(eventId, session.id, 'client-1');
+      const acked = app.acknowledgePendingNotification(eventId, session.id, 'client-1');
       expect(acked).toBe(true);
     });
 
@@ -201,7 +202,7 @@ describe('web-push dispatch service', () => {
       }));
       const session = seedSession('ws1', { parentId: null });
 
-      const { notifyTerminalMessage, acknowledgePendingNotification } = await import('@/services/web-push/dispatch');
+      const app = getJean2NotificationsApplication();
 
       const msg = {
         id: 'msg-normal-error',
@@ -216,10 +217,10 @@ describe('web-push dispatch service', () => {
         completedAt: Date.now(),
       };
 
-      notifyTerminalMessage(msg, session.id);
+      app.notifyTerminalMessage(msg, session.id);
 
       const eventId = 'message:msg-normal-error:error';
-      const acked = acknowledgePendingNotification(eventId, session.id, 'client-1');
+      const acked = app.acknowledgePendingNotification(eventId, session.id, 'client-1');
       expect(acked).toBe(true);
     });
 
@@ -242,7 +243,7 @@ describe('web-push dispatch service', () => {
         metadata: { scheduledJobId: job.id },
       });
 
-      const { notifyTerminalMessage, acknowledgePendingNotification } = await import('@/services/web-push/dispatch');
+      const app = getJean2NotificationsApplication();
 
       const msg = {
         id: 'msg-sched-off',
@@ -257,10 +258,10 @@ describe('web-push dispatch service', () => {
         completedAt: Date.now(),
       };
 
-      notifyTerminalMessage(msg, session.id);
+      app.notifyTerminalMessage(msg, session.id);
 
       const eventId = 'message:msg-sched-off:completed';
-      const acked = acknowledgePendingNotification(eventId, session.id, 'client-1');
+      const acked = app.acknowledgePendingNotification(eventId, session.id, 'client-1');
       expect(acked).toBe(false); // Nothing was scheduled
     });
 
@@ -283,7 +284,7 @@ describe('web-push dispatch service', () => {
         metadata: { scheduledJobId: job.id },
       });
 
-      const { notifyTerminalMessage, acknowledgePendingNotification } = await import('@/services/web-push/dispatch');
+      const app = getJean2NotificationsApplication();
 
       const msg = {
         id: 'msg-sched-on',
@@ -298,10 +299,10 @@ describe('web-push dispatch service', () => {
         completedAt: Date.now(),
       };
 
-      notifyTerminalMessage(msg, session.id);
+      app.notifyTerminalMessage(msg, session.id);
 
       const eventId = 'message:msg-sched-on:completed';
-      const acked = acknowledgePendingNotification(eventId, session.id, 'client-1');
+      const acked = app.acknowledgePendingNotification(eventId, session.id, 'client-1');
       expect(acked).toBe(true);
     });
 
@@ -334,7 +335,7 @@ describe('web-push dispatch service', () => {
         metadata: { scheduledJobId: jobOn.id },
       });
 
-      const { notifyTerminalMessage, acknowledgePendingNotification } = await import('@/services/web-push/dispatch');
+      const app = getJean2NotificationsApplication();
       const messageBase = {
         role: 'assistant' as const,
         status: 'error' as const,
@@ -346,23 +347,23 @@ describe('web-push dispatch service', () => {
         completedAt: Date.now(),
       };
 
-      notifyTerminalMessage({
+      app.notifyTerminalMessage({
         ...messageBase,
         id: 'msg-failure-off',
         sessionId: sessionOff.id,
       }, sessionOff.id);
-      expect(acknowledgePendingNotification(
+      expect(app.acknowledgePendingNotification(
         'message:msg-failure-off:error',
         sessionOff.id,
         'client-1',
       )).toBe(false);
 
-      notifyTerminalMessage({
+      app.notifyTerminalMessage({
         ...messageBase,
         id: 'msg-failure-on',
         sessionId: sessionOn.id,
       }, sessionOn.id);
-      expect(acknowledgePendingNotification(
+      expect(app.acknowledgePendingNotification(
         'message:msg-failure-on:error',
         sessionOn.id,
         'client-1',
@@ -391,7 +392,7 @@ describe('web-push dispatch service', () => {
       // Delete the job so the session references a missing record
       deleteScheduledJob(job.id);
 
-      const { notifyTerminalMessage, acknowledgePendingNotification } = await import('@/services/web-push/dispatch');
+      const app = getJean2NotificationsApplication();
 
       const msg = {
         id: 'msg-sched-missing',
@@ -406,10 +407,10 @@ describe('web-push dispatch service', () => {
         completedAt: Date.now(),
       };
 
-      notifyTerminalMessage(msg, session.id);
+      app.notifyTerminalMessage(msg, session.id);
 
       const eventId = 'message:msg-sched-missing:completed';
-      const acked = acknowledgePendingNotification(eventId, session.id, 'client-1');
+      const acked = app.acknowledgePendingNotification(eventId, session.id, 'client-1');
       expect(acked).toBe(false);
     });
 
@@ -445,8 +446,8 @@ describe('web-push dispatch service', () => {
         createdAt: Date.now(),
       });
 
-      const { dispatchPendingPermissionNotification } = await import('@/services/web-push/dispatch');
-      await dispatchPendingPermissionNotification(requestIdOff, sessionOff.id);
+      const app = getJean2NotificationsApplication();
+      await app.dispatchPendingPermissionNotification(requestIdOff, sessionOff.id);
 
       // No delivery row should have been created for the off-session
       const subs = listEnabledSubscriptionsForEvent('permission_required');
@@ -484,7 +485,7 @@ describe('web-push dispatch service', () => {
         createdAt: Date.now(),
       });
 
-      await dispatchPendingPermissionNotification(requestIdOn, sessionOn.id);
+      await app.dispatchPendingPermissionNotification(requestIdOn, sessionOn.id);
 
       // A delivery row should have been reserved by the server
       const onDelivery = reserveDelivery({

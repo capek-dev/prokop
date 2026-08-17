@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { Hono } from 'hono';
+import type { ConfigurationApplication } from '@/application/configuration';
 
 const createValidatedPreconfig = mock(async (data: Record<string, unknown>) => ({
   ...data,
@@ -18,6 +19,19 @@ mock.module('@/configuration/preconfigs', () => ({
 }));
 
 const { registerConfigRoutes } = await import('@/routes/config');
+
+function fakeConfiguration(): ConfigurationApplication {
+  return {
+    models: {} as ConfigurationApplication['models'],
+    prompts: {} as ConfigurationApplication['prompts'],
+    preconfigs: {
+      listValidatedPreconfigs: async () => [],
+      createValidatedPreconfig: createValidatedPreconfig as unknown as ConfigurationApplication['preconfigs']['createValidatedPreconfig'],
+      updateValidatedPreconfig: updateValidatedPreconfig as unknown as ConfigurationApplication['preconfigs']['updateValidatedPreconfig'],
+      deleteValidatedPreconfig: async () => undefined,
+    },
+  };
+}
 
 function fakeProviders() {
   return {
@@ -42,7 +56,7 @@ describe('preconfig routes', () => {
 
   test('forwards allowSelfAsSubagent on create and update', async () => {
     const app = new Hono();
-    registerConfigRoutes(app, fakeProviders());
+    registerConfigRoutes(app, fakeProviders(), fakeConfiguration());
 
     const createResponse = await app.request('/api/preconfigs', {
       method: 'POST',

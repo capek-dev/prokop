@@ -1,6 +1,6 @@
 import type { ServerMessage, Session, AskAuthority } from '@jean2/sdk';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
-import { getConnectionByWs } from './client-registry';
+import { getConnectionBySocket } from '@/transport/websocket/connection-registry';
 
 export type BroadcastFn = (message: ServerMessage) => void;
 
@@ -58,7 +58,7 @@ export function registerBroadcastToSessionCallback(callback: BroadcastToSessionF
 
 function toConnectionId(excludeWs: unknown): ConnectionId | undefined {
   if (excludeWs === undefined || excludeWs === null) return undefined;
-  return getConnectionByWs(excludeWs)?.connectionId;
+  return getConnectionBySocket(excludeWs)?.connectionId;
 }
 
 export function broadcastSessionCreated(session: Session): void {

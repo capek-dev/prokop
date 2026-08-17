@@ -1,5 +1,6 @@
 import type {
   NotificationsApplication,
+  PermissionsApplication,
   ProvidersApplication,
   SessionApplication,
   SessionControlApplication,
@@ -13,6 +14,7 @@ export interface WireApplication {
   control: SessionControlApplication<ConnectionId>;
   providers: ProvidersApplication;
   notifications: NotificationsApplication;
+  permissions: PermissionsApplication;
 }
 
 let installed: WireApplication | null = null;

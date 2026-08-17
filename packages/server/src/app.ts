@@ -14,14 +14,14 @@ import { ZodError } from 'zod';
 
 import { requireAuth, isPublicRoute } from '@/auth/middleware';
 import { isAuthEnabled } from '@/auth/token';
-import { getClientEnabled } from '@/env';
+import { getClientEnabled } from '@/infrastructure/runtime/environment';
 import { ensurePromptsDir } from '@/prompts/registry';
 import { VERSION } from '@/version';
-import { HttpError } from '@/utils/http-errors';
+import { HttpError } from '@/application/http-errors';
 import { createWiredApplication, type WiredApplication } from '@/bootstrap/application';
 
 // Route modules
-import { registerSessionRoutes } from '@/routes/sessions';
+import { registerSessionRoutes } from '@/transport/http/routes/sessions';
 import { registerWorkspaceRoutes } from '@/routes/workspaces';
 import { registerFileRoutes } from '@/routes/files';
 import { registerToolRoutes } from '@/routes/tools';
@@ -118,11 +118,11 @@ export function createApp(application?: WiredApplication) {
   registerFileRoutes(app, wired.files);
   registerToolRoutes(app, wired.tools);
   registerMcpRoutes(app, wired.mcp);
-  registerConfigRoutes(app, wired.providers);
-  registerResponseFormatRoutes(app);
+  registerConfigRoutes(app, wired.providers, wired.configuration);
+  registerResponseFormatRoutes(app, wired.responseFormats);
   registerSchedulerRoutes(app, wired.scheduling);
   registerAgentRoutes(app, wired.agents);
-  registerMaintenanceRoutes(app);
+  registerMaintenanceRoutes(app, wired.maintenance);
   registerNotificationRoutes(app, wired.notifications);
   if (process.env.JEAN2_SANDBOX === 'true') {
     registerSandboxRoutes(app);

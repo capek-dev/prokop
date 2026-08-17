@@ -10,10 +10,15 @@ import {
   createSessionHttpApplication,
   createToolsHttpApplication,
   createWorkspaceApplication,
+  createPermissionsApplication,
+  createConfigurationApplication,
+  createMaintenanceApplication,
+  createResponseFormatsApplication,
   type AgentsApplication,
   type FilesApplication,
   type McpHttpApplication,
   type NotificationsApplication,
+  type PermissionsApplication,
   type ProvidersApplication,
   type SchedulingHttpApplication,
   type SchedulingTicker,
@@ -22,6 +27,9 @@ import {
   type SessionHttpApplication,
   type ToolsHttpApplication,
   type WorkspaceApplication,
+  type ConfigurationApplication,
+  type MaintenanceApplication,
+  type ResponseFormatsApplication,
 } from '@/application';
 import {
   createJean2AskAuthorityPort,
@@ -37,6 +45,10 @@ import {
   createJean2McpWorkspacePort,
   createJean2OAuthFlowPort,
   createJean2PendingAskPort,
+  createJean2PermissionRepositoryPort,
+  createJean2ConfigurationPorts,
+  createJean2MaintenanceApplication,
+  createJean2ResponseFormatsApplication,
   createJean2ProviderCredentialPort,
   createJean2ScheduledJobExecution,
   createJean2ScheduledJobRepository,
@@ -55,10 +67,10 @@ import {
 import { installTerminalSessionStore } from '@/transport/terminal';
 import { createJean2TerminalSessionPort } from '@/adapters/jean2/terminal';
 import { createTransportControllerPorts } from '@/transport/websocket/control-port';
-import { getAutoApproveTakeover } from '@/env';
+import { getAutoApproveTakeover } from '@/infrastructure/runtime/environment';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
-import { getDataDir } from '@/paths';
+import { getDataDir } from '@/infrastructure/runtime/paths';
 
 export interface WiredApplication {
   session: SessionApplication<ConnectionId>;
@@ -80,8 +92,14 @@ export interface WiredApplication {
   providers: ProvidersApplication;
   /** The wired notification reservation and delivery use cases (S4). */
   notifications: NotificationsApplication;
+  /** The wired permission grant application. */
+  permissions: PermissionsApplication;
   /** The wired files list/search/preview/edit/git use cases (S5). */
   files: FilesApplication;
+  /** The wired configuration use cases (S9). */
+  configuration: ConfigurationApplication;
+  maintenance: MaintenanceApplication;
+  responseFormats: ResponseFormatsApplication;
 }
 
 /**
@@ -170,9 +188,16 @@ export function createWiredApplication(): WiredApplication {
 
   const notifications = getJean2NotificationsApplication();
 
+  const permissions = createPermissionsApplication({
+    repository: createJean2PermissionRepositoryPort(),
+  });
+
   const files = createFilesApplication(createJean2FilesApplicationPort());
+  const configuration = createConfigurationApplication(createJean2ConfigurationPorts());
+  const maintenance = createMaintenanceApplication(createJean2MaintenanceApplication());
+  const responseFormats = createResponseFormatsApplication(createJean2ResponseFormatsApplication());
 
   installTerminalSessionStore(createJean2TerminalSessionPort());
 
-  return { session, control, http, scheduling, schedulerTicker, agents, workspaces, tools, mcp, providers, notifications, files };
+  return { session, control, http, scheduling, schedulerTicker, agents, workspaces, tools, mcp, providers, notifications, permissions, files, configuration, maintenance, responseFormats };
 }

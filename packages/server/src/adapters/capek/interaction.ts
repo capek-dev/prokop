@@ -1,4 +1,4 @@
-import { getPermissionTimeoutMs } from '@/env';
+import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { getSession } from '@/store';
 import {
   cancelPendingRequestsBySession,
@@ -12,9 +12,9 @@ import {
   removePendingAsk,
   removePendingAsksByToolCallId,
   resolvePermissionRequestByRequestId,
-} from '@/store/pending-asks';
-import { createGrantFromOptions, matchGrant } from '@/store/permissions';
-import { notifyPermissionRequired } from '@/services/web-push/dispatch';
+} from '@/infrastructure/sqlite/pending-asks';
+import { createGrantFromOptions, matchGrant } from '@/infrastructure/sqlite/permissions';
+import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
 import type { Jean2CompatibilityBindings } from './types';
 
 export const jean2InteractionBindings: Jean2CompatibilityBindings['interaction'] = {
@@ -33,5 +33,6 @@ export const jean2InteractionBindings: Jean2CompatibilityBindings['interaction']
   createGrantFromOptions,
   getSessionAutoApproveSeverity: (sessionId: string) => getSession(sessionId)?.autoApproveSeverity ?? undefined,
   getPermissionTimeoutMs,
-  notifyPermissionRequired,
+  notifyPermissionRequired: (requestId: string, rootSessionId: string) =>
+    getJean2NotificationsApplication().notifyPermissionRequired(requestId, rootSessionId),
 };

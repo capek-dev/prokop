@@ -1,5 +1,14 @@
 import { getDatabase } from '@/store';
 import {
+  backfillFts as backfillFtsWithDb,
+  indexMessage as indexMessageWithDb,
+  initializeFts as initializeFtsWithDb,
+  migrateFtsForAgents as migrateFtsForAgentsWithDb,
+  removeMessageFromFts as removeMessageFromFtsWithDb,
+  removeSessionFromFts as removeSessionFromFtsWithDb,
+  type FtsDatabase,
+} from '@/infrastructure/session-search/fts';
+import {
   getMessageContentForFts as getMessageContentForFtsWithDb,
   sanitizeFtsQuery,
   searchMessages as searchMessagesWithDb,
@@ -8,15 +17,6 @@ import type {
   SessionSearchMessageResult,
   SessionSearchOptions,
 } from '@/application/ports/session-search';
-
-/**
- * Temporary S5 compatibility module. Search, sanitization, and content
- * extraction delegate to the infrastructure query implementation through the
- * current store database handle; the lifecycle, projection, mutation, and
- * backfill functions stay here until S6 moves the projection behind
- * committed events. New query consumers must use the port plus the
- * infrastructure repository, not this module.
- */
 
 export type FtsSearchResult = SessionSearchMessageResult;
 export type SearchOptions = SessionSearchOptions;
@@ -33,126 +33,16 @@ export function getMessageContentForFts(
 
 export { sanitizeFtsQuery };
 
-export function initializeFts(db: ReturnType<typeof getDatabase>): void {
-  db.run(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
-      message_id UNINDEXED,
-      session_id UNINDEXED,
-      workspace_id UNINDEXED,
-      agent_id UNINDEXED,
-      role UNINDEXED,
-      content,
-      tool_name,
-      tokenize = 'unicode61'
-    )
-  `);
+export function initializeFts(db: FtsDatabase): void {
+  initializeFtsWithDb(db);
 }
 
-export function migrateFtsForAgents(db: ReturnType<typeof getDatabase>): void {
-  const cols = db.prepare("PRAGMA table_info(messages_fts)").all() as { name: string }[];
-  if (!cols.some(c => c.name === 'agent_id')) {
-    db.run('DROP TABLE IF EXISTS messages_fts');
-    initializeFts(db);
-  }
+export function migrateFtsForAgents(db: FtsDatabase): void {
+  migrateFtsForAgentsWithDb(db);
 }
-
-const BACKFILL_BATCH_SIZE = 500;
-const BACKFILL_PROGRESS_INTERVAL = 5000;
 
 export function backfillFts(): number {
-  const db = getDatabase();
-
-  const ftsCount = (db.query('SELECT COUNT(*) as cnt FROM messages_fts').get() as { cnt: number }).cnt;
-  if (ftsCount > 0) return 0;
-
-  const msgCount = (db.query('SELECT COUNT(*) as cnt FROM messages').get() as { cnt: number }).cnt;
-  if (msgCount === 0) return 0;
-
-  console.log(`[fts] Backfilling ${msgCount} messages into search index...`);
-
-  const totalBackfilled = batchBackfill(db, BACKFILL_BATCH_SIZE);
-
-  console.log(`[fts] Backfill complete: ${totalBackfilled} messages indexed`);
-  return totalBackfilled;
-}
-
-function batchBackfill(db: ReturnType<typeof getDatabase>, batchSize: number): number {
-  const totalMsgs = (db.query('SELECT COUNT(*) as cnt FROM messages').get() as { cnt: number }).cnt;
-  const totalBatches = Math.ceil(totalMsgs / batchSize);
-
-  let totalBackfilled = 0;
-  let offset = 0;
-
-  for (let batch = 0; batch < totalBatches; batch++) {
-    db.transaction(() => {
-      const rows = db.query(`
-        SELECT
-          m.id as message_id,
-          m.session_id,
-          s.workspace_id,
-          s.agent_id,
-          m.role,
-          m.created_at,
-          GROUP_CONCAT(
-            CASE
-              WHEN p.type = 'text' THEN json_extract(p.data, '$.text')
-              WHEN p.type = 'reasoning' THEN json_extract(p.data, '$.text')
-              WHEN p.type = 'tool' THEN json_extract(p.data, '$.name')
-              ELSE NULL
-            END, ' '
-          ) as content,
-          GROUP_CONCAT(
-            CASE
-              WHEN p.type = 'tool' THEN json_extract(p.data, '$.name')
-              ELSE NULL
-            END, ' '
-          ) as tool_name
-        FROM messages m
-        JOIN sessions s ON m.session_id = s.id
-        LEFT JOIN parts p ON p.message_id = m.id
-        WHERE s.workspace_id IS NOT NULL
-        GROUP BY m.id
-        ORDER BY m.created_at ASC
-        LIMIT ? OFFSET ?
-      `).all(batchSize, offset) as Array<{
-        message_id: string;
-        session_id: string;
-        workspace_id: string;
-        agent_id: string | null;
-        role: string;
-        created_at: number;
-        content: string | null;
-        tool_name: string | null;
-      }>;
-
-      const insertStmt = db.prepare(`
-        INSERT INTO messages_fts (message_id, session_id, workspace_id, agent_id, role, content, tool_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      for (const row of rows) {
-        if (!row.content && !row.tool_name) continue;
-        insertStmt.run(
-          row.message_id,
-          row.session_id,
-          row.workspace_id,
-          row.agent_id,
-          row.role,
-          row.content ?? '',
-          row.tool_name ?? '',
-        );
-        totalBackfilled++;
-      }
-
-      offset += batchSize;
-    })();
-
-    if (totalBackfilled >= (batch + 1) * BACKFILL_PROGRESS_INTERVAL) {
-      console.log(`[fts] Backfill progress: ${totalBackfilled}/${totalMsgs} messages`);
-    }
-  }
-
-  return totalBackfilled;
+  return backfillFtsWithDb(getDatabase());
 }
 
 export function indexMessage(
@@ -164,29 +54,22 @@ export function indexMessage(
   toolName: string,
   agentId?: string | null,
 ): void {
-  const db = getDatabase();
-  if (!content && !toolName) {
-    // If nothing to index, just remove any existing entry
-    db.run('DELETE FROM messages_fts WHERE message_id = ?', [messageId]);
-    return;
-  }
-
-  // Phase 3: Atomic delete + insert to prevent duplicate FTS rows
-  db.transaction(() => {
-    db.run('DELETE FROM messages_fts WHERE message_id = ?', [messageId]);
-    db.run(
-      'INSERT INTO messages_fts (message_id, session_id, workspace_id, agent_id, role, content, tool_name) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [messageId, sessionId, workspaceId, agentId ?? null, role, content, toolName],
-    );
-  })();
+  indexMessageWithDb(
+    getDatabase(),
+    messageId,
+    sessionId,
+    workspaceId,
+    role,
+    content,
+    toolName,
+    agentId,
+  );
 }
 
 export function removeMessageFromFts(messageId: string): void {
-  const db = getDatabase();
-  db.run('DELETE FROM messages_fts WHERE message_id = ?', [messageId]);
+  removeMessageFromFtsWithDb(getDatabase(), messageId);
 }
 
 export function removeSessionFromFts(sessionId: string): void {
-  const db = getDatabase();
-  db.run('DELETE FROM messages_fts WHERE session_id = ?', [sessionId]);
+  removeSessionFromFtsWithDb(getDatabase(), sessionId);
 }

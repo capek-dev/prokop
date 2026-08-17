@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { configureCapekJean2Compatibility } from '@/capek-adapter';
+import { createRuntime } from '@/bootstrap/create-runtime';
 import { getModelWithMetadata } from '@capekai/core/internal/execution';
 import { SandboxLanguageModel } from '@capekai/core/internal/sandbox';
 import { activateSandbox, deactivateSandbox } from '@/sandbox';
@@ -7,7 +7,7 @@ import { activateSandbox, deactivateSandbox } from '@/sandbox';
 const originalOpenAIApiKey = process.env.JEAN2_LLM_OPENAI_API_KEY;
 
 beforeEach(() => {
-  configureCapekJean2Compatibility();
+  createRuntime();
 });
 
 afterEach(() => {

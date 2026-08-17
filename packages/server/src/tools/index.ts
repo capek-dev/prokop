@@ -1,4 +1,4 @@
-export * from './tool-repository';
+export * from '@/infrastructure/tools/tool-repository';
 export {
   installTool,
   installToolFromUrl,
@@ -12,7 +12,7 @@ export {
   type InstallResult,
   type InstalledTool,
   type RemoveResult,
-} from './tool-installer';
+} from '@/infrastructure/tools/tool-installer';
 export {
   runToolsCommand,
   toolsList,

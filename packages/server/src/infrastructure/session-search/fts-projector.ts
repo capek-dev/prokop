@@ -4,24 +4,29 @@ import type {
 } from '@/application/ports/session-message-events';
 import {
   getMessageContentForFts,
+} from '@/infrastructure/sqlite/session-search-query-repository';
+import {
   indexMessage,
   removeMessageFromFts,
   removeSessionFromFts,
-} from '@/session-search/fts';
+  type FtsDatabase,
+} from './fts';
 import type { Message, Session } from '@jean2/sdk';
 
 export function createFtsProjector(dependencies: {
+  getDatabase(): FtsDatabase;
   getMessage(messageId: string): Message | null;
   getSession(sessionId: string): Session | null;
 }): SessionMessageEventPublisher {
   return {
     publish(event: SessionMessageCommittedEvent): void {
+      const db = dependencies.getDatabase();
       if (event.type === 'message.deleted') {
-        removeMessageFromFts(event.messageId);
+        removeMessageFromFts(db, event.messageId);
         return;
       }
       if (event.type === 'session.deleted') {
-        removeSessionFromFts(event.sessionId);
+        removeSessionFromFts(db, event.sessionId);
         return;
       }
 
@@ -30,8 +35,9 @@ export function createFtsProjector(dependencies: {
         if (!message) return;
         const session = dependencies.getSession(message.sessionId);
         if (!session?.workspaceId) return;
-        const { content, toolName } = getMessageContentForFts(event.messageId);
+        const { content, toolName } = getMessageContentForFts(db, event.messageId);
         indexMessage(
+          db,
           event.messageId,
           message.sessionId,
           session.workspaceId,

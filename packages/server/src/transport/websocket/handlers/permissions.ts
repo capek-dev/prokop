@@ -1,6 +1,6 @@
 import type { RouterContext } from '../router-context';
 import type { ConnectionId } from '../connection-id';
-import { getWorkspaceGrants, revokeGrant, revokeAllWorkspaceGrants } from '@/store/permissions';
+import { requireWireApplication } from '../application';
 import type { PermissionListRequestMessage, PermissionRevokeMessage, PermissionRevokeAllMessage } from '@jean2/sdk';
 
 export function handlePermissionList(
@@ -8,7 +8,7 @@ export function handlePermissionList(
   ws: ConnectionId,
   msg: PermissionListRequestMessage,
 ): void {
-  const grants = getWorkspaceGrants(msg.workspaceId, { includeRevoked: msg.includeRevoked });
+  const grants = requireWireApplication().permissions.list(msg.workspaceId, { includeRevoked: msg.includeRevoked });
   ctx.send(ws, { type: 'permission.list', workspaceId: msg.workspaceId, grants });
 }
 
@@ -17,7 +17,7 @@ export function handlePermissionRevoke(
   ws: ConnectionId,
   msg: PermissionRevokeMessage,
 ): void {
-  revokeGrant(msg.grantId, null);
+  requireWireApplication().permissions.revoke(msg.grantId, null);
   ctx.send(ws, { type: 'permission.revoked', grantId: msg.grantId });
 }
 
@@ -26,6 +26,6 @@ export function handlePermissionRevokeAll(
   ws: ConnectionId,
   msg: PermissionRevokeAllMessage,
 ): void {
-  const count = revokeAllWorkspaceGrants(msg.workspaceId, null);
+  const count = requireWireApplication().permissions.revokeAll(msg.workspaceId, null);
   ctx.send(ws, { type: 'permission.all_revoked', workspaceId: msg.workspaceId, count });
 }

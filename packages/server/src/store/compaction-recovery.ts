@@ -4,8 +4,8 @@
  * to the Capek compaction domain in C6 step 2; this store module keeps every
  * pre-slice export identity and only wires the inward-facing
  * `CompactionRecoveryPort` over the current store queries plus the transport
- * broadcast adapters. The store -> compat -> domain path stays temporary
- * until S6/S8 retire it.
+ * broadcast adapters. The store wiring remains until the remaining storage
+ * migration assigns these queries to infrastructure.
  */
 
 import {
@@ -15,7 +15,7 @@ import {
   type RuntimeEventSink,
 } from '@capekai/core/internal/execution';
 import type { CompactionRecoveryPort } from '@/application/ports/session';
-import { mapCapekEventToServerMessage } from '@/capek-event-adapter';
+import { mapCapekEventToServerMessage } from '@/adapters/capek/events';
 import {
   broadcastEvent,
   broadcastSessionUpdated,

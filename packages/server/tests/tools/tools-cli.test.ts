@@ -6,7 +6,7 @@ import {
   selectRecommendedTools,
   validateInstallOptions,
 } from '@/tools/tools-cli';
-import type { RepositoryTool } from '@/tools/tool-repository';
+import type { RepositoryTool } from '@/infrastructure/tools/tool-repository';
 
 const tools: RepositoryTool[] = [
   {

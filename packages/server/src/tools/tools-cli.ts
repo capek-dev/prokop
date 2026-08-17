@@ -5,14 +5,14 @@ import { restoreTerminalState } from './clack-utils';
 import {
   fetchRepositoryWithVersions,
   type RepositoryTool,
-} from './tool-repository';
+} from '@/infrastructure/tools/tool-repository';
 
 import {
   installToolFromUrl,
   removeTool,
   getInstalledTools,
   getToolsBaseDir,
-} from './tool-installer';
+} from '@/infrastructure/tools/tool-installer';
 
 const INTERACTIVE_INSTALL_VISIBLE_ITEMS = 10;
 

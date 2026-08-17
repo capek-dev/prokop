@@ -9,7 +9,7 @@ import {
   getToolByName,
   collectEnvVars,
   type ToolRepository,
-} from '@/tools/tool-repository';
+} from '@/infrastructure/tools/tool-repository';
 
 function createValidRegistry(tempDir: string): ToolRepository {
   return {

@@ -9,7 +9,7 @@ import {
   type ConnectableProvider,
   type TokenResponse,
 } from '@capekai/core/internal/providers';
-import { loadProviderConfig, saveProviderConfig, deleteProviderConfig } from './storage';
+import { loadProviderConfig, saveProviderConfig, deleteProviderConfig } from '@/infrastructure/providers/provider-config-files';
 import {
   registerOAuthConfig,
   initiateOAuthFlow,

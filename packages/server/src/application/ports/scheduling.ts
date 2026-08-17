@@ -1,6 +1,9 @@
 import type {
+  AutoApproveSeverity,
   CreateScheduledJobInput,
+  Preconfig,
   ScheduledJob,
+  Session,
   UpdateScheduledJobInput,
   Workspace,
 } from '@jean2/sdk';
@@ -38,4 +41,25 @@ export interface ScheduledJobWorkspacePort {
 export interface ScheduledJobExecutionPort {
   run(job: ScheduledJob): Promise<void>;
   trigger(job: ScheduledJob): void;
+}
+
+export interface ScheduledRunSessionPort {
+  createSession(
+    session: Omit<Session, 'createdAt' | 'updatedAt'> & { createdAt?: string; updatedAt?: string },
+  ): Session;
+  getSession(id: string): Session | null;
+}
+
+export interface ScheduledRunWorkspacePort {
+  getWorkspace(id: string): Workspace | null;
+  getAutoApproveSeverity(id: string): AutoApproveSeverity;
+}
+
+export interface ScheduledRunPreconfigPort {
+  getPreconfig(id: string): Promise<Preconfig | null>;
+  getDefaultPreconfig(): Promise<Preconfig | null>;
+}
+
+export interface ScheduledRunModelsConfigPort {
+  getModelsConfig(): { defaultModel: string; defaultProvider: string };
 }

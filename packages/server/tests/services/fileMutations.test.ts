@@ -3,7 +3,10 @@ import { mkdirSync, writeFileSync, rmSync, symlinkSync, chmodSync, lstatSync, re
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { createHash } from 'crypto';
-import { readEditableFile, saveFile } from '@/services/fileMutations';
+import { workspacePathPolicyPort } from '@/adapters/capek/workspace-paths';
+import { createEditableFileOps } from '@/infrastructure/filesystem/file-mutations';
+
+const { readEditableFile, saveFile } = createEditableFileOps(workspacePathPolicyPort);
 import {
   ConflictError,
   ForbiddenError,

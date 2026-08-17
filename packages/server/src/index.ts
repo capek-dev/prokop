@@ -3,7 +3,7 @@ globalThis.AI_SDK_LOG_WARNINGS = false;
 import { readFileSync } from 'fs';
 
 import { createApp } from '@/app';
-import { configureCapekJean2Compatibility } from '@/capek-adapter';
+import { createRuntime } from '@/bootstrap/create-runtime';
 import { createWiredApplication } from '@/bootstrap/application';
 import { installDeliveryPort } from '@/core/broadcast';
 import { installWireApplication } from '@/transport/websocket/application';
@@ -11,10 +11,10 @@ import { resolveAskDeliveryTargets } from '@/core/capability-router';
 import { createBunWebSocketAdapter, type WsData } from '@/transport/websocket/bun-adapter';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { scanTools } from '@capekai/core/internal/tools';
-import { closeDatabase } from '@/store';
-import { backfillFts } from '@/session-search/fts';
+import { closeDatabase, getDatabase } from '@/store';
+import { backfillFts } from '@/infrastructure/session-search/fts';
 import type { ServerMessage, AskAuthority } from '@jean2/sdk';
-import { getTerminalManager, getTerminalEventManager } from '@/services/terminal';
+import { getTerminalManager, getTerminalEventManager } from '@/transport/terminal';
 import { cleanupRunningSessionsOnStartup } from '@/store/terminal-sessions';
 import {
   reconcileAllSessionsCompaction,
@@ -36,7 +36,7 @@ import {
   getClientEnabled,
   getClientPort,
   getLLMDeepseekApiKey,
-} from '@/env';
+} from '@/infrastructure/runtime/environment';
 import { activateSandbox } from '@/sandbox';
 import {
   createClientLauncher,
@@ -61,9 +61,9 @@ export interface ServerInstance {
 }
 
 async function startServer(options?: ServerOptions): Promise<ServerInstance> {
-  configureCapekJean2Compatibility();
+  createRuntime();
   const application = createWiredApplication();
-  installWireApplication({ session: application.session, control: application.control, providers: application.providers, notifications: application.notifications });
+  installWireApplication({ session: application.session, control: application.control, providers: application.providers, notifications: application.notifications, permissions: application.permissions });
   installSchedulerRuntime(application.schedulerTicker);
   cleanupRunningSessionsOnStartup();
   reconcileAllSessionsCompaction();
@@ -76,7 +76,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     console.log('[cleanup] Removed orphaned data:', cleanupStats);
   }
 
-  backfillFts();
+  backfillFts(getDatabase());
   cleanupPushData();
 
   const port = options?.port ?? getPort();
