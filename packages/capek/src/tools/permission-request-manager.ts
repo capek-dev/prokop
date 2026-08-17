@@ -3,9 +3,8 @@
  * reuse, validation, and audit decisions moved to the permission domain
  * (`permission/policy.ts` owns the scoped service;
  * `permission/permission-request-manager.ts` owns this export surface).
- * Every prior export resolves to the same identity, so `compat/jean2.ts` and
- * the server permission tests keep working unchanged until C8 retires the
- * compat surface.
+ * Every prior export resolves to the same identity, so the server permission
+ * tests and `internal/ask-authority.ts` keep working unchanged.
  */
 
 export {

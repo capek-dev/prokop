@@ -9,32 +9,40 @@ import type {
   Preconfig,
   Session,
 } from '@jean2/sdk';
+import { SandboxLanguageModel } from '../src/sandbox/model';
+import { sandboxController } from '../src/sandbox/controller';
 import {
-  SandboxLanguageModel,
   configureAgentSource,
   configurePreconfigSource,
-  configureRuntimeConfiguration,
-  registerProvider,
-  resetProviders,
-  sandboxController,
-  canSpawnSubagent,
-  executeChildSession,
-  createLlmApi,
-  evaluateGoal,
-  executeSubagent,
-  executeWorkflow,
-  getSubagentResumeError,
+} from '../src/context/sources';
+import { configureRuntimeConfiguration } from '../src/configuration/runtime';
+import { registerProvider, resetProviders } from '../src/providers/registry';
+import { executeChildSession } from '../src/subagent/child-session';
+import { canSpawnSubagent, executeSubagent } from '../src/subagent/task-tool';
+import { getSubagentResumeError } from '../src/subagent/policy';
+import { createLlmApi } from '../src/tools/llm-api';
+import { evaluateGoal } from '../src/goals/evaluator';
+import { runGoalLoop } from '../src/goals/loop';
+import { executeWorkflow } from '../src/workflow/execution';
+import {
   handleChat,
   regenerateSessionTitle,
-  runGoalLoop,
-  runOrchestratorSession,
-} from '../src/compat/jean2';
+} from '../src/core/chat-handler';
+import { runOrchestratorSession } from '../src/workflow/orchestrator-session';
 import { decomposeTask } from '../src/core/workflow-decomposer';
 import { synthesizeResults } from '../src/core/workflow-synthesizer';
 import {
-  setJean2CompatibilityBindings,
-  type Jean2CompatibilityBindings,
-} from '../src/compat/bindings';
+  configureRuntimeHost,
+  type RuntimeHost,
+} from '../src/runtime/host';
+import { setDefaultContextAssembler } from '../src/context/assembler';
+import { fixedBuilderContextAssembler } from '../src/plugins/legacy-system-message';
+import { installMemoryToolFallback } from '../src/plugins/memory-domain';
+import { installSchedulerToolFallback } from '../src/plugins/scheduler-domain';
+import { installSessionSearchToolFallback } from '../src/plugins/session-search-domain';
+import { installSkillsToolFallback } from '../src/plugins/skills-domain';
+import { installTaskToolFallback } from '../src/plugins/subagent-domain';
+import { installWorkflowToolFallback } from '../src/plugins/workflow-domain';
 import type { StreamChatEvent } from '../src/core/retry';
 import type { RuntimeDelivery, RuntimeEvent } from '../src/runtime/events';
 import type { ChatOptions } from '../src/core/agent';
@@ -80,11 +88,11 @@ interface RuntimeState {
   terminalMessages: AssistantMessage[];
 }
 
-interface RuntimeOverrides extends Omit<Partial<Jean2CompatibilityBindings>, 'delivery'> {
+interface RuntimeOverrides extends Omit<Partial<RuntimeHost>, 'delivery'> {
   storage?: Omit<Partial<StorageBundle>, 'conversation'> & {
     conversation?: Partial<StorageBundle['conversation']>;
   };
-  delivery?: Partial<Jean2CompatibilityBindings['delivery']>;
+  delivery?: Partial<RuntimeHost['delivery']>;
 }
 
 function bindRuntime(
@@ -195,13 +203,22 @@ function bindRuntime(
     sandbox: {
       isSandboxActive: () => false,
     },
-  } as unknown as Jean2CompatibilityBindings;
+  } as unknown as RuntimeHost;
   for (const [group, value] of Object.entries(overrides)) {
     if (group === 'storage') continue;
-    const key = group as keyof Jean2CompatibilityBindings;
+    const key = group as keyof RuntimeHost;
     bindings[key] = { ...bindings[key], ...value } as never;
   }
-  setJean2CompatibilityBindings(bindings);
+  configureRuntimeHost(bindings);
+  // The retired compat barrel installed the legacy fixed-builder assembler
+  // as the process default at module load; the test setup owns it now.
+  setDefaultContextAssembler(fixedBuilderContextAssembler);
+  installSessionSearchToolFallback();
+  installSchedulerToolFallback();
+  installTaskToolFallback();
+  installWorkflowToolFallback();
+  installMemoryToolFallback();
+  installSkillsToolFallback();
   configureRuntimeConfiguration({
     findModel: () => undefined,
     getMaxOutputTokens: () => 32000,

@@ -98,9 +98,9 @@ function isTestExecution(): boolean {
 
 /** Test-only destructive reset. Fails closed outside test execution: a
  * production process must never be able to wipe the unscoped fallback
- * registry. The compatibility installation path
- * (`setJean2CompatibilityBindings`) is the idempotent production way to
- * restore the complete inventory. */
+ * registry. The production installation path (configureRuntimeHost plus the
+ * six install*ToolFallback calls) is the idempotent way to restore the
+ * complete inventory. */
 export function resetDomainToolFallbacksForTests(): void {
   if (!isTestExecution()) {
     throw new Error(

@@ -23,10 +23,10 @@ import type { ContextSectionContribution } from '../kernel/types';
  * Fixed system-message builder, byte-frozen as the C3 legacy adapter.
  *
  * C3 replaced this builder with ordered context contributions, but the fixed
- * implementation stays available through `@capekai/core/compat/jean2` for
- * migration and serves as the reference against which ordered assembly is
- * verified byte-for-byte. The section guidance constants below are shared
- * with the ordered contributions so both paths emit identical bytes.
+ * implementation stays available through `internal/execution` for migration
+ * and serves as the reference against which ordered assembly is verified
+ * byte-for-byte. The section guidance constants below are shared with the
+ * ordered contributions so both paths emit identical bytes.
  */
 
 export interface SystemMessageOptions {

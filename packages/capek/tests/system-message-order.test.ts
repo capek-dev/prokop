@@ -6,7 +6,7 @@ import {
   configureAgentSource,
   configureInstructionSource,
   configurePreconfigSource,
-} from '../src/compat/jean2';
+} from '../src/context/sources';
 import { buildSystemMessage } from '../src/plugins/legacy-system-message';
 import { configureStorage, createInMemoryStorageBundle } from '../src/storage';
 

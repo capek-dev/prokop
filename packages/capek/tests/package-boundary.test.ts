@@ -4,7 +4,6 @@ import { dirname, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 import * as rootApi from '@capekai/core';
 import { capekPackagePhase, createAgent } from '@capekai/core';
-import { jean2CompatibilityPhase } from '@capekai/core/compat/jean2';
 import * as compositionApi from '@capekai/core/internal/composition';
 import * as hostsApi from '@capekai/core/internal/hosts';
 import * as executionApi from '@capekai/core/internal/execution';
@@ -96,7 +95,6 @@ function resolvesWithin(specifier: string, importer: string, target: string): bo
 describe('package boundary', () => {
   test('declared package entrypoints import by package name', () => {
     expect(capekPackagePhase).toBe(9);
-    expect(jean2CompatibilityPhase).toBe(9);
     expect(typeof createAgent).toBe('function');
     expect(typeof createInMemoryConversationStore).toBe('function');
   });
@@ -169,6 +167,8 @@ describe('package boundary', () => {
       'installSchedulerToolFallback',
       'installSessionSearchToolFallback',
       'installSkillsToolFallback',
+      'fixedBuilderContextAssembler',
+      'setDefaultContextAssembler',
       'installTaskToolFallback',
       'installWorkflowToolFallback',
       'listEntries',
@@ -328,9 +328,8 @@ describe('package boundary', () => {
     ].sort());
   });
 
-  test('Phase 8 runtime uses package-owned host seams', () => {
+  test('package runtime imports no compat modules (S8e retirement)', () => {
     const violations = collectSourceFiles(packageSourceRoot)
-      .filter((path) => !path.includes(`${sep}compat${sep}`))
       .flatMap((path) => collectImports(path)
         .filter((specifier) => specifier.includes('compat/'))
         .map((specifier) => `${relative(repositoryRoot, path)} imports ${specifier}`));
@@ -361,100 +360,6 @@ describe('package boundary', () => {
     expect(violations).toEqual([]);
   });
 
-  test('tool workspace policy files do not import Jean2 compatibility wrappers', () => {
-    const policyFiles = [
-      resolve(packageSourceRoot, 'tools/executor.ts'),
-      resolve(packageSourceRoot, 'tools/workspace-capability.ts'),
-    ];
-    const violations = policyFiles.flatMap((path) => collectImports(path)
-      .filter((specifier) => specifier.includes('compat/jean2-dependencies'))
-      .map((specifier) => `${relative(repositoryRoot, path)} imports ${specifier}`));
-
-    expect(violations).toEqual([]);
-  });
-
-  test('package runtime storage does not use Jean2 compatibility storage wrappers', () => {
-    const violations: string[] = [];
-    for (const path of collectSourceFiles(packageSourceRoot)) {
-      if (path.endsWith('compat/jean2-dependencies.ts')) continue;
-      for (const specifier of collectImports(path)) {
-        if (specifier.includes('compat/jean2-dependencies')) {
-          const sourceFile = ts.createSourceFile(
-            path,
-            readFileSync(path, 'utf8'),
-            ts.ScriptTarget.Latest,
-            true,
-          );
-          const declaration = sourceFile.statements.find(statement =>
-            ts.isImportDeclaration(statement)
-            && ts.isStringLiteral(statement.moduleSpecifier)
-            && statement.moduleSpecifier.text.includes('compat/jean2-dependencies'));
-          if (!declaration || !ts.isImportDeclaration(declaration)) continue;
-          const importedNames = declaration.importClause?.namedBindings
-            && ts.isNamedImports(declaration.importClause.namedBindings)
-            ? declaration.importClause.namedBindings.elements.map(element => element.name.text)
-            : [];
-          const storageNames = new Set([
-            'createSession', 'createMessage', 'getMessage', 'getMessageWithParts', 'deleteMessage',
-            'updateMessage', 'getSession', 'updateSession', 'transitionToolToInterrupted',
-            'syncMessageFts', 'getPartsByMessage', 'createPart', 'updatePart', 'getPart',
-            'persistStreamingPartSnapshots', 'getAttachment', 'getWorkspace',
-            'transitionToolToRunningByCallId', 'getChildSessions', 'listMessagesWithParts',
-            'listLatestMessagesWithPartsPage', 'getPartsBySession', 'buildEffectiveContextHistory',
-            'addMessageToQueue', 'deleteQueuedMessage', 'getNextQueuedMessage',
-            'getResponseFormat', 'getWorkspaceAutoApproveSeverity',
-          ]);
-          if (importedNames.some(name => storageNames.has(name))) violations.push(relative(repositoryRoot, path));
-        }
-      }
-    }
-    expect(violations).toEqual([]);
-  });
-
-  test('Phase 8 package runtime does not import completed Jean2 compatibility seams', () => {
-    const phase6Names = new Set([
-      'resolveToolsPath', 'readInstallManifest',
-      'findModel', 'findModelVariant', 'getMaxOutputTokens', 'getModelsConfig',
-      'getLLMTemperature', 'getLLMMaxSteps', 'getLLMSubagentMaxSteps',
-      'getLLMBaseUrl', 'getLLMOpenAIApiKey', 'getLLMOpenRouterApiKey',
-      'getLLMMinimaxApiKey', 'getLLMZhipuApiKey', 'getLLMZhipuCodingApiKey',
-      'getLLMDeepseekApiKey', 'getCompactionModel', 'getCompactionProvider',
-      'getCompactionMaxTokens', 'getCompactionPreserveRecentToolCount',
-      'getCompactionPreserveSmallToolChars', 'getCompactionToolClearCharsThreshold',
-      'getCompactionMaxPrunedToolCount', 'getCompactionAutoThresholdRatio',
-      'getCompactionAutoReserveCapTokens', 'getCompactionAutoSafetyMarginTokens',
-      'getPreconfig', 'getDefaultPreconfig', 'getPreconfigOrAgent',
-      'listPreconfigs', 'listSubagentPreconfigs', 'getAgentDirectory',
-      'readAgentMemoryFile', 'initializeWorkspace', 'getMcpTools',
-      'memoryToolDefinition', 'executeMemoryTool', 'loadMemoryInstructions',
-      'getMemoryGuidance', 'getSkillManageToolDefinition', 'executeSkillManageTool',
-      'buildSkillManageToolDescription', 'createSkillTool', 'getSkillManageGuidance',
-      'getSessionSearchToolDefinition', 'executeSessionSearchTool',
-      'getSessionSearchGuidance', 'getSchedulerToolDefinition', 'executeSchedulerTool',
-      'buildWorkspaceSystemPrompt', 'loadInstructions', 'formatInstructions',
-      'getSandboxController',
-    ]);
-    const violations: string[] = [];
-
-    for (const path of collectSourceFiles(packageSourceRoot)) {
-      if (path.endsWith('compat/jean2-dependencies.ts')) continue;
-      const sourceFile = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true);
-      for (const statement of sourceFile.statements) {
-        if (!ts.isImportDeclaration(statement)
-          || !ts.isStringLiteral(statement.moduleSpecifier)
-          || !statement.moduleSpecifier.text.includes('compat/jean2-dependencies')) continue;
-        const bindings = statement.importClause?.namedBindings;
-        if (!bindings || !ts.isNamedImports(bindings)) continue;
-        for (const element of bindings.elements) {
-          if (phase6Names.has(element.name.text)) {
-            violations.push(`${relative(repositoryRoot, path)} imports ${element.name.text}`);
-          }
-        }
-      }
-    }
-
-    expect(violations).toEqual([]);
-  });
 
   test('package runtime imports no Jean2 delivery or hosting modules', () => {
     const forbiddenModuleFragments = [
@@ -465,7 +370,6 @@ describe('package boundary', () => {
       'services/web-push',
     ];
     const violations = collectSourceFiles(packageSourceRoot)
-      .filter((path) => !path.includes(`${sep}compat${sep}`))
       .flatMap((path) => collectImports(path)
         .filter((specifier) => forbiddenModuleFragments.some((fragment) => specifier.includes(fragment)))
         .map((specifier) => `${relative(repositoryRoot, path)} imports ${specifier}`));

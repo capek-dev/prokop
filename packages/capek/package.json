@@ -8,10 +8,6 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./compat/jean2": {
-      "types": "./src/compat/jean2.ts",
-      "default": "./src/compat/jean2.ts"
-    },
     "./internal/composition": {
       "types": "./src/internal/composition.ts",
       "default": "./src/internal/composition.ts"
