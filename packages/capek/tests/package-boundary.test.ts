@@ -6,6 +6,14 @@ import * as rootApi from '@capekai/core';
 import { capekPackagePhase, createAgent } from '@capekai/core';
 import { jean2CompatibilityPhase } from '@capekai/core/compat/jean2';
 import * as compositionApi from '@capekai/core/internal/composition';
+import * as hostsApi from '@capekai/core/internal/hosts';
+import * as executionApi from '@capekai/core/internal/execution';
+import * as providersApi from '@capekai/core/internal/providers';
+import * as toolsApi from '@capekai/core/internal/tools';
+import * as askAuthorityApi from '@capekai/core/internal/ask-authority';
+import * as sandboxApi from '@capekai/core/internal/sandbox';
+import * as workspaceApi from '@capekai/core/internal/workspace';
+import * as configurationApi from '@capekai/core/internal/configuration';
 import { createInMemoryConversationStore } from '@capekai/core/storage';
 
 const repositoryRoot = resolve(import.meta.dir, '../../..');
@@ -135,6 +143,113 @@ describe('package boundary', () => {
     expect(typeof compositionApi.enterAgentScope).toBe('function');
     expect(typeof compositionApi.capekStorageKey.id).toBe('string');
     expect(typeof compositionApi.capekContextAssemblerKey.id).toBe('string');
+  });
+
+  test('internal hosts subpath exposes exactly the host configuration surface', () => {
+    expect(Object.keys(hostsApi).sort()).toEqual([
+      'configureAgentSource',
+      'configureInstructionSource',
+      'configurePreconfigSource',
+      'configureRuntimeHost',
+      'configureSchedulerHost',
+      'configureSessionSearchHost',
+      'getRuntimeHost',
+      'installMemoryToolFallback',
+      'installSchedulerToolFallback',
+      'installSessionSearchToolFallback',
+      'installSkillsToolFallback',
+      'installTaskToolFallback',
+      'installWorkflowToolFallback',
+      'withRuntimeHost',
+    ].sort());
+  });
+
+  test('internal execution subpath exposes exactly the execution surface', () => {
+    expect(Object.keys(executionApi).sort()).toEqual([
+      'executeCompaction',
+      'forkSession',
+      'handleChat',
+      'handleSessionEditMessage',
+      'interruptManager',
+      'reconcileAllSessionsCompactionWithDeps',
+      'reconcileSessionCompactionWithDeps',
+      'regenerateSessionTitle',
+      'revertToStep',
+    ].sort());
+  });
+
+  test('internal providers subpath exposes exactly the provider surface', () => {
+    expect(Object.keys(providersApi).sort()).toEqual([
+      'connectProvider',
+      'createCapabilityTool',
+      'createModelForProvider',
+      'createOpenAiResponsesModel',
+      'disconnectProvider',
+      'executeChildSession',
+      'findProviderFromModel',
+      'getConnectableProviders',
+      'getProvider',
+      'getProviderStatus',
+      'registerProvider',
+      'runTextModel',
+    ].sort());
+  });
+
+  test('internal tools subpath exposes exactly the tool surface', () => {
+    expect(Object.keys(toolsApi).sort()).toEqual([
+      'ArtifactError',
+      'clearCache',
+      'configureToolSource',
+      'configureToolsPath',
+      'downloadArtifact',
+      'extractArtifact',
+      'getTool',
+      'listTools',
+      'readInstallManifest',
+      'scanTools',
+      'validateArtifactStructure',
+      'verifyChecksum',
+      'writeInstallManifest',
+    ].sort());
+  });
+
+  test('internal ask-authority subpath exposes exactly the pending-ask surface', () => {
+    expect(Object.keys(askAuthorityApi).sort()).toEqual([
+      'ASK_TIMEOUT',
+      'getAuthorityForPendingAsk',
+      'getSessionIdForPendingAsk',
+      'resolveAsk',
+    ].sort());
+  });
+
+  test('internal sandbox subpath exposes exactly the sandbox surface', () => {
+    expect(Object.keys(sandboxApi).sort()).toEqual([
+      'SandboxController',
+      'SandboxProvider',
+      'sandboxController',
+    ].sort());
+  });
+
+  test('internal workspace subpath exposes exactly the workspace policy surface', () => {
+    expect(Object.keys(workspaceApi).sort()).toEqual([
+      'expandPath',
+      'isInsideUnselectedAdditionalRoot',
+      'isPathInside',
+      'isPathWithinWorkspace',
+      'resolveCandidatePath',
+      'resolvePath',
+      'resolveRootForQuery',
+      'selectEditableRoot',
+    ].sort());
+  });
+
+  test('internal configuration subpath exposes exactly the runtime configuration surface', () => {
+    expect(Object.keys(configurationApi).sort()).toEqual([
+      'configureRuntimeConfiguration',
+      'getApiKeyForProvider',
+      'getRuntimeConfiguration',
+      'withRuntimeConfiguration',
+    ].sort());
   });
 
   test('Phase 8 runtime uses package-owned host seams', () => {
