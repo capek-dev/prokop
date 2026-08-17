@@ -75,7 +75,7 @@ describe('transport ask.response end to end with the real pending-ask machinery'
     const { ctx, sent } = makeContext();
     handleClaim(sessionId, controllerId);
 
-    const askApi = createAskApi(sessionId, 'call-1', 'question', () => {});
+    const askApi = createAskApi(sessionId, 'e2e-call-1', 'question', () => {});
     const values: unknown[] = [];
     const promise = askApi({ type: 'text', question: 'Continue?', target: 'human' }).then((value) => {
       values.push(value);
@@ -83,13 +83,13 @@ describe('transport ask.response end to end with the real pending-ask machinery'
 
     await handleClientMessage(ctx, controllerId, {
       type: 'ask.response',
-      toolCallId: 'call-1',
+      toolCallId: 'e2e-call-1',
       response: { type: 'text', value: 'Jean' },
     });
     await promise;
 
     expect(values).toEqual(['Jean']);
-    expect(hasPendingAsk('call-1')).toBe(false);
+    expect(hasPendingAsk('e2e-call-1')).toBe(false);
     expect(sent).toEqual([]);
   });
 
@@ -99,12 +99,12 @@ describe('transport ask.response end to end with the real pending-ask machinery'
     const { ctx, sent } = makeContext();
     handleClaim(sessionId, controllerId);
 
-    const askApi = createAskApi(sessionId, 'call-2', 'capability-tool', () => {});
+    const askApi = createAskApi(sessionId, 'e2e-call-2', 'capability-tool', () => {});
     const promise = askApi({ type: 'client_capability', capability: 'browser_tabs', target: 'client' });
 
     await handleClientMessage(ctx, capableId, {
       type: 'ask.response',
-      toolCallId: 'call-2',
+      toolCallId: 'e2e-call-2',
       response: { type: 'client_capability', capability: 'browser_tabs', result: { tabs: 3 } },
     });
 
@@ -118,14 +118,14 @@ describe('transport ask.response end to end with the real pending-ask machinery'
     const { ctx, sent } = makeContext();
     handleClaim(sessionId, controllerId);
 
-    const askApi = createAskApi(sessionId, 'call-3', 'capability-tool', () => {});
+    const askApi = createAskApi(sessionId, 'e2e-call-3', 'capability-tool', () => {});
     const promise = askApi({ type: 'client_capability', capability: 'browser_tabs', target: 'client' })
       .then(() => {})
       .catch(() => {});
 
     await handleClientMessage(ctx, otherId, {
       type: 'ask.response',
-      toolCallId: 'call-3',
+      toolCallId: 'e2e-call-3',
       response: { type: 'client_capability', capability: 'browser_tabs', result: null },
     });
 
@@ -133,13 +133,13 @@ describe('transport ask.response end to end with the real pending-ask machinery'
     expect(sent[0]).toMatchObject({
       type: 'ask.response_rejected',
       sessionId,
-      toolCallId: 'call-3',
+      toolCallId: 'e2e-call-3',
       code: 'not_controller',
       message: 'Your client does not have the required capabilities for this ask',
     });
-    expect(hasPendingAsk('call-3')).toBe(true);
+    expect(hasPendingAsk('e2e-call-3')).toBe(true);
 
-    rejectPendingAsksByToolCallId('call-3');
+    rejectPendingAsksByToolCallId('e2e-call-3');
     await promise;
   });
 
@@ -149,7 +149,7 @@ describe('transport ask.response end to end with the real pending-ask machinery'
     handleClaim(sessionId, controllerId);
 
     let resolved = false;
-    const askApi = createAskApi(sessionId, 'call-4', 'question', () => {});
+    const askApi = createAskApi(sessionId, 'e2e-call-4', 'question', () => {});
     const promise = askApi({ type: 'text', question: 'Continue?', target: 'human' })
       .then(() => {
         resolved = true;
@@ -166,9 +166,9 @@ describe('transport ask.response end to end with the real pending-ask machinery'
 
     expect(sent).toEqual([]);
     expect(resolved).toBe(false);
-    expect(hasPendingAsk('call-4')).toBe(true);
+    expect(hasPendingAsk('e2e-call-4')).toBe(true);
 
-    rejectPendingAsksByToolCallId('call-4');
+    rejectPendingAsksByToolCallId('e2e-call-4');
     await promise;
   });
 });

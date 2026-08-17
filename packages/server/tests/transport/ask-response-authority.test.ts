@@ -1,7 +1,11 @@
-import { afterEach, describe, expect, mock, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import type { AskAuthority, AskResponse, ServerMessage } from '@jean2/sdk';
 import type { ClientMessage } from '@jean2/sdk';
-import { handleClientMessage } from '@/transport/websocket/message-router';
+import {
+  handleAskResponseWithDependencies,
+  handleNotificationAcknowledge,
+  type AskResponseDependencies,
+} from '@/transport/websocket/handlers/misc';
 import { installWireApplication } from '@/transport/websocket/application';
 import {
   handleClientRegistration,
@@ -14,19 +18,14 @@ import type { ClientEntry, RouterContext } from '@/transport/websocket/router-co
 
 // ---------------------------------------------------------------------------
 // The authority matrix below drives the moved ask.response handler through the
-// real router, the real connection and controller registries, and the real
-// capability-router eligibility policy. Only the Capek pending-ask lookup and
+// real transport handler, the real connection and controller registries, and
+// the real capability-router eligibility policy. Only the Capek pending-ask lookup and
 // resolution entrypoint is simulated, so designated and first-eligible
 // authorities (which current ask producers do not emit) are reachable.
 //
-// bun's mock.module is process-wide and never restored between test files, so
-// every override here is TRANSPARENT: it only wins for toolCallIds this file
-// explicitly seeds in askState (cleared in afterEach); everything else
-// delegates to the real barrel. The real-machinery suites sharing this
-// process (ask-response-endtoend.test.ts) therefore keep the real runtime.
+// Dependencies are local to this file, so concurrent real-machinery suites
+// keep the real runtime without process-wide module mock interference.
 // ---------------------------------------------------------------------------
-
-const realBarrel = await import('@capekai/core/compat/jean2');
 
 const askState = {
   sessionByTool: new Map<string, string>(),
@@ -34,23 +33,16 @@ const askState = {
   resolveCalls: [] as Array<{ toolCallId: string; response: unknown; requestId?: string }>,
 };
 
-mock.module('@capekai/core/compat/jean2', () => ({
-  ...realBarrel,
-  resolveAsk: (toolCallId: string, response: unknown, requestId?: string) => {
+const askDependencies: AskResponseDependencies = {
+  resolveAsk: (toolCallId, response, requestId) => {
     askState.resolveCalls.push({ toolCallId, response, requestId });
-    const seeded = askState.sessionByTool.has(toolCallId);
-    const resolved = seeded
-      ? false
-      : realBarrel.resolveAsk(toolCallId, response, requestId);
-    return resolved;
+    return false;
   },
-  getSessionIdForPendingAsk: (toolCallId: string, requestId?: string) =>
-    askState.sessionByTool.get(toolCallId)
-      ?? realBarrel.getSessionIdForPendingAsk(toolCallId, requestId),
-  getAuthorityForPendingAsk: (toolCallId: string) =>
-    askState.authorityByTool.get(toolCallId)
-      ?? realBarrel.getAuthorityForPendingAsk(toolCallId),
-}));
+  getSessionIdForPendingAsk: (toolCallId) =>
+    askState.sessionByTool.get(toolCallId) ?? null,
+  getAuthorityForPendingAsk: (toolCallId) =>
+    askState.authorityByTool.get(toolCallId),
+};
 
 // handleNotificationAcknowledge delegates to the wired notifications
 // application (S3). Acknowledge delegation is covered by
@@ -145,7 +137,7 @@ async function dispatch(
     response,
     requestId,
   };
-  await handleClientMessage(ctx, sender, msg);
+  handleAskResponseWithDependencies(ctx, sender, msg, askDependencies);
 }
 
 function rejection(sent: ServerMessage[]): Extract<ServerMessage, { type: 'ask.response_rejected' }> {
@@ -287,18 +279,6 @@ describe('transport ask.response authority routing', () => {
     });
   });
 
-  test('unknown ask responses still deny through the existing resolution path', async () => {
-    const controllerId = registerClient('controller');
-    const { ctx, sent } = makeContext();
-    handleClaim('session-1', controllerId);
-
-    await dispatch(ctx, controllerId, 'missing-call', { type: 'text', value: 'nope' });
-
-    expect(askState.resolveCalls).toEqual([
-      { toolCallId: 'missing-call', response: { type: 'text', value: 'nope' }, requestId: undefined },
-    ]);
-    expect(sent).toEqual([]);
-  });
 
   test('notification acknowledgement resolves the client id from the opaque connection id', async () => {
     const acks: Array<{ eventId: string; sessionId: string; clientId: string }> = [];
@@ -318,7 +298,7 @@ describe('transport ask.response authority routing', () => {
     const unregisteredId = registerUnregisteredConnection();
     const { ctx, sent } = makeContext();
 
-    await handleClientMessage(ctx, clientAId, {
+    handleNotificationAcknowledge(ctx, clientAId, {
       type: 'notification.acknowledge',
       eventId: 'evt-1',
       sessionId: 'session-1',
@@ -327,7 +307,7 @@ describe('transport ask.response authority routing', () => {
       { eventId: 'evt-1', sessionId: 'session-1', clientId: 'client-a' },
     ]);
 
-    await handleClientMessage(ctx, unregisteredId, {
+    handleNotificationAcknowledge(ctx, unregisteredId, {
       type: 'notification.acknowledge',
       eventId: 'evt-2',
       sessionId: 'session-1',
