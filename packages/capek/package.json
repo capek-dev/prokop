@@ -16,6 +16,38 @@
       "types": "./src/internal/composition.ts",
       "default": "./src/internal/composition.ts"
     },
+    "./internal/hosts": {
+      "types": "./src/internal/hosts.ts",
+      "default": "./src/internal/hosts.ts"
+    },
+    "./internal/execution": {
+      "types": "./src/internal/execution.ts",
+      "default": "./src/internal/execution.ts"
+    },
+    "./internal/providers": {
+      "types": "./src/internal/providers.ts",
+      "default": "./src/internal/providers.ts"
+    },
+    "./internal/tools": {
+      "types": "./src/internal/tools.ts",
+      "default": "./src/internal/tools.ts"
+    },
+    "./internal/ask-authority": {
+      "types": "./src/internal/ask-authority.ts",
+      "default": "./src/internal/ask-authority.ts"
+    },
+    "./internal/sandbox": {
+      "types": "./src/internal/sandbox.ts",
+      "default": "./src/internal/sandbox.ts"
+    },
+    "./internal/workspace": {
+      "types": "./src/internal/workspace.ts",
+      "default": "./src/internal/workspace.ts"
+    },
+    "./internal/configuration": {
+      "types": "./src/internal/configuration.ts",
+      "default": "./src/internal/configuration.ts"
+    },
     "./tool": {
       "types": "./src/tool.ts",
       "default": "./src/tool.ts"
