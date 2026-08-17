@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { getJean2CompatibilityBindings } from '@capekai/core/compat/jean2';
+import { getRuntimeHost as getJean2CompatibilityBindings } from '@capekai/core/internal/hosts';
 import {
   configureJean2Bindings,
   jean2CompatibilityBindings,

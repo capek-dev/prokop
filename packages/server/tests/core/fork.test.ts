@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
-import { forkSession } from '@capekai/core/compat/jean2';
+import { forkSession } from '@capekai/core/internal/execution';
 import { createMessage, createPart, listMessagesWithParts } from '@/store';
 import { getSession } from '@/store/sessions';
 import type { AssistantMessage, ToolPart } from '@jean2/sdk';

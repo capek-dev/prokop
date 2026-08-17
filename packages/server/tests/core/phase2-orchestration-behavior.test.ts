@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { AssistantMessage, Preconfig, ServerMessage } from '@jean2/sdk';
 import type { ServerWebSocket } from 'bun';
-import {
-  executeChildSession,
-  runOrchestratorSession,
-} from '@capekai/core/compat/jean2';
+import { runOrchestratorSession } from '@capekai/core/internal/execution';
+import { executeChildSession } from '@capekai/core/internal/providers';
 import { handleChat, handleSessionEditMessage, type Jean2RouterContext } from '@/core/chat-handler';
-import { executeCompaction, interruptManager, sandboxController } from '@capekai/core/compat/jean2';
+import { executeCompaction, interruptManager } from '@capekai/core/internal/execution';
+import { sandboxController } from '@capekai/core/internal/sandbox';
 import { createPreconfig } from '@/core/preconfig';
 import { activateSandbox, deactivateSandbox } from '@/sandbox';
 import {

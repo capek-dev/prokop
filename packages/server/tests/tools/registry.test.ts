@@ -4,12 +4,7 @@ import { join, resolve } from 'path';
 import { tmpdir } from 'os';
 
 import { configureCapekJean2Compatibility } from '@/capek-adapter';
-import {
-  scanTools,
-  getTool,
-  listTools,
-  clearCache,
-} from '@capekai/core/compat/jean2';
+import { scanTools, getTool, listTools, clearCache } from '@capekai/core/internal/tools';
 
 const FIXTURE_DIR = resolve(import.meta.dir, 'fixtures', 'test-fixture-tool');
 

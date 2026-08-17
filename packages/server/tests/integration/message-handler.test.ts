@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { MockLanguageModelV3, convertArrayToReadableStream } from 'ai/test';
-import { withProviderOverrides } from '@capekai/core/compat/jean2';
-import type { ConnectableProvider, ModelFactoryOptions } from '@capekai/core/compat/jean2';
+import { withProviderOverrides } from '@capekai/core/internal/providers';
+import { type ConnectableProvider, type ModelFactoryOptions } from '@capekai/core/internal/providers';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
 import { seedWorkspaceWithSession } from '#tests/seed';
@@ -21,7 +21,8 @@ import {
   deleteQueuedMessage,
   getNextQueuedMessage,
 } from '@/store';
-import { executeCompaction, revertToStep, forkSession, interruptManager, resolveAsk, createAskApi } from '@capekai/core/compat/jean2';
+import { executeCompaction, revertToStep, forkSession, interruptManager } from '@capekai/core/internal/execution';
+import { resolveAsk, createAskApi } from '@capekai/core/internal/ask-authority';
 import { getWorkspaceGrants, revokeGrant, revokeAllWorkspaceGrants } from '@/store/permissions';
 import type { AssistantMessage, ToolPart, ServerMessage } from '@jean2/sdk';
 

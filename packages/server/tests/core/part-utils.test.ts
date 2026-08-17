@@ -1,12 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import {
-  isTextPart,
-  isToolPart,
-  isImagePart,
-  isFilePart,
-  parseToolInput,
-  createStepPart,
-} from '@capekai/core/compat/jean2';
+import { isTextPart, isToolPart, isImagePart, isFilePart, parseToolInput, createStepPart } from '@capekai/core/internal/execution';
 import type { Part } from '@jean2/sdk';
 
 describe('type guards', () => {

@@ -1,22 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { MockLanguageModelV3, convertArrayToReadableStream } from 'ai/test';
 import type { AssistantMessage, ToolPart } from '@jean2/sdk';
-import {
-  getJean2CompatibilityBindings,
-  getRuntimeConfiguration,
-  withJean2CompatibilityBindings,
-  withProviderOverrides,
-  withRuntimeConfiguration,
-} from '@capekai/core/compat/jean2';
-import type {
-  ConnectableProvider,
-  ModelFactoryOptions,
-  RuntimeEvent,
-} from '@capekai/core/compat/jean2';
+import { withProviderOverrides } from '@capekai/core/internal/providers';
+import { getRuntimeConfiguration, withRuntimeConfiguration } from '@capekai/core/internal/configuration';
+import { getRuntimeHost as getJean2CompatibilityBindings, withRuntimeHost as withJean2CompatibilityBindings } from '@capekai/core/internal/hosts';
+import { type RuntimeEvent } from '@capekai/core';
+import { type ConnectableProvider, type ModelFactoryOptions } from '@capekai/core/internal/providers';
 import { getStorage } from '@capekai/core/storage';
 import { configureCapekJean2Compatibility } from '@/capek-adapter';
-import { executeCompaction, isCompactionActive } from '@capekai/core/compat/jean2';
-import { convertToAiSdkMessages } from '@capekai/core/compat/jean2';
+import { executeCompaction, isCompactionActive } from '@capekai/core/internal/execution';
+import { convertToAiSdkMessages } from '@capekai/core/internal/execution';
 import {
   createMessage,
   createPart,

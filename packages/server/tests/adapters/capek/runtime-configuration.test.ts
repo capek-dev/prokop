@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
-import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/compat/jean2';
+import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/internal/configuration';
 
 const realEnv = await import('@/env');
 

@@ -3,19 +3,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { tool, jsonSchema } from 'ai';
-import {
-  configureAgentSource,
-  configurePreconfigSource,
-  configureToolSource,
-  setJean2CompatibilityBindings,
-} from '@capekai/core/compat/jean2';
+import { configureToolSource } from '@capekai/core/internal/tools';
+import { configureAgentSource, configurePreconfigSource } from '@capekai/core/internal/hosts';
 import {
   configureStorage,
   type StorageBundle,
 } from '@capekai/core/storage';
+import { configureJean2Bindings } from '@/adapters/capek/bindings';
 import { jean2CompatibilityBindings, jean2StorageBundle } from '@/capek-adapter';
-import { buildAiSdkTools, type BuildToolsOptions } from '@capekai/core/compat/jean2';
-import { clearCache, scanTools } from '@capekai/core/compat/jean2';
+import { buildAiSdkTools, type BuildToolsOptions } from '@capekai/core/internal/execution';
+import { clearCache, scanTools } from '@capekai/core/internal/tools';
 import type { Preconfig, Session, Workspace } from '@jean2/sdk';
 
 interface BindingOverrides {
@@ -47,7 +44,7 @@ function configureBindings(overrides: BindingOverrides = {}): void {
     },
   };
   configureStorage(storage);
-  setJean2CompatibilityBindings(jean2CompatibilityBindings);
+  configureJean2Bindings();
   configurePreconfigSource({
     get: async () => null,
     getDefault: async () => null,
@@ -122,7 +119,7 @@ describe('build-tools binding integration', () => {
       fixtureDir = null;
     }
     configureStorage(jean2StorageBundle);
-    setJean2CompatibilityBindings(jean2CompatibilityBindings);
+    configureJean2Bindings();
   });
 
   test('exposes only intrinsic artifact retrieval when no sources are enabled', async () => {

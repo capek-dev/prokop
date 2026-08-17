@@ -2,26 +2,12 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import ts from 'typescript';
-import {
-  buildSystemMessage,
-  configureAgentSource,
-  configureInstructionSource,
-  configurePreconfigSource,
-  configureRuntimeConfiguration,
-  configureSchedulerHost,
-  configureSessionSearchHost,
-  configureToolSource,
-  configureToolsPath,
-  createModelForProvider,
-  getConnectableProviders,
-  getJean2CompatibilityBindings,
-  getProvider,
-  getRuntimeConfiguration,
-  getSchedulerHost,
-  getSessionSearchHost,
-  getToolSource,
-  sandboxController,
-} from '@capekai/core/compat/jean2';
+import { buildSystemMessage } from '@capekai/core/internal/execution';
+import { createModelForProvider, getConnectableProviders, getProvider } from '@capekai/core/internal/providers';
+import { configureToolSource, configureToolsPath, getToolSource } from '@capekai/core/internal/tools';
+import { sandboxController } from '@capekai/core/internal/sandbox';
+import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/internal/configuration';
+import { configureAgentSource, configureInstructionSource, configurePreconfigSource, configureSchedulerHost, configureSessionSearchHost, getRuntimeHost as getJean2CompatibilityBindings, getSchedulerHost, getSessionSearchHost } from '@capekai/core/internal/hosts';
 import {
   configureStorage,
   createInMemoryStorageBundle,

@@ -35,7 +35,7 @@ import {
 } from '@/store/messages';
 import { createSession } from '@/store/sessions';
 import { getDatabase } from '@/store';
-import { revertToStep, forkSession } from '@capekai/core/compat/jean2';
+import { revertToStep, forkSession } from '@capekai/core/internal/execution';
 import { createTestSession } from '#tests/factories';
 import type { AssistantMessage, Part, ToolPart } from '@jean2/sdk';
 
