@@ -6,7 +6,6 @@ import {
   getParticipantConnections,
 } from './session-control-registry';
 import type { RegisteredConnection } from './client-registry';
-import type { ServerMessage } from '@jean2/sdk';
 import {
   carrierHasCapabilities,
   checkAskResponseEligibility as checkAskResponseEligibilityWithInput,
@@ -14,7 +13,6 @@ import {
   isAllowedResponder as isAllowedResponderForClient,
   resolveAskDeliveryTargets as resolveAskDeliveryTargetsFromInventories,
   type AskDeliveryInventories,
-  type AskDeliveryTargets as DomainAskDeliveryTargets,
   type EligibilityCheck,
 } from '@/domains/controllers';
 
@@ -120,29 +118,6 @@ export function resolveAskDeliveryTargets(
 ): AskDeliveryTargets {
   const resolved = resolveAskDeliveryTargetsFromInventories(inventoriesFor(sessionId, authority));
   return { connections: resolved.connections, excludeControllerCheck: resolved.excludeControllerCheck };
-}
-
-export type { DomainAskDeliveryTargets };
-
-// ── Send helpers ─────────────────────────────────────────────
-
-/**
- * Send a message to the resolved delivery targets for an ask.
- * Falls back to controller-only delivery when no custom targets are needed.
- */
-export function sendToAskTargets(
-  sessionId: string,
-  authority: AskAuthority,
-  message: ServerMessage,
-  sendFn: (ws: unknown, msg: ServerMessage) => void,
-  excludeWs?: unknown,
-): void {
-  const targets = resolveAskDeliveryTargets(sessionId, authority);
-
-  for (const conn of targets.connections) {
-    if (excludeWs && conn.ws === excludeWs) continue;
-    sendFn(conn.ws, message);
-  }
 }
 
 /**

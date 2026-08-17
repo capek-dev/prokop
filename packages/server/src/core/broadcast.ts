@@ -1,6 +1,5 @@
 import type { ServerMessage, Session, AskAuthority } from '@jean2/sdk';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
-import { resolveAskDeliveryTargets } from './capability-router';
 import { getConnectionByWs } from './client-registry';
 
 export type BroadcastFn = (message: ServerMessage) => void;
@@ -40,7 +39,6 @@ let installedPort: DeliveryPort | null = null;
 let broadcastCallback: BroadcastCallback | null = null;
 let sendToControllerCallback: SendToControllerFn | null = null;
 let broadcastToSessionCallback: BroadcastToSessionFn | null = null;
-let sendToAskTargetsCallback: ((ws: unknown, msg: ServerMessage) => void) | null = null;
 
 export function installDeliveryPort(port: DeliveryPort): void {
   installedPort = port;
@@ -56,12 +54,6 @@ export function registerSendToControllerCallback(callback: SendToControllerFn): 
 
 export function registerBroadcastToSessionCallback(callback: BroadcastToSessionFn): void {
   broadcastToSessionCallback = callback;
-}
-
-export function registerSendToAskTargetsCallback(
-  sendFn: (ws: unknown, msg: ServerMessage) => void,
-): void {
-  sendToAskTargetsCallback = sendFn;
 }
 
 function toConnectionId(excludeWs: unknown): ConnectionId | undefined {
@@ -162,10 +154,10 @@ export function broadcastToSessionEvent(sessionId: string, message: ServerMessag
 /**
  * Send an ask to the delivery targets resolved from the ask's authority.
  *
- * With an installed delivery port this delegates to transport resolution.
- * The legacy callback path keeps the historical behavior: controller_only
- * falls back to sendToControllerEvent, and unresolved custom targets fall
- * back to controller delivery.
+ * With an installed delivery port this delegates to transport resolution
+ * (the ask-routing domain is the single target-resolution owner, injected
+ * at bootstrap). The legacy callback path is controller-only fallback
+ * delivery; it no longer re-resolves ask-target policy.
  */
 export function sendToAskTargetsEvent(
   sessionId: string,
@@ -177,21 +169,5 @@ export function sendToAskTargetsEvent(
     return;
   }
 
-  if (!sendToAskTargetsCallback) {
-    // Fallback: use controller-only delivery
-    sendToControllerEvent(sessionId, message);
-    return;
-  }
-
-  const targets = resolveAskDeliveryTargets(sessionId, authority);
-
-  if (targets.connections.length === 0) {
-    // No capability-aware targets found - fall back to controller delivery
-    sendToControllerEvent(sessionId, message);
-    return;
-  }
-
-  for (const conn of targets.connections) {
-    sendToAskTargetsCallback(conn.ws, message);
-  }
+  sendToControllerEvent(sessionId, message);
 }
