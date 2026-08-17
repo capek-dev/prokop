@@ -1,4 +1,6 @@
 import type { Part } from '@jean2/sdk';
+import type { ScopeDiagnosticsSnapshot } from '../kernel/types';
+import type { FacadeProfileId } from '../profiles/facade';
 import type { ToolOutputArtifactPage } from '../storage/contracts';
 export type { AgentStorageOption } from '../storage/options';
 
@@ -47,7 +49,14 @@ export type AgentEvent =
   | { type: 'error'; sessionId: string; error: AgentError }
   | { type: 'result'; result: AgentResult };
 
+export interface AgentDiagnostics {
+  profileId: FacadeProfileId;
+  process: ScopeDiagnosticsSnapshot;
+  agent: ScopeDiagnosticsSnapshot;
+}
+
 export interface Agent {
+  diagnostics(): Promise<AgentDiagnostics>;
   run(input: AgentInput, options?: RunOptions): Promise<AgentResult>;
   stream(input: AgentInput, options?: RunOptions): AsyncIterable<AgentEvent>;
   resume(sessionId: string, input?: AgentInput, options?: RunOptions): Promise<AgentResult>;

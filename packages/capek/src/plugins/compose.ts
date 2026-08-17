@@ -28,7 +28,8 @@ import { withSandboxController } from '../sandbox/controller';
 import { withStorage } from '../storage/runtime';
 import { withToolRegistryResolver } from '../tools/registry';
 import { withToolSource } from '../tools/tool-source';
-import { currentAgentPlugins, currentProcessPlugins } from './current-plugins';
+import { jean2Profile } from '../profiles/jean2';
+import { codingFacadeProfile, type FacadeProfile } from '../profiles/facade';
 import { createFacadeAgentPlugins, type FacadeScopeValues } from './facade-plugins';
 import { fixedBuilderContextAssembler } from './legacy-system-message';
 import {
@@ -50,6 +51,7 @@ import {
 } from './service-keys';
 
 export interface FacadeComposition {
+  readonly profileId: FacadeProfile['id'];
   readonly processScope: ProcessScopeHandle;
   readonly agentScope: AgentScopeHandle;
 }
@@ -59,13 +61,16 @@ export interface FacadeComposition {
 // compat entrypoint installation; both bind the same byte-frozen adapter.
 setDefaultContextAssembler(fixedBuilderContextAssembler);
 
-export function createCurrentProcessScope(): Promise<ProcessScopeHandle> {
-  return createProcessScope([...currentProcessPlugins()]);
+export function createJean2ProcessScope(): Promise<ProcessScopeHandle> {
+  return createProcessScope([...jean2Profile.processPlugins()]);
 }
 
-export function createCurrentAgentScope(parent: ProcessScopeHandle): Promise<AgentScopeHandle> {
-  return createAgentScope(parent, [...currentAgentPlugins()]);
+export function createJean2AgentScope(parent: ProcessScopeHandle): Promise<AgentScopeHandle> {
+  return createAgentScope(parent, [...jean2Profile.agentPlugins()]);
 }
+
+export const createCurrentProcessScope = createJean2ProcessScope;
+export const createCurrentAgentScope = createJean2AgentScope;
 
 let sharedProcessScopePromise: Promise<ProcessScopeHandle> | null = null;
 let sharedScopeFactory: () => Promise<ProcessScopeHandle> = createCurrentProcessScope;
@@ -126,13 +131,17 @@ export async function resetSharedProcessScopeForTests(): Promise<void> {
 /** Composes one facade agent scope above the shared current process scope. */
 export async function createFacadeAgentComposition(
   values: FacadeScopeValues,
+  profile: FacadeProfile = codingFacadeProfile,
 ): Promise<FacadeComposition> {
   const processScope = await getSharedCurrentProcessScope();
   const agentScope = await createAgentScope(
     processScope,
-    [...createFacadeAgentPlugins(values)],
+    [...createFacadeAgentPlugins({
+      ...values,
+      profilePlugins: profile.plugins(),
+    })],
   );
-  return { processScope, agentScope };
+  return { profileId: profile.id, processScope, agentScope };
 }
 
 /**

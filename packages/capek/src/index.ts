@@ -1,8 +1,11 @@
 export const capekPackagePhase = 9 as const;
 
 export { createAgent } from './facade/create-agent';
+export type { CreateAgentOptions } from './facade/create-agent';
+export type { FacadeProfileId } from './profiles/facade';
 export type {
   Agent,
+  AgentDiagnostics,
   AgentError,
   AgentEvent,
   AgentInput,

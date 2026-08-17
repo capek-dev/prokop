@@ -11,8 +11,15 @@
 export {
   createCurrentAgentScope,
   createCurrentProcessScope,
+  createJean2AgentScope,
+  createJean2ProcessScope,
   enterAgentScope,
 } from '../plugins/compose';
+export {
+  JEAN2_AGENT_PLUGIN_IDS,
+  JEAN2_PROCESS_PLUGIN_IDS,
+  JEAN2_PROFILE_ID,
+} from '../profiles/jean2';
 export type {
   AgentScopeHandle,
   CapekPlugin,
