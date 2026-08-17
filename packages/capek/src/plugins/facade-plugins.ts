@@ -46,8 +46,9 @@ export interface FacadeScopeValues {
    * contributed coding tools (C4). The explicit value is the rollback
    * path and the C2 test seam. */
   toolResolver?: ToolRegistryResolver;
-  /** Installed agent plugins, normally `codingAgentBundle()`. Omitted in
-   * the C2 compatibility tests that compose scopes directly. */
+  /** Plugins selected by the explicit facade profile. */
+  profilePlugins?: readonly CapekPlugin<unknown>[];
+  /** Temporary C2 test compatibility alias. */
   codingPlugins?: readonly CapekPlugin<unknown>[];
   sandboxController: SandboxController;
   providerOverrides: ReadonlyMap<string, ConnectableProvider>;
@@ -96,6 +97,6 @@ export function createFacadeAgentPlugins(values: FacadeScopeValues): readonly Ca
       : toolResolverValuePlugin('facade.tool-resolver', values.toolResolver),
     sandboxControllerValuePlugin('facade.sandbox-controller', values.sandboxController),
     providerOverridesValuePlugin('facade.provider-overrides', values.providerOverrides),
-    ...(values.codingPlugins ?? []),
+    ...(values.profilePlugins ?? values.codingPlugins ?? []),
   ];
 }

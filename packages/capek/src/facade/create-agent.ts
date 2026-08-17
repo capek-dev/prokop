@@ -28,7 +28,7 @@ import { createAgentRuntime } from '../runtime/agent-runtime';
 import type { AgentDriver } from '../runtime/agent-runtime';
 import type { DefaultDriverInput } from '../runtime/default-agent-driver';
 import { createAgentStorage } from '../storage/options';
-import { codingAgentBundle } from '../bundles/coding-agent';
+import { resolveFacadeProfile } from '../profiles/facade';
 import {
   buildEffectiveContextHistory,
   createMessage,
@@ -50,7 +50,9 @@ import type {
   AgentStorageOption,
   RunOptions,
   UsageSummary,
+  AgentDiagnostics,
 } from './types';
+import type { FacadeProfileId } from '../profiles/facade';
 
 const DEFAULT_PROMPT = `You are a practical coding and research agent. Inspect the workspace before making claims. Use the bundled read and search tools to gather evidence, then answer with concrete findings. Use edit, write, patch, or shell tools only when the user asks for changes. Ask a focused question when required information is missing.`;
 
@@ -59,9 +61,10 @@ export interface TerminalInteraction {
   close(): void;
 }
 
-interface CreateAgentOptions {
+export interface CreateAgentOptions {
   model: string;
   workspace: string;
+  profile?: FacadeProfileId;
   storage?: AgentStorageOption;
   prompt?: string;
   interaction?: false | 'terminal' | ((request: AskRequestMessage) => unknown | Promise<unknown>);
@@ -240,10 +243,9 @@ class StandaloneAgent implements Agent {
       host: this.#bindings,
       contextSources: {},
       toolSource: {},
-      codingPlugins: codingAgentBundle(),
       sandboxController: this.#sandboxController,
       providerOverrides: this.#providerOverrides,
-    });
+    }, resolveFacadeProfile(options.profile));
     // An idle agent must never surface an unhandled rejection when scope
     // composition fails. run/close and the test accessor await this same
     // promise and still observe the original rejection.
@@ -252,6 +254,15 @@ class StandaloneAgent implements Agent {
       value: (): Promise<FacadeComposition> => this.#composition,
       enumerable: false,
     });
+  }
+
+  async diagnostics(): Promise<AgentDiagnostics> {
+    const composition = await this.#composition;
+    return {
+      profileId: composition.profileId,
+      process: composition.processScope.snapshot(),
+      agent: composition.agentScope.snapshot(),
+    };
   }
 
   async run(input: AgentInput, options?: RunOptions): Promise<AgentResult> {
