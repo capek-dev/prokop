@@ -31,8 +31,26 @@ export { installTaskToolFallback } from '../plugins/subagent-domain';
 export { installWorkflowToolFallback } from '../plugins/workflow-domain';
 export { installMemoryToolFallback } from '../plugins/memory-domain';
 export { installSkillsToolFallback } from '../plugins/skills-domain';
-export { configureSessionSearchHost, type SessionSearchHost } from '../session-search/host';
-export { configureSchedulerHost, type SchedulerHost } from '../scheduler/host';
+export { configureSessionSearchHost, getSessionSearchHost, type SessionSearchHost } from '../session-search/host';
+export { configureSchedulerHost, getSchedulerHost, type SchedulerHost } from '../scheduler/host';
+export { executeSchedulerTool } from '../scheduler/scheduler-tool';
+export { executeSessionSearchTool } from '../session-search/session-search-tool';
+export { executeSkillManageTool, buildSkillManageToolDescription } from '../skills/skill-manage-tool';
+export { executeMemoryTool } from '../memory/memory-tool';
+export {
+  addEntry,
+  entriesToContent,
+  formatEntriesForDisplay,
+  formatMemorySection,
+  listEntries,
+  loadMemoryFile,
+  loadMemoryInstructions,
+  MEMORY_CHAR_LIMIT,
+  parseEntries,
+  removeEntry,
+  replaceEntry,
+  USER_CHAR_LIMIT,
+} from '../memory/registry';
 export {
   configureAgentSource,
   configureInstructionSource,

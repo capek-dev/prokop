@@ -17,9 +17,11 @@ export {
   getProvider,
   getProviderStatus,
   registerProvider,
+  withProviderOverrides,
 } from '../providers/registry';
 export type { ConnectableProvider } from '../providers/types';
 export type { TokenResponse } from '../providers/types';
+export type { ModelFactoryOptions } from '../providers/types';
 export {
   createCapabilityTool,
   createOpenAiResponsesModel,

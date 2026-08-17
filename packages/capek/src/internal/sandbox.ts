@@ -9,8 +9,10 @@
 
 export { SandboxController, sandboxController } from '../sandbox/controller';
 export { SandboxProvider } from '../sandbox/provider';
+export { SandboxLanguageModel } from '../sandbox/model';
 export type {
   AutoResponderRule,
+  LlmCallContext,
   SandboxControlEvent,
   SandboxRespondMessage,
   SandboxResponse,

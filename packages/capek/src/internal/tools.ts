@@ -17,6 +17,7 @@ export {
 } from '../tools/registry';
 export {
   configureToolSource,
+  getToolSource,
   type ToolSourceLifecycle,
 } from '../tools/tool-source';
 export {
@@ -27,7 +28,12 @@ export {
   verifyChecksum,
 } from '../tools/tool-artifact';
 export {
+  getManifestPath,
   readInstallManifest,
   writeInstallManifest,
   type InstallManifest,
 } from '../tools/install-manifest';
+export {
+  stripVisualization,
+  extractVisualization,
+} from '../utils/strip-visualization';
