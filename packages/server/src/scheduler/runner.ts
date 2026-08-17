@@ -5,7 +5,7 @@ import { getWorkspace, getWorkspaceAutoApproveSeverity } from '@/store/workspace
 import { markScheduledJobRun, markScheduledJobError } from '@/store/scheduled-jobs';
 import { getPreconfig, getDefaultPreconfig } from '@/core/preconfig';
 import { getModelsConfig } from '@/config';
-import { findProviderFromModel, executeChildSession } from '@capekai/core/compat/jean2';
+import { findProviderFromModel, executeChildSession } from '@capekai/core/internal/providers';
 
 
 export async function runScheduledJob(job: ScheduledJob): Promise<void> {

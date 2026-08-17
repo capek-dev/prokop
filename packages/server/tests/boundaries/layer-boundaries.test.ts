@@ -30,35 +30,9 @@ const honoMatchers: SpecifierMatcher[] = [
   { prefix: '@hono/' },
 ];
 
-const compatBarrelExceptions: Record<string, string[]> = {
-  'packages/server/src/adapters/capek/ask-authority.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/adapters/capek/bindings.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/adapters/capek/context-sources.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/adapters/capek/events.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/adapters/capek/execution.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/adapters/capek/runtime-configuration.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/adapters/capek/scheduler.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/adapters/capek/session-search.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/adapters/capek/tool-source.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/adapters/capek/types.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/configuration/models.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/configuration/tool-env.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/core/session-title.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/index.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/mcp/converter.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/mcp/manager.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/providers/codex.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/providers/gmail.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/providers/oauth-manager.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/adapters/capek/provider-accounts.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/sandbox/index.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/sandbox/routes.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/scheduler/runner.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/adapters/capek/workspace-paths.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/store/compaction-recovery.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/tools/tool-installer.ts': ['@capekai/core/compat/jean2'],
-  'packages/server/src/transport/websocket/handlers/misc.ts': ['@capekai/core/compat/jean2'],
-};
+// S8 gate: the compat barrel has zero consumers; the rule stays as
+// enforcement against reintroduction.
+const compatBarrelExceptions: Record<string, string[]> = {};
 
 // S2 exit gate: zero non-transport ServerWebSocket exceptions remain.
 const serverWebSocketExceptions: Record<string, string[]> = {};
@@ -147,12 +121,14 @@ const aiSdkExceptions: Record<string, string[]> = {};
 // import legacy implementations. S3 retired the session lifecycle, queue,
 // control, chat, and session handler entries; S4 retired the misc handler's
 // capability-router import (the ask eligibility policy now lives in the
-// controller domain via the application port layer). The permission and
-// provider entries stay deferred until their owning slices; the terminal
-// manager entry was retired by the S5 PTY/terminal persistence slice.
+// controller domain via the application port layer). S8 moved the misc
+// handler onto the focused internal subpaths; the permission entry stays
+// deferred until its owning slice; the terminal manager entry was retired by
+// the S5 PTY/terminal persistence slice.
 const layerTransportLegacyExceptions: Record<string, string[]> = {
   'packages/server/src/transport/websocket/handlers/misc.ts': [
-    '@capekai/core/compat/jean2',
+    '@capekai/core/internal/ask-authority',
+    '@capekai/core/internal/sandbox',
   ],
   'packages/server/src/transport/websocket/handlers/permissions.ts': ['@/store/permissions'],
 };
@@ -547,9 +523,12 @@ describe('server layer boundaries', () => {
       globalBaselineRules[0],
     ]);
 
+    // S8 emptied the exception map, so every barrel consumer is flagged.
     expect(result.violations).toEqual([
+      'packages/server/src/providers/codex.ts imports @capekai/core/compat/jean2 (value) [rule: no-direct-compat-barrel]',
       'packages/server/src/routes/notifications.ts imports @capekai/core/compat/jean2 (value) [rule: no-direct-compat-barrel]',
     ]);
+    expect(compatBarrelExceptions).toEqual({});
   });
 
   test('alias specifiers resolve against the package source root', () => {
@@ -716,7 +695,7 @@ describe('server layer boundaries', () => {
     const imports = parseImports(file!.sourceText, file!.path);
 
     const allowedSpecifiers = [
-      '@capekai/core/compat/jean2',
+      '@capekai/core/internal/hosts',
       '@jean2/sdk',
       '@/application/ports/session-search',
     ];
@@ -822,7 +801,7 @@ describe('server layer boundaries', () => {
     const imports = parseImports(file!.sourceText, file!.path);
 
     const allowedSpecifiers = [
-      '@capekai/core/compat/jean2',
+      '@capekai/core/internal/hosts',
       '@/application/ports/scheduling',
     ];
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
@@ -898,7 +877,7 @@ describe('server layer boundaries', () => {
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect([...new Set(imports.map((imp) => imp.specifier))].sort()).toEqual([
-      '@capekai/core/compat/jean2',
+      '@capekai/core/internal/execution',
       '@/application/ports/session',
       '@/capek-event-adapter',
       '@/core/broadcast',
@@ -1141,11 +1120,15 @@ describe('server layer boundaries', () => {
       imports.some((imp) => imp.specifier === '@/core/capability-router'),
     ).toBe(false);
     // The exact legacy exception entry is retired; the misc handler keeps
-    // only the Capek compat entry (the web-push dispatch import moved to the
-    // wired notifications application in the S4 notification slice).
+    // only the S8 internal-subpath exceptions (the web-push dispatch import
+    // moved to the wired notifications application in the S4 notification
+    // slice).
     expect(
       layerTransportLegacyExceptions['packages/server/src/transport/websocket/handlers/misc.ts'],
-    ).toEqual(['@capekai/core/compat/jean2']);
+    ).toEqual([
+      '@capekai/core/internal/ask-authority',
+      '@capekai/core/internal/sandbox',
+    ]);
   });
 
   test('S4 gate: the capability router is a registry-bound compatibility wrapper over the controller domain', () => {
@@ -1859,7 +1842,7 @@ describe('server layer boundaries', () => {
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@capekai/core/compat/jean2',
+      '@capekai/core/internal/providers',
       '@/application/ports/provider-accounts',
     ].sort());
   });

@@ -1,1 +1,1 @@
-export type { Jean2CompatibilityBindings } from '@capekai/core/compat/jean2';
+export type { RuntimeHost as Jean2CompatibilityBindings } from '@capekai/core/internal/hosts';

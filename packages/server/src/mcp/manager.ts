@@ -9,7 +9,7 @@ import type {
   McpRemoteServerConfig,
   McpStatus,
 } from '@jean2/sdk';
-import type { CapabilityTool as Tool } from '@capekai/core/compat/jean2';
+import type { CapabilityTool as Tool } from '@capekai/core/internal/providers';
 import { convertMcpTool } from './converter';
 import { McpOAuthProvider } from './oauth-provider';
 import { getMcpServers } from './config';

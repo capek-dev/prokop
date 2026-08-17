@@ -13,7 +13,7 @@ import {
   reconcileSessionCompactionWithDeps as reconcileSessionWithDeps,
   type CompactionRecoveryDeps,
   type RuntimeEventSink,
-} from '@capekai/core/compat/jean2';
+} from '@capekai/core/internal/execution';
 import type { CompactionRecoveryPort } from '@/application/ports/session';
 import { mapCapekEventToServerMessage } from '@/capek-event-adapter';
 import {

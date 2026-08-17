@@ -1,4 +1,4 @@
-import { createCapabilityTool, type CapabilityTool } from '@capekai/core/compat/jean2';
+import { createCapabilityTool, type CapabilityTool } from '@capekai/core/internal/providers';
 import { CallToolResultSchema, type Tool as MCPToolDef } from '@modelcontextprotocol/sdk/types.js';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 

@@ -1,12 +1,20 @@
 import {
-  setJean2CompatibilityBindings,
-  type Jean2CompatibilityBindings,
-} from '@capekai/core/compat/jean2';
+  configureRuntimeHost,
+  installMemoryToolFallback,
+  installSchedulerToolFallback,
+  installSessionSearchToolFallback,
+  installSkillsToolFallback,
+  installTaskToolFallback,
+  installWorkflowToolFallback,
+  type RuntimeHost,
+} from '@capekai/core/internal/hosts';
 import { jean2DeliveryBindings } from './delivery';
 import { jean2InteractionBindings } from './interaction';
 import { jean2SandboxBindings } from './sandbox';
 import { jean2TitleBindings } from './titles';
 import { jean2WorkspaceBindings } from './workspace';
+
+export type { RuntimeHost as Jean2CompatibilityBindings } from '@capekai/core/internal/hosts';
 
 export const jean2CompatibilityBindings = {
   interaction: jean2InteractionBindings,
@@ -14,8 +22,14 @@ export const jean2CompatibilityBindings = {
   titles: jean2TitleBindings,
   workspace: jean2WorkspaceBindings,
   sandbox: jean2SandboxBindings,
-} satisfies Jean2CompatibilityBindings;
+} satisfies RuntimeHost;
 
 export function configureJean2Bindings(): void {
-  setJean2CompatibilityBindings(jean2CompatibilityBindings);
+  configureRuntimeHost(jean2CompatibilityBindings);
+  installSessionSearchToolFallback();
+  installSchedulerToolFallback();
+  installTaskToolFallback();
+  installWorkflowToolFallback();
+  installMemoryToolFallback();
+  installSkillsToolFallback();
 }

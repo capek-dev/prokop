@@ -1,7 +1,8 @@
 import type { RouterContext } from '../router-context';
 import type { ConnectionId } from '../connection-id';
 import { handleClientRegistration, getClientByClientId, getClientIdForConnection, getConnectionById } from '../connection-registry';
-import { resolveAsk, getSessionIdForPendingAsk, getAuthorityForPendingAsk, sandboxController, type SandboxRespondMessage } from '@capekai/core/compat/jean2';
+import { resolveAsk, getSessionIdForPendingAsk, getAuthorityForPendingAsk } from '@capekai/core/internal/ask-authority';
+import { sandboxController, type SandboxRespondMessage } from '@capekai/core/internal/sandbox';
 import { getControlState } from '../control-registry';
 import { requireWireApplication } from '../application';
 import { checkAskResponseEligibility } from '@/application/ports/control';

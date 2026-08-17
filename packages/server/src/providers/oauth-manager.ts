@@ -7,7 +7,7 @@
  */
 import type { OAuthProviderConfig, OAuthRedirectStrategy } from '@jean2/sdk';
 import { broadcastEvent } from '@/core/broadcast';
-import { getProvider, getProviderStatus, type TokenResponse } from '@capekai/core/compat/jean2';
+import { getProvider, getProviderStatus, type TokenResponse } from '@capekai/core/internal/providers';
 import {
   buildAuthorizationUrl,
   buildTokenExchangeParams,

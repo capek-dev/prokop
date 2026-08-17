@@ -3,7 +3,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import type { LoadedTool } from '@jean2/sdk';
 import { resolveToolsPath, getDefaultToolsPath } from '@/config';
-import { clearCache as clearToolsCache, downloadArtifact, verifyChecksum, extractArtifact, validateArtifactStructure, ArtifactError, readInstallManifest, writeInstallManifest, type InstallManifest } from '@capekai/core/compat/jean2';
+import { clearCache as clearToolsCache, downloadArtifact, verifyChecksum, extractArtifact, validateArtifactStructure, ArtifactError, readInstallManifest, writeInstallManifest, type InstallManifest } from '@capekai/core/internal/tools';
 import {
   buildSourceInstallManifest,
   buildUrlInstallManifest,
@@ -20,7 +20,7 @@ import {
 import { installDependencies, NpmInstallError } from './tool-npm-installer';
 import { bundleTool } from './tool-bundler';
 
-export type { InstallManifest } from '@capekai/core/compat/jean2';
+export type { InstallManifest } from '@capekai/core/internal/tools';
 
 export interface InstallResult {
   success: boolean;

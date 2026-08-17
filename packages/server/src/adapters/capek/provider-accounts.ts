@@ -3,7 +3,7 @@ import {
   disconnectProvider,
   getConnectableProviders,
   getProviderStatus,
-} from '@capekai/core/compat/jean2';
+} from '@capekai/core/internal/providers';
 import type { ProviderRegistryPort } from '@/application/ports/provider-accounts';
 
 /**
