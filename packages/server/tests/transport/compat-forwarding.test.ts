@@ -36,7 +36,6 @@ import {
   installDeliveryPort,
   registerBroadcastCallback,
   registerBroadcastToSessionCallback,
-  registerSendToAskTargetsCallback,
   registerSendToControllerCallback,
   sendToAskTargetsEvent,
   sendToControllerEvent,
@@ -162,7 +161,6 @@ describe('core broadcast compatibility and injected delivery', () => {
     });
     registerSendToControllerCallback(null as never);
     registerBroadcastToSessionCallback(null as never);
-    registerSendToAskTargetsCallback(null as never);
 
     sendToControllerEvent('s', { type: 'error', code: 'a', message: 'b' });
     broadcastToSessionEvent('s', { type: 'error', code: 'c', message: 'd' });
@@ -170,12 +168,11 @@ describe('core broadcast compatibility and injected delivery', () => {
     expect(messages).toHaveLength(2);
   });
 
-  test('ask-target events fall back to controller delivery when no ask callback is registered', () => {
+  test('ask-target events fall back to controller delivery without an installed port', () => {
     const messages: ServerMessage[] = [];
     registerBroadcastCallback((message) => {
       messages.push(message);
     });
-    registerSendToAskTargetsCallback(null as never);
 
     sendToAskTargetsEvent('s', { visibilityScope: 'controller_only', resolutionMode: 'controller_only' } as AskAuthority, {
       type: 'error',
