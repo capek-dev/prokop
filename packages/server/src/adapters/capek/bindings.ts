@@ -1,11 +1,13 @@
 import {
   configureRuntimeHost,
+  fixedBuilderContextAssembler,
   installMemoryToolFallback,
   installSchedulerToolFallback,
   installSessionSearchToolFallback,
   installSkillsToolFallback,
   installTaskToolFallback,
   installWorkflowToolFallback,
+  setDefaultContextAssembler,
   type RuntimeHost,
 } from '@capekai/core/internal/hosts';
 import { jean2DeliveryBindings } from './delivery';
@@ -25,6 +27,11 @@ export const jean2CompatibilityBindings = {
 } satisfies RuntimeHost;
 
 export function configureJean2Bindings(): void {
+  // The Jean2 path runs outside composed agent scopes, so the legacy
+  // fixed-builder assembler stays the process default (the retired
+  // compatibility barrel installed this at module load; the bootstrap
+  // owns the installation now).
+  setDefaultContextAssembler(fixedBuilderContextAssembler);
   configureRuntimeHost(jean2CompatibilityBindings);
   installSessionSearchToolFallback();
   installSchedulerToolFallback();
