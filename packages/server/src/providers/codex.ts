@@ -8,7 +8,7 @@ import {
   registerProvider,
   type ConnectableProvider,
   type TokenResponse,
-} from '@capekai/core/compat/jean2';
+} from '@capekai/core/internal/providers';
 import { loadProviderConfig, saveProviderConfig, deleteProviderConfig } from './storage';
 import {
   registerOAuthConfig,

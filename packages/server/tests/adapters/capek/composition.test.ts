@@ -289,6 +289,7 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
       ['capek.search-capability', 'agent', 'coding.search', 'agent'],
       ['capek.shell-capability', 'agent', 'coding.shell', 'agent'],
       ['capek.tool-output-capability', 'agent', 'coding.tool-output', 'agent'],
+      ['capek.agent-driver', 'agent', 'current.agent-driver', 'agent'],
       ['capek.context-assembler', 'agent', 'current.context-sections', 'agent'],
       ['capek.context-sources', 'agent', 'current.context-sources', 'agent'],
       ['capek.orchestrator-session', 'agent', 'current.orchestrator-session', 'agent'],

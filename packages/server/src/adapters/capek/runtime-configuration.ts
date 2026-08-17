@@ -1,7 +1,7 @@
 import {
   configureRuntimeConfiguration,
   type RuntimeConfiguration,
-} from '@capekai/core/compat/jean2';
+} from '@capekai/core/internal/configuration';
 import {
   findModel,
   findModelVariant,

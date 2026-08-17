@@ -1,7 +1,7 @@
 import {
   configureSchedulerHost,
   type SchedulerHost,
-} from '@capekai/core/compat/jean2';
+} from '@capekai/core/internal/hosts';
 import type {
   ScheduledJobExecutionPort,
   ScheduledJobRepositoryPort,

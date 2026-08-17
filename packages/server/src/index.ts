@@ -10,7 +10,7 @@ import { installWireApplication } from '@/transport/websocket/application';
 import { resolveAskDeliveryTargets } from '@/core/capability-router';
 import { createBunWebSocketAdapter, type WsData } from '@/transport/websocket/bun-adapter';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
-import { scanTools } from '@capekai/core/compat/jean2';
+import { scanTools } from '@capekai/core/internal/tools';
 import { closeDatabase } from '@/store';
 import { backfillFts } from '@/session-search/fts';
 import type { ServerMessage, AskAuthority } from '@jean2/sdk';

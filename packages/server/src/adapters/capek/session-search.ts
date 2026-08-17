@@ -1,7 +1,7 @@
 import {
   configureSessionSearchHost,
   type SessionSearchHost,
-} from '@capekai/core/compat/jean2';
+} from '@capekai/core/internal/hosts';
 import type { Session, Workspace } from '@jean2/sdk';
 import type { SessionSearchQueryPort } from '@/application/ports/session-search';
 

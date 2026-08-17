@@ -1,7 +1,7 @@
 import { atomicWriteFile, readFileSafe } from './files';
 import { getEnvFilePath } from '@/paths';
 import { getJean2EnvValue, getAllJean2EnvKeys, reloadJean2Env } from '@/env';
-import { listTools } from '@capekai/core/compat/jean2';
+import { listTools } from '@capekai/core/internal/tools';
 import { ENV_PRESETS, getPreset, isPresetKey } from './env-presets';
 import { ConfigurationPersistenceError, ConfigurationValidationError } from './errors';
 

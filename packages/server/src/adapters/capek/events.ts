@@ -1,4 +1,4 @@
-import type { RuntimeDelivery, RuntimeEvent, RuntimeEventContext } from '@capekai/core/compat/jean2';
+import type { RuntimeDelivery, RuntimeEvent, RuntimeEventContext } from '@capekai/core';
 import type { AskAuthority, ServerMessage } from '@jean2/sdk';
 import {
   broadcastEvent,

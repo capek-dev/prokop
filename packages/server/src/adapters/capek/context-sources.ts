@@ -5,7 +5,7 @@ import {
   type AgentSource,
   type InstructionSource,
   type PreconfigSource,
-} from '@capekai/core/compat/jean2';
+} from '@capekai/core/internal/hosts';
 import { getAgentDirectory, getPreconfigOrAgent } from '@/agents/storage';
 import { readAgentMemoryFile } from '@/agents/memory';
 import {
