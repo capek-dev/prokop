@@ -12,7 +12,18 @@
 
 export {
   ASK_TIMEOUT,
+  createAskApi,
   getAuthorityForPendingAsk,
   getSessionIdForPendingAsk,
+  hasPendingAsk,
+  rejectPendingAsksByToolCallId,
   resolveAsk,
 } from '../permission/ask-user-api';
+export {
+  getPendingRequestsByRootSession,
+  hasPendingWaiter,
+  rejectPermission,
+  rejectPermissionsBySession,
+  requestPermission,
+  resolvePermission,
+} from '../permission/permission-request-manager';
