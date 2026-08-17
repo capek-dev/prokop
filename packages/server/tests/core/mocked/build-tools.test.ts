@@ -10,7 +10,7 @@ import {
   type StorageBundle,
 } from '@capekai/core/storage';
 import { configureJean2Bindings } from '@/adapters/capek/bindings';
-import { jean2CompatibilityBindings, jean2StorageBundle } from '@/capek-adapter';
+import { jean2CompatibilityBindings, jean2StorageBundle } from '@/adapters/capek';
 import { buildAiSdkTools, type BuildToolsOptions } from '@capekai/core/internal/execution';
 import { clearCache, scanTools } from '@capekai/core/internal/tools';
 import type { Preconfig, Session, Workspace } from '@jean2/sdk';

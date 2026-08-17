@@ -6,7 +6,7 @@ import {
   sendToAskTargetsEvent,
   sendToControllerEvent,
 } from '@/core/broadcast';
-import { notifyTerminalMessage } from '@/services/web-push/dispatch';
+import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
 
 export function mapCapekEventToServerMessage(event: RuntimeEvent): ServerMessage | null {
   switch (event.kind) {
@@ -161,7 +161,10 @@ export function createJean2RuntimeContext<Origin>(router: Jean2EventRouter<Origi
 
 export function deliverCapekEvent(delivery: RuntimeDelivery): void {
   if (delivery.event.kind === 'terminal') {
-    notifyTerminalMessage(delivery.event.message, delivery.event.sessionId);
+    getJean2NotificationsApplication().notifyTerminalMessage(
+      delivery.event.message,
+      delivery.event.sessionId,
+    );
     return;
   }
 

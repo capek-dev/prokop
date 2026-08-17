@@ -16,7 +16,7 @@ import { createJean2ScheduledJobExecution } from '@/adapters/jean2/scheduled-job
 import { createJean2SessionRepository } from '@/adapters/jean2/session-repository';
 import { createScheduledJobRepository } from '@/infrastructure/sqlite/scheduled-job-repository';
 import { createSessionSearchQueryRepository } from '@/infrastructure/sqlite/session-search-query-repository';
-import { getDatabase } from '@/store';
+import { getDatabase } from '@/infrastructure/sqlite/database';
 
 /** S5 session-search host dependencies. The query port is the SQLite
  * infrastructure repository with an injected store accessor; session and
@@ -70,14 +70,6 @@ export function createRuntime(): void {
   configureJean2SchedulerHost(createSchedulerHostDeps());
   configureJean2ToolSource();
   configureJean2Bindings();
-}
-
-/**
- * Temporary compatibility name: the old adapter entrypoint now delegates to
- * the explicit composition root. Removed when consumers migrate in S8.
- */
-export function configureCapekJean2Compatibility(): void {
-  createRuntime();
 }
 
 export { createJean2RuntimeComposition } from '@/adapters/capek/composition';

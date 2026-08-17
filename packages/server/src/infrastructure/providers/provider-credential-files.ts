@@ -1,6 +1,6 @@
 import type { ProviderCredentialStatus, ProviderCredentialsResponse } from '@jean2/sdk';
-import { getJean2EnvValue, reloadJean2Env } from '@/env';
-import { getEnvFilePath } from '@/paths';
+import { getJean2EnvValue, reloadJean2Env } from '@/infrastructure/runtime/environment';
+import { getEnvFilePath } from '@/infrastructure/runtime/paths';
 import { atomicWriteFile, readFileSafe } from '@/configuration/files';
 import {
   ConfigurationNotFoundError,

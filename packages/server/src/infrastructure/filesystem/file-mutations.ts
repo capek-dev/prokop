@@ -18,14 +18,14 @@ import {
   FILE_PREVIEW_MAX_BYTES,
   isBinaryBuffer,
   isBinaryExtension,
-} from '@/utils/binaryDetection';
+} from './binary-detection';
 import {
   BadRequestError,
   ConflictError,
   ForbiddenError,
   NotFoundError,
   PayloadTooLargeError,
-} from '@/utils/http-errors';
+} from '@/application/http-errors';
 import { getLanguageForPath, getMimeTypeForPath } from './file-preview';
 
 export interface WorkspaceLike {

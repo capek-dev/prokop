@@ -2,7 +2,7 @@ import {
   generateSessionTitle,
   hasManualSessionTitle,
   isDefaultSessionTitle,
-} from '@/core/session-title';
+} from '@/infrastructure/session-title';
 import type { Jean2CompatibilityBindings } from './types';
 
 export const jean2TitleBindings: Jean2CompatibilityBindings['titles'] = {

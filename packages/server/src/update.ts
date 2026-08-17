@@ -4,7 +4,7 @@ import { existsSync, statSync, openSync, renameSync } from 'fs';
 
 import { VERSION } from '@/version';
 import { getStatus, stopDaemon, getLogFilePath } from '@/daemon';
-import { getToolEnv } from '@/env';
+import { getToolEnv } from '@/infrastructure/runtime/environment';
 import { isInitialized } from '@/config';
 
 export interface UpdateOptions {

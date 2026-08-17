@@ -9,6 +9,7 @@ import type { RouterContext } from '@/transport/websocket/router-context';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import type { ProvidersApplication } from '@/application/providers';
 import type { NotificationsApplication } from '@/application/notifications';
+import type { PermissionsApplication } from '@/application/permissions';
 import type { SessionApplication, SessionControlApplication } from '@/application';
 
 interface Spy {
@@ -31,7 +32,8 @@ function installProviders(providers: ProvidersApplication): void {
   const session = {} as SessionApplication<ConnectionId>;
   const control = {} as SessionControlApplication<ConnectionId>;
   const notifications = makeNotifications();
-  const wire: WireApplication = { session, control, providers, notifications };
+  const permissions = {} as PermissionsApplication;
+  const wire: WireApplication = { session, control, providers, notifications, permissions };
   installWireApplication(wire);
 }
 

@@ -7,7 +7,7 @@ import { getRuntimeHost as getJean2CompatibilityBindings, withRuntimeHost as wit
 import { type RuntimeEvent } from '@capekai/core';
 import { type ConnectableProvider, type ModelFactoryOptions } from '@capekai/core/internal/providers';
 import { getStorage } from '@capekai/core/storage';
-import { configureCapekJean2Compatibility } from '@/capek-adapter';
+import { createRuntime } from '@/bootstrap/create-runtime';
 import { executeCompaction, isCompactionActive } from '@capekai/core/internal/execution';
 import { convertToAiSdkMessages } from '@capekai/core/internal/execution';
 import {
@@ -54,7 +54,7 @@ function createCompactionModel(control: ModelControl): MockLanguageModelV3 {
 }
 
 function installBindings(control: ModelControl): Map<string, ConnectableProvider> {
-  configureCapekJean2Compatibility();
+  createRuntime();
   const model = createCompactionModel(control);
   const createProvider = (id: string) => ({
     descriptor: { id, displayName: id, authType: 'none' as const, connectable: false },
@@ -153,7 +153,7 @@ describe('package-owned compaction executor', () => {
 
   afterEach(() => {
     resetTestDatabase();
-    configureCapekJean2Compatibility();
+    createRuntime();
   });
 
   test('rejects missing and child sessions without starting compaction', async () => {

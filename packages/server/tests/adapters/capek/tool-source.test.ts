@@ -4,7 +4,7 @@ import { getToolSource } from '@capekai/core/internal/tools';
 const realBarrel = await import('@capekai/core/internal/tools');
 const realConfig = await import('@/config');
 const realPaths = await import('@/paths');
-const realMcp = await import('@/mcp');
+const realMcp = await import('@/infrastructure/mcp');
 
 const realConfigureToolsPath = realBarrel.configureToolsPath;
 const realConfigureToolSource = realBarrel.configureToolSource;

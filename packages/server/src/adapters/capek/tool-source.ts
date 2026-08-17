@@ -6,8 +6,8 @@ import {
   type ToolSourceLifecycle,
 } from '@capekai/core/internal/tools';
 import { resolveToolsPath } from '@/config';
-import { getTools, initializeWorkspace } from '@/mcp';
-import { getToolsDir } from '@/paths';
+import { getTools, initializeWorkspace } from '@/infrastructure/mcp';
+import { getToolsDir } from '@/infrastructure/runtime/paths';
 
 export const jean2ToolSource: ToolSourceLifecycle = {
   initializeWorkspace,

@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, existsSync, writeFileSync, cpSync } from 'fs';
 import { join, resolve } from 'path';
 import { tmpdir } from 'os';
 
-import { configureCapekJean2Compatibility } from '@/capek-adapter';
+import { createRuntime } from '@/bootstrap/create-runtime';
 import { scanTools, getTool, listTools, clearCache } from '@capekai/core/internal/tools';
 
 const FIXTURE_DIR = resolve(import.meta.dir, 'fixtures', 'test-fixture-tool');
@@ -17,7 +17,7 @@ describe('registry', () => {
   let toolsDir: string;
 
   beforeEach(() => {
-    configureCapekJean2Compatibility();
+    createRuntime();
     tempDir = createTempDir();
     mkdirSync(tempDir, { recursive: true });
     toolsDir = join(tempDir, 'tools');

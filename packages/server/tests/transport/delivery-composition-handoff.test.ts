@@ -7,9 +7,11 @@ import { createBunWebSocketAdapter } from '@/transport/websocket/bun-adapter';
 import { installDeliveryPort } from '@/core/broadcast';
 import { unregisterConnection } from '@/transport/websocket/connection-registry';
 
-mock.module('@/services/web-push/dispatch', () => ({
-  notifyTerminalMessage: () => {},
-  acknowledgePendingNotification: () => {},
+mock.module('@/adapters/jean2/notifications', () => ({
+  getJean2NotificationsApplication: () => ({
+    notifyTerminalMessage: () => {},
+    acknowledgePendingNotification: () => {},
+  }),
 }));
 
 const sockets: unknown[] = [];

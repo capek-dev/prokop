@@ -14,7 +14,7 @@ import {
   reserveDelivery,
   updatePushSubscriptionPreferences,
   upsertPushSubscription,
-} from '@/store/web-push';
+} from './web-push';
 
 export function createNotificationRepository(): NotificationStorePort {
   return {

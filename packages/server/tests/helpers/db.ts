@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
-import { configureCapekJean2Compatibility } from '@/capek-adapter';
-import { initializeSchema, DB } from '@/store';
+import { createRuntime } from '@/bootstrap/create-runtime';
+import { initializeSchema, DB } from '@/infrastructure/sqlite/database';
 
 /**
  * Create a fresh in-memory SQLite database with full schema initialized.
@@ -28,7 +28,7 @@ export function createTestDatabase(): Database {
  *   afterEach(() => resetTestDatabase());
  */
 export function setupTestDatabase(): Database {
-  configureCapekJean2Compatibility();
+  createRuntime();
   const db = createTestDatabase();
   DB.configure({ database: db });
   return db;

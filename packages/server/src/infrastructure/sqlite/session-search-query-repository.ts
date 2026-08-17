@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite';
+import type { FtsDatabase } from '@/infrastructure/session-search/fts';
 import type {
   SessionSearchMessageListItem,
   SessionSearchMessageRef,
@@ -141,7 +142,7 @@ export function searchMessages(db: Database, options: SessionSearchOptions): Ses
 }
 
 export function getMessageContentForFts(
-  db: Database,
+  db: FtsDatabase,
   messageId: string,
 ): { content: string; toolName: string } {
   const parts = db.query(

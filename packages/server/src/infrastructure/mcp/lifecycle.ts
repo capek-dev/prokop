@@ -1,4 +1,4 @@
-import * as mcp from '@/mcp';
+import * as mcp from './index';
 import type { McpLifecyclePort } from '@/application/ports/mcp';
 
 export function createMcpLifecycle(): McpLifecyclePort {

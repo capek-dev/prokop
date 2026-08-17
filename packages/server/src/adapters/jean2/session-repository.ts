@@ -32,7 +32,7 @@ import {
 } from '@/store';
 import { getWorkspaceAutoApproveSeverity } from '@/store/workspaces';
 import { getPreconfigOrAgent, isAgentSync } from '@/agents/storage';
-import { markManualSessionTitle } from '@/core/session-title';
+import { markManualSessionTitle } from '@/infrastructure/session-title';
 import {
   cleanupAllPendingAsks,
   listAllPendingAsks,

@@ -6,7 +6,7 @@ import {
   deliverCapekEvent,
   mapCapekEventToServerMessage,
   type Jean2EventRouter,
-} from '@/capek-event-adapter';
+} from '@/adapters/capek/events';
 
 function map(event: RuntimeEvent): unknown {
   return mapCapekEventToServerMessage(event);

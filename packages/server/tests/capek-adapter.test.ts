@@ -4,11 +4,11 @@ import { join } from 'path';
 import { getRuntimeConfiguration } from '@capekai/core/internal/configuration';
 import { getRuntimeHost as getJean2CompatibilityBindings } from '@capekai/core/internal/hosts';
 import {
-  configureCapekJean2Compatibility,
   jean2CompatibilityBindings,
   jean2RuntimeConfiguration,
   jean2StorageBundle,
-} from '@/capek-adapter';
+} from '@/adapters/capek';
+import { createRuntime } from '@/bootstrap/create-runtime';
 import { getSession } from '@/store';
 
 const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, string[]> = {
@@ -36,7 +36,7 @@ describe('Čapek Jean2 adapter', () => {
   });
 
   test('configures the exact adapter value and preserves host function identity', () => {
-    configureCapekJean2Compatibility();
+    createRuntime();
     const configured = getJean2CompatibilityBindings();
 
     expect(configured).toBe(jean2CompatibilityBindings);

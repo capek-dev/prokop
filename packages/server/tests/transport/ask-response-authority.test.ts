@@ -53,6 +53,7 @@ installWireApplication({
   control: {} as never,
   providers: {} as never,
   notifications: { acknowledgePendingNotification: () => false } as never,
+  permissions: {} as never,
 });
 
 const sockets: unknown[] = [];
@@ -292,6 +293,7 @@ describe('transport ask.response authority routing', () => {
           return true;
         },
       } as never,
+      permissions: {} as never,
     });
 
     const clientAId = registerClient('client-a');

@@ -33,6 +33,7 @@ export type {
 function buildHooks(): SessionMessageRepositoryHooks {
   return {
     events: createFtsProjector({
+      getDatabase,
       getMessage: (messageId) => repo().getMessage(messageId),
       getSession,
     }),

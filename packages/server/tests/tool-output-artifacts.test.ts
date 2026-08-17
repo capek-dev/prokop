@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createApp } from '@/app';
-import { jean2StorageBundle } from '@/capek-adapter';
+import { jean2StorageBundle } from '@/adapters/capek';
 import {
   createToolOutputArtifact,
   deleteSession,

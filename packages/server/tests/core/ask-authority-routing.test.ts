@@ -6,7 +6,7 @@ import {
   handleClientRegistration,
   registerConnection,
   unregisterConnection,
-} from '@/core/client-registry';
+} from '@/transport/websocket/connection-registry';
 
 const sockets: ServerWebSocket[] = [];
 
@@ -21,8 +21,8 @@ function authority(overrides: Partial<AskAuthority>): AskAuthority {
 function registerClient(clientId: string, capabilities: string[]): void {
   const socket = {} as ServerWebSocket;
   sockets.push(socket);
-  registerConnection(socket);
-  handleClientRegistration(socket, {
+  const connectionId = registerConnection(socket);
+  handleClientRegistration(connectionId, {
     type: 'client.register',
     client: {
       clientId,

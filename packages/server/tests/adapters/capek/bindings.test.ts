@@ -28,7 +28,7 @@ import {
   resolvePermissionRequestByRequestId,
 } from '@/store/pending-asks';
 import { createGrantFromOptions, matchGrant } from '@/store/permissions';
-import { notifyPermissionRequired } from '@/services/web-push/dispatch';
+import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { seedSession, seedWorkspace } from '#tests/seed';
 
@@ -65,7 +65,8 @@ describe('Čapek binding group adapters', () => {
     expect(jean2InteractionBindings.matchGrant).toBe(matchGrant);
     expect(jean2InteractionBindings.createGrantFromOptions).toBe(createGrantFromOptions);
     expect(jean2InteractionBindings.getPermissionTimeoutMs).toBe(getPermissionTimeoutMs);
-    expect(jean2InteractionBindings.notifyPermissionRequired).toBe(notifyPermissionRequired);
+    expect(typeof jean2InteractionBindings.notifyPermissionRequired).toBe('function');
+    expect(getJean2NotificationsApplication().notifyPermissionRequired).toBeDefined();
   });
 
   test('interaction auto-approve severity reads the session record and falls back to undefined', () => {

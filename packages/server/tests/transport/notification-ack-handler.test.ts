@@ -9,6 +9,7 @@ import {
 import type { RouterContext } from '@/transport/websocket/router-context';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import type { NotificationsApplication } from '@/application/notifications';
+import type { PermissionsApplication } from '@/application/permissions';
 import type { ProvidersApplication } from '@/application/providers';
 import type { SessionApplication, SessionControlApplication } from '@/application';
 import type { NotificationAcknowledgeMessage } from '@jean2/sdk';
@@ -21,7 +22,8 @@ function installNotifications(notifications: NotificationsApplication): void {
   const session = {} as SessionApplication<ConnectionId>;
   const control = {} as SessionControlApplication<ConnectionId>;
   const providers = {} as ProvidersApplication;
-  const wire: WireApplication = { session, control, providers, notifications };
+  const permissions = {} as PermissionsApplication;
+  const wire: WireApplication = { session, control, providers, notifications, permissions };
   installWireApplication(wire);
 }
 

@@ -31,14 +31,11 @@ import {
 } from '@capekai/core/internal/composition';
 import * as focused from '@/adapters/capek';
 import { configureJean2SessionSearchHost } from '@/adapters/capek/session-search';
-import { configureCapekJean2Compatibility, createJean2RuntimeComposition, createRuntime } from '@/bootstrap/create-runtime';
+import { createJean2RuntimeComposition, createRuntime } from '@/bootstrap/create-runtime';
 import { createMessage, createPart } from '@/store';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { createTestTextPart, createTestUserMessage } from '#tests/factories';
 import { seedSession, seedWorkspace } from '#tests/seed';
-import * as legacy from '@/capek-adapter';
-import * as legacyEvents from '@/capek-event-adapter';
-import * as events from '@/adapters/capek/events';
 import { parseImports } from '../../helpers/import-scan';
 
 const repositoryRoot = resolve(import.meta.dir, '../../../../../');
@@ -132,46 +129,18 @@ describe('Čapek composition root', () => {
     expect(topLevelCallsOf(source, 'createRuntime')).toEqual(expectedCompositionSteps);
   });
 
-  test('configureCapekJean2Compatibility installs the full adapter set with preserved identities', () => {
-    configureCapekJean2Compatibility();
+  test('createRuntime installs the full adapter set with preserved identities', () => {
+    createRuntime();
+    const configured = getJean2CompatibilityBindings();
 
-    expect(getJean2CompatibilityBindings()).toBe(legacy.jean2CompatibilityBindings);
-    expect(getRuntimeConfiguration()).toBe(legacy.jean2RuntimeConfiguration);
-    expect(getStorage()).toBe(legacy.jean2StorageBundle);
-    expect(getSessionSearchHost()).toBe(legacy.jean2SessionSearchHost);
-    expect(getSchedulerHost()).toBe(legacy.jean2SchedulerHost);
+    expect(configured).toBe(focused.jean2CompatibilityBindings);
+    expect(getRuntimeConfiguration()).toBe(focused.jean2RuntimeConfiguration);
+    expect(getStorage()).toBe(focused.jean2StorageBundle);
+    expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);
+    expect(getSchedulerHost()).toBe(focused.jean2SchedulerHost);
     expect(getToolSource()).toBe(focused.jean2ToolSource);
-    expect(createRuntime).toBeDefined();
   });
 
-  test('the legacy adapter path forwards every prior export by identity', () => {
-    expect(Object.keys(legacy).sort()).toEqual([
-      'configureCapekJean2Compatibility',
-      'jean2CompatibilityBindings',
-      'jean2RuntimeConfiguration',
-      'jean2SchedulerHost',
-      'jean2SessionSearchHost',
-      'jean2StorageBundle',
-    ].sort());
-
-    expect(legacy.jean2CompatibilityBindings).toBe(focused.jean2CompatibilityBindings);
-    expect(legacy.jean2RuntimeConfiguration).toBe(focused.jean2RuntimeConfiguration);
-    expect(legacy.jean2SchedulerHost).toBe(focused.jean2SchedulerHost);
-    expect(legacy.jean2SessionSearchHost).toBe(focused.jean2SessionSearchHost);
-    expect(legacy.jean2StorageBundle).toBe(focused.jean2StorageBundle);
-  });
-
-  test('the legacy event adapter path forwards every prior export by identity', () => {
-    expect(Object.keys(legacyEvents).sort()).toEqual([
-      'createJean2RuntimeContext',
-      'deliverCapekEvent',
-      'mapCapekEventToServerMessage',
-    ].sort());
-
-    expect(legacyEvents.mapCapekEventToServerMessage).toBe(events.mapCapekEventToServerMessage);
-    expect(legacyEvents.createJean2RuntimeContext).toBe(events.createJean2RuntimeContext);
-    expect(legacyEvents.deliverCapekEvent).toBe(events.deliverCapekEvent);
-  });
 });
 
 describe('S5 session-search host wiring', () => {
@@ -221,15 +190,15 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
   });
 
   test('composes the installed Jean2 objects through process and agent providers by exact identity', async () => {
-    configureCapekJean2Compatibility();
+    createRuntime();
 
     const composition = await createJean2RuntimeComposition();
     processScope = composition.processScope;
     agentScope = composition.agentScope;
 
-    expect(agentScope.require(capekStorageKey)).toBe(legacy.jean2StorageBundle);
-    expect(agentScope.require(capekRuntimeConfigurationKey)).toBe(legacy.jean2RuntimeConfiguration);
-    expect(agentScope.require(capekRuntimeHostKey)).toBe(legacy.jean2CompatibilityBindings);
+    expect(agentScope.require(capekStorageKey)).toBe(focused.jean2StorageBundle);
+    expect(agentScope.require(capekRuntimeConfigurationKey)).toBe(focused.jean2RuntimeConfiguration);
+    expect(agentScope.require(capekRuntimeHostKey)).toBe(focused.jean2CompatibilityBindings);
     expect(agentScope.require(capekToolSourceKey)).toBe(focused.jean2ToolSource);
     expect(agentScope.require(capekSandboxControllerKey)).toBe(sandboxController);
     expect(agentScope.require(capekProviderOverridesKey)).toBeInstanceOf(Map);
@@ -240,22 +209,21 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
     expect(sources.agents).toBe(focused.jean2AgentSource);
     expect(sources.instructions).toBe(focused.jean2InstructionSource);
 
-    expect(processScope.require(capekSessionSearchHostKey)).toBe(legacy.jean2SessionSearchHost);
-    expect(processScope.require(capekSchedulerHostKey)).toBe(legacy.jean2SchedulerHost);
+    expect(processScope.require(capekSessionSearchHostKey)).toBe(focused.jean2SessionSearchHost);
+    expect(processScope.require(capekSchedulerHostKey)).toBe(focused.jean2SchedulerHost);
     expect(typeof processScope.require(capekProviderRegistryKey).getProvider).toBe('function');
 
-    // The S1 accessors still return the same objects: the runtime path is
-    // unchanged by the composition representation.
-    expect(getJean2CompatibilityBindings()).toBe(legacy.jean2CompatibilityBindings);
-    expect(getRuntimeConfiguration()).toBe(legacy.jean2RuntimeConfiguration);
-    expect(getStorage()).toBe(legacy.jean2StorageBundle);
-    expect(getSessionSearchHost()).toBe(legacy.jean2SessionSearchHost);
-    expect(getSchedulerHost()).toBe(legacy.jean2SchedulerHost);
+    // The accessors return the same focused adapter objects after composition.
+    expect(getJean2CompatibilityBindings()).toBe(focused.jean2CompatibilityBindings);
+    expect(getRuntimeConfiguration()).toBe(focused.jean2RuntimeConfiguration);
+    expect(getStorage()).toBe(focused.jean2StorageBundle);
+    expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);
+    expect(getSchedulerHost()).toBe(focused.jean2SchedulerHost);
     expect(getToolSource()).toBe(focused.jean2ToolSource);
   });
 
   test('diagnostics list every Jean2 seam with correct key scopes and provider ownership', async () => {
-    configureCapekJean2Compatibility();
+    createRuntime();
 
     const composition = await createJean2RuntimeComposition();
     processScope = composition.processScope;
@@ -318,7 +286,7 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
   });
 
   test('provider plugin methods are the current registry functions', async () => {
-    configureCapekJean2Compatibility();
+    createRuntime();
 
     const composition = await createJean2RuntimeComposition();
     processScope = composition.processScope;
@@ -361,7 +329,7 @@ describe('C4 coding bundle in the Jean2 composition', () => {
   });
 
   test('exposes the exact standard contributed coding inventory without a scoped resolver', async () => {
-    configureCapekJean2Compatibility();
+    createRuntime();
 
     const composition = await createJean2RuntimeComposition();
     processScope = composition.processScope;
@@ -432,7 +400,7 @@ describe('C3 ordered context in the Jean2 composition', () => {
   };
 
   test('buildContext reproduces the fixed builder byte-for-byte through the composed scope', async () => {
-    configureCapekJean2Compatibility();
+    createRuntime();
     configureStorage(createInMemoryStorageBundle({
       workspaces: [{
         id: 'c3-workspace',
@@ -466,7 +434,7 @@ describe('C3 ordered context in the Jean2 composition', () => {
   });
 
   test('diagnostics list the exact ordered sections with the assembler service pinned', async () => {
-    configureCapekJean2Compatibility();
+    createRuntime();
 
     const composition = await createJean2RuntimeComposition();
     processScope = composition.processScope;

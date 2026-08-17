@@ -29,7 +29,7 @@ import {
   getLLMTemperature,
   getLLMZhipuApiKey,
   getLLMZhipuCodingApiKey,
-} from '@/env';
+} from '@/infrastructure/runtime/environment';
 
 export const jean2RuntimeConfiguration: RuntimeConfiguration = {
   findModel,

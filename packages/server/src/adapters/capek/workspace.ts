@@ -1,7 +1,7 @@
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { getJean2EnvValue } from '@/env';
-import { getUploadDir } from '@/paths';
+import { getJean2EnvValue } from '@/infrastructure/runtime/environment';
+import { getUploadDir } from '@/infrastructure/runtime/paths';
 import {
   addWorkspaceAdditionalPath,
   removeWorkspaceAdditionalPath,

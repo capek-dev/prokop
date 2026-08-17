@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import { configureCapekJean2Compatibility } from '@/capek-adapter';
+import { createRuntime } from '@/bootstrap/create-runtime';
 import { buildStreamConfig } from '@capekai/core/internal/execution';
 
 describe('buildStreamConfig provider options', () => {
-  beforeEach(() => configureCapekJean2Compatibility());
+  beforeEach(() => createRuntime());
   test('preserves OpenAI connector defaults when merging a reasoning variant', () => {
     const result = buildStreamConfig({
       modelId: 'gpt-5.6-luna',

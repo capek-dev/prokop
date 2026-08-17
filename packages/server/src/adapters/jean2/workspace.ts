@@ -24,9 +24,9 @@ import {
   unpinMessage,
 } from '@/store/pinned-messages';
 import { deleteScheduledJobsByWorkspace } from '@/store/scheduled-jobs';
-import { getTerminalManager } from '@/services/terminal';
-import { shutdownWorkspace } from '@/mcp';
-import { getWorkspacesDir } from '@/paths';
+import { getTerminalManager } from '@/transport/terminal';
+import { shutdownWorkspace } from '@/infrastructure/mcp';
+import { getWorkspacesDir } from '@/infrastructure/runtime/paths';
 import { workspacePathPolicyPort } from '@/adapters/capek/workspace-paths';
 import type {
   WorkspaceCleanupPort,

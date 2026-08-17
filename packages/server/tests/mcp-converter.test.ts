@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { Tool as MCPTool } from '@modelcontextprotocol/sdk/types.js';
-import { convertMcpTool } from '@/mcp/converter';
+import { convertMcpTool } from '@/infrastructure/mcp/converter';
 
 const definition: MCPTool = {
   name: 'large-output',

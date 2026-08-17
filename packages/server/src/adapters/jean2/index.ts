@@ -34,3 +34,7 @@ export { createJean2TerminalSessionPort } from './terminal';
 export { createJean2OAuthFlowPort } from './oauth';
 export { createJean2ProviderCredentialPort } from './provider-credentials';
 export { getJean2NotificationsApplication } from './notifications';
+export { createJean2PermissionRepositoryPort } from './permissions';
+export { createJean2ConfigurationPorts } from './configuration';
+export { createJean2MaintenanceApplication } from './maintenance';
+export { createJean2ResponseFormatsApplication } from './response-formats';
