@@ -2,14 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
-import {
-  requestPermission,
-  resolvePermission,
-  rejectPermission,
-  rejectPermissionsBySession,
-  getPendingRequestsByRootSession,
-  hasPendingWaiter,
-} from '@capekai/core/compat/jean2';
+import { requestPermission, resolvePermission, rejectPermission, rejectPermissionsBySession, getPendingRequestsByRootSession, hasPendingWaiter } from '@capekai/core/internal/ask-authority';
 import { listPendingAsksBySession } from '@/store/pending-asks';
 import {
   getWorkspaceGrants,

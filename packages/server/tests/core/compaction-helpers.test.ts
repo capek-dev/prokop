@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import {
-  buildConversationText,
-  formatOutput,
-  estimateToolOutputSize,
-} from '@capekai/core/compat/jean2';
+import { buildConversationText, formatOutput, estimateToolOutputSize } from '@capekai/core/internal/execution';
 import type { MessageWithParts, ToolPart, TextPart } from '@jean2/sdk';
 
 // ---------------------------------------------------------------------------

@@ -2,10 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace, seedSession } from '#tests/seed';
-import {
-  requestPermission,
-  resolvePermission,
-} from '@capekai/core/compat/jean2';
+import { requestPermission, resolvePermission } from '@capekai/core/internal/ask-authority';
 import {
   getWorkspaceGrants,
 } from '@/store/permissions';

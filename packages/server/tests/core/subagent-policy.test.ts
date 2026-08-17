@@ -2,14 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { updateSession } from '@/store';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { seedSession, seedWorkspace } from '#tests/seed';
-import {
-  collectSubagentAncestry,
-  evaluateSubagentTarget,
-  getSubagentResumeError,
-  isSubagentSpawningDisabled,
-  isValidSubagentPreconfig,
-  isValidSubagentTargetPreconfig,
-} from '@capekai/core/compat/jean2';
+import { collectSubagentAncestry, evaluateSubagentTarget, getSubagentResumeError, isSubagentSpawningDisabled, isValidSubagentPreconfig, isValidSubagentTargetPreconfig } from '@capekai/core/internal/execution';
 
 function evaluate(options: {
   target: string;

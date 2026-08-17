@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
-import type { RuntimeDelivery, RuntimeEvent } from '@capekai/core/compat/jean2';
+import { type RuntimeDelivery, type RuntimeEvent } from '@capekai/core';
 import { jean2DeliveryBindings } from '@/adapters/capek/delivery';
 import { deliverCapekEvent } from '@/adapters/capek/events';
 import { createBunWebSocketAdapter } from '@/transport/websocket/bun-adapter';

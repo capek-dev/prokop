@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import type { Preconfig } from '@jean2/sdk';
 import { configureCapekJean2Compatibility } from '@/capek-adapter';
-import { buildSystemMessage } from '@capekai/core/compat/jean2';
+import { buildSystemMessage } from '@capekai/core/internal/execution';
 
 const preconfig: Preconfig = {
   id: 'self-delegating-agent-test',

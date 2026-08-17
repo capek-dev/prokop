@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { RuntimeEvent } from '@capekai/core/compat/jean2';
+import { type RuntimeEvent } from '@capekai/core';
 import type { ServerMessage } from '@jean2/sdk';
 import {
   createJean2RuntimeContext,
