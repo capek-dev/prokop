@@ -4,8 +4,7 @@
  * owns the types; `workspace/policy.ts` owns the scoped service and the
  * module-level containment runtime). Every prior export resolves to the
  * same identity, so `core/tool-builders/external-tools.ts`, `runtime/host.ts`,
- * and `compat/jean2.ts` keep working unchanged until C8 retires the compat
- * surface.
+ * and `internal/execution.ts` keep working unchanged.
  *
  * C6 step 6: capability construction is runtime code. The active provider
  * supplies only its frozen options (blocked paths, sensitive patterns,

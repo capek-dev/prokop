@@ -31,6 +31,8 @@ export { installTaskToolFallback } from '../plugins/subagent-domain';
 export { installWorkflowToolFallback } from '../plugins/workflow-domain';
 export { installMemoryToolFallback } from '../plugins/memory-domain';
 export { installSkillsToolFallback } from '../plugins/skills-domain';
+export { setDefaultContextAssembler } from '../context/assembler';
+export { fixedBuilderContextAssembler } from '../plugins/legacy-system-message';
 export { configureSessionSearchHost, getSessionSearchHost, type SessionSearchHost } from '../session-search/host';
 export { configureSchedulerHost, getSchedulerHost, type SchedulerHost } from '../scheduler/host';
 export { executeSchedulerTool } from '../scheduler/scheduler-tool';

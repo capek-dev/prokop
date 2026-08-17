@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { Ask, PermissionAsk, Session } from '@jean2/sdk';
-import {
-  setJean2CompatibilityBindings,
-  type Jean2CompatibilityBindings,
-  type PendingAskRecord,
-} from '../src/compat/bindings';
+import { configureRuntimeHost, type PendingAskRecord, type RuntimeHost } from '../src/runtime/host';
 import {
   createAskApi,
   getAuthorityForPendingAsk,
@@ -50,7 +46,7 @@ function permissionAsk(overrides: Partial<PermissionAsk> = {}): PermissionAsk {
 function bindInteraction(
   state: InteractionState,
   session?: Session,
-  matchGrant: Jean2CompatibilityBindings['interaction']['matchGrant'] = () => ({
+  matchGrant: RuntimeHost['interaction']['matchGrant'] = () => ({
     matched: false,
     grant: null,
   }),
@@ -126,8 +122,8 @@ function bindInteraction(
         state.notifications.push({ requestId, rootSessionId });
       },
     },
-  } as unknown as Jean2CompatibilityBindings;
-  setJean2CompatibilityBindings(bindings);
+  } as unknown as RuntimeHost;
+  configureRuntimeHost(bindings);
 }
 
 function state(): InteractionState {
