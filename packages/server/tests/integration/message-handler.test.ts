@@ -6,7 +6,7 @@ import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
 import { seedWorkspaceWithSession } from '#tests/seed';
 import { createMockBroadcast } from '#tests/mocks';
-import { registerBroadcastCallback } from '@/core/broadcast';
+import { installDeliveryPort, type DeliveryPort } from '@/core/broadcast';
 import {
   createSession,
   getSession,
@@ -83,7 +83,7 @@ mock.module('@/config', () => ({
   clearModelsCache: () => {},
 }));
 
-mock.module('@/env', () => ({
+mock.module('@/infrastructure/runtime/environment', () => ({
   getLLMOpenAIApiKey: () => 'test-key',
   getCompactionMaxTokens: () => 2000,
   getCompactionPreserveRecentToolCount: () => 3,
@@ -104,7 +104,14 @@ describe('Integration: WebSocket message handlers', () => {
   beforeEach(() => {
     setupTestDataDir();
     setupTestDatabase();
-    registerBroadcastCallback(broadcastMock.callback as (message: ServerMessage, excludeWs?: unknown) => void);
+    const deliveryPort: DeliveryPort = {
+      sendToConnection: (_connectionId, message) => broadcastMock.callback(message),
+      broadcast: (message) => broadcastMock.callback(message),
+      broadcastToSession: (_sessionId, message) => broadcastMock.callback(message),
+      sendToController: (_sessionId, message) => broadcastMock.callback(message),
+      sendToAskTargets: (_sessionId, _authority, message) => broadcastMock.callback(message),
+    };
+    installDeliveryPort(deliveryPort);
     broadcastMock.clear();
 
     const ctx = seedWorkspaceWithSession();
@@ -113,6 +120,7 @@ describe('Integration: WebSocket message handlers', () => {
   });
 
   afterEach(() => {
+    installDeliveryPort(null as never);
     resetTestDatabase();
     resetTestDataDir();
   });

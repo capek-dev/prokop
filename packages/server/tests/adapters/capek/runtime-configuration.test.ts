@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/internal/configuration';
 
-const realEnv = await import('@/env');
+const realEnv = await import('@/infrastructure/runtime/environment');
 
 const realGetLLMTemperature = realEnv.getLLMTemperature;
 const realGetLLMMaxSteps = realEnv.getLLMMaxSteps;
@@ -21,7 +21,7 @@ const realGetCompactionAutoSafetyMarginTokens = realEnv.getCompactionAutoSafetyM
 // File-scoped module mock. The API key getters return distinct controlled
 // values so provider mapping mistakes cannot hide behind equal values or the
 // developer's real environment configuration. All other env exports stay real.
-mock.module('@/env', () => ({
+mock.module('@/infrastructure/runtime/environment', () => ({
   ...realEnv,
   getLLMOpenAIApiKey: (): string | undefined => 'openai-key-1',
   getLLMOpenRouterApiKey: (): string | undefined => 'openrouter-key-2',

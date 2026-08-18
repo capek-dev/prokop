@@ -32,7 +32,9 @@ import {
   type ResponseFormatsApplication,
 } from '@/application';
 import {
+  configureJean2AgentSource,
   createJean2AskAuthorityPort,
+  configureJean2PreconfigSource,
   createJean2ProviderRegistryPort,
   createJean2SessionExecution,
   jean2StorageBundle,
@@ -77,8 +79,7 @@ export interface WiredApplication {
   control: SessionControlApplication<ConnectionId>;
   http: SessionHttpApplication;
   scheduling: SchedulingHttpApplication;
-  /** The wired tick loop; the server startup path installs it into the
-   * legacy `scheduler` entrypoint before calling `startScheduler()`. */
+  /** The wired scheduled-job tick loop owned by the application composition. */
   schedulerTicker: SchedulingTicker;
   /** The wired agent promotion, home, and memory use cases (S4). */
   agents: AgentsApplication;
@@ -111,11 +112,25 @@ export interface WiredApplication {
  * takeover configuration. The S4 scheduling slice adds the scheduled-job
  * HTTP use cases and the tick loop over the store-backed scheduled-job
  * repository adapter, the storage workspace lookup, and the current runner
- * execution adapter. Bootstrap installs this into the transport layer;
- * use cases never import store or Capek implementations themselves.
+ * execution adapter. The composed ticker is returned for direct startup and
+ * shutdown lifecycle calls; use cases never import store or Capek
+ * implementations themselves.
  */
-export function createWiredApplication(): WiredApplication {
-  const repository = createJean2SessionRepository();
+export function createWiredAgentsApplication(): AgentsApplication {
+  return createAgentsApplication({
+    dataDir: () => getDataDir(),
+    directory: createAgentDirectoryPort(),
+    workspaces: createJean2AgentWorkspacePort(),
+    preconfigs: createJean2AgentPreconfigPort(),
+  });
+}
+
+export function createWiredApplication(existingAgents?: AgentsApplication): WiredApplication {
+  const agents = existingAgents ?? createWiredAgentsApplication();
+  configureJean2PreconfigSource(agents);
+  configureJean2AgentSource(agents);
+
+  const repository = createJean2SessionRepository(agents);
   const execution = createJean2SessionExecution();
   const askAuthority = createJean2AskAuthorityPort();
   const pendingAsks = createJean2PendingAskPort();
@@ -151,13 +166,6 @@ export function createWiredApplication(): WiredApplication {
   const schedulerTicker = createSchedulingTicker({
     repository: schedulingRepository,
     execution: schedulingExecution,
-  });
-
-  const agents = createAgentsApplication({
-    dataDir: () => getDataDir(),
-    directory: createAgentDirectoryPort(),
-    workspaces: createJean2AgentWorkspacePort(),
-    preconfigs: createJean2AgentPreconfigPort(),
   });
 
   const workspaces = createWorkspaceApplication({

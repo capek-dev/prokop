@@ -1,6 +1,6 @@
 import { zValidator } from '@hono/zod-validator';
 import type { ZodSchema } from 'zod';
-import { BadRequestError } from '@/utils/http-errors';
+import { BadRequestError } from '@/application/http-errors';
 
 /**
  * Wraps zValidator with a custom hook that throws BadRequestError on validation failure.

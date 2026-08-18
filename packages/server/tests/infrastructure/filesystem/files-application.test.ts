@@ -4,7 +4,7 @@ import { homedir, tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { createFilesApplication } from '@/application/files';
 import { createJean2FilesApplicationPort } from '@/adapters/jean2/files';
-import { ConflictError } from '@/utils/http-errors';
+import { ConflictError } from '@/application/http-errors';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
 import { updateWorkspace } from '@/infrastructure/sqlite/workspaces';

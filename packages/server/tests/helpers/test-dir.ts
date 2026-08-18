@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { Paths, getModelsConfigPath } from '@/paths';
+import { Paths, getModelsConfigPath } from '@/infrastructure/runtime/paths';
 import { clearConfigCache, clearModelsCache } from '@/config';
 import defaultModelsJson from '@/config/models.json';
 

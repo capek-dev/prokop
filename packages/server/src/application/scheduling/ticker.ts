@@ -13,9 +13,7 @@ export interface SchedulingTickerDeps {
 /**
  * Scheduled-job tick loop. Owns the due-query cadence, the at-most-once
  * advance-before-execute ordering, and the failure bookkeeping (log plus
- * `markError`). The legacy `scheduler/index.ts` module installs this ticker
- * from bootstrap and keeps `startScheduler`/`stopScheduler` as the
- * compatibility entrypoints.
+ * `markError`). The composed application owns its start and stop lifecycle.
  */
 export interface SchedulingTicker {
   start(): void;

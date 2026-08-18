@@ -6,8 +6,7 @@ import {
   type InstructionSource,
   type PreconfigSource,
 } from '@capekai/core/internal/hosts';
-import { getAgentDirectory, getPreconfigOrAgent } from '@/agents/storage';
-import { readAgentMemoryFile } from '@/agents/memory';
+import type { AgentsApplication } from '@/application/agents';
 import {
   getDefaultPreconfig,
   getPreconfig,
@@ -19,25 +18,28 @@ import { getGlobalAgentsPath } from '@/infrastructure/runtime/paths';
 export const jean2PreconfigSource: PreconfigSource = {
   get: getPreconfig,
   getDefault: getDefaultPreconfig,
-  getForAgent: getPreconfigOrAgent,
+  getForAgent: async () => null,
   list: listPreconfigs,
   listSubagents: listSubagentPreconfigs,
 };
 
 export const jean2AgentSource: AgentSource = {
-  getDirectory: getAgentDirectory,
-  readMemoryFile: readAgentMemoryFile,
+  getDirectory: async () => null,
+  readMemoryFile: async () => null,
 };
 
 export const jean2InstructionSource: InstructionSource = {
   getGlobalPath: getGlobalAgentsPath,
 };
 
-export function configureJean2PreconfigSource(): void {
+export function configureJean2PreconfigSource(agents: AgentsApplication): void {
+  jean2PreconfigSource.getForAgent = (id) => agents.getPreconfigOrAgent(id);
   configurePreconfigSource(jean2PreconfigSource);
 }
 
-export function configureJean2AgentSource(): void {
+export function configureJean2AgentSource(agents: AgentsApplication): void {
+  jean2AgentSource.getDirectory = (id) => agents.getAgentDirectory(id);
+  jean2AgentSource.readMemoryFile = (id, filename) => agents.readAgentMemoryFile(id, filename);
   configureAgentSource(jean2AgentSource);
 }
 

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-import { getClientDir } from '@/paths';
+import { getClientDir } from '@/infrastructure/runtime/paths';
 import {
   createArborist,
   fetchPackageMetadata,

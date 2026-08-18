@@ -11,7 +11,7 @@ import { createFilePreview } from '@/infrastructure/filesystem/file-preview';
 
 const getFilePreview = createFilePreview(workspacePathPolicyPort);
 import { registerFileRoutes } from '@/routes/files';
-import { HttpError } from '@/utils/http-errors';
+import { HttpError } from '@/application/http-errors';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
 import type { WorkspacePathPolicyPort } from '@/application/ports/workspace-paths';

@@ -39,7 +39,7 @@ import {
   type Attachment,
 } from '@/infrastructure/sqlite/attachments';
 import { getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
-import { getPreconfigOrAgent, isAgentSync } from '@/agents/storage';
+import type { AgentsApplication } from '@/application/agents';
 import { markManualSessionTitle } from '@/infrastructure/session-title';
 import {
   cleanupAllPendingAsks,
@@ -135,7 +135,9 @@ function toCreateInput(input: SessionRecordCreateInput) {
  * exactly as before. No transaction wrapper is introduced because the
  * current implementation has none.
  */
-export function createJean2SessionRepository(): SessionRepositoryPort {
+export function createJean2SessionRepository(
+  agents: Pick<AgentsApplication, 'getPreconfigOrAgent' | 'isAgentSync'>,
+): SessionRepositoryPort {
   return {
     createSession(input: SessionRecordCreateInput): Session {
       return createSession(toCreateInput(input));
@@ -230,11 +232,11 @@ export function createJean2SessionRepository(): SessionRepositoryPort {
     },
 
     async getPreconfigOrAgent(id: string): Promise<Preconfig | null> {
-      return getPreconfigOrAgent(id);
+      return agents.getPreconfigOrAgent(id);
     },
 
     isAgentSync(id: string): boolean {
-      return isAgentSync(id);
+      return agents.isAgentSync(id);
     },
 
     toolOutput: {

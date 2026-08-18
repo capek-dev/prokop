@@ -13,7 +13,7 @@ import {
   NotFoundError,
   BadRequestError,
   PayloadTooLargeError,
-} from '@/utils/http-errors';
+} from '@/application/http-errors';
 import { FILE_PREVIEW_MAX_BYTES } from '@/infrastructure/filesystem/binary-detection';
 
 let workspaceDir: string;

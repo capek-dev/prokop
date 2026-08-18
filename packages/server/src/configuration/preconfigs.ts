@@ -5,7 +5,7 @@ import {
   createPreconfig,
   updatePreconfig,
   deletePreconfig,
-} from '@/core/preconfig';
+} from '@/infrastructure/configuration/preconfig';
 import {
   firstUnknownSubagentId,
   knownSubagentIds,

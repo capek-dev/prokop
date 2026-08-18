@@ -14,7 +14,7 @@ import { validate } from './validate';
 import { saveFileSchema } from './schemas';
 import type { SaveFileRequest } from '@jean2/sdk';
 
-import { BadRequestError, ForbiddenError, HttpError, NotFoundError } from '@/utils/http-errors';
+import { BadRequestError, ForbiddenError, HttpError, NotFoundError } from '@/application/http-errors';
 
 /** Maps the application/infrastructure plain errors and passes everything
  * else through, preserving the exact pre-slice status codes and messages.

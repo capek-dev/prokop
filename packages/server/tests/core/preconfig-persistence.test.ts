@@ -7,7 +7,7 @@ import {
   getPreconfigJsonPath,
   getPreconfigMdPath,
   updatePreconfig,
-} from '@/core/preconfig';
+} from '@/infrastructure/configuration/preconfig';
 import { resetTestDataDir, setupTestDataDir } from '#tests/test-dir';
 
 function createInput(id: string): Omit<Preconfig, 'id'> & { id: string } {
