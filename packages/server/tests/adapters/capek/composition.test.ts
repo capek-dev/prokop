@@ -31,6 +31,7 @@ import {
 } from '@capekai/core/internal/composition';
 import * as focused from '@/adapters/capek';
 import { configureJean2SessionSearchHost } from '@/adapters/capek/session-search';
+import { JEAN2_AGENT_PLUGIN_IDS, JEAN2_PROCESS_PLUGIN_IDS } from '@/adapters/capek/profile';
 import { createWiredApplication } from '@/bootstrap/application';
 import { createJean2RuntimeComposition, createRuntime } from '@/bootstrap/create-runtime';
 import { createMessage, createPart } from '@/infrastructure/sqlite/message-store';
@@ -231,6 +232,21 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
     expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);
     expect(getSchedulerHost()).toBe(focused.jean2SchedulerHost);
     expect(getToolSource()).toBe(focused.jean2ToolSource);
+  });
+
+  test('composition keeps the Jean2 plugin inventory pinned', async () => {
+    createRuntime();
+
+    const composition = await createJean2RuntimeComposition();
+    processScope = composition.processScope;
+    agentScope = composition.agentScope;
+
+    expect(processScope.snapshot().plugins.map((plugin) => plugin.id).sort()).toEqual(
+      [...JEAN2_PROCESS_PLUGIN_IDS].sort(),
+    );
+    expect(agentScope.snapshot().plugins.map((plugin) => plugin.id).sort()).toEqual(
+      [...JEAN2_AGENT_PLUGIN_IDS].sort(),
+    );
   });
 
   test('diagnostics list every Jean2 seam with correct key scopes and provider ownership', async () => {
