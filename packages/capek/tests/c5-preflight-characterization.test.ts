@@ -532,10 +532,10 @@ describe('C5 context contribution order and provenance', () => {
     const workspacePath = join(root, 'workspace');
     const globalPath = join(root, 'global.md');
     const agentDir = join(root, 'agent');
-    await mkdir(join(workspacePath, '.jean2'), { recursive: true });
+    await mkdir(join(workspacePath, '.capek'), { recursive: true });
     await writeFile(join(workspacePath, 'AGENTS.md'), 'PROJECT');
-    await writeFile(join(workspacePath, '.jean2', 'USER.md'), '- USER');
-    await writeFile(join(workspacePath, '.jean2', 'MEMORY.md'), '- MEMORY');
+    await writeFile(join(workspacePath, '.capek', 'USER.md'), '- USER');
+    await writeFile(join(workspacePath, '.capek', 'MEMORY.md'), '- MEMORY');
     await writeFile(globalPath, 'GLOBAL');
 
     configureStorage(createInMemoryStorageBundle({ workspaces: [enabledWorkspace(workspacePath)] }));

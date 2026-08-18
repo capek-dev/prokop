@@ -1,12 +1,24 @@
 import type { PermissionAsk, PermissionRiskLevel } from '@capekai/tool';
-import { addEntry, listEntries, removeEntry, replaceEntry, type MemoryActionResult, type MemoryTarget } from './registry';
+import {
+  addEntry,
+  listEntries,
+  removeEntry,
+  replaceEntry,
+  MEMORY_LINE_MEMORY_TARGET,
+  MEMORY_LINE_NO_SECRETS,
+  MEMORY_LINE_ONLY_COMPACT,
+  MEMORY_LINE_USE_LIST,
+  MEMORY_LINE_USER_TARGET,
+  type MemoryActionResult,
+  type MemoryTarget,
+} from './registry';
 
 export const memoryToolDefinition = {
   name: 'memory',
   description: `Persist durable workspace knowledge across sessions.
 
-Use target="user" for user preferences and communication/workflow expectations.
-Use target="memory" for workspace facts, repo conventions, commands, lessons, and non-obvious fixes.
+${MEMORY_LINE_USER_TARGET}
+${MEMORY_LINE_MEMORY_TARGET}
 
 Character limits: user=1500 chars, workspace=2500 chars. Keep entries compact.
 
@@ -16,9 +28,9 @@ Actions:
 - replace: Find an entry by oldText substring and replace it. Requires oldText and content.
 - remove: Find an entry by oldText substring and remove it. Requires oldText.
 
-Use list before replace/remove to see the exact current entries and avoid guesswork.
-Only save compact facts that should affect future sessions.
-Do not save secrets, raw logs, large code, or one-off details.`,
+${MEMORY_LINE_USE_LIST}
+${MEMORY_LINE_ONLY_COMPACT}
+${MEMORY_LINE_NO_SECRETS}`,
   inputSchema: {
     type: 'object' as const,
     properties: {

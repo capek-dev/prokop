@@ -172,7 +172,7 @@ describe('C5 memory and skills composed scope ownership', () => {
     configureStorage(decoyStorage);
 
     const workspacePath = join(await tempDir('scoped'), 'workspace');
-    await mkdir(join(workspacePath, '.jean2'), { recursive: true });
+    await mkdir(join(workspacePath, '.capek'), { recursive: true });
 
     try {
       const tools = await enterAgentScope(agentScope, () => buildAiSdkTools({
@@ -214,7 +214,7 @@ describe('C5 memory and skills composed scope ownership', () => {
 
   test('the workspace settings gates stay in the builders for the composed path', async () => {
     const workspacePath = join(await tempDir('gates'), 'workspace');
-    await mkdir(join(workspacePath, '.jean2'), { recursive: true });
+    await mkdir(join(workspacePath, '.capek'), { recursive: true });
     await mkdir(join(workspacePath, '.agents', 'skills'), { recursive: true });
     configureStorage(createInMemoryStorageBundle({ workspaces: [workspaceWith({ memory: false, skillsManage: false })] }));
 
@@ -336,7 +336,7 @@ describe('C5 memory and skills composed scope ownership', () => {
 
   test('the explicitly installed fallbacks keep the unscoped memory and skills tools byte-compatible', async () => {
     const workspacePath = join(await tempDir('fallback'), 'workspace');
-    await mkdir(join(workspacePath, '.jean2'), { recursive: true });
+    await mkdir(join(workspacePath, '.capek'), { recursive: true });
     const skillDir = join(workspacePath, '.agents', 'skills', 'demo');
     await mkdir(skillDir, { recursive: true });
     await writeFile(join(skillDir, 'SKILL.md'), '---\nname: demo\ndescription: Demo skill\n---\nbody\n');
@@ -384,7 +384,7 @@ describe('C5 memory and skills composed scope ownership', () => {
 
   test('the composed memory tool executes against the workspace path captured by the builder', async () => {
     const workspacePath = join(await tempDir('execute'), 'workspace');
-    await mkdir(join(workspacePath, '.jean2'), { recursive: true });
+    await mkdir(join(workspacePath, '.capek'), { recursive: true });
     configureStorage(createInMemoryStorageBundle({ workspaces: [workspaceWith({ memory: true, skillsManage: false })] }));
 
     const processScope = await createCurrentProcessScope();
@@ -406,7 +406,7 @@ describe('C5 memory and skills composed scope ownership', () => {
       );
       expect(result).toMatchObject({ title: 'Memory updated' });
       const { readFile } = await import('node:fs/promises');
-      const content = await readFile(join(workspacePath, '.jean2', 'MEMORY.md'), 'utf-8');
+      const content = await readFile(join(workspacePath, '.capek', 'MEMORY.md'), 'utf-8');
       expect(content).toContain('a workspace fact');
     } finally {
       await agentScope.dispose();

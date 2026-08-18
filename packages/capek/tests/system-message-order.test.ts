@@ -47,8 +47,8 @@ describe('ordered system context', () => {
       getDirectory: async () => '/agents/agent',
       readMemoryFile: async (_id, file) => file === 'USER.md' ? 'AGENT_USER' : 'AGENT_MEMORY',
     });
-    await mkdir(join(workspacePath, '.jean2'), { recursive: true });
-    await writeFile(join(workspacePath, '.jean2', 'MEMORY.md'), '- WORKSPACE_MEMORY');
+    await mkdir(join(workspacePath, '.capek'), { recursive: true });
+    await writeFile(join(workspacePath, '.capek', 'MEMORY.md'), '- WORKSPACE_MEMORY');
 
     const message = await buildSystemMessage({
       preconfig,

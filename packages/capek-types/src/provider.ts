@@ -10,6 +10,7 @@ export interface ProviderDescriptor {
   connectable: boolean;
   /** Whether this provider supplies LLM models ('llm') or is a data/action service ('service'). */
   kind?: 'llm' | 'service';
+  providerOptionsKey?: string;
 }
 
 export interface ProviderStatus {

@@ -1,4 +1,3 @@
-import { join } from 'path';
 import type { PermissionRiskLevel } from '@capekai/tool';
 import { serviceKey } from '../kernel/service-key';
 import type {
@@ -17,11 +16,11 @@ import type { ContextSources } from '../context/sources';
 import {
   executeMemoryTool,
   memoryToolDefinition,
-  MEMORY_GUIDANCE,
   loadMemoryInstructions,
 } from '../memory';
 import type { StorageBundle } from '../storage/contracts';
-import { AGENT_MEMORY_SKILLS_GUIDANCE } from './legacy-system-message';
+import { getHostGuidance } from '../runtime/host-guidance';
+import { getHostLayout } from '../runtime/host-layout';
 import { capekContextSourcesKey, capekStorageKey } from './service-keys';
 
 /**
@@ -60,7 +59,7 @@ export function createMemoryToolPayload(): DomainToolPayload {
       const risk = (context.permissionRisk ?? 'none') as PermissionRiskLevel;
       const result = await executeMemoryTool(
         input,
-        join(workspacePath, '.jean2'),
+        getHostLayout().workspaceMemoryDir(workspacePath),
         risk,
         context.ask,
       );
@@ -177,7 +176,7 @@ function workspaceMemorySections(storage: StorageBundle): readonly MemorySection
         if (!data.workspaceId) return null;
         const workspace = storage.workspaces.get(data.workspaceId);
         if (!workspace?.settings?.memory?.enabled || !data.workspacePath) return null;
-        return loadMemoryInstructions(join(data.workspacePath, '.jean2'));
+        return loadMemoryInstructions(getHostLayout().workspaceMemoryDir(data.workspacePath));
       },
     },
     {
@@ -188,7 +187,7 @@ function workspaceMemorySections(storage: StorageBundle): readonly MemorySection
         const data = validateContextAssemblyData(build.data);
         if (!data.workspaceId) return null;
         const workspace = storage.workspaces.get(data.workspaceId);
-        return workspace?.settings?.memory?.enabled && data.workspacePath ? MEMORY_GUIDANCE : null;
+        return workspace?.settings?.memory?.enabled && data.workspacePath ? getHostGuidance().memory : null;
       },
     },
   ];
@@ -227,7 +226,7 @@ export function memoryDomainPlugin(id: string): CapekPlugin<unknown> {
           requiredCapabilities: [capekMemoryDomainKey],
         });
       }
-      for (const section of agentMemorySections(sources, AGENT_MEMORY_SKILLS_GUIDANCE)) {
+      for (const section of agentMemorySections(sources, getHostGuidance().agentMemorySkills)) {
         context.contributeContext(section);
       }
       for (const section of workspaceMemorySections(storage)) {

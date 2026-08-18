@@ -1,7 +1,5 @@
 import type { Preconfig } from '@capekai/types';
-import { SESSION_SEARCH_GUIDANCE } from '../session-search';
-import { loadMemoryInstructions, MEMORY_GUIDANCE } from '../memory';
-import { SKILL_MANAGE_GUIDANCE } from '../skills';
+import { loadMemoryInstructions } from '../memory';
 import { selfDelegationGuidance } from '../subagent/guidance';
 import {
   buildWorkspaceSystemPrompt,
@@ -11,7 +9,8 @@ import {
   readAgentMemoryFile,
 } from '../context';
 import { getWorkspace } from '../storage/runtime';
-import { join } from 'path';
+import { getHostGuidance } from '../runtime/host-guidance';
+import { getHostLayout } from '../runtime/host-layout';
 import {
   validateContextAssemblyData,
   type ContextAssembler,
@@ -59,7 +58,7 @@ export const legacySessionSearchGuidanceSection: ContextSectionContribution<Cont
     const data = validateContextAssemblyData(context.data);
     if (!data.workspaceId) return null;
     return getWorkspace(data.workspaceId)?.settings?.sessionSearch?.enabled
-      ? SESSION_SEARCH_GUIDANCE
+      ? getHostGuidance().sessionSearch
       : null;
   },
 };
@@ -109,7 +108,7 @@ export async function buildSystemMessage(options: SystemMessageOptions): Promise
       systemMessage = `<agent_memory>\n${agentMemory}\n</agent_memory>\n\n` + systemMessage;
     }
 
-    systemMessage = systemMessage + '\n\n' + AGENT_MEMORY_SKILLS_GUIDANCE;
+    systemMessage = systemMessage + '\n\n' + getHostGuidance().agentMemorySkills;
   }
 
   if (options.selfDelegationAvailable) {
@@ -133,19 +132,19 @@ export async function buildSystemMessage(options: SystemMessageOptions): Promise
   if (workspaceId) {
     const workspace = getWorkspace(workspaceId);
     if (workspace?.settings?.memory?.enabled && workspacePath) {
-      const memorySection = await loadMemoryInstructions(join(workspacePath, '.jean2'));
+      const memorySection = await loadMemoryInstructions(getHostLayout().workspaceMemoryDir(workspacePath));
       if (memorySection) {
         systemMessage = systemMessage + '\n\n' + memorySection;
       }
-      systemMessage = systemMessage + '\n\n' + MEMORY_GUIDANCE;
+      systemMessage = systemMessage + '\n\n' + getHostGuidance().memory;
     }
 
     if (workspace?.settings?.skills?.managementEnabled) {
-      systemMessage = systemMessage + '\n\n' + SKILL_MANAGE_GUIDANCE;
+      systemMessage = systemMessage + '\n\n' + getHostGuidance().skillManage;
     }
 
     if (workspace?.settings?.sessionSearch?.enabled) {
-      systemMessage = systemMessage + '\n\n' + SESSION_SEARCH_GUIDANCE;
+      systemMessage = systemMessage + '\n\n' + getHostGuidance().sessionSearch;
     }
   }
 

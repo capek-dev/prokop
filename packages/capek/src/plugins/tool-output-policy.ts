@@ -1,5 +1,4 @@
-import os from 'node:os';
-import path from 'node:path';
+import { getHostLayout } from '../runtime/host-layout';
 import type { CapekPlugin, PluginContext } from '../kernel/types';
 import {
   createToolOutputService,
@@ -20,7 +19,7 @@ import { capekToolOutputPolicyKey } from './service-keys';
  * validation and session-scoped retrieval invariants stay in the storage
  * layer.
  */
-export function toolOutputPolicyPlugin(id: string): CapekPlugin<unknown> {
+export function toolOutputPolicyPlugin(id: string, tempRoot?: string): CapekPlugin<unknown> {
   return {
     id,
     scope: 'agent',
@@ -32,7 +31,7 @@ export function toolOutputPolicyPlugin(id: string): CapekPlugin<unknown> {
         retrievalToolName: 'retrieve-tool-output',
         truncationMaxChars: 50_000,
         truncationPreviewChars: 10_000,
-        truncationTempDir: path.join(os.tmpdir(), 'jean2'),
+        truncationTempDir: tempRoot ?? getHostLayout().toolOutputTempRoot(),
       };
       context.provide(
         capekToolOutputPolicyKey,

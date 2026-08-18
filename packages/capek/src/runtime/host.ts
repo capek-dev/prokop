@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type { HostLayout } from './host-layout';
 import type { Ask } from '@capekai/tool';
 import type {
   AskRequestMessage, AskTimedOutMessage, AutoApproveSeverity, MessageWithParts, Session,
@@ -100,6 +101,14 @@ export interface RuntimeHost {
   titles: TitleHost;
   workspace: WorkspaceCapabilityBindings;
   sandbox: SandboxBindings;
+  /** Host-supplied filesystem layout policy. */
+  layout?: HostLayout;
+  guidance?: {
+    memory?: string;
+    agentMemorySkills?: string;
+    skillManage?: string;
+    sessionSearch?: string;
+  };
 }
 
 let host: RuntimeHost | null = null;
