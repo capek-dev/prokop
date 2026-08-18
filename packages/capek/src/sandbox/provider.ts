@@ -1,5 +1,5 @@
 import type { LanguageModel } from 'ai';
-import type { ProviderDescriptor, ProviderStatus } from '@jean2/sdk';
+import type { ProviderDescriptor, ProviderStatus } from '@capekai/types';
 import type {
   ConnectableProvider,
   ModelFactoryOptions,

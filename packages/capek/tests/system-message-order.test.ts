@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
-import type { Preconfig } from '@jean2/sdk';
+import type { Preconfig } from '@capekai/types';
 import {
   configureAgentSource,
   configureInstructionSource,

@@ -1,7 +1,7 @@
 import { existsSync } from 'fs';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
-import type { SkillInfo } from '@jean2/sdk';
+import type { SkillInfo } from '@capekai/types';
 
 function parseFrontmatter(raw: string): { frontmatter: Record<string, unknown>; content: string } {
   const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);

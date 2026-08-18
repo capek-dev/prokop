@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
-import type { ToolDefinition, WorkflowInput, WorkflowResult, WorkflowSubtask } from '@jean2/sdk';
+import type { ToolDefinition } from '@capekai/tool';
+import type { WorkflowInput, WorkflowResult, WorkflowSubtask } from '@capekai/types';
 import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
 import { getSession } from '../storage/runtime';
 import { listSubagentPreconfigs } from '../context';
@@ -102,7 +103,7 @@ export interface WorkflowExecutionOptions {
 /** Injected dependencies captured by the workflow domain plugin. */
 export interface WorkflowServiceDeps {
   canSpawn(sessionId: string): boolean;
-  listSubagents(): Promise<import('@jean2/sdk').Preconfig[]>;
+  listSubagents(): Promise<import('@capekai/types').Preconfig[]>;
   executeLeaf(input: SubagentInput): Promise<SubagentOutput>;
   orchestrator: { run(options: OrchestratorSessionOptions): Promise<OrchestratorSessionResult> };
 }
@@ -416,7 +417,7 @@ export async function getWorkflowToolDefinition(
 /** Composed definition resolution over injected lookups. */
 export async function resolveWorkflowToolDefinitionWithDeps(
   options: GetWorkflowToolDefinitionOptions,
-  deps: { getSession: (id: string) => import('@jean2/sdk').Session | null; listPreconfigs: () => Promise<import('@jean2/sdk').Preconfig[]> },
+  deps: { getSession: (id: string) => import('@capekai/types').Session | null; listPreconfigs: () => Promise<import('@capekai/types').Preconfig[]> },
 ): Promise<WorkflowToolDefinition | null> {
   const subagents = await resolveEffectiveSubagentTargets({
     sessionId: options.sessionId,
@@ -433,7 +434,7 @@ export async function resolveWorkflowToolDefinitionWithDeps(
 /** Pure assembly of the workflow tool definition from a resolved target
  * list. Moved byte-for-byte from the pre-C5 `getWorkflowToolDefinition`
  * assembly. */
-export function buildWorkflowToolDefinition(subagents: import('@jean2/sdk').Preconfig[]): WorkflowToolDefinition {
+export function buildWorkflowToolDefinition(subagents: import('@capekai/types').Preconfig[]): WorkflowToolDefinition {
   const allowedSubagentIds = subagents.map((subagent) => subagent.id);
   const subagentList = allowedSubagentIds.join(', ');
 

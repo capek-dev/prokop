@@ -1,4 +1,4 @@
-import type { Session } from '@jean2/sdk';
+import type { Session } from '@capekai/types';
 import { getRuntimeHost } from './host';
 import type { RuntimeAudience, RuntimeDelivery, RuntimeEvent } from './events';
 

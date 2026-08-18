@@ -1,5 +1,5 @@
 import type { Tool } from 'ai';
-import type { ToolDefinition } from '@jean2/sdk';
+import type { ToolDefinition } from '@capekai/tool';
 import { dirname } from 'path';
 import { pathToFileURL } from 'url';
 import { formatSkillsList, getAvailableSkills, getSkill } from './registry';

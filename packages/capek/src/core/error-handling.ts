@@ -1,4 +1,4 @@
-import type { AuthErrorMessage, ContextOverflowErrorMessage, InvalidRequestErrorMessage, ErrorMessage } from '@jean2/sdk';
+import type { AuthErrorMessage, ContextOverflowErrorMessage, InvalidRequestErrorMessage, ErrorMessage } from '@capekai/types';
 import { ApiErrorType, ERROR_AUTH, ERROR_INVALID_REQUEST, ERROR_CHAT_FAILED } from '../utils/errors';
 import type { ClassifiedError } from '../utils/errors';
 

@@ -13,6 +13,7 @@ import {
 
 const repositoryRoot = resolve(import.meta.dir, '../../..');
 const packageSourceRoot = resolve(repositoryRoot, 'packages/capek/src');
+const capekaiPackagePrefix = '@capekai/';
 
 function dir(name: string): string {
   return resolve(packageSourceRoot, name);
@@ -322,7 +323,7 @@ const c0Rules: DependencyRule[] = [
     forbiddenSpecifiers: [
       { prefix: '@ai-sdk/' },
       { exact: 'ai' },
-      { prefix: '@jean2/' },
+      { prefix: capekaiPackagePrefix },
       { exact: 'hono' },
       { prefix: 'bun:' },
       { prefix: 'node:' },
@@ -499,7 +500,7 @@ describe('C0 internal dependency boundaries', () => {
           "import { createAgent } from '../facade/create-agent';",
           "import { aliased } from '@/facade/other';",
           "import { generateText } from 'ai';",
-          "import { session } from '@jean2/sdk';",
+          "import { session } from '@capekai/types';",
           "import { Database } from 'bun:sqlite';",
           "import { readFile } from 'node:fs';",
           "const cap = require('@capekai/core');",
@@ -519,7 +520,7 @@ describe('C0 internal dependency boundaries', () => {
       'packages/capek/src/kernel/impure.ts imports ../facade/create-agent (value) [rule: kernel-purity]',
       'packages/capek/src/kernel/impure.ts imports @/facade/other (value) [rule: kernel-purity]',
       'packages/capek/src/kernel/impure.ts imports ai (value) [rule: kernel-purity]',
-      'packages/capek/src/kernel/impure.ts imports @jean2/sdk (value) [rule: kernel-purity]',
+      'packages/capek/src/kernel/impure.ts imports @capekai/types (value) [rule: kernel-purity]',
       'packages/capek/src/kernel/impure.ts imports bun:sqlite (value) [rule: kernel-purity]',
       'packages/capek/src/kernel/impure.ts imports node:fs (value) [rule: kernel-purity]',
       'packages/capek/src/kernel/impure.ts imports @capekai/core (require) [rule: kernel-purity]',
@@ -760,7 +761,7 @@ describe('C0 internal dependency boundaries', () => {
           "import { createAgent } from '@/facade/create-agent';",
           "import { z } from 'zod';",
           "const cap = require('@capekai/core');",
-          "const dyn = await import('@jean2/sdk');",
+          "const dyn = await import('@capekai/types');",
           "import { generateText } from 'ai';",
           "import { Database } from 'bun:sqlite';",
           "import { readFile } from 'node:fs';",
@@ -777,7 +778,7 @@ describe('C0 internal dependency boundaries', () => {
       'packages/capek/src/kernel/impure.ts imports @/facade/create-agent (value) [rule: kernel-strict-self-containment]',
       'packages/capek/src/kernel/impure.ts imports zod (value) [rule: kernel-strict-self-containment]',
       'packages/capek/src/kernel/impure.ts imports @capekai/core (require) [rule: kernel-strict-self-containment]',
-      'packages/capek/src/kernel/impure.ts imports @jean2/sdk (dynamic) [rule: kernel-strict-self-containment]',
+      'packages/capek/src/kernel/impure.ts imports @capekai/types (dynamic) [rule: kernel-strict-self-containment]',
       'packages/capek/src/kernel/impure.ts imports ai (value) [rule: kernel-strict-self-containment]',
       'packages/capek/src/kernel/impure.ts imports bun:sqlite (value) [rule: kernel-strict-self-containment]',
       'packages/capek/src/kernel/impure.ts imports node:fs (value) [rule: kernel-strict-self-containment]',

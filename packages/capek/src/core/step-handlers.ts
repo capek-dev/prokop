@@ -1,4 +1,4 @@
-import type { MessageEvent, StepPart } from '@jean2/sdk';
+import type { MessageEvent, StepPart } from '@capekai/types';
 import { createPart, updatePart } from '../storage/runtime';
 import { createStepPart } from './part-utils';
 import { randomUUID } from 'crypto';

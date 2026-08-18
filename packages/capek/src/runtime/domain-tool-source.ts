@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { Ask } from '@jean2/sdk';
+import type { Ask } from '@capekai/tool';
 
 /**
  * Internal contributed-domain-tool payload context (C5).

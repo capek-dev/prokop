@@ -1,4 +1,4 @@
-import type { Session } from '@jean2/sdk';
+import type { Session } from '@capekai/types';
 import { getSession } from '../storage/runtime';
 
 export type ToolExecutionScope = 'subsession' | 'scheduled';

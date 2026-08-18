@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Message, MessageWithParts, Part, Session, ToolPart } from '@jean2/sdk';
+import type { Message, MessageWithParts, Part, Session, ToolPart } from '@capekai/types';
 import type {
   ClosableStore,
   ConversationStore,

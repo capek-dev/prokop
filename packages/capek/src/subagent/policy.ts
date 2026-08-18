@@ -1,4 +1,4 @@
-import type { Preconfig, Session } from '@jean2/sdk';
+import type { Preconfig, Session } from '@capekai/types';
 import { listPreconfigs as runtimeListPreconfigs } from '../context';
 import { getSession as runtimeGetSession } from '../storage/runtime';
 

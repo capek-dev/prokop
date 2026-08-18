@@ -1,4 +1,4 @@
-import type { PermissionRiskLevel } from '@jean2/sdk';
+import type { PermissionRiskLevel } from '@capekai/tool';
 import {
   validateContextAssemblyData,
   type ContextAssemblyData,

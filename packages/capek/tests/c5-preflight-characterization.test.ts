@@ -16,7 +16,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { jsonSchema, tool } from 'ai';
-import type { Preconfig, Session, Workspace } from '@jean2/sdk';
+import type { Preconfig, Session, Workspace } from '@capekai/types';
 import { minimalAgentBundle } from '../src/bundles/minimal-agent';
 import { configureRuntimeConfiguration } from '../src/configuration/runtime';
 import { buildAiSdkTools, type BuildToolsOptions } from '../src/core/build-tools';

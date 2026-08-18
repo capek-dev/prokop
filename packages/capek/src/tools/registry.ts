@@ -3,7 +3,8 @@ import { readdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { watch } from 'fs';
 import { basename, dirname, join, resolve, relative } from 'path';
-import type { ToolDefinition, LoadedTool } from '@jean2/sdk';
+import type { ToolDefinition } from '@capekai/tool'
+import { LoadedTool } from '@capekai/tool';
 import { readInstallManifest } from './install-manifest';
 
 export interface ToolRegistryResolver {

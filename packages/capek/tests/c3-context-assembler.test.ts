@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Preconfig, Workspace } from '@jean2/sdk';
+import type { Preconfig, Workspace } from '@capekai/types';
 import { createDefaultRuntimeConfiguration } from '../src/configuration/defaults';
 import { configureRuntimeConfiguration } from '../src/configuration/runtime';
 import {

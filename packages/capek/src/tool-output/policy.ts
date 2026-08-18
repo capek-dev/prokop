@@ -20,7 +20,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { jsonSchema, tool, type Tool as AiTool } from 'ai';
-import type { LoadedTool, ToolContext, ToolDefinition, ToolResult } from '@jean2/sdk';
+import type { LoadedTool } from '@capekai/tool'
+import { ToolContext, ToolDefinition, ToolResult } from '@capekai/tool';
 import {
   createToolOutputArtifact,
   getToolOutputArtifactPage,

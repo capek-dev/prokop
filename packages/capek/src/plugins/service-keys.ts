@@ -12,8 +12,8 @@
  */
 
 import { serviceKey } from '../kernel/service-key';
-import type { ProviderStatus } from '@jean2/sdk';
-import type { LoadedTool, ToolDefinition } from '@jean2/sdk';
+import type { ProviderStatus } from '@capekai/types';
+import type { LoadedTool, ToolDefinition } from '@capekai/tool';
 import type { RuntimeConfiguration } from '../configuration/contracts';
 import type { ContextSources } from '../context/sources';
 import type { ContextAssembler } from '../context/assembler';

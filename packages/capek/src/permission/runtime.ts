@@ -16,11 +16,9 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
-import type {
-  Ask,
-  AskApi,
-  AskAuthority,
-} from '@jean2/sdk';
+import type { Ask } from '@capekai/tool';
+import type { AskAuthority } from '@capekai/types';
+import type { AskApi } from '@capekai/tool';
 import { getRuntimeHost } from '../runtime/host';
 import type { PendingAskRecord } from '../runtime/host';
 import type {
@@ -350,7 +348,7 @@ export function createPermissionRuntimeService(
     const provider = activeProvider();
 
     if (isPermissionAsk && workspaceId) {
-      const permAsk = ask as import('@jean2/sdk').PermissionAsk;
+      const permAsk = ask as import('@capekai/tool').PermissionAsk;
       const effectiveRootSessionId = rootSessionId ?? sessionId;
 
       if (permAsk.intents && permAsk.intents.length > 0) {

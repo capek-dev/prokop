@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type {
-  AssistantMessage,
-  CompactionPart,
-  ToolPart,
-} from '@jean2/sdk';
+  AssistantMessage, CompactionPart, ToolPart } from '@capekai/types';
 import {
   createCompactionService,
   getCompactionService,

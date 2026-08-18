@@ -1,13 +1,4 @@
-import type {
-  Message,
-  MessageWithParts,
-  Part,
-  QueuedMessage,
-  ResponseFormat,
-  Session,
-  ToolPart,
-  Workspace,
-} from '@jean2/sdk';
+import type { Message, MessageWithParts, Part, QueuedMessage, ResponseFormat, Session, ToolPart, Workspace } from '@capekai/types';
 import { createInMemoryToolOutputArtifactStore } from './tool-output-artifacts';
 import type {
   AttachmentRecord,

@@ -1,4 +1,5 @@
-import type { ToolDefinition, TextPart, Session, ResponseFormat, Preconfig } from '@jean2/sdk';
+import type { ToolDefinition } from '@capekai/tool'
+import type { TextPart, Session, ResponseFormat, Preconfig } from '@capekai/types';
 import {
   broadcastEvent,
   broadcastSessionCreated,

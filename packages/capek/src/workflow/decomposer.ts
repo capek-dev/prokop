@@ -1,5 +1,5 @@
 import { listSubagentPreconfigs } from '../context';
-import type { WorkflowSubtask, Preconfig } from '@jean2/sdk';
+import type { WorkflowSubtask, Preconfig } from '@capekai/types';
 import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
 import {
   runOrchestratorSession,

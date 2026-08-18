@@ -1,7 +1,7 @@
 import { Output, jsonSchema } from 'ai';
 import { findModel, findModelVariant, getLLMTemperature, getLLMMaxSteps } from '../../configuration/runtime';
 import { buildSchemaPromptInstruction } from '../structured-output';
-import type { ResponseFormat } from '@jean2/sdk';
+import type { ResponseFormat } from '@capekai/types';
 
 export interface StreamConfigResult {
   providerOptions: Record<string, Record<string, unknown>> | undefined;

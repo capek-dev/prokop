@@ -1,5 +1,5 @@
 import { streamText, stepCountIs } from 'ai';
-import type { MessageWithParts, ToolPart, StepPart, Preconfig, MessageEvent, AssistantMessage, ResponseFormat } from '@jean2/sdk';
+import type { MessageWithParts, ToolPart, StepPart, Preconfig, MessageEvent, AssistantMessage, ResponseFormat } from '@capekai/types';
 import { createMessage, updateMessage, getSession, updateSession, transitionToolToInterrupted, syncMessageFts } from '../storage/runtime';
 
 import { findModel, getMaxOutputTokens } from '../configuration/runtime';

@@ -1,4 +1,6 @@
-import type { PermissionAsk, PermissionRiskLevel, Session } from '@jean2/sdk';
+import type { PermissionAsk } from '@capekai/tool'
+import type { PermissionRiskLevel } from '@capekai/tool'
+import type { Session } from '@capekai/types';
 import { getSessionSearchHost, type SessionSearchHost } from './host';
 
 export const sessionSearchToolDefinition = {

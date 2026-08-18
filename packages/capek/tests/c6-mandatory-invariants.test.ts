@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import type { PermissionAsk, ToolContext } from '@jean2/sdk';
+import type { PermissionAsk } from '@capekai/tool';
+import { ToolContext } from '@capekai/tool';
 import {
   createRetryPolicy,
   withRetryPolicy,
@@ -356,7 +357,7 @@ describe('C6 mandatory invariants below configurable policy', () => {
       },
       resolveAskAuthority: () => ({ visibilityScope: 'controller_only', resolutionMode: 'controller_only' }),
       extractResolutionValue: (response) => response,
-      isValidPermissionResponse: (response: unknown): response is import('@jean2/sdk').AskPermissionResponse => true,
+      isValidPermissionResponse: (response: unknown): response is import('@capekai/tool').AskPermissionResponse => true,
       isPermissionApproved: () => true,
       isRiskAtOrBelow: () => true,
       shouldAutoApprove: () => false,
@@ -411,7 +412,7 @@ describe('C6 mandatory invariants below configurable policy', () => {
       },
       resolveAskAuthority: () => ({ visibilityScope: 'controller_only', resolutionMode: 'controller_only' }),
       extractResolutionValue: (response) => response,
-      isValidPermissionResponse: (response: unknown): response is import('@jean2/sdk').AskPermissionResponse => true,
+      isValidPermissionResponse: (response: unknown): response is import('@capekai/tool').AskPermissionResponse => true,
       isPermissionApproved: () => true,
       isRiskAtOrBelow: () => true,
       shouldAutoApprove: () => false,

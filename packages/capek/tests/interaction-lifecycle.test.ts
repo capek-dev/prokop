@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import type { Ask, PermissionAsk, Session } from '@jean2/sdk';
+import type { Ask } from '@capekai/tool';
+import type { Session } from '@capekai/types';
+import type { PermissionAsk } from '@capekai/tool';
 import { configureRuntimeHost, type PendingAskRecord, type RuntimeHost } from '../src/runtime/host';
 import {
   createAskApi,

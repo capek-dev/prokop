@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { MessageWithParts, Part, TextPart, Preconfig, UserMessage, ResponseFormat, StructuredOutputData } from '@jean2/sdk';
+import type { MessageWithParts, Part, TextPart, Preconfig, UserMessage, ResponseFormat, StructuredOutputData } from '@capekai/types';
 import {
   broadcastEvent,
   notifyTerminalMessage,

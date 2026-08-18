@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import type { ScheduledJob, Session, Workspace } from '@jean2/sdk';
+import type { ScheduledJob, Session, Workspace } from '@capekai/types';
 import {
   configureSessionSearchHost,
   executeSessionSearchTool,

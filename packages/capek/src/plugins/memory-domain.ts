@@ -1,5 +1,5 @@
 import { join } from 'path';
-import type { PermissionRiskLevel } from '@jean2/sdk';
+import type { PermissionRiskLevel } from '@capekai/tool';
 import { serviceKey } from '../kernel/service-key';
 import type {
   CapekPlugin,

@@ -1,4 +1,4 @@
-import type { InterruptReason, SessionInterruptResult } from '@jean2/sdk';
+import type { InterruptReason, SessionInterruptResult } from '@capekai/types';
 import { isSandboxActive } from '../runtime/host-dependencies';
 import { getSandboxController } from '../sandbox/controller';
 import { getChildSessions, getSession, updateSession } from '../storage/runtime';

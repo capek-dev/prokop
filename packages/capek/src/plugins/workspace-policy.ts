@@ -1,6 +1,6 @@
 import type { CapekPlugin, PluginContext } from '../kernel/types';
 import { homedir } from 'os';
-import { SENSITIVE_FILE_PATTERNS } from '@jean2/sdk';
+import { SENSITIVE_FILE_PATTERNS } from '@capekai/types';
 import {
   BLOCKED_PATHS,
   createWorkspaceService,

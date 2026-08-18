@@ -1,4 +1,4 @@
-import type { Session, Workspace } from '@jean2/sdk';
+import type { Session, Workspace } from '@capekai/types';
 
 export interface SearchMessageResult {
   messageId: string;

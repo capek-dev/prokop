@@ -14,7 +14,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import type { AssistantMessage, GoalState, Session, TextPart } from '@jean2/sdk';
+import type { AssistantMessage, GoalState, Session, TextPart } from '@capekai/types';
 import { configureRuntimeConfiguration } from '../src/configuration/runtime';
 import {
   createCurrentAgentScope,

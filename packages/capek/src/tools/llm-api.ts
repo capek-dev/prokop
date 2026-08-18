@@ -1,7 +1,8 @@
 import { streamText, streamObject } from 'ai';
 import { jsonSchema } from 'ai';
 import type { ModelMessage } from 'ai';
-import type { LlmApi, LlmTextOptions, LlmStructuredOptions, LlmImage } from '@jean2/sdk';
+import type { LlmApi } from '@capekai/tool'
+import { LlmTextOptions, LlmStructuredOptions, LlmImage } from '@capekai/tool';
 import { getModelWithMetadata } from '../core/model-utils';
 
 export function createLlmApi(defaultModelId?: string, defaultProviderId?: string, sessionId?: string): LlmApi {

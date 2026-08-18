@@ -15,7 +15,7 @@
  * semantics are preserved by identity. No tool implementation changed.
  */
 
-import type { LoadedTool } from '@jean2/sdk';
+import type { LoadedTool } from '@capekai/tool';
 import { serviceKey } from '../kernel/service-key';
 import type {
   CapekPlugin,

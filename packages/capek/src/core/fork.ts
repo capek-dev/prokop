@@ -1,4 +1,4 @@
-import type { Message, MessageWithParts, Part, Session } from '@jean2/sdk';
+import type { Message, MessageWithParts, Part, Session } from '@capekai/types';
 import {
   createMessage,
   createPart,

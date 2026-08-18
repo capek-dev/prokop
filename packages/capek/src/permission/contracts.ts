@@ -21,16 +21,9 @@
  * `InteractionHost` installed by the compatibility bindings.
  */
 
-import type {
-  Ask,
-  AskApi,
-  AskAuthority,
-  AskPermissionResponse,
-  AskRequestMessage,
-  AskTimedOutMessage,
-  ClientCapability,
-  PermissionRiskLevel,
-} from '@jean2/sdk';
+import type { Ask, AskApi, AskPermissionResponse } from '@capekai/tool';
+import type { PermissionRiskLevel } from '@capekai/tool';
+import type { AskAuthority, AskRequestMessage, AskTimedOutMessage, ClientCapability } from '@capekai/types';
 import type { PendingAskRecord } from '../runtime/host';
 
 /** Provider options translated at composition. The generic ask timeout has

@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import type { ToolContext } from '@jean2/sdk';
+import type { ToolContext } from '@capekai/tool';
 import { createInMemoryStorageBundle, withStorage } from '@capekai/core/storage';
 import { codingAgentBundle, CODING_AGENT_BUNDLE_PLUGIN_IDS } from '../src/bundles/coding-agent';
 import { minimalAgentBundle } from '../src/bundles/minimal-agent';

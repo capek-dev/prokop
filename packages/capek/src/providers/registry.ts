@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { ProviderStatus } from '@jean2/sdk';
+import type { ProviderStatus } from '@capekai/types';
 import type {
   ConnectableProvider,
   ConnectOptions,

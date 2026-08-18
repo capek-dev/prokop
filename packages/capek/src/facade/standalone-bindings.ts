@@ -1,9 +1,7 @@
 import { join } from 'node:path';
 import type {
-  AutoApproveSeverity,
-  PermissionGrant,
-  ServerMessage,
-} from '@jean2/sdk';
+  AutoApproveSeverity, ServerMessage } from '@capekai/types'
+import { PermissionGrant } from '@capekai/tool';
 import type {
   PendingAskRecord,
   RuntimeHost,

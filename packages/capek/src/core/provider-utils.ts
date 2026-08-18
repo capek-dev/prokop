@@ -1,8 +1,5 @@
-import {
-  findModel,
-  getModelsConfig,
-} from '../configuration/runtime';
-import type { Session, Preconfig } from '@jean2/sdk';
+import { findModel, getModelsConfig, } from '../configuration/runtime';
+import type { Session, Preconfig } from '@capekai/types';
 
 export type Provider = 'openai' | 'openrouter' | 'minimax' | 'zhipu' | 'zhipu-coding' | 'deepseek';
 

@@ -1,6 +1,6 @@
 import { serviceKey } from '../kernel/service-key';
 import type { CapekPlugin, PluginContext } from '../kernel/types';
-import type { Session } from '@jean2/sdk';
+import type { Session } from '@capekai/types';
 import type { RuntimeHost } from '../runtime/host';
 import type { StorageBundle } from '../storage/contracts';
 import {

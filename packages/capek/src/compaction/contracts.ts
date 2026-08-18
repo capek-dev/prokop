@@ -5,7 +5,7 @@
  * barrel, `core/agent.ts`, and every existing consumer keep working.
  */
 
-import type { AssistantMessage, TextPart } from '@jean2/sdk';
+import type { AssistantMessage, TextPart } from '@capekai/types';
 
 /** Compaction trigger reasons */
 export type CompactionTriggerReason = 'manual' | 'auto' | 'overflow';
