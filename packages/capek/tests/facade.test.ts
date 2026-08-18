@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { createAgent } from '@capekai/core';
 import { facadeRuntimeIdentity } from '../src/facade/create-agent';
 import { streamChatWithRetry } from '../src/retry/stream-chat';
+import { resetSharedProcessScopeForTests } from '../src/plugins/compose';
 import type { SandboxControlEvent, SandboxHistoryEntry } from '../src/sandbox/types';
 
 const roots: string[] = [];
@@ -16,6 +17,7 @@ async function workspace(): Promise<string> {
 }
 
 afterEach(async () => {
+  await resetSharedProcessScopeForTests();
   for (const path of roots.splice(0)) await rm(path, { recursive: true, force: true });
 });
 
@@ -35,6 +37,7 @@ describe('createAgent facade', () => {
     expect(result.sessionId).toBeTruthy();
     expect(result).not.toHaveProperty('runId');
     expect(Object.getOwnPropertyNames(Object.getPrototypeOf(agent)).filter((name) => name !== 'constructor')).toEqual([
+      'diagnostics',
       'run',
       'stream',
       'resume',

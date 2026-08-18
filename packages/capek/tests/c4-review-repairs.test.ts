@@ -17,6 +17,7 @@ import { codingAgentBundle } from '../src/bundles/coding-agent';
 import { minimalAgentBundle } from '../src/bundles/minimal-agent';
 import { buildAiSdkTools } from '../src/core/build-tools';
 import type { CapekPlugin } from '../src/kernel/types';
+import type { FacadeProfile } from '../src/profiles/facade';
 import {
   capekFilesystemCapabilityKey,
   capekQuestionCapabilityKey,
@@ -83,16 +84,19 @@ function minimalHost(): RuntimeHost {
 }
 
 function facadeComposition(codingPlugins: readonly CapekPlugin<unknown>[]) {
+  const profile: FacadeProfile = {
+    id: codingPlugins.length === 0 ? 'minimal' : 'coding',
+    plugins: () => codingPlugins,
+  };
   return createFacadeAgentComposition({
     storage: createInMemoryStorageBundle(),
     configuration: createDefaultRuntimeConfiguration(),
     host: minimalHost(),
     contextSources: {},
     toolSource: {},
-    codingPlugins,
     sandboxController: new SandboxController(),
     providerOverrides: new Map(),
-  });
+  }, profile);
 }
 
 type LooseToolExecute = (

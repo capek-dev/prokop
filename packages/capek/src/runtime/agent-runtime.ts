@@ -68,6 +68,9 @@ export function createAgentRuntime<Input, Result>(
         }
         throw error;
       } finally {
+        if (!controller.signal.aborted) {
+          controller.abort(new Error('Agent run settled'));
+        }
         runOptions.signal?.removeEventListener('abort', cancel);
         if (runScope.runStatus === 'created' || runScope.runStatus === 'running') {
           await runScope.cancel('runtime cleanup').completion;
