@@ -17,6 +17,7 @@ import { configureRuntimeConfiguration } from '../src/configuration/runtime';
 import {
   ContextAssemblyDataError,
   getContextAssembler,
+  setDefaultContextAssembler,
   withContextAssembler,
   type ContextAssemblyData,
 } from '../src/context/assembler';
@@ -30,18 +31,17 @@ import { createAgentScope, createProcessScope } from '../src/kernel/kernel';
 import type { CapekPlugin, PluginContext } from '../src/kernel/types';
 import { createAgent } from '../src/facade/create-agent';
 import {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
   createFacadeAgentComposition,
   enterAgentScope,
   resetSharedProcessScopeForTests,
 } from '../src/plugins/compose';
+import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
 import {
   createContextSectionsPlugin,
   createOrderedContextAssembler,
   CURRENT_CONTEXT_SECTION_IDS,
 } from '../src/plugins/context-sections';
-import { buildSystemMessage } from '../src/plugins/legacy-system-message';
+import { buildSystemMessage, fixedBuilderContextAssembler } from '../src/plugins/legacy-system-message';
 import { capekContextAssemblerKey } from '../src/plugins/service-keys';
 import { resetProviders } from '../src/providers/registry';
 import { configureRuntimeHost, type RuntimeHost } from '../src/runtime/host';
@@ -133,6 +133,7 @@ function minimalSchedulerHost(): SchedulerHost {
 }
 
 function configureEnvironment(): void {
+  setDefaultContextAssembler(fixedBuilderContextAssembler);
   configureStorage(createInMemoryStorageBundle());
   configureRuntimeConfiguration();
   configureRuntimeHost(minimalHost());

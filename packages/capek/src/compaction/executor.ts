@@ -8,8 +8,8 @@
 
 import { getModelsConfig } from '../configuration/runtime';
 import {
-  broadcastEvent,
-  broadcastSessionUpdated,
+  emitRuntimeEvent,
+  emitSessionUpdated,
 } from '../runtime/host-dependencies';
 import { getMessageWithParts, getSession, updateSession } from '../storage/runtime';
 import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
@@ -53,8 +53,8 @@ export function isCompactionActive(sessionId: string): boolean {
 export async function executeCompaction(
   sessionId: string,
   reason: CompactionTriggerReason,
-  broadcast: BroadcastFn = broadcastEvent,
-  broadcastSessUpdate: BroadcastSessionFn = broadcastSessionUpdated,
+  broadcast: BroadcastFn = emitRuntimeEvent,
+  broadcastSessUpdate: BroadcastSessionFn = emitSessionUpdated,
   abortSignal?: AbortSignal,
   /** Additive test/injection seam mirroring `processCompactionTask`'s own
    * generateSummaryFn parameter. Production callers pass at most five

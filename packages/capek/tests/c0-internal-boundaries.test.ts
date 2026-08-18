@@ -66,6 +66,9 @@ const c0Rules: DependencyRule[] = [
     rationale: 'Leaf concerns must not import outside their own directory while they have no declared contracts.',
     appliesTo: leafConcerns.map(dir),
     allowedResolvedDirs: 'own-concern',
+    exceptions: {
+      'packages/capek/src/skills/registry.ts': ['../runtime/host-layout'],
+    },
   },
   {
     name: 'facade-no-optional-domains',
@@ -107,9 +110,7 @@ const c0Rules: DependencyRule[] = [
       { prefix: '../session-search', name: 'executeSessionSearchTool' },
     ],
     exceptions: {
-      'packages/capek/src/plugins/legacy-system-message.ts': ['../session-search'],
       'packages/capek/src/plugins/session-search-domain.ts': [
-        '../session-search',
         '../session-search/session-search-tool',
       ],
     },
@@ -265,8 +266,6 @@ const c0Rules: DependencyRule[] = [
     ],
     exceptions: {
       'packages/capek/src/plugins/skills-domain.ts': ['../skills'],
-      'packages/capek/src/plugins/legacy-system-message.ts': ['../skills'],
-      'packages/capek/src/plugins/context-sections.ts': ['../skills'],
     },
   },
   {

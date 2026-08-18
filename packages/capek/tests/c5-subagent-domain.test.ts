@@ -21,11 +21,10 @@ import {
 } from '../src/context/sources';
 import { configureRuntimeConfiguration } from '../src/configuration/runtime';
 import {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
   enterAgentScope,
   resetSharedProcessScopeForTests,
 } from '../src/plugins/compose';
+import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
 import { resetDomainToolFallbacksForTests } from '../src/runtime/domain-tool-source';
 import { configureRuntimeHost, type RuntimeHost } from '../src/runtime/host';
 import {

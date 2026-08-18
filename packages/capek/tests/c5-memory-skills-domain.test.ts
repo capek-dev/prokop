@@ -23,11 +23,10 @@ import {
 } from '../src/context/sources';
 import { configureRuntimeConfiguration } from '../src/configuration/runtime';
 import {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
   enterAgentScope,
   resetSharedProcessScopeForTests,
 } from '../src/plugins/compose';
+import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
 import {
   CURRENT_MEMORY_DOMAIN_PLUGIN_ID,
   capekMemoryDomainKey,

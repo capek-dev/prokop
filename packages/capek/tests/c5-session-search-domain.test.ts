@@ -32,14 +32,13 @@ import { createAgentScope } from '../src/kernel/kernel';
 import type { CapekPlugin, PluginContext } from '../src/kernel/types';
 import { codingAgentBundle } from '../src/bundles/coding-agent';
 import {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
   createFacadeAgentComposition,
   enterAgentScope,
   resetSharedProcessScopeForTests,
 } from '../src/plugins/compose';
+import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
 import { CURRENT_CONTEXT_SECTION_IDS } from '../src/plugins/context-sections';
-import { currentAgentPlugins } from '../src/plugins/current-plugins';
+import { currentAgentPlugins } from './helpers/composition';
 import { buildSystemMessage } from '../src/plugins/legacy-system-message';
 import {
   CURRENT_SCHEDULER_DOMAIN_PLUGIN_ID,

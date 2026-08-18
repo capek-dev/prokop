@@ -1,5 +1,5 @@
 import {
-  broadcastEvent,
+  emitRuntimeEvent,
   type BroadcastFn,
 } from '../runtime/host-dependencies';
 import { getAgentDirectory } from '../context';
@@ -37,7 +37,7 @@ export interface BuildToolsOptions {
 
 export async function buildAiSdkTools(
   options: BuildToolsOptions,
-  broadcast: BroadcastFn = broadcastEvent,
+  broadcast: BroadcastFn = emitRuntimeEvent,
 ): Promise<Record<string, import('ai').Tool>> {
   const {
     toolNames,

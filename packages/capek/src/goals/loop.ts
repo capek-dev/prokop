@@ -1,5 +1,5 @@
 import type { GoalState, Session } from '@capekai/types';
-import { broadcastSessionUpdated } from '../runtime/host-dependencies';
+import { emitSessionUpdated } from '../runtime/host-dependencies';
 import { getSession, updateSession } from '../storage/runtime';
 import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
 import {
@@ -62,7 +62,7 @@ export async function runGoalLoop(options: GoalLoopOptions): Promise<void> {
     getSession,
     updateSession,
     evaluate: (evaluateOptions) => evaluateGoal(evaluateOptions),
-    broadcastSessionUpdatedDefault: broadcastSessionUpdated,
+    broadcastSessionUpdatedDefault: emitSessionUpdated,
   });
 }
 

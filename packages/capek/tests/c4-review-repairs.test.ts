@@ -25,12 +25,11 @@ import {
   STANDARD_CODING_CAPABILITIES,
 } from '../src/plugins/coding-capabilities';
 import {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
   createFacadeAgentComposition,
   enterAgentScope,
   resetSharedProcessScopeForTests,
 } from '../src/plugins/compose';
+import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
 import { capekToolResolverKey } from '../src/plugins/service-keys';
 import { CURRENT_SCHEDULER_DOMAIN_PLUGIN_ID } from '../src/plugins/scheduler-domain';
 import { CURRENT_SESSION_SEARCH_DOMAIN_PLUGIN_ID } from '../src/plugins/session-search-domain';

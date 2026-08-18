@@ -3,13 +3,6 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createAgent } from '@capekai/core';
-import {
-  createJean2AgentScope,
-  createJean2ProcessScope,
-  JEAN2_AGENT_PLUGIN_IDS,
-  JEAN2_PROCESS_PLUGIN_IDS,
-  JEAN2_PROFILE_ID,
-} from '@capekai/core/internal/composition';
 import { createStandaloneBindings } from '../src/facade/standalone-bindings';
 import { resetSharedProcessScopeForTests } from '../src/plugins/compose';
 import { configureRuntimeHost } from '../src/runtime/host';
@@ -36,20 +29,6 @@ afterEach(async () => {
 });
 
 describe('C8 explicit profiles', () => {
-  test('Jean2 profile exposes its exact process and agent inventory', async () => {
-    const processScope = await createJean2ProcessScope();
-    const agentScope = await createJean2AgentScope(processScope);
-
-    expect(JEAN2_PROFILE_ID).toBe('jean2-compatible');
-    expect(processScope.snapshot().plugins.map((plugin) => plugin.id).sort()).toEqual(
-      [...JEAN2_PROCESS_PLUGIN_IDS].sort(),
-    );
-    expect(agentScope.snapshot().plugins.map((plugin) => plugin.id).sort()).toEqual(
-      [...JEAN2_AGENT_PLUGIN_IDS].sort(),
-    );
-
-    await processScope.dispose();
-  });
 
   test('coding remains the facade default and diagnostics expose the composition', async () => {
     const agent = createAgent({

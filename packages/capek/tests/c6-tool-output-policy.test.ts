@@ -35,11 +35,10 @@ import { configureSchedulerHost, type SchedulerHost } from '../src/scheduler/hos
 import { configureSessionSearchHost, type SessionSearchHost } from '../src/session-search/host';
 import { createAgentScope } from '../src/kernel/kernel';
 import {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
   enterAgentScope,
 } from '../src/plugins/compose';
-import { currentAgentPlugins } from '../src/plugins/current-plugins';
+import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
+import { currentAgentPlugins } from './helpers/composition';
 import { capekToolOutputPolicyKey } from '../src/plugins/service-keys';
 
 const temporaryDirectories: string[] = [];
