@@ -156,11 +156,17 @@ export async function loadMemoryInstructions(basePath: string): Promise<string |
   return sections.length > 0 ? sections.join('\n\n') : null;
 }
 
+export const MEMORY_LINE_USER_TARGET = 'Use target="user" for user preferences and communication/workflow expectations.';
+export const MEMORY_LINE_MEMORY_TARGET = 'Use target="memory" for workspace facts, repo conventions, commands, lessons, and non-obvious fixes.';
+export const MEMORY_LINE_ONLY_COMPACT = 'Only save compact facts that should affect future sessions.';
+export const MEMORY_LINE_NO_SECRETS = 'Do not save secrets, raw logs, large code, or one-off details.';
+export const MEMORY_LINE_USE_LIST = 'Use list before replace/remove to see the exact current entries and avoid guesswork.';
+
 export const MEMORY_GUIDANCE = `You can persist durable workspace knowledge using the memory tool.
-Use target="user" for user preferences and communication/workflow expectations.
-Use target="memory" for workspace facts, repo conventions, commands, lessons, and non-obvious fixes.
+${MEMORY_LINE_USER_TARGET}
+${MEMORY_LINE_MEMORY_TARGET}
 Character limits: user=${USER_CHAR_LIMIT}, workspace=${MEMORY_CHAR_LIMIT}.
-Only save compact facts that should affect future sessions.
-Do not save secrets, raw logs, large code, or one-off details.
+${MEMORY_LINE_ONLY_COMPACT}
+${MEMORY_LINE_NO_SECRETS}
 If memory is full, consolidate existing entries with replace before adding.
 Use the list action to verify current entries before replacing or removing.`;

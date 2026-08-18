@@ -142,7 +142,7 @@ function makeOptions(overrides: Partial<ToolOutputPolicyOptions> = {}): ToolOutp
     retrievalToolName: RETRIEVE_TOOL_OUTPUT_NAME,
     truncationMaxChars: 50_000,
     truncationPreviewChars: 10_000,
-    truncationTempDir: join(tmpdir(), 'jean2'),
+    truncationTempDir: join(tmpdir(), 'capek'),
     ...overrides,
   };
 }

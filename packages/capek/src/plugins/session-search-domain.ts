@@ -16,7 +16,7 @@ import {
   type DomainToolExecuteContext,
   type DomainToolPayload,
 } from '../runtime/domain-tool-source';
-import { SESSION_SEARCH_GUIDANCE } from '../session-search';
+import { getHostGuidance } from '../runtime/host-guidance';
 import type { SessionSearchHost } from '../session-search/host';
 import {
   executeSessionSearchTool,
@@ -168,7 +168,7 @@ export function sessionSearchDomainPlugin(id: string): CapekPlugin<unknown> {
       const service: SessionSearchDomainService = {
         tools: [payload],
         isEnabled,
-        guidance: SESSION_SEARCH_GUIDANCE,
+        guidance: getHostGuidance().sessionSearch,
       };
 
       const guidance: GuidanceSectionContribution = {

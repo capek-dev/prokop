@@ -1,6 +1,7 @@
 import { existsSync } from 'fs';
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
+import { getHostLayout } from '../runtime/host-layout';
 import type { SkillInfo } from '@capekai/types';
 
 function parseFrontmatter(raw: string): { frontmatter: Record<string, unknown>; content: string } {
@@ -40,7 +41,7 @@ export async function scanSkillsDir(skillsDir: string): Promise<SkillInfo[]> {
 }
 export const scanSkillsFromDir = scanSkillsDir;
 export async function scanSkills(workspacePath: string, agentSkillsDir?: string): Promise<SkillInfo[]> {
-  const skills = await scanSkillsDir(join(workspacePath, '.agents', 'skills'));
+  const skills = await scanSkillsDir(getHostLayout().workspaceSkillsDir(workspacePath));
   if (agentSkillsDir) {
     const names = new Set(skills.map((skill) => skill.name));
     for (const skill of await scanSkillsDir(agentSkillsDir)) if (!names.has(skill.name)) skills.push(skill);

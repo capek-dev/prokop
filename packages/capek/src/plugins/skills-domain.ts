@@ -1,4 +1,5 @@
-import { join } from 'path';
+import { getHostGuidance } from '../runtime/host-guidance';
+import { getHostLayout } from '../runtime/host-layout';
 import type { PermissionRiskLevel } from '@capekai/tool';
 import { serviceKey } from '../kernel/service-key';
 import type {
@@ -19,7 +20,6 @@ import {
   executeSkillManageTool,
   executeSkillTool,
   skillManageToolDefinition,
-  SKILL_MANAGE_GUIDANCE,
 } from '../skills';
 import type { StorageBundle } from '../storage/contracts';
 import { capekStorageKey } from './service-keys';
@@ -86,7 +86,7 @@ export function createSkillManageToolPayload(): DomainToolPayload {
     inputSchema: skillManageToolDefinition.inputSchema,
     resolveDefinition: async (_sessionId, options) => {
       const description = await buildSkillManageToolDescription(
-        join(options?.workspacePath as string, '.agents', 'skills'),
+        getHostLayout().workspaceSkillsDir(options?.workspacePath as string),
       );
       return { description, inputSchema: skillManageToolDefinition.inputSchema };
     },
@@ -94,7 +94,7 @@ export function createSkillManageToolPayload(): DomainToolPayload {
       const risk = (context.permissionRisk ?? 'none') as PermissionRiskLevel;
       const result = await executeSkillManageTool(
         input,
-        join(context.workspacePath as string, '.agents', 'skills'),
+        getHostLayout().workspaceSkillsDir(context.workspacePath as string),
         risk,
         context.ask,
       );
@@ -121,14 +121,14 @@ export function createAgentSkillManageToolPayload(): DomainToolPayload {
     inputSchema: skillManageToolDefinition.inputSchema,
     resolveDefinition: async (_sessionId, options) => {
       const description = await buildSkillManageToolDescription(
-        join(options?.agentDir as string, 'skills'),
+        getHostLayout().agentSkillsDir(options?.agentDir as string),
       );
       return { description, inputSchema: skillManageToolDefinition.inputSchema };
     },
     execute: async (input, context) => {
       const result = await executeSkillManageTool(
         input,
-        join(context.agentDir as string, 'skills'),
+        getHostLayout().agentSkillsDir(context.agentDir as string),
         'none',
       );
       if (!result.success) {
@@ -167,7 +167,7 @@ function skillManagementGuidanceSection(storage: StorageBundle): SkillSectionCon
       const data = validateContextAssemblyData(build.data);
       if (!data.workspaceId) return null;
       return storage.workspaces.get(data.workspaceId)?.settings?.skills?.managementEnabled
-        ? SKILL_MANAGE_GUIDANCE
+        ? getHostGuidance().skillManage
         : null;
     },
   };

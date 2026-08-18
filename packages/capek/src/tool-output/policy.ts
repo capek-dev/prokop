@@ -53,7 +53,7 @@ function defaultOptions(): ToolOutputPolicyOptions {
     retrievalToolName: RETRIEVE_TOOL_OUTPUT_NAME,
     truncationMaxChars: 50_000,
     truncationPreviewChars: 10_000,
-    truncationTempDir: path.join(os.tmpdir(), 'jean2'),
+    truncationTempDir: path.join(os.tmpdir(), 'capek'),
   };
 }
 

@@ -182,9 +182,9 @@ async function configureFullSources(
     readMemoryFile: async (_id, file) => (file === 'USER.md' ? 'AGENT_USER' : 'AGENT_MEMORY'),
   });
   configureInstructionSource({ getGlobalPath: () => globalPath });
-  await mkdir(join(workspacePath, '.jean2'), { recursive: true });
-  await writeFile(join(workspacePath, '.jean2', 'USER.md'), '- WORKSPACE_USER');
-  await writeFile(join(workspacePath, '.jean2', 'MEMORY.md'), '- WORKSPACE_MEMORY');
+  await mkdir(join(workspacePath, '.capek'), { recursive: true });
+  await writeFile(join(workspacePath, '.capek', 'USER.md'), '- WORKSPACE_USER');
+  await writeFile(join(workspacePath, '.capek', 'MEMORY.md'), '- WORKSPACE_MEMORY');
   await writeFile(join(workspacePath, 'AGENTS.md'), 'PROJECT');
 }
 
@@ -363,7 +363,7 @@ describe('C3 ordered context assembler', () => {
       expect(fixed).toBe(goldenExpected(root));
 
       // HEAD-baseline anchors, verified against this branch's HEAD: the
-      // memory section is read from `${workspacePath}/.jean2` and the
+      // memory section is read from `${workspacePath}/.capek` and the
       // workspace section keeps its exact parameterized examples.
       expect(ordered).toContain('<user_memory path="USER.md" usage="16/1500">\n- WORKSPACE_USER\n</user_memory>');
       expect(ordered).toContain('<workspace_memory path="MEMORY.md" usage="18/2500">\n- WORKSPACE_MEMORY\n</workspace_memory>');

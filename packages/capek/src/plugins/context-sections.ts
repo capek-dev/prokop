@@ -1,4 +1,3 @@
-import { join } from 'path';
 import {
   validateContextAssemblyData,
   type ContextAssembler,
@@ -18,11 +17,11 @@ import type {
   PluginContext,
   ProvidedContextSection,
 } from '../kernel/types';
-import { loadMemoryInstructions, MEMORY_GUIDANCE } from '../memory';
-import { SKILL_MANAGE_GUIDANCE } from '../skills';
+import { loadMemoryInstructions } from '../memory';
+import { getHostGuidance } from '../runtime/host-guidance';
+import { getHostLayout } from '../runtime/host-layout';
 import { getWorkspace } from '../storage/runtime';
 import {
-  AGENT_MEMORY_SKILLS_GUIDANCE,
   legacySelfDelegationGuidanceSection,
   legacySessionSearchGuidanceSection,
 } from './legacy-system-message';
@@ -141,7 +140,7 @@ const LEGACY_MEMORY_SKILLS_SECTIONS: readonly SectionContribution[] = [
     provide: async (context) => {
       const data = requiredData(context);
       const agentDir = await getAgentDirectory(data.preconfig.id);
-      return agentDir ? AGENT_MEMORY_SKILLS_GUIDANCE : null;
+      return agentDir ? getHostGuidance().agentMemorySkills : null;
     },
   },
   {
@@ -153,7 +152,7 @@ const LEGACY_MEMORY_SKILLS_SECTIONS: readonly SectionContribution[] = [
       if (!data.workspaceId) return null;
       const workspace = getWorkspace(data.workspaceId);
       if (!workspace?.settings?.memory?.enabled || !data.workspacePath) return null;
-      return loadMemoryInstructions(join(data.workspacePath, '.jean2'));
+      return loadMemoryInstructions(getHostLayout().workspaceMemoryDir(data.workspacePath));
     },
   },
   {
@@ -164,7 +163,7 @@ const LEGACY_MEMORY_SKILLS_SECTIONS: readonly SectionContribution[] = [
       const data = requiredData(context);
       if (!data.workspaceId) return null;
       const workspace = getWorkspace(data.workspaceId);
-      return workspace?.settings?.memory?.enabled && data.workspacePath ? MEMORY_GUIDANCE : null;
+      return workspace?.settings?.memory?.enabled && data.workspacePath ? getHostGuidance().memory : null;
     },
   },
   {
@@ -175,7 +174,7 @@ const LEGACY_MEMORY_SKILLS_SECTIONS: readonly SectionContribution[] = [
       const data = requiredData(context);
       if (!data.workspaceId) return null;
       return getWorkspace(data.workspaceId)?.settings?.skills?.managementEnabled
-        ? SKILL_MANAGE_GUIDANCE
+        ? getHostGuidance().skillManage
         : null;
     },
   },
