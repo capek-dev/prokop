@@ -1,5 +1,6 @@
 import { Output, jsonSchema } from 'ai';
-import { findModel, findModelVariant, getLLMTemperature, getLLMMaxSteps } from '../../configuration/runtime';
+import { findModel, findModelVariant, getLLMTemperature, getLLMMaxSteps, getModelsConfig } from '../../configuration/runtime';
+import { getProvider } from '../../providers/registry';
 import { buildSchemaPromptInstruction } from '../structured-output';
 import type { ResponseFormat } from '@capekai/types';
 
@@ -40,8 +41,9 @@ export function buildStreamConfig(options: StreamConfigOptions): StreamConfigRes
   const variantOpts = variant ? findModelVariant(modelId || '', variant) : undefined;
 
   // Determine the provider-specific providerOptions key
-  const resolvedProvider = providerId || 'openai';
-  const providerOptionsKey = resolvedProvider === 'codex' ? 'openai' : resolvedProvider;
+  const resolvedProvider = providerId || getModelsConfig().defaultProvider;
+  const registered = resolvedProvider ? getProvider(resolvedProvider) : undefined;
+  const providerOptionsKey = registered?.descriptor.providerOptionsKey ?? resolvedProvider;
 
   // Build merged providerOptions
   let providerOptions: Record<string, Record<string, unknown>> | undefined;

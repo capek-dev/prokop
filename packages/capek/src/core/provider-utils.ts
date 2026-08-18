@@ -1,4 +1,5 @@
-import { findModel, getModelsConfig, } from '../configuration/runtime';
+import { findModel, getModelsConfig } from '../configuration/runtime';
+import { getProvider } from '../providers/registry';
 import type { Session, Preconfig } from '@capekai/types';
 
 export type Provider = 'openai' | 'openrouter' | 'minimax' | 'zhipu' | 'zhipu-coding' | 'deepseek';
@@ -27,7 +28,7 @@ export function parseModelSpecifier(modelId: string): ParsedModelSpecifier {
   const separator = modelId.indexOf('/');
   if (separator <= 0 || separator === modelId.length - 1) return { modelId };
   const providerId = modelId.slice(0, separator) as Provider;
-  if (!EXPLICIT_PROVIDERS.has(providerId)) return { modelId };
+  if (!EXPLICIT_PROVIDERS.has(providerId) && !getProvider(providerId)) return { modelId };
   return {
     providerId,
     modelId: modelId.slice(separator + 1),
@@ -44,7 +45,7 @@ export function findProviderFromModel(modelId: string): string {
   for (const { test, provider } of PROVIDER_PREFIXES) {
     if (test(modelId)) return provider;
   }
-  return 'openai';
+  return getModelsConfig().defaultProvider;
 }
 
 export function resolveModelId(

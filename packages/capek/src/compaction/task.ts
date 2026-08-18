@@ -17,6 +17,7 @@ import type {
   AssistantMessage, CompactionPart, MessageWithParts, TextPart, ToolPart } from '@capekai/types';
 import { getModelWithMetadata } from '../core/model-utils';
 import { findProviderFromModel } from '../core/provider-utils';
+import { getModelsConfig } from '../configuration/runtime';
 import { broadcastEvent, type BroadcastFn } from '../runtime/host-dependencies';
 import {
   buildEffectiveContextHistory,
@@ -286,7 +287,7 @@ async function defaultGenerateSummary(
     sessionId,
   });
 
-  const effectiveModelId = policy.modelId || 'gpt-4o';
+  const effectiveModelId = policy.modelId || getModelsConfig().defaultModel;
   let effectiveProviderId = policy.providerId;
   if (!effectiveProviderId) {
     effectiveProviderId = findProviderFromModel(effectiveModelId);

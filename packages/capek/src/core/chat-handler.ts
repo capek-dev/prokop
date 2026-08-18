@@ -571,12 +571,11 @@ export async function handleChat<Origin>(
 
   const isConnectableProvider = getProvider(provider) !== undefined;
   if (!apiKey && !isConnectableProvider) {
-    const envKey = `JEAN2_LLM_${provider.toUpperCase()}_API_KEY`;
     deliverToOrigin(ctx, origin, {
       kind: 'failure',
       category: 'generic',
       code: 'no_api_key',
-      message: `No API key configured for provider: ${provider}. Set ${envKey}`,
+      message: `No API key configured for provider: ${provider}. Register the provider or configure its API key in runtime configuration.`,
     });
     return;
   }
