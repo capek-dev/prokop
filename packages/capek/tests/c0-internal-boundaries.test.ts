@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { existsSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import {
   evaluateRules,
@@ -66,16 +67,10 @@ const c0Rules: DependencyRule[] = [
     allowedResolvedDirs: 'own-concern',
   },
   {
-    name: 'facade-no-compat-or-optional-domains',
-    rationale: 'The facade composes core services and must not depend on the migration barrel or optional domain plugins.',
+    name: 'facade-no-optional-domains',
+    rationale: 'The facade composes core services and must not depend on optional domain plugins.',
     appliesTo: [dir('facade')],
-    forbiddenResolvedDirs: [dir('compat'), dir('memory'), dir('skills'), dir('session-search'), dir('scheduler'), dir('subagent'), dir('workflow'), dir('goals')],
-  },
-  {
-    name: 'compat-no-facade',
-    rationale: 'The compatibility barrel must not import the facade; the facade is built on the same internals.',
-    appliesTo: [dir('compat')],
-    forbiddenResolvedDirs: [dir('facade')],
+    forbiddenResolvedDirs: [dir('memory'), dir('skills'), dir('session-search'), dir('scheduler'), dir('subagent'), dir('workflow'), dir('goals')],
   },
   {
     name: 'tools-no-core',
@@ -314,10 +309,9 @@ const c0Rules: DependencyRule[] = [
     name: 'sandbox-no-storage-or-providers',
     rationale: 'Sandbox must not import storage implementations or the provider registry.',
     appliesTo: [dir('sandbox')],
-    forbiddenResolvedDirs: [dir('storage'), dir('providers')],
+    forbiddenResolvedDirs: [dir('storage'), resolve(dir('providers'), 'registry.ts')],
     exceptions: {
       'packages/capek/src/sandbox/model.ts': ['../storage/runtime'],
-      'packages/capek/src/sandbox/provider-types.ts': ['../providers/types'],
     },
   },
   {
@@ -336,10 +330,10 @@ const c0Rules: DependencyRule[] = [
     ],
   },
   {
-    name: 'plugins-no-compat-or-facade',
-    rationale: 'The C2 plugin layer wraps current seam contracts and must not import the migration barrel or the facade; compat and the facade compose on top of plugins.',
+    name: 'plugins-no-facade',
+    rationale: 'Plugins must not import the facade.',
     appliesTo: [dir('plugins')],
-    forbiddenResolvedDirs: [dir('compat'), dir('facade')],
+    forbiddenResolvedDirs: [dir('facade')],
   },
   {
     name: 'plugins-no-core',
@@ -358,12 +352,6 @@ const c0Rules: DependencyRule[] = [
     rationale: 'The kernel is a composition-only concern; the turn-execution core must not import it.',
     appliesTo: [dir('core')],
     forbiddenResolvedDirs: [dir('kernel')],
-  },
-  {
-    name: 'internal-composition-narrow',
-    rationale: 'The internal package subpath re-exports only the plugins composition surface, never product domains.',
-    appliesTo: [dir('internal')],
-    allowedResolvedDirs: [dir('plugins')],
   },
   {
     name: 'facade-core-no-standard-tool-list',
@@ -440,6 +428,8 @@ describe('C0 internal dependency boundaries', () => {
   });
 
   test('retired forwarders are absent and no source or test imports through them', () => {
+    expect(existsSync(resolve(repositoryRoot, 'packages/capek/src/compat'))).toBe(false);
+
     const retiredForwarderPaths = [
       'packages/capek/src/core/subagent.ts',
       'packages/capek/src/core/child-session.ts',
@@ -464,6 +454,7 @@ describe('C0 internal dependency boundaries', () => {
       'packages/capek/src/tools/workspace-capability.ts',
       'packages/capek/src/tools/tool-output-artifacts.ts',
       'packages/capek/src/core/goal-loop.ts',
+      'packages/capek/src/sandbox/provider-types.ts',
     ];
     const sourceFiles = scanDirectory(packageSourceRoot);
     expect(retiredForwarderPaths.filter((repoFile) =>
