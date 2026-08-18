@@ -27,6 +27,8 @@
   },
   "dependencies": {
     "@capekai/core": "workspace:*",
+    "@capekai/tool": "workspace:*",
+    "@capekai/types": "workspace:*",
     "@clack/prompts": "^0.10.0",
     "@hono/zod-validator": "^0.8.0",
     "@jean2/sdk": "workspace:*",

@@ -1641,6 +1641,7 @@ describe('server layer boundaries', () => {
   test('S4/S5 gate: the tool-installation domain imports only SDK types, path, and sibling modules', () => {
     const allowedSpecifiers = [
       '@jean2/sdk',
+      '@capekai/tool',
       'path',
       './policy',
       './selection',
