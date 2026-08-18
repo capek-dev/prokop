@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   configureRuntimeHost,
   fixedBuilderContextAssembler,
@@ -24,6 +26,12 @@ export const jean2CompatibilityBindings = {
   titles: jean2TitleBindings,
   workspace: jean2WorkspaceBindings,
   sandbox: jean2SandboxBindings,
+  layout: {
+    workspaceMemoryDir: (workspacePath: string) => join(workspacePath, '.jean2'),
+    workspaceSkillsDir: (workspacePath: string) => join(workspacePath, '.agents', 'skills'),
+    agentSkillsDir: (agentDir: string) => join(agentDir, 'skills'),
+    toolOutputTempRoot: () => join(tmpdir(), 'jean2'),
+  },
 } satisfies RuntimeHost;
 
 export function configureJean2Bindings(): void {
