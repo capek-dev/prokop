@@ -20,7 +20,7 @@ import {
 import { runMigrations } from '@/infrastructure/sqlite/database';
 import { initializePreconfigs, migrateUuidPreconfigs } from '@/infrastructure/configuration/preconfig';
 import defaultModelsJson from '@/config/models.json';
-import { installRecommendedTools } from '@/tools';
+import { installRecommendedTools } from '@/tools/tools-cli';
 
 export interface InitOptions {
   databasePath?: string;

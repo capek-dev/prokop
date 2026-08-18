@@ -36,7 +36,8 @@ import { getAttachment } from '@/infrastructure/sqlite/attachments';
 import { getResponseFormat } from '@/infrastructure/sqlite/response-formats';
 import { getWorkspace, getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
 import { jean2ToolOutputArtifactStore } from '@/infrastructure/sqlite/tool-output-artifacts';
-import { searchMessages } from '@/session-search/fts';
+import { searchMessages } from '@/infrastructure/sqlite/session-search-query-repository';
+import { getDatabase } from '@/infrastructure/sqlite/database';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { createTestAssistantMessage, createTestTextPart, createTestUserMessage } from '#tests/factories';
 import { seedSession, seedWorkspace } from '#tests/seed';
@@ -115,7 +116,7 @@ describe('Čapek storage adapter', () => {
 
     const indexed = createTestTextPart('message-1', 'original text');
     createPart(indexed, session.id);
-    expect(searchMessages({
+    expect(searchMessages(getDatabase(), {
       query: 'original',
       sessionId: session.id,
       roleFilter: ['user', 'assistant'],
@@ -126,7 +127,7 @@ describe('Čapek storage adapter', () => {
     const updated = jean2StorageBundle.conversation.updatePart(indexed.id, { text: 'changed text' });
     expect((updated as { text?: string })?.text).toBe('changed text');
     expect((getPart(indexed.id) as { text?: string })?.text).toBe('changed text');
-    expect(searchMessages({
+    expect(searchMessages(getDatabase(), {
       query: 'changed',
       sessionId: session.id,
       roleFilter: ['user', 'assistant'],
@@ -137,7 +138,7 @@ describe('Čapek storage adapter', () => {
     const fresh = createTestTextPart('message-1', 'fresh text');
     jean2StorageBundle.conversation.createPart(fresh, session.id);
     expect(getPartsByMessage('message-1')).toHaveLength(2);
-    expect(searchMessages({
+    expect(searchMessages(getDatabase(), {
       query: 'fresh',
       sessionId: session.id,
       roleFilter: ['user', 'assistant'],

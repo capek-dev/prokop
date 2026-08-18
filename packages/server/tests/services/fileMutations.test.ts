@@ -14,7 +14,7 @@ import {
   BadRequestError,
   PayloadTooLargeError,
 } from '@/utils/http-errors';
-import { FILE_PREVIEW_MAX_BYTES } from '@/utils/binaryDetection';
+import { FILE_PREVIEW_MAX_BYTES } from '@/infrastructure/filesystem/binary-detection';
 
 let workspaceDir: string;
 let outsideDir: string;

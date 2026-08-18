@@ -3,6 +3,7 @@ import { relative, resolve } from 'node:path';
 import {
   evaluateRules,
   parseImports,
+  resolveLocalSpecifier,
   scanDirectory,
   type DependencyRule,
   type ScannedFile,
@@ -761,22 +762,6 @@ describe('server layer boundaries', () => {
     ]);
   });
 
-  test('S9 gate: the session-search fts compatibility module delegates lifecycle to infrastructure', () => {
-    // The compatibility path preserves the public search and lifecycle exports
-    // while infrastructure owns the FTS SQL and repair operations.
-    const ftsPath = resolve(serverSourceRoot, 'session-search/fts.ts');
-    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === ftsPath);
-    expect(file).toBeDefined();
-
-    const imports = parseImports(file!.sourceText, file!.path);
-    expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@/application/ports/session-search',
-      '@/infrastructure/session-search/fts',
-      '@/infrastructure/sqlite/database',
-      '@/infrastructure/sqlite/session-search-query-repository',
-    ].sort());
-  });
-
   test('S4 gate: the scheduler route invokes only the scheduling application and presentation helpers', () => {
     expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain(
       'packages/server/src/routes/scheduler.ts',
@@ -1372,22 +1357,6 @@ describe('server layer boundaries', () => {
     expect(workspaceViolations).toEqual([]);
   });
 
-  test('S5 gate: the path utils module re-exports the Capek workspace policy through the adapter port', () => {
-    const utilsPath = resolve(serverSourceRoot, 'utils/paths.ts');
-    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === utilsPath);
-    expect(file).toBeDefined();
-
-    const imports = parseImports(file!.sourceText, file!.path);
-    expect(imports).toHaveLength(1);
-    expect(imports[0].specifier).toBe('@/adapters/capek/workspace-paths');
-    expect(imports[0].kind).toBe('value');
-    const sourceText = file!.sourceText;
-    expect(sourceText).toContain('expandPath = workspacePathPolicyPort.expandPath');
-    expect(sourceText).toContain('isPathWithinWorkspace = workspacePathPolicyPort.isPathWithinWorkspace');
-    expect(sourceText).toContain('resolvePath = workspacePathPolicyPort.resolvePath');
-    expect(sourceText).toContain('resolveRoot = workspacePathPolicyPort.resolveRootForQuery');
-  });
-
   test('S5 gate: file mutations consume the Capek workspace policy through the adapter port', () => {
     const mutationsPath = resolve(serverSourceRoot, 'adapters/jean2/files.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === mutationsPath);
@@ -1888,14 +1857,41 @@ describe('server layer boundaries', () => {
     expect(distribution?.sourceText).not.toContain("from '@/tools/tool-repository'");
   });
 
+  test('S9 gate: retired compatibility wrappers are absent and unimported', () => {
+    const files = scanDirectory(serverSourceRoot);
+    const retired = [
+      'packages/server/src/core/session-title.ts',
+      'packages/server/src/utils/binaryDetection.ts',
+      'packages/server/src/utils/paths.ts',
+      'packages/server/src/session-search/fts.ts',
+      'packages/server/src/tools/index.ts',
+    ] as const;
+    const retiredPaths = new Set(retired.map((path) => resolve(repositoryRoot, path)));
+    const retiredSpecifiers = new Set([
+      '@/core/session-title',
+      '@/utils/binaryDetection',
+      '@/utils/paths',
+      '@/session-search/fts',
+      '@/tools',
+    ]);
+    const imports = files.flatMap((file) => parseImports(file.sourceText, file.path));
+
+    for (const path of retired) {
+      expect(files.some((file) => relative(repositoryRoot, file.path) === path)).toBe(false);
+    }
+    for (const imp of imports) {
+      expect(retiredSpecifiers.has(imp.specifier)).toBe(false);
+      const resolved = resolveLocalSpecifier(imp.specifier, imp.file, serverSourceRoot);
+      expect(resolved === null || !retiredPaths.has(resolved)).toBe(true);
+    }
+  });
+
   test('S9 gate: shared leaves have infrastructure or application owners', () => {
     const files = scanDirectory(serverSourceRoot);
     const wrappers = [
       ['packages/server/src/paths.ts', '@/infrastructure/runtime/paths'],
       ['packages/server/src/env.ts', '@/infrastructure/runtime/environment'],
       ['packages/server/src/core/preconfig.ts', '@/infrastructure/configuration/preconfig'],
-      ['packages/server/src/core/session-title.ts', '@/infrastructure/session-title'],
-      ['packages/server/src/utils/binaryDetection.ts', '@/infrastructure/filesystem/binary-detection'],
       ['packages/server/src/utils/http-errors.ts', '@/application/http-errors'],
     ] as const;
     for (const [path, owner] of wrappers) {
