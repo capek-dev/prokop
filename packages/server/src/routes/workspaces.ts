@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { validate } from './validate';
 import type { SessionStatus } from '@jean2/sdk';
 import type { WorkspaceApplication } from '@/application/workspaces';
-import { BadRequestError, NotFoundError } from '@/utils/http-errors';
+import { BadRequestError, NotFoundError } from '@/application/http-errors';
 import { createWorkspaceSchema, updateWorkspaceSettingsSchema, pinMessageSchema } from './schemas';
 
 /**

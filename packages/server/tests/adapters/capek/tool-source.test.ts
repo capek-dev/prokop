@@ -3,7 +3,7 @@ import { getToolSource } from '@capekai/core/internal/tools';
 
 const realBarrel = await import('@capekai/core/internal/tools');
 const realConfig = await import('@/config');
-const realPaths = await import('@/paths');
+const realPaths = await import('@/infrastructure/runtime/paths');
 const realMcp = await import('@/infrastructure/mcp');
 
 const realConfigureToolsPath = realBarrel.configureToolsPath;
@@ -23,7 +23,7 @@ mock.module('@/config', () => ({
   },
 }));
 
-mock.module('@/paths', () => ({
+mock.module('@/infrastructure/runtime/paths', () => ({
   ...realPaths,
   getToolsDir: (): string => '/tools-dir',
 }));

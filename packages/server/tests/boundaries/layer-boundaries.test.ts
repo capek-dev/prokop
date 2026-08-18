@@ -40,7 +40,7 @@ const serverWebSocketExceptions: Record<string, string[]> = {};
 
 const layerAdaptersLegacyExceptions: Record<string, string[]> = {
   'packages/server/src/adapters/capek/context-sources.ts': [
-    '@/agents/storage', '@/agents/memory', '@/infrastructure/configuration/preconfig', '@/infrastructure/runtime/paths',
+    '@/infrastructure/configuration/preconfig', '@/infrastructure/runtime/paths',
   ],
   'packages/server/src/adapters/capek/events.ts': [
     '@/core/broadcast',
@@ -69,7 +69,7 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
     '@/infrastructure/sqlite/workspaces', '@/infrastructure/runtime/environment', '@/infrastructure/runtime/paths',
   ],
   'packages/server/src/adapters/jean2/session-repository.ts': [
-    '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/queued-messages', '@/infrastructure/sqlite/tool-output-artifacts', '@/infrastructure/sqlite/attachments', '@/infrastructure/sqlite/pending-asks', '@/infrastructure/sqlite/workspaces', '@/adapters/capek/compaction-recovery', '@/agents/storage', '@/infrastructure/session-title',
+    '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/queued-messages', '@/infrastructure/sqlite/tool-output-artifacts', '@/infrastructure/sqlite/attachments', '@/infrastructure/sqlite/pending-asks', '@/infrastructure/sqlite/workspaces', '@/adapters/capek/compaction-recovery', '@/infrastructure/session-title',
   ],
   'packages/server/src/adapters/jean2/scheduled-job-repository.ts': [
     '@/infrastructure/sqlite/scheduled-job-store',
@@ -142,24 +142,21 @@ const layerTransportLegacyExceptions: Record<string, string[]> = {
   ],
 };
 
-// S3 exact per-file exceptions for HTTP route files that S3 does not own.
-// The session route is owned by transport/http; no legacy routes/sessions path
-// is retained. Other route files keep exact exceptions until their owned slice.
+// HTTP route legacy exceptions are empty. The session route's presentation-helper
+// exception is documented separately in the transport rule below.
 const layerHttpRoutesLegacyExceptions: Record<string, string[]> = {};
 
 // S3 per-file exceptions for transport presentation helpers still living at
-// legacy paths. The session route file uses the shared zod validation,
-// session schemas, and HTTP error presenters; none of these import store or
-// Capek implementations.
+// legacy paths. The session route file uses the shared zod validation and
+// session schemas; neither imports store or Capek implementations.
 const layerTransportHttpPresentationExceptions: Record<string, string[]> = {
   'packages/server/src/transport/http/routes/sessions.ts': [
-    '@/routes/validate', '@/routes/schemas', '@/utils/http-errors',
+    '@/routes/validate', '@/routes/schemas',
   ],
 };
 
-// Bootstrap composition exceptions: the root reads process configuration and
-// injects the concrete store accessor into infrastructure repositories. These
-// remain explicit until configuration and storage ownership are completed.
+// Bootstrap has no exceptions. The root reads process configuration and
+// composes the layers without injecting a store accessor.
 const layerBootstrapExceptions: Record<string, string[]> = {};
 
 // S5 filesystem isolation: the filesystem infrastructure moves the exact
@@ -168,16 +165,11 @@ const layerBootstrapExceptions: Record<string, string[]> = {};
 // file mutations) are the only exceptions, pinned by the S5 gate below.
 const layerInfrastructureExceptions: Record<string, string[]> = {
   'packages/server/src/infrastructure/sqlite/database.ts': ['@/config', '@/utils/perf'],
-  'packages/server/src/infrastructure/filesystem/file-preview.ts': [],
-  'packages/server/src/infrastructure/filesystem/file-mutations.ts': [],
-  'packages/server/src/infrastructure/filesystem/git-status.ts': [],
   'packages/server/src/infrastructure/mcp/manager.ts': ['@/version'],
   'packages/server/src/infrastructure/session-title.ts': ['@/config'],
-  'packages/server/src/infrastructure/mcp/auth.ts': [],
   'packages/server/src/infrastructure/tools/distribution.ts': ['@/config'],
   'packages/server/src/infrastructure/tools/tool-installer.ts': ['@/config'],
   'packages/server/src/infrastructure/tools/tool-npm-installer.ts': ['@/services/npm-utils'],
-  'packages/server/src/infrastructure/providers/provider-config-files.ts': [],
   'packages/server/src/infrastructure/providers/provider-credential-files.ts': [
     '@/configuration/errors', '@/configuration/files',
   ],
@@ -202,7 +194,7 @@ const globalBaselineRules: DependencyRule[] = [
   },
   {
     name: 'sqlite-infrastructure-only',
-    rationale: 'SQLite belongs to infrastructure. Remaining store consumers are recorded for the S9 storage migration; new consumers fail.',
+    rationale: 'SQLite is infrastructure-only. No store exceptions remain; new consumers fail.',
     appliesTo: [serverSourceRoot],
     forbiddenSpecifiers: [{ exact: 'bun:sqlite' }],
     allowedInDirs: [infrastructureSqliteDir],
@@ -300,7 +292,7 @@ const layerRules: DependencyRule[] = [
   },
   {
     name: 'layer-http-routes',
-    rationale: 'HTTP routes invoke application use cases. No SQLite, AI SDK, or Capek implementation imports. Configuration, maintenance, and response-format route exceptions remain recorded for their owning slices.',
+    rationale: 'HTTP routes invoke application use cases. No SQLite, AI SDK, or Capek implementation imports. No HTTP route legacy exceptions remain; the session route presentation helpers are documented separately in the transport rule.',
     appliesTo: [routesDir],
     forbiddenSpecifiers: [
       { exact: 'bun:sqlite' },
@@ -664,7 +656,7 @@ describe('server layer boundaries', () => {
     }
 
     expect(layerTransportHttpPresentationExceptions['packages/server/src/transport/http/routes/sessions.ts']).toEqual([
-      '@/routes/validate', '@/routes/schemas', '@/utils/http-errors',
+      '@/routes/validate', '@/routes/schemas',
     ]);
 
     const imports = scanDirectory(serverSourceRoot)
@@ -778,7 +770,7 @@ describe('server layer boundaries', () => {
       '@/application/scheduling',
       './validate',
       './schemas',
-      '@/utils/http-errors',
+      '@/application/http-errors',
     ];
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
 
@@ -960,7 +952,7 @@ describe('server layer boundaries', () => {
       '@/application/agents',
       './validate',
       './schemas',
-      '@/utils/http-errors',
+      '@/application/http-errors',
     ];
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
 
@@ -1003,20 +995,23 @@ describe('server layer boundaries', () => {
     ].sort());
   });
 
-  test('S4 gate: the agents storage compatibility module forwards through the application and jean2 adapters', () => {
-    const compatPath = resolve(serverSourceRoot, 'agents/storage.ts');
-    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === compatPath);
-    expect(file).toBeDefined();
+  test('S4 gate: retired agent compatibility modules are absent and unimported', () => {
+    const files = scanDirectory(serverSourceRoot);
+    const retired = [
+      'packages/server/src/agents/memory.ts',
+      'packages/server/src/agents/storage.ts',
+    ] as const;
+    const retiredPaths = new Set(retired.map((path) => resolve(repositoryRoot, path)));
+    const imports = files.flatMap((file) => parseImports(file.sourceText, file.path));
 
-    const imports = parseImports(file!.sourceText, file!.path);
-    expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@jean2/sdk',
-      '@/adapters/jean2',
-      '@/application/agents',
-      '@/infrastructure/agents/agent-directory-filesystem',
-      '@/paths',
-      'path',
-    ].sort());
+    for (const path of retired) {
+      expect(files.some((file) => relative(repositoryRoot, file.path) === path)).toBe(false);
+    }
+    for (const imp of imports) {
+      expect(imp.specifier.startsWith('@/agents')).toBe(false);
+      const resolved = resolveLocalSpecifier(imp.specifier, imp.file, serverSourceRoot);
+      expect(resolved === null || !retiredPaths.has(resolved)).toBe(true);
+    }
   });
 
   test('S4 gate: the infrastructure agent directory adapter imports only the directory port', () => {
@@ -1140,36 +1135,18 @@ describe('server layer boundaries', () => {
     ]);
   });
 
-  test('S4 gate: the capability router is a registry-bound compatibility wrapper over the controller domain', () => {
-    const routerPath = resolve(serverSourceRoot, 'core/capability-router.ts');
-    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === routerPath);
-    expect(file).toBeDefined();
+  test('S9 gate: the capability router is absent and cannot be reintroduced', () => {
+    const files = scanDirectory(serverSourceRoot);
+    const retiredPath = resolve(serverSourceRoot, 'core/capability-router.ts');
+    const retiredPaths = new Set([retiredPath, retiredPath.replace(/\.tsx?$/, '')]);
+    const imports = files.flatMap((file) => parseImports(file.sourceText, file.path));
 
-    const imports = parseImports(file!.sourceText, file!.path);
-    expect(
-      imports.some((imp) =>
-        imp.specifier === '@/domains/controllers'
-        && imp.names.includes('checkAskResponseEligibility')
-        && imp.names.includes('resolveAskDeliveryTargets')
-        && imp.names.includes('getEligibleResponderClientIds')
-      ),
-    ).toBe(true);
-    expect(
-      imports.some((imp) =>
-        imp.specifier === '@/transport/websocket/connection-registry'
-        && imp.names.includes('getClientByClientId')
-        && imp.names.includes('getConnectionsForClient')
-        && imp.names.includes('getAllClients')
-      ),
-    ).toBe(true);
-    expect(
-      imports.some((imp) =>
-        imp.specifier === '@/transport/websocket/control-registry'
-        && imp.names.includes('getParticipantClientIds')
-        && imp.names.includes('getControllerConnections')
-        && imp.names.includes('getParticipantConnections')
-      ),
-    ).toBe(true);
+    expect(files.some((file) => file.path === retiredPath)).toBe(false);
+    for (const imp of imports) {
+      expect(imp.specifier).not.toBe('@/core/capability-router');
+      const resolved = resolveLocalSpecifier(imp.specifier, imp.file, serverSourceRoot);
+      expect(resolved === null || !retiredPaths.has(resolved)).toBe(true);
+    }
   });
 
   test('S9 gate: the tool-output artifact implementation is owned by SQLite infrastructure', () => {
@@ -1275,7 +1252,7 @@ describe('server layer boundaries', () => {
       '@/application/workspaces',
       './validate',
       './schemas',
-      '@/utils/http-errors',
+      '@/application/http-errors',
     ];
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
 
@@ -1417,7 +1394,7 @@ describe('server layer boundaries', () => {
       'path',
       '@jean2/sdk',
       '@/application/files',
-      '@/utils/http-errors',
+      '@/application/http-errors',
       './schemas',
       './validate',
     ];
@@ -1511,15 +1488,11 @@ describe('server layer boundaries', () => {
       expect(file!.sourceText).not.toContain("@/store");
     }
 
-    // The narrow infrastructure exceptions must match the observed imports
-    // exactly; no broader exception may be recorded.
+    // Filesystem modules have no infrastructure exceptions. Their exact allowed
+    // imports are asserted above.
     expect(Object.keys(layerInfrastructureExceptions)
-      .filter((path) => path.startsWith('packages/server/src/infrastructure/filesystem/'))
-      .sort()).toEqual([
-      'packages/server/src/infrastructure/filesystem/file-mutations.ts',
-      'packages/server/src/infrastructure/filesystem/file-preview.ts',
-      'packages/server/src/infrastructure/filesystem/git-status.ts',
-    ]);
+      .filter((path) => path.startsWith('packages/server/src/infrastructure/filesystem/')))
+      .toEqual([]);
   });
 
   test('S5 gate: the terminal manager keeps PTY and transport ownership and persists through the port', () => {
@@ -1635,7 +1608,7 @@ describe('server layer boundaries', () => {
       '@/application/mcp',
       './validate',
       './schemas',
-      '@/utils/http-errors',
+      '@/application/http-errors',
     ];
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
 
@@ -1857,22 +1830,37 @@ describe('server layer boundaries', () => {
     expect(distribution?.sourceText).not.toContain("from '@/tools/tool-repository'");
   });
 
-  test('S9 gate: retired compatibility wrappers are absent and unimported', () => {
+  test('S9 gate: retired compatibility wrappers, including the scheduler lifecycle seam, are absent and unimported', () => {
     const files = scanDirectory(serverSourceRoot);
     const retired = [
       'packages/server/src/core/session-title.ts',
+      'packages/server/src/core/preconfig.ts',
+      'packages/server/src/paths.ts',
+      'packages/server/src/env.ts',
       'packages/server/src/utils/binaryDetection.ts',
       'packages/server/src/utils/paths.ts',
+      'packages/server/src/utils/http-errors.ts',
       'packages/server/src/session-search/fts.ts',
+      'packages/server/src/scheduler/index.ts',
       'packages/server/src/tools/index.ts',
     ] as const;
     const retiredPaths = new Set(retired.map((path) => resolve(repositoryRoot, path)));
     const retiredSpecifiers = new Set([
       '@/core/session-title',
+      '@/core/preconfig',
+      '@/env',
+      '@/paths',
       '@/utils/binaryDetection',
       '@/utils/paths',
+      '@/utils/http-errors',
       '@/session-search/fts',
+      '@/scheduler',
       '@/tools',
+    ]);
+    const retiredSpecifierPrefixes = ['@/scheduler/', '@/env/', '@/paths/', '@/utils/http-errors/'];
+    const retiredResolvedPaths = new Set([
+      ...retiredPaths,
+      ...[...retiredPaths].map((path) => path.replace(/\.tsx?$/, '')),
     ]);
     const imports = files.flatMap((file) => parseImports(file.sourceText, file.path));
 
@@ -1880,25 +1868,15 @@ describe('server layer boundaries', () => {
       expect(files.some((file) => relative(repositoryRoot, file.path) === path)).toBe(false);
     }
     for (const imp of imports) {
-      expect(retiredSpecifiers.has(imp.specifier)).toBe(false);
+      expect(
+        retiredSpecifiers.has(imp.specifier) ||
+          retiredSpecifierPrefixes.some((prefix) => imp.specifier.startsWith(prefix)),
+      ).toBe(false);
       const resolved = resolveLocalSpecifier(imp.specifier, imp.file, serverSourceRoot);
-      expect(resolved === null || !retiredPaths.has(resolved)).toBe(true);
+      expect(resolved === null || !retiredResolvedPaths.has(resolved)).toBe(true);
     }
   });
 
-  test('S9 gate: shared leaves have infrastructure or application owners', () => {
-    const files = scanDirectory(serverSourceRoot);
-    const wrappers = [
-      ['packages/server/src/paths.ts', '@/infrastructure/runtime/paths'],
-      ['packages/server/src/env.ts', '@/infrastructure/runtime/environment'],
-      ['packages/server/src/core/preconfig.ts', '@/infrastructure/configuration/preconfig'],
-      ['packages/server/src/utils/http-errors.ts', '@/application/http-errors'],
-    ] as const;
-    for (const [path, owner] of wrappers) {
-      const file = files.find((candidate) => relative(repositoryRoot, candidate.path) === path);
-      expect(file?.sourceText).toContain(owner);
-    }
-  });
 
   test('S9 gate: configuration HTTP routes use the configuration application', () => {
     const routePath = resolve(routesDir, 'config.ts');
@@ -2093,7 +2071,7 @@ describe('server layer boundaries', () => {
       '@/application/notifications',
       './validate',
       './schemas',
-      '@/utils/http-errors',
+      '@/application/http-errors',
     ];
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
 

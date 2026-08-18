@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import { validate } from './validate';
 import { randomUUID } from 'crypto';
 import type { ResponseFormatsApplication } from '@/application/ports/response-formats';
-import { NotFoundError } from '@/utils/http-errors';
+import { NotFoundError } from '@/application/http-errors';
 import { createResponseFormatSchema, updateResponseFormatSchema } from './schemas';
 
 export function registerResponseFormatRoutes(app: Hono, responseFormats: ResponseFormatsApplication): void {

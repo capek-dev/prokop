@@ -7,11 +7,12 @@ import { createAgentsApplication } from '@/application/agents';
 import {
   createJean2AgentPreconfigPort,
   createJean2AgentWorkspacePort,
+  createJean2SessionRepository,
 } from '@/adapters/jean2';
 import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
 import { agentHomeWorkspaceSettings } from '@/domains/agents';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
-import { getDataDir } from '@/paths';
+import { getDataDir } from '@/infrastructure/runtime/paths';
 
 describe('jean2 agents adapters over the real store and filesystem', () => {
   beforeEach(() => {
@@ -65,5 +66,24 @@ describe('jean2 agents adapters over the real store and filesystem', () => {
     });
 
     await expect(application.promotePreconfig('missing')).rejects.toThrow('Preconfig not found');
+  });
+
+  test('session repository delegates preconfig lookup and synchronous agent detection to the composed application', async () => {
+    const calls: string[] = [];
+    const agents = {
+      async getPreconfigOrAgent(id: string) {
+        calls.push(`preconfig:${id}`);
+        return null;
+      },
+      isAgentSync(id: string) {
+        calls.push(`sync:${id}`);
+        return id === 'coder';
+      },
+    };
+    const repository = createJean2SessionRepository(agents);
+
+    expect(await repository.getPreconfigOrAgent('coder')).toBeNull();
+    expect(repository.isAgentSync('coder')).toBe(true);
+    expect(calls).toEqual(['preconfig:coder', 'sync:coder']);
   });
 });

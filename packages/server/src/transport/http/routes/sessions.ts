@@ -8,7 +8,7 @@ import {
   NotFoundError,
   PayloadTooLargeError,
   UnauthorizedError,
-} from '@/utils/http-errors';
+} from '@/application/http-errors';
 import type { SessionHttpApplication } from '@/application';
 
 /**

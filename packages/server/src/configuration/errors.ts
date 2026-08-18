@@ -1,4 +1,4 @@
-import { HttpError } from '@/utils/http-errors';
+import { HttpError } from '@/application/http-errors';
 
 export class ConfigurationError extends HttpError {
   constructor(status: number, message: string, code: string, details?: unknown) {

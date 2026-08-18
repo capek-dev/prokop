@@ -4,7 +4,7 @@ import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
 import { getPushSubscription } from '@/infrastructure/sqlite/web-push';
 import { getVapidCredentials, resetVapidCache } from '@/services/web-push/credentials';
-import { getWebPushCredentialsPath } from '@/paths';
+import { getWebPushCredentialsPath } from '@/infrastructure/runtime/paths';
 import { existsSync } from 'fs';
 
 async function json(res: Response): Promise<Record<string, unknown>> {

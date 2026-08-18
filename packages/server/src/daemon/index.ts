@@ -11,10 +11,10 @@ import {
   watchFile,
   writeFileSync,
 } from 'fs';
-import { getPidFilePath as getPidFilePathFromPaths, getLogFilePath as getLogFilePathFromPaths, getDataDir } from '@/paths';
+import { getPidFilePath as getPidFilePathFromPaths, getLogFilePath as getLogFilePathFromPaths, getDataDir } from '@/infrastructure/runtime/paths';
 
 import { getPort, getHost } from '@/config';
-import { getToolEnv, getTlsEnabled, getTlsCertFile, getTlsKeyFile, getClientEnabled, getClientPort } from '@/env';
+import { getToolEnv, getTlsEnabled, getTlsCertFile, getTlsKeyFile, getClientEnabled, getClientPort } from '@/infrastructure/runtime/environment';
 
 export interface DaemonStatus {
   running: boolean;

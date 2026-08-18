@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
 import { registerNotificationRoutes } from '@/routes/notifications';
-import { HttpError } from '@/utils/http-errors';
+import { HttpError } from '@/application/http-errors';
 import type { NotificationsApplication } from '@/application/notifications';
 import type { PushSubscriptionRecord } from '@jean2/sdk';
 

@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { validate } from './validate';
 import type { NotificationsApplication } from '@/application/notifications';
-import { NotFoundError } from '@/utils/http-errors';
+import { NotFoundError } from '@/application/http-errors';
 import { upsertSubscriptionSchema, updateSubscriptionPreferencesSchema } from './schemas';
 
 /**

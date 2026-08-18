@@ -7,9 +7,20 @@ import { createRuntime } from '@/bootstrap/create-runtime';
 import { createWiredApplication } from '@/bootstrap/application';
 import { installDeliveryPort } from '@/core/broadcast';
 import { installWireApplication } from '@/transport/websocket/application';
-import { resolveAskDeliveryTargets } from '@/core/capability-router';
+import { resolveAskDeliveryTargets, type AskDeliveryInventories } from '@/domains/controllers';
 import { createBunWebSocketAdapter, type WsData } from '@/transport/websocket/bun-adapter';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
+import {
+  getAllClients,
+  getClientByClientId,
+  getConnectionsForClient,
+  type RegisteredConnection,
+} from '@/transport/websocket/connection-registry';
+import {
+  getControllerConnections,
+  getParticipantClientIds,
+  getParticipantConnections,
+} from '@/transport/websocket/control-registry';
 import { scanTools } from '@capekai/core/internal/tools';
 import { closeDatabase, getDatabase } from '@/infrastructure/sqlite/database';
 import { backfillFts } from '@/infrastructure/session-search/fts';
@@ -41,7 +52,6 @@ import {
   prepareAndLaunchClient,
   type ClientLauncher,
 } from '@/services/client-launcher';
-import { startScheduler, stopScheduler, installSchedulerRuntime } from '@/scheduler';
 import { startPushRetryScheduler, stopPushRetryScheduler, cleanupPushData } from '@/services/web-push/retry-scheduler';
 import {
   startProviderAccountLifecycle,
@@ -58,11 +68,29 @@ export interface ServerInstance {
   cleanup: () => void;
 }
 
+function resolveAskTargetConnections(
+  sessionId: string,
+  authority: AskAuthority,
+): RegisteredConnection[] {
+  const inventories: AskDeliveryInventories<RegisteredConnection> = {
+    authority,
+    controllerConnections: getControllerConnections(sessionId),
+    participantConnections: getParticipantConnections(sessionId),
+    clientIdOf: (conn) => conn.clientId,
+    identityOf: (conn) => conn.connectionId,
+    capabilitiesOf: (clientId) => getClientByClientId(clientId),
+    connectionsForClient: (clientId) => getConnectionsForClient(clientId),
+    globalClientIds: () => Array.from(getAllClients().keys()),
+    participantClientIds: () => getParticipantClientIds(sessionId),
+  };
+
+  return resolveAskDeliveryTargets(inventories).connections;
+}
+
 async function startServer(options?: ServerOptions): Promise<ServerInstance> {
-  createRuntime();
-  const application = createWiredApplication();
+  const agents = createRuntime();
+  const application = createWiredApplication(agents);
   installWireApplication({ session: application.session, control: application.control, providers: application.providers, notifications: application.notifications, permissions: application.permissions });
-  installSchedulerRuntime(application.schedulerTicker);
   cleanupRunningSessionsOnStartup();
   reconcileAllSessionsCompaction();
   reconcileAllOrphanedToolCalls();
@@ -89,7 +117,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
       getEventManager: () => getTerminalEventManager(),
     },
     resolveAskTargets: (sessionId: string, authority: AskAuthority): ConnectionId[] =>
-      resolveAskDeliveryTargets(sessionId, authority).connections.map((conn) => conn.connectionId),
+      resolveAskTargetConnections(sessionId, authority).map((conn) => conn.connectionId),
   });
   installDeliveryPort(transport.delivery);
 
@@ -160,7 +188,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   transport.startTimers();
 
   // Start the scheduler tick loop (catches jobs that became due while offline)
-  startScheduler();
+  application.schedulerTicker.start();
   startPushRetryScheduler();
   startProviderAccountLifecycle();
 
@@ -198,7 +226,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
 
   const cleanup = () => {
     transport.stopTimers();
-    stopScheduler();
+    application.schedulerTicker.stop();
     stopPushRetryScheduler();
     stopProviderAccountLifecycle();
     clientLauncher?.stop();

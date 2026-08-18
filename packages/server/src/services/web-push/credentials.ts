@@ -2,7 +2,7 @@ import { existsSync, chmodSync, writeFileSync, renameSync, unlinkSync, readFileS
 import { dirname, join } from 'path';
 import { randomUUID } from 'crypto';
 import { mkdirSync } from 'fs';
-import { getWebPushCredentialsPath } from '@/paths';
+import { getWebPushCredentialsPath } from '@/infrastructure/runtime/paths';
 import webpush from 'web-push';
 import type { PushSubscription } from 'web-push';
 

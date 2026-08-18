@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import { validate } from './validate';
 import type { McpHttpApplication } from '@/application/mcp';
-import { NotFoundError } from '@/utils/http-errors';
+import { NotFoundError } from '@/application/http-errors';
 import { mcpServerNameSchema } from './schemas';
 
 /**

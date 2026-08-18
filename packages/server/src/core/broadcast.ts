@@ -6,10 +6,6 @@ export type BroadcastFn = (message: ServerMessage) => void;
 
 export type BroadcastSessionFn = (session: Session) => void;
 
-export type SendToControllerFn = (sessionId: string, message: ServerMessage) => void;
-
-export type BroadcastToSessionFn = (sessionId: string, message: ServerMessage) => void;
-
 export type SendToAskTargetsFn = (
   sessionId: string,
   authority: AskAuthority,
@@ -21,8 +17,7 @@ export type SendToAskTargetsFn = (
  * controller, ask-target, and global broadcast.
  *
  * S2 contract: production bootstrap installs the concrete transport port via
- * `installDeliveryPort`. The legacy `register*Callback` functions remain only
- * for temporary forwarding and test compatibility.
+ * `installDeliveryPort`.
  */
 export interface DeliveryPort {
   readonly sendToConnection: (connectionId: ConnectionId, message: ServerMessage) => void;
@@ -32,28 +27,10 @@ export interface DeliveryPort {
   readonly sendToAskTargets: (sessionId: string, authority: AskAuthority, message: ServerMessage) => void;
 }
 
-type BroadcastCallback = (message: ServerMessage, excludeWs?: unknown) => void;
-
 let installedPort: DeliveryPort | null = null;
-
-let broadcastCallback: BroadcastCallback | null = null;
-let sendToControllerCallback: SendToControllerFn | null = null;
-let broadcastToSessionCallback: BroadcastToSessionFn | null = null;
 
 export function installDeliveryPort(port: DeliveryPort): void {
   installedPort = port;
-}
-
-export function registerBroadcastCallback(callback: BroadcastCallback): void {
-  broadcastCallback = callback as BroadcastCallback;
-}
-
-export function registerSendToControllerCallback(callback: SendToControllerFn): void {
-  sendToControllerCallback = callback;
-}
-
-export function registerBroadcastToSessionCallback(callback: BroadcastToSessionFn): void {
-  broadcastToSessionCallback = callback;
 }
 
 function toConnectionId(excludeWs: unknown): ConnectionId | undefined {
@@ -67,17 +44,7 @@ export function broadcastSessionCreated(session: Session): void {
     session,
   };
 
-  if (installedPort) {
-    installedPort.broadcast(message);
-    return;
-  }
-
-  if (!broadcastCallback) {
-    console.error('Broadcast callback not registered. Call registerBroadcastCallback first.');
-    return;
-  }
-
-  broadcastCallback(message);
+  installedPort?.broadcast(message);
 }
 
 export function broadcastSessionCreatedExclude(session: Session, excludeWs: unknown): void {
@@ -86,17 +53,7 @@ export function broadcastSessionCreatedExclude(session: Session, excludeWs: unkn
     session,
   };
 
-  if (installedPort) {
-    installedPort.broadcast(message, toConnectionId(excludeWs));
-    return;
-  }
-
-  if (!broadcastCallback) {
-    console.error('Broadcast callback not registered. Call registerBroadcastCallback first.');
-    return;
-  }
-
-  broadcastCallback(message, excludeWs);
+  installedPort?.broadcast(message, toConnectionId(excludeWs));
 }
 
 export function broadcastSessionUpdated(session: Session): void {
@@ -105,26 +62,11 @@ export function broadcastSessionUpdated(session: Session): void {
     session,
   };
 
-  if (installedPort) {
-    installedPort.broadcast(message);
-    return;
-  }
-
-  if (!broadcastCallback) {
-    console.error('Broadcast callback not registered. Call registerBroadcastCallback first.');
-    return;
-  }
-
-  broadcastCallback(message);
+  installedPort?.broadcast(message);
 }
 
 export function broadcastEvent(message: ServerMessage): void {
-  if (installedPort) {
-    installedPort.broadcast(message);
-    return;
-  }
-  if (!broadcastCallback) return;
-  broadcastCallback(message);
+  installedPort?.broadcast(message);
 }
 
 export function sendToControllerEvent(sessionId: string, message: ServerMessage): void {
@@ -132,11 +74,7 @@ export function sendToControllerEvent(sessionId: string, message: ServerMessage)
     installedPort.sendToController(sessionId, message);
     return;
   }
-  if (!sendToControllerCallback) {
-    broadcastEvent(message);
-    return;
-  }
-  sendToControllerCallback(sessionId, message);
+  broadcastEvent(message);
 }
 
 export function broadcastToSessionEvent(sessionId: string, message: ServerMessage): void {
@@ -144,11 +82,7 @@ export function broadcastToSessionEvent(sessionId: string, message: ServerMessag
     installedPort.broadcastToSession(sessionId, message);
     return;
   }
-  if (!broadcastToSessionCallback) {
-    broadcastEvent(message);
-    return;
-  }
-  broadcastToSessionCallback(sessionId, message);
+  broadcastEvent(message);
 }
 
 /**
@@ -156,8 +90,8 @@ export function broadcastToSessionEvent(sessionId: string, message: ServerMessag
  *
  * With an installed delivery port this delegates to transport resolution
  * (the ask-routing domain is the single target-resolution owner, injected
- * at bootstrap). The legacy callback path is controller-only fallback
- * delivery; it no longer re-resolves ask-target policy.
+ * at bootstrap). Without an installed port, delivery falls back to the
+ * controller-only path and does not re-resolve ask-target policy.
  */
 export function sendToAskTargetsEvent(
   sessionId: string,

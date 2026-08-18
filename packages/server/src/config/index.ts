@@ -7,14 +7,14 @@ import {
   getHost as getEnvHost,
   getLLMMaxTokens,
   getModelsPath,
-} from '../env';
+} from '@/infrastructure/runtime/environment';
 import {
   getDataDir,
   getConfigPath as getConfigFilePath,
   getModelsConfigPath as getModelsConfigFilePath,
   getDefaultDatabasePath as getDefaultDatabasePathFromPaths,
   getToolsDir,
-} from '../paths';
+} from '@/infrastructure/runtime/paths';
 
 // NotInitializedError for when config doesn't exist
 export class NotInitializedError extends Error {

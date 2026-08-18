@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { homedir } from 'os';
 import { join, resolve } from 'path';
 import { registerFileRoutes } from '@/routes/files';
-import { HttpError } from '@/utils/http-errors';
+import { HttpError } from '@/application/http-errors';
 import type { FilesApplication } from '@/application/files';
 
 function makeFilesApplication(

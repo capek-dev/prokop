@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { validate } from './validate';
 import type { AgentsApplication } from '@/application/agents';
-import { NotFoundError } from '@/utils/http-errors';
+import { NotFoundError } from '@/application/http-errors';
 import { updateAgentMemorySchema } from './schemas';
 
 /**

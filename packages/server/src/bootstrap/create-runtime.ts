@@ -12,6 +12,8 @@ import {
 import type { Jean2SchedulerHostDeps } from '@/adapters/capek/scheduler';
 import { jean2StorageBundle } from '@/adapters/capek/storage';
 import type { Jean2SessionSearchHostDeps } from '@/adapters/capek/session-search';
+import { createWiredAgentsApplication } from '@/bootstrap/application';
+import type { AgentsApplication } from '@/application/agents';
 import { createJean2ScheduledJobExecution } from '@/adapters/jean2/scheduled-job-execution';
 import { createJean2SessionRepository } from '@/adapters/jean2/session-repository';
 import { createScheduledJobRepository } from '@/infrastructure/sqlite/scheduled-job-repository';
@@ -22,8 +24,8 @@ import { getDatabase } from '@/infrastructure/sqlite/database';
  * infrastructure repository with an injected store accessor; session and
  * workspace lookups come from the existing repository and storage adapter
  * implementations. */
-function createSessionSearchHostDeps(): Jean2SessionSearchHostDeps {
-  const sessionRepository = createJean2SessionRepository();
+function createSessionSearchHostDeps(agents: AgentsApplication): Jean2SessionSearchHostDeps {
+  const sessionRepository = createJean2SessionRepository(agents);
   return {
     // Bootstrap is the composition root: it injects the concrete store
     // accessor; the repository holds no module-global connection state.
@@ -60,16 +62,19 @@ function createSchedulerHostDeps(): Jean2SchedulerHostDeps {
  * session-search host must be configured before the compatibility bindings so
  * the explicit unscoped fallback captures the configured host.
  */
-export function createRuntime(): void {
+export function createRuntime(existingAgents?: AgentsApplication): AgentsApplication {
+  const agents = existingAgents ?? createWiredAgentsApplication();
+
   configureJean2Storage();
   configureJean2RuntimeConfiguration();
-  configureJean2PreconfigSource();
-  configureJean2AgentSource();
+  configureJean2PreconfigSource(agents);
+  configureJean2AgentSource(agents);
   configureJean2InstructionSource();
-  configureJean2SessionSearchHost(createSessionSearchHostDeps());
+  configureJean2SessionSearchHost(createSessionSearchHostDeps(agents));
   configureJean2SchedulerHost(createSchedulerHostDeps());
   configureJean2ToolSource();
   configureJean2Bindings();
+  return agents;
 }
 
 export { createJean2RuntimeComposition } from '@/adapters/capek/composition';

@@ -8,10 +8,10 @@
  *   - Paths.configure({ dataDir }) (e.g. for CLI --data-dir flag, or tests)
  *
  * Usage:
- *   import { getAuthTokenPath, getPreconfigsDir } from '@/paths';
+ *   import { getAuthTokenPath, getPreconfigsDir } from '@/infrastructure/runtime/paths';
  *
  * Override (generic — not test-specific):
- *   import { Paths } from '@/paths';
+ *   import { Paths } from '@/infrastructure/runtime/paths';
  *   Paths.configure({ dataDir: '/tmp/some-dir' });
  *   Paths.reset();
  */

@@ -7,7 +7,7 @@ import { handleChat, handleSessionEditMessage } from '@/transport/websocket/chat
 import type { RouterContext } from '@/transport/websocket/router-context';
 import { executeCompaction, interruptManager } from '@capekai/core/internal/execution';
 import { sandboxController } from '@capekai/core/internal/sandbox';
-import { createPreconfig } from '@/core/preconfig';
+import { createPreconfig } from '@/infrastructure/configuration/preconfig';
 import { activateSandbox, deactivateSandbox } from '@/sandbox';
 import { createSession, getChildSessions, getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
-import { HttpError } from '@/utils/http-errors';
+import { HttpError } from '@/application/http-errors';
 import { registerSessionRoutes } from '@/transport/http/routes/sessions';
 import { createSessionHttpApplication, type SessionHttpApplication } from '@/application/sessions/http';
 import type { SessionRepositoryPort } from '@/application/ports/session';

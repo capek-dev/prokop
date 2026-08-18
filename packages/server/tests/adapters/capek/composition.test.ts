@@ -31,6 +31,7 @@ import {
 } from '@capekai/core/internal/composition';
 import * as focused from '@/adapters/capek';
 import { configureJean2SessionSearchHost } from '@/adapters/capek/session-search';
+import { createWiredApplication } from '@/bootstrap/application';
 import { createJean2RuntimeComposition, createRuntime } from '@/bootstrap/create-runtime';
 import { createMessage, createPart } from '@/infrastructure/sqlite/message-store';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
@@ -113,10 +114,13 @@ describe('Čapek composition root', () => {
       '@/adapters/capek/session-search',
       '@/adapters/capek/scheduler',
       '@/adapters/capek/composition',
+      '@/bootstrap/application',
+      '@/application/agents',
       '@/adapters/jean2/session-repository',
       '@/adapters/jean2/scheduled-job-execution',
       '@/infrastructure/sqlite/session-search-query-repository',
       '@/infrastructure/sqlite/scheduled-job-repository',
+      '@/infrastructure/sqlite/database',
       '@/infrastructure/sqlite/message-store',
     ];
     for (const imp of imports) {
@@ -139,6 +143,13 @@ describe('Čapek composition root', () => {
     expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);
     expect(getSchedulerHost()).toBe(focused.jean2SchedulerHost);
     expect(getToolSource()).toBe(focused.jean2ToolSource);
+  });
+
+  test('the runtime and HTTP composition reuse one AgentsApplication identity', () => {
+    const agents = createRuntime();
+    const wired = createWiredApplication(agents);
+
+    expect(wired.agents).toBe(agents);
   });
 
 });

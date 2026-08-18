@@ -9,7 +9,7 @@ import {
   ConfigurationConflictError,
   ConfigurationPersistenceError,
 } from './errors';
-import { getPromptsDir } from '@/paths';
+import { getPromptsDir } from '@/infrastructure/runtime/paths';
 
 function getPromptsDirPath(): string {
   return getPromptsDir();

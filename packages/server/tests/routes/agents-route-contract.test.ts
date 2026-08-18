@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
 import { registerAgentRoutes } from '@/routes/agents';
-import { HttpError } from '@/utils/http-errors';
+import { HttpError } from '@/application/http-errors';
 import type { AgentsApplication } from '@/application/agents';
 import type { Agent, Preconfig } from '@jean2/sdk';
 
