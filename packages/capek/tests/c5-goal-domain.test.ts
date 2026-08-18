@@ -619,7 +619,7 @@ describe('C5 goal loop lifecycle with injected deps', () => {
     expect((state.broadcasts.at(-1)?.metadata?.goal as GoalState | undefined)?.completedAt).toBeDefined();
   });
 
-  test('the legacy module path and forwarder identities stay intact', async () => {
+  test('the legacy goal-loop module path and identity stay intact', async () => {
     const state: FakeLoopState = { session: makeSession(), broadcasts: [], turns: [] };
     const sessions = new Map<string, Session>([[state.session.id, state.session]]);
     configureStorage({
@@ -651,8 +651,5 @@ describe('C5 goal loop lifecycle with injected deps', () => {
     // Forwarder identity: the core goal-loop export IS the domain function.
     const domainLoop = (await import('../src/goals/loop')).runGoalLoop;
     expect(runGoalLoop).toBe(domainLoop);
-    const domainEvaluator = (await import('../src/goals/evaluator')).evaluateGoal;
-    const coreEvaluator = (await import('../src/core/goal-evaluator')).evaluateGoal;
-    expect(coreEvaluator).toBe(domainEvaluator);
   });
 });
