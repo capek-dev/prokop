@@ -10,7 +10,7 @@ import { jean2InteractionBindings } from '@/adapters/capek/interaction';
 import { jean2SandboxBindings } from '@/adapters/capek/sandbox';
 import { jean2TitleBindings } from '@/adapters/capek/titles';
 import { jean2WorkspaceBindings } from '@/adapters/capek/workspace';
-import { generateSessionTitle, hasManualSessionTitle, isDefaultSessionTitle } from '@/core/session-title';
+import { generateSessionTitle, hasManualSessionTitle, isDefaultSessionTitle } from '@/infrastructure/session-title';
 import { isSandboxActive } from '@/sandbox';
 import { getPermissionTimeoutMs } from '@/env';
 import { getSession } from '@/infrastructure/sqlite/session-store';

@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach } from 'bun:test';
-import { isBinaryExtension, isBinaryFile } from '@/utils/binaryDetection';
+import { isBinaryExtension, isBinaryFile } from '@/infrastructure/filesystem/binary-detection';
 
 const tempFiles: string[] = [];
 
