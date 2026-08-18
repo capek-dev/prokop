@@ -5,7 +5,7 @@ import type {
   ModelFactoryOptions,
   ModelFactoryResult,
   TokenResponse,
-} from './provider-types';
+} from '../providers/types';
 import { SandboxLanguageModel } from './model';
 
 export class SandboxProvider implements ConnectableProvider {
