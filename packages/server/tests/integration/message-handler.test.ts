@@ -12,18 +12,22 @@ import {
   getSession,
   updateSession,
   deleteSession,
+} from '@/infrastructure/sqlite/session-store';
+import {
   createMessage,
   createPart,
   listMessagesWithParts,
+} from '@/infrastructure/sqlite/message-store';
+import {
   addMessageToQueue,
   getQueuedMessage,
   listQueuedMessages,
   deleteQueuedMessage,
   getNextQueuedMessage,
-} from '@/store';
+} from '@/infrastructure/sqlite/queued-messages';
 import { executeCompaction, revertToStep, forkSession, interruptManager } from '@capekai/core/internal/execution';
 import { resolveAsk, createAskApi } from '@capekai/core/internal/ask-authority';
-import { getWorkspaceGrants, revokeGrant, revokeAllWorkspaceGrants } from '@/store/permissions';
+import { getWorkspaceGrants, revokeGrant, revokeAllWorkspaceGrants } from '@/infrastructure/sqlite/permissions';
 import type { AssistantMessage, ToolPart, ServerMessage } from '@jean2/sdk';
 
 const broadcastMock = createMockBroadcast();
@@ -259,7 +263,7 @@ describe('Integration: WebSocket message handlers', () => {
     });
 
     test('compaction fails for child session (parentId set)', async () => {
-      const { createSession: createSess } = await import('@/store/sessions');
+      const { createSession: createSess } = await import('@/infrastructure/sqlite/session-store');
       const childSession = createSess({
         id: 'child-sess',
         workspaceId,
@@ -451,7 +455,7 @@ describe('Integration: WebSocket message handlers', () => {
     });
 
     test('interrupt marks subagent session as interrupted', async () => {
-      const { createSession: createSess } = await import('@/store/sessions');
+      const { createSession: createSess } = await import('@/infrastructure/sqlite/session-store');
       const childSession = createSess({
         id: 'child-int',
         workspaceId,
@@ -581,7 +585,7 @@ describe('Integration: WebSocket message handlers', () => {
     });
 
     test('create ask with permission auto-grants if matching grant exists', async () => {
-      const { createGrantFromOptions } = await import('@/store/permissions');
+      const { createGrantFromOptions } = await import('@/infrastructure/sqlite/permissions');
       createGrantFromOptions({
         workspaceId,
         toolName: 'read-file',
@@ -629,7 +633,7 @@ describe('Integration: WebSocket message handlers', () => {
     });
 
     test('revoke grant removes it', async () => {
-      const { createGrantFromOptions } = await import('@/store/permissions');
+      const { createGrantFromOptions } = await import('@/infrastructure/sqlite/permissions');
       createGrantFromOptions({
         workspaceId,
         toolName: 'read-file',
@@ -654,7 +658,7 @@ describe('Integration: WebSocket message handlers', () => {
     });
 
     test('revoke all workspace grants', async () => {
-      const { createGrantFromOptions } = await import('@/store/permissions');
+      const { createGrantFromOptions } = await import('@/infrastructure/sqlite/permissions');
       createGrantFromOptions({
         workspaceId,
         toolName: 'read-file',

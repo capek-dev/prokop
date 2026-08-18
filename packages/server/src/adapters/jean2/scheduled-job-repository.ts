@@ -10,7 +10,7 @@ import {
   markScheduledJobError,
   markScheduledJobRun,
   updateScheduledJob,
-} from '@/store/scheduled-jobs';
+} from '@/infrastructure/sqlite/scheduled-job-store';
 import type { ScheduledJobRepositoryPort } from '@/application/ports/scheduling';
 
 /**

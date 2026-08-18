@@ -1,13 +1,10 @@
 /**
- * S5 compat forwarder. Session SQL and row mapping moved to
- * `infrastructure/sqlite/session-repository.ts`; this module keeps every
- * pre-slice export identity and wires the temporary side-effect hooks (FTS
- * removal, attachment deletion, output-dir cleanup) around the repository
- * exactly as before. The store -> compat -> infrastructure path stays
- * temporary until S6/S8 retire it.
+ * Session persistence and the side effects that must remain ordered with
+ * session deletion. The repository is created lazily over the database
+ * singleton so database replacement in tests keeps the existing behavior.
  */
 
-import { getDatabase } from './index';
+import { getDatabase } from './database';
 import type { Session, SessionStatus, Workspace } from '@jean2/sdk';
 import { getWorkspace } from './workspaces';
 import { deleteAttachmentsForSession, deleteAttachmentsForWorkspace } from './attachments';
@@ -18,7 +15,7 @@ import path from 'node:path';
 import {
   createSessionRepository,
   type SessionDatabaseAccessor,
-} from '@/infrastructure/sqlite/session-repository';
+} from './session-repository';
 import type {
   ListSessionPageOptions,
   SessionCursorPayload,
@@ -63,8 +60,6 @@ function buildHooks(): SessionMessageRepositoryHooks {
 
 let repository: SessionStorePort | null = null;
 
-/** Lazily created compat repository over the current store database
- * accessor, exactly like the other S5 compat modules. */
 function repo(): SessionStorePort {
   return (repository ??= createSessionRepository(
     getDatabase as SessionDatabaseAccessor,
@@ -110,11 +105,6 @@ export function cleanupWorkspaceSessionsOutputDirs(workspaceId: string): void {
   }
 }
 
-/**
- * Cleanup session output directories for a list of session IDs.
- * Used when deleting a workspace - the sessions may already be removed from DB,
- * so we clean up based on pre-collected session IDs.
- */
 export function cleanupSessionsOutputDirs(sessionIds: string[]): void {
   for (const sessionId of sessionIds) {
     cleanupSessionOutputDir(sessionId);
@@ -181,5 +171,5 @@ export function listSessionPageGrouped(
   return repo().listSessionPageGrouped(workspaceIds, options);
 }
 
-export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from '@/infrastructure/sqlite/session-repository';
+export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from './session-repository';
 export { cleanupSessionOutputDir };

@@ -8,8 +8,8 @@ import {
   listWorkspaces,
   deleteWorkspace,
   type CreateWorkspaceInput,
-} from '@/store/workspaces';
-import { createSession, getSession, listSessionsByWorkspace } from '@/store/sessions';
+} from '@/infrastructure/sqlite/workspaces';
+import { createSession, getSession, listSessionsByWorkspace } from '@/infrastructure/sqlite/session-store';
 
 describe('test infrastructure smoke test', () => {
   beforeEach(() => {

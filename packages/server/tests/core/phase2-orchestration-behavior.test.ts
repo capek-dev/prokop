@@ -9,20 +9,19 @@ import { executeCompaction, interruptManager } from '@capekai/core/internal/exec
 import { sandboxController } from '@capekai/core/internal/sandbox';
 import { createPreconfig } from '@/core/preconfig';
 import { activateSandbox, deactivateSandbox } from '@/sandbox';
+import { createSession, getChildSessions, getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import {
-  addMessageToQueue,
-  createAttachment,
   createMessage,
   createPart,
-  createSession,
-  getChildSessions,
-  getNextQueuedMessage,
   getPartsByMessage,
-  getSession,
   listMessagesWithParts,
+} from '@/infrastructure/sqlite/message-store';
+import {
+  addMessageToQueue,
+  getNextQueuedMessage,
   listQueuedMessages,
-  updateSession,
-} from '@/store';
+} from '@/infrastructure/sqlite/queued-messages';
+import { createAttachment } from '@/infrastructure/sqlite/attachments';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
 import { resetTestDataDir, setupTestDataDir } from '#tests/test-dir';

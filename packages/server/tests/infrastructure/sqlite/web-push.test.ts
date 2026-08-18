@@ -15,7 +15,7 @@ import {
   deleteOldDeliveries,
   deleteAllOldDeliveries,
   getDeliveriesDueForRetry,
-} from '@/store/web-push';
+} from '@/infrastructure/sqlite/web-push';
 
 const validEndpoint = 'https://fcm.googleapis.com/fcm/send/abc123';
 const validKeys = { p256dh: 'p256dh-value', auth: 'auth-value' };

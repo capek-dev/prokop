@@ -5,7 +5,7 @@ import { seedWorkspace, seedSession } from '#tests/seed';
 import { requestPermission, resolvePermission } from '@capekai/core/internal/ask-authority';
 import {
   getWorkspaceGrants,
-} from '@/store/permissions';
+} from '@/infrastructure/sqlite/permissions';
 import type { PermissionAsk } from '@jean2/sdk';
 
 // =============================================================================

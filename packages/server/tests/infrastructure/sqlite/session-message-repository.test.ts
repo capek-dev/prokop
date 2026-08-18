@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
-import { getDatabase } from '@/store';
+import { getDatabase } from '@/infrastructure/sqlite/database';
 import {
   addMessageToQueue,
   getNextQueuedMessage,
-} from '@/store/queued-messages';
+} from '@/infrastructure/sqlite/queued-messages';
 import { createSessionRepository } from '@/infrastructure/sqlite/session-repository';
 import { createMessageRepository } from '@/infrastructure/sqlite/message-repository';
 import type { SessionMessageRepositoryHooks } from '@/application/ports/session-message';
@@ -300,7 +300,7 @@ describe('S5 session and message SQLite repositories', () => {
 
     expect(getNextQueuedMessage(sessionId)?.id).toBe(first.id);
     expect(getNextQueuedMessage(sessionId)?.id).toBe(first.id);
-    const { deleteQueuedMessage } = require('@/store/queued-messages') as typeof import('@/store/queued-messages');
+    const { deleteQueuedMessage } = require('@/infrastructure/sqlite/queued-messages') as typeof import('@/infrastructure/sqlite/queued-messages');
     deleteQueuedMessage(first.id);
     expect(getNextQueuedMessage(sessionId)?.id).toBe(second.id);
   });

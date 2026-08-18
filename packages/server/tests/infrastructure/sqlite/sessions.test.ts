@@ -18,8 +18,8 @@ import {
   listSessionPageGrouped,
   encodeSessionCursor,
   decodeSessionCursor,
-} from '@/store/sessions';
-import { getDatabase } from '@/store';
+} from '@/infrastructure/sqlite/session-store';
+import { getDatabase } from '@/infrastructure/sqlite/database';
 
 function makeSession(overrides: {
   id: string;

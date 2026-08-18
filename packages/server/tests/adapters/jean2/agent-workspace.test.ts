@@ -10,7 +10,7 @@ import {
 } from '@/adapters/jean2';
 import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
 import { agentHomeWorkspaceSettings } from '@/domains/agents';
-import { getWorkspace } from '@/store/workspaces';
+import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { getDataDir } from '@/paths';
 
 describe('jean2 agents adapters over the real store and filesystem', () => {

@@ -13,7 +13,7 @@ import {
   listActiveTerminalSessions,
   cleanupStaleTerminalSessions,
   cleanupRunningSessionsOnStartup,
-} from '@/store/terminal-sessions';
+} from '@/infrastructure/sqlite/terminal-session-store';
 
 describe('terminal-sessions store', () => {
   beforeEach(() => {

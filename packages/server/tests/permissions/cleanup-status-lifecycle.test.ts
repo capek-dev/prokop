@@ -9,7 +9,7 @@ import {
   expirePermissionRequest,
   cleanupAllPendingAsks,
   type PendingAskRecord,
-} from '@/store/pending-asks';
+} from '@/infrastructure/sqlite/pending-asks';
 
 // =============================================================================
 // Test Suite — Bugfix 09: Timeout in child session leaves stale warning and

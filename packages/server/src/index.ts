@@ -11,17 +11,15 @@ import { resolveAskDeliveryTargets } from '@/core/capability-router';
 import { createBunWebSocketAdapter, type WsData } from '@/transport/websocket/bun-adapter';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { scanTools } from '@capekai/core/internal/tools';
-import { closeDatabase, getDatabase } from '@/store';
+import { closeDatabase, getDatabase } from '@/infrastructure/sqlite/database';
 import { backfillFts } from '@/infrastructure/session-search/fts';
 import type { ServerMessage, AskAuthority } from '@jean2/sdk';
 import { getTerminalManager, getTerminalEventManager } from '@/transport/terminal';
-import { cleanupRunningSessionsOnStartup } from '@/store/terminal-sessions';
-import {
-  reconcileAllSessionsCompaction,
-  reconcileAllOrphanedToolCalls,
-  cleanupAllPendingAsks,
-  cleanupOrphanedData,
-} from '@/store';
+import { cleanupRunningSessionsOnStartup } from '@/infrastructure/sqlite/terminal-session-store';
+import { reconcileAllSessionsCompaction } from '@/adapters/capek/compaction-recovery';
+import { reconcileAllOrphanedToolCalls } from '@/infrastructure/sqlite/message-store';
+import { cleanupAllPendingAsks } from '@/infrastructure/sqlite/pending-asks';
+import { cleanupOrphanedData } from '@/infrastructure/sqlite/cleanup';
 import { getPort, getHost } from '@/config';
 import { validateToken, isAuthEnabled } from '@/auth/token';
 import {

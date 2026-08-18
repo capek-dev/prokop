@@ -9,25 +9,15 @@ import {
   jean2StorageBundle,
 } from '@/adapters/capek/storage';
 import {
-  addMessageToQueue,
   buildEffectiveContextHistory,
   createMessage,
   createPart,
-  createSession,
   deleteMessage,
-  deleteQueuedMessage,
-  getAttachment,
-  getChildSessions,
   getMessage,
   getMessageWithParts,
-  getNextQueuedMessage,
   getPart,
   getPartsByMessage,
   getPartsBySession,
-  getResponseFormat,
-  getSession,
-  getWorkspace,
-  jean2ToolOutputArtifactStore,
   listLatestMessagesWithPartsPage,
   listMessagesWithParts,
   persistStreamingPartSnapshots,
@@ -35,9 +25,17 @@ import {
   transitionToolToInterrupted,
   transitionToolToRunningByCallId,
   updateMessage,
-  updateSession,
-} from '@/store';
-import { getWorkspaceAutoApproveSeverity } from '@/store/workspaces';
+} from '@/infrastructure/sqlite/message-store';
+import { createSession, getChildSessions, getSession, updateSession } from '@/infrastructure/sqlite/session-store';
+import {
+  addMessageToQueue,
+  deleteQueuedMessage,
+  getNextQueuedMessage,
+} from '@/infrastructure/sqlite/queued-messages';
+import { getAttachment } from '@/infrastructure/sqlite/attachments';
+import { getResponseFormat } from '@/infrastructure/sqlite/response-formats';
+import { getWorkspace, getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
+import { jean2ToolOutputArtifactStore } from '@/infrastructure/sqlite/tool-output-artifacts';
 import { searchMessages } from '@/session-search/fts';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { createTestAssistantMessage, createTestTextPart, createTestUserMessage } from '#tests/factories';
@@ -47,14 +45,14 @@ import { seedSession, seedWorkspace } from '#tests/seed';
 // real implementation. Every other fts export stays real, so schema setup and
 // search behavior are unchanged. This makes the store's internal
 // syncMessageToFts path observable for the updateMessage wrapper.
-const realFts = await import('@/session-search/fts');
+const realFts = await import('@/infrastructure/session-search/fts');
 const realIndexMessage = realFts.indexMessage;
 const indexCalls: string[] = [];
 
-mock.module('@/session-search/fts', () => ({
+mock.module('@/infrastructure/session-search/fts', () => ({
   ...realFts,
   indexMessage: (...args: unknown[]): void => {
-    indexCalls.push(String(args[0]));
+    indexCalls.push(String(args[1]));
     realIndexMessage(...(args as Parameters<typeof realIndexMessage>));
   },
 }));

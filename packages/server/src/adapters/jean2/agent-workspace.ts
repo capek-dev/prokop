@@ -1,6 +1,6 @@
 import type { AgentPreconfigPort, AgentWorkspacePort } from '@/application/ports/agents';
 import { getPreconfig } from '@/infrastructure/configuration/preconfig';
-import { createWorkspace, deleteWorkspace, updateWorkspace } from '@/store/workspaces';
+import { createWorkspace, deleteWorkspace, updateWorkspace } from '@/infrastructure/sqlite/workspaces';
 
 /**
  * Jean2 adapter for the agent workspace port (S4). Wraps the current

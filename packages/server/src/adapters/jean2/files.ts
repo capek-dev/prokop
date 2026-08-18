@@ -5,7 +5,7 @@
  * workspace store lookup.
  */
 
-import { getWorkspace } from '@/store';
+import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { workspacePathPolicyPort } from '@/adapters/capek/workspace-paths';
 import type { FilesApplicationPort } from '@/application/ports/files';
 import { listDirectory, searchFiles } from '@/infrastructure/filesystem/workspace-files';

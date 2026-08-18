@@ -1,4 +1,4 @@
-import { getDatabase } from '@/store';
+import { getDatabase } from '@/infrastructure/sqlite/database';
 import {
   backfillFts as backfillFtsWithDb,
   indexMessage as indexMessageWithDb,

@@ -6,7 +6,8 @@ import {
   jean2SessionSearchHost,
   type Jean2SessionSearchHostDeps,
 } from '@/adapters/capek/session-search';
-import { createMessage, createPart, createSession } from '@/store';
+import { createMessage, createPart } from '@/infrastructure/sqlite/message-store';
+import { createSession } from '@/infrastructure/sqlite/session-store';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import {
   createTestSession,

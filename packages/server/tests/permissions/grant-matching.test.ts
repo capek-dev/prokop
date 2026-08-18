@@ -7,7 +7,7 @@ import {
   matchGrant,
   createGrantFromOptions,
   revokeGrant,
-} from '@/store/permissions';
+} from '@/infrastructure/sqlite/permissions';
 
 // =============================================================================
 // Test Suite B — Grant Matching Tests (Target-Based)

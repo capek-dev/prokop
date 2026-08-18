@@ -9,8 +9,8 @@ import {
   updateWorkspace,
   deleteWorkspace,
   countSessionsInWorkspace,
-} from '@/store/workspaces';
-import { createSession, getSession } from '@/store/sessions';
+} from '@/infrastructure/sqlite/workspaces';
+import { createSession, getSession } from '@/infrastructure/sqlite/session-store';
 import { createTestSession } from '#tests/factories';
 
 function makeSession(overrides: { id: string; workspaceId: string; title: string; status: 'active' | 'closed' }) {

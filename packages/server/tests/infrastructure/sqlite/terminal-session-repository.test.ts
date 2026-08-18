@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
-import { getDatabase } from '@/store';
+import { getDatabase } from '@/infrastructure/sqlite/database';
 import { createTerminalSessionRepository } from '@/infrastructure/sqlite/terminal-session-repository';
 import { createJean2TerminalSessionPort } from '@/adapters/jean2/terminal';
 import type { TerminalSessionRow } from '@/application/ports/terminal';

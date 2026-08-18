@@ -7,7 +7,7 @@ import {
   getWorkspaceGrants,
   matchGrant,
   createGrantFromOptions,
-} from '@/store/permissions';
+} from '@/infrastructure/sqlite/permissions';
 import type { PermissionAsk } from '@jean2/sdk';
 
 // =============================================================================

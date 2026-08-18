@@ -45,41 +45,47 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
     '@/core/broadcast',
   ],
   'packages/server/src/adapters/capek/interaction.ts': [
-    '@/infrastructure/sqlite/pending-asks', '@/infrastructure/sqlite/permissions', '@/store', '@/infrastructure/runtime/environment',
+    '@/infrastructure/sqlite/pending-asks', '@/infrastructure/sqlite/permissions', '@/infrastructure/sqlite/session-store', '@/infrastructure/runtime/environment',
   ],
   'packages/server/src/adapters/capek/runtime-configuration.ts': [
     '@/config', '@/infrastructure/runtime/environment',
   ],
   'packages/server/src/adapters/capek/sandbox.ts': ['@/sandbox'],
   'packages/server/src/adapters/capek/storage.ts': [
-    '@/store', '@/store/workspaces',
+    '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/session-store',
+    '@/infrastructure/sqlite/queued-messages', '@/infrastructure/sqlite/attachments',
+    '@/infrastructure/sqlite/response-formats', '@/infrastructure/sqlite/tool-output-artifacts',
+    '@/infrastructure/sqlite/workspaces',
+  ],
+  'packages/server/src/adapters/capek/compaction-recovery.ts': [
+    '@/core/broadcast', '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/session-store',
   ],
   'packages/server/src/adapters/capek/titles.ts': ['@/infrastructure/session-title'],
   'packages/server/src/adapters/capek/tool-source.ts': [
     '@/config', '@/infrastructure/mcp', '@/infrastructure/runtime/paths',
   ],
   'packages/server/src/adapters/capek/workspace.ts': [
-    '@/store/workspaces', '@/infrastructure/runtime/environment', '@/infrastructure/runtime/paths',
+    '@/infrastructure/sqlite/workspaces', '@/infrastructure/runtime/environment', '@/infrastructure/runtime/paths',
   ],
   'packages/server/src/adapters/jean2/session-repository.ts': [
-    '@/store', '@/store/pending-asks', '@/store/workspaces', '@/agents/storage', '@/infrastructure/session-title',
+    '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/queued-messages', '@/infrastructure/sqlite/tool-output-artifacts', '@/infrastructure/sqlite/attachments', '@/infrastructure/sqlite/pending-asks', '@/infrastructure/sqlite/workspaces', '@/adapters/capek/compaction-recovery', '@/agents/storage', '@/infrastructure/session-title',
   ],
   'packages/server/src/adapters/jean2/scheduled-job-repository.ts': [
-    '@/store/scheduled-jobs',
+    '@/infrastructure/sqlite/scheduled-job-store',
   ],
   'packages/server/src/adapters/jean2/scheduled-job-execution.ts': [
     '@/config', '@/infrastructure/configuration/preconfig', '@/infrastructure/scheduling/scheduled-job-runner',
-    '@/store/sessions', '@/store/workspaces', '@/store/scheduled-jobs',
+    '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/workspaces', '@/infrastructure/sqlite/scheduled-job-store',
   ],
   'packages/server/src/adapters/jean2/terminal.ts': [
-    '@/store', '@/infrastructure/sqlite/terminal-session-repository',
+    '@/infrastructure/sqlite/database', '@/infrastructure/sqlite/terminal-session-repository',
   ],
   'packages/server/src/adapters/jean2/agent-workspace.ts': [
-    '@/infrastructure/configuration/preconfig', '@/store/workspaces',
+    '@/infrastructure/configuration/preconfig', '@/infrastructure/sqlite/workspaces',
   ],
   'packages/server/src/adapters/jean2/workspace.ts': [
-    '@/store/workspaces', '@/store/sessions', '@/store/pinned-messages',
-    '@/store/scheduled-jobs', '@/transport/terminal', '@/infrastructure/mcp', '@/infrastructure/runtime/paths',
+    '@/infrastructure/sqlite/workspaces', '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/pinned-messages',
+    '@/infrastructure/sqlite/scheduled-job-store', '@/transport/terminal', '@/infrastructure/mcp', '@/infrastructure/runtime/paths',
   ],
 
   'packages/server/src/adapters/jean2/tools.ts': [
@@ -92,17 +98,17 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
     '@/configuration/provider-credentials',
   ],
   'packages/server/src/adapters/jean2/mcp.ts': [
-    '@/infrastructure/mcp/lifecycle', '@/store/workspaces',
+    '@/infrastructure/mcp/lifecycle', '@/infrastructure/sqlite/workspaces',
   ],
   'packages/server/src/adapters/jean2/files.ts': [
-    '@/store', '@/infrastructure/filesystem/workspace-files',
+    '@/infrastructure/sqlite/workspaces', '@/infrastructure/filesystem/workspace-files',
     '@/infrastructure/filesystem/file-preview',
     '@/infrastructure/filesystem/file-mutations',
     '@/infrastructure/filesystem/git-status',
   ],
   'packages/server/src/adapters/jean2/notifications.ts': [
     '@/infrastructure/sqlite/notification-repository', '@/infrastructure/web-push/sender',
-    '@/store/sessions', '@/store/scheduled-jobs', '@/store/pending-asks', '@/infrastructure/runtime/environment',
+    '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/scheduled-job-store', '@/infrastructure/sqlite/pending-asks', '@/infrastructure/runtime/environment',
   ],
   'packages/server/src/adapters/jean2/permissions.ts': ['@/infrastructure/sqlite/permissions'],
   'packages/server/src/adapters/jean2/tool-distribution.ts': [
@@ -213,6 +219,13 @@ const globalBaselineRules: DependencyRule[] = [
       { exact: 'zhipu-ai-provider' },
     ],
     exceptions: aiSdkExceptions,
+  },
+  {
+    name: 'no-store-compat-surface',
+    rationale: 'The store compatibility directory is removed. Server source must import actual owners.',
+    appliesTo: [serverSourceRoot],
+    forbiddenSpecifiers: [{ exact: '@/store' }, { prefix: '@/store/' }],
+    exceptions: {},
   },
 ];
 
@@ -759,8 +772,8 @@ describe('server layer boundaries', () => {
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
       '@/application/ports/session-search',
       '@/infrastructure/session-search/fts',
+      '@/infrastructure/sqlite/database',
       '@/infrastructure/sqlite/session-search-query-repository',
-      '@/store',
     ].sort());
   });
 
@@ -853,20 +866,19 @@ describe('server layer boundaries', () => {
     ]);
   });
 
-  test('S5 gate: the scheduled-jobs store compatibility module wraps only the store and the infrastructure repository', () => {
-    // Temporary S5 compatibility path: store -> compat -> infrastructure
-    // repository. Retired when consumers migrate to the adapter.
-    const compatPath = resolve(serverSourceRoot, 'store/scheduled-jobs.ts');
-    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === compatPath);
+  test('S9 gate: the scheduled-job store owns lazy repository wiring', () => {
+    const storePath = resolve(infrastructureSqliteDir, 'scheduled-job-store.ts');
+    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === storePath);
     expect(file).toBeDefined();
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
       '@jean2/sdk',
       '@/application/ports/scheduling',
-      '@/infrastructure/sqlite/scheduled-job-repository',
-      './index',
+      './database',
+      './scheduled-job-repository',
     ].sort());
+    expect(file!.sourceText).not.toContain('@/store');
   });
 
   test('S5 gate: the infrastructure scheduled-job repository imports only ports and the scheduling domain', () => {
@@ -885,13 +897,9 @@ describe('server layer boundaries', () => {
     ].sort());
   });
 
-  test('S5 gate: the compaction-recovery store compatibility module wires only the capek domain, ports, broadcasts, and store queries', () => {
-    // The store wiring preserves the legacy export surface while the
-    // reconciliation decisions remain owned by the Capek domain. It wires
-    // the inward-facing port over store queries and transport broadcast
-    // adapters.
-    const compatPath = resolve(serverSourceRoot, 'store/compaction-recovery.ts');
-    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === compatPath);
+  test('S9 gate: the capek compaction-recovery adapter wires domain recovery to owned storage and broadcasts', () => {
+    const adapterPath = resolve(adaptersCapekDir, 'compaction-recovery.ts');
+    const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
 
     const imports = parseImports(file!.sourceText, file!.path);
@@ -900,20 +908,17 @@ describe('server layer boundaries', () => {
       '@/application/ports/session',
       '@/adapters/capek/events',
       '@/core/broadcast',
-      './messages',
-      './sessions',
+      '@/infrastructure/sqlite/message-store',
+      '@/infrastructure/sqlite/session-store',
     ].sort());
 
-    // The module must delegate to the Capek domain functions; the decision
-    // logic no longer lives in the store.
     const sourceText = file!.sourceText;
     expect(sourceText).toContain('reconcileSessionCompactionWithDeps');
     expect(sourceText).toContain('reconcileAllSessionsCompactionWithDeps');
     expect(sourceText).toContain('reconcileSessionWithDeps');
     expect(sourceText).toContain('reconcileAllSessionsWithDeps');
-    // The pre-slice ReconcileOptions identity stays local to the store
-    // module instead of re-exporting a new compat-barrel type.
     expect(sourceText).toContain('export interface ReconcileOptions');
+    expect(sourceText).not.toContain('@/store');
   });
 
   test('S5 gate: the compaction recovery port is fulfilled without SQL crossing into the capek domain', () => {
@@ -1009,7 +1014,7 @@ describe('server layer boundaries', () => {
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
       '@/application/ports/agents',
       '@/infrastructure/configuration/preconfig',
-      '@/store/workspaces',
+      '@/infrastructure/sqlite/workspaces',
     ].sort());
   });
 
@@ -1182,78 +1187,60 @@ describe('server layer boundaries', () => {
     ).toBe(true);
   });
 
-  test('S5 gate: the tool-output artifact store module wraps only the capek storage contract and the database accessor', () => {
-    // The artifact SQLite store holds no product policy: ID validation and
-    // page assembly come from @capekai/core/storage (the mandatory
-    // invariants), and the module only maps rows and issues SQL.
-    const storePath = resolve(serverSourceRoot, 'store/tool-output-artifacts.ts');
+  test('S9 gate: the tool-output artifact implementation is owned by SQLite infrastructure', () => {
+    const storePath = resolve(infrastructureSqliteDir, 'tool-output-artifacts.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === storePath);
     expect(file).toBeDefined();
 
-    const imports = parseImports(file!.sourceText, file!.path);
-    expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@/infrastructure/sqlite/tool-output-artifacts',
+    expect(parseImports(file!.sourceText, file!.path).map((imp) => imp.specifier).sort()).toEqual([
+      '@capekai/core/storage',
+      './database',
+      'node:crypto',
     ].sort());
-    expect(file!.sourceText).not.toContain('Math.min(limit');
-    expect(file!.sourceText).not.toContain('slice(');
+    expect(file!.sourceText).not.toContain('@/store');
   });
 
-  test('S5 gate: the sessions and messages store compat modules forward to the infrastructure repositories', () => {
-    // Session/message SQL moved to infrastructure/sqlite in this category.
-    // The compat modules keep every pre-slice export identity and only wire
-    // the temporary side-effect hooks around the repositories. No SQL may
-    // remain in the compat layer.
-    const sessionsPath = resolve(serverSourceRoot, 'store/sessions.ts');
-    const messagesPath = resolve(serverSourceRoot, 'store/messages.ts');
-    for (const [label, path, expectedSpecifiers, forbiddenFragments] of [
+  test('S9 gate: session and message store wiring is owned by SQLite infrastructure', () => {
+    const owners = [
       [
         'sessions',
-        sessionsPath,
+        resolve(infrastructureSqliteDir, 'session-store.ts'),
         [
           '@/application/ports/session-message',
-          '@/infrastructure/sqlite/session-repository',
           '@/infrastructure/session-search/fts',
-          './attachments',
-          './index',
-          './workspaces',
           '@jean2/sdk',
+          './attachments',
+          './database',
+          './session-repository',
+          './workspaces',
           'fs',
           'node:os',
           'node:path',
         ],
-        ['INSERT INTO', 'SELECT * FROM', 'CREATE TABLE'],
+        'createSessionRepository',
       ],
       [
         'messages',
-        messagesPath,
+        resolve(infrastructureSqliteDir, 'message-store.ts'),
         [
           '@/application/ports/session-message',
           '@/infrastructure/session-search/fts-projector',
-          '@/infrastructure/sqlite/message-repository',
-          './index',
-          './sessions',
           '@jean2/sdk',
+          './database',
+          './message-repository',
+          './session-store',
         ],
-        ['INSERT INTO', 'SELECT * FROM', 'CREATE TABLE'],
+        'createMessageRepository',
       ],
-    ] as const) {
+    ] as const;
+
+    for (const [label, path, expectedSpecifiers, factory] of owners) {
       const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === path);
       expect(file, label).toBeDefined();
-
-      const imports = parseImports(file!.sourceText, file!.path);
-      expect(
-        [...new Set(imports.map((imp) => imp.specifier))].sort(),
-        label,
-      ).toEqual([...expectedSpecifiers].sort());
-      for (const fragment of forbiddenFragments) {
-        expect(file!.sourceText, `${label} must not contain ${fragment}`).not.toContain(fragment);
-      }
-      // The compat layer delegates through the repository factory.
-      if (label === 'sessions') {
-        expect(file!.sourceText).toContain('createSessionRepository');
-      } else {
-        expect(file!.sourceText).toContain('createMessageRepository');
-      }
+      expect([...new Set(parseImports(file!.sourceText, file!.path).map((imp) => imp.specifier))].sort(), label)
+        .toEqual([...expectedSpecifiers].sort());
+      expect(file!.sourceText, label).not.toContain('@/store');
+      expect(file!.sourceText, label).toContain(factory);
     }
   });
 
@@ -1348,10 +1335,10 @@ describe('server layer boundaries', () => {
       '@/infrastructure/mcp',
       '@/infrastructure/runtime/paths',
       '@/transport/terminal',
-      '@/store/pinned-messages',
-      '@/store/scheduled-jobs',
-      '@/store/sessions',
-      '@/store/workspaces',
+      '@/infrastructure/sqlite/pinned-messages',
+      '@/infrastructure/sqlite/scheduled-job-store',
+      '@/infrastructure/sqlite/session-store',
+      '@/infrastructure/sqlite/workspaces',
       'fs',
     ].sort());
   });
@@ -1508,7 +1495,7 @@ describe('server layer boundaries', () => {
       '@/infrastructure/filesystem/file-preview',
       '@/infrastructure/filesystem/git-status',
       '@/infrastructure/filesystem/workspace-files',
-      '@/store',
+      '@/infrastructure/sqlite/workspaces',
     ].sort());
   });
 
@@ -1588,17 +1575,18 @@ describe('server layer boundaries', () => {
     ).toBe(true);
   });
 
-  test('S5 gate: the terminal sessions store compat module forwards to the infrastructure repository with no SQL', () => {
-    const storePath = resolve(serverSourceRoot, 'store/terminal-sessions.ts');
+  test('S9 gate: terminal session store wiring is owned by SQLite infrastructure', () => {
+    const storePath = resolve(infrastructureSqliteDir, 'terminal-session-store.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === storePath);
     expect(file).toBeDefined();
 
     const imports = parseImports(file!.sourceText, file!.path);
-    expect(
-      imports.some((imp) =>
-        imp.specifier === '@/infrastructure/sqlite/terminal-session-repository'
-      ),
-    ).toBe(true);
+    expect(imports.map((imp) => imp.specifier).sort()).toEqual([
+      '@/application/ports/terminal',
+      './database',
+      './terminal-session-repository',
+    ].sort());
+    expect(file!.sourceText).not.toContain('@/store');
     expect(file!.sourceText).not.toContain('SELECT * FROM');
     expect(file!.sourceText).not.toContain('INSERT INTO');
   });
@@ -1778,7 +1766,7 @@ describe('server layer boundaries', () => {
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
       '@/application/ports/mcp',
       '@/infrastructure/mcp/lifecycle',
-      '@/store/workspaces',
+      '@/infrastructure/sqlite/workspaces',
     ].sort());
   });
 
@@ -1837,28 +1825,23 @@ describe('server layer boundaries', () => {
       '@/config',
       '@/infrastructure/configuration/preconfig',
       '@/infrastructure/scheduling/scheduled-job-runner',
-      '@/store/scheduled-jobs',
-      '@/store/sessions',
-      '@/store/workspaces',
+      '@/infrastructure/sqlite/scheduled-job-store',
+      '@/infrastructure/sqlite/session-store',
+      '@/infrastructure/sqlite/workspaces',
     ].sort());
     expect(adapter!.sourceText).not.toContain('@/scheduler/runner');
   });
 
-  test('S9 gate: store compatibility exports delegate database ownership to infrastructure', () => {
-    const storeIndex = scanDirectory(serverSourceRoot).find((candidate) =>
-      candidate.path === resolve(serverSourceRoot, 'store/index.ts'));
-    const storeFormats = scanDirectory(serverSourceRoot).find((candidate) =>
-      candidate.path === resolve(serverSourceRoot, 'store/response-formats.ts'));
-    expect(storeIndex).toBeDefined();
-    expect(storeFormats).toBeDefined();
-    const storeImports = parseImports(storeIndex!.sourceText, storeIndex!.path).map((imp) => imp.specifier);
-    expect(storeImports).toContain('@/infrastructure/sqlite/database');
-    expect(storeImports).not.toContain('bun:sqlite');
-    expect(parseImports(storeFormats!.sourceText, storeFormats!.path).map((imp) => imp.specifier)).toContain(
-      '@/infrastructure/sqlite/response-formats',
-    );
-    expect(storeIndex!.sourceText).not.toContain("from 'bun:sqlite'");
-    expect(storeFormats!.sourceText).not.toContain("from 'bun:sqlite'");
+  test('S9 gate: the store compatibility directory is absent and no source file imports @/store', () => {
+    const files = scanDirectory(serverSourceRoot);
+    expect(files.some((file) => file.path === resolve(serverSourceRoot, 'store/index.ts'))).toBe(false);
+    expect(files.some((file) => file.path.startsWith(`${resolve(serverSourceRoot, 'store')}/`))).toBe(false);
+
+    for (const file of files) {
+      expect(parseImports(file.sourceText, file.path).some((imp) =>
+        imp.specifier === '@/store' || imp.specifier.startsWith('@/store/'),
+      )).toBe(false);
+    }
   });
 
   test('S9 gate: maintenance and response-format routes use applications', () => {
@@ -2169,10 +2152,10 @@ describe('server layer boundaries', () => {
       '@/domains/scheduling/notifications',
       '@/infrastructure/runtime/environment',
       '@/infrastructure/sqlite/notification-repository',
+      '@/infrastructure/sqlite/pending-asks',
+      '@/infrastructure/sqlite/scheduled-job-store',
+      '@/infrastructure/sqlite/session-store',
       '@/infrastructure/web-push/sender',
-      '@/store/pending-asks',
-      '@/store/scheduled-jobs',
-      '@/store/sessions',
     ].sort());
   });
 

@@ -4,7 +4,7 @@ import { createApp } from '@/app';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
 import { seedWorkspace, seedSession } from '#tests/seed';
-import { createMessage } from '@/store/messages';
+import { createMessage } from '@/infrastructure/sqlite/message-store';
 import { createTestUserMessage } from '#tests/factories';
 
 interface MaintenanceResponse {

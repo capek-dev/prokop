@@ -8,7 +8,7 @@ import {
   createGrantFromOptions,
   revokeGrant,
   revokeAllWorkspaceGrants,
-} from '@/store/permissions';
+} from '@/infrastructure/sqlite/permissions';
 
 describe('permissions store', () => {
   beforeEach(() => {

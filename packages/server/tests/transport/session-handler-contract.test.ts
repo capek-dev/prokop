@@ -10,7 +10,8 @@ import {
 } from '@/transport/websocket/connection-registry';
 import { removeSessionControl } from '@/transport/websocket/control-registry';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
-import { getSession, listQueuedMessages } from '@/store';
+import { getSession } from '@/infrastructure/sqlite/session-store';
+import { listQueuedMessages } from '@/infrastructure/sqlite/queued-messages';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
 import { seedWorkspaceWithSession } from '#tests/seed';

@@ -1,5 +1,5 @@
 import { createMcpLifecycle } from '@/infrastructure/mcp/lifecycle';
-import { getWorkspace } from '@/store/workspaces';
+import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import type { McpLifecyclePort, McpWorkspacePort } from '@/application/ports/mcp';
 
 /**

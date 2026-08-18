@@ -9,7 +9,7 @@ import {
   listWorkspaces,
   removeWorkspaceAdditionalPath,
   updateWorkspace,
-} from '@/store/workspaces';
+} from '@/infrastructure/sqlite/workspaces';
 import {
   cleanupSessionsOutputDirs,
   decodeSessionCursor,
@@ -17,13 +17,13 @@ import {
   encodeSessionCursor,
   listSessionPageByWorkspace,
   listSessionsByWorkspace,
-} from '@/store/sessions';
+} from '@/infrastructure/sqlite/session-store';
 import {
   listPinnedMessagesByWorkspace,
   pinMessage,
   unpinMessage,
-} from '@/store/pinned-messages';
-import { deleteScheduledJobsByWorkspace } from '@/store/scheduled-jobs';
+} from '@/infrastructure/sqlite/pinned-messages';
+import { deleteScheduledJobsByWorkspace } from '@/infrastructure/sqlite/scheduled-job-store';
 import { getTerminalManager } from '@/transport/terminal';
 import { shutdownWorkspace } from '@/infrastructure/mcp';
 import { getWorkspacesDir } from '@/infrastructure/runtime/paths';

@@ -1,7 +1,7 @@
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
-import { getSession } from '@/store/sessions';
-import { getScheduledJob } from '@/store/scheduled-jobs';
-import { getPermissionRequestByRequestId } from '@/store/pending-asks';
+import { getSession } from '@/infrastructure/sqlite/session-store';
+import { getScheduledJob } from '@/infrastructure/sqlite/scheduled-job-store';
+import { getPermissionRequestByRequestId } from '@/infrastructure/sqlite/pending-asks';
 import { createNotificationRepository } from '@/infrastructure/sqlite/notification-repository';
 import { createWebPushSender } from '@/infrastructure/web-push/sender';
 import { canNotifyForSession as scheduledSessionCanNotify } from '@/domains/scheduling/notifications';

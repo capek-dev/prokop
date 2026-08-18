@@ -1,22 +1,22 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { setupTestDatabase, resetTestDatabase } from '../helpers/db';
-import { seedWorkspaceWithSession, seedSession } from '../helpers/seed';
+import { setupTestDatabase, resetTestDatabase } from '../../helpers/db';
+import { seedWorkspaceWithSession, seedSession } from '../../helpers/seed';
 import {
   createTestUserMessage,
   createTestAssistantMessage,
   createTestTextPart,
-} from '../helpers/factories';
+} from '../../helpers/factories';
 import {
   createMessage,
   createPart,
-} from '@/store/messages';
+} from '@/infrastructure/sqlite/message-store';
 import {
   pinMessage,
   unpinMessage,
   listPinnedMessagesByWorkspace,
   isMessagePinned,
   PinnedMessageError,
-} from '@/store/pinned-messages';
+} from '@/infrastructure/sqlite/pinned-messages';
 
 describe('Pinned Messages Store', () => {
   beforeEach(() => setupTestDatabase());
@@ -255,7 +255,7 @@ describe('Pinned Messages Store', () => {
       pinMessage({ workspaceId, sessionId, messageId: msg.id });
       expect(isMessagePinned(workspaceId, msg.id)).toBe(true);
 
-      const { getDatabase } = require('@/store/index');
+      const { getDatabase } = require('@/infrastructure/sqlite/database');
       const db = getDatabase();
       db.run('PRAGMA foreign_keys = ON');
       db.run('DELETE FROM sessions WHERE id = ?', [sessionId]);

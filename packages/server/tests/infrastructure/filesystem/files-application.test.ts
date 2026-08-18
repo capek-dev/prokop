@@ -7,7 +7,7 @@ import { createJean2FilesApplicationPort } from '@/adapters/jean2/files';
 import { ConflictError } from '@/utils/http-errors';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
-import { updateWorkspace } from '@/store/workspaces';
+import { updateWorkspace } from '@/infrastructure/sqlite/workspaces';
 
 const temporaryDirectories: string[] = [];
 

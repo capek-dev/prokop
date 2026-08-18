@@ -5,7 +5,7 @@ import { getUploadDir } from '@/infrastructure/runtime/paths';
 import {
   addWorkspaceAdditionalPath,
   removeWorkspaceAdditionalPath,
-} from '@/store/workspaces';
+} from '@/infrastructure/sqlite/workspaces';
 import type { Jean2CompatibilityBindings } from './types';
 
 export const jean2WorkspaceBindings: Jean2CompatibilityBindings['workspace'] = {

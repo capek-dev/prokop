@@ -2,14 +2,14 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
-import { createSession } from '@/store/sessions';
+import { createSession } from '@/infrastructure/sqlite/session-store';
 import { createTestSession } from '#tests/factories';
 import {
   createPendingAsk,
   listPendingRequestsByRootSession,
   listAllPendingAsks,
   type PendingAskRecord,
-} from '@/store/pending-asks';
+} from '@/infrastructure/sqlite/pending-asks';
 
 function makeSession(overrides: { id: string; workspaceId: string; title: string; status: 'active' | 'closed'; parentId?: string }) {
   const { createdAt: _c, updatedAt: _u, ...defaults } = createTestSession(overrides);

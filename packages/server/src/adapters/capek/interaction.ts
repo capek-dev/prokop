@@ -1,5 +1,5 @@
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
-import { getSession } from '@/store';
+import { getSession } from '@/infrastructure/sqlite/session-store';
 import {
   cancelPendingRequestsBySession,
   createPendingAsk,

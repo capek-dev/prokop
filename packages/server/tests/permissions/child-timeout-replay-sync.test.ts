@@ -11,7 +11,7 @@ import {
   resolvePermissionRequestByRequestId,
   cleanupAllPendingAsks,
   type PendingAskRecord,
-} from '@/store/pending-asks';
+} from '@/infrastructure/sqlite/pending-asks';
 
 // =============================================================================
 // Test Suite — Bugfix 08: Child timeout prompt lingers in root chat

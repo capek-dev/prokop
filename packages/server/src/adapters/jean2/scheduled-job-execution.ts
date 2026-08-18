@@ -1,9 +1,9 @@
 import { getModelsConfig } from '@/config';
 import { getDefaultPreconfig, getPreconfig } from '@/infrastructure/configuration/preconfig';
 import { createScheduledJobRunner } from '@/infrastructure/scheduling/scheduled-job-runner';
-import { createSession, getSession } from '@/store/sessions';
-import { getWorkspace, getWorkspaceAutoApproveSeverity } from '@/store/workspaces';
-import { markScheduledJobError, markScheduledJobRun } from '@/store/scheduled-jobs';
+import { createSession, getSession } from '@/infrastructure/sqlite/session-store';
+import { getWorkspace, getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
+import { markScheduledJobError, markScheduledJobRun } from '@/infrastructure/sqlite/scheduled-job-store';
 import type { ScheduledJobExecutionPort } from '@/application/ports/scheduling';
 
 export function createJean2ScheduledJobExecution(): ScheduledJobExecutionPort {
