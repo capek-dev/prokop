@@ -28,6 +28,10 @@ import type { ServerMessage, AskAuthority } from '@jean2/sdk';
 import { getTerminalManager, getTerminalEventManager } from '@/transport/terminal';
 import { cleanupRunningSessionsOnStartup } from '@/infrastructure/sqlite/terminal-session-store';
 import { reconcileAllSessionsCompaction } from '@/adapters/capek/compaction-recovery';
+import {
+  disposeJean2ExecutionScope,
+  initializeJean2ExecutionScope,
+} from '@/adapters/capek/execution-scope';
 import { reconcileAllOrphanedToolCalls } from '@/infrastructure/sqlite/message-store';
 import { cleanupAllPendingAsks } from '@/infrastructure/sqlite/pending-asks';
 import { cleanupOrphanedData } from '@/infrastructure/sqlite/cleanup';
@@ -65,7 +69,7 @@ export interface ServerOptions {
 
 export interface ServerInstance {
   server: ReturnType<typeof Bun.serve>;
-  cleanup: () => void;
+  cleanup: () => Promise<void>;
 }
 
 function resolveAskTargetConnections(
@@ -168,76 +172,119 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
 
   console.log(`Server starting on ${protocol}://${host}:${port}`);
 
-  const server = Bun.serve({
-    port,
-    hostname: host,
-    ...(tls && { tls }),
-
-    async fetch(req: Request): Promise<Response | undefined> {
-      const upgrade = transport.handleUpgrade(req, (data: WsData) => server.upgrade(req, { data }));
-      if (upgrade.handled) {
-        return upgrade.response;
-      }
-
-      return app.fetch(req);
-    },
-
-    websocket: transport.websocket,
-  });
-
-  transport.startTimers();
-
-  // Start the scheduler tick loop (catches jobs that became due while offline)
-  application.schedulerTicker.start();
-  startPushRetryScheduler();
-  startProviderAccountLifecycle();
-
+  let server: ReturnType<typeof Bun.serve> | undefined;
   let clientLauncher: ClientLauncher | undefined;
+  let cleanupPromise: Promise<void> | null = null;
+  let onSigterm: (() => void) | undefined;
+  let onSigint: (() => void) | undefined;
 
-  if (getClientEnabled()) {
-    clientLauncher = createClientLauncher();
-    const { version, launchResult } = await prepareAndLaunchClient(
-      clientLauncher,
-      getClientPort(),
+  const cleanup = (): Promise<void> => {
+    if (cleanupPromise !== null) return cleanupPromise;
+
+    cleanupPromise = (async (): Promise<void> => {
+      const failures: unknown[] = [];
+      const attempt = (operation: () => void): void => {
+        try {
+          operation();
+        } catch (error: unknown) {
+          failures.push(error);
+        }
+      };
+
+      attempt(() => transport.stopTimers());
+      attempt(() => application.schedulerTicker.stop());
+      attempt(() => stopPushRetryScheduler());
+      attempt(() => stopProviderAccountLifecycle());
+      attempt(() => clientLauncher?.stop());
+      attempt(() => server?.stop());
+      attempt(() => getTerminalManager().destroyAllSessions());
+      try {
+        await disposeJean2ExecutionScope();
+      } catch (error: unknown) {
+        failures.push(error);
+      }
+      attempt(() => closeDatabase());
+      if (onSigterm) process.removeListener('SIGTERM', onSigterm);
+      if (onSigint) process.removeListener('SIGINT', onSigint);
+
+      if (failures.length > 0) {
+        throw new AggregateError(failures, 'Server cleanup failed');
+      }
+    })();
+    return cleanupPromise;
+  };
+
+  try {
+    await initializeJean2ExecutionScope();
+    server = Bun.serve({
       port,
-      host,
-    );
+      hostname: host,
+      ...(tls && { tls }),
 
-    if (launchResult?.success) {
-      console.log(`[client] @jean2/client@${version} running at ${launchResult.url}`);
-    } else if (launchResult) {
-      console.warn(`[client] Failed to launch: ${launchResult.error}`);
+      async fetch(req: Request): Promise<Response | undefined> {
+        const upgrade = transport.handleUpgrade(req, (data: WsData) => server!.upgrade(req, { data }));
+        if (upgrade.handled) {
+          return upgrade.response;
+        }
+
+        return app.fetch(req);
+      },
+
+      websocket: transport.websocket,
+    });
+
+    transport.startTimers();
+
+    // Start the scheduler tick loop (catches jobs that became due while offline)
+    application.schedulerTicker.start();
+    startPushRetryScheduler();
+    startProviderAccountLifecycle();
+
+    if (getClientEnabled()) {
+      clientLauncher = createClientLauncher();
+      const { version, launchResult } = await prepareAndLaunchClient(
+        clientLauncher,
+        getClientPort(),
+        port,
+        host,
+      );
+
+      if (launchResult?.success) {
+        console.log(`[client] @jean2/client@${version} running at ${launchResult.url}`);
+      } else if (launchResult) {
+        console.warn(`[client] Failed to launch: ${launchResult.error}`);
+      }
+    } else {
+      console.log('[client] Built-in client disabled (JEAN2_CLIENT_ENABLED=false)');
     }
-  } else {
-    console.log('[client] Built-in client disabled (JEAN2_CLIENT_ENABLED=false)');
+
+    console.log(`AI Agent Server running at ${protocol}://${host}:${port}`);
+
+    const onShutdown = async (signal: string): Promise<void> => {
+      console.log(`Received ${signal}, shutting down...`);
+      try {
+        await cleanup();
+        process.exit(0);
+      } catch (error: unknown) {
+        console.error('Server cleanup failed:', error);
+        process.exit(1);
+      }
+    };
+
+    onSigterm = () => void onShutdown('SIGTERM');
+    onSigint = () => void onShutdown('SIGINT');
+    process.on('SIGTERM', onSigterm);
+    process.on('SIGINT', onSigint);
+
+    return { server, cleanup };
+  } catch (error: unknown) {
+    try {
+      await cleanup();
+    } catch (cleanupError: unknown) {
+      console.error('Startup cleanup failed:', cleanupError);
+    }
+    throw error;
   }
-
-  console.log(`AI Agent Server running at ${protocol}://${host}:${port}`);
-
-  const onShutdown = (signal: string) => {
-    console.log(`Received ${signal}, shutting down...`);
-    transport.stopTimers();
-    cleanup();
-    process.exit(0);
-  };
-
-  process.on('SIGTERM', () => onShutdown('SIGTERM'));
-  process.on('SIGINT', () => onShutdown('SIGINT'));
-
-  const cleanup = () => {
-    transport.stopTimers();
-    application.schedulerTicker.stop();
-    stopPushRetryScheduler();
-    stopProviderAccountLifecycle();
-    clientLauncher?.stop();
-    server.stop();
-    getTerminalManager().destroyAllSessions();
-    closeDatabase();
-    process.removeListener('SIGTERM', onShutdown);
-    process.removeListener('SIGINT', onShutdown);
-  };
-
-  return { server, cleanup };
 }
 
 if (import.meta.main) {

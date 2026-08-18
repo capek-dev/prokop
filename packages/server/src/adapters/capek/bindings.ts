@@ -27,10 +27,9 @@ export const jean2CompatibilityBindings = {
 } satisfies RuntimeHost;
 
 export function configureJean2Bindings(): void {
-  // The Jean2 path runs outside composed agent scopes, so the legacy
-  // fixed-builder assembler stays the process default (the retired
-  // compatibility barrel installed this at module load; the bootstrap
-  // owns the installation now).
+  // The unscoped Jean2 fallback keeps the legacy fixed-builder assembler as
+  // the process default. Composed execution scopes seed their own ordered
+  // assembler through enterAgentScope. The bootstrap owns this installation.
   setDefaultContextAssembler(fixedBuilderContextAssembler);
   configureRuntimeHost(jean2CompatibilityBindings);
   installSessionSearchToolFallback();

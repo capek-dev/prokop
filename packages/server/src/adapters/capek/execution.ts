@@ -17,17 +17,46 @@ import type {
 } from '@/application/ports/execution';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import { createJean2RuntimeContext } from './events';
+import { withJean2ExecutionScope } from './execution-scope';
+
+export interface Jean2SessionExecutionDependencies {
+  handleChat?: typeof handleCapekChat;
+  handleSessionEditMessage?: typeof handleCapekSessionEditMessage;
+  regenerateSessionTitle?: typeof regenerateCapekSessionTitle;
+  executeCompaction?: typeof executeCapekCompaction;
+  revertToStep?: typeof revertCapekToStep;
+  forkSession?: typeof forkCapekSession;
+}
+
+function runtimeContext<Origin>(wire: SessionWirePorts<Origin>) {
+  return createJean2RuntimeContext({
+    send: wire.delivery.send,
+    broadcast: wire.delivery.broadcast,
+    broadcastToSession: wire.delivery.broadcastToSession,
+    sendToController: wire.delivery.sendToController,
+    sendToAskTargets: wire.delivery.sendToAskTargets,
+    attachOriginToSession: wire.actor.attachOriginToSession,
+  });
+}
 
 /**
  * Capek execution adapter (S3).
  *
  * Fulfills the application execution port with the exact current Capek
- * compat identities. Send and edit delegate to the same handleChat and
- * handleSessionEditMessage identities and await the same completion; no
- * algorithm is duplicated here. The Capek runtime context is constructed
- * from the application wire ports, exactly like the pre-S3 chat handler.
+ * execution identities. Every stateful execution entry enters the composed
+ * Jean2 agent scope for its full awaited duration. Interrupt methods remain
+ * direct because interruptManager has no AsyncLocalStorage state.
  */
-export function createJean2SessionExecution(): SessionExecutionPort {
+export function createJean2SessionExecution(
+  dependencies: Jean2SessionExecutionDependencies = {},
+): SessionExecutionPort {
+  const handleChat = dependencies.handleChat ?? handleCapekChat;
+  const handleSessionEditMessage = dependencies.handleSessionEditMessage ?? handleCapekSessionEditMessage;
+  const regenerateSessionTitle = dependencies.regenerateSessionTitle ?? regenerateCapekSessionTitle;
+  const executeCompaction = dependencies.executeCompaction ?? executeCapekCompaction;
+  const revertToStep = dependencies.revertToStep ?? revertCapekToStep;
+  const forkSession = dependencies.forkSession ?? forkCapekSession;
+
   return {
     sendMessage<Origin>(
       wire: SessionWirePorts<Origin>,
@@ -39,15 +68,8 @@ export function createJean2SessionExecution(): SessionExecutionPort {
       goalCondition?: string,
       goalMaxTurns?: number,
     ): Promise<void> {
-      return handleCapekChat(
-        createJean2RuntimeContext({
-          send: wire.delivery.send,
-          broadcast: wire.delivery.broadcast,
-          broadcastToSession: wire.delivery.broadcastToSession,
-          sendToController: wire.delivery.sendToController,
-          sendToAskTargets: wire.delivery.sendToAskTargets,
-          attachOriginToSession: wire.actor.attachOriginToSession,
-        }),
+      return withJean2ExecutionScope(() => handleChat(
+        runtimeContext(wire),
         origin,
         sessionId,
         content,
@@ -55,7 +77,7 @@ export function createJean2SessionExecution(): SessionExecutionPort {
         responseFormatId,
         goalCondition,
         goalMaxTurns,
-      );
+      ));
     },
 
     editMessage<Origin>(
@@ -63,18 +85,11 @@ export function createJean2SessionExecution(): SessionExecutionPort {
       origin: Origin,
       input: { sessionId: string; messageId: string; content: string },
     ): Promise<void> {
-      return handleCapekSessionEditMessage(
-        createJean2RuntimeContext({
-          send: wire.delivery.send,
-          broadcast: wire.delivery.broadcast,
-          broadcastToSession: wire.delivery.broadcastToSession,
-          sendToController: wire.delivery.sendToController,
-          sendToAskTargets: wire.delivery.sendToAskTargets,
-          attachOriginToSession: wire.actor.attachOriginToSession,
-        }),
+      return withJean2ExecutionScope(() => handleSessionEditMessage(
+        runtimeContext(wire),
         origin,
         input,
-      );
+      ));
     },
 
     regenerateTitle<Origin>(
@@ -83,19 +98,12 @@ export function createJean2SessionExecution(): SessionExecutionPort {
       sessionId: string,
       options?: { force?: boolean },
     ): Promise<void> {
-      return regenerateCapekSessionTitle(
-        createJean2RuntimeContext({
-          send: wire.delivery.send,
-          broadcast: wire.delivery.broadcast,
-          broadcastToSession: wire.delivery.broadcastToSession,
-          sendToController: wire.delivery.sendToController,
-          sendToAskTargets: wire.delivery.sendToAskTargets,
-          attachOriginToSession: wire.actor.attachOriginToSession,
-        }),
+      return withJean2ExecutionScope(() => regenerateSessionTitle(
+        runtimeContext(wire),
         origin,
         sessionId,
         options,
-      );
+      ));
     },
 
     async interruptSession(sessionId: string, reason?: string): Promise<InterruptExecutionResult> {
@@ -107,17 +115,17 @@ export function createJean2SessionExecution(): SessionExecutionPort {
     },
 
     async compact(sessionId: string, reason: 'manual'): Promise<CompactionExecutionOutcome> {
-      const result = await executeCapekCompaction(sessionId, reason);
+      const result = await withJean2ExecutionScope(() => executeCompaction(sessionId, reason));
       return result as CompactionExecutionOutcome;
     },
 
     async revert(input: { sessionId: string; targetMessageId: string }): Promise<RevertExecutionResult> {
-      const result = await revertCapekToStep(input);
+      const result = await withJean2ExecutionScope(() => revertToStep(input));
       return result as RevertExecutionResult;
     },
 
     async fork(input: { sessionId: string; targetMessageId: string; title?: string }): Promise<ForkExecutionResult> {
-      const result = await forkCapekSession(input);
+      const result = await withJean2ExecutionScope(() => forkSession(input));
       return result as unknown as ForkExecutionResult;
     },
   };
