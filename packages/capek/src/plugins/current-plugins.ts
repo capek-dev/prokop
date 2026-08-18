@@ -104,12 +104,11 @@ export const CURRENT_AGENT_PLUGIN_IDS = [
 
 /** The current agent composition installs the coding capability plugins
  * (C4) and the session-search and scheduler domain plugins (C5) so the
- * Jean2 composition representation exposes the exact standard contributed
- * coding inventory plus the service-derived session-search and scheduler
- * tools and the session-search guidance contribution. It intentionally
- * omits `capek.tool-resolver` so installed-tool cache resolution runs
- * unchanged, exactly as the unseeded host path does today; production
- * Jean2 execution stays on that path until live adoption. */
+ * Jean2 composition exposes the exact standard contributed coding inventory
+ * plus the service-derived session-search and scheduler tools and the
+ * session-search guidance contribution. It intentionally omits
+ * `capek.tool-resolver` so installed-tool cache resolution runs unchanged,
+ * exactly as the unseeded host path does today. */
 export function currentAgentPlugins(): readonly CapekPlugin<unknown>[] {
   return [
     storageValuePlugin('current.storage', getStorage()),
