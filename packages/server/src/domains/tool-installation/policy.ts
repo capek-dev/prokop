@@ -1,4 +1,5 @@
 import { join } from 'path';
+import type { InstallManifest } from '@capekai/tool';
 
 /**
  * Tool-installation domain: tool installation metadata and release policy.
@@ -78,8 +79,8 @@ export interface ToolInstallManifest {
   sourceUrl?: string;
   artifactSha256?: string;
   entry: string;
-  runtime: string;
-  installStrategy: string;
+  runtime: InstallManifest['runtime'];
+  installStrategy: InstallManifest['installStrategy'];
   sdkVersion?: string;
   sdkIntegrity?: string;
 }

@@ -155,7 +155,7 @@ export async function installTool(
     sdkVersion,
     sdkIntegrity,
   });
-  writeInstallManifest(stagingDir, manifest as unknown as InstallManifest);
+  writeInstallManifest(stagingDir, manifest);
 
   if (existsSync(finalDir)) {
     const backupDir = finalDir + '.previous';
@@ -310,7 +310,7 @@ export async function installToolFromUrl(
     sdkVersion: sdkVersionFromUrl,
     sdkIntegrity: sdkIntegrityFromUrl,
   });
-  writeInstallManifest(stagingDir, manifest as unknown as InstallManifest);
+  writeInstallManifest(stagingDir, manifest);
 
     if (existsSync(finalDir)) {
       const backupDir = finalDir + '.previous';
