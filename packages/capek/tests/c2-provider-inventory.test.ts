@@ -335,15 +335,15 @@ describe('C2 provider inventory', () => {
       'current.permission-policy',
     );
     expect(snapshot.plugins.map((plugin) => plugin.id)).toEqual(expectedPluginIds);
-    // 4 process services + 9 current agent services (storage, runtime
-    // configuration, runtime host, context sources, context sections,
-    // orchestrator session, tool source, sandbox controller, provider
-    // overrides) + the C6 agent-scoped retry policy, compaction service,
+    // 4 process services + 10 current agent services (storage, runtime
+    // configuration, runtime host, agent driver, context sources, context
+    // sections, orchestrator session, tool source, sandbox controller,
+    // provider overrides) + the C6 agent-scoped retry policy, compaction service,
     // permission policy and permission runtime, workspace policy, and
     // tool-output policy + 6 coding capability services + the seven C5
     // domain services (goal, memory, session-search, scheduler, skills,
     // subagent, workflow) installed by the current composition.
-    expect(snapshot.services).toHaveLength(32);
+    expect(snapshot.services).toHaveLength(33);
 
     const serialized = JSON.stringify(snapshot);
     expect(serialized).not.toContain('getApiKey');

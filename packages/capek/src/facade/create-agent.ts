@@ -384,23 +384,36 @@ class StandaloneAgent implements Agent {
         agentScope,
         driver: driver as AgentDriver<DefaultDriverInput<AgentResult>, AgentResult>,
       });
-      return runtime.run(sessionId, {
-        advance: async (context) => ({
-          result: await this.#perform(
-            agentScope,
+      try {
+        return await runtime.run(sessionId, {
+          advance: async (context) => ({
+            result: await this.#perform(
+              agentScope,
+              sessionId,
+              input,
+              options,
+              createNewSession,
+              emit,
+              context.signal,
+            ),
+            continuation: 'complete',
+          }),
+        }, {
+          signal: runAbort.signal,
+          cancellationReason: 'agent interrupted',
+        });
+      } catch (error: unknown) {
+        if (runAbort.signal.aborted) {
+          const interrupted: AgentResult = {
+            status: 'interrupted',
+            text: '',
+            parts: [],
             sessionId,
-            input,
-            options,
-            createNewSession,
-            emit,
-            context.signal,
-          ),
-          continuation: 'complete',
-        }),
-      }, {
-        signal: runAbort.signal,
-        cancellationReason: 'agent interrupted',
-      });
+          };
+          return interrupted;
+        }
+        throw error;
+      }
     });
     this.#activePromise = promise;
     const clearActive = (): void => {
