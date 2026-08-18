@@ -1,3 +1,5 @@
+import type { ClientDescriptor } from '@capekai/types';
+
 // No permission type imports needed — permission grant/deny messages removed.
 // All permission responses go through ask.response (AskResponseMessage).
 
@@ -5,14 +7,7 @@
 // Client Control: Descriptor
 // =============================================================================
 
-export interface ClientDescriptor {
-  clientId: string;
-  clientType: 'desktop' | 'web' | 'extension' | 'sdk' | 'mobile';
-  displayName: string;
-  interactionMode: 'human' | 'headless' | 'hybrid';
-  capabilities: string[];
-  instanceMetadata?: Record<string, unknown>;
-}
+export type { ClientDescriptor };
 
 // =============================================================================
 // Client Control: Registration (Client → Server)
