@@ -1,12 +1,13 @@
 import {
   capekContextAssemblerKey,
-  createCurrentAgentScope,
-  createCurrentProcessScope,
+  createAgentScope,
+  createProcessScope,
   enterAgentScope,
   type AgentScopeHandle,
   type ContextAssemblyData,
   type ProcessScopeHandle,
 } from '@capekai/core/internal/composition';
+import { jean2AgentPlugins, jean2ProcessPlugins } from './profile';
 
 export interface Jean2RuntimeComposition {
   processScope: ProcessScopeHandle;
@@ -16,26 +17,16 @@ export interface Jean2RuntimeComposition {
 }
 
 /**
- * Kernel composition representation of the Jean2 runtime.
+ * Explicit Jean2 server composition root.
  *
- * Must be called after the `configureX()` installation performed by
- * `createRuntime()`: the composed providers are bound to the exact installed
- * adapter objects, so `require()` on the scope resolves the S1 exports by
- * identity. Server startup creates the shared execution composition after
- * this installation, and the session and scheduled execution adapters enter
- * that composed agent scope for the full awaited duration of each entry.
- *
- * C3 exposes ordered context assembly through the same representation:
- * `buildContext` enters the composed agent scope (seeding the exact installed
- * accessors synchronously) and delegates to the required context assembler
- * service. This factory remains the composition and diagnostics surface; live
- * execution adoption is centralized in the execution adapters.
+ * The server owns the Jean2 plugin inventory and composes it through Capek's
+ * generic process and agent scope factories after all adapters are installed.
  */
 export async function createJean2RuntimeComposition(): Promise<Jean2RuntimeComposition> {
-  const processScope = await createCurrentProcessScope();
+  const processScope = await createProcessScope([...jean2ProcessPlugins()]);
   let agentScope: AgentScopeHandle | null = null;
   try {
-    const createdAgentScope = await createCurrentAgentScope(processScope);
+    const createdAgentScope = await createAgentScope(processScope, [...jean2AgentPlugins()]);
     agentScope = createdAgentScope;
     const assembler = createdAgentScope.require(capekContextAssemblerKey);
     return {
