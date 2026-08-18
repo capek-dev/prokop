@@ -5,7 +5,8 @@ import {
   getMessageContentForFts,
   sanitizeFtsQuery,
 } from '@/infrastructure/sqlite/session-search-query-repository';
-import { createMessage, createPart, getDatabase } from '@/store';
+import { createMessage, createPart } from '@/infrastructure/sqlite/message-store';
+import { getDatabase } from '@/infrastructure/sqlite/database';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import {
   createTestTextPart,

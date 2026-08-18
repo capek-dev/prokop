@@ -11,7 +11,7 @@ import {
   getNextQueuedMessage,
   getQueuedMessageCount,
   addMessageToQueue,
-} from '@/store/queued-messages';
+} from '@/infrastructure/sqlite/queued-messages';
 import type { QueuedMessage } from '@jean2/sdk';
 
 describe('queued-messages store', () => {

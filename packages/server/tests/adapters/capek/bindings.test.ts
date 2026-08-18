@@ -13,7 +13,7 @@ import { jean2WorkspaceBindings } from '@/adapters/capek/workspace';
 import { generateSessionTitle, hasManualSessionTitle, isDefaultSessionTitle } from '@/core/session-title';
 import { isSandboxActive } from '@/sandbox';
 import { getPermissionTimeoutMs } from '@/env';
-import { getSession } from '@/store';
+import { getSession } from '@/infrastructure/sqlite/session-store';
 import {
   cancelPendingRequestsBySession,
   createPendingAsk,
@@ -26,8 +26,8 @@ import {
   removePendingAsk,
   removePendingAsksByToolCallId,
   resolvePermissionRequestByRequestId,
-} from '@/store/pending-asks';
-import { createGrantFromOptions, matchGrant } from '@/store/permissions';
+} from '@/infrastructure/sqlite/pending-asks';
+import { createGrantFromOptions, matchGrant } from '@/infrastructure/sqlite/permissions';
 import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { seedSession, seedWorkspace } from '#tests/seed';

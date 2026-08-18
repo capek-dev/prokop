@@ -32,7 +32,7 @@ import {
 import * as focused from '@/adapters/capek';
 import { configureJean2SessionSearchHost } from '@/adapters/capek/session-search';
 import { createJean2RuntimeComposition, createRuntime } from '@/bootstrap/create-runtime';
-import { createMessage, createPart } from '@/store';
+import { createMessage, createPart } from '@/infrastructure/sqlite/message-store';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { createTestTextPart, createTestUserMessage } from '#tests/factories';
 import { seedSession, seedWorkspace } from '#tests/seed';
@@ -117,7 +117,7 @@ describe('Čapek composition root', () => {
       '@/adapters/jean2/scheduled-job-execution',
       '@/infrastructure/sqlite/session-search-query-repository',
       '@/infrastructure/sqlite/scheduled-job-repository',
-      '@/store',
+      '@/infrastructure/sqlite/message-store',
     ];
     for (const imp of imports) {
       expect(allowedSpecifiers).toContain(imp.specifier);

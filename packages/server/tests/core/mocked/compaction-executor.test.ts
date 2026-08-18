@@ -10,16 +10,17 @@ import { getStorage } from '@capekai/core/storage';
 import { createRuntime } from '@/bootstrap/create-runtime';
 import { executeCompaction, isCompactionActive } from '@capekai/core/internal/execution';
 import { convertToAiSdkMessages } from '@capekai/core/internal/execution';
+import { createSession, getSession } from '@/infrastructure/sqlite/session-store';
 import {
   createMessage,
   createPart,
-  createSession,
-  createToolOutputArtifact,
   getPart,
-  getSession,
-  getToolOutputArtifactPage,
   listMessagesWithParts,
-} from '@/store';
+} from '@/infrastructure/sqlite/message-store';
+import {
+  createToolOutputArtifact,
+  getToolOutputArtifactPage,
+} from '@/infrastructure/sqlite/tool-output-artifacts';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
 

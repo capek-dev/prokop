@@ -1,13 +1,11 @@
 /**
- * Terminal session store compat forwarder (S5 PTY/terminal persistence
- * isolation). Keeps every pre-slice export identity; SQL and row mapping
- * now live in `infrastructure/sqlite/terminal-session-repository.ts`. The
- * startup and stale cleanup behavior is exactly the pre-slice one, delegated
- * through the repository over the current store database accessor.
+ * Terminal session persistence facade. The repository is created once with a
+ * lazy database accessor, preserving startup cleanup and database lifecycle
+ * behavior while keeping terminal storage in the SQLite infrastructure.
  */
 
-import { getDatabase } from './index';
-import { createTerminalSessionRepository } from '@/infrastructure/sqlite/terminal-session-repository';
+import { getDatabase } from './database';
+import { createTerminalSessionRepository } from './terminal-session-repository';
 import type {
   CreateTerminalSessionInput,
   TerminalSessionRow,

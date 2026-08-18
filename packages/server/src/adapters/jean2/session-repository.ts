@@ -9,19 +9,27 @@ import {
   listSessionPageGrouped,
   listTagsByWorkspace,
   updateSession,
+} from '@/infrastructure/sqlite/session-store';
+import {
   listMessages,
   listLatestMessagesWithPartsPage,
   listMessagesWithPartsBeforeSequence,
-  reconcileSessionCompaction,
   reconcileOrphanedToolCalls,
+} from '@/infrastructure/sqlite/message-store';
+import { reconcileSessionCompaction } from '@/adapters/capek/compaction-recovery';
+import {
   listQueuedMessages,
   addMessageToQueue,
   getQueuedMessage,
   deleteQueuedMessage,
+} from '@/infrastructure/sqlite/queued-messages';
+import {
   DEFAULT_TOOL_OUTPUT_PAGE_CHARS,
   getToolOutputArtifactPage,
   isToolOutputArtifactId,
   MAX_TOOL_OUTPUT_PAGE_CHARS,
+} from '@/infrastructure/sqlite/tool-output-artifacts';
+import {
   createAttachment,
   determineKind,
   getAttachmentByKey,
@@ -29,15 +37,15 @@ import {
   MAX_ATTACHMENT_SIZE,
   validateImageMime,
   type Attachment,
-} from '@/store';
-import { getWorkspaceAutoApproveSeverity } from '@/store/workspaces';
+} from '@/infrastructure/sqlite/attachments';
+import { getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
 import { getPreconfigOrAgent, isAgentSync } from '@/agents/storage';
 import { markManualSessionTitle } from '@/infrastructure/session-title';
 import {
   cleanupAllPendingAsks,
   listAllPendingAsks,
   listPendingRequestsByRootSession,
-} from '@/store/pending-asks';
+} from '@/infrastructure/sqlite/pending-asks';
 import { existsSync, readFileSync } from 'fs';
 import type {
   AttachmentRecord,

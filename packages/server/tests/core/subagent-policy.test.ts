@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { updateSession } from '@/store';
+import { updateSession } from '@/infrastructure/sqlite/session-store';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { seedSession, seedWorkspace } from '#tests/seed';
 import { collectSubagentAncestry, evaluateSubagentTarget, getSubagentResumeError, isSubagentSpawningDisabled, isValidSubagentPreconfig, isValidSubagentTargetPreconfig } from '@capekai/core/internal/execution';

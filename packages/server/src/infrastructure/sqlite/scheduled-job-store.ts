@@ -4,15 +4,13 @@ import type {
   UpdateScheduledJobInput,
 } from '@jean2/sdk';
 import type { ScheduledJobRepositoryPort } from '@/application/ports/scheduling';
-import { createScheduledJobRepository } from '@/infrastructure/sqlite/scheduled-job-repository';
-import { getDatabase } from './index';
+import { createScheduledJobRepository } from './scheduled-job-repository';
+import { getDatabase } from './database';
 
 /**
- * S5 compatibility module. The scheduled-job persistence implementation
- * moved to `infrastructure/sqlite/scheduled-job-repository.ts`; this module
- * keeps every pre-S5 export identity and forwards to a lazily created
- * repository over the current store database accessor, so test database
- * reconfiguration keeps working. Removed when consumers migrate.
+ * Scheduled-job persistence facade. The repository remains lazy and receives
+ * the database accessor so test database reconfiguration has the same effect
+ * as before.
  */
 
 let repository: ScheduledJobRepositoryPort | null = null;

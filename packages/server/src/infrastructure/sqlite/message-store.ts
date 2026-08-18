@@ -1,20 +1,17 @@
 /**
- * S5 compat forwarder. Message and part SQL and row mapping moved to
- * `infrastructure/sqlite/message-repository.ts`; this module keeps every
- * pre-slice export identity and owns the temporary FTS sync helper (which
- * reads message/session content and calls the FTS index), preserving the
- * exact pre-slice ordering around CRUD. S6 owns moving the projection
- * behind committed events, at which point the FTS hooks retire.
+ * Message and part persistence with the FTS projection hooks that must stay
+ * ordered with CRUD. The repository is created lazily over the database
+ * singleton, preserving test database replacement and existing call timing.
  */
 
-import { getDatabase } from './index';
-import { getSession } from './sessions';
+import { getDatabase } from './database';
+import { getSession } from './session-store';
 import { createFtsProjector } from '@/infrastructure/session-search/fts-projector';
 import type { Message, MessageWithParts, Part, ToolPart } from '@jean2/sdk';
 import {
   createMessageRepository,
   type MessageDatabaseAccessor,
-} from '@/infrastructure/sqlite/message-repository';
+} from './message-repository';
 import type {
   CompactionBoundary,
   MessageStorePort,
@@ -45,8 +42,6 @@ function buildHooks(): SessionMessageRepositoryHooks {
 
 let repository: MessageStorePort | null = null;
 
-/** Lazily created compat repository over the current store database
- * accessor, exactly like the other S5 compat modules. */
 function repo(): MessageStorePort {
   return (repository ??= createMessageRepository(
     getDatabase as MessageDatabaseAccessor,

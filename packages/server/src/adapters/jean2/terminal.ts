@@ -5,7 +5,7 @@
  * accessor.
  */
 
-import { getDatabase } from '@/store';
+import { getDatabase } from '@/infrastructure/sqlite/database';
 import { createTerminalSessionRepository } from '@/infrastructure/sqlite/terminal-session-repository';
 import type { TerminalSessionStorePort } from '@/application/ports/terminal';
 

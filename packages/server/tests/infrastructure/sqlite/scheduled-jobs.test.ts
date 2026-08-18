@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite';
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
-import { initializeSchema } from '@/store';
+import { initializeSchema } from '@/infrastructure/sqlite/database';
 import { seedWorkspace } from '#tests/seed';
 import {
   createScheduledJob,
@@ -16,7 +16,7 @@ import {
   markScheduledJobError,
   advanceScheduledJob,
   markScheduledJobCompleted,
-} from '@/store/scheduled-jobs';
+} from '@/infrastructure/sqlite/scheduled-job-store';
 
 describe('scheduled-jobs store', () => {
   beforeEach(() => {

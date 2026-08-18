@@ -17,11 +17,11 @@ import {
 } from '@/daemon';
 
 import { initJean2, type InitOptions } from '@/init';
-import { runMigrations, getDatabase } from '@/store';
+import { runMigrations, getDatabase } from '@/infrastructure/sqlite/database';
 import { runToolsCommand, type ToolsCommandArgs } from '@/tools/tools-cli';
 import { performUpdate, type UpdateOptions } from '@/update';
 import { syncModels, type SyncResult } from '@/configuration/models-sync';
-import { cleanupOrphanedData, vacuumDatabase, formatBytes } from '@/store/cleanup';
+import { cleanupOrphanedData, vacuumDatabase, formatBytes } from '@/infrastructure/sqlite/cleanup';
 import { VERSION } from '@/version';
 
 import '@/tools/clack-utils';

@@ -1,7 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { createTestSession, createTestUserMessage, createTestTextPart } from '#tests/factories';
-import { createSession, createMessage, createPart, createWorkspace } from '@/store';
+import { createSession } from '@/infrastructure/sqlite/session-store';
+import { createMessage, createPart } from '@/infrastructure/sqlite/message-store';
+import { createWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { executeSessionSearchTool } from '@capekai/core/internal/hosts';
 
 describe('session_search tool', () => {

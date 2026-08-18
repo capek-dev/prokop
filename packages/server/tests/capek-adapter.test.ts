@@ -9,7 +9,7 @@ import {
   jean2StorageBundle,
 } from '@/adapters/capek';
 import { createRuntime } from '@/bootstrap/create-runtime';
-import { getSession } from '@/store';
+import { getSession } from '@/infrastructure/sqlite/session-store';
 
 const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, string[]> = {
   interaction: [

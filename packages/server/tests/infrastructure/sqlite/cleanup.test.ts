@@ -7,26 +7,26 @@ import {
   deleteSession,
   deleteSessionsByWorkspace,
   getSession,
-} from '@/store/sessions';
+} from '@/infrastructure/sqlite/session-store';
 import {
   createMessage,
   createPart,
   listMessagesWithParts,
-} from '@/store/messages';
+} from '@/infrastructure/sqlite/message-store';
 import {
   createPendingAsk,
   listAllPendingAsks,
-} from '@/store/pending-asks';
+} from '@/infrastructure/sqlite/pending-asks';
 import {
   addMessageToQueue,
   listQueuedMessages,
-} from '@/store/queued-messages';
-import { pinMessage, listPinnedMessagesByWorkspace } from '@/store/pinned-messages';
+} from '@/infrastructure/sqlite/queued-messages';
+import { pinMessage, listPinnedMessagesByWorkspace } from '@/infrastructure/sqlite/pinned-messages';
 import {
   cleanupOrphanedData,
   vacuumDatabase,
-} from '@/store/cleanup';
-import { getDatabase } from '@/store';
+} from '@/infrastructure/sqlite/cleanup';
+import { getDatabase } from '@/infrastructure/sqlite/database';
 import type { PermissionAsk } from '@jean2/sdk';
 
 function makeSession(overrides: { id: string; workspaceId: string; title: string; status: 'active' | 'closed' }) {

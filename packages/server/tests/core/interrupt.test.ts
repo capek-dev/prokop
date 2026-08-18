@@ -125,9 +125,9 @@ describe('InterruptManager', () => {
 
     // The getChildSessions is called during interruptSession to cascade to children
     // We've seeded workspace+session, so we need a child session in the DB
-    const { createSession } = await import('@/store/sessions');
+    const { createSession } = await import('@/infrastructure/sqlite/session-store');
     const { createTestSession } = await import('#tests/factories');
-    const { getWorkspace } = await import('@/store/workspaces');
+    const { getWorkspace } = await import('@/infrastructure/sqlite/workspaces');
 
     const ws = getWorkspace('ws1');
     if (ws) {

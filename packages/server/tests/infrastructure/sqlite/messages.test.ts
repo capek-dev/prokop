@@ -32,9 +32,9 @@ import {
   persistStreamingPartSnapshot,
   persistStreamingPartSnapshots,
   syncMessageFts,
-} from '@/store/messages';
-import { createSession } from '@/store/sessions';
-import { getDatabase } from '@/store';
+} from '@/infrastructure/sqlite/message-store';
+import { createSession } from '@/infrastructure/sqlite/session-store';
+import { getDatabase } from '@/infrastructure/sqlite/database';
 import { revertToStep, forkSession } from '@capekai/core/internal/execution';
 import { createTestSession } from '#tests/factories';
 import type { AssistantMessage, Part, ToolPart } from '@jean2/sdk';

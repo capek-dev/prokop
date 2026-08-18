@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { createApp } from '@/app';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
-import { getPushSubscription } from '@/store';
+import { getPushSubscription } from '@/infrastructure/sqlite/web-push';
 import { getVapidCredentials, resetVapidCache } from '@/services/web-push/credentials';
 import { getWebPushCredentialsPath } from '@/paths';
 import { existsSync } from 'fs';

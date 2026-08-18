@@ -11,8 +11,8 @@ import {
   listAllPendingAsks,
   cleanupAllPendingAsks,
   type PendingAskRecord,
-} from '@/store/pending-asks';
-import { createSession } from '@/store/sessions';
+} from '@/infrastructure/sqlite/pending-asks';
+import { createSession } from '@/infrastructure/sqlite/session-store';
 import { createTestSession } from '#tests/factories';
 
 function makeSession(overrides: { id: string; workspaceId: string; title: string; status: 'active' | 'closed'; parentId?: string }) {

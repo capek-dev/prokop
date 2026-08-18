@@ -6,9 +6,9 @@ import {
   listEnabledSubscriptionsForEvent,
   reserveDelivery,
   deleteStaleSubscription,
-} from '@/store/web-push';
-import { createScheduledJob, deleteScheduledJob } from '@/store/scheduled-jobs';
-import { createPendingAsk } from '@/store/pending-asks';
+} from '@/infrastructure/sqlite/web-push';
+import { createScheduledJob, deleteScheduledJob } from '@/infrastructure/sqlite/scheduled-job-store';
+import { createPendingAsk } from '@/infrastructure/sqlite/pending-asks';
 import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
 
 const validKeys = { p256dh: 'p256dh-value', auth: 'auth-value' };
@@ -134,7 +134,7 @@ describe('web-push dispatch service', () => {
     });
 
     // Both subscriptions should have delivery records reserved
-    const { getPushSubscription } = await import('@/store/web-push');
+    const { getPushSubscription } = await import('@/infrastructure/sqlite/web-push');
     // Since sendNotification mock succeeds, deliveries are marked delivered
     expect(getPushSubscription).toBeDefined();
   });

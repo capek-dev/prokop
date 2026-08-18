@@ -1,5 +1,5 @@
-import { createWorkspace, type CreateWorkspaceInput } from '@/store/workspaces';
-import { createSession } from '@/store/sessions';
+import { createWorkspace, type CreateWorkspaceInput } from '@/infrastructure/sqlite/workspaces';
+import { createSession } from '@/infrastructure/sqlite/session-store';
 import { createTestSession } from './factories';
 
 const DEFAULT_WORKSPACE: CreateWorkspaceInput = {

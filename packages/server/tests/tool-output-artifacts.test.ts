@@ -3,11 +3,11 @@ import { createApp } from '@/app';
 import { jean2StorageBundle } from '@/adapters/capek';
 import {
   createToolOutputArtifact,
-  deleteSession,
-  deleteWorkspace,
-  getDatabase,
   getToolOutputArtifactPage,
-} from '@/store';
+} from '@/infrastructure/sqlite/tool-output-artifacts';
+import { deleteSession } from '@/infrastructure/sqlite/session-store';
+import { deleteWorkspace } from '@/infrastructure/sqlite/workspaces';
+import { getDatabase } from '@/infrastructure/sqlite/database';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedSession, seedWorkspace } from '#tests/seed';
 import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';

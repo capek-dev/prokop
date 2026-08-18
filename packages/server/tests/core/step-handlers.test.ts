@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import type { StepPart } from '@jean2/sdk';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
-import { createMessage } from '@/store/messages';
+import { createMessage } from '@/infrastructure/sqlite/message-store';
 import { createStepCallbacks, type StepCallbacksContext } from '@capekai/core/internal/execution';
 
 describe('step-handlers', () => {

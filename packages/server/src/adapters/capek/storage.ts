@@ -3,25 +3,15 @@ import {
   type StorageBundle,
 } from '@capekai/core/storage';
 import {
-  addMessageToQueue,
   buildEffectiveContextHistory,
   createMessage,
   createPart,
-  createSession,
   deleteMessage,
-  deleteQueuedMessage,
-  getAttachment,
-  getChildSessions,
   getMessage,
   getMessageWithParts,
-  getNextQueuedMessage,
   getPart,
   getPartsByMessage,
   getPartsBySession,
-  getResponseFormat,
-  getSession,
-  getWorkspace,
-  jean2ToolOutputArtifactStore,
   listLatestMessagesWithPartsPage,
   listMessagesWithParts,
   persistStreamingPartSnapshots,
@@ -30,9 +20,22 @@ import {
   transitionToolToRunningByCallId,
   updateMessage,
   updatePart,
+} from '@/infrastructure/sqlite/message-store';
+import {
+  createSession,
+  getChildSessions,
+  getSession,
   updateSession,
-} from '@/store';
-import { getWorkspaceAutoApproveSeverity } from '@/store/workspaces';
+} from '@/infrastructure/sqlite/session-store';
+import {
+  addMessageToQueue,
+  deleteQueuedMessage,
+  getNextQueuedMessage,
+} from '@/infrastructure/sqlite/queued-messages';
+import { getAttachment } from '@/infrastructure/sqlite/attachments';
+import { getResponseFormat } from '@/infrastructure/sqlite/response-formats';
+import { getWorkspace, getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
+import { jean2ToolOutputArtifactStore } from '@/infrastructure/sqlite/tool-output-artifacts';
 
 export const jean2StorageBundle: StorageBundle = {
   conversation: {

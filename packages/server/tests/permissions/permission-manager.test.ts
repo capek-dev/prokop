@@ -3,11 +3,11 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
 import { requestPermission, resolvePermission, rejectPermission, rejectPermissionsBySession, getPendingRequestsByRootSession, hasPendingWaiter } from '@capekai/core/internal/ask-authority';
-import { listPendingAsksBySession } from '@/store/pending-asks';
+import { listPendingAsksBySession } from '@/infrastructure/sqlite/pending-asks';
 import {
   getWorkspaceGrants,
   matchGrant,
-} from '@/store/permissions';
+} from '@/infrastructure/sqlite/permissions';
 import type { Ask, PermissionAsk } from '@jean2/sdk';
 
 // =============================================================================
@@ -66,7 +66,7 @@ describe('permission request manager', () => {
   describe('auto-approve', () => {
     test('auto-approves when existing grant matches intent target', async () => {
       // Pre-create a matching grant
-      const { createGrantFromOptions } = await import('@/store/permissions');
+      const { createGrantFromOptions } = await import('@/infrastructure/sqlite/permissions');
       createGrantFromOptions({
         workspaceId,
         toolName: 'shell',
@@ -93,7 +93,7 @@ describe('permission request manager', () => {
 
     test('does not auto-approve when grant does not match target', async () => {
       // Create a grant for a different file
-      const { createGrantFromOptions } = await import('@/store/permissions');
+      const { createGrantFromOptions } = await import('@/infrastructure/sqlite/permissions');
       createGrantFromOptions({
         workspaceId,
         toolName: 'shell',
