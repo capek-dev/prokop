@@ -1,40 +1,12 @@
-import { afterEach, describe, expect, mock, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/internal/configuration';
-
-const realEnv = await import('@/infrastructure/runtime/environment');
-
-const realGetLLMTemperature = realEnv.getLLMTemperature;
-const realGetLLMMaxSteps = realEnv.getLLMMaxSteps;
-const realGetLLMSubagentMaxSteps = realEnv.getLLMSubagentMaxSteps;
-const realGetLLMBaseUrl = realEnv.getLLMBaseUrl;
-const realGetCompactionModel = realEnv.getCompactionModel;
-const realGetCompactionProvider = realEnv.getCompactionProvider;
-const realGetCompactionMaxTokens = realEnv.getCompactionMaxTokens;
-const realGetCompactionPreserveRecentToolCount = realEnv.getCompactionPreserveRecentToolCount;
-const realGetCompactionPreserveSmallToolChars = realEnv.getCompactionPreserveSmallToolChars;
-const realGetCompactionToolClearCharsThreshold = realEnv.getCompactionToolClearCharsThreshold;
-const realGetCompactionMaxPrunedToolCount = realEnv.getCompactionMaxPrunedToolCount;
-const realGetCompactionAutoThresholdRatio = realEnv.getCompactionAutoThresholdRatio;
-const realGetCompactionAutoReserveCapTokens = realEnv.getCompactionAutoReserveCapTokens;
-const realGetCompactionAutoSafetyMarginTokens = realEnv.getCompactionAutoSafetyMarginTokens;
-
-// File-scoped module mock. The API key getters return distinct controlled
-// values so provider mapping mistakes cannot hide behind equal values or the
-// developer's real environment configuration. All other env exports stay real.
-mock.module('@/infrastructure/runtime/environment', () => ({
-  ...realEnv,
-  getLLMOpenAIApiKey: (): string | undefined => 'openai-key-1',
-  getLLMOpenRouterApiKey: (): string | undefined => 'openrouter-key-2',
-  getLLMMinimaxApiKey: (): string | undefined => 'minimax-key-3',
-  getLLMZhipuApiKey: (): string | undefined => 'zhipu-key-4',
-  getLLMZhipuCodingApiKey: (): string | undefined => 'zhipu-coding-key-5',
-  getLLMDeepseekApiKey: (): string | undefined => 'deepseek-key-6',
-}));
-
-const adapter = await import('@/adapters/capek/runtime-configuration');
-const configModule = await import('@/config');
-const jean2RuntimeConfiguration = adapter.jean2RuntimeConfiguration;
-const configureJean2RuntimeConfiguration = adapter.configureJean2RuntimeConfiguration;
+import {
+  configureJean2RuntimeConfiguration,
+  createJean2RuntimeConfiguration,
+  jean2RuntimeConfiguration,
+} from '@/adapters/capek/runtime-configuration';
+import * as configModule from '@/config';
+import * as environment from '@/infrastructure/runtime/environment';
 
 describe('Čapek runtime configuration adapter', () => {
   afterEach(() => {
@@ -54,34 +26,45 @@ describe('Čapek runtime configuration adapter', () => {
   });
 
   test('forwards every model and compaction accessor by identity', () => {
-    expect(jean2RuntimeConfiguration.findModel).toBe(configModule.findModel);
-    expect(jean2RuntimeConfiguration.findModelVariant).toBe(configModule.findModelVariant);
-    expect(jean2RuntimeConfiguration.getModelsConfig).toBe(configModule.getModelsConfig);
-    expect(jean2RuntimeConfiguration.getMaxOutputTokens).toBe(configModule.getMaxOutputTokens);
-    expect(jean2RuntimeConfiguration.getLLMTemperature).toBe(realGetLLMTemperature);
-    expect(jean2RuntimeConfiguration.getLLMMaxSteps).toBe(realGetLLMMaxSteps);
-    expect(jean2RuntimeConfiguration.getLLMSubagentMaxSteps).toBe(realGetLLMSubagentMaxSteps);
-    expect(jean2RuntimeConfiguration.getLLMBaseUrl).toBe(realGetLLMBaseUrl);
-    expect(jean2RuntimeConfiguration.getCompactionModel).toBe(realGetCompactionModel);
-    expect(jean2RuntimeConfiguration.getCompactionProvider).toBe(realGetCompactionProvider);
-    expect(jean2RuntimeConfiguration.getCompactionMaxTokens).toBe(realGetCompactionMaxTokens);
-    expect(jean2RuntimeConfiguration.getCompactionPreserveRecentToolCount).toBe(realGetCompactionPreserveRecentToolCount);
-    expect(jean2RuntimeConfiguration.getCompactionPreserveSmallToolChars).toBe(realGetCompactionPreserveSmallToolChars);
-    expect(jean2RuntimeConfiguration.getCompactionToolClearCharsThreshold).toBe(realGetCompactionToolClearCharsThreshold);
-    expect(jean2RuntimeConfiguration.getCompactionMaxPrunedToolCount).toBe(realGetCompactionMaxPrunedToolCount);
-    expect(jean2RuntimeConfiguration.getCompactionAutoThresholdRatio).toBe(realGetCompactionAutoThresholdRatio);
-    expect(jean2RuntimeConfiguration.getCompactionAutoReserveCapTokens).toBe(realGetCompactionAutoReserveCapTokens);
-    expect(jean2RuntimeConfiguration.getCompactionAutoSafetyMarginTokens).toBe(realGetCompactionAutoSafetyMarginTokens);
+    const configuration = createJean2RuntimeConfiguration({ ...configModule, ...environment });
+
+    expect(configuration.findModel).toBe(configModule.findModel);
+    expect(configuration.findModelVariant).toBe(configModule.findModelVariant);
+    expect(configuration.getModelsConfig).toBe(configModule.getModelsConfig);
+    expect(configuration.getMaxOutputTokens).toBe(configModule.getMaxOutputTokens);
+    expect(configuration.getLLMTemperature).toBe(environment.getLLMTemperature);
+    expect(configuration.getLLMMaxSteps).toBe(environment.getLLMMaxSteps);
+    expect(configuration.getLLMSubagentMaxSteps).toBe(environment.getLLMSubagentMaxSteps);
+    expect(configuration.getLLMBaseUrl).toBe(environment.getLLMBaseUrl);
+    expect(configuration.getCompactionModel).toBe(environment.getCompactionModel);
+    expect(configuration.getCompactionProvider).toBe(environment.getCompactionProvider);
+    expect(configuration.getCompactionMaxTokens).toBe(environment.getCompactionMaxTokens);
+    expect(configuration.getCompactionPreserveRecentToolCount).toBe(environment.getCompactionPreserveRecentToolCount);
+    expect(configuration.getCompactionPreserveSmallToolChars).toBe(environment.getCompactionPreserveSmallToolChars);
+    expect(configuration.getCompactionToolClearCharsThreshold).toBe(environment.getCompactionToolClearCharsThreshold);
+    expect(configuration.getCompactionMaxPrunedToolCount).toBe(environment.getCompactionMaxPrunedToolCount);
+    expect(configuration.getCompactionAutoThresholdRatio).toBe(environment.getCompactionAutoThresholdRatio);
+    expect(configuration.getCompactionAutoReserveCapTokens).toBe(environment.getCompactionAutoReserveCapTokens);
+    expect(configuration.getCompactionAutoSafetyMarginTokens).toBe(environment.getCompactionAutoSafetyMarginTokens);
   });
 
   test('maps provider API keys to distinct controlled accessor values without renaming providers', () => {
-    expect(jean2RuntimeConfiguration.getApiKey('openai')).toBe('openai-key-1');
-    expect(jean2RuntimeConfiguration.getApiKey('openrouter')).toBe('openrouter-key-2');
-    expect(jean2RuntimeConfiguration.getApiKey('minimax')).toBe('minimax-key-3');
-    expect(jean2RuntimeConfiguration.getApiKey('zhipu')).toBe('zhipu-key-4');
-    expect(jean2RuntimeConfiguration.getApiKey('zhipu-coding')).toBe('zhipu-coding-key-5');
-    expect(jean2RuntimeConfiguration.getApiKey('deepseek')).toBe('deepseek-key-6');
-    expect(jean2RuntimeConfiguration.getApiKey('unknown-provider')).toBeUndefined();
+    const configuration = createJean2RuntimeConfiguration({
+      getLLMOpenAIApiKey: () => 'openai-key-1',
+      getLLMOpenRouterApiKey: () => 'openrouter-key-2',
+      getLLMMinimaxApiKey: () => 'minimax-key-3',
+      getLLMZhipuApiKey: () => 'zhipu-key-4',
+      getLLMZhipuCodingApiKey: () => 'zhipu-coding-key-5',
+      getLLMDeepseekApiKey: () => 'deepseek-key-6',
+    });
+
+    expect(configuration.getApiKey('openai')).toBe('openai-key-1');
+    expect(configuration.getApiKey('openrouter')).toBe('openrouter-key-2');
+    expect(configuration.getApiKey('minimax')).toBe('minimax-key-3');
+    expect(configuration.getApiKey('zhipu')).toBe('zhipu-key-4');
+    expect(configuration.getApiKey('zhipu-coding')).toBe('zhipu-coding-key-5');
+    expect(configuration.getApiKey('deepseek')).toBe('deepseek-key-6');
+    expect(configuration.getApiKey('unknown-provider')).toBeUndefined();
   });
 
   test('installs the module-level runtime configuration by identity', () => {

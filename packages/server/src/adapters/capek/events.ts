@@ -1,5 +1,6 @@
 import type { RuntimeDelivery, RuntimeEvent, RuntimeEventContext } from '@capekai/core';
 import type { AskAuthority, ServerMessage } from '@jean2/sdk';
+import type { NotificationsApplication } from '@/application/notifications';
 import {
   broadcastEvent,
   broadcastToSessionEvent,
@@ -159,9 +160,12 @@ export function createJean2RuntimeContext<Origin>(router: Jean2EventRouter<Origi
   };
 }
 
-export function deliverCapekEvent(delivery: RuntimeDelivery): void {
+export function deliverCapekEvent(
+  delivery: RuntimeDelivery,
+  notifications?: Pick<NotificationsApplication, 'notifyTerminalMessage'>,
+): void {
   if (delivery.event.kind === 'terminal') {
-    getJean2NotificationsApplication().notifyTerminalMessage(
+    (notifications ?? getJean2NotificationsApplication()).notifyTerminalMessage(
       delivery.event.message,
       delivery.event.sessionId,
     );
