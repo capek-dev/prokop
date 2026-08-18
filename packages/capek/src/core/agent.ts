@@ -2,7 +2,7 @@ import { streamText, stepCountIs } from 'ai';
 import type { MessageWithParts, ToolPart, StepPart, Preconfig, MessageEvent, AssistantMessage, ResponseFormat } from '@capekai/types';
 import { createMessage, updateMessage, getSession, updateSession, transitionToolToInterrupted, syncMessageFts } from '../storage/runtime';
 
-import { findModel, getMaxOutputTokens } from '../configuration/runtime';
+import { findModel, getMaxOutputTokens, getModelsConfig } from '../configuration/runtime';
 import { randomUUID } from 'crypto';
 import { interruptManager } from './interrupt';
 import { broadcastSessionUpdated } from '../runtime/host-dependencies';
@@ -212,8 +212,8 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
     role: 'assistant',
     status: 'streaming',
     createdAt: Date.now(),
-    modelId: resolvedModelId || 'gpt-4o',
-    providerId: providerId || 'openai',
+    modelId: resolvedModelId || getModelsConfig().defaultModel,
+    providerId: providerId || getModelsConfig().defaultProvider,
     tokens: { prompt: 0, completion: 0 },
     cost: 0,
   };
@@ -370,7 +370,7 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
         cacheWriteTokens: stepCtx.latestUsage.cacheWriteTokens,
         noCacheTokens: stepCtx.latestUsage.noCacheTokens,
       },
-      model: resolvedModelId || 'gpt-4o',
+      model: resolvedModelId || getModelsConfig().defaultModel,
       variant: variant || null,
     };
   }

@@ -55,18 +55,34 @@ describe('runtime configuration', () => {
     expect(resolveProviderId(null, null)).toBe('fallback-provider');
   });
 
-  test('uses exact process defaults and provider inference', () => {
-    const previous = process.env.JEAN2_LLM_MAX_TOKENS;
-    delete process.env.JEAN2_LLM_MAX_TOKENS;
+  test('uses neutral defaults and explicit provider inference', () => {
     configureRuntimeConfiguration();
     expect(getMaxOutputTokens()).toBe(32000);
+    expect(findProviderFromModel('unknown')).toBe('');
+
+    const model = {
+      id: 'gpt-4o',
+      name: 'GPT-4o',
+      contextWindow: 128000,
+      maxOutputTokens: 16384,
+      tier: 'standard' as const,
+    };
+    configureRuntimeConfiguration({
+      ...createDefaultRuntimeConfiguration(),
+      findModel: (modelId, providerId) => modelId === 'gpt-4o' && (!providerId || providerId === 'openai')
+        ? { ...model, providerId: 'openai', providerName: 'OpenAI' }
+        : undefined,
+      getModelsConfig: () => ({
+        providers: [{ id: 'openai', name: 'OpenAI', models: [model] }],
+        defaultModel: 'gpt-4o',
+        defaultProvider: 'openai',
+      }),
+    });
+
     expect(findProviderFromModel('org/model')).toBe('openrouter');
-    expect(findProviderFromModel('openai/gpt-4o-mini')).toBe('openai');
     expect(findProviderFromModel('MiniMax-M2')).toBe('minimax');
     expect(findProviderFromModel('deepseek-chat')).toBe('deepseek');
-    expect(findProviderFromModel('unknown')).toBe('openai');
-    if (previous === undefined) delete process.env.JEAN2_LLM_MAX_TOKENS;
-    else process.env.JEAN2_LLM_MAX_TOKENS = previous;
+    expect(findProviderFromModel('gpt-4o')).toBe('openai');
   });
 
   test('normalizes explicit provider and model specifiers', async () => {
@@ -87,7 +103,11 @@ describe('runtime configuration', () => {
     expect((await getModelWithMetadata({ modelId: 'openai/gpt-4o-mini' })).model).toBe(model);
   });
 
-  test('resolves the existing default model without Jean2 bindings', async () => {
+  test('resolves the configured default model without product bindings', async () => {
+    configureRuntimeConfiguration({
+      ...createDefaultRuntimeConfiguration(),
+      getModelsConfig: () => ({ providers: [], defaultModel: 'configured-model', defaultProvider: 'custom' }),
+    });
     const model = {} as LanguageModel;
     registerProvider({
       descriptor: { id: 'custom', displayName: 'Custom', authType: 'none', connectable: true },
@@ -96,7 +116,7 @@ describe('runtime configuration', () => {
       disconnect: async () => {},
       onTokensReceived: async () => {},
       createModel: async (options) => {
-        expect(options.modelId).toBe('gpt-4o');
+        expect(options.modelId).toBe('configured-model');
         return { model };
       },
     });

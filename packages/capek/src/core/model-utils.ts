@@ -1,7 +1,7 @@
 import { type LanguageModel } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { findProviderFromModel, parseModelSpecifier } from './provider-utils';
-import { findModel, getApiKeyForProvider, getLLMBaseUrl } from '../configuration/runtime';
+import { findModel, getApiKeyForProvider, getLLMBaseUrl, getModelsConfig } from '../configuration/runtime';
 import { createModelForProvider, getProvider } from '../providers/registry';
 import { isSandboxActive } from '../runtime/host-dependencies';
 
@@ -29,7 +29,7 @@ export async function getModelWithMetadata(
   const options: ModelResolutionOptions = typeof modelIdOrOptions === 'string'
     ? { modelId: modelIdOrOptions, providerId, systemPrompt }
     : (modelIdOrOptions ?? {});
-  const requestedModelId = options.modelId || 'gpt-4o';
+  const requestedModelId = options.modelId || getModelsConfig().defaultModel;
   const parsedSpecifier = parseModelSpecifier(requestedModelId);
   const resolvedModelId = parsedSpecifier.modelId;
   const sandboxProvider = getProvider('sandbox');
@@ -61,7 +61,11 @@ export async function getModelWithMetadata(
     }
   }
 
-  const registeredProvider = provider ? getProvider(provider) : undefined;
+  if (!provider) {
+    throw new Error('No provider resolved for model "' + model + '". Configure runtime configuration (getModelsConfig) with a default provider, register the provider, or pass providerId explicitly.');
+  }
+
+  const registeredProvider = getProvider(provider);
   if (registeredProvider) {
     const result = await createModelForProvider({
       modelId: model,
@@ -80,8 +84,7 @@ export async function getModelWithMetadata(
   const apiKey = getApiKeyForProvider(provider);
 
   if (!apiKey) {
-    const envName = provider.toUpperCase().replaceAll('-', '_');
-    throw new Error(`No API key configured for provider: ${provider}. Set ${envName}_API_KEY or JEAN2_LLM_${envName}_API_KEY.`);
+    throw new Error(`No API key configured for provider: ${provider}. Register the provider with registerProvider or configure getApiKey in runtime configuration.`);
   }
 
   switch (provider) {

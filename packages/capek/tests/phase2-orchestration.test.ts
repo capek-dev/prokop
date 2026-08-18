@@ -893,7 +893,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
       kind: 'failure',
       category: 'generic',
       code: 'no_api_key',
-      message: 'No API key configured for provider: test-provider. Set JEAN2_LLM_TEST-PROVIDER_API_KEY',
+      message: 'No API key configured for provider: test-provider. Register the provider or configure its API key in runtime configuration.',
     }]);
   });
 

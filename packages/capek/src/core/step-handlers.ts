@@ -2,6 +2,7 @@ import type { MessageEvent, StepPart } from '@capekai/types';
 import { createPart, updatePart } from '../storage/runtime';
 import { createStepPart } from './part-utils';
 import { randomUUID } from 'crypto';
+import { getModelsConfig } from '../configuration/runtime';
 
 interface StepUsage {
   inputTokens?: number;
@@ -146,7 +147,7 @@ export function createStepCallbacks(ctx: StepCallbacksContext) {
               cacheWriteTokens: ctx.latestUsage.cacheWriteTokens,
               noCacheTokens: ctx.latestUsage.noCacheTokens,
             },
-            model: ctx.resolvedModelId ?? 'gpt-4o',
+            model: ctx.resolvedModelId ?? getModelsConfig().defaultModel,
             variant: ctx.variant ?? null,
           });
         }
