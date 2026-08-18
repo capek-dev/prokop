@@ -208,12 +208,11 @@ const c0Rules: DependencyRule[] = [
   },
   {
     name: 'tools-no-tool-output-domain-except-forwarders',
-    rationale: 'The tool-output domain owns the artifact envelope and truncation policy; tools, core, the facade, and plugins consume it only through the two pinned compatibility forwarders (tools/tool-output-artifacts.ts and utils/truncate-tool-result.ts), which preserve the pre-C6 export identities. The plugin layer imports the domain only through its provider module.',
+    rationale: 'The tool-output domain owns the artifact envelope and truncation policy; tools, core, the facade, and plugins consume it through the surviving compatibility forwarder and domain bridges. The plugin layer imports the domain only through its provider module.',
     appliesTo: [dir('tools'), dir('core'), dir('facade'), dir('plugins')],
     forbiddenResolvedDirs: [dir('tool-output')],
     exceptions: {
       'packages/capek/src/tools/tool-output-artifacts.ts': ['../tool-output/policy'],
-      'packages/capek/src/utils/truncate-tool-result.ts': ['../tool-output/policy'],
       'packages/capek/src/plugins/tool-output-policy.ts': ['../tool-output/policy'],
       'packages/capek/src/plugins/compose.ts': ['../tool-output/policy'],
       'packages/capek/src/plugins/service-keys.ts': ['../tool-output/contracts'],
@@ -478,6 +477,30 @@ describe('C0 internal dependency boundaries', () => {
     expect(result.staleExceptions).toEqual([]);
   });
 
+  test('retired forwarders are absent and no source or test imports through them', () => {
+    const retiredForwarderPaths = [
+      'packages/capek/src/core/subagent.ts',
+      'packages/capek/src/core/child-session.ts',
+      'packages/capek/src/core/workflow.ts',
+      'packages/capek/src/utils/truncate-tool-result.ts',
+      'packages/capek/src/core/goal-evaluator.ts',
+    ];
+    const sourceFiles = scanDirectory(packageSourceRoot);
+    expect(retiredForwarderPaths.filter((repoFile) =>
+      sourceFiles.some((file) => relative(repositoryRoot, file.path) === repoFile))).toEqual([]);
+
+    const imports = [...sourceFiles, ...scanDirectory(resolve(repositoryRoot, 'packages/capek/tests'))]
+      .flatMap((file) => parseImports(file.sourceText, file.path));
+    const retiredImports = imports.filter((imp) => {
+      const resolved = resolveLocalSpecifier(imp.specifier, imp.file, packageSourceRoot);
+      return retiredForwarderPaths.some((repoFile) => {
+        const target = resolve(repositoryRoot, repoFile);
+        return resolved === target || resolved === target.slice(0, -3);
+      });
+    });
+    expect(retiredImports).toEqual([]);
+  });
+
   test('a new violation fails while a named exception stays allowed', () => {
     const synthetic: ScannedFile[] = [
       {
@@ -615,11 +638,9 @@ describe('C0 internal dependency boundaries', () => {
     expect(violations).toEqual([]);
   });
 
-  test('the runtime core imports the concrete subagent domain only through the three compatibility forwarders', () => {
+  test('the runtime core imports the concrete subagent domain only through the compatibility forwarder', () => {
     const forwarderFiles = new Set([
-      'packages/capek/src/core/subagent.ts',
       'packages/capek/src/core/subagent-policy.ts',
-      'packages/capek/src/core/child-session.ts',
     ]);
     const violations: string[] = [];
     for (const file of scanDirectory(dir('core'))) {
@@ -637,11 +658,9 @@ describe('C0 internal dependency boundaries', () => {
     expect(violations).toEqual([]);
   });
 
-  test('the subagent domain forwarders re-export the domain implementation', () => {
+  test('the subagent domain forwarder re-exports the domain implementation', () => {
     const files = [
-      'packages/capek/src/core/subagent.ts',
       'packages/capek/src/core/subagent-policy.ts',
-      'packages/capek/src/core/child-session.ts',
     ];
     for (const repoFile of files) {
       const file = scanDirectory(dir('core')).find((candidate) => relative(repositoryRoot, candidate.path) === repoFile);
@@ -655,9 +674,8 @@ describe('C0 internal dependency boundaries', () => {
     }
   });
 
-  test('the runtime core imports the concrete workflow domain only through the four compatibility forwarders', () => {
+  test('the runtime core imports the concrete workflow domain only through the three compatibility forwarders', () => {
     const forwarderFiles = new Set([
-      'packages/capek/src/core/workflow.ts',
       'packages/capek/src/core/workflow-decomposer.ts',
       'packages/capek/src/core/workflow-synthesizer.ts',
       'packages/capek/src/core/workflow-orchestrator-session.ts',
@@ -680,7 +698,6 @@ describe('C0 internal dependency boundaries', () => {
 
   test('the workflow domain forwarders re-export the domain implementation', () => {
     const files = [
-      'packages/capek/src/core/workflow.ts',
       'packages/capek/src/core/workflow-decomposer.ts',
       'packages/capek/src/core/workflow-synthesizer.ts',
       'packages/capek/src/core/workflow-orchestrator-session.ts',
@@ -939,16 +956,13 @@ describe('C0 internal dependency boundaries', () => {
     expect(imports.some((imp) => imp.specifier === '../workspace/policy' && imp.names.includes('getWorkspaceService'))).toBe(true);
   });
 
-  test('the tool-output forwarders delegate to the tool-output domain', () => {
-    const toolForwarder = 'packages/capek/src/tools/tool-output-artifacts.ts';
-    const truncateForwarder = 'packages/capek/src/utils/truncate-tool-result.ts';
-    for (const repoFile of [toolForwarder, truncateForwarder]) {
-      const file = scanDirectory(packageSourceRoot).find((candidate) =>
-        relative(repositoryRoot, candidate.path) === repoFile);
-      expect(file, repoFile).toBeDefined();
-      const imports = parseImports(file!.sourceText, file!.path);
-      expect(imports.some((imp) => imp.specifier === '../tool-output/policy'), repoFile).toBe(true);
-    }
+  test('the tool-output forwarder delegates to the tool-output domain', () => {
+    const repoFile = 'packages/capek/src/tools/tool-output-artifacts.ts';
+    const file = scanDirectory(packageSourceRoot).find((candidate) =>
+      relative(repositoryRoot, candidate.path) === repoFile);
+    expect(file, repoFile).toBeDefined();
+    const imports = parseImports(file!.sourceText, file!.path);
+    expect(imports.some((imp) => imp.specifier === '../tool-output/policy'), repoFile).toBe(true);
 
     const policyFile = 'packages/capek/src/tool-output/policy.ts';
     const domain = scanDirectory(packageSourceRoot).find((candidate) =>
@@ -1001,9 +1015,8 @@ describe('C0 internal dependency boundaries', () => {
     expect(policyFile!.sourceText).not.toContain('maxPageChars:');
   });
 
-  test('the runtime core imports the concrete goal domain only through the two compatibility forwarders', () => {
+  test('the runtime core imports the concrete goal domain only through the compatibility forwarder', () => {
     const forwarderFiles = new Set([
-      'packages/capek/src/core/goal-evaluator.ts',
       'packages/capek/src/core/goal-loop.ts',
     ]);
     const violations: string[] = [];
@@ -1022,9 +1035,8 @@ describe('C0 internal dependency boundaries', () => {
     expect(violations).toEqual([]);
   });
 
-  test('the goal domain forwarders re-export the domain implementation', () => {
+  test('the goal domain forwarder re-exports the domain implementation', () => {
     const files = [
-      'packages/capek/src/core/goal-evaluator.ts',
       'packages/capek/src/core/goal-loop.ts',
     ];
     for (const repoFile of files) {

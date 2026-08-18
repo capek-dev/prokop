@@ -29,7 +29,6 @@ import {
   retrieveToolOutputStandardTool,
   wrapToolsWithOutputPolicy as forwardedWrap,
 } from '../src/tools/tool-output-artifacts';
-import { truncateToolResult as forwardedTruncate } from '../src/utils/truncate-tool-result';
 import { configureStorage, createInMemoryStorageBundle } from '../src/storage';
 import type { StorageBundle } from '../src/storage/contracts';
 import { configureRuntimeConfiguration } from '../src/configuration/runtime';
@@ -164,13 +163,12 @@ afterEach(() => {
 });
 
 describe('C6 tool-output policy contract', () => {
-  test('pins the exact default options and forwarder identities', () => {
+  test('pins the exact default options and surviving forwarder identity', () => {
     const service = createToolOutputService({ id: 'test' });
     expect(service.options).toEqual(makeOptions());
     expect(TOOL_OUTPUT_THRESHOLD_CHARS).toBe(50_000);
     expect(TOOL_OUTPUT_PREVIEW_CHARS).toBe(10_000);
     expect(forwardedApply).toBe(applyToolOutputPolicy);
-    expect(forwardedTruncate).toBe(truncateToolResult);
   });
 
   test('passes below-threshold results through untouched', () => {
