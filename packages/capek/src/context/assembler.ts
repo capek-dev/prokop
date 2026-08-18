@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { Preconfig } from '@jean2/sdk';
+import type { Preconfig } from '@capekai/types';
 
 /**
  * Context assembler contract and runtime accessors.

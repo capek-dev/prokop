@@ -8,7 +8,7 @@
  * over this domain.
  */
 
-import type { Message, Session } from '@jean2/sdk';
+import type { Message, Session } from '@capekai/types';
 import type { BroadcastFn } from '../runtime/host-dependencies';
 import { getCompactionService } from './policy';
 import { persistCompactionFailure } from './task';

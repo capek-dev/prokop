@@ -14,18 +14,7 @@
 import type { ChatOptions } from '../core/agent';
 import type { UsageEventData } from '../core/step-handlers';
 import type {
-  AssistantMessage,
-  AuthErrorMessage,
-  ChatRetryMessage,
-  ContextOverflowErrorMessage,
-  ErrorMessage,
-  InvalidRequestErrorMessage,
-  MessageEvent,
-  RateLimitErrorMessage,
-  ServerErrorMessage,
-  TimeoutErrorMessage,
-  ToolPart,
-} from '@jean2/sdk';
+  AssistantMessage, AuthErrorMessage, ChatRetryMessage, ContextOverflowErrorMessage, ErrorMessage, InvalidRequestErrorMessage, MessageEvent, RateLimitErrorMessage, ServerErrorMessage, TimeoutErrorMessage, ToolPart } from '@capekai/types';
 import {
   ApiErrorType,
   ERROR_CHAT_FAILED,

@@ -1,13 +1,5 @@
-import type {
-  Ask,
-  AskAuthority,
-  AssistantMessage,
-  Message,
-  MessageWithParts,
-  Part,
-  QueuedMessage,
-  Session,
-} from '@jean2/sdk';
+import type { Ask } from '@capekai/tool'
+import type { AskAuthority, AssistantMessage, Message, MessageWithParts, Part, QueuedMessage, Session } from '@capekai/types';
 import type { UsageEventData } from '../core/step-handlers';
 
 export type RuntimeEvent =

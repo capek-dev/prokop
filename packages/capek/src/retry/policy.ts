@@ -17,7 +17,7 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { ChatRetryErrorType } from '@jean2/sdk';
+import type { ChatRetryErrorType } from '@capekai/types';
 import {
   ApiErrorType,
   classifyApiError,

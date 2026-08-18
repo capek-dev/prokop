@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import type {
-  Ask,
-  AutoApproveSeverity,
-  PermissionAsk,
-} from '@jean2/sdk';
+import type { Ask } from '@capekai/tool';
+import type { AutoApproveSeverity } from '@capekai/types';
+import type { PermissionAsk } from '@capekai/tool';
 import {
   buildGrantParams,
   createAskPermissionService,

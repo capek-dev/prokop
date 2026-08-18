@@ -11,7 +11,8 @@ import {
   type AskBroadcastFn,
 } from '../../permission/ask-user-api';
 import { interruptManager } from '../interrupt';
-import type { WorkflowInput, PermissionRiskLevel } from '@jean2/sdk';
+import type { WorkflowInput } from '@capekai/types';
+import type { PermissionRiskLevel } from '@capekai/tool';
 import type { ToolMap } from './types';
 
 export interface WorkspaceToolsOptions {
@@ -102,7 +103,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
           return await memoryPayload.execute(args, {
             workspaceId,
             sessionId,
-            ask: (ask: import('@jean2/sdk').Ask) => askApi(ask),
+            ask: (ask: import('@capekai/tool').Ask) => askApi(ask),
             agentId,
             workspacePath,
             permissionRisk,
@@ -149,7 +150,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
               workspaceId,
               sessionId,
               ask: broadcastFn
-                ? (ask: import('@jean2/sdk').Ask) =>
+                ? (ask: import('@capekai/tool').Ask) =>
                   createAskApi(sessionId, toolCallId, workflowPayload.name, broadcastFn, workspaceId, rootSessionId)(ask)
                 : async () => {
                   throw new Error('Cannot ask user: no broadcast channel available');
@@ -186,7 +187,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
             return await skillManagePayload.execute(args, {
               workspaceId,
               sessionId,
-              ask: (ask: import('@jean2/sdk').Ask) => askApi(ask),
+              ask: (ask: import('@capekai/tool').Ask) => askApi(ask),
               agentId,
               workspacePath,
               permissionRisk,
@@ -219,7 +220,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
             {
               workspaceId,
               sessionId,
-              ask: (ask: import('@jean2/sdk').Ask) => askApi(ask),
+              ask: (ask: import('@capekai/tool').Ask) => askApi(ask),
               agentId,
               permissionRisk: searchSettings?.permissionRisk,
               includeToolResults: searchSettings?.includeToolResults === true,
@@ -254,7 +255,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
             {
               workspaceId,
               sessionId,
-              ask: (ask: import('@jean2/sdk').Ask) => askApi(ask),
+              ask: (ask: import('@capekai/tool').Ask) => askApi(ask),
               agentId,
               permissionRisk: schedulingRisk,
             },
@@ -279,7 +280,7 @@ function createAskApiOrThrow(
   broadcastFn: AskBroadcastFn | undefined,
   workspaceId: string | undefined,
   rootSessionId: string,
-): import('@jean2/sdk').AskApi {
+): import('@capekai/tool').AskApi {
   if (!broadcastFn) {
     throw new Error('Cannot ask user: no broadcast channel available');
   }

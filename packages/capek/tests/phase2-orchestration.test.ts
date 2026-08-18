@@ -1,14 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { LanguageModel } from 'ai';
 import type {
-  AssistantMessage,
-  GoalState,
-  Message,
-  MessageWithParts,
-  Part,
-  Preconfig,
-  Session,
-} from '@jean2/sdk';
+  AssistantMessage, GoalState, Message, MessageWithParts, Part, Preconfig, Session } from '@capekai/types';
 import { SandboxLanguageModel } from '../src/sandbox/model';
 import { sandboxController } from '../src/sandbox/controller';
 import {

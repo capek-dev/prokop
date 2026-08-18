@@ -14,12 +14,7 @@
 import { streamText as aiStreamText } from 'ai';
 import { randomUUID } from 'crypto';
 import type {
-  AssistantMessage,
-  CompactionPart,
-  MessageWithParts,
-  TextPart,
-  ToolPart,
-} from '@jean2/sdk';
+  AssistantMessage, CompactionPart, MessageWithParts, TextPart, ToolPart } from '@capekai/types';
 import { getModelWithMetadata } from '../core/model-utils';
 import { findProviderFromModel } from '../core/provider-utils';
 import { broadcastEvent, type BroadcastFn } from '../runtime/host-dependencies';

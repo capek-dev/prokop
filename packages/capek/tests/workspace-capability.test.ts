@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'fs';
 import { homedir, tmpdir } from 'os';
 import { join, resolve } from 'path';
-import type { LoadedTool, ToolContext, ToolResult } from '@jean2/sdk';
+import type { LoadedTool, ToolContext, ToolResult } from '@capekai/tool';
 import { executeTool } from '../src/tools/executor';
 import {
   createWorkspaceCapability,

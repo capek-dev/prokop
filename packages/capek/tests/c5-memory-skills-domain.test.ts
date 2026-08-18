@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Workspace } from '@jean2/sdk';
+import type { Workspace } from '@capekai/types';
 import { buildAiSdkTools } from '../src/core/build-tools';
 import {
   configureAgentSource,

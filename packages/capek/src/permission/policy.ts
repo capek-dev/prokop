@@ -15,20 +15,13 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type { Ask } from '@capekai/tool';
 import type {
-  Ask,
-  AskAuthority,
-  AskPermissionResponse,
-  ClientCapability,
-  GrantScope,
-  PermissionAsk,
-  PermissionIntent,
-  PermissionRiskLevel,
-} from '@jean2/sdk';
-import {
-  SHELL_DANGEROUS_COMMANDS,
-  SHELL_FILESYSTEM_COMMANDS,
-} from '@jean2/sdk';
+  AskAuthority, AskPermissionResponse, ClientCapability, GrantScope, PermissionIntent,
+} from '@capekai/types';
+import type { PermissionAsk, PermissionRiskLevel } from '@capekai/tool';
+import { SHELL_FILESYSTEM_COMMANDS } from '@capekai/tool';
+import { SHELL_DANGEROUS_COMMANDS } from '@capekai/tool';
 import { getRuntimeHost } from '../runtime/host';
 import type {
   CreateGrantParams,

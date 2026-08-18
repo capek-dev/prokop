@@ -10,7 +10,7 @@
  * path by identity.
  */
 
-import type { LoadedTool } from '@jean2/sdk';
+import type { LoadedTool } from '@capekai/tool';
 import type { CapekPlugin, EffectiveTool, PluginContext, ServiceKey } from '../kernel/types';
 import type { ToolRegistryResolver } from '../tools/registry';
 import {

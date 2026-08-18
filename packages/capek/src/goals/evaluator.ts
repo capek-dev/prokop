@@ -1,5 +1,5 @@
 import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
-import type { GoalEvaluation, MessageWithParts, TextPart, ToolPart } from '@jean2/sdk';
+import type { GoalEvaluation, MessageWithParts, TextPart, ToolPart } from '@capekai/types';
 import { listMessagesWithParts } from '../storage/runtime';
 import { runOrchestratorSession } from '../workflow/orchestrator-session';
 

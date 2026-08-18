@@ -1,4 +1,4 @@
-import type { CreateScheduledJobInput, ScheduledJob, UpdateScheduledJobInput } from '@jean2/sdk';
+import type { CreateScheduledJobInput, ScheduledJob, UpdateScheduledJobInput } from '@capekai/types';
 
 export interface SchedulerHost {
   create(workspaceId: string, input: CreateScheduledJobInput): ScheduledJob;

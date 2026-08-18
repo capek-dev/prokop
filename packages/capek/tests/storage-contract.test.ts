@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { Message, Session, ToolPart } from '@jean2/sdk';
+import type { Message, Session, ToolPart } from '@capekai/types';
 import {
   createInMemoryConversationStore,
   createInMemoryMessageQueueStore,

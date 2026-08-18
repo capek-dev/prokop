@@ -1,4 +1,4 @@
-import type { ResponseFormat } from '@jean2/sdk';
+import type { ResponseFormat } from '@capekai/types';
 import {
   emitRuntimeEvent,
   generateSessionTitle,

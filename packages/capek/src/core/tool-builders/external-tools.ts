@@ -95,7 +95,7 @@ export async function buildExternalTools(options: ExternalToolsOptions): Promise
           const askFactory = (tcId: string) =>
             broadcastFn
               ? createAskApi(sessionId, tcId, definition.name, broadcastFn, workspaceId, rootSessionId)
-              : (() => { throw new Error('Cannot ask user: no broadcast channel available (broadcastFn not provided)'); }) as import('@jean2/sdk').AskApi;
+              : (() => { throw new Error('Cannot ask user: no broadcast channel available (broadcastFn not provided)'); }) as import('@capekai/tool').AskApi;
 
           const workspace = createWorkspaceCapability(getToolWorkspaceHost({
             workspaceId,

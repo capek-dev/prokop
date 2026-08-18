@@ -1,4 +1,4 @@
-import type { Part } from '@jean2/sdk';
+import type { Part } from '@capekai/types';
 import type { FacadeComposition } from '../plugins/compose';
 import type { FacadeProfileId } from '../profiles/facade';
 import type { ToolOutputArtifactPage } from '../storage/contracts';

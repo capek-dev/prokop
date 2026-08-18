@@ -1,4 +1,6 @@
-import type { PermissionAsk, PermissionRiskLevel, ScheduleConfig, ScheduleKind, ScheduledJob, UpdateScheduledJobInput } from '@jean2/sdk';
+import type { PermissionAsk } from '@capekai/tool'
+import type { PermissionRiskLevel } from '@capekai/tool'
+import type { ScheduleConfig, ScheduleKind, ScheduledJob, UpdateScheduledJobInput } from '@capekai/types';
 import { getSchedulerHost, type SchedulerHost } from './host';
 
 export const schedulerToolDefinition = {

@@ -1,23 +1,10 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import type { InstallManifest } from '@capekai/tool';
+
+export type { InstallManifest };
 
 const INSTALL_MANIFEST = '.install-manifest.json';
-
-export interface InstallManifest {
-  toolName: string;
-  toolVersion: string | null;
-  installedAt: string;
-  sourceUrl?: string;
-  sourcePath?: string;
-  artifactSha256?: string;
-  entry: string;
-  runtime: 'bun';
-  packageName?: string;
-  packageVersion?: string;
-  installStrategy: 'source+npm' | 'source+npm+bundle';
-  sdkVersion?: string;
-  sdkIntegrity?: string;
-}
 
 function isInstallManifest(data: unknown): data is InstallManifest {
   if (typeof data !== 'object' || data === null) return false;

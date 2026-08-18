@@ -2,14 +2,11 @@ import { createHash } from 'node:crypto';
 import { basename, dirname, resolve, sep } from 'node:path';
 import ignore from 'ignore';
 import picomatch from 'picomatch';
-import type { LoadedTool, ToolContext, ToolDefinition, ToolResult } from '@jean2/sdk';
+import type { LoadedTool, ToolContext, ToolDefinition, ToolResult } from '@capekai/tool';
 import {
-  SHELL_DANGEROUS_COMMANDS,
-  SHELL_FILESYSTEM_COMMANDS,
-  SHELL_SHELL_OPERATORS,
-  createFilePermissionAsk,
-  getEffectiveShellCommandIdentity,
-} from '@jean2/sdk';
+  SHELL_FILESYSTEM_COMMANDS, SHELL_SHELL_OPERATORS, SHELL_DANGEROUS_COMMANDS,
+} from '@capekai/tool';
+import { createFilePermissionAsk, getEffectiveShellCommandIdentity } from '@capekai/types';
 import { retrieveToolOutputStandardTool } from '../tool-output/policy';
 
 const STANDARD_TOOL_PATH = 'builtin:@capekai/core';

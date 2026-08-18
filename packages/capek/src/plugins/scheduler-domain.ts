@@ -1,4 +1,5 @@
-import type { PermissionRiskLevel, Session, WorkspaceSchedulingSettings } from '@jean2/sdk';
+import type { PermissionRiskLevel } from '@capekai/tool'
+import type { Session, WorkspaceSchedulingSettings } from '@capekai/types';
 import { serviceKey } from '../kernel/service-key';
 import type {
   CapekPlugin,

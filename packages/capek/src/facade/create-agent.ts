@@ -5,12 +5,7 @@ import { join } from 'node:path';
 import { stdin, stdout } from 'node:process';
 import { createInterface, type Interface as ReadlineInterface } from 'node:readline/promises';
 import type {
-  AskRequestMessage,
-  AssistantMessage,
-  Part,
-  Preconfig,
-  ServerMessage,
-} from '@jean2/sdk';
+  AskRequestMessage, AssistantMessage, Part, Preconfig, ServerMessage } from '@capekai/types';
 import { executeCompaction } from '../compaction/executor';
 import { interruptManager } from '../core/interrupt';
 import { streamChatWithRetry, type StreamChatEvent } from '../retry/stream-chat';

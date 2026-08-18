@@ -1,4 +1,4 @@
-import type { AnyVisualization } from '@jean2/sdk';
+import type { AnyVisualization } from '@capekai/types';
 
 /**
  * Recursively strip _visualization fields from any object.

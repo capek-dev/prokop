@@ -1,6 +1,6 @@
 import type { LanguageModelUsage } from 'ai';
 import { extractJsonFromText } from '../structured-output';
-import type { StructuredOutputData, ResponseFormat } from '@jean2/sdk';
+import type { StructuredOutputData, ResponseFormat } from '@capekai/types';
 
 export interface FinalizationData {
   usageData: LanguageModelUsage | null;

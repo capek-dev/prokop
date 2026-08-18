@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
-import type { Preconfig } from '@jean2/sdk';
+import type { Preconfig } from '@capekai/types';
 
 export interface LoadedInstructions {
   global: string | null;

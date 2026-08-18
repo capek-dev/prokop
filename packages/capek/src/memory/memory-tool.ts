@@ -1,4 +1,4 @@
-import type { PermissionAsk, PermissionRiskLevel } from '@jean2/sdk';
+import type { PermissionAsk, PermissionRiskLevel } from '@capekai/tool';
 import { addEntry, listEntries, removeEntry, replaceEntry, type MemoryActionResult, type MemoryTarget } from './registry';
 
 export const memoryToolDefinition = {

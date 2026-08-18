@@ -19,6 +19,7 @@ const repositoryRoot = resolve(import.meta.dir, '../../..');
 const packageRoot = resolve(repositoryRoot, 'packages/capek');
 const packageSourceRoot = resolve(packageRoot, 'src');
 const serverSourceRoot = resolve(repositoryRoot, 'packages/server/src');
+const jean2ServerPackage = ['@jean2', '/server'].join('');
 const ignoredDirectories = new Set([
   '.git',
   '.architecture-specs',
@@ -382,8 +383,8 @@ describe('package boundary', () => {
 
     for (const path of collectSourceFiles(packageSourceRoot)) {
       for (const specifier of collectImports(path)) {
-        const importsServerPackage = specifier === '@jean2/server'
-          || specifier.startsWith('@jean2/server/');
+        const importsServerPackage = specifier === jean2ServerPackage
+          || specifier.startsWith(`${jean2ServerPackage}/`);
         const importsServerSourcePath = specifier.includes('packages/server/src');
         const resolvesIntoServerSource = resolvesWithin(specifier, path, serverSourceRoot);
 

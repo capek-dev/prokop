@@ -1,15 +1,5 @@
-import type {
-  AutoApproveSeverity,
-  Message,
-  MessageWithParts,
-  Part,
-  QueuedMessage,
-  ResponseFormat,
-  Session,
-  ToolPart,
-  Workspace,
-} from '@jean2/sdk';
-import type { AttachmentKind } from '@jean2/sdk';
+import type { AutoApproveSeverity, Message, MessageWithParts, Part, QueuedMessage, ResponseFormat, Session, ToolPart, Workspace } from '@capekai/types';
+import type { AttachmentKind } from '@capekai/types';
 
 export interface StreamingPartSnapshot {
   id: string;

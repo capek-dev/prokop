@@ -1,4 +1,4 @@
-import type { Preconfig } from '@jean2/sdk';
+import type { Preconfig } from '@capekai/types';
 import { SESSION_SEARCH_GUIDANCE } from '../session-search';
 import { loadMemoryInstructions, MEMORY_GUIDANCE } from '../memory';
 import { SKILL_MANAGE_GUIDANCE } from '../skills';

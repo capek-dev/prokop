@@ -24,7 +24,7 @@ import type {
   ToolLogger as SdkToolLogger,
   ToolModule as SdkToolModule,
   ToolResult as SdkToolResult,
-} from '@jean2/sdk';
+} from '@capekai/tool';
 
 type Assert<T extends true> = T;
 type IsAssignable<From, To> = [From] extends [To] ? true : false;

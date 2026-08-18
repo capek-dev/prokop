@@ -1,7 +1,8 @@
 import { existsSync } from 'fs';
 import { mkdir, readFile, readdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
-import type { PermissionAsk, PermissionRiskLevel } from '@jean2/sdk';
+import type { PermissionAsk } from '@capekai/tool';
+import { PermissionRiskLevel } from '@capekai/tool';
 import { scanSkillsFromDir } from './registry';
 
 type SkillManageAction = 'list' | 'create' | 'update' | 'patch' | 'delete';

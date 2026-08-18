@@ -17,7 +17,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { homedir } from 'os';
 import { isAbsolute, join, relative, resolve, sep } from 'path';
-import { SENSITIVE_FILE_PATTERNS } from '@jean2/sdk';
+import { SENSITIVE_FILE_PATTERNS } from '@capekai/types';
 import type {
   WorkspaceCapability,
   WorkspaceCapabilityHost,

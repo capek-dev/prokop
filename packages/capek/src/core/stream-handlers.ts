@@ -1,4 +1,4 @@
-import type { TextPart, ToolPart, ReasoningPart, MessageEvent } from '@jean2/sdk';
+import type { TextPart, ToolPart, ReasoningPart, MessageEvent } from '@capekai/types';
 import { createPart, updatePart, getPart, persistStreamingPartSnapshots } from '../storage/runtime';
 import { parseToolInput } from './part-utils';
 import { randomUUID } from 'crypto';

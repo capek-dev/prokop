@@ -1,4 +1,4 @@
-import type { WorkflowInput, WorkflowResult } from '@jean2/sdk';
+import type { WorkflowInput, WorkflowResult } from '@capekai/types';
 import { serviceKey } from '../kernel/service-key';
 import type {
   CapekPlugin,

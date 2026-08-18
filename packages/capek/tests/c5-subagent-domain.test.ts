@@ -12,7 +12,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import type { Preconfig, Session, TextPart } from '@jean2/sdk';
+import type { Preconfig, Session, TextPart } from '@capekai/types';
 import { buildAiSdkTools } from '../src/core/build-tools';
 import {
   configureAgentSource,

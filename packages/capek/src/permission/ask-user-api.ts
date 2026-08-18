@@ -7,10 +7,8 @@
  * behavior.
  */
 
-import type {
-  AskApi,
-  AskAuthority,
-} from '@jean2/sdk';
+import type { AskApi } from '@capekai/tool'
+import type { AskAuthority } from '@capekai/types';
 import type { PendingAskRecord } from '../runtime/host';
 import { ASK_TIMEOUT } from './policy';
 import { getPermissionRuntimeService } from './runtime';

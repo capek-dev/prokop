@@ -1,4 +1,5 @@
-import type { Preconfig, ToolDefinition } from '@jean2/sdk';
+import type { Preconfig } from '@capekai/types'
+import type { ToolDefinition } from '@capekai/tool';
 import { validateContextAssemblyData, type ContextAssemblyData } from '../context/assembler';
 import { serviceKey } from '../kernel/service-key';
 import type {

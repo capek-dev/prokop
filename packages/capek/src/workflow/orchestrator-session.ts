@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { streamText } from 'ai';
-import type { AssistantMessage, TextPart, UserMessage } from '@jean2/sdk';
+import type { AssistantMessage, TextPart, UserMessage } from '@capekai/types';
 import {
   broadcastEvent,
   broadcastSessionCreated,

@@ -1,5 +1,5 @@
 import type { LanguageModel } from 'ai';
-import type { OAuthRedirectStrategy, ProviderDescriptor, ProviderStatus } from '@jean2/sdk';
+import type { OAuthRedirectStrategy, ProviderDescriptor, ProviderStatus } from '@capekai/types';
 
 export interface ModelFactoryOptions {
   modelId: string;

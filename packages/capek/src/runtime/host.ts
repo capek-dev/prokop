@@ -1,15 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type { Ask } from '@capekai/tool';
 import type {
-  Ask,
-  AskRequestMessage,
-  AskTimedOutMessage,
-  AutoApproveSeverity,
-  MessageWithParts,
-  PermissionGrant,
-  PermissionGrantOptions,
-  PermissionResource,
-  Session,
-} from '@jean2/sdk';
+  AskRequestMessage, AskTimedOutMessage, AutoApproveSeverity, MessageWithParts, Session,
+} from '@capekai/types';
+import type { PermissionGrant, PermissionGrantOptions, PermissionResource } from '@capekai/tool';
 import type { WorkspaceCapabilityHost } from '../workspace/contracts';
 import type { RuntimeDelivery, RuntimeEvent } from './events';
 
