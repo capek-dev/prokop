@@ -1,10 +1,10 @@
 import type { ToolDefinition } from '@capekai/tool'
 import type { TextPart, Session, ResponseFormat, Preconfig } from '@capekai/types';
 import {
-  broadcastEvent,
-  broadcastSessionCreated,
-  broadcastSessionUpdated,
-  broadcastToSessionEvent,
+  emitRuntimeEvent,
+  emitSessionCreated,
+  emitSessionUpdated,
+  emitToSession,
 } from '../runtime/host-dependencies';
 import { getPreconfigOrAgent, listSubagentPreconfigs } from '../context';
 import {
@@ -241,10 +241,10 @@ function moduleServiceDeps(): SubagentServiceDeps {
       listSubagentPreconfigs,
     },
     broadcasts: {
-      event: broadcastEvent,
-      sessionCreated: broadcastSessionCreated,
-      sessionUpdated: broadcastSessionUpdated,
-      toSession: (sessionId, event) => broadcastToSessionEvent(sessionId, event),
+      event: emitRuntimeEvent,
+      sessionCreated: emitSessionCreated,
+      sessionUpdated: emitSessionUpdated,
+      toSession: (sessionId, event) => emitToSession(sessionId, event),
     },
     executeChild: executeChildSession,
   };

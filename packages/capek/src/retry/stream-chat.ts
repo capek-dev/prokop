@@ -23,7 +23,7 @@ import {
   ERROR_TIMEOUT,
   type ClassifiedError,
 } from '../utils/errors';
-import { broadcastSessionUpdated } from '../runtime/host-dependencies';
+import { emitSessionUpdated } from '../runtime/host-dependencies';
 import {
   getPartsByMessage,
   getSession,
@@ -144,7 +144,7 @@ export async function* streamChatWithRetry(
   if (isMainSession) {
     const updatedSession = updateSession(options.sessionId, { runningAt: new Date().toISOString() });
     if (updatedSession) {
-      broadcastSessionUpdated(updatedSession);
+      emitSessionUpdated(updatedSession);
     }
   }
 
@@ -305,7 +305,7 @@ export async function* streamChatWithRetry(
     if (isMainSession) {
       const updatedSession = updateSession(options.sessionId, { runningAt: null });
       if (updatedSession) {
-        broadcastSessionUpdated(updatedSession);
+        emitSessionUpdated(updatedSession);
       }
     }
   }

@@ -29,11 +29,10 @@ import { createAgentScope, createProcessScope } from '../src/kernel/kernel';
 import { LifecycleError } from '../src/kernel/errors';
 import { CURRENT_CONTEXT_SECTION_IDS } from '../src/plugins/context-sections';
 import {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
   enterAgentScope,
   resetSharedProcessScopeForTests,
 } from '../src/plugins/compose';
+import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
 import { resetProviders } from '../src/providers/registry';
 import { configureRuntimeHost, type RuntimeHost } from '../src/runtime/host';
 import { resetDomainToolFallbacksForTests } from '../src/runtime/domain-tool-source';

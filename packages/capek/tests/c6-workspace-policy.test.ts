@@ -25,11 +25,10 @@ import type {
 } from '../src/workspace/contracts';
 import { createAgentScope } from '../src/kernel/kernel';
 import {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
   enterAgentScope,
 } from '../src/plugins/compose';
-import { currentAgentPlugins } from '../src/plugins/current-plugins';
+import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
+import { currentAgentPlugins } from './helpers/composition';
 import { capekWorkspacePolicyKey } from '../src/plugins/service-keys';
 import { configureRuntimeConfiguration } from '../src/configuration/runtime';
 import { createDefaultRuntimeConfiguration } from '../src/configuration/defaults';

@@ -42,11 +42,10 @@ import { configureSchedulerHost, type SchedulerHost } from '../src/scheduler/hos
 import { configureSessionSearchHost, type SessionSearchHost } from '../src/session-search/host';
 import { createAgentScope } from '../src/kernel/kernel';
 import {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
   enterAgentScope,
 } from '../src/plugins/compose';
-import { currentAgentPlugins } from '../src/plugins/current-plugins';
+import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
+import { currentAgentPlugins } from './helpers/composition';
 import { capekCompactionServiceKey } from '../src/plugins/service-keys';
 import type { GenerateSummaryFn } from '../src/compaction/contracts';
 
@@ -253,7 +252,21 @@ function makeDeps(overrides: Partial<CompactionRecoveryDeps> = {}): {
 
 beforeEach(() => {
   configureStorage(createInMemoryStorageBundle());
-  configureRuntimeConfiguration(createDefaultRuntimeConfiguration());
+  configureRuntimeConfiguration({
+    ...createDefaultRuntimeConfiguration(),
+    findModel(modelId) {
+      if (modelId !== 'gpt-4o') return undefined;
+      return {
+        id: 'gpt-4o',
+        name: 'GPT-4o',
+        contextWindow: 128000,
+        maxOutputTokens: 16384,
+        tier: 'standard',
+        providerId: 'openai',
+        providerName: 'OpenAI',
+      };
+    },
+  });
   configureRuntimeHost(minimalHost());
   configureSessionSearchHost(minimalSearchHost());
   configureSchedulerHost(minimalSchedulerHost());

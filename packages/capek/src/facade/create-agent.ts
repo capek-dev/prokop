@@ -19,6 +19,8 @@ import {
   type FacadeComposition,
 } from '../plugins/compose';
 import { capekAgentDriverKey, capekToolResolverKey } from '../plugins/service-keys';
+import { setDefaultContextAssembler } from '../context/assembler';
+import { fixedBuilderContextAssembler } from '../plugins/legacy-system-message';
 import { createAgentRuntime } from '../runtime/agent-runtime';
 import type { AgentDriver } from '../runtime/agent-runtime';
 import type { DefaultDriverInput } from '../runtime/default-agent-driver';
@@ -50,6 +52,13 @@ import type {
 import type { FacadeProfileId } from '../profiles/facade';
 
 const DEFAULT_PROMPT = `You are a practical coding and research agent. Inspect the workspace before making claims. Use the bundled read and search tools to gather evidence, then answer with concrete findings. Use edit, write, patch, or shell tools only when the user asks for changes. Ask a focused question when required information is missing.`;
+let facadeDefaultAssemblerInstalled = false;
+
+function ensureFacadeDefaultAssembler(): void {
+  if (facadeDefaultAssemblerInstalled) return;
+  setDefaultContextAssembler(fixedBuilderContextAssembler);
+  facadeDefaultAssemblerInstalled = true;
+}
 
 export interface TerminalInteraction {
   request(message: AskRequestMessage, signal: AbortSignal): Promise<unknown>;
@@ -208,6 +217,7 @@ class StandaloneAgent implements Agent {
   #storageClosed = false;
 
   constructor(options: CreateAgentOptions) {
+    ensureFacadeDefaultAssembler();
     if (!options.model.trim()) throw new Error('model is required');
     if (!options.workspace.trim()) throw new Error('workspace is required');
     this.#workspace = options.workspace;

@@ -5,20 +5,21 @@
  * pre-C2 behavior (no rewrap, no double close).
  */
 
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createAgent } from '@capekai/core';
 import { createInMemoryConversationStore, createInMemoryStorageBundle } from '@capekai/core/storage';
 import { getFacadeComposition } from '../src/facade/create-agent';
+import { createStandaloneBindings } from '../src/facade/standalone-bindings';
 import type { AgentEvent } from '../src/facade/types';
 import {
-  createCurrentProcessScope,
   enterAgentScope,
   resetSharedProcessScopeForTests,
   setSharedProcessScopeFactoryForTests,
 } from '../src/plugins/compose';
+import { createCurrentProcessScope } from './helpers/composition';
 import {
   capekProviderOverridesKey,
   capekProviderRegistryKey,
@@ -30,10 +31,19 @@ import {
 import { SandboxProvider } from '../src/sandbox/provider';
 import type { SandboxControlEvent, SandboxHistoryEntry } from '../src/sandbox/types';
 import { configureSchedulerHost, type SchedulerHost } from '../src/scheduler/host';
+import { configureRuntimeHost } from '../src/runtime/host';
 import { getProvider, resetProviders, withProviderOverrides } from '../src/providers/registry';
 import { getStorage } from '../src/storage/runtime';
 
 const roots: string[] = [];
+
+beforeEach(() => {
+  configureRuntimeHost(createStandaloneBindings({
+    workspace: tmpdir(),
+    sandboxActive: false,
+    tempRoot: join(tmpdir(), 'capek-c2-facade-host'),
+  }));
+});
 
 async function workspace(): Promise<string> {
   const path = await mkdtemp(join(tmpdir(), 'capek-c2-facade-'));
@@ -82,11 +92,11 @@ describe('createAgent through the agent scope', () => {
 
     const snapshot = agentScope.snapshot();
     // C4 adds the six coding capability services on top of the C2
-    // inventory (4 process services plus 16 facade services, including the
-    // agent driver and C6 agent-scoped retry policy, compaction service,
-    // permission policy and permission runtime, workspace policy, and tool-output policy). The
-    // C5 subagent domain is not part of the facade base composition: facade
-    // profiles install optional domains explicitly.
+    // inventory (4 facade process services plus 16 facade agent services,
+    // including the agent driver and C6 agent-scoped retry policy, compaction
+    // service, permission policy and permission runtime, workspace policy, and
+    // tool-output policy). The C5 subagent domain is not part of the facade
+    // base composition: facade profiles install optional domains explicitly.
     expect(snapshot.services).toHaveLength(26);
     const facadeServices = snapshot.services.filter((service) =>
       service.providerPluginId.startsWith('facade.'));
@@ -95,13 +105,17 @@ describe('createAgent through the agent scope', () => {
       'facade.compaction-policy',
       'facade.context-sections',
       'facade.context-sources',
+      'facade.installed-tool-registry',
       'facade.permission-policy',
       'facade.permission-policy',
       'facade.provider-overrides',
+      'facade.provider-registry',
       'facade.retry-policy',
       'facade.runtime-configuration',
       'facade.runtime-host',
       'facade.sandbox-controller',
+      'facade.scheduler-host',
+      'facade.session-search-host',
       'facade.storage',
       'facade.tool-output-policy',
       'facade.tool-resolver',

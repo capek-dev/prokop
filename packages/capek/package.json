@@ -12,6 +12,10 @@
       "types": "./src/internal/composition.ts",
       "default": "./src/internal/composition.ts"
     },
+    "./internal/plugins": {
+      "types": "./src/internal/plugins.ts",
+      "default": "./src/internal/plugins.ts"
+    },
     "./internal/hosts": {
       "types": "./src/internal/hosts.ts",
       "default": "./src/internal/hosts.ts"

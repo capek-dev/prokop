@@ -58,13 +58,6 @@ export const emitToAskTargets = (
 export const emitTerminal = (message: Extract<RuntimeEvent, { kind: 'terminal' }>['message'], sessionId: string): void =>
   emitRuntimeEvent({ kind: 'terminal', message, sessionId }, { scope: 'host' });
 
-export const broadcastEvent = emitRuntimeEvent;
-export const broadcastSessionCreated = emitSessionCreated;
-export const broadcastSessionUpdated = emitSessionUpdated;
-export const broadcastToSessionEvent = emitToSession;
-export const sendToControllerEvent = emitToController;
-export const sendToAskTargetsEvent = emitToAskTargets;
-export const notifyTerminalMessage = emitTerminal;
 export const isDefaultSessionTitle = (...args: Parameters<ReturnType<typeof getRuntimeHost>['titles']['isDefaultSessionTitle']>) =>
   getRuntimeHost().titles.isDefaultSessionTitle(...args);
 export const hasManualSessionTitle = (...args: Parameters<ReturnType<typeof getRuntimeHost>['titles']['hasManualSessionTitle']>) =>

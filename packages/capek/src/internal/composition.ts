@@ -1,25 +1,10 @@
-/**
- * Internal package-owned composition entrypoint (`@capekai/core/internal/composition`).
- *
- * Narrow by design: only the current-scope composition helpers, their
- * service keys, and the scope handle types are exported. This is not a
- * public authoring surface; C9 decides whether a stable plugin entrypoint
- * ever exists. The package root intentionally does not re-export anything
- * from here.
- */
+/** Internal package-owned generic composition entrypoint. */
 
 export {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
-  createJean2AgentScope,
-  createJean2ProcessScope,
+  createAgentScope,
+  createProcessScope,
   enterAgentScope,
 } from '../plugins/compose';
-export {
-  JEAN2_AGENT_PLUGIN_IDS,
-  JEAN2_PROCESS_PLUGIN_IDS,
-  JEAN2_PROFILE_ID,
-} from '../profiles/jean2';
 export type {
   AgentScopeHandle,
   CapekPlugin,

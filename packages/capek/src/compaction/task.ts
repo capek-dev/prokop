@@ -18,7 +18,7 @@ import type {
 import { getModelWithMetadata } from '../core/model-utils';
 import { findProviderFromModel } from '../core/provider-utils';
 import { getModelsConfig } from '../configuration/runtime';
-import { broadcastEvent, type BroadcastFn } from '../runtime/host-dependencies';
+import { emitRuntimeEvent, type BroadcastFn } from '../runtime/host-dependencies';
 import {
   buildEffectiveContextHistory,
   createMessage,
@@ -498,7 +498,7 @@ export function persistCompactionFailure(
   sessionId: string,
   triggerMessageId: string,
   errorMessage: string,
-  broadcast: BroadcastFn = broadcastEvent,
+  broadcast: BroadcastFn = emitRuntimeEvent,
 ): void {
   const now = Date.now();
   const msgId = randomUUID();

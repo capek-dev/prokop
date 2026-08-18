@@ -21,12 +21,11 @@ import type { ScheduledJob, Session, Workspace } from '@capekai/types';
 import { buildAiSdkTools } from '../src/core/build-tools';
 import { createAgentScope } from '../src/kernel/kernel';
 import {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
   enterAgentScope,
   resetSharedProcessScopeForTests,
 } from '../src/plugins/compose';
-import { currentAgentPlugins } from '../src/plugins/current-plugins';
+import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
+import { currentAgentPlugins } from './helpers/composition';
 import {
   CURRENT_SCHEDULER_DOMAIN_PLUGIN_ID,
   SCHEDULER_TOOL_CONTRIBUTION_ID,

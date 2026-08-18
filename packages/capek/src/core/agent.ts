@@ -5,7 +5,7 @@ import { createMessage, updateMessage, getSession, updateSession, transitionTool
 import { findModel, getMaxOutputTokens, getModelsConfig } from '../configuration/runtime';
 import { randomUUID } from 'crypto';
 import { interruptManager } from './interrupt';
-import { broadcastSessionUpdated } from '../runtime/host-dependencies';
+import { emitSessionUpdated } from '../runtime/host-dependencies';
 import { rejectPendingAsksBySession } from '../permission/ask-user-api';
 import { getModelWithMetadata } from './model-utils';
 
@@ -91,7 +91,7 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
   if (isMainSession && managesSessionLifecycle) {
     const updatedSession = updateSession(_sessionId, { runningAt: new Date().toISOString() });
     if (updatedSession) {
-      broadcastSessionUpdated(updatedSession);
+      emitSessionUpdated(updatedSession);
     }
   }
 
@@ -326,7 +326,7 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
       if (isMainSession) {
         const updatedSession = updateSession(_sessionId, { runningAt: null });
         if (updatedSession) {
-          broadcastSessionUpdated(updatedSession);
+          emitSessionUpdated(updatedSession);
         }
       }
     }

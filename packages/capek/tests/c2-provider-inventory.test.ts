@@ -21,17 +21,17 @@ import {
 } from '../src/kernel/kernel';
 import type { CapekPlugin, PluginContext } from '../src/kernel/types';
 import {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
   createFacadeAgentComposition,
   enterAgentScope,
 } from '../src/plugins/compose';
 import {
+  createCurrentAgentScope,
+  createCurrentProcessScope,
   CURRENT_AGENT_PLUGIN_IDS,
   CURRENT_PROCESS_PLUGIN_IDS,
   currentAgentPlugins,
   currentProcessPlugins,
-} from '../src/plugins/current-plugins';
+} from './helpers/composition';
 import { FACADE_AGENT_PLUGIN_IDS } from '../src/plugins/facade-plugins';
 import {
   C2_PROCESS_KEYS,

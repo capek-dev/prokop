@@ -15,6 +15,8 @@ import type { SandboxController } from '../sandbox/controller';
 import type { StorageBundle } from '../storage/contracts';
 import type { ToolRegistryResolver } from '../tools/registry';
 import type { ToolSourceLifecycle } from '../tools/tool-source';
+import { getSchedulerHost } from '../scheduler/host';
+import { getSessionSearchHost } from '../session-search/host';
 import { createContextSectionsPlugin } from './context-sections';
 import { retryPolicyPlugin } from './retry-policy';
 import { compactionPolicyPlugin } from './compaction-policy';
@@ -33,7 +35,27 @@ import {
   storageValuePlugin,
   toolResolverValuePlugin,
   toolSourceValuePlugin,
+  installedToolRegistryValuePlugin,
+  providerRegistryValuePlugin,
+  schedulerHostValuePlugin,
+  sessionSearchHostValuePlugin,
 } from './value-plugins';
+
+export const FACADE_PROCESS_PLUGIN_IDS = [
+  'facade.provider-registry',
+  'facade.installed-tool-registry',
+  'facade.session-search-host',
+  'facade.scheduler-host',
+] as const;
+
+export function facadeProcessPlugins(): readonly CapekPlugin<unknown>[] {
+  return [
+    providerRegistryValuePlugin('facade.provider-registry'),
+    installedToolRegistryValuePlugin('facade.installed-tool-registry'),
+    sessionSearchHostValuePlugin('facade.session-search-host', getSessionSearchHost()),
+    schedulerHostValuePlugin('facade.scheduler-host', getSchedulerHost()),
+  ];
+}
 
 export interface FacadeScopeValues {
   storage: StorageBundle;

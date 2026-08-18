@@ -35,11 +35,9 @@ import {
 import { configureRuntimeHost, type RuntimeHost } from '../src/runtime/host';
 import type { PendingAskRecord } from '../src/runtime/host';
 import {
-  createCurrentAgentScope,
-  createCurrentProcessScope,
   enterAgentScope,
 } from '../src/plugins/compose';
-import { currentAgentPlugins } from '../src/plugins/current-plugins';
+import { createCurrentAgentScope, createCurrentProcessScope, currentAgentPlugins } from './helpers/composition';
 import { createAgentScope } from '../src/kernel/kernel';
 import { capekPermissionPolicyKey, capekPermissionRuntimeKey } from '../src/plugins/service-keys';
 

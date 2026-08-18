@@ -2,9 +2,9 @@ import { randomUUID } from 'crypto';
 import { streamText } from 'ai';
 import type { AssistantMessage, TextPart, UserMessage } from '@capekai/types';
 import {
-  broadcastEvent,
-  broadcastSessionCreated,
-  broadcastSessionUpdated,
+  emitRuntimeEvent,
+  emitSessionCreated,
+  emitSessionUpdated,
 } from '../runtime/host-dependencies';
 import { getModelsConfig } from '../configuration/runtime';
 import {
@@ -57,9 +57,9 @@ export async function runOrchestratorSession(options: OrchestratorSessionOptions
     userPrompt,
     maxTokens = 4096,
     abortSignal,
-    broadcast = broadcastEvent,
-    broadcastSessionCreated: broadcastSessCreated = broadcastSessionCreated,
-    broadcastSessionUpdated: broadcastSessUpdated = broadcastSessionUpdated,
+    broadcast = emitRuntimeEvent,
+    broadcastSessionCreated: broadcastSessCreated = emitSessionCreated,
+    broadcastSessionUpdated: broadcastSessUpdated = emitSessionUpdated,
   } = options;
   const parentSession = getSession(parentSessionId);
   const config = getModelsConfig();

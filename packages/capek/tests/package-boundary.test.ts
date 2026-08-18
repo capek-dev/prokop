@@ -112,9 +112,6 @@ describe('package boundary', () => {
       'C2_PROCESS_KEYS',
       'C2_REQUIRED_AGENT_KEYS',
       'C2_SERVICE_KEYS',
-      'JEAN2_AGENT_PLUGIN_IDS',
-      'JEAN2_PROCESS_PLUGIN_IDS',
-      'JEAN2_PROFILE_ID',
       'capekAgentDriverKey',
       'capekContextAssemblerKey',
       'capekContextSourcesKey',
@@ -129,20 +126,17 @@ describe('package boundary', () => {
       'capekStorageKey',
       'capekToolResolverKey',
       'capekToolSourceKey',
-      'createCurrentAgentScope',
-      'createCurrentProcessScope',
-      'createJean2AgentScope',
-      'createJean2ProcessScope',
+      'createAgentScope',
+      'createProcessScope',
       'enterAgentScope',
     ].sort());
-    expect(typeof compositionApi.createCurrentProcessScope).toBe('function');
-    expect(typeof compositionApi.createCurrentAgentScope).toBe('function');
-    expect(typeof compositionApi.createJean2ProcessScope).toBe('function');
-    expect(typeof compositionApi.createJean2AgentScope).toBe('function');
+    expect(typeof compositionApi.createProcessScope).toBe('function');
+    expect(typeof compositionApi.createAgentScope).toBe('function');
     expect(typeof compositionApi.enterAgentScope).toBe('function');
     expect(typeof compositionApi.capekStorageKey.id).toBe('string');
     expect(typeof compositionApi.capekContextAssemblerKey.id).toBe('string');
   });
+
 
   test('internal hosts subpath exposes exactly the host configuration surface', () => {
     expect(Object.keys(hostsApi).sort()).toEqual([

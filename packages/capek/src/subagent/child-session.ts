@@ -1,10 +1,10 @@
 import { randomUUID } from 'crypto';
 import type { MessageWithParts, Part, TextPart, Preconfig, UserMessage, ResponseFormat, StructuredOutputData } from '@capekai/types';
 import {
-  broadcastEvent,
-  notifyTerminalMessage,
-  sendToAskTargetsEvent,
-  sendToControllerEvent,
+  emitRuntimeEvent,
+  emitTerminal,
+  emitToAskTargets,
+  emitToController,
 } from '../runtime/host-dependencies';
 import { getLLMSubagentMaxSteps } from '../configuration/runtime';
 import {
@@ -52,7 +52,7 @@ export async function executeChildSession(options: {
     modelId,
     providerId,
     variant,
-    broadcast: broadcastFn = broadcastEvent,
+    broadcast: broadcastFn = emitRuntimeEvent,
     broadcastToSession: broadcastToSessionFn = broadcastFn,
     responseFormat,
     abortSignal,
@@ -142,7 +142,7 @@ export async function executeChildSession(options: {
         },
       };
       const authority = message.authority ?? { visibilityScope: 'controller_only' as const, resolutionMode: 'controller_only' as const };
-      sendToAskTargetsEvent(rootSessionId, authority, {
+      emitToAskTargets(rootSessionId, authority, {
         kind: 'ask',
         action: 'requested',
         sessionId: rewritten.sessionId,
@@ -157,7 +157,7 @@ export async function executeChildSession(options: {
         ...message,
         sessionId: rootSessionId,
       };
-      sendToControllerEvent(rootSessionId, {
+      emitToController(rootSessionId, {
         kind: 'ask',
         action: 'timed_out',
         sessionId: rewritten.sessionId,
@@ -210,7 +210,7 @@ export async function executeChildSession(options: {
       }
       updateMessage(event.message.id, event.message, { syncFts: false });
       if (event.message.mode !== 'retry_failed') {
-        notifyTerminalMessage(event.message, childSessionId);
+        emitTerminal(event.message, childSessionId);
       }
       broadcastToSessionFn({ kind: 'message', action: 'updated', message: event.message });
     } else if (event.type === 'usage') {
