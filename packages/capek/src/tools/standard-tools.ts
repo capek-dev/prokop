@@ -10,7 +10,7 @@ import {
   createFilePermissionAsk,
   getEffectiveShellCommandIdentity,
 } from '@jean2/sdk';
-import { retrieveToolOutputStandardTool } from './tool-output-artifacts';
+import { retrieveToolOutputStandardTool } from '../tool-output/policy';
 
 const STANDARD_TOOL_PATH = 'builtin:@capekai/core';
 const SKIP_NAMES = new Set(['node_modules', '.git', 'dist', 'build', 'target', 'vendor', '.venv', 'coverage']);

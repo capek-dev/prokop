@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { homedir } from 'os';
 import { join, resolve } from 'path';
 import {
+  createWorkspaceCapability,
   createWorkspaceService,
   expandPath,
   getWorkspaceService,
   isInsideUnselectedAdditionalRoot,
+  isLexicallyContained,
   isPathInside,
   isPathWithinWorkspace,
   resetDefaultWorkspaceServiceForTests,
@@ -21,10 +23,6 @@ import type {
   WorkspaceCapabilityHost,
   WorkspacePolicyOptions,
 } from '../src/workspace/contracts';
-import {
-  createWorkspaceCapability as forwardedCreateCapability,
-  isLexicallyContained as forwardedIsLexicallyContained,
-} from '../src/tools/workspace-capability';
 import { createAgentScope } from '../src/kernel/kernel';
 import {
   createCurrentAgentScope,
@@ -217,7 +215,7 @@ describe('C6 workspace policy contract', () => {
     const service = makeService();
     expect(service.isLexicallyContained('/workspace/project/file.txt', '/workspace/project')).toBe(true);
     expect(service.isLexicallyContained('/workspace/project-other/file.txt', '/workspace/project')).toBe(false);
-    expect(forwardedIsLexicallyContained('/workspace/project-other/file.txt', '/workspace/project')).toBe(false);
+    expect(isLexicallyContained('/workspace/project-other/file.txt', '/workspace/project')).toBe(false);
   });
 
   test('sensitive and blocked classification preserves case rules', () => {
@@ -245,7 +243,7 @@ describe('C6 workspace policy contract', () => {
 
 describe('C6 workspace capability over the scoped service', () => {
   test('resolves the effective root and additional roots lexically', () => {
-    const workspace = forwardedCreateCapability(host());
+    const workspace = createWorkspaceCapability(host());
     expect(workspace.effectiveRoot).toBe(resolve('/workspace/project'));
     expect(workspace.additionalRoots).toEqual([resolve('/workspace/shared')]);
     expect(workspace.resolvePath('src/index.ts')).toBe(resolve('/workspace/project/src/index.ts'));
@@ -255,7 +253,7 @@ describe('C6 workspace capability over the scoped service', () => {
   });
 
   test('falls back to process.cwd when no root is supplied', () => {
-    const workspace = forwardedCreateCapability(host({ root: undefined }));
+    const workspace = createWorkspaceCapability(host({ root: undefined }));
     expect(workspace.effectiveRoot).toBe(resolve(process.cwd()));
     expect(workspace.resolvePath('file.txt')).toBe(resolve(process.cwd(), 'file.txt'));
   });
@@ -265,19 +263,19 @@ describe('C6 workspace capability over the scoped service', () => {
     const capability = service.createCapability(host());
     expect(capability.resolvePath('~/file.txt')).toBe(join('/home/user', 'file.txt'));
     expect(capability.resolvePath('~user/file.txt')).toBe(resolve('/workspace/project/~user/file.txt'));
-    // The unscoped forwarder uses the real process home.
-    const defaultCapability = forwardedCreateCapability(host());
+    // The unscoped service uses the real process home.
+    const defaultCapability = createWorkspaceCapability(host());
     expect(defaultCapability.resolvePath('~/file.txt')).toBe(join(homedir(), 'file.txt'));
   });
 
   test('rejects sibling-prefix paths with separator-aware containment', () => {
-    const workspace = forwardedCreateCapability(host());
+    const workspace = createWorkspaceCapability(host());
     expect(workspace.isWithinWorkspace('/workspace/project-other/file.txt')).toBe(false);
     expect(workspace.isWithinWorkspace('/workspace/shared-other/file.txt')).toBe(false);
   });
 
   test('preserves sensitive and case-sensitive blocked classification', () => {
-    const workspace = forwardedCreateCapability(host());
+    const workspace = createWorkspaceCapability(host());
     expect(workspace.isSensitivePath('/workspace/project/.ENV.local')).toBe(true);
     expect(workspace.isSensitivePath('/workspace/project/public.txt')).toBe(false);
     expect(workspace.isBlockedPath('/etc/passwd')).toBe(true);
@@ -290,10 +288,10 @@ describe('C6 workspace capability over the scoped service', () => {
     process.env[key] = 'process';
 
     try {
-      const overlay = forwardedCreateCapability(host({
+      const overlay = createWorkspaceCapability(host({
         getEnvironmentValue: (candidate) => candidate === key ? 'overlay' : undefined,
       }));
-      const fallback = forwardedCreateCapability(host());
+      const fallback = createWorkspaceCapability(host());
       expect(overlay.getEnvironmentValue(key)).toBe('overlay');
       expect(fallback.getEnvironmentValue(key)).toBe('process');
     } finally {
@@ -304,7 +302,7 @@ describe('C6 workspace capability over the scoped service', () => {
 
   test('normalizes add and remove callback paths and denies absent mutation rights', async () => {
     const calls: string[] = [];
-    const workspace = forwardedCreateCapability(host({
+    const workspace = createWorkspaceCapability(host({
       addAdditionalRoot: (path) => {
         calls.push(`add:${path}`);
         return true;
@@ -322,7 +320,7 @@ describe('C6 workspace capability over the scoped service', () => {
       `remove:${resolve('./additional')}`,
     ]);
 
-    const immutable = forwardedCreateCapability(host());
+    const immutable = createWorkspaceCapability(host());
     expect(await immutable.addWorkspacePath('/other')).toBe(false);
     expect(await immutable.removeWorkspacePath('/other')).toBe(false);
   });

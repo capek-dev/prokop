@@ -5,11 +5,8 @@ import {
   executeSessionSearchTool,
   type SessionSearchHost,
 } from '../src/session-search';
-import {
-  configureSchedulerHost,
-  executeSchedulerTool,
-  type SchedulerHost,
-} from '../src/scheduler';
+import { configureSchedulerHost, type SchedulerHost } from '../src/scheduler/host';
+import { executeSchedulerTool } from '../src/scheduler/scheduler-tool';
 
 const workspace: Workspace = {
   id: 'workspace-1',

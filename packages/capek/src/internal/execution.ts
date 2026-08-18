@@ -105,4 +105,4 @@ export {
   type StepCallbacksContext,
 } from '../core/step-handlers';
 export { buildSystemMessage } from '../plugins/legacy-system-message';
-export { createWorkspaceCapability } from '../tools/workspace-capability';
+export { createWorkspaceCapability } from '../workspace/policy';

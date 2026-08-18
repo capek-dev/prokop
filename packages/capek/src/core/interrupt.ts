@@ -2,7 +2,7 @@ import type { InterruptReason, SessionInterruptResult } from '@jean2/sdk';
 import { isSandboxActive } from '../runtime/host-dependencies';
 import { getSandboxController } from '../sandbox/controller';
 import { getChildSessions, getSession, updateSession } from '../storage/runtime';
-import { rejectPendingAsksBySession } from '../tools/ask-user-api';
+import { rejectPendingAsksBySession } from '../permission/ask-user-api';
 
 interface ToolExecution {
   controller: AbortController;

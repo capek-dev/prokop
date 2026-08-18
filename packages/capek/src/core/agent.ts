@@ -6,7 +6,7 @@ import { findModel, getMaxOutputTokens } from '../configuration/runtime';
 import { randomUUID } from 'crypto';
 import { interruptManager } from './interrupt';
 import { broadcastSessionUpdated } from '../runtime/host-dependencies';
-import { rejectPendingAsksBySession } from '../tools/ask-user-api';
+import { rejectPendingAsksBySession } from '../permission/ask-user-api';
 import { getModelWithMetadata } from './model-utils';
 
 import { createStepCallbacks, type CallbackEvent, type UsageEventData } from './step-handlers';
@@ -16,13 +16,13 @@ import { buildAiSdkTools, type BuildToolsOptions } from './build-tools';
 import { getContextAssembler } from '../context/assembler';
 import { getAgentDirectory } from '../context';
 import { initializeToolWorkspace } from '../tools/tool-source';
-import { resolveEffectiveSubagentTargets } from './subagent-policy';
+import { resolveEffectiveSubagentTargets } from '../subagent/policy';
 import { join } from 'path';
 
 import { classifyApiError } from '../utils/errors';
 import { createErrorEvent, type ErrorEvent } from './error-handling';
-import type { CompactionPolicy } from './compaction';
-import { computeAutoThreshold } from './stream/compaction-threshold';
+import type { CompactionPolicy } from '../compaction/contracts';
+import { computeAutoThreshold } from '../compaction/policy';
 import { buildStreamConfig } from './stream/stream-config';
 import { extractFinalizationData } from './stream/finalization';
 

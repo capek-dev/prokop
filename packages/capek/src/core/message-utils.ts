@@ -3,7 +3,7 @@ import type { ModelMessage } from 'ai';
 import { isTextPart, isToolPart, isImagePart, isFilePart, parseToolInput } from './part-utils';
 import { stripVisualization } from '../utils/strip-visualization';
 import { getAttachment } from '../storage/runtime';
-import { isToolOutputArtifactReference, RETRIEVE_TOOL_OUTPUT_NAME } from '../tools/tool-output-artifacts';
+import { isToolOutputArtifactReference, RETRIEVE_TOOL_OUTPUT_NAME } from '../tool-output/policy';
 
 type AiSdkContent = string | Array<{
   type: 'text' | 'tool-call' | 'tool-result' | 'image' | 'file';

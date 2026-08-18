@@ -7,8 +7,8 @@ import { executeTool } from '../src/tools/executor';
 import {
   createWorkspaceCapability,
   isLexicallyContained,
-  type WorkspaceCapabilityHost,
-} from '../src/tools/workspace-capability';
+} from '../src/workspace/policy';
+import type { WorkspaceCapabilityHost } from '../src/workspace/contracts';
 
 const createdDirectories: string[] = [];
 

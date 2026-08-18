@@ -8,9 +8,9 @@ import {
   buildRetrieveToolOutputAiTool,
   RETRIEVE_TOOL_OUTPUT_NAME,
   wrapToolsWithOutputPolicy,
-} from '../tools/tool-output-artifacts';
+} from '../tool-output/policy';
 import { getSession } from '../storage/runtime';
-import type { AskBroadcastFn } from '../tools/ask-user-api';
+import type { AskBroadcastFn } from '../permission/ask-user-api';
 import { hasScopedToolRegistryResolver } from '../tools/registry';
 import { join } from 'path';
 import { buildExternalTools } from './tool-builders/external-tools';

@@ -1,7 +1,7 @@
 import type { BroadcastFn, BroadcastSessionFn } from '../runtime/host';
 import type { GoalEvaluation, MessageWithParts, TextPart, ToolPart } from '@jean2/sdk';
 import { listMessagesWithParts } from '../storage/runtime';
-import { runOrchestratorSession } from '../core/workflow-orchestrator-session';
+import { runOrchestratorSession } from '../workflow/orchestrator-session';
 
 /**
  * Goal domain: the goal evaluator model turn. Moved byte-for-byte from

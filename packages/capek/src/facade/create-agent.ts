@@ -11,9 +11,9 @@ import type {
   Preconfig,
   ServerMessage,
 } from '@jean2/sdk';
-import { executeCompaction } from '../core/compaction-executor';
+import { executeCompaction } from '../compaction/executor';
 import { interruptManager } from '../core/interrupt';
-import { streamChatWithRetry, type StreamChatEvent } from '../core/retry';
+import { streamChatWithRetry, type StreamChatEvent } from '../retry/stream-chat';
 import { SandboxController } from '../sandbox/controller';
 import { SandboxProvider } from '../sandbox/provider';
 import type { AutoResponderRule, SandboxControlEvent } from '../sandbox/types';
@@ -38,7 +38,7 @@ import {
   getToolOutputArtifactPage,
   updateSession,
 } from '../storage/runtime';
-import { rejectAsk, resolveAsk } from '../tools/ask-user-api';
+import { rejectAsk, resolveAsk } from '../permission/ask-user-api';
 import { createFacadeConfiguration, resolveFacadeModel } from './configuration';
 import { createStandaloneBindings } from './standalone-bindings';
 import type {

@@ -12,7 +12,7 @@ import {
   TOOL_OUTPUT_PREVIEW_CHARS,
   TOOL_OUTPUT_THRESHOLD_CHARS,
   wrapToolsWithOutputPolicy,
-} from '../src/tools/tool-output-artifacts';
+} from '../src/tool-output/policy';
 
 function policyContext(toolName = 'synthetic') {
   return {

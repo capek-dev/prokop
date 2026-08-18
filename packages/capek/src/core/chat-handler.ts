@@ -29,15 +29,15 @@ import {
 } from '../storage/runtime';
 import type { AskBroadcastFn } from '../runtime/host';
 import type { RuntimeDelivery, RuntimeEvent, RuntimeEventContext } from '../runtime/events';
-import { getCompactionService } from './compaction';
-import { executeCompaction } from './compaction-executor';
-import { runGoalLoop } from './goal-loop';
+import { getCompactionService } from '../compaction/policy';
+import { executeCompaction } from '../compaction/executor';
+import { runGoalLoop } from '../goals/loop';
 import { interruptManager } from './interrupt';
 import { getApiKeyForProvider } from '../configuration/runtime';
 import { getProvider } from '../providers/registry';
 import { resolveModelId, resolveProviderId } from './provider-utils';
 import { revertToStep } from './revert';
-import { streamChatWithRetry } from './retry';
+import { streamChatWithRetry } from '../retry/stream-chat';
 
 export type RuntimeRequestContext<Origin = unknown> = RuntimeEventContext<Origin>;
 

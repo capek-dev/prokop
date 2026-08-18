@@ -51,7 +51,7 @@ import { configureSessionSearchHost } from '../src/session-search/host';
 import { createInMemoryStorageBundle } from '../src/storage/memory';
 import type { StorageBundle } from '../src/storage/contracts';
 import { configureStorage } from '../src/storage/runtime';
-import { resolvePermission } from '../src/tools/permission-request-manager';
+import { resolvePermission } from '../src/permission/permission-request-manager';
 import { clearCache } from '../src/tools/registry';
 import { STANDARD_TOOL_NAMES } from '../src/tools/standard-tools';
 import { configureToolSource } from '../src/tools/tool-source';

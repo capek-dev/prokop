@@ -359,6 +359,9 @@ export function getRetrieveToolOutputStandardTool(): LoadedTool {
   };
 }
 
+/** Stable singleton used by the standard coding capability inventory. */
+export const retrieveToolOutputStandardTool: LoadedTool = getRetrieveToolOutputStandardTool();
+
 export function applyToolOutputPolicy(result: unknown, context: ToolOutputPolicyContext): unknown {
   return getToolOutputService().applyToolOutputPolicy(result, context);
 }

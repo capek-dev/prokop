@@ -15,20 +15,17 @@ import {
   isToolOutputArtifactReference,
   resetDefaultToolOutputServiceForTests,
   RETRIEVE_TOOL_OUTPUT_NAME,
+  retrieveToolOutput,
+  retrieveToolOutputStandardTool,
   TOOL_OUTPUT_PREVIEW_CHARS,
   TOOL_OUTPUT_THRESHOLD_CHARS,
   truncateToolResult,
+  wrapToolsWithOutputPolicy,
   withToolOutputService,
   type ToolOutputArtifactReference,
   type ToolOutputPolicyContext,
   type ToolOutputPolicyOptions,
 } from '../src/tool-output/policy';
-import {
-  applyToolOutputPolicy as forwardedApply,
-  retrieveToolOutput as forwardedRetrieve,
-  retrieveToolOutputStandardTool,
-  wrapToolsWithOutputPolicy as forwardedWrap,
-} from '../src/tools/tool-output-artifacts';
 import { configureStorage, createInMemoryStorageBundle } from '../src/storage';
 import type { StorageBundle } from '../src/storage/contracts';
 import { configureRuntimeConfiguration } from '../src/configuration/runtime';
@@ -163,12 +160,11 @@ afterEach(() => {
 });
 
 describe('C6 tool-output policy contract', () => {
-  test('pins the exact default options and surviving forwarder identity', () => {
+  test('pins the exact default options and policy surface', () => {
     const service = createToolOutputService({ id: 'test' });
     expect(service.options).toEqual(makeOptions());
     expect(TOOL_OUTPUT_THRESHOLD_CHARS).toBe(50_000);
     expect(TOOL_OUTPUT_PREVIEW_CHARS).toBe(10_000);
-    expect(forwardedApply).toBe(applyToolOutputPolicy);
   });
 
   test('passes below-threshold results through untouched', () => {
@@ -194,7 +190,7 @@ describe('C6 tool-output policy contract', () => {
     expect(reference.message).toBe(
       `Exact output is available with ${RETRIEVE_TOOL_OUTPUT_NAME} using artifactId ${reference.artifactId}.`,
     );
-    const page = forwardedRetrieve('tool-output-session', { artifactId: reference.artifactId });
+    const page = retrieveToolOutput('tool-output-session', { artifactId: reference.artifactId });
     expect(page?.format).toBe('text');
     expect(page?.totalChars).toBe(large.length);
     expect(page?.complete).toBe(false);
@@ -214,7 +210,7 @@ describe('C6 tool-output policy contract', () => {
     );
     expect(reference._visualization).toEqual({ type: 'chart', data: 'z'.repeat(60_000) });
 
-    const page = forwardedRetrieve('tool-output-session', { artifactId: reference.artifactId });
+    const page = retrieveToolOutput('tool-output-session', { artifactId: reference.artifactId });
     expect(page).not.toBeNull();
     expect(page!.content).not.toContain('_visualization');
     expect(page!.content).toContain('content');
@@ -276,9 +272,9 @@ describe('C6 tool-output policy contract', () => {
     const large = 'x'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS + 1);
     const result = applyToolOutputPolicy(large, context()) as ToolOutputArtifactReference;
 
-    expect(forwardedRetrieve('tool-output-session', { artifactId: 'not-a-uuid' })).toBeNull();
-    expect(forwardedRetrieve('tool-output-session', { artifactId: '00000000-0000-4000-8000-000000000000' })).toBeNull();
-    expect(forwardedRetrieve('other-session', { artifactId: result.artifactId })).toBeNull();
+    expect(retrieveToolOutput('tool-output-session', { artifactId: 'not-a-uuid' })).toBeNull();
+    expect(retrieveToolOutput('tool-output-session', { artifactId: '00000000-0000-4000-8000-000000000000' })).toBeNull();
+    expect(retrieveToolOutput('other-session', { artifactId: result.artifactId })).toBeNull();
 
     // The retrieval tool reports the exact failure string.
     const outcome = retrieveToolOutputStandardTool.execute(
@@ -291,7 +287,7 @@ describe('C6 tool-output policy contract', () => {
   test('retrieval pages clamp offset and limit exactly', () => {
     const large = 'a'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS + 5);
     const result = applyToolOutputPolicy(large, context()) as ToolOutputArtifactReference;
-    const page = forwardedRetrieve('tool-output-session', {
+    const page = retrieveToolOutput('tool-output-session', {
       artifactId: result.artifactId,
       offset: large.length - 5,
       limit: 20_000,
@@ -325,7 +321,7 @@ describe('C6 tool-output policy contract', () => {
     } as unknown as AiTool;
     const noExecute = { description: 'no execute' } as AiTool;
 
-    const wrapped = forwardedWrap({
+    const wrapped = wrapToolsWithOutputPolicy({
       plain,
       [RETRIEVE_TOOL_OUTPUT_NAME]: retrieval,
       noExecute,
@@ -338,7 +334,7 @@ describe('C6 tool-output policy contract', () => {
     await (wrapped.plain.execute as (...args: unknown[]) => unknown)({}, { toolCallId: 'call-x' });
     expect(calls).toEqual(['plain']);
 
-    const reWrapped = forwardedWrap(wrapped, { sessionId: 'tool-output-session' });
+    const reWrapped = wrapToolsWithOutputPolicy(wrapped, { sessionId: 'tool-output-session' });
     expect(reWrapped.plain).toBe(wrapped.plain);
 
     // Missing toolCallId passes the result through unchanged.

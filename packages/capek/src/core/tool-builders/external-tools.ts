@@ -2,12 +2,12 @@ import { tool, jsonSchema } from 'ai';
 import { getTool } from '../../tools/registry';
 import { executeTool } from '../../tools/executor';
 import { createLlmApi } from '../../tools/llm-api';
-import { createWorkspaceCapability } from '../../tools/workspace-capability';
+import { createWorkspaceCapability } from '../../workspace/policy';
 import {
   createAskApi,
   rejectPendingAsksByToolCallId,
   type AskBroadcastFn,
-} from '../../tools/ask-user-api';
+} from '../../permission/ask-user-api';
 import { getToolWorkspaceHost } from '../../runtime/host-dependencies';
 import { transitionToolToRunningByCallId } from '../../storage/runtime';
 import { interruptManager } from '../interrupt';
