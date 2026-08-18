@@ -25,8 +25,8 @@ const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, s
   titles: ['isDefaultSessionTitle', 'hasManualSessionTitle', 'generateSessionTitle'],
   workspace: ['createToolWorkspaceHost'],
   sandbox: ['isSandboxActive'],
+  layout: ['workspaceMemoryDir', 'workspaceSkillsDir', 'agentSkillsDir', 'toolOutputTempRoot'],
 };
-
 describe('Čapek Jean2 adapter', () => {
   test('supplies every exact binding operation with no shadowed extras', () => {
     for (const [group, expected] of Object.entries(expectedGroupOperations)) {

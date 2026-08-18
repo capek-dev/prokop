@@ -131,6 +131,7 @@ const codexProvider: ConnectableProvider = {
     description: 'Use ChatGPT subscription models via OAuth',
     authType: 'oauth',
     connectable: true,
+    providerOptionsKey: 'openai',
   },
 
   getStatus(): ProviderStatus {

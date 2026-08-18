@@ -1,22 +1,23 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createRuntime } from '@/bootstrap/create-runtime';
 import { getModelWithMetadata } from '@capekai/core/internal/execution';
+import {
+  configureRuntimeConfiguration,
+  getRuntimeConfiguration,
+} from '@capekai/core/internal/configuration';
 import { SandboxLanguageModel } from '@capekai/core/internal/sandbox';
 import { activateSandbox, deactivateSandbox } from '@/sandbox';
 
-const originalOpenAIApiKey = process.env.JEAN2_LLM_OPENAI_API_KEY;
+let originalRuntimeConfiguration: ReturnType<typeof getRuntimeConfiguration>;
 
 beforeEach(() => {
   createRuntime();
+  originalRuntimeConfiguration = getRuntimeConfiguration();
 });
 
 afterEach(() => {
   deactivateSandbox();
-  if (originalOpenAIApiKey === undefined) {
-    delete process.env.JEAN2_LLM_OPENAI_API_KEY;
-  } else {
-    process.env.JEAN2_LLM_OPENAI_API_KEY = originalOpenAIApiKey;
-  }
+  configureRuntimeConfiguration(originalRuntimeConfiguration);
 });
 
 describe('getModelWithMetadata', () => {
@@ -34,7 +35,10 @@ describe('getModelWithMetadata', () => {
   });
 
   test('uses the OpenAI Responses connector with local storage disabled', async () => {
-    process.env.JEAN2_LLM_OPENAI_API_KEY = 'test-key';
+    configureRuntimeConfiguration({
+      ...getRuntimeConfiguration(),
+      getApiKey: (providerId) => providerId === 'openai' ? 'test-key' : undefined,
+    });
 
     const result = await getModelWithMetadata({
       modelId: 'gpt-5.6-luna',

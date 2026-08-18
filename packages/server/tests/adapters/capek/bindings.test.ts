@@ -97,7 +97,7 @@ describe('Čapek binding group adapters', () => {
 
   test('bindings assemble the exact group objects in the original order', () => {
     expect(Object.keys(jean2CompatibilityBindings)).toEqual([
-      'interaction', 'delivery', 'titles', 'workspace', 'sandbox',
+      'interaction', 'delivery', 'titles', 'workspace', 'sandbox', 'layout',
     ]);
     expect(jean2CompatibilityBindings.interaction).toBe(jean2InteractionBindings);
     expect(jean2CompatibilityBindings.delivery).toBe(jean2DeliveryBindings);
