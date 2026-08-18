@@ -18,7 +18,7 @@ import {
   CODING_CAPABILITY_KEYS,
 } from '../src/plugins/coding-capabilities';
 import type { SandboxControlEvent, SandboxHistoryEntry } from '../src/sandbox/types';
-import { retrieveToolOutputStandardTool } from '../src/tools/tool-output-artifacts';
+import { retrieveToolOutputStandardTool } from '../src/tool-output/policy';
 import { getStandardTool, STANDARD_TOOL_NAMES } from '../src/tools/standard-tools';
 
 const roots: string[] = [];

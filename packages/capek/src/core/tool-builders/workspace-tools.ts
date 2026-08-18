@@ -9,7 +9,7 @@ import {
   createAskApi,
   rejectPendingAsksByToolCallId,
   type AskBroadcastFn,
-} from '../../tools/ask-user-api';
+} from '../../permission/ask-user-api';
 import { interruptManager } from '../interrupt';
 import type { WorkflowInput, PermissionRiskLevel } from '@jean2/sdk';
 import type { ToolMap } from './types';

@@ -8,12 +8,12 @@ import {
   rejectPendingAsksBySession,
   rejectPendingAsksByToolCallId,
   resolveAsk,
-} from '../src/tools/ask-user-api';
+} from '../src/permission/ask-user-api';
 import {
   rejectPermissionsBySession,
   requestPermission,
   resolvePermission,
-} from '../src/tools/permission-request-manager';
+} from '../src/permission/permission-request-manager';
 import { configureStorage, createInMemoryStorageBundle } from '../src/storage';
 
 interface InteractionState {

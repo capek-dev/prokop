@@ -35,6 +35,7 @@ import {
   buildContinuationMessage,
 } from '../src/goals/evaluator';
 import {
+  runGoalLoop,
   runGoalLoopWithDeps,
   type GoalLoopDeps,
   type RunTurnFn,
@@ -43,7 +44,6 @@ import { configureRuntimeHost, type RuntimeHost } from '../src/runtime/host';
 import { configureStorage, createInMemoryStorageBundle } from '../src/storage';
 import { STANDARD_TOOL_NAMES } from '../src/tools/standard-tools';
 import { configureToolSource } from '../src/tools/tool-source';
-import { runGoalLoop } from '../src/core/goal-loop';
 
 function minimalHost(): RuntimeHost {
   return {
@@ -619,7 +619,7 @@ describe('C5 goal loop lifecycle with injected deps', () => {
     expect((state.broadcasts.at(-1)?.metadata?.goal as GoalState | undefined)?.completedAt).toBeDefined();
   });
 
-  test('the legacy goal-loop module path and identity stay intact', async () => {
+  test('the unscoped goal loop preserves its behavior', async () => {
     const state: FakeLoopState = { session: makeSession(), broadcasts: [], turns: [] };
     const sessions = new Map<string, Session>([[state.session.id, state.session]]);
     configureStorage({
@@ -647,9 +647,5 @@ describe('C5 goal loop lifecycle with injected deps', () => {
     });
 
     expect(goalStateOf(state.session)?.status).toBe('met');
-    expect(runGoalLoop).toBeDefined();
-    // Forwarder identity: the core goal-loop export IS the domain function.
-    const domainLoop = (await import('../src/goals/loop')).runGoalLoop;
-    expect(runGoalLoop).toBe(domainLoop);
   });
 });

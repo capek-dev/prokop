@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import type { AskApi, ToolResult } from '@jean2/sdk';
 import { executeTool } from '../src/tools/executor';
 import { getStandardTool, STANDARD_TOOL_NAMES } from '../src/tools/standard-tools';
-import { createWorkspaceCapability } from '../src/tools/workspace-capability';
+import { createWorkspaceCapability } from '../src/workspace/policy';
 import { createInMemoryStorageBundle, withStorage } from '@capekai/core/storage';
 
 const roots: string[] = [];

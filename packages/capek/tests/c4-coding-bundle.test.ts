@@ -23,7 +23,7 @@ import {
 } from '../src/plugins/coding-capabilities';
 import { createContributedToolResolver } from '../src/plugins/tool-catalog';
 import { createToolOutputArtifact } from '../src/storage/runtime';
-import { retrieveToolOutputStandardTool } from '../src/tools/tool-output-artifacts';
+import { retrieveToolOutputStandardTool } from '../src/tool-output/policy';
 import { getStandardTool, STANDARD_TOOL_NAMES } from '../src/tools/standard-tools';
 
 const BUILTIN_PATH = 'builtin:@capekai/core';

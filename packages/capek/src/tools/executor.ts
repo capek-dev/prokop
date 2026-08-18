@@ -1,7 +1,7 @@
 import { resolve, extname } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import type { ToolContext, ToolResult, LoadedTool, FileSystemApi, DirEntry, FileStat, EnvApi, ToolLogger, AskApi, LlmApi } from '@jean2/sdk';
-import type { WorkspaceCapability } from './workspace-capability';
+import type { WorkspaceCapability } from '../workspace/contracts';
 
 function createThrowingStub<T>(name: string): T {
   return new Proxy({}, {

@@ -17,15 +17,15 @@ import {
   createPermissionRuntimeService,
 } from '../src/permission/runtime';
 import {
-  createAskApi as forwardedCreateAskApi,
-  getAuthorityForPendingAsk as forwardedGetAuthority,
-  getSessionIdForPendingAsk as forwardedGetSessionId,
-  hasPendingAsk as forwardedHasPendingAsk,
-  rejectAsk as forwardedRejectAsk,
-  rejectPendingAsksBySession as forwardedRejectBySession,
-  rejectPendingAsksByToolCallId as forwardedRejectByToolCall,
-  resolveAsk as forwardedResolveAsk,
-} from '../src/tools/ask-user-api';
+  createAskApi,
+  getAuthorityForPendingAsk,
+  getSessionIdForPendingAsk,
+  hasPendingAsk,
+  rejectAsk,
+  rejectPendingAsksBySession,
+  rejectPendingAsksByToolCallId,
+  resolveAsk,
+} from '../src/permission/ask-user-api';
 import {
   getPendingRequestsByRootSession as forwardedGetPending,
   getPendingWaiterCount as forwardedWaiterCount,
@@ -33,7 +33,7 @@ import {
   rejectPermissionsBySession as forwardedRejectPermissionsBySession,
   requestPermission as forwardedRequestPermission,
   resolvePermission as forwardedResolvePermission,
-} from '../src/tools/permission-request-manager';
+} from '../src/permission/permission-request-manager';
 import { configureRuntimeHost, type RuntimeHost } from '../src/runtime/host';
 import type { PendingAskRecord } from '../src/runtime/host';
 import {
@@ -712,18 +712,18 @@ describe('C6 scoped permission policy composition', () => {
   });
 });
 
-describe('C6 permission forwarders', () => {
-  test('forwarders delegate through the scoped service', async () => {
-    const askApi = forwardedCreateAskApi('session', 'forwarded-call', 'fixture', broadcast);
+describe('C6 permission API and request manager surfaces', () => {
+  test('permission APIs delegate through the scoped service', async () => {
+    const askApi = createAskApi('session', 'forwarded-call', 'fixture', broadcast);
     const pending = askApi({ type: 'text', question: 'Forwarded?', target: 'human' }) as Promise<unknown>;
 
-    expect(forwardedHasPendingAsk('forwarded-call')).toBe(true);
-    expect(forwardedGetSessionId('forwarded-call')).toBe('session');
-    expect(forwardedGetAuthority('forwarded-call')).toEqual({
+    expect(hasPendingAsk('forwarded-call')).toBe(true);
+    expect(getSessionIdForPendingAsk('forwarded-call')).toBe('session');
+    expect(getAuthorityForPendingAsk('forwarded-call')).toEqual({
       visibilityScope: 'controller_only',
       resolutionMode: 'controller_only',
     });
-    expect(forwardedResolveAsk('forwarded-call', { type: 'text', value: 'yes' })).toBe(true);
+    expect(resolveAsk('forwarded-call', { type: 'text', value: 'yes' })).toBe(true);
     expect(await pending).toBe('yes');
 
     const permission = forwardedRequestPermission({
@@ -755,8 +755,8 @@ describe('C6 permission forwarders', () => {
     await expect(rejectPending).rejects.toThrow('interrupted');
 
     expect(forwardedGetPending('session')).toHaveLength(0);
-    expect(forwardedRejectAsk('missing-call', new Error('x'))).toBe(false);
-    expect(forwardedRejectByToolCall('missing-call', new Error('x'))).toHaveLength(0);
-    expect(forwardedRejectBySession('missing-session', new Error('x'))).toHaveLength(0);
+    expect(rejectAsk('missing-call', new Error('x'))).toBe(false);
+    expect(rejectPendingAsksByToolCallId('missing-call', new Error('x'))).toHaveLength(0);
+    expect(rejectPendingAsksBySession('missing-session', new Error('x'))).toHaveLength(0);
   });
 });

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { LanguageModel } from 'ai';
+import { createDefaultRuntimeConfiguration } from '../src/configuration/defaults';
 import {
   configureRuntimeConfiguration,
-  createDefaultRuntimeConfiguration,
   findModel,
   findModelVariant,
   getMaxOutputTokens,
-} from '../src/configuration';
+} from '../src/configuration/runtime';
 import { getModelWithMetadata } from '../src/core/model-utils';
 import { findProviderFromModel, resolveModelId, resolveProviderId } from '../src/core/provider-utils';
 import {
@@ -15,7 +15,7 @@ import {
   getProviderStatus,
   registerProvider,
   resetProviders,
-} from '../src/providers';
+} from '../src/providers/registry';
 
 afterEach(() => {
   configureRuntimeConfiguration();

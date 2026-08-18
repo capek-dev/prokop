@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createAgent } from '@capekai/core';
 import { facadeRuntimeIdentity } from '../src/facade/create-agent';
-import { streamChatWithRetry } from '../src/core/retry';
+import { streamChatWithRetry } from '../src/retry/stream-chat';
 import type { SandboxControlEvent, SandboxHistoryEntry } from '../src/sandbox/types';
 
 const roots: string[] = [];

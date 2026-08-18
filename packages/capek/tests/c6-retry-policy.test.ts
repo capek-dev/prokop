@@ -15,8 +15,6 @@ import {
   type CircuitState,
   type RetryPolicy,
 } from '../src/retry/policy';
-import { streamChatWithRetry as forwardedStreamChatWithRetry } from '../src/core/retry';
-import { createRetryCircuitState as forwardedCreateRetryCircuitState } from '../src/core/retry';
 import { ApiErrorType, classifyApiError } from '../src/utils/errors';
 import { configureRuntimeConfiguration } from '../src/configuration/runtime';
 import { createDefaultRuntimeConfiguration } from '../src/configuration/defaults';
@@ -744,12 +742,7 @@ describe('C6 agent-scoped retry policy composition', () => {
   });
 });
 
-describe('C6 compatibility forwarder identity', () => {
-  test('core/retry.ts re-exports the exact retry domain functions', () => {
-    expect(forwardedStreamChatWithRetry).toBe(streamChatWithRetry);
-    expect(forwardedCreateRetryCircuitState).toBe(createRetryCircuitState);
-  });
-
+describe('C6 retry policy compatibility surface', () => {
   test('a policy overlay map keeps the exact CircuitState shape', () => {
     const state: Map<string, CircuitState> = createRetryCircuitState();
     state.set('p:m', { failures: 1, lastFailureAt: Date.now(), openUntil: 0 });

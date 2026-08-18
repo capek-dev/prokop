@@ -10,7 +10,7 @@ import type {
   PermissionResource,
   Session,
 } from '@jean2/sdk';
-import type { WorkspaceCapabilityHost } from '../tools/workspace-capability';
+import type { WorkspaceCapabilityHost } from '../workspace/contracts';
 import type { RuntimeDelivery, RuntimeEvent } from './events';
 
 export type AskEventSink = (message: AskRequestMessage | AskTimedOutMessage) => void;

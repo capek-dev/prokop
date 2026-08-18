@@ -24,10 +24,6 @@ import {
   reconcileSessionCompaction,
   type CompactionRecoveryDeps,
 } from '../src/compaction/recovery';
-import {
-  createCompactionTrigger as forwardedCreateTrigger,
-  getCompactionService as forwardedGetService,
-} from '../src/core/compaction';
 import { createDefaultRuntimeConfiguration } from '../src/configuration/defaults';
 import {
   configureRuntimeConfiguration,
@@ -405,9 +401,7 @@ describe('C6 default compaction service contract', () => {
     expect(a.isCompactionActive(SESSION_ID)).toBe(false);
   });
 
-  test('compat functions resolve through the scoped service', () => {
-    expect(forwardedGetService).toBe(getCompactionService);
-    expect(forwardedCreateTrigger).toBe(createCompactionTrigger);
+  test('policy functions resolve through the scoped service', () => {
     expect(resolveCompactionPolicy(undefined, undefined).maxOutputTokens)
       .toBe(getDefaultCompactionPolicy().maxOutputTokens);
   });

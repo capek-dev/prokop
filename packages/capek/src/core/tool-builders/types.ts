@@ -1,5 +1,5 @@
 import type { Tool } from 'ai';
-import type { AskBroadcastFn } from '../../tools/ask-user-api';
+import type { AskBroadcastFn } from '../../permission/ask-user-api';
 
 export interface ToolBuildContext {
   sessionId: string;

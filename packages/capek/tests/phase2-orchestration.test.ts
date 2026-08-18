@@ -29,8 +29,8 @@ import {
   regenerateSessionTitle,
 } from '../src/core/chat-handler';
 import { runOrchestratorSession } from '../src/workflow/orchestrator-session';
-import { decomposeTask } from '../src/core/workflow-decomposer';
-import { synthesizeResults } from '../src/core/workflow-synthesizer';
+import { decomposeTask } from '../src/workflow/decomposer';
+import { synthesizeResults } from '../src/workflow/synthesizer';
 import {
   configureRuntimeHost,
   type RuntimeHost,
@@ -43,7 +43,7 @@ import { installSessionSearchToolFallback } from '../src/plugins/session-search-
 import { installSkillsToolFallback } from '../src/plugins/skills-domain';
 import { installTaskToolFallback } from '../src/plugins/subagent-domain';
 import { installWorkflowToolFallback } from '../src/plugins/workflow-domain';
-import type { StreamChatEvent } from '../src/core/retry';
+import type { StreamChatEvent } from '../src/retry/stream-chat';
 import type { RuntimeDelivery, RuntimeEvent } from '../src/runtime/events';
 import type { ChatOptions } from '../src/core/agent';
 import {
@@ -323,7 +323,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
       preconfig,
       prompt: 'work',
       broadcastToSession: (message) => delivered.push(message),
-      streamChat: childEvents as typeof import('../src/core/retry').streamChatWithRetry,
+      streamChat: childEvents as typeof import('../src/retry/stream-chat').streamChatWithRetry,
     });
 
     expect(state.askTargets).toHaveLength(1);
@@ -358,7 +358,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
           ...options,
           streamChat: (async function* () {
             yield { type, message } as StreamChatEvent;
-          }) as typeof import('../src/core/retry').streamChatWithRetry,
+          }) as typeof import('../src/retry/stream-chat').streamChatWithRetry,
         }),
       });
 
@@ -396,7 +396,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
       streamChat: (async function* (options: ChatOptions) {
         receivedMessageCount = options.messages.length;
         if (options.messages.length < 0) yield {} as StreamChatEvent;
-      }) as typeof import('../src/core/retry').streamChatWithRetry,
+      }) as typeof import('../src/retry/stream-chat').streamChatWithRetry,
     });
 
     expect(receivedMessageCount).toBe(2);

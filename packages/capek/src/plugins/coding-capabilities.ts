@@ -24,7 +24,7 @@ import type {
   ToolDefinition as KernelToolDefinition,
 } from '../kernel/types';
 import { getStandardTool } from '../tools/standard-tools';
-import { retrieveToolOutputStandardTool } from '../tools/tool-output-artifacts';
+import { retrieveToolOutputStandardTool } from '../tool-output/policy';
 
 export type CodingCapabilityId =
   | 'filesystem'

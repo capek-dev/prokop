@@ -43,7 +43,7 @@ import {
   updateMessage,
   updateSession,
 } from '../storage/runtime';
-import { rejectPendingAsksBySession } from '../tools/ask-user-api';
+import { rejectPendingAsksBySession } from '../permission/ask-user-api';
 import { interruptManager } from '../core/interrupt';
 import {
   getRetryPolicy,

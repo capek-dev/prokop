@@ -15,10 +15,10 @@ import {
   withAskPermissionPolicy,
 } from '../src/permission/policy';
 import type { AskPermissionPolicyService } from '../src/permission/contracts';
-import { resolveAsk } from '../src/tools/ask-user-api';
+import { resolveAsk } from '../src/permission/ask-user-api';
 import {
   requestPermission,
-} from '../src/tools/permission-request-manager';
+} from '../src/permission/permission-request-manager';
 import {
   createWorkspaceService,
   withWorkspaceService,
@@ -27,7 +27,7 @@ import type { WorkspaceService } from '../src/workspace/contracts';
 import {
   createWorkspaceCapability,
   isLexicallyContained,
-} from '../src/tools/workspace-capability';
+} from '../src/workspace/policy';
 import type { WorkspaceCapabilityHost } from '../src/workspace/contracts';
 import {
   applyToolOutputPolicy,
@@ -37,7 +37,7 @@ import {
   type ToolOutputArtifactReference,
 } from '../src/tool-output/policy';
 import type { ToolOutputArtifactService } from '../src/tool-output/contracts';
-import { retrieveToolOutputStandardTool } from '../src/tools/tool-output-artifacts';
+import { retrieveToolOutputStandardTool } from '../src/tool-output/policy';
 import {
   createCompactionService,
   withCompactionService,

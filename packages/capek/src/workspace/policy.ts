@@ -246,6 +246,11 @@ export function getWorkspaceService(): WorkspaceService {
     ?? (processDefaultService ??= createWorkspaceService({ id: 'workspace.process-default' }));
 }
 
+/** Builds the tool-runtime capability over the active workspace policy. */
+export function createWorkspaceCapability(host: WorkspaceCapabilityHost): WorkspaceCapability {
+  return createWorkspaceCapabilityWithOptions(host, getWorkspaceService().options);
+}
+
 /** Seeds a service for the callback duration. `enterAgentScope` seeds the
  * composed agent scope's service here. */
 export function withWorkspaceService<T>(service: WorkspaceService, callback: () => T): T {
