@@ -3,7 +3,7 @@ import type { SessionWirePorts } from './delivery';
 
 /**
  * Compact / revert / fork result contracts, structural copies of the Capek
- * compat shapes. The Capek execution adapter casts compat results onto these
+ * execution results. The Capek execution adapter maps those results onto these
  * contracts; no algorithm lives in the application layer.
  */
 export interface CompactionExecutionResult {
@@ -42,12 +42,12 @@ export interface EditMessageInput {
 }
 
 /**
- * Execution port. Each operation delegates to the exact current Capek compat
- * identity (handleChat, handleSessionEditMessage, regenerateSessionTitle,
- * interruptManager, executeCompaction, revertToStep, forkSession) and awaits
- * the same completion. The adapter owns the Capek runtime-context
- * construction; the application only supplies delivery and origin
- * bookkeeping through the wire ports.
+ * Execution port. Each operation delegates to the exact current internal Capek
+ * execution identity (handleChat, handleSessionEditMessage,
+ * regenerateSessionTitle, interruptManager, executeCompaction, revertToStep,
+ * forkSession) and awaits the same completion. The adapter owns the Capek
+ * runtime-context construction; the application only supplies delivery and
+ * origin bookkeeping through the wire ports.
  */
 export interface SessionExecutionPort {
   sendMessage<Origin>(

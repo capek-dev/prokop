@@ -1763,6 +1763,7 @@ describe('server layer boundaries', () => {
     const adapter = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(adapter).toBeDefined();
     expect(parseImports(adapter!.sourceText, adapter!.path).map((imp) => imp.specifier).sort()).toEqual([
+      '@/adapters/capek/execution-scope',
       '@/application/ports/scheduling',
       '@/config',
       '@/infrastructure/configuration/preconfig',
@@ -1770,8 +1771,56 @@ describe('server layer boundaries', () => {
       '@/infrastructure/sqlite/scheduled-job-store',
       '@/infrastructure/sqlite/session-store',
       '@/infrastructure/sqlite/workspaces',
+      '@jean2/sdk',
     ].sort());
     expect(adapter!.sourceText).not.toContain('@/scheduler/runner');
+  });
+
+  test('S10 gate: stateful session execution enters the composed scope', () => {
+    const executionPath = resolve(adaptersCapekDir, 'execution.ts');
+    const execution = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === executionPath);
+    expect(execution).toBeDefined();
+    expect(parseImports(execution!.sourceText, execution!.path).map((imp) => imp.specifier)).toContain('./execution-scope');
+    expect(execution!.sourceText).toContain('withJean2ExecutionScope');
+
+    const scopePath = resolve(adaptersCapekDir, 'execution-scope.ts');
+    const scope = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === scopePath);
+    expect(scope).toBeDefined();
+    expect(parseImports(scope!.sourceText, scope!.path).map((imp) => imp.specifier)).toContain('./composition');
+    expect(scope!.sourceText).not.toContain('createCurrentProcessScope');
+    expect(scope!.sourceText).not.toContain('createCurrentAgentScope');
+    for (const identity of [
+      'handleCapekChat',
+      'handleCapekSessionEditMessage',
+      'regenerateCapekSessionTitle',
+      'executeCapekCompaction',
+      'revertCapekToStep',
+      'forkCapekSession',
+    ]) {
+      expect(execution!.sourceText).toContain(identity);
+    }
+  });
+
+  test('S10 gate: startup owns execution composition creation and disposal', () => {
+    const startupPath = resolve(serverSourceRoot, 'index.ts');
+    const startup = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === startupPath);
+    expect(startup).toBeDefined();
+    expect(parseImports(startup!.sourceText, startup!.path).map((imp) => imp.specifier)).toContain(
+      '@/adapters/capek/execution-scope',
+    );
+
+    const source = startup!.sourceText;
+    expect(source.indexOf('const agents = createRuntime();')).toBeLessThan(
+      source.indexOf('await initializeJean2ExecutionScope();'),
+    );
+    expect(source.indexOf('await disposeJean2ExecutionScope();')).toBeGreaterThan(
+      source.indexOf('const cleanup ='),
+    );
+    expect(source).toContain('if (cleanupPromise !== null) return cleanupPromise;');
+    expect(source).toContain("console.error('Startup cleanup failed:', cleanupError);");
+    expect(source.indexOf('await disposeJean2ExecutionScope();')).toBeLessThan(
+      source.indexOf('attempt(() => closeDatabase());'),
+    );
   });
 
   test('S9 gate: the store compatibility directory is absent and no source file imports @/store', () => {
