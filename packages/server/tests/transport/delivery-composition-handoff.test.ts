@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, mock, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
 import { type RuntimeDelivery, type RuntimeEvent } from '@capekai/core';
 import { jean2DeliveryBindings } from '@/adapters/capek/delivery';
@@ -6,13 +6,6 @@ import { deliverCapekEvent } from '@/adapters/capek/events';
 import { createBunWebSocketAdapter } from '@/transport/websocket/bun-adapter';
 import { installDeliveryPort } from '@/core/broadcast';
 import { unregisterConnection } from '@/transport/websocket/connection-registry';
-
-mock.module('@/adapters/jean2/notifications', () => ({
-  getJean2NotificationsApplication: () => ({
-    notifyTerminalMessage: () => {},
-    acknowledgePendingNotification: () => {},
-  }),
-}));
 
 const sockets: unknown[] = [];
 
@@ -38,6 +31,7 @@ describe('S2 C2 composition delivery handoff', () => {
 
   test('deliverCapekEvent routes every host audience through the installed port', () => {
     const calls: Array<{ audience: string; sessionId?: string }> = [];
+    let notificationCalls = 0;
     const port = {
       sendToConnection: () => {},
       broadcast: () => {
@@ -65,10 +59,13 @@ describe('S2 C2 composition delivery handoff', () => {
     });
     // Origin and host audiences stay out of the socket protocol.
     deliverCapekEvent({ audience: { scope: 'origin', origin: {} }, event: failureEvent() });
-    deliverCapekEvent({
-      audience: { scope: 'host' },
-      event: { kind: 'terminal', sessionId: 's', message: { id: 'm' } as never },
-    } as RuntimeDelivery);
+    deliverCapekEvent(
+      {
+        audience: { scope: 'host' },
+        event: { kind: 'terminal', sessionId: 's', message: { id: 'm' } as never },
+      } as RuntimeDelivery,
+      { notifyTerminalMessage: () => { notificationCalls += 1; } },
+    );
 
     expect(calls).toEqual([
       { audience: 'global' },
@@ -76,6 +73,7 @@ describe('S2 C2 composition delivery handoff', () => {
       { audience: 'controller', sessionId: 's' },
       { audience: 'ask_targets', sessionId: 's' },
     ]);
+    expect(notificationCalls).toBe(1);
   });
 
   test('the production transport port installed into the composition path reaches sockets', () => {
