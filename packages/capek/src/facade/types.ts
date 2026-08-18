@@ -1,8 +1,10 @@
 import type { Part } from '@jean2/sdk';
-import type { ScopeDiagnosticsSnapshot } from '../kernel/types';
+import type { FacadeComposition } from '../plugins/compose';
 import type { FacadeProfileId } from '../profiles/facade';
 import type { ToolOutputArtifactPage } from '../storage/contracts';
 export type { AgentStorageOption } from '../storage/options';
+
+type ScopeDiagnosticsSnapshot = ReturnType<FacadeComposition['agentScope']['snapshot']>;
 
 export type AgentInput = string | { text: string };
 
