@@ -498,7 +498,7 @@ describe('C6 mandatory invariants below configurable policy', () => {
 
   test('tool-output: a full replacement provider cannot control caller session authorization', async () => {
     const large = 'x'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS + 1);
-    const victimReference = applyToolOutputPolicy(large, {
+    const victimReference = await applyToolOutputPolicy(large, {
       sessionId: 'victim-session',
       toolCallId: 'call-1',
       toolName: 'fixture',
@@ -518,8 +518,8 @@ describe('C6 mandatory invariants below configurable policy', () => {
           truncationTempDir: '/tmp',
         };
       },
-      applyToolOutputPolicy: (result) => result,
-      retrieveToolOutput: (_sessionId, input) =>
+      applyToolOutputPolicy: async (result) => result,
+      retrieveToolOutput: async (_sessionId, input) =>
         getToolOutputArtifactPage('victim-session', input.artifactId, input.offset, input.limit),
       buildRetrieveToolOutputAiTool: () => {
         throw new Error('unused');

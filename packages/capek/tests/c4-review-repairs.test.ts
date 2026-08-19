@@ -191,14 +191,14 @@ describe('retrieve-tool-output assembly branches', () => {
       const toolNames = resolver.list().map((entry) => entry.definition.name);
       expect(toolNames).toEqual([...STANDARD_TOOL_NAMES]);
 
-      const artifact = createToolOutputArtifact({
+      const artifact = await createToolOutputArtifact({
         sessionId: 'scoped-catalog-session',
         toolCallId: 'call-1',
         toolName: 'read-file',
         content: 'x'.repeat(2000),
         format: 'text',
       });
-      const foreign = createToolOutputArtifact({
+      const foreign = await createToolOutputArtifact({
         sessionId: 'foreign-session',
         toolCallId: 'call-9',
         toolName: 'read-file',

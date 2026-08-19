@@ -247,19 +247,22 @@ export function createInMemoryMessageQueueStore(options: { attachments?: Attachm
   const records = new Map<string, QueuedMessage>();
   let id = 0;
   return {
-    addMessage(sessionId, content, attachments) {
+    async addMessage(sessionId, content, attachments) {
       const position = Math.max(-1, ...[...records.values()]
         .filter(record => record.sessionId === sessionId)
         .map(record => record.position)) + 1;
-      const enriched = attachments?.map(attachment => {
-        const record = options.attachments?.get(sessionId, attachment.id);
-        return record ? {
-          ...attachment,
-          filename: record.filename,
-          mimeType: record.mimeType,
-          accessKey: record.accessKey,
-        } : attachment;
-      });
+      const enriched: Array<{ id: string; kind: string; filename?: string; mimeType?: string; accessKey?: string }> | undefined = attachments ? [] : undefined;
+      if (attachments && enriched) {
+        for (const attachment of attachments) {
+          const record = await options.attachments?.get(sessionId, attachment.id);
+          enriched.push(record ? {
+            ...attachment,
+            filename: record.filename,
+            mimeType: record.mimeType,
+            accessKey: record.accessKey,
+          } : attachment);
+        }
+      }
       const message: QueuedMessage = {
         id: `queue-${++id}`,
         sessionId,
@@ -271,13 +274,13 @@ export function createInMemoryMessageQueueStore(options: { attachments?: Attachm
       records.set(message.id, copy(message));
       return copy(message);
     },
-    peek(sessionId) {
+    async peek(sessionId) {
       const message = [...records.values()]
         .filter(record => record.sessionId === sessionId)
         .sort((left, right) => left.position - right.position || left.id.localeCompare(right.id))[0];
       return message ? copy(message) : null;
     },
-    delete(idToDelete) {
+    async delete(idToDelete) {
       return records.delete(idToDelete);
     },
   };
@@ -294,14 +297,14 @@ export function createInMemoryStorageBundle(records: InMemoryAuxiliaryRecords = 
   const workspaces = new Map(records.workspaces?.map(record => [record.id, copy(record)]));
   const responseFormats = new Map(records.responseFormats?.map(record => [record.id, copy(record)]));
   const attachmentStore: AttachmentStore = {
-    get: (sessionId, attachmentId) => copy(attachments.get(`${sessionId}:${attachmentId}`) ?? null),
+    get: async (sessionId, attachmentId) => copy(attachments.get(`${sessionId}:${attachmentId}`) ?? null),
   };
   const workspaceStore: WorkspaceStore = {
     get: id => copy(workspaces.get(id) ?? null),
     getAutoApproveSeverity: id => workspaces.get(id)?.settings.autoApproveSeverity ?? 'low',
   };
   const responseFormatStore: ResponseFormatStore = {
-    get: id => copy(responseFormats.get(id) ?? null),
+    get: async id => copy(responseFormats.get(id) ?? null),
   };
   const index: ConversationIndex = { syncMessage: () => {} };
   return {

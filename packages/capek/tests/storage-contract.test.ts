@@ -198,9 +198,9 @@ runConversationContract('SQLite conversation store', () => {
 
 function runToolOutputArtifactContract(name: string, createStore: () => ToolOutputArtifactStore & Partial<ClosableStore>): void {
   describe(name, () => {
-    test('enforces opaque session scope and bounded character pages', () => {
+    test('enforces opaque session scope and bounded character pages', async () => {
       const store = createStore();
-      const artifact = store.create({
+      const artifact = await store.create({
         sessionId: 'root',
         workspaceId: 'workspace-1',
         toolCallId: 'call-1',
@@ -211,22 +211,22 @@ function runToolOutputArtifactContract(name: string, createStore: () => ToolOutp
 
       expect(artifact.id).toMatch(/^[0-9a-f-]{36}$/);
       expect(artifact.size).toBe(MAX_TOOL_OUTPUT_PAGE_CHARS + 5);
-      expect(store.getPage('root', 'malformed')).toBeNull();
-      expect(store.getPage('other', artifact.id)).toBeNull();
-      expect(store.getPage('root', crypto.randomUUID())).toBeNull();
-      expect(store.getPage('root', artifact.id, 0, MAX_TOOL_OUTPUT_PAGE_CHARS * 2)).toMatchObject({
+      expect(await store.getPage('root', 'malformed')).toBeNull();
+      expect(await store.getPage('other', artifact.id)).toBeNull();
+      expect(await store.getPage('root', crypto.randomUUID())).toBeNull();
+      expect(await store.getPage('root', artifact.id, 0, MAX_TOOL_OUTPUT_PAGE_CHARS * 2)).toMatchObject({
         offset: 0,
         limit: MAX_TOOL_OUTPUT_PAGE_CHARS,
         totalChars: MAX_TOOL_OUTPUT_PAGE_CHARS + 5,
         nextOffset: MAX_TOOL_OUTPUT_PAGE_CHARS,
         complete: false,
       });
-      expect(store.getPage('root', artifact.id, MAX_TOOL_OUTPUT_PAGE_CHARS, 10)).toMatchObject({
+      expect(await store.getPage('root', artifact.id, MAX_TOOL_OUTPUT_PAGE_CHARS, 10)).toMatchObject({
         content: 'xxxxx',
         nextOffset: null,
         complete: true,
       });
-      expect(store.getPage('root', artifact.id, Number.MAX_SAFE_INTEGER, 10)).toMatchObject({
+      expect(await store.getPage('root', artifact.id, Number.MAX_SAFE_INTEGER, 10)).toMatchObject({
         content: '',
         offset: MAX_TOOL_OUTPUT_PAGE_CHARS + 5,
         complete: true,
@@ -277,14 +277,14 @@ describe('storage persistence and queue contracts', () => {
     reopened.close();
   });
 
-  test('reopens SQLite artifacts and cascades them with session deletion', () => {
+  test('reopens SQLite artifacts and cascades them with session deletion', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'capek-artifact-reopen-'));
     temporaryDirectories.push(directory);
     const path = join(directory, 'conversation.sqlite');
     const conversation = createSqliteConversationStore({ path });
     conversation.createSession(session('root'));
     const first = createSqliteToolOutputArtifactStore({ path });
-    const artifact = first.create({
+    const artifact = await first.create({
       sessionId: 'root',
       toolCallId: 'call-1',
       toolName: 'synthetic',
@@ -294,24 +294,24 @@ describe('storage persistence and queue contracts', () => {
     first.close();
 
     const reopened = createSqliteToolOutputArtifactStore({ path });
-    expect(reopened.getPage('root', artifact.id)?.content).toBe('exact');
+    expect((await reopened.getPage('root', artifact.id))?.content).toBe('exact');
     const db = new Database(path, { strict: true });
     db.exec('PRAGMA foreign_keys = ON');
     db.run('DELETE FROM capek_sessions WHERE id = ?', ['root']);
     db.close();
-    expect(reopened.getPage('root', artifact.id)).toBeNull();
+    expect(await reopened.getPage('root', artifact.id)).toBeNull();
     reopened.close();
     conversation.close();
   });
 
-  test('peeks then deletes queued messages in FIFO order', () => {
+  test('peeks then deletes queued messages in FIFO order', async () => {
     const queue = createInMemoryMessageQueueStore();
-    const first = queue.addMessage('root', 'first');
-    queue.addMessage('root', 'second');
+    const first = await queue.addMessage('root', 'first');
+    await queue.addMessage('root', 'second');
     expect(first.createdAt).toBeGreaterThan(0);
-    expect(queue.peek('root')?.id).toBe(first.id);
-    expect(queue.peek('root')?.id).toBe(first.id);
-    expect(queue.delete(first.id)).toBe(true);
-    expect(queue.peek('root')?.content).toBe('second');
+    expect((await queue.peek('root'))?.id).toBe(first.id);
+    expect((await queue.peek('root'))?.id).toBe(first.id);
+    expect(await queue.delete(first.id)).toBe(true);
+    expect((await queue.peek('root'))?.content).toBe('second');
   });
 });

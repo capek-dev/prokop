@@ -256,7 +256,7 @@ describe('contributed tool-output retrieval', () => {
   test('the contributed retrieve-tool-output executor keeps exact session-scoped retrieval', async () => {
     const storage = createInMemoryStorageBundle();
     withStorage(storage, async () => {
-      const artifact = createToolOutputArtifact({
+      const artifact = await createToolOutputArtifact({
         sessionId: 'session-a',
         toolCallId: 'call-1',
         toolName: 'read-file',
