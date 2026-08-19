@@ -2,7 +2,7 @@ import {
   completeOAuthFlow,
   handleServerCallback,
   initiateOAuthFlow,
-} from '@/providers/oauth-manager';
+} from '@/infrastructure/oauth/oauth-manager';
 import type {
   OAuthFlowPort,
   OAuthServerCallbackResult,

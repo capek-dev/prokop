@@ -20,7 +20,7 @@ import {
   parseOAuthErrorBody,
   type PkceCodes,
 } from '@/domains/provider-accounts';
-import { OAuthFlowState } from '@/infrastructure/oauth/oauth-flow-state';
+import { OAuthFlowState } from './oauth-flow-state';
 
 export {
   OAuthTokenRefreshError,

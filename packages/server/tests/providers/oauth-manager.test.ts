@@ -3,7 +3,7 @@ import {
   OAuthTokenRefreshError,
   refreshTokens,
   registerOAuthConfig,
-} from '@/providers/oauth-manager';
+} from '@/infrastructure/oauth/oauth-manager';
 
 const originalFetch = globalThis.fetch;
 
