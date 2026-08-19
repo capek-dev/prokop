@@ -31,7 +31,7 @@ import type { AskBroadcastFn } from '../runtime/host';
 import type { RuntimeDelivery, RuntimeEvent, RuntimeEventContext } from '../runtime/events';
 import { getCompactionService } from '../compaction/policy';
 import { executeCompaction } from '../compaction/executor';
-import { runGoalLoop } from '../goals/loop';
+import { getGoalDomain } from '../goals/service';
 import { interruptManager } from './interrupt';
 import { getApiKeyForProvider } from '../configuration/runtime';
 import { getProvider } from '../providers/registry';
@@ -591,7 +591,7 @@ export async function handleChat<Origin>(
     }, 200);
 
     try {
-      await runGoalLoop({
+      await getGoalDomain().runGoalLoop({
         sessionId,
         condition: goalCondition,
         initialPrompt: content,

@@ -102,5 +102,6 @@ packages/client-electron/.electron-cache/
 
 .jean2
 
-# Private migration architecture source of truth
+# Private architecture sources of truth
 .architecture-specs/
+.architecture-v2/

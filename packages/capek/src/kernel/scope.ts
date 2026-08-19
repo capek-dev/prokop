@@ -20,13 +20,9 @@ import {
   buildContextSections,
   buildSnapshot,
   collectEffectiveContextSections,
-  collectEffectiveGuards,
-  collectEffectiveProjections,
   collectEffectiveTools,
   type LocalContextSectionRegistration,
-  type LocalGuardRegistration,
   type LocalListenerRegistration,
-  type LocalProjectionRegistration,
   type LocalToolRegistration,
   type ResolvedService,
 } from './diagnostics';
@@ -36,8 +32,6 @@ import { createPluginRecords, type PluginContextHost, type PluginRecord } from '
 import { planActivation, type ParentServiceInfo } from './registry';
 import type {
   CapekPlugin,
-  CapabilityGuardContribution,
-  CapabilityGuardDiagnostic,
   CleanupBarrier,
   ContextSectionContribution,
   Disposable,
@@ -46,8 +40,6 @@ import type {
   EventListenerContribution,
   KernelEvent,
   PluginOptionsMap,
-  ProjectionContribution,
-  ProjectionDiagnostic,
   ProvidedContextSection,
   RunCancellation,
   RunStatus,
@@ -86,7 +78,7 @@ interface BarrierRegistration {
   removed: boolean;
 }
 
-type ContributionStoreKey = 'tool' | 'context' | 'listener' | 'guard' | 'projection';
+type ContributionStoreKey = 'tool' | 'context' | 'listener';
 
 function validateContributionObject(kind: string, value: unknown): asserts value is object {
   if (typeof value !== 'object' || value === null) {
@@ -131,29 +123,6 @@ function validateServiceKeyShape(
   }
 }
 
-function validateEventTypeList(
-  kind: string,
-  id: string,
-  value: unknown,
-): asserts value is readonly string[] {
-  if (!Array.isArray(value)) {
-    throw new MalformedPluginError(
-      `${kind} contribution '${id}' eventTypes must be an array of non-empty strings`,
-    );
-  }
-  if (value.length === 0) {
-    throw new MalformedPluginError(
-      `${kind} contribution '${id}' must declare at least one event type`,
-    );
-  }
-  for (const entry of value) {
-    if (typeof entry !== 'string' || entry.length === 0) {
-      throw new MalformedPluginError(
-        `${kind} contribution '${id}' eventTypes must contain only non-empty strings`,
-      );
-    }
-  }
-}
 
 function validateToolContribution(contribution: ToolContribution): void {
   validateContributionObject('tool', contribution);
@@ -209,40 +178,6 @@ function validateToolContribution(contribution: ToolContribution): void {
   }
 }
 
-function validateGuardShape(contribution: CapabilityGuardContribution): void {
-  validateContributionObject('capability guard', contribution);
-  validateContributionId('capability guard', contribution.id);
-  validateFiniteOrder('capability guard', contribution.id, contribution.order);
-  if (typeof contribution.evaluate !== 'function') {
-    throw new MalformedPluginError(
-      `capability guard '${contribution.id}' must provide an evaluate function`,
-    );
-  }
-}
-
-function validateProjectionShape(contribution: ProjectionContribution): void {
-  validateContributionObject('projection', contribution);
-  validateContributionId('projection', contribution.id);
-  if (
-    contribution.order !== undefined
-    && (typeof contribution.order !== 'number' || !Number.isFinite(contribution.order))
-  ) {
-    throw new MalformedPluginError(
-      `projection contribution '${contribution.id}' must have a finite order when present`,
-    );
-  }
-  validateEventTypeList('projection', contribution.id, contribution.eventTypes);
-  if (typeof contribution.project !== 'function') {
-    throw new MalformedPluginError(
-      `projection '${contribution.id}' must provide a project function`,
-    );
-  }
-  if (contribution.rebuild !== undefined && typeof contribution.rebuild !== 'function') {
-    throw new MalformedPluginError(
-      `projection '${contribution.id}' rebuild must be a function when present`,
-    );
-  }
-}
 
 async function activateScope(
   scope: ScopeBase,
@@ -269,8 +204,6 @@ export abstract class ScopeBase implements PluginContextHost {
   private readonly tools = new Map<string, LocalToolRegistration>();
   private readonly contextSections = new Map<string, LocalContextSectionRegistration>();
   private readonly listeners = new Map<string, ListenerRegistration>();
-  private readonly guards = new Map<string, LocalGuardRegistration>();
-  private readonly projections = new Map<string, LocalProjectionRegistration>();
   private readonly barriers: BarrierRegistration[] = [];
   private readonly children: ScopeBase[] = [];
   private disposePromise: Promise<void> | null = null;
@@ -380,49 +313,6 @@ export abstract class ScopeBase implements PluginContextHost {
     };
   }
 
-  registerCapabilityGuard(
-    pluginId: string,
-    contribution: CapabilityGuardContribution,
-  ): Disposable {
-    validateGuardShape(contribution);
-    const existing = this.findContributionInChain('guard', contribution.id);
-    if (existing !== null) {
-      throw new DuplicateContributionError(
-        `capability guard '${contribution.id}' is already registered in the ${existing.scopeKind} scope by plugin '${existing.pluginId}'`,
-      );
-    }
-    this.guards.set(contribution.id, { contribution, pluginId });
-    let removed = false;
-    return {
-      dispose: () => {
-        if (removed) return;
-        removed = true;
-        this.guards.delete(contribution.id);
-      },
-    };
-  }
-
-  registerProjection(
-    pluginId: string,
-    contribution: ProjectionContribution,
-  ): Disposable {
-    validateProjectionShape(contribution);
-    const existing = this.findContributionInChain('projection', contribution.id);
-    if (existing !== null) {
-      throw new DuplicateContributionError(
-        `projection '${contribution.id}' is already registered in the ${existing.scopeKind} scope by plugin '${existing.pluginId}'`,
-      );
-    }
-    this.projections.set(contribution.id, { contribution, pluginId });
-    let removed = false;
-    return {
-      dispose: () => {
-        if (removed) return;
-        removed = true;
-        this.projections.delete(contribution.id);
-      },
-    };
-  }
 
   /** Walks the scope chain so a child scope can never register an id that is
    * already contributed by any ancestor. Distinct ancestor ids stay inherited. */
@@ -444,8 +334,6 @@ export abstract class ScopeBase implements PluginContextHost {
       case 'tool': return this.tools;
       case 'context': return this.contextSections;
       case 'listener': return this.listeners;
-      case 'guard': return this.guards;
-      case 'projection': return this.projections;
     }
   }
 
@@ -522,13 +410,6 @@ export abstract class ScopeBase implements PluginContextHost {
     return collectEffectiveContextSections(this);
   }
 
-  listCapabilityGuards(): readonly CapabilityGuardDiagnostic[] {
-    return collectEffectiveGuards(this);
-  }
-
-  listProjections(): readonly ProjectionDiagnostic[] {
-    return collectEffectiveProjections(this);
-  }
 
   async buildContext<TData = unknown>(data?: TData): Promise<readonly ProvidedContextSection[]> {
     if (this.status !== 'active') {
@@ -566,13 +447,6 @@ export abstract class ScopeBase implements PluginContextHost {
     return this.listeners;
   }
 
-  get localGuards(): ReadonlyMap<string, LocalGuardRegistration> {
-    return this.guards;
-  }
-
-  get localProjections(): ReadonlyMap<string, LocalProjectionRegistration> {
-    return this.projections;
-  }
 
   get cleanupBarrierCount(): number {
     return this.barriers.filter((barrier) => !barrier.removed).length;

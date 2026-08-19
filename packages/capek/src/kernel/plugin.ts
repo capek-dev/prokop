@@ -12,7 +12,6 @@ import {
 import { validateListener } from './events';
 import type {
   CapekPlugin,
-  CapabilityGuardContribution,
   CleanupBarrier,
   CompositionDiagnostics,
   ContextSectionContribution,
@@ -20,7 +19,6 @@ import type {
   EffectiveTool,
   EventListenerContribution,
   PluginContext,
-  ProjectionContribution,
   ProvidedContextSection,
   RuntimeScope,
   ScopeDiagnosticsSnapshot,
@@ -44,8 +42,6 @@ export interface PluginContextHost {
     contribution: ContextSectionContribution,
   ): Disposable;
   registerListener(pluginId: string, contribution: EventListenerContribution): Disposable;
-  registerCapabilityGuard(pluginId: string, contribution: CapabilityGuardContribution): Disposable;
-  registerProjection(pluginId: string, contribution: ProjectionContribution): Disposable;
   registerBarrier(pluginId: string, barrier: CleanupBarrier): Disposable;
   resolveService<T>(key: ServiceKey<T>): T | undefined;
   listTools(): readonly EffectiveTool[];
@@ -166,17 +162,6 @@ export class PluginContextImpl implements PluginContext {
     return registration;
   }
 
-  contributeCapabilityGuard(contribution: CapabilityGuardContribution): Disposable {
-    const registration = this.host.registerCapabilityGuard(this.plugin.id, contribution);
-    this.disposers.push(registration);
-    return registration;
-  }
-
-  contributeProjection(contribution: ProjectionContribution): Disposable {
-    const registration = this.host.registerProjection(this.plugin.id, contribution);
-    this.disposers.push(registration);
-    return registration;
-  }
 
   registerCleanupBarrier(barrier: CleanupBarrier): Disposable {
     const registration = this.host.registerBarrier(this.plugin.id, barrier);

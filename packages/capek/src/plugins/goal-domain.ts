@@ -3,36 +3,34 @@ import type { CapekPlugin, PluginContext } from '../kernel/types';
 import type { Session } from '@capekai/types';
 import type { RuntimeHost } from '../runtime/host';
 import type { StorageBundle } from '../storage/contracts';
-import {
-  capekOrchestratorSessionKey,
-  type OrchestratorSessionContract,
-} from './service-keys';
+import type { GoalDomainService } from '../goals/service';
 import {
   evaluateGoalWithDeps,
   runGoalLoopWithDeps,
-  type EvaluateGoalOptions,
   type GoalEvaluatorDeps,
   type GoalLoopDeps,
-  type GoalLoopOptions,
 } from '../goals';
-import { capekRuntimeHostKey, capekStorageKey } from './service-keys';
+import {
+  capekOrchestratorSessionKey,
+  capekRuntimeHostKey,
+  capekStorageKey,
+  type OrchestratorSessionContract,
+} from './service-keys';
 
 /**
  * C5 goal domain plugin. Owns the agent-scoped `capek.goal-domain` service:
  * goal evaluation and the persistent goal loop run directive over the
  * scope-captured storage bundle and the shared `capek.orchestrator-session`
- * contract. No model-facing goal tool exists in the pre-C5 product (goal
- * mode is a client session directive through `handleChat`), so the domain
- * contributes no tool and no context section; production goal execution
- * stays on the module path until live adoption.
+ * contract. No model-facing goal tool exists in the product (goal mode is a
+ * client session directive through `handleChat`), so the domain contributes
+ * no tool and no context section. Live adoption: `core/chat-handler.ts`
+ * resolves this service through `getGoalDomain()`; the unscoped fallback in
+ * `goals/service.ts` keeps the module path for uncomposed consumers.
  */
 
 export const CURRENT_GOAL_DOMAIN_PLUGIN_ID = 'current.goal-domain';
 
-export interface GoalDomainService {
-  evaluateGoal(options: EvaluateGoalOptions): ReturnType<typeof evaluateGoalWithDeps>;
-  runGoalLoop(options: GoalLoopOptions): Promise<void>;
-}
+export type { GoalDomainService };
 
 export const capekGoalDomainKey = serviceKey<GoalDomainService>(
   'capek.goal-domain',

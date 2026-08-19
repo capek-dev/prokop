@@ -5,8 +5,6 @@
  */
 
 import type {
-  CapabilityGuardContribution,
-  CapabilityGuardDiagnostic,
   ContextPhase,
   ContextSectionContribution,
   EffectiveContextSection,
@@ -14,8 +12,6 @@ import type {
   EventListenerContribution,
   ListenerDiagnostic,
   PluginStatus,
-  ProjectionContribution,
-  ProjectionDiagnostic,
   ProvidedContextSection,
   RunStatus,
   RunTerminalOutcome,
@@ -51,15 +47,6 @@ export interface LocalListenerRegistration {
   readonly pluginId: string;
 }
 
-export interface LocalGuardRegistration {
-  readonly contribution: CapabilityGuardContribution;
-  readonly pluginId: string;
-}
-
-export interface LocalProjectionRegistration {
-  readonly contribution: ProjectionContribution;
-  readonly pluginId: string;
-}
 
 export interface ResolvedService {
   readonly key: ServiceKey<unknown>;
@@ -83,8 +70,6 @@ export interface ScopeStateView {
   readonly localTools: ReadonlyMap<string, LocalToolRegistration>;
   readonly localContextSections: ReadonlyMap<string, LocalContextSectionRegistration>;
   readonly localListeners: ReadonlyMap<string, LocalListenerRegistration>;
-  readonly localGuards: ReadonlyMap<string, LocalGuardRegistration>;
-  readonly localProjections: ReadonlyMap<string, LocalProjectionRegistration>;
   readonly cleanupBarrierCount: number;
   readonly runId?: string;
   readonly runStatus?: RunStatus;
@@ -205,59 +190,6 @@ function collectEffectiveListeners(view: ScopeStateView): ListenerDiagnostic[] {
   return listeners;
 }
 
-/** Guards are registration metadata. The kernel lists them in
- * deterministic order (order, plugin id, contribution id) and never
- * executes a policy pipeline or exposes the evaluate callback. */
-export function collectEffectiveGuards(view: ScopeStateView): CapabilityGuardDiagnostic[] {
-  const guards: CapabilityGuardDiagnostic[] = [];
-  const seen = new Set<string>();
-  for (const scope of chainOf(view)) {
-    for (const [guardId, registration] of scope.localGuards) {
-      if (seen.has(guardId)) continue;
-      seen.add(guardId);
-      guards.push({
-        id: guardId,
-        order: registration.contribution.order,
-        pluginId: registration.pluginId,
-        scopeKind: scope.kind,
-      });
-    }
-  }
-  guards.sort((a, b) => (
-    a.order - b.order
-    || compareIds(a.pluginId, b.pluginId)
-    || compareIds(a.id, b.id)
-  ));
-  return guards;
-}
-
-/** Projections are registration metadata. The kernel lists them in
- * deterministic order (order with omitted orders defaulting to 0, plugin
- * id, contribution id) and never invokes project or rebuild or exposes the
- * callbacks. */
-export function collectEffectiveProjections(view: ScopeStateView): ProjectionDiagnostic[] {
-  const projections: ProjectionDiagnostic[] = [];
-  const seen = new Set<string>();
-  for (const scope of chainOf(view)) {
-    for (const [projectionId, registration] of scope.localProjections) {
-      if (seen.has(projectionId)) continue;
-      seen.add(projectionId);
-      projections.push({
-        id: projectionId,
-        order: registration.contribution.order ?? 0,
-        pluginId: registration.pluginId,
-        scopeKind: scope.kind,
-        eventTypes: registration.contribution.eventTypes,
-      });
-    }
-  }
-  projections.sort((a, b) => (
-    a.order - b.order
-    || compareIds(a.pluginId, b.pluginId)
-    || compareIds(a.id, b.id)
-  ));
-  return projections;
-}
 
 export function buildSnapshot(view: ScopeStateView): ScopeDiagnosticsSnapshot {
   const runFields = view.runId !== undefined
@@ -284,8 +216,6 @@ export function buildSnapshot(view: ScopeStateView): ScopeDiagnosticsSnapshot {
       scopeKind: section.scopeKind,
     })),
     listeners: collectEffectiveListeners(view),
-    capabilityGuards: collectEffectiveGuards(view),
-    projections: collectEffectiveProjections(view),
     cleanupBarrierCount: view.cleanupBarrierCount,
     ...runFields,
   };
