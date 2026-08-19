@@ -2,9 +2,9 @@ import type { ModelsConfig, ProviderDefinition } from '@/config';
 import { getModelsDocument, saveModelsDocument, validateModelsDocument } from '@/config/models';
 import { ConfigurationValidationError } from '@/config/errors';
 
-const MODELS_REGISTRY_URL =
-  process.env.JEAN2_MODELS_REGISTRY_URL ||
-  'https://raw.githubusercontent.com/jean2ai/jean2/main/packages/server/src/config/models.json';
+import { getModelsRegistryUrl } from '@/infrastructure/runtime/environment';
+
+const MODELS_REGISTRY_URL = getModelsRegistryUrl();
 
 export interface SyncResult {
   mode: 'merge' | 'override';

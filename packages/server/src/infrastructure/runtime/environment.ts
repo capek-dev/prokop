@@ -66,6 +66,13 @@ export function getModelsPath(): string | undefined {
   return process.env.JEAN2_MODELS_PATH;
 }
 
+export function getModelsRegistryUrl(): string {
+  return (
+    process.env.JEAN2_MODELS_REGISTRY_URL ||
+    'https://raw.githubusercontent.com/jean2ai/jean2/main/packages/server/src/config/models.json'
+  );
+}
+
 export function getLLMOpenAIApiKey(): string | undefined {
   return envOverlay.get('JEAN2_LLM_OPENAI_API_KEY') ?? process.env.JEAN2_LLM_OPENAI_API_KEY;
 }
