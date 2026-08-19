@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { SandboxController, type LlmCallContext } from '@capekai/core/internal/sandbox';
+import { SandboxController, type LlmCallContext } from '@capekai/core/sandbox';
 
 function createContext(overrides: Partial<LlmCallContext> = {}): LlmCallContext {
   return {

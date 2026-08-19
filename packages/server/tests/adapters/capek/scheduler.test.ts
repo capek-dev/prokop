@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { configureSchedulerHost, getSchedulerHost } from '@capekai/core/internal/hosts';
+import { configureSchedulerHost, getSchedulerHost } from '@capekai/core/hosts';
 import {
   configureJean2SchedulerHost,
   jean2SchedulerHost,

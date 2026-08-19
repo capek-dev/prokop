@@ -4,7 +4,7 @@ import {
   getTool as capekGetTool,
   listTools as capekListTools,
   type ToolSourceLifecycle,
-} from '@capekai/core/internal/tools';
+} from '@capekai/core/tools';
 import { resolveToolsPath } from '@/config';
 import { getTools, initializeWorkspace } from '@/infrastructure/mcp';
 import { getToolsDir } from '@/infrastructure/runtime/paths';

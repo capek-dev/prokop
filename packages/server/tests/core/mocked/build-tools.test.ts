@@ -3,16 +3,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { tool, jsonSchema } from 'ai';
-import { configureToolSource } from '@capekai/core/internal/tools';
-import { configureAgentSource, configurePreconfigSource } from '@capekai/core/internal/hosts';
+import { configureToolSource } from '@capekai/core/tools';
+import { configureAgentSource, configurePreconfigSource } from '@capekai/core/hosts';
 import {
   configureStorage,
   type StorageBundle,
 } from '@capekai/core/storage';
 import { configureJean2Bindings } from '@/adapters/capek/bindings';
 import { jean2CompatibilityBindings, jean2StorageBundle } from '@/adapters/capek';
-import { buildAiSdkTools, type BuildToolsOptions } from '@capekai/core/internal/execution';
-import { clearCache, scanTools } from '@capekai/core/internal/tools';
+import { buildAiSdkTools, type BuildToolsOptions } from '@capekai/core/execution';
+import { clearCache, scanTools } from '@capekai/core/tools';
 import type { Preconfig, Session, Workspace } from '@jean2/sdk';
 
 interface BindingOverrides {

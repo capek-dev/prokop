@@ -4,7 +4,7 @@ import { join, resolve } from 'path';
 import { tmpdir } from 'os';
 
 import { createRuntime } from '@/bootstrap/create-runtime';
-import { scanTools, getTool, listTools, clearCache } from '@capekai/core/internal/tools';
+import { scanTools, getTool, listTools, clearCache } from '@capekai/core/tools';
 
 const FIXTURE_DIR = resolve(import.meta.dir, 'fixtures', 'test-fixture-tool');
 

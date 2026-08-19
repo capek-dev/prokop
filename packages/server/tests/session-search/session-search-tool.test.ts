@@ -4,7 +4,7 @@ import { createTestSession, createTestUserMessage, createTestTextPart } from '#t
 import { createSession } from '@/infrastructure/sqlite/session-store';
 import { createMessage, createPart } from '@/infrastructure/sqlite/message-store';
 import { createWorkspace } from '@/infrastructure/sqlite/workspaces';
-import { executeSessionSearchTool } from '@capekai/core/internal/hosts';
+import { executeSessionSearchTool } from '@capekai/core/hosts';
 
 describe('session_search tool', () => {
   let workspaceId: string;

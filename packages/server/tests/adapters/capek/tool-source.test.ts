@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { getToolSource } from '@capekai/core/internal/tools';
+import { getToolSource } from '@capekai/core/tools';
 
-const realBarrel = await import('@capekai/core/internal/tools');
+const realBarrel = await import('@capekai/core/tools');
 const realConfig = await import('@/config');
 const realPaths = await import('@/infrastructure/runtime/paths');
 const realMcp = await import('@/infrastructure/mcp');
@@ -28,7 +28,7 @@ mock.module('@/infrastructure/runtime/paths', () => ({
   getToolsDir: (): string => '/tools-dir',
 }));
 
-mock.module('@capekai/core/internal/tools', () => ({
+mock.module('@capekai/core/tools', () => ({
   ...realBarrel,
   configureToolsPath: (path?: string): void => {
     configuredPaths.push(path);

@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
-import { interruptManager } from '@capekai/core/internal/execution';
+import { interruptManager } from '@capekai/core/execution';
 
 describe('InterruptManager', () => {
   let sessionId: string;

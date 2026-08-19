@@ -1,5 +1,5 @@
 import type { MessageWithParts } from '@jean2/sdk';
-import { runTextModel } from '@capekai/core/internal/providers';
+import { runTextModel } from '@/adapters/capek/contracts';
 import { getModelsConfig, findModel } from '@/config';
 
 const DEFAULT_SESSION_TITLES = new Set(['new session', 'new']);

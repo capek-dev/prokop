@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { buildSchemaPromptInstruction, extractJsonFromText } from '@capekai/core/internal/execution';
+import { buildSchemaPromptInstruction, extractJsonFromText } from '@capekai/core/execution';
 
 const responseFormat = {
   id: 'format-1',

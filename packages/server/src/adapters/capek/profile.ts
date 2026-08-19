@@ -1,6 +1,6 @@
 /** The Jean2 server composition profile and its exact plugin inventory. */
 
-import type { CapekPlugin } from '@capekai/core/internal/composition';
+import type { CapekPlugin } from '@capekai/core/composition';
 import {
   CODING_CAPABILITY_PLUGIN_IDS,
   codingCapabilityPlugins,
@@ -45,7 +45,7 @@ import {
   CURRENT_SKILLS_DOMAIN_PLUGIN_ID,
   CURRENT_SUBAGENT_DOMAIN_PLUGIN_ID,
   CURRENT_WORKFLOW_DOMAIN_PLUGIN_ID,
-} from '@capekai/core/internal/plugins';
+} from '@capekai/core/plugins';
 
 export const JEAN2_PROCESS_PLUGIN_IDS = [
   'current.provider-registry',

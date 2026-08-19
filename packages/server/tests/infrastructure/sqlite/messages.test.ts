@@ -35,7 +35,7 @@ import {
 } from '@/infrastructure/sqlite/message-store';
 import { createSession } from '@/infrastructure/sqlite/session-store';
 import { getDatabase } from '@/infrastructure/sqlite/database';
-import { revertToStep, forkSession } from '@capekai/core/internal/execution';
+import { revertToStep, forkSession } from '@capekai/core/execution';
 import { createTestSession } from '#tests/factories';
 import type { AssistantMessage, Part, ToolPart } from '@jean2/sdk';
 

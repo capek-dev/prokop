@@ -12,7 +12,7 @@ import {
 
 const repositoryRoot = resolve(import.meta.dir, '../../../../');
 const serverSourceRoot = resolve(repositoryRoot, 'packages/server/src');
-
+const serverTestsRoot = resolve(repositoryRoot, 'packages/server/tests');
 const bootstrapDir = resolve(serverSourceRoot, 'bootstrap');
 const transportDir = resolve(serverSourceRoot, 'transport');
 const applicationDir = resolve(serverSourceRoot, 'application');
@@ -24,6 +24,8 @@ const routesDir = resolve(serverSourceRoot, 'routes');
 const utilsDir = resolve(serverSourceRoot, 'utils');
 const layerDirs = [bootstrapDir, transportDir, applicationDir, domainsDir, infrastructureDir, adaptersDir];
 const infrastructureSqliteDir = resolve(infrastructureDir, 'sqlite');
+
+const capekInternalPrefix = '@capekai/core/' + 'internal/';
 
 const honoMatchers: SpecifierMatcher[] = [
   { exact: 'hono' },
@@ -130,17 +132,9 @@ const aiSdkExceptions: Record<string, string[]> = {};
 // S2 exact per-file exceptions for transport wire handlers that still
 // import legacy implementations. S3 retired the session lifecycle, queue,
 // control, chat, and session handler entries; S4 retired the misc handler's
-// capability-router import (the ask eligibility policy now lives in the
-// controller domain via the application port layer). S8 moved the misc
-// handler onto the focused internal subpaths; the terminal manager entry was
-// retired by the S5 PTY/terminal persistence slice. S9 moved permission
-// persistence behind the wired permission application.
-const layerTransportLegacyExceptions: Record<string, string[]> = {
-  'packages/server/src/transport/websocket/handlers/misc.ts': [
-    '@capekai/core/internal/ask-authority',
-    '@capekai/core/internal/sandbox',
-  ],
-};
+// capability-router import. S9 moved permission persistence behind the wired
+// permission application.
+const layerTransportLegacyExceptions: Record<string, string[]> = {};
 
 // HTTP route legacy exceptions are empty. The session route's presentation-helper
 // exception is documented separately in the transport rule below.
@@ -220,6 +214,13 @@ const globalBaselineRules: DependencyRule[] = [
     forbiddenSpecifiers: [{ exact: '@/store' }, { prefix: '@/store/' }],
     exceptions: {},
   },
+  {
+    name: 'no-direct-capek-internals',
+    rationale: 'Public Capek subpaths are the contract; internal paths are not resolvable outside packages/capek.',
+    appliesTo: [serverSourceRoot, serverTestsRoot],
+    forbiddenSpecifiers: [{ prefix: capekInternalPrefix }],
+    exceptions: {},
+  },
 ];
 
 const layerRules: DependencyRule[] = [
@@ -240,7 +241,7 @@ const layerRules: DependencyRule[] = [
       { prefix: '@ai-sdk/' },
       { prefix: '@capekai/core' },
     ],
-    allowedResolvedDirs: [transportDir, applicationDir],
+    allowedResolvedDirs: [transportDir, applicationDir, adaptersCapekDir],
     exceptions: {
       ...layerTransportLegacyExceptions,
       ...layerTransportHttpPresentationExceptions,
@@ -273,7 +274,7 @@ const layerRules: DependencyRule[] = [
     name: 'layer-infrastructure',
     rationale: 'Infrastructure implements ports. It may import domains and application ports but not transport route handlers.',
     appliesTo: [infrastructureDir],
-    allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir],
+    allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir, adaptersCapekDir],
     exceptions: layerInfrastructureExceptions,
   },
   {
@@ -720,7 +721,7 @@ describe('server layer boundaries', () => {
     const imports = parseImports(file!.sourceText, file!.path);
 
     const allowedSpecifiers = [
-      '@capekai/core/internal/hosts',
+      '@capekai/core/hosts',
       '@jean2/sdk',
       '@/application/ports/session-search',
     ];
@@ -811,7 +812,7 @@ describe('server layer boundaries', () => {
     const imports = parseImports(file!.sourceText, file!.path);
 
     const allowedSpecifiers = [
-      '@capekai/core/internal/hosts',
+      '@capekai/core/hosts',
       '@/application/ports/scheduling',
     ];
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
@@ -881,7 +882,7 @@ describe('server layer boundaries', () => {
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect([...new Set(imports.map((imp) => imp.specifier))].sort()).toEqual([
-      '@capekai/core/internal/execution',
+      '@capekai/core/execution',
       '@/application/ports/session',
       '@/adapters/capek/events',
       '@/core/broadcast',
@@ -1123,16 +1124,7 @@ describe('server layer boundaries', () => {
     expect(
       imports.some((imp) => imp.specifier === '@/core/capability-router'),
     ).toBe(false);
-    // The exact legacy exception entry is retired; the misc handler keeps
-    // only the S8 internal-subpath exceptions (the web-push dispatch import
-    // moved to the wired notifications application in the S4 notification
-    // slice).
-    expect(
-      layerTransportLegacyExceptions['packages/server/src/transport/websocket/handlers/misc.ts'],
-    ).toEqual([
-      '@capekai/core/internal/ask-authority',
-      '@capekai/core/internal/sandbox',
-    ]);
+    expect(layerTransportLegacyExceptions).toEqual({});
   });
 
   test('S9 gate: the capability router is absent and cannot be reintroduced', () => {
@@ -1155,7 +1147,7 @@ describe('server layer boundaries', () => {
     expect(file).toBeDefined();
 
     expect(parseImports(file!.sourceText, file!.path).map((imp) => imp.specifier).sort()).toEqual([
-      '@capekai/core/storage',
+      '@/adapters/capek/contracts',
       './database',
       'node:crypto',
     ].sort());
@@ -1754,8 +1746,8 @@ describe('server layer boundaries', () => {
     const runner = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === runnerPath);
     expect(runner).toBeDefined();
     expect(parseImports(runner!.sourceText, runner!.path).map((imp) => imp.specifier).sort()).toEqual([
+      '@/adapters/capek/contracts',
       '@/application/ports/scheduling',
-      '@capekai/core/internal/providers',
       '@jean2/sdk',
       'crypto',
     ].sort());
@@ -2008,7 +2000,7 @@ describe('server layer boundaries', () => {
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@capekai/core/internal/providers',
+      '@capekai/core/providers',
       '@/application/ports/provider-accounts',
     ].sort());
   });

@@ -1,5 +1,5 @@
 import type { Hono } from 'hono';
-import { sandboxController, type AutoResponderRule, type SandboxResponse } from '@capekai/core/internal/sandbox';
+import { sandboxController, type AutoResponderRule, type SandboxResponse } from '@/adapters/capek/contracts';
 import { isSandboxActive } from '@/sandbox';
 
 interface AutoResponderRequestBody {

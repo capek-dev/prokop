@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import type { Preconfig } from '@jean2/sdk';
 import { createRuntime } from '@/bootstrap/create-runtime';
-import { buildSystemMessage } from '@capekai/core/internal/execution';
+import { buildSystemMessage } from '@capekai/core/execution';
 
 const preconfig: Preconfig = {
   id: 'self-delegating-agent-test',

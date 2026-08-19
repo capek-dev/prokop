@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/internal/configuration';
+import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/configuration';
 import {
   configureJean2RuntimeConfiguration,
   createJean2RuntimeConfiguration,

@@ -1,4 +1,4 @@
-import { ASK_TIMEOUT, getAuthorityForPendingAsk } from '@capekai/core/internal/ask-authority';
+import { ASK_TIMEOUT, getAuthorityForPendingAsk } from '@capekai/core/ask-authority';
 import type { AskAuthorityPort } from '@/application/ports/session';
 
 /**

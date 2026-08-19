@@ -2,12 +2,12 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import ts from 'typescript';
-import { buildSystemMessage } from '@capekai/core/internal/execution';
-import { createModelForProvider, getConnectableProviders, getProvider } from '@capekai/core/internal/providers';
-import { configureToolSource, configureToolsPath, getToolSource } from '@capekai/core/internal/tools';
-import { sandboxController } from '@capekai/core/internal/sandbox';
-import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/internal/configuration';
-import { configureAgentSource, configureInstructionSource, configurePreconfigSource, configureSchedulerHost, configureSessionSearchHost, getRuntimeHost as getJean2CompatibilityBindings, getSchedulerHost, getSessionSearchHost } from '@capekai/core/internal/hosts';
+import { buildSystemMessage } from '@capekai/core/execution';
+import { createModelForProvider, getConnectableProviders, getProvider } from '@capekai/core/providers';
+import { configureToolSource, configureToolsPath, getToolSource } from '@capekai/core/tools';
+import { sandboxController } from '@capekai/core/sandbox';
+import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/configuration';
+import { configureAgentSource, configureInstructionSource, configurePreconfigSource, configureSchedulerHost, configureSessionSearchHost, getRuntimeHost as getJean2CompatibilityBindings, getSchedulerHost, getSessionSearchHost } from '@capekai/core/hosts';
 import {
   configureStorage,
   createInMemoryStorageBundle,
@@ -28,7 +28,7 @@ import {
   capekToolSourceKey,
   type AgentScopeHandle,
   type ProcessScopeHandle,
-} from '@capekai/core/internal/composition';
+} from '@capekai/core/composition';
 import * as focused from '@/adapters/capek';
 import { configureJean2SessionSearchHost } from '@/adapters/capek/session-search';
 import { JEAN2_AGENT_PLUGIN_IDS, JEAN2_PROCESS_PLUGIN_IDS } from '@/adapters/capek/profile';

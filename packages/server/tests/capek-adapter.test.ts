@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { getRuntimeConfiguration } from '@capekai/core/internal/configuration';
-import { getRuntimeHost as getJean2CompatibilityBindings } from '@capekai/core/internal/hosts';
+import { getRuntimeConfiguration } from '@capekai/core/configuration';
+import { getRuntimeHost as getJean2CompatibilityBindings } from '@capekai/core/hosts';
 import {
   jean2CompatibilityBindings,
   jean2RuntimeConfiguration,
