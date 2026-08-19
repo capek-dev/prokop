@@ -60,7 +60,7 @@ import { createAgentScope, createProcessScope } from '../src/kernel/kernel';
 import { configureStorage, createSession } from '../src/storage/runtime';
 import { createInMemoryStorageBundle } from '../src/storage/memory';
 import { clearCache } from '../src/tools/registry';
-import { configureToolSource } from '../src/tools/tool-source';
+import { configureWorkspaceToolDiscovery } from '../src/tools/tool-source';
 import type { SubagentInput, SubagentOutput } from '../src/subagent/task-tool';
 
 const roots: string[] = [];
@@ -149,7 +149,7 @@ function configureEnvironment(): void {
   });
   configureAgentSource();
   configureInstructionSource();
-  configureToolSource();
+  configureWorkspaceToolDiscovery();
   installWorkflowToolFallback();
 }
 

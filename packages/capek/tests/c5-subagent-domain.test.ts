@@ -49,7 +49,7 @@ import { selfDelegationGuidance } from '../src/subagent/guidance';
 import { configureStorage, createSession } from '../src/storage/runtime';
 import { createInMemoryStorageBundle } from '../src/storage/memory';
 import { clearCache } from '../src/tools/registry';
-import { configureToolSource } from '../src/tools/tool-source';
+import { configureWorkspaceToolDiscovery } from '../src/tools/tool-source';
 
 function minimalHost(): RuntimeHost {
   return {
@@ -143,7 +143,7 @@ function configureEnvironment(): void {
   });
   configureAgentSource();
   configureInstructionSource();
-  configureToolSource();
+  configureWorkspaceToolDiscovery();
   installTaskToolFallback();
 }
 

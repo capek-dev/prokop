@@ -7,7 +7,7 @@ import {
   configureJean2SchedulerHost,
   configureJean2SessionSearchHost,
   configureJean2Storage,
-  configureJean2ToolSource,
+  configureJean2WorkspaceToolDiscovery,
 } from '@/adapters/capek';
 import type { Jean2SchedulerHostDeps } from '@/adapters/capek/scheduler';
 import type { Jean2SessionSearchHostDeps } from '@/adapters/capek/session-search';
@@ -72,7 +72,7 @@ export function createRuntime(existingAgents?: AgentsApplication): AgentsApplica
   configureJean2InstructionSource();
   configureJean2SessionSearchHost(createSessionSearchHostDeps(agents));
   configureJean2SchedulerHost(createSchedulerHostDeps());
-  configureJean2ToolSource();
+  configureJean2WorkspaceToolDiscovery();
   configureJean2Bindings();
   return agents;
 }

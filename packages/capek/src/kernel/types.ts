@@ -72,6 +72,10 @@ export interface ToolContribution {
   readonly id: string;
   readonly order?: number;
   readonly definition: ToolDefinition;
+  /** Opaque product-layer payload (for capek: the exact `LoadedTool` this
+   * contribution advertises). The kernel never reads it; the effective-tool
+   * view carries it through unchanged. */
+  readonly payload?: unknown;
   readonly requiredCapabilities?: readonly ServiceKey<unknown>[];
   readonly visibility?: ToolVisibility;
 }
@@ -234,6 +238,8 @@ export interface EffectiveTool {
   readonly id: string;
   readonly order: number;
   readonly definition: ToolDefinition;
+  /** The contribution's opaque payload, carried through unchanged. */
+  readonly payload?: unknown;
   readonly pluginId: string;
   readonly visible: boolean;
   readonly hiddenReasons: readonly string[];

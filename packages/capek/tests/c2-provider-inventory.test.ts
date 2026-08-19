@@ -49,7 +49,7 @@ import {
   capekSessionSearchHostKey,
   capekStorageKey,
   capekToolResolverKey,
-  capekToolSourceKey,
+  capekWorkspaceToolDiscoveryKey,
 } from '../src/plugins/service-keys';
 import { resetProviders } from '../src/providers/registry';
 import type { RuntimeHost } from '../src/runtime/host';
@@ -62,8 +62,7 @@ import type { SessionSearchHost } from '../src/session-search/host';
 import { createInMemoryStorageBundle } from '../src/storage/memory';
 import { configureStorage, getStorage } from '../src/storage/runtime';
 import { getTool } from '../src/tools/registry';
-import { getStandardTool } from '../src/tools/standard-tools';
-import { configureToolSource } from '../src/tools/tool-source';
+import { configureWorkspaceToolDiscovery } from '../src/tools/tool-source';
 
 function minimalHost(): RuntimeHost {
   return {
@@ -144,7 +143,7 @@ afterEach(() => {
   configureInstructionSource();
   configureSessionSearchHost(minimalSearchHost());
   configureSchedulerHost(minimalSchedulerHost());
-  configureToolSource();
+  configureWorkspaceToolDiscovery();
   resetProviders();
 });
 
@@ -207,7 +206,7 @@ describe('C2 provider inventory', () => {
     expect(agentScope.require(capekStorageKey)).toBe(storage);
     expect(agentScope.require(capekRuntimeConfigurationKey)).toBe(configuration);
     expect(agentScope.require(capekRuntimeHostKey)).toBe(host);
-    expect(agentScope.require(capekToolSourceKey)).toBeDefined();
+    expect(agentScope.require(capekWorkspaceToolDiscoveryKey)).toBeDefined();
     expect(agentScope.require(capekSandboxControllerKey)).toBeInstanceOf(SandboxController);
     expect(agentScope.require(capekProviderOverridesKey)).toBeInstanceOf(Map);
     expect(typeof agentScope.require(capekContextAssemblerKey).build).toBe('function');
@@ -292,7 +291,7 @@ describe('C2 provider inventory', () => {
     // plugins declare the storage service dependency, so they activate right
     // after storage instead of their alphabetical position.
     const sortedIds = [...CURRENT_AGENT_PLUGIN_IDS].sort();
-    const domainIds = [
+    const domainIds: string[] = [
       'current.goal-domain',
       'current.memory-domain',
       'current.scheduler-domain',
@@ -301,7 +300,7 @@ describe('C2 provider inventory', () => {
       'current.subagent-domain',
       'current.workflow-domain',
     ];
-    const expectedPluginIds = sortedIds.filter((id) => !domainIds.includes(id) && id !== 'current.compaction-policy' && id !== 'current.permission-policy');
+    const expectedPluginIds: string[] = sortedIds.filter((id) => !domainIds.includes(id) && id !== 'current.compaction-policy' && id !== 'current.permission-policy');
     expectedPluginIds.splice(expectedPluginIds.indexOf('current.storage') + 1, 0, ...[
       'current.goal-domain',
       'current.memory-domain',
@@ -312,9 +311,9 @@ describe('C2 provider inventory', () => {
     ]);
     // The workflow domain requires the subagent domain service and the
     // orchestrator-session contract, so its deterministic activation order
-    // lands after tool-source, which is after its subagent dependency.
+    // lands after tool-output-policy, before the workspace plugins.
     expectedPluginIds.splice(
-      expectedPluginIds.indexOf('current.tool-source') + 1,
+      expectedPluginIds.indexOf('current.tool-output-policy') + 1,
       0,
       'current.workflow-domain',
     );
@@ -340,10 +339,10 @@ describe('C2 provider inventory', () => {
     // sections, orchestrator session, tool source, sandbox controller,
     // provider overrides) + the C6 agent-scoped retry policy, compaction service,
     // permission policy and permission runtime, workspace policy, and
-    // tool-output policy + 6 coding capability services + the seven C5
-    // domain services (goal, memory, session-search, scheduler, skills,
-    // subagent, workflow) installed by the current composition.
-    expect(snapshot.services).toHaveLength(33);
+    // tool-output policy + the seven C5 domain services (goal, memory,
+    // session-search, scheduler, skills, subagent, workflow) installed by
+    // the current composition.
+    expect(snapshot.services).toHaveLength(27);
 
     const serialized = JSON.stringify(snapshot);
     expect(serialized).not.toContain('getApiKey');
@@ -381,8 +380,8 @@ describe('C2 agent scope entry', () => {
       configuration,
       host,
       contextSources: {},
-      toolSource,
-      toolResolver: { get: getStandardTool, list: () => [] },
+      workspaceToolDiscovery: toolSource,
+      toolResolver: { get: () => null, list: () => [] },
       sandboxController: controller,
       providerOverrides: new Map(),
     });
@@ -403,24 +402,23 @@ describe('C2 agent scope entry', () => {
     await agentScope.dispose();
   });
 
-  test('entering a facade composition resolves standard tools through the seeded resolver', async () => {
+  test('entering a facade composition resolves contributed tools through the seeded resolver', async () => {
     const storage = createInMemoryStorageBundle();
     const { agentScope } = await createFacadeAgentComposition({
       storage,
       configuration: createDefaultRuntimeConfiguration(),
       host: minimalHost(),
       contextSources: {},
-      toolSource: {},
-      toolResolver: { get: getStandardTool, list: () => [] },
+      workspaceToolDiscovery: {},
       sandboxController: new SandboxController(),
       providerOverrides: new Map(),
     });
 
     const resolved = await enterAgentScope(agentScope, async () => {
-      const standard = await getTool('read-file');
-      return standard?.definition.name ?? null;
+      const retrieval = await getTool('retrieve-tool-output');
+      return retrieval?.definition.name ?? null;
     });
-    expect(resolved).toBe('read-file');
+    expect(resolved).toBe('retrieve-tool-output');
 
     await agentScope.dispose();
   });
@@ -431,8 +429,8 @@ describe('C2 agent scope entry', () => {
       configuration: createDefaultRuntimeConfiguration(),
       host: minimalHost(),
       contextSources: {},
-      toolSource: {},
-      toolResolver: { get: getStandardTool, list: () => [] },
+      workspaceToolDiscovery: {},
+      toolResolver: { get: () => null, list: () => [] },
       sandboxController: new SandboxController(),
       providerOverrides: new Map(),
     });

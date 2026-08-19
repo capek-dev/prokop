@@ -131,6 +131,9 @@ export function collectEffectiveTools(view: ScopeStateView): EffectiveTool[] {
         id: toolId,
         order: registration.contribution.order ?? 0,
         definition: registration.contribution.definition,
+        ...(registration.contribution.payload !== undefined
+          ? { payload: registration.contribution.payload }
+          : {}),
         pluginId: registration.pluginId,
         visible: hiddenReasons.length === 0,
         hiddenReasons,
@@ -207,7 +210,7 @@ export function buildSnapshot(view: ScopeStateView): ScopeDiagnosticsSnapshot {
       status: record.status,
     })),
     services: collectEffectiveServices(view),
-    tools: collectEffectiveTools(view).map(({ definition: _definition, ...tool }) => tool),
+    tools: collectEffectiveTools(view).map(({ definition: _definition, payload: _payload, ...tool }) => tool),
     contextSections: collectEffectiveContextSections(view).map((section) => ({
       id: section.id,
       phase: section.phase,

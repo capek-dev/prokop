@@ -61,15 +61,6 @@ function captureHistory(onEvent: (event: SandboxControlEvent) => void, history: 
 }
 
 const STANDARD_WITHOUT_QUESTION = [
-  'read-file',
-  'write-file',
-  'edit',
-  'edit-range',
-  'apply-patch',
-  'ls',
-  'glob',
-  'grep',
-  'shell',
   'retrieve-tool-output',
 ];
 
@@ -91,13 +82,12 @@ describe('createAgent through the agent scope', () => {
     expect(agentScope.parent?.kind).toBe('process');
 
     const snapshot = agentScope.snapshot();
-    // C4 adds the six coding capability services on top of the C2
-    // inventory (4 facade process services plus 16 facade agent services,
-    // including the agent driver and C6 agent-scoped retry policy, compaction
-    // service, permission policy and permission runtime, workspace policy, and
-    // tool-output policy). The C5 subagent domain is not part of the facade
-    // base composition: facade profiles install optional domains explicitly.
-    expect(snapshot.services).toHaveLength(26);
+    // The C2 inventory without baked-in coding capabilities: 4 facade
+    // process services plus 16 facade agent services (agent driver, C6
+    // agent-scoped retry policy, compaction service, permission policy and
+    // runtime, workspace policy, tool-output policy, tool resolver, and
+    // workspace tool discovery).
+    expect(snapshot.services).toHaveLength(20);
     const facadeServices = snapshot.services.filter((service) =>
       service.providerPluginId.startsWith('facade.'));
     expect(facadeServices.map((service) => service.providerPluginId).sort()).toEqual([
@@ -119,8 +109,8 @@ describe('createAgent through the agent scope', () => {
       'facade.storage',
       'facade.tool-output-policy',
       'facade.tool-resolver',
-      'facade.tool-source',
       'facade.workspace-policy',
+      'facade.workspace-tool-discovery',
     ]);
 
     await agent.close();

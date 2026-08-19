@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { getToolSource } from '@capekai/core/tools';
+import { getWorkspaceToolDiscovery } from '@capekai/core/tools';
 
 const realBarrel = await import('@capekai/core/tools');
 const realConfig = await import('@/config');
@@ -7,7 +7,7 @@ const realPaths = await import('@/infrastructure/runtime/paths');
 const realMcp = await import('@/infrastructure/mcp');
 
 const realConfigureToolsPath = realBarrel.configureToolsPath;
-const realConfigureToolSource = realBarrel.configureToolSource;
+const realConfigureWorkspaceToolDiscovery = realBarrel.configureWorkspaceToolDiscovery;
 
 let resolvedToolsPath = '/resolved/tools';
 let resolvedPathError: Error | null = null;
@@ -39,7 +39,7 @@ const adapter = await import('@/adapters/capek/tool-source');
 
 let savedToolsPathEnv: string | undefined;
 
-describe('Čapek tool source adapter', () => {
+describe('Čapek workspace tool discovery adapter', () => {
   beforeEach(() => {
     configuredPaths.length = 0;
     resolvedToolsPath = '/resolved/tools';
@@ -51,27 +51,27 @@ describe('Čapek tool source adapter', () => {
     if (savedToolsPathEnv === undefined) delete process.env.JEAN2_TOOLS_PATH;
     else process.env.JEAN2_TOOLS_PATH = savedToolsPathEnv;
     realConfigureToolsPath();
-    realConfigureToolSource();
+    realConfigureWorkspaceToolDiscovery();
   });
 
-  test('wraps the exact tool source operations by identity', () => {
-    expect(Object.keys(adapter.jean2ToolSource).sort()).toEqual(['discoverTools', 'initializeWorkspace'].sort());
-    expect(adapter.jean2ToolSource.initializeWorkspace).toBe(realMcp.initializeWorkspace);
-    expect(adapter.jean2ToolSource.discoverTools).toBe(realMcp.getTools);
+  test('wraps the exact workspace tool discovery operations by identity', () => {
+    expect(Object.keys(adapter.jean2WorkspaceToolDiscovery).sort()).toEqual(['discoverTools', 'initializeWorkspace'].sort());
+    expect(adapter.jean2WorkspaceToolDiscovery.initializeWorkspace).toBe(realMcp.initializeWorkspace);
+    expect(adapter.jean2WorkspaceToolDiscovery.discoverTools).toBe(realMcp.getTools);
   });
 
-  test('configures the resolved tools path first and installs the module-level source', () => {
+  test('configures the resolved tools path first and installs the module-level discovery', () => {
     process.env.JEAN2_TOOLS_PATH = '/env-must-not-win';
-    adapter.configureJean2ToolSource();
+    adapter.configureJean2WorkspaceToolDiscovery();
 
     expect(configuredPaths).toEqual(['/resolved/tools']);
-    expect(getToolSource()).toBe(adapter.jean2ToolSource);
+    expect(getWorkspaceToolDiscovery()).toBe(adapter.jean2WorkspaceToolDiscovery);
   });
 
   test('falls back to the environment path when resolution throws', () => {
     resolvedPathError = new Error('resolution unavailable');
     process.env.JEAN2_TOOLS_PATH = '/env/tools';
-    adapter.configureJean2ToolSource();
+    adapter.configureJean2WorkspaceToolDiscovery();
 
     expect(configuredPaths).toEqual(['/env/tools']);
   });
@@ -79,7 +79,7 @@ describe('Čapek tool source adapter', () => {
   test('falls back to the tools directory when resolution throws and the environment is unset', () => {
     resolvedPathError = new Error('resolution unavailable');
     delete process.env.JEAN2_TOOLS_PATH;
-    adapter.configureJean2ToolSource();
+    adapter.configureJean2WorkspaceToolDiscovery();
 
     expect(configuredPaths).toEqual(['/tools-dir']);
   });

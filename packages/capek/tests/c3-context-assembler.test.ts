@@ -51,8 +51,7 @@ import { configureSchedulerHost, type SchedulerHost } from '../src/scheduler/hos
 import { configureSessionSearchHost, type SessionSearchHost } from '../src/session-search/host';
 import { createInMemoryStorageBundle } from '../src/storage/memory';
 import { configureStorage } from '../src/storage/runtime';
-import { getStandardTool } from '../src/tools/standard-tools';
-import { configureToolSource } from '../src/tools/tool-source';
+import { configureWorkspaceToolDiscovery } from '../src/tools/tool-source';
 
 const roots: string[] = [];
 
@@ -142,7 +141,7 @@ function configureEnvironment(): void {
   configureInstructionSource();
   configureSessionSearchHost(minimalSearchHost());
   configureSchedulerHost(minimalSchedulerHost());
-  configureToolSource();
+  configureWorkspaceToolDiscovery();
 }
 
 afterEach(async () => {
@@ -757,8 +756,8 @@ describe('C3 facade and isolation', () => {
           readMemoryFile: async () => 'MEM-A',
         },
       },
-      toolSource: {},
-      toolResolver: { get: getStandardTool, list: () => [] },
+      workspaceToolDiscovery: {},
+      toolResolver: { get: () => null, list: () => [] },
       sandboxController: new SandboxController(),
       providerOverrides: new Map(),
     });
@@ -772,8 +771,8 @@ describe('C3 facade and isolation', () => {
           readMemoryFile: async () => 'MEM-B',
         },
       },
-      toolSource: {},
-      toolResolver: { get: getStandardTool, list: () => [] },
+      workspaceToolDiscovery: {},
+      toolResolver: { get: () => null, list: () => [] },
       sandboxController: new SandboxController(),
       providerOverrides: new Map(),
     });

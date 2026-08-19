@@ -34,7 +34,7 @@ import {
   watchTools,
   type ToolRegistryResolver,
 } from '../tools/registry';
-import type { ToolSourceLifecycle } from '../tools/tool-source';
+import type { WorkspaceToolDiscovery } from '../tools/tool-source';
 import {
   capekContextSourcesKey,
   capekInstalledToolRegistryKey,
@@ -47,7 +47,7 @@ import {
   capekSessionSearchHostKey,
   capekStorageKey,
   capekToolResolverKey,
-  capekToolSourceKey,
+  capekWorkspaceToolDiscoveryKey,
   type InstalledToolRegistryContract,
   type ProviderRegistryContract,
 } from './service-keys';
@@ -85,8 +85,11 @@ export function contextSourcesValuePlugin(
   return valuePlugin(id, capekContextSourcesKey, sources);
 }
 
-export function toolSourceValuePlugin(id: string, source: ToolSourceLifecycle): CapekPlugin<unknown> {
-  return valuePlugin(id, capekToolSourceKey, source);
+export function workspaceToolDiscoveryValuePlugin(
+  id: string,
+  discovery: WorkspaceToolDiscovery,
+): CapekPlugin<unknown> {
+  return valuePlugin(id, capekWorkspaceToolDiscoveryKey, discovery);
 }
 
 export function toolResolverValuePlugin(id: string, resolver: ToolRegistryResolver): CapekPlugin<unknown> {

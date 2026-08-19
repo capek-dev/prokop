@@ -3,7 +3,7 @@ import {
   type BroadcastFn,
 } from '../runtime/host-dependencies';
 import { getAgentDirectory } from '../context';
-import { discoverSourceTools } from '../tools/tool-source';
+import { discoverWorkspaceTools } from '../tools/tool-source';
 import {
   buildRetrieveToolOutputAiTool,
   RETRIEVE_TOOL_OUTPUT_NAME,
@@ -115,7 +115,7 @@ export async function buildAiSdkTools(
 
     // Phase 3: MCP tools
     try {
-      const mcpTools = await discoverSourceTools(workspacePath, sessionId);
+      const mcpTools = await discoverWorkspaceTools(workspacePath, sessionId);
       Object.assign(tools, mcpTools);
     } catch (err) {
       console.error('Failed to load MCP tools:', err);

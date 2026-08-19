@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import ts from 'typescript';
 import { buildSystemMessage } from '@capekai/core/execution';
 import { createModelForProvider, getConnectableProviders, getProvider } from '@capekai/core/providers';
-import { configureToolSource, configureToolsPath, getToolSource } from '@capekai/core/tools';
+import { configureWorkspaceToolDiscovery, configureToolsPath, getWorkspaceToolDiscovery } from '@capekai/core/tools';
 import { sandboxController } from '@capekai/core/sandbox';
 import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/configuration';
 import { configureAgentSource, configureInstructionSource, configurePreconfigSource, configureSchedulerHost, configureSessionSearchHost, getRuntimeHost as getJean2CompatibilityBindings, getSchedulerHost, getSessionSearchHost } from '@capekai/core/hosts';
@@ -25,7 +25,7 @@ import {
   capekSessionSearchHostKey,
   capekStorageKey,
   capekToolResolverKey,
-  capekToolSourceKey,
+  capekWorkspaceToolDiscoveryKey,
   type AgentScopeHandle,
   type ProcessScopeHandle,
 } from '@capekai/core/composition';
@@ -52,7 +52,7 @@ const expectedCompositionSteps = [
   'configureJean2InstructionSource',
   'configureJean2SessionSearchHost',
   'configureJean2SchedulerHost',
-  'configureJean2ToolSource',
+  'configureJean2WorkspaceToolDiscovery',
   'configureJean2Bindings',
 ];
 
@@ -99,7 +99,7 @@ describe('Čapek composition root', () => {
     configureSessionSearchHost();
     configureSchedulerHost();
     configureToolsPath();
-    configureToolSource();
+    configureWorkspaceToolDiscovery();
   });
 
   test('imports only the pinned adapter, infrastructure, and store wiring set', () => {
@@ -144,7 +144,7 @@ describe('Čapek composition root', () => {
     expect(getStorage()).toBe(focused.jean2StorageBundle);
     expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);
     expect(getSchedulerHost()).toBe(focused.jean2SchedulerHost);
-    expect(getToolSource()).toBe(focused.jean2ToolSource);
+    expect(getWorkspaceToolDiscovery()).toBe(focused.jean2WorkspaceToolDiscovery);
   });
 
   test('the runtime and HTTP composition reuse one AgentsApplication identity', () => {
@@ -212,7 +212,7 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
     expect(agentScope.require(capekStorageKey)).toBe(focused.jean2StorageBundle);
     expect(agentScope.require(capekRuntimeConfigurationKey)).toBe(focused.jean2RuntimeConfiguration);
     expect(agentScope.require(capekRuntimeHostKey)).toBe(focused.jean2CompatibilityBindings);
-    expect(agentScope.require(capekToolSourceKey)).toBe(focused.jean2ToolSource);
+    expect(agentScope.require(capekWorkspaceToolDiscoveryKey)).toBe(focused.jean2WorkspaceToolDiscovery);
     expect(agentScope.require(capekSandboxControllerKey)).toBe(sandboxController);
     expect(agentScope.require(capekProviderOverridesKey)).toBeInstanceOf(Map);
     expect([...agentScope.require(capekProviderOverridesKey)]).toEqual([]);
@@ -232,7 +232,7 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
     expect(getStorage()).toBe(focused.jean2StorageBundle);
     expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);
     expect(getSchedulerHost()).toBe(focused.jean2SchedulerHost);
-    expect(getToolSource()).toBe(focused.jean2ToolSource);
+    expect(getWorkspaceToolDiscovery()).toBe(focused.jean2WorkspaceToolDiscovery);
   });
 
   test('composition keeps the Jean2 plugin inventory pinned', async () => {
@@ -265,12 +265,6 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
     ]);
 
     expect(agentServices).toEqual([
-      ['capek.editing-capability', 'agent', 'coding.editing', 'agent'],
-      ['capek.filesystem-capability', 'agent', 'coding.filesystem', 'agent'],
-      ['capek.question-capability', 'agent', 'coding.question', 'agent'],
-      ['capek.search-capability', 'agent', 'coding.search', 'agent'],
-      ['capek.shell-capability', 'agent', 'coding.shell', 'agent'],
-      ['capek.tool-output-capability', 'agent', 'coding.tool-output', 'agent'],
       ['capek.agent-driver', 'agent', 'current.agent-driver', 'agent'],
       ['capek.context-assembler', 'agent', 'current.context-sections', 'agent'],
       ['capek.context-sources', 'agent', 'current.context-sources', 'agent'],
@@ -291,9 +285,9 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
       ['capek.skills-domain', 'agent', 'current.skills-domain', 'agent'],
       ['capek.subagent-domain', 'agent', 'current.subagent-domain', 'agent'],
       ['capek.tool-output-policy', 'agent', 'current.tool-output-policy', 'agent'],
-      ['capek.tool-source', 'agent', 'current.tool-source', 'agent'],
       ['capek.workflow-domain', 'agent', 'current.workflow-domain', 'agent'],
       ['capek.workspace-policy', 'agent', 'current.workspace-policy', 'agent'],
+      ['capek.workspace-tool-discovery', 'agent', 'current.workspace-tool-discovery', 'agent'],
       ['capek.installed-tool-registry', 'process', 'current.installed-tool-registry', 'process'],
       ['capek.provider-registry', 'process', 'current.provider-registry', 'process'],
       ['capek.scheduler-host', 'process', 'current.scheduler-host', 'process'],
@@ -332,16 +326,6 @@ describe('C4 coding bundle in the Jean2 composition', () => {
   let agentScope: AgentScopeHandle | null = null;
 
   const STANDARD_CODING_TOOL_NAMES = [
-    'read-file',
-    'write-file',
-    'edit',
-    'edit-range',
-    'apply-patch',
-    'ls',
-    'glob',
-    'grep',
-    'shell',
-    'question',
     'retrieve-tool-output',
   ];
 
@@ -379,7 +363,7 @@ describe('C4 coding bundle in the Jean2 composition', () => {
     for (const tool of tools) {
       expect(tool.visible).toBe(true);
       expect(
-        tool.pluginId.startsWith('coding.')
+        tool.pluginId === 'current.tool-output-policy'
         || tool.pluginId === 'current.session-search-domain'
         || tool.pluginId === 'current.scheduler-domain'
         || tool.pluginId === 'current.subagent-domain'

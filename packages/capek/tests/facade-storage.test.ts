@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createAgent } from '@capekai/core';
 import { createInMemoryConversationStore } from '@capekai/core/storage';
+import type { LoadedTool } from '@capekai/tool';
 
 const roots: string[] = [];
 
@@ -11,6 +12,37 @@ async function root(): Promise<string> {
   const path = await mkdtemp(join(tmpdir(), 'capek-storage-option-'));
   roots.push(path);
   return path;
+}
+
+/** A local grep tool for the scripted sandbox response. */
+function localGrepTool(): LoadedTool {
+  return {
+    definition: {
+      name: 'grep',
+      description: 'Local test grep.',
+      inputSchema: {
+        type: 'object',
+        properties: { pattern: { type: 'string' }, path: { type: 'string' } },
+        required: ['pattern', 'path'],
+      },
+      timeout: 5000,
+    },
+    execute: async (input) => {
+      const { readFile, readdir } = await import('node:fs/promises');
+      const { join: joinPath } = await import('node:path');
+      const dir = String(input.path);
+      const files = (await readdir(dir)).filter((name) => name.endsWith('.txt'));
+      const lines: string[] = [];
+      for (const name of files) {
+        const content = await readFile(joinPath(dir, name), 'utf-8');
+        for (const line of content.split('\n')) {
+          if (line.includes(String(input.pattern))) lines.push(`${name}:${line}`);
+        }
+      }
+      return { success: true, result: { content: lines.join('\n'), truncated: false } };
+    },
+    path: 'builtin:test',
+  };
 }
 
 afterEach(async () => {
@@ -81,6 +113,7 @@ describe('createAgent storage options', () => {
     const first = createAgent({
       model: 'openai/gpt-4o-mini',
       workspace,
+      tools: [localGrepTool()],
       storage: { type: 'sqlite', path },
       sandbox: {
         rules: [{

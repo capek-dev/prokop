@@ -30,7 +30,6 @@ import {
 import { buildAiSdkTools } from '../src/core/build-tools';
 import { createAgentScope } from '../src/kernel/kernel';
 import type { CapekPlugin, PluginContext } from '../src/kernel/types';
-import { codingAgentBundle } from '../src/bundles/coding-agent';
 import {
   createFacadeAgentComposition,
   enterAgentScope,
@@ -74,7 +73,7 @@ import type { StorageBundle } from '../src/storage/contracts';
 import { configureStorage } from '../src/storage/runtime';
 import { resolvePermission } from '../src/permission/permission-request-manager';
 import { clearCache } from '../src/tools/registry';
-import { configureToolSource } from '../src/tools/tool-source';
+import { configureWorkspaceToolDiscovery } from '../src/tools/tool-source';
 
 function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -214,7 +213,7 @@ function configureEnvironment(): void {
   configureInstructionSource();
   configureSessionSearchHost();
   configureSchedulerHost(minimalSchedulerHost());
-  configureToolSource();
+  configureWorkspaceToolDiscovery();
 }
 
 beforeEach(() => configureEnvironment());
@@ -948,8 +947,7 @@ describe('C5 facade and current context parity', () => {
       configuration: createDefaultRuntimeConfiguration(),
       host: minimalHost(),
       contextSources: {},
-      toolSource: {},
-      codingPlugins: codingAgentBundle(),
+      workspaceToolDiscovery: {},
       sandboxController: new SandboxController(),
       providerOverrides: new Map(),
     });

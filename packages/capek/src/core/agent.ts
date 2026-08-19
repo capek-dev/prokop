@@ -15,7 +15,7 @@ import { convertToAiSdkMessages } from './message-utils';
 import { buildAiSdkTools, type BuildToolsOptions } from './build-tools';
 import { getContextAssembler } from '../context/assembler';
 import { getAgentDirectory } from '../context';
-import { initializeToolWorkspace } from '../tools/tool-source';
+import { initializeWorkspaceDiscovery } from '../tools/tool-source';
 import { resolveEffectiveSubagentTargets } from '../subagent/policy';
 import { join } from 'path';
 
@@ -82,7 +82,7 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
 
   // Initialize MCP for workspace
   if (workspacePath) {
-    initializeToolWorkspace(workspacePath).catch((err: unknown) => {
+    initializeWorkspaceDiscovery(workspacePath).catch((err: unknown) => {
       console.error('Failed to initialize MCP:', err);
     });
   }

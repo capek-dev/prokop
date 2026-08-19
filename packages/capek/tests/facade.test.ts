@@ -7,6 +7,7 @@ import { facadeRuntimeIdentity } from '../src/facade/create-agent';
 import { streamChatWithRetry } from '../src/retry/stream-chat';
 import { resetSharedProcessScopeForTests } from '../src/plugins/compose';
 import type { SandboxControlEvent, SandboxHistoryEntry } from '../src/sandbox/types';
+import type { LoadedTool } from '@capekai/tool';
 
 const roots: string[] = [];
 
@@ -14,6 +15,72 @@ async function workspace(): Promise<string> {
   const path = await mkdtemp(join(tmpdir(), 'capek-facade-'));
   roots.push(path);
   return path;
+}
+
+/** Simple local tools the scripted sandbox responses can call. The shell
+ * tool routes through the permission ask exactly like a real dangerous
+ * command would, so the interaction tests exercise the real ask path. */
+function localTools(): LoadedTool[] {
+  const def = (name: string, properties: Record<string, unknown>, required: string[]) => ({
+    name,
+    description: `Local test tool ${name}.`,
+    inputSchema: { type: 'object', properties, required },
+    timeout: 300000,
+  });
+  return [
+    {
+      definition: def('shell', { command: { type: 'string' } }, ['command']),
+      execute: async (input, context) => {
+        const approved = await context.ask({
+          type: 'permission',
+          question: `Run command: ${String(input.command)}?`,
+        });
+        if (!approved) return { success: false, error: 'USER_REJECTION' };
+        return { success: true, result: { ok: true } };
+      },
+      path: 'builtin:test',
+    },
+    {
+      definition: def('question', { title: { type: 'string' }, questions: { type: 'array' } }, ['title', 'questions']),
+      execute: async (input, context) => {
+        const response = await context.ask({
+          target: 'human',
+          type: 'form',
+          question: String(input.title),
+          questions: input.questions as never[],
+        });
+        return { success: true, result: { title: input.title, answers: response } };
+      },
+      path: 'builtin:test',
+    },
+    {
+      definition: def('read-file', { path: { type: 'string' } }, ['path']),
+      execute: async (input) => {
+        const { readFile } = await import('node:fs/promises');
+        const content = await readFile(String(input.path), 'utf-8');
+        return { success: true, result: { content } };
+      },
+      path: 'builtin:test',
+    },
+    {
+      definition: def('grep', { pattern: { type: 'string' }, path: { type: 'string' } }, ['pattern', 'path']),
+      execute: async (input) => {
+        const { readFile, readdir } = await import('node:fs/promises');
+        const { join: joinPath } = await import('node:path');
+        const dir = String(input.path);
+        const files = (await readdir(dir)).filter((name) => name.endsWith('.txt'));
+        const lines: string[] = [];
+        for (const name of files) {
+          const content = await readFile(joinPath(dir, name), 'utf-8');
+          for (const line of content.split('\n')) {
+            if (line.includes(String(input.pattern))) lines.push(`${name}:${line}`);
+          }
+        }
+        return { success: true, result: { content: lines.join('\n'), truncated: false } };
+      },
+      path: 'builtin:test',
+    },
+  ];
 }
 
 afterEach(async () => {
@@ -182,6 +249,7 @@ describe('createAgent facade', () => {
     const agent = createAgent({
       model: 'openai/gpt-4o-mini',
       workspace: root,
+      tools: localTools(),
       sandbox: {
         rules: [
           {
@@ -214,6 +282,7 @@ describe('createAgent facade', () => {
     const agent = createAgent({
       model: 'openai/gpt-4o-mini',
       workspace: root,
+      tools: localTools(),
       interaction: async () => ({ type: 'permission', grant: 'unknown' }),
       sandbox: {
         rules: [
@@ -342,6 +411,7 @@ describe('createAgent facade', () => {
     const agent = createAgent({
       model: 'openai/gpt-4o-mini',
       workspace: root,
+      tools: localTools(),
       interaction: async () => {
         throw new Error('interaction failed');
       },
@@ -387,6 +457,7 @@ describe('createAgent facade', () => {
     const agent = createAgent({
       model: 'openai/gpt-4o-mini',
       workspace: root,
+      tools: localTools(),
       interaction: 'terminal',
       terminal: {
         request: async (_message, signal) => {
@@ -438,6 +509,7 @@ describe('createAgent facade', () => {
     const agent = createAgent({
       model: 'openai/gpt-4o-mini',
       workspace: root,
+      tools: localTools(),
       interaction: 'terminal',
       terminal: {
         request: async (_message, signal) => {
@@ -472,6 +544,7 @@ describe('createAgent facade', () => {
     const agent = createAgent({
       model: 'openai/gpt-4o-mini',
       workspace: root,
+      tools: localTools(),
       sandbox: {
         rules: [{
           match: { mode: 'stream', hasToolResults: false },
@@ -526,6 +599,7 @@ describe('createAgent facade', () => {
     const agent = createAgent({
       model: 'openai/gpt-4o-mini',
       workspace: root,
+      tools: localTools(),
       sandbox: {
         rules: [
           {
