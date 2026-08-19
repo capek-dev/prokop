@@ -31,7 +31,7 @@ import type { SchedulerHost } from '../scheduler/host';
 import type { SessionSearchHost } from '../session-search/host';
 import type { StorageBundle } from '../storage/contracts';
 import type { ToolRegistryResolver } from '../tools/registry';
-import type { ToolSourceLifecycle } from '../tools/tool-source';
+import type { WorkspaceToolDiscovery } from '../tools/tool-source';
 import type { AgentDriver } from '../runtime/agent-runtime';
 import type { DefaultDriverInput } from '../runtime/default-agent-driver';
 
@@ -101,7 +101,10 @@ export const capekContextSourcesKey = serviceKey<Partial<ContextSources>>(
   'agent',
 );
 
-export const capekToolSourceKey = serviceKey<ToolSourceLifecycle>('capek.tool-source', 'agent');
+export const capekWorkspaceToolDiscoveryKey = serviceKey<WorkspaceToolDiscovery>(
+  'capek.workspace-tool-discovery',
+  'agent',
+);
 
 /** Optional by design: only the facade composition provides it. The current
  * composition omits it so installed-tool cache resolution runs unchanged. */
@@ -254,7 +257,7 @@ export const C2_SERVICE_KEYS = [
   capekRuntimeConfigurationKey,
   capekRuntimeHostKey,
   capekContextSourcesKey,
-  capekToolSourceKey,
+  capekWorkspaceToolDiscoveryKey,
   capekToolResolverKey,
   capekSandboxControllerKey,
   capekProviderOverridesKey,
@@ -271,7 +274,7 @@ export const C2_REQUIRED_AGENT_KEYS = [
   capekRuntimeConfigurationKey,
   capekRuntimeHostKey,
   capekContextSourcesKey,
-  capekToolSourceKey,
+  capekWorkspaceToolDiscoveryKey,
   capekSandboxControllerKey,
   capekProviderOverridesKey,
   capekContextAssemblerKey,

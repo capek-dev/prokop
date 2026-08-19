@@ -29,8 +29,7 @@ import { withRuntimeHost } from '../runtime/host';
 import { withSandboxController } from '../sandbox/controller';
 import { withStorage } from '../storage/runtime';
 import { withToolRegistryResolver } from '../tools/registry';
-import { withToolSource } from '../tools/tool-source';
-import { codingFacadeProfile, type FacadeProfile } from '../profiles/facade';
+import { withWorkspaceToolDiscovery } from '../tools/tool-source';
 import { createFacadeAgentPlugins, facadeProcessPlugins, type FacadeScopeValues } from './facade-plugins';
 import { capekGoalDomainKey } from './goal-domain';
 import {
@@ -48,11 +47,10 @@ import {
   capekSandboxControllerKey,
   capekStorageKey,
   capekToolResolverKey,
-  capekToolSourceKey,
+  capekWorkspaceToolDiscoveryKey,
 } from './service-keys';
 
 export interface FacadeComposition {
-  readonly profileId: FacadeProfile['id'];
   readonly processScope: ProcessScopeHandle;
   readonly agentScope: AgentScopeHandle;
 }
@@ -117,17 +115,13 @@ export async function resetSharedProcessScopeForTests(): Promise<void> {
 /** Composes one facade agent scope above the shared facade process scope. */
 export async function createFacadeAgentComposition(
   values: FacadeScopeValues,
-  profile: FacadeProfile = codingFacadeProfile,
 ): Promise<FacadeComposition> {
   const processScope = await getSharedFacadeProcessScope();
   const agentScope = await createAgentScope(
     processScope,
-    [...createFacadeAgentPlugins({
-      ...values,
-      profilePlugins: profile.plugins(),
-    })],
+    [...createFacadeAgentPlugins(values)],
   );
-  return { profileId: profile.id, processScope, agentScope };
+  return { processScope, agentScope };
 }
 
 /**
@@ -159,7 +153,7 @@ export function enterAgentScope<T>(scope: AgentScopeHandle, callback: () => T): 
   const toolOutputPolicy = scope.require(capekToolOutputPolicyKey);
   const contextSources = scope.require(capekContextSourcesKey);
   const providerOverrides = scope.require(capekProviderOverridesKey);
-  const toolSource = scope.require(capekToolSourceKey);
+  const workspaceToolDiscovery = scope.require(capekWorkspaceToolDiscoveryKey);
   const sandboxController = scope.require(capekSandboxControllerKey);
   const toolResolver = scope.optional(capekToolResolverKey);
   const contextAssembler = scope.require(capekContextAssemblerKey);
@@ -175,10 +169,10 @@ export function enterAgentScope<T>(scope: AgentScopeHandle, callback: () => T): 
   }
 
   const resolveTools = toolResolver === undefined
-    ? (inner: () => T): T => withToolSource(toolSource, () =>
+    ? (inner: () => T): T => withWorkspaceToolDiscovery(workspaceToolDiscovery, () =>
       withSandboxController(sandboxController, inner))
     : (inner: () => T): T => withToolRegistryResolver(toolResolver, () =>
-      withToolSource(toolSource, () =>
+      withWorkspaceToolDiscovery(workspaceToolDiscovery, () =>
         withSandboxController(sandboxController, inner)));
 
   const resolveGoalDomain = goalDomain === undefined
@@ -206,4 +200,5 @@ export type {
   AgentScopeHandle,
   CapekPlugin,
   ProcessScopeHandle,
+  ToolDefinition,
 } from '../kernel/types';

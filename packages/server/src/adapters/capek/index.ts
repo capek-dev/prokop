@@ -27,7 +27,10 @@ export {
 } from './session-search';
 export { configureJean2Storage, jean2StorageBundle } from './storage';
 export { jean2TitleBindings } from './titles';
-export { configureJean2ToolSource, jean2ToolSource } from './tool-source';
+export {
+  configureJean2WorkspaceToolDiscovery,
+  jean2WorkspaceToolDiscovery,
+} from './tool-source';
 export { jean2WorkspaceBindings } from './workspace';
 export { createJean2AskAuthorityPort } from './ask-authority';
 export { createJean2SessionExecution } from './execution';

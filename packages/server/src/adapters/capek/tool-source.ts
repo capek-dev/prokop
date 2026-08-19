@@ -1,15 +1,17 @@
 import {
-  configureToolSource,
   configureToolsPath,
+  configureWorkspaceToolDiscovery,
   getTool as capekGetTool,
   listTools as capekListTools,
-  type ToolSourceLifecycle,
+  type WorkspaceToolDiscovery,
 } from '@capekai/core/tools';
 import { resolveToolsPath } from '@/config';
 import { getTools, initializeWorkspace } from '@/infrastructure/mcp';
 import { getToolsDir } from '@/infrastructure/runtime/paths';
 
-export const jean2ToolSource: ToolSourceLifecycle = {
+/** The Jean2 workspace tool discovery: the MCP manager's per-workspace
+ * client lifecycle and tool listing. */
+export const jean2WorkspaceToolDiscovery: WorkspaceToolDiscovery = {
   initializeWorkspace,
   discoverTools: getTools,
 };
@@ -22,11 +24,11 @@ export const jean2ToolCatalog = {
   getTool: capekGetTool,
 };
 
-export function configureJean2ToolSource(): void {
+export function configureJean2WorkspaceToolDiscovery(): void {
   try {
     configureToolsPath(resolveToolsPath());
   } catch {
     configureToolsPath(process.env.JEAN2_TOOLS_PATH || getToolsDir());
   }
-  configureToolSource(jean2ToolSource);
+  configureWorkspaceToolDiscovery(jean2WorkspaceToolDiscovery);
 }

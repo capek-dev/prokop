@@ -12,7 +12,7 @@ export {
   sessionSearchHostValuePlugin,
   storageValuePlugin,
   toolResolverValuePlugin,
-  toolSourceValuePlugin,
+  workspaceToolDiscoveryValuePlugin,
 } from '../plugins/value-plugins';
 export { retryPolicyPlugin } from '../plugins/retry-policy';
 export { compactionPolicyPlugin } from '../plugins/compaction-policy';
@@ -51,10 +51,6 @@ export {
   skillsDomainPlugin,
 } from '../plugins/skills-domain';
 export {
-  CODING_CAPABILITY_PLUGIN_IDS,
-  codingCapabilityPlugins,
-} from '../plugins/coding-capabilities';
-export {
   FACADE_AGENT_PLUGIN_IDS,
   FACADE_PROCESS_PLUGIN_IDS,
   createFacadeAgentPlugins,
@@ -66,7 +62,7 @@ export {
 } from '../context/sources';
 export { getRuntimeConfiguration } from '../configuration/runtime';
 export { getRuntimeHost } from '../runtime/host';
-export { getToolSource } from '../tools/tool-source';
+export { getWorkspaceToolDiscovery } from '../tools/tool-source';
 export { getSandboxController } from '../sandbox/controller';
 export { getStorage } from '../storage/runtime';
 export { getSessionSearchHost } from '../session-search/host';

@@ -16,7 +16,7 @@ import {
 import { configureJean2Bindings } from '@/adapters/capek/bindings';
 import { configureJean2RuntimeConfiguration } from '@/adapters/capek/runtime-configuration';
 import { configureJean2Storage, jean2StorageBundle } from '@/adapters/capek/storage';
-import { configureJean2ToolSource } from '@/adapters/capek/tool-source';
+import { configureJean2WorkspaceToolDiscovery } from '@/adapters/capek/tool-source';
 import {
   createJean2SessionExecution,
   type Jean2SessionExecutionDependencies,
@@ -41,7 +41,7 @@ describe('Jean2 composed execution scope', () => {
   function configureComposition(): void {
     configureJean2Storage();
     configureJean2RuntimeConfiguration();
-    configureJean2ToolSource();
+    configureJean2WorkspaceToolDiscovery();
     configureJean2Bindings();
   }
 

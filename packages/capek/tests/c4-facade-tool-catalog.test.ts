@@ -1,9 +1,10 @@
 /**
  * C4 facade tool catalog tests.
  *
- * Pins that createAgent composes the coding bundle and that the facade's
+ * Pins that createAgent composes zero baked-in tools and that the facade's
  * tool resolver and preconfig tool names derive from the composed scope's
- * effective contributed tools, with the current defaults preserved.
+ * effective contributed tool payloads (retrieve-tool-output arrives through
+ * the tool-output policy plugin's own contribution).
  */
 
 import { afterEach, describe, expect, test } from 'bun:test';
@@ -14,12 +15,9 @@ import { createAgent } from '@capekai/core';
 import { getFacadeComposition } from '../src/facade/create-agent';
 import { resetSharedProcessScopeForTests } from '../src/plugins/compose';
 import { capekToolResolverKey } from '../src/plugins/service-keys';
-import {
-  CODING_CAPABILITY_KEYS,
-} from '../src/plugins/coding-capabilities';
 import type { SandboxControlEvent, SandboxHistoryEntry } from '../src/sandbox/types';
 import { retrieveToolOutputStandardTool } from '../src/tool-output/policy';
-import { getStandardTool, STANDARD_TOOL_NAMES } from '../src/tools/standard-tools';
+import type { LoadedTool } from '@capekai/tool';
 
 const roots: string[] = [];
 
@@ -44,34 +42,22 @@ afterEach(async () => {
 });
 
 describe('facade tool defaults derive from contributed tools', () => {
-  test('createAgent composes the coding bundle and derives the resolver from effective contributions', async () => {
+  test('createAgent composes no baked-in tools; retrieval arrives via the tool-output policy contribution', async () => {
     const root = await workspace();
     const agent = createAgent({ model: 'openai/gpt-4o-mini', workspace: root, sandbox: true });
 
     const { agentScope } = await getFacadeComposition(agent);
 
     const tools = agentScope.listTools();
-    expect(tools.map((tool) => tool.definition.name)).toEqual([...STANDARD_TOOL_NAMES]);
+    expect(tools.map((tool) => tool.definition.name)).toEqual(['retrieve-tool-output']);
     for (const tool of tools) {
       expect(tool.visible).toBe(true);
-      expect(tool.pluginId.startsWith('coding.')).toBe(true);
-    }
-
-    const snapshot = agentScope.snapshot();
-    const codingServices = snapshot.services.filter((service) =>
-      CODING_CAPABILITY_KEYS.some((key) => key.id === service.keyId));
-    expect(codingServices.map((service) => service.keyId).sort()).toEqual(
-      CODING_CAPABILITY_KEYS.map((key) => key.id).sort(),
-    );
-    for (const service of codingServices) {
-      expect(service.providerPluginId.startsWith('coding.')).toBe(true);
     }
 
     const resolver = agentScope.require(capekToolResolverKey);
-    expect(resolver.list().map((entry) => entry.definition.name)).toEqual([...STANDARD_TOOL_NAMES]);
-    expect(resolver.get('read-file')).toBe(getStandardTool('read-file'));
-    expect(resolver.get('question')).toBe(getStandardTool('question'));
+    expect(resolver.list().map((entry) => entry.definition.name)).toEqual(['retrieve-tool-output']);
     expect(resolver.get('retrieve-tool-output')).toBe(retrieveToolOutputStandardTool);
+    expect(resolver.get('read-file')).toBeNull();
 
     await agent.close();
   });
@@ -92,15 +78,6 @@ describe('facade tool defaults derive from contributed tools', () => {
     expect(result.status).toBe('completed');
     const entry = history.at(-1)!;
     expect(entry.context.tools.map((tool) => tool.name)).toEqual([
-      'read-file',
-      'write-file',
-      'edit',
-      'edit-range',
-      'apply-patch',
-      'ls',
-      'glob',
-      'grep',
-      'shell',
       'retrieve-tool-output',
     ]);
 
@@ -118,12 +95,44 @@ describe('facade tool defaults derive from contributed tools', () => {
     const resolverA = compositionA.agentScope.require(capekToolResolverKey);
     const resolverB = compositionB.agentScope.require(capekToolResolverKey);
     expect(resolverA).not.toBe(resolverB);
-    expect(resolverA.get('read-file')).toBe(getStandardTool('read-file'));
-    expect(resolverB.get('read-file')).toBe(getStandardTool('read-file'));
+    expect(resolverA.get('retrieve-tool-output')).toBe(retrieveToolOutputStandardTool);
+    expect(resolverB.get('retrieve-tool-output')).toBe(retrieveToolOutputStandardTool);
     expect(compositionA.agentScope.listTools().map((tool) => tool.definition.name))
       .toEqual(compositionB.agentScope.listTools().map((tool) => tool.definition.name));
 
     await agentA.close();
     await agentB.close();
+  });
+
+  test('a custom tool contributed through profilePlugins lands in the resolver and the model tool list', async () => {
+    const customTool: LoadedTool = {
+      definition: {
+        name: 'custom-echo',
+        description: 'Echoes its input.',
+        inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+        timeout: 5000,
+      },
+      execute: async (input) => ({ success: true, result: { echoed: input.text } }),
+      path: 'builtin:test',
+    };
+
+    const root = await workspace();
+    const agent = createAgent({
+      model: 'openai/gpt-4o-mini',
+      workspace: root,
+      sandbox: true,
+      tools: [customTool],
+    });
+
+    const { agentScope } = await getFacadeComposition(agent);
+    expect(agentScope.listTools().map((tool) => tool.definition.name)).toEqual([
+      'retrieve-tool-output',
+      'custom-echo',
+    ]);
+
+    const resolver = agentScope.require(capekToolResolverKey);
+    expect(resolver.get('custom-echo')).toBe(customTool);
+
+    await agent.close();
   });
 });

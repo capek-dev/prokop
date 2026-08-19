@@ -17,7 +17,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { jsonSchema, tool } from 'ai';
 import type { Preconfig, Session, Workspace } from '@capekai/types';
-import { minimalAgentBundle } from '../src/bundles/minimal-agent';
 import { configureRuntimeConfiguration } from '../src/configuration/runtime';
 import { buildAiSdkTools, type BuildToolsOptions } from '../src/core/build-tools';
 import {
@@ -50,8 +49,7 @@ import {
 import { createInMemoryStorageBundle } from '../src/storage/memory';
 import { configureStorage, createSession } from '../src/storage/runtime';
 import { clearCache, scanTools } from '../src/tools/registry';
-import { STANDARD_TOOL_NAMES } from '../src/tools/standard-tools';
-import { configureToolSource } from '../src/tools/tool-source';
+import { configureWorkspaceToolDiscovery } from '../src/tools/tool-source';
 
 const roots: string[] = [];
 
@@ -140,7 +138,7 @@ function configureEnvironment(): void {
   configureInstructionSource();
   configureSessionSearchHost(minimalSearchHost());
   configureSchedulerHost(minimalSchedulerHost());
-  configureToolSource();
+  configureWorkspaceToolDiscovery();
   // Explicit fallback installation: the unscoped order baseline below needs
   // the session_search, scheduler, task, workflow, memory, and skills tools
   // exactly like the Jean2 bootstrap installs them.
@@ -246,7 +244,7 @@ async function configureToolOrderFixture(
     list: async () => [SUBAGENT_PRECONFIG],
     listSubagents: async () => [SUBAGENT_PRECONFIG],
   });
-  configureToolSource({
+  configureWorkspaceToolDiscovery({
     discoverTools: async () => ({
       'mcp-alpha': tool({
         description: 'C5 fixture mcp-alpha',
@@ -295,9 +293,8 @@ describe('C5 minimal composition isolation', () => {
 
   test('a minimal agent scope composes with no services, tools, or context contributions', async () => {
     const processScope = await createProcessScope([]);
-    const agentScope = await createAgentScope(processScope, [...minimalAgentBundle()]);
+    const agentScope = await createAgentScope(processScope, []);
     try {
-      expect(minimalAgentBundle()).toEqual([]);
       expect(processScope.snapshot().services).toEqual([]);
       expect(agentScope.snapshot().services).toEqual([]);
       expect(agentScope.snapshot().tools).toEqual([]);
@@ -314,10 +311,10 @@ describe('C5 minimal composition isolation', () => {
     const currentProcess = await createCurrentProcessScope();
     const currentAgent = await createCurrentAgentScope(currentProcess);
     const minimalProcess = await createProcessScope([]);
-    const minimalAgent = await createAgentScope(minimalProcess, [...minimalAgentBundle()]);
+    const minimalAgent = await createAgentScope(minimalProcess, []);
     try {
       expect(currentAgent.listTools().map((entry) => entry.definition.name)).toEqual([
-        ...STANDARD_TOOL_NAMES,
+        'retrieve-tool-output',
         'task',
         'skill',
         'memory',
@@ -347,7 +344,7 @@ describe('C5 minimal composition isolation', () => {
         expect(minimalAgent.listContextSections()).toEqual([]);
         expect(minimalAgent.snapshot().services).toEqual([]);
         expect(currentAgent.listTools().map((entry) => entry.definition.name)).toEqual([
-          ...STANDARD_TOOL_NAMES,
+          'retrieve-tool-output',
           'task',
           'skill',
           'memory',
@@ -373,7 +370,7 @@ describe('C5 minimal composition isolation', () => {
 
   test('the minimal scope cannot drive a seeded turn because required services are absent', async () => {
     const processScope = await createProcessScope([]);
-    const agentScope = await createAgentScope(processScope, [...minimalAgentBundle()]);
+    const agentScope = await createAgentScope(processScope, []);
     try {
       expect(() => enterAgentScope(agentScope, () => undefined)).toThrow(LifecycleError);
     } finally {

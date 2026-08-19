@@ -24,11 +24,11 @@ import {
 } from '../src/storage/runtime';
 import { createInMemoryStorageBundle } from '../src/storage/memory';
 import {
-  configureToolSource,
-  discoverSourceTools,
-  getToolSource,
-  withToolSource,
-  type ToolSourceLifecycle,
+  configureWorkspaceToolDiscovery,
+  discoverWorkspaceTools,
+  getWorkspaceToolDiscovery,
+  withWorkspaceToolDiscovery,
+  type WorkspaceToolDiscovery,
 } from '../src/tools/tool-source';
 
 function buildConfiguration(temperature: number): RuntimeConfiguration {
@@ -48,7 +48,7 @@ function buildProvider(id: string): ConnectableProvider {
   };
 }
 
-function buildToolSource(label: string, toolNames: string[]): ToolSourceLifecycle {
+function buildDiscovery(label: string, toolNames: string[]): WorkspaceToolDiscovery {
   return {
     async initializeWorkspace(): Promise<void> {},
     async discoverTools(): Promise<Record<string, Tool>> {
@@ -68,7 +68,7 @@ interface ScopeValues {
   storage: StorageBundle;
   configuration: RuntimeConfiguration;
   providers: ReadonlyMap<string, ConnectableProvider>;
-  toolSource: ToolSourceLifecycle;
+  workspaceToolDiscovery: WorkspaceToolDiscovery;
 }
 
 interface ScopeObservation {
@@ -78,12 +78,12 @@ interface ScopeObservation {
   configuration: RuntimeConfiguration;
   sharedProvider: ConnectableProvider | undefined;
   globalOnlyProvider: ConnectableProvider | undefined;
-  toolSource: ToolSourceLifecycle;
+  workspaceToolDiscovery: WorkspaceToolDiscovery;
   discovered: string[];
 }
 
 // Follows the actual facade #scope nesting order for the tested seams:
-// withStorage -> withRuntimeConfiguration -> withProviderOverrides -> withToolSource
+// withStorage -> withRuntimeConfiguration -> withProviderOverrides -> withWorkspaceToolDiscovery
 function runScope(
   label: 'A' | 'B',
   values: ScopeValues,
@@ -99,14 +99,14 @@ function runScope(
       configuration: getRuntimeConfiguration(),
       sharedProvider: getProvider('shared'),
       globalOnlyProvider: getProvider('global-only'),
-      toolSource: getToolSource(),
+      workspaceToolDiscovery: getWorkspaceToolDiscovery(),
       discovered,
     });
   };
   return withStorage(values.storage, () =>
     withRuntimeConfiguration(values.configuration, () =>
       withProviderOverrides(values.providers, () =>
-        withToolSource(values.toolSource, async () => {
+        withWorkspaceToolDiscovery(values.workspaceToolDiscovery, async () => {
           observe('entered', []);
           entered();
           await barrier;
@@ -120,7 +120,7 @@ function runScope(
             parentId: null,
             agentName: null,
           });
-          const discovered = Object.keys(await discoverSourceTools(`/workspace-${label}`));
+          const discovered = Object.keys(await discoverWorkspaceTools(`/workspace-${label}`));
           observe('resumed', discovered);
           return `${label}-done`;
         }))));
@@ -129,7 +129,7 @@ function runScope(
 afterEach(() => {
   configureStorage(createInMemoryStorageBundle());
   configureRuntimeConfiguration();
-  configureToolSource();
+  configureWorkspaceToolDiscovery();
   resetProviders();
 });
 
@@ -137,12 +137,12 @@ describe('scoped override isolation', () => {
   test('keeps two concurrently live agent scopes isolated and restores module defaults', async () => {
     const defaultStorage = createInMemoryStorageBundle();
     const defaultConfiguration = buildConfiguration(0.5);
-    const defaultToolSource = buildToolSource('default', []);
+    const defaultDiscovery = buildDiscovery('default', []);
     const defaultSharedProvider = buildProvider('shared');
     const globalOnlyProvider = buildProvider('global-only');
     configureStorage(defaultStorage);
     configureRuntimeConfiguration(defaultConfiguration);
-    configureToolSource(defaultToolSource);
+    configureWorkspaceToolDiscovery(defaultDiscovery);
     registerProvider(defaultSharedProvider);
     registerProvider(globalOnlyProvider);
 
@@ -152,8 +152,8 @@ describe('scoped override isolation', () => {
     const configurationB = buildConfiguration(0.9);
     const providerA = buildProvider('shared');
     const providerB = buildProvider('shared');
-    const toolSourceA = buildToolSource('A', ['a-tool']);
-    const toolSourceB = buildToolSource('B', ['b-tool']);
+    const toolSourceA = buildDiscovery('A', ['a-tool']);
+    const toolSourceB = buildDiscovery('B', ['b-tool']);
 
     let releaseEnteredA!: () => void;
     let releaseEnteredB!: () => void;
@@ -177,13 +177,13 @@ describe('scoped override isolation', () => {
       storage: storageA,
       configuration: configurationA,
       providers: new Map([['shared', providerA]]),
-      toolSource: toolSourceA,
+      workspaceToolDiscovery: toolSourceA,
     }, releaseEnteredA, barrierA, observations);
     const bRun = runScope('B', {
       storage: storageB,
       configuration: configurationB,
       providers: new Map([['shared', providerB]]),
-      toolSource: toolSourceB,
+      workspaceToolDiscovery: toolSourceB,
     }, releaseEnteredB, barrierB, observations);
 
     await Promise.all([aEntered, bEntered]);
@@ -198,8 +198,8 @@ describe('scoped override isolation', () => {
     expect(enteredB.sharedProvider).toBe(providerB);
     expect(enteredA.globalOnlyProvider).toBe(globalOnlyProvider);
     expect(enteredB.globalOnlyProvider).toBe(globalOnlyProvider);
-    expect(enteredA.toolSource).toBe(toolSourceA);
-    expect(enteredB.toolSource).toBe(toolSourceB);
+    expect(enteredA.workspaceToolDiscovery).toBe(toolSourceA);
+    expect(enteredB.workspaceToolDiscovery).toBe(toolSourceB);
 
     releaseBarrierA();
     releaseBarrierB();
@@ -213,8 +213,8 @@ describe('scoped override isolation', () => {
     expect(resumedB.configuration.getLLMTemperature()).toBe(0.9);
     expect(resumedA.sharedProvider).toBe(providerA);
     expect(resumedB.sharedProvider).toBe(providerB);
-    expect(resumedA.toolSource).toBe(toolSourceA);
-    expect(resumedB.toolSource).toBe(toolSourceB);
+    expect(resumedA.workspaceToolDiscovery).toBe(toolSourceA);
+    expect(resumedB.workspaceToolDiscovery).toBe(toolSourceB);
     expect(resumedA.discovered).toEqual(['a-tool']);
     expect(resumedB.discovered).toEqual(['b-tool']);
 
@@ -228,7 +228,7 @@ describe('scoped override isolation', () => {
     expect(getStorage()).toBe(defaultStorage);
     expect(getRuntimeConfiguration()).toBe(defaultConfiguration);
     expect(getProvider('shared')).toBe(defaultSharedProvider);
-    expect(getToolSource()).toBe(defaultToolSource);
+    expect(getWorkspaceToolDiscovery()).toBe(defaultDiscovery);
   });
 
   test('falls back per ID to the global provider and restores the module default after exit', async () => {
@@ -237,7 +237,7 @@ describe('scoped override isolation', () => {
     registerProvider(globalShared);
     registerProvider(globalOther);
     const scopedShared = buildProvider('shared');
-    const scopedToolSource = buildToolSource('scoped', ['scoped-tool']);
+    const scopedToolSource = buildDiscovery('scoped', ['scoped-tool']);
 
     await withProviderOverrides(new Map([['shared', scopedShared]]), async () => {
       expect(getProvider('shared')).toBe(scopedShared);
@@ -246,13 +246,13 @@ describe('scoped override isolation', () => {
       expect(combined.some((provider) => provider === scopedShared)).toBe(true);
       expect(combined.some((provider) => provider === globalOther)).toBe(true);
       expect(combined.some((provider) => provider === globalShared)).toBe(false);
-      await withToolSource(scopedToolSource, async () => {
-        expect(getToolSource()).toBe(scopedToolSource);
-        expect(Object.keys(await discoverSourceTools('/any'))).toEqual(['scoped-tool']);
+      await withWorkspaceToolDiscovery(scopedToolSource, async () => {
+        expect(getWorkspaceToolDiscovery()).toBe(scopedToolSource);
+        expect(Object.keys(await discoverWorkspaceTools('/any'))).toEqual(['scoped-tool']);
       });
     });
 
     expect(getProvider('shared')).toBe(globalShared);
-    expect(getToolSource()).not.toBe(scopedToolSource);
+    expect(getWorkspaceToolDiscovery()).not.toBe(scopedToolSource);
   });
 });

@@ -52,8 +52,7 @@ import type { StorageBundle } from '../src/storage/contracts';
 import { configureStorage } from '../src/storage/runtime';
 import { resolvePermission } from '../src/permission/permission-request-manager';
 import { clearCache } from '../src/tools/registry';
-import { STANDARD_TOOL_NAMES } from '../src/tools/standard-tools';
-import { configureToolSource } from '../src/tools/tool-source';
+import { configureWorkspaceToolDiscovery } from '../src/tools/tool-source';
 
 function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -225,7 +224,7 @@ function configureEnvironment(): void {
   configureRuntimeHost(minimalHost());
   configureSessionSearchHost();
   configureSchedulerHost(schedulerHost());
-  configureToolSource();
+  configureWorkspaceToolDiscovery();
 }
 
 beforeEach(() => configureEnvironment());
@@ -741,7 +740,7 @@ describe('C5 scheduler domain composition', () => {
     try {
       const tools = agentScope.listTools();
       expect(tools.map((tool) => tool.definition.name)).toEqual([
-        ...STANDARD_TOOL_NAMES,
+        'retrieve-tool-output',
         'task',
         'skill',
         'memory',

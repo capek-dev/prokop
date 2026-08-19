@@ -43,8 +43,7 @@ import { getGoalDomain, withGoalDomain } from '../src/goals/service';
 import { enterAgentScope } from '../src/plugins/compose';
 import { configureRuntimeHost, type RuntimeHost } from '../src/runtime/host';
 import { configureStorage, createInMemoryStorageBundle } from '../src/storage';
-import { STANDARD_TOOL_NAMES } from '../src/tools/standard-tools';
-import { configureToolSource } from '../src/tools/tool-source';
+import { configureWorkspaceToolDiscovery } from '../src/tools/tool-source';
 
 function minimalHost(): RuntimeHost {
   return {
@@ -106,7 +105,7 @@ function configureEnvironment(): void {
   configureStorage(createInMemoryStorageBundle());
   configureRuntimeConfiguration();
   configureRuntimeHost(minimalHost());
-  configureToolSource();
+  configureWorkspaceToolDiscovery();
 }
 
 afterEach(async () => {
@@ -182,7 +181,7 @@ describe('C5 goal composed scope ownership', () => {
       // session directive. The domain therefore contributes no tool.
       expect(tools.some((tool) => tool.definition.name === 'goal')).toBe(false);
       expect(tools.map((tool) => tool.definition.name)).toEqual([
-        ...STANDARD_TOOL_NAMES,
+        'retrieve-tool-output',
         'task',
         'skill',
         'memory',

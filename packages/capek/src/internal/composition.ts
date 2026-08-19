@@ -24,7 +24,7 @@ export {
   capekSessionSearchHostKey,
   capekStorageKey,
   capekToolResolverKey,
-  capekToolSourceKey,
+  capekWorkspaceToolDiscoveryKey,
 } from '../plugins/service-keys';
 export {
   C2_PROCESS_KEYS,

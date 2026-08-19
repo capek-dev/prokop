@@ -14,7 +14,7 @@ import type { RuntimeHost } from '../runtime/host';
 import type { SandboxController } from '../sandbox/controller';
 import type { StorageBundle } from '../storage/contracts';
 import type { ToolRegistryResolver } from '../tools/registry';
-import type { ToolSourceLifecycle } from '../tools/tool-source';
+import type { WorkspaceToolDiscovery } from '../tools/tool-source';
 import { getSchedulerHost } from '../scheduler/host';
 import { getSessionSearchHost } from '../session-search/host';
 import { createContextSectionsPlugin } from './context-sections';
@@ -24,8 +24,7 @@ import { permissionPolicyPlugin } from './permission-policy';
 import { workspacePolicyPlugin } from './workspace-policy';
 import { toolOutputPolicyPlugin } from './tool-output-policy';
 import { defaultAgentDriverPlugin } from './default-agent-driver';
-import { CODING_CAPABILITY_KEYS } from './coding-capabilities';
-import { codingToolResolverPlugin } from './tool-catalog';
+import { contributedToolResolverPlugin } from './tool-catalog';
 import {
   contextSourcesValuePlugin,
   providerOverridesValuePlugin,
@@ -34,7 +33,7 @@ import {
   sandboxControllerValuePlugin,
   storageValuePlugin,
   toolResolverValuePlugin,
-  toolSourceValuePlugin,
+  workspaceToolDiscoveryValuePlugin,
   installedToolRegistryValuePlugin,
   providerRegistryValuePlugin,
   schedulerHostValuePlugin,
@@ -62,13 +61,14 @@ export interface FacadeScopeValues {
   configuration: RuntimeConfiguration;
   host: RuntimeHost;
   contextSources: Partial<ContextSources>;
-  toolSource: ToolSourceLifecycle;
+  workspaceToolDiscovery: WorkspaceToolDiscovery;
   /** Optional compatibility resolver. When omitted, the facade
    * composition derives the resolver from the composed scope's effective
-   * contributed coding tools (C4). The explicit value is the rollback
+   * contributed tool payloads. The explicit value is the rollback
    * path and the C2 test seam. */
   toolResolver?: ToolRegistryResolver;
-  /** Plugins selected by the explicit facade profile. */
+  /** Host-supplied plugins appended after the facade's own (external tool
+   * contributions land here). */
   profilePlugins?: readonly CapekPlugin<unknown>[];
   /** Temporary C2 test compatibility alias. */
   codingPlugins?: readonly CapekPlugin<unknown>[];
@@ -88,7 +88,7 @@ export const FACADE_AGENT_PLUGIN_IDS = [
   'facade.tool-output-policy',
   'facade.context-sources',
   'facade.context-sections',
-  'facade.tool-source',
+  'facade.workspace-tool-discovery',
   'facade.tool-resolver',
   'facade.sandbox-controller',
   'facade.provider-overrides',
@@ -113,9 +113,9 @@ export function createFacadeAgentPlugins(values: FacadeScopeValues): readonly Ca
     // in the current Jean2 composition), so context-sections stays at its
     // pre-C5 defaults here.
     createContextSectionsPlugin('facade.context-sections'),
-    toolSourceValuePlugin('facade.tool-source', values.toolSource),
+    workspaceToolDiscoveryValuePlugin('facade.workspace-tool-discovery', values.workspaceToolDiscovery),
     values.toolResolver === undefined
-      ? codingToolResolverPlugin('facade.tool-resolver', CODING_CAPABILITY_KEYS)
+      ? contributedToolResolverPlugin('facade.tool-resolver')
       : toolResolverValuePlugin('facade.tool-resolver', values.toolResolver),
     sandboxControllerValuePlugin('facade.sandbox-controller', values.sandboxController),
     providerOverridesValuePlugin('facade.provider-overrides', values.providerOverrides),

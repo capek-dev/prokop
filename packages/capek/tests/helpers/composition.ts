@@ -1,7 +1,5 @@
 import { createAgentScope, createProcessScope } from '../../src/plugins/compose';
 import {
-  CODING_CAPABILITY_PLUGIN_IDS,
-  codingCapabilityPlugins,
   compactionPolicyPlugin,
   contextSourcesValuePlugin,
   createContextSectionsPlugin,
@@ -13,7 +11,7 @@ import {
   getSchedulerHost,
   getSessionSearchHost,
   getStorage,
-  getToolSource,
+  getWorkspaceToolDiscovery,
   goalDomainPlugin,
   installedToolRegistryValuePlugin,
   memoryDomainPlugin,
@@ -33,7 +31,7 @@ import {
   storageValuePlugin,
   subagentDomainPlugin,
   toolOutputPolicyPlugin,
-  toolSourceValuePlugin,
+  workspaceToolDiscoveryValuePlugin,
   workflowDomainPlugin,
   workspacePolicyPlugin,
   CURRENT_GOAL_DOMAIN_PLUGIN_ID,
@@ -73,10 +71,9 @@ export const CURRENT_AGENT_PLUGIN_IDS = [
   CURRENT_GOAL_DOMAIN_PLUGIN_ID,
   CURRENT_MEMORY_DOMAIN_PLUGIN_ID,
   CURRENT_SKILLS_DOMAIN_PLUGIN_ID,
-  'current.tool-source',
+  'current.workspace-tool-discovery',
   'current.sandbox-controller',
   'current.provider-overrides',
-  ...CODING_CAPABILITY_PLUGIN_IDS,
 ] as const;
 
 export function currentProcessPlugins(): readonly CapekPlugin<unknown>[] {
@@ -113,10 +110,9 @@ export function currentAgentPlugins(): readonly CapekPlugin<unknown>[] {
     goalDomainPlugin(CURRENT_GOAL_DOMAIN_PLUGIN_ID),
     memoryDomainPlugin(CURRENT_MEMORY_DOMAIN_PLUGIN_ID),
     skillsDomainPlugin(CURRENT_SKILLS_DOMAIN_PLUGIN_ID),
-    toolSourceValuePlugin('current.tool-source', getToolSource()),
+    workspaceToolDiscoveryValuePlugin('current.workspace-tool-discovery', getWorkspaceToolDiscovery()),
     sandboxControllerValuePlugin('current.sandbox-controller', getSandboxController()),
     providerOverridesValuePlugin('current.provider-overrides', new Map()),
-    ...codingCapabilityPlugins(),
   ];
 }
 

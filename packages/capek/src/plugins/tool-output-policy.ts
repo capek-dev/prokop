@@ -1,7 +1,8 @@
 import { getHostLayout } from '../runtime/host-layout';
-import type { CapekPlugin, PluginContext } from '../kernel/types';
+import type { CapekPlugin, PluginContext, ToolDefinition as KernelToolDefinition } from '../kernel/types';
 import {
   createToolOutputService,
+  retrieveToolOutputStandardTool,
   type ToolOutputPolicyOptions,
 } from '../tool-output/policy';
 import { capekToolOutputPolicyKey } from './service-keys';
@@ -37,6 +38,15 @@ export function toolOutputPolicyPlugin(id: string, tempRoot?: string): CapekPlug
         capekToolOutputPolicyKey,
         createToolOutputService({ id, options }),
       );
+      // The retrieval tool is the tool-output capability's own contribution:
+      // it enters the effective catalog through the service it depends on.
+      context.contributeTool({
+        id: 'tool-output.retrieve-tool-output',
+        order: 600,
+        definition: retrieveToolOutputStandardTool.definition as KernelToolDefinition,
+        payload: retrieveToolOutputStandardTool,
+        requiredCapabilities: [capekToolOutputPolicyKey],
+      });
     },
   };
 }

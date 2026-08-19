@@ -6,6 +6,7 @@ import { stdin, stdout } from 'node:process';
 import { createInterface, type Interface as ReadlineInterface } from 'node:readline/promises';
 import type {
   AskRequestMessage, AssistantMessage, Part, Preconfig, ServerMessage } from '@capekai/types';
+import type { LoadedTool } from '@capekai/tool';
 import { executeCompaction } from '../compaction/executor';
 import { interruptManager } from '../core/interrupt';
 import { streamChatWithRetry, type StreamChatEvent } from '../retry/stream-chat';
@@ -16,16 +17,19 @@ import {
   createFacadeAgentComposition,
   enterAgentScope,
   type AgentScopeHandle,
+  type CapekPlugin,
   type FacadeComposition,
+  type ToolDefinition as KernelToolDefinition,
 } from '../plugins/compose';
 import { capekAgentDriverKey, capekToolResolverKey } from '../plugins/service-keys';
 import { setDefaultContextAssembler } from '../context/assembler';
 import { fixedBuilderContextAssembler } from '../plugins/legacy-system-message';
+import { withRuntimeHost } from '../runtime/host';
 import { createAgentRuntime } from '../runtime/agent-runtime';
 import type { AgentDriver } from '../runtime/agent-runtime';
 import type { DefaultDriverInput } from '../runtime/default-agent-driver';
 import { createAgentStorage } from '../storage/options';
-import { resolveFacadeProfile } from '../profiles/facade';
+import { scanTools } from '../tools/registry';
 import {
   buildEffectiveContextHistory,
   createMessage,
@@ -49,9 +53,8 @@ import type {
   UsageSummary,
   AgentDiagnostics,
 } from './types';
-import type { FacadeProfileId } from '../profiles/facade';
 
-const DEFAULT_PROMPT = `You are a practical coding and research agent. Inspect the workspace before making claims. Use the bundled read and search tools to gather evidence, then answer with concrete findings. Use edit, write, patch, or shell tools only when the user asks for changes. Ask a focused question when required information is missing.`;
+const DEFAULT_PROMPT = `You are a practical coding and research agent. Inspect the workspace with the available tools before making claims, then answer with concrete findings. Only make changes when the user asks for them. Ask a focused question when required information is missing.`;
 let facadeDefaultAssemblerInstalled = false;
 
 function ensureFacadeDefaultAssembler(): void {
@@ -68,7 +71,12 @@ export interface TerminalInteraction {
 export interface CreateAgentOptions {
   model: string;
   workspace: string;
-  profile?: FacadeProfileId;
+  /** Directly supplied tools, contributed as one `facade.custom-tools`
+   * plugin. Wins name collisions against toolsPath scans. */
+  tools?: LoadedTool[];
+  /** A tools directory to scan once at composition; every discovered tool
+   * is contributed. Curate by pointing at a curated directory. */
+  toolsPath?: string;
   storage?: AgentStorageOption;
   prompt?: string;
   interaction?: false | 'terminal' | ((request: AskRequestMessage) => unknown | Promise<unknown>);
@@ -144,6 +152,36 @@ function defaultSandboxRules(): AutoResponderRule[] {
     match: {},
     response: { type: 'text', content: 'Sandbox response.' },
   }];
+}
+
+/** One agent plugin contributing the caller-supplied tools with their
+ * payloads, in array order (order base 1000, after the tool-output policy's
+ * own contribution at 600). */
+function customToolsPlugin(tools: readonly LoadedTool[]): CapekPlugin<unknown> {
+  return {
+    id: 'facade.custom-tools',
+    scope: 'agent',
+    setup(context) {
+      tools.forEach((loaded, index) => {
+        context.contributeTool({
+          id: `custom.${loaded.definition.name}`,
+          order: 1000 + index,
+          definition: loaded.definition as KernelToolDefinition,
+          payload: loaded,
+        });
+      });
+    },
+  };
+}
+
+/** Resolves the facade's tool surface: a snapshot scan of toolsPath plus the
+ * directly supplied tools, merged by name (direct tools win collisions). */
+async function resolveFacadeTools(options: CreateAgentOptions): Promise<readonly CapekPlugin<unknown>[]> {
+  const scanned = options.toolsPath ? await scanTools(options.toolsPath) : [];
+  const direct = options.tools ?? [];
+  const directNames = new Set(direct.map((loaded) => loaded.definition.name));
+  const merged = [...scanned.filter((loaded) => !directNames.has(loaded.definition.name)), ...direct];
+  return merged.length === 0 ? [] : [customToolsPlugin(merged)];
 }
 
 class ReadlineTerminalInteraction implements TerminalInteraction {
@@ -242,15 +280,22 @@ class StandaloneAgent implements Agent {
       sandboxActive: this.#sandboxActive,
       tempRoot: this.#tempRoot,
     });
-    this.#composition = createFacadeAgentComposition({
-      storage: this.#storage.storage,
-      configuration: this.#configuration,
-      host: this.#bindings,
-      contextSources: {},
-      toolSource: {},
-      sandboxController: this.#sandboxController,
-      providerOverrides: this.#providerOverrides,
-    }, resolveFacadeProfile(options.profile));
+    // Composition runs inside the agent's own host context: the C6 policy
+    // providers read ambient layout (tool-output temp root) at activation,
+ // and the standalone agent is that host. The ALS context propagates
+    // through the composition promise chain.
+    this.#composition = withRuntimeHost(this.#bindings, () =>
+      resolveFacadeTools(options).then((toolPlugins) =>
+        createFacadeAgentComposition({
+          storage: this.#storage.storage,
+          configuration: this.#configuration,
+          host: this.#bindings,
+          contextSources: {},
+          workspaceToolDiscovery: {},
+          sandboxController: this.#sandboxController,
+          providerOverrides: this.#providerOverrides,
+          profilePlugins: toolPlugins,
+        })));
     // An idle agent must never surface an unhandled rejection when scope
     // composition fails. run/close and the test accessor await this same
     // promise and still observe the original rejection.
@@ -264,7 +309,6 @@ class StandaloneAgent implements Agent {
   async diagnostics(): Promise<AgentDiagnostics> {
     const composition = await this.#composition;
     return {
-      profileId: composition.profileId,
       process: composition.processScope.snapshot(),
       agent: composition.agentScope.snapshot(),
     };

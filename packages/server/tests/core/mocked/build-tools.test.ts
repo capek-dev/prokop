@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { tool, jsonSchema } from 'ai';
-import { configureToolSource } from '@capekai/core/tools';
+import { configureWorkspaceToolDiscovery } from '@capekai/core/tools';
 import { configureAgentSource, configurePreconfigSource } from '@capekai/core/hosts';
 import {
   configureStorage,
@@ -53,7 +53,7 @@ function configureBindings(overrides: BindingOverrides = {}): void {
     listSubagents: async () => overrides.subagentPreconfigs ?? [],
   });
   configureAgentSource();
-  configureToolSource({
+  configureWorkspaceToolDiscovery({
     discoverTools: async () => overrides.mcpTools ?? {},
   });
 }

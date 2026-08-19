@@ -17,9 +17,9 @@ export {
   scanTools,
 } from '../tools/registry';
 export {
-  configureToolSource,
-  getToolSource,
-  type ToolSourceLifecycle,
+  configureWorkspaceToolDiscovery,
+  getWorkspaceToolDiscovery,
+  type WorkspaceToolDiscovery,
 } from '../tools/tool-source';
 export {
   ArtifactError,

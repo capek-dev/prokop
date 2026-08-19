@@ -1,23 +1,23 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import {
-  configureToolSource,
-  discoverSourceTools,
-  getToolSource,
-  initializeToolWorkspace,
+  configureWorkspaceToolDiscovery,
+  discoverWorkspaceTools,
+  getWorkspaceToolDiscovery,
+  initializeWorkspaceDiscovery,
 } from '../src/tools/tool-source';
 
-afterEach(() => configureToolSource());
+afterEach(() => configureWorkspaceToolDiscovery());
 
-describe('tool source lifecycle', () => {
+describe('workspace tool discovery', () => {
   test('defaults to no-op initialization and no tools', async () => {
-    await expect(initializeToolWorkspace('/workspace')).resolves.toBeUndefined();
-    await expect(discoverSourceTools('/workspace', 'session-1')).resolves.toEqual({});
+    await expect(initializeWorkspaceDiscovery('/workspace')).resolves.toBeUndefined();
+    await expect(discoverWorkspaceTools('/workspace', 'session-1')).resolves.toEqual({});
   });
 
-  test('delegates configured lifecycle calls with exact arguments', async () => {
+  test('delegates configured discovery calls with exact arguments', async () => {
     const calls: unknown[][] = [];
     const tools = { example: {} as never };
-    configureToolSource({
+    configureWorkspaceToolDiscovery({
       async initializeWorkspace(path) {
         calls.push(['initialize', path]);
       },
@@ -27,12 +27,12 @@ describe('tool source lifecycle', () => {
       },
     });
 
-    await initializeToolWorkspace('/workspace');
-    expect(await discoverSourceTools('/workspace', 'session-1')).toBe(tools);
+    await initializeWorkspaceDiscovery('/workspace');
+    expect(await discoverWorkspaceTools('/workspace', 'session-1')).toBe(tools);
     expect(calls).toEqual([
       ['initialize', '/workspace'],
       ['discover', '/workspace', 'session-1'],
     ]);
-    expect(getToolSource().discoverTools).toBeDefined();
+    expect(getWorkspaceToolDiscovery().discoverTools).toBeDefined();
   });
 });

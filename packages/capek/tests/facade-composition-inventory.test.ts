@@ -24,29 +24,10 @@ function captureHistory(onEvent: (event: SandboxControlEvent) => void, history: 
 }
 
 const STANDARD_WITHOUT_QUESTION = [
-  'read-file',
-  'write-file',
-  'edit',
-  'edit-range',
-  'apply-patch',
-  'ls',
-  'glob',
-  'grep',
-  'shell',
   'retrieve-tool-output',
 ];
 
 const STANDARD_WITH_QUESTION = [
-  'read-file',
-  'write-file',
-  'edit',
-  'edit-range',
-  'apply-patch',
-  'ls',
-  'glob',
-  'grep',
-  'shell',
-  'question',
   'retrieve-tool-output',
 ];
 

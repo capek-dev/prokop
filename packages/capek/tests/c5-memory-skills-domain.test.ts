@@ -40,7 +40,7 @@ import {
 import { resetDomainToolFallbacksForTests } from '../src/runtime/domain-tool-source';
 import { configureRuntimeHost, type RuntimeHost } from '../src/runtime/host';
 import { configureStorage, createInMemoryStorageBundle } from '../src/storage';
-import { configureToolSource } from '../src/tools/tool-source';
+import { configureWorkspaceToolDiscovery } from '../src/tools/tool-source';
 import { MEMORY_GUIDANCE } from '../src/memory';
 import { SKILL_MANAGE_GUIDANCE } from '../src/skills';
 
@@ -118,7 +118,7 @@ function configureEnvironment(): void {
   configurePreconfigSource();
   configureAgentSource();
   configureInstructionSource();
-  configureToolSource();
+  configureWorkspaceToolDiscovery();
   installMemoryToolFallback();
   installSkillsToolFallback();
 }

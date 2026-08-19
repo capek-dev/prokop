@@ -1,6 +1,5 @@
 import type { Part } from '@capekai/types';
 import type { FacadeComposition } from '../plugins/compose';
-import type { FacadeProfileId } from '../profiles/facade';
 import type { ToolOutputArtifactPage } from '../storage/contracts';
 export type { AgentStorageOption } from '../storage/options';
 
@@ -52,7 +51,6 @@ export type AgentEvent =
   | { type: 'result'; result: AgentResult };
 
 export interface AgentDiagnostics {
-  profileId: FacadeProfileId;
   process: ScopeDiagnosticsSnapshot;
   agent: ScopeDiagnosticsSnapshot;
 }
