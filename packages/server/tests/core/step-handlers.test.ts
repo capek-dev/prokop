@@ -58,34 +58,34 @@ describe('step-handlers', () => {
   // ── experimental_onStepStart ─────────────────────────────────
 
   describe('experimental_onStepStart', () => {
-    test('creates step part with started status', () => {
+    test('creates step part with started status', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
 
       expect(ctx.stepParts).toHaveLength(1);
       expect(ctx.stepParts[0].status).toBe('started');
       expect(ctx.stepParts[0].number).toBe(1);
     });
 
-    test('increments step number (stepNumber + 1)', () => {
+    test('increments step number (stepNumber + 1)', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.experimental_onStepStart({ stepNumber: 1 });
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.experimental_onStepStart({ stepNumber: 1 });
 
       expect(ctx.stepParts).toHaveLength(2);
       expect(ctx.stepParts[0].number).toBe(1);
       expect(ctx.stepParts[1].number).toBe(2);
     });
 
-    test('step part has correct message and session ids', () => {
+    test('step part has correct message and session ids', async () => {
       const ctx = createContext({ messageId: 'msg-1' });
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
 
       expect(ctx.stepParts[0].messageId).toBe('msg-1');
     });
@@ -94,12 +94,12 @@ describe('step-handlers', () => {
   // ── onStepFinish ─────────────────────────────────────────────
 
   describe('onStepFinish', () => {
-    test('updates existing step part to finished status', () => {
+    test('updates existing step part to finished status', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({
         stepNumber: 0,
         finishReason: 'stop',
         usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
@@ -110,12 +110,12 @@ describe('step-handlers', () => {
       expect(ctx.stepParts[0].finishReason).toBe('stop');
     });
 
-    test('sets token counts from usage', () => {
+    test('sets token counts from usage', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({
         stepNumber: 0,
         finishReason: 'stop',
         usage: {
@@ -140,12 +140,12 @@ describe('step-handlers', () => {
       });
     });
 
-    test('defaults token counts to 0 when no usage', () => {
+    test('defaults token counts to 0 when no usage', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({ stepNumber: 0, finishReason: 'stop' });
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({ stepNumber: 0, finishReason: 'stop' });
 
       const step = ctx.stepParts[0] as StepPart;
       expect(step.tokens).toEqual({
@@ -157,59 +157,59 @@ describe('step-handlers', () => {
       });
     });
 
-    test('maps finishReason stop correctly', () => {
+    test('maps finishReason stop correctly', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({ stepNumber: 0, finishReason: 'stop' });
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({ stepNumber: 0, finishReason: 'stop' });
       expect(ctx.stepParts[0].finishReason).toBe('stop');
     });
 
-    test('maps finishReason tool-calls correctly', () => {
+    test('maps finishReason tool-calls correctly', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({ stepNumber: 0, finishReason: 'tool-calls' });
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({ stepNumber: 0, finishReason: 'tool-calls' });
       expect(ctx.stepParts[0].finishReason).toBe('tool-calls');
     });
 
-    test('maps finishReason length correctly', () => {
+    test('maps finishReason length correctly', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({ stepNumber: 0, finishReason: 'length' });
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({ stepNumber: 0, finishReason: 'length' });
       expect(ctx.stepParts[0].finishReason).toBe('length');
     });
 
-    test('maps finishReason error correctly', () => {
+    test('maps finishReason error correctly', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({ stepNumber: 0, finishReason: 'error' });
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({ stepNumber: 0, finishReason: 'error' });
       expect(ctx.stepParts[0].finishReason).toBe('error');
     });
 
-    test('maps finishReason other to error', () => {
+    test('maps finishReason other to error', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({ stepNumber: 0, finishReason: 'other' });
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({ stepNumber: 0, finishReason: 'other' });
       expect(ctx.stepParts[0].finishReason).toBe('error');
     });
 
-    test('leaves finishReason undefined for null finishReason', () => {
+    test('leaves finishReason undefined for null finishReason', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({ stepNumber: 0, finishReason: null });
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({ stepNumber: 0, finishReason: null });
       expect(ctx.stepParts[0].finishReason).toBeUndefined();
     });
 
-    test('creates new step part if no matching start part exists', () => {
+    test('creates new step part if no matching start part exists', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.onStepFinish({
+      await callbacks.onStepFinish({
         stepNumber: 0,
         finishReason: 'stop',
         usage: { inputTokens: 50, outputTokens: 25, totalTokens: 75 },
@@ -219,12 +219,12 @@ describe('step-handlers', () => {
       expect(ctx.stepParts[0].status).toBe('finished');
     });
 
-    test('updates latestUsage in context when usage provided', () => {
+    test('updates latestUsage in context when usage provided', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({
         stepNumber: 0,
         finishReason: 'stop',
         usage: {
@@ -249,12 +249,12 @@ describe('step-handlers', () => {
       });
     });
 
-    test('does not update latestUsage when no usage', () => {
+    test('does not update latestUsage when no usage', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({ stepNumber: 0, finishReason: 'stop' });
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({ stepNumber: 0, finishReason: 'stop' });
 
       expect(ctx.latestUsage).toEqual({
         promptTokens: 0,
@@ -270,7 +270,7 @@ describe('step-handlers', () => {
   // ── Compaction threshold ─────────────────────────────────────
 
   describe('compaction threshold detection', () => {
-    test('sets needsCompaction when main session input tokens exceed threshold', () => {
+    test('sets needsCompaction when main session input tokens exceed threshold', async () => {
       const ctx = createContext({
         sessionId,
         isMainSession: true,
@@ -279,8 +279,8 @@ describe('step-handlers', () => {
       });
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({
         stepNumber: 0,
         finishReason: 'stop',
         usage: { inputTokens: 110000, outputTokens: 50, totalTokens: 110050 },
@@ -289,7 +289,7 @@ describe('step-handlers', () => {
       expect(ctx.needsCompaction).toBe(true);
     });
 
-    test('does not set needsCompaction when tokens below threshold', () => {
+    test('does not set needsCompaction when tokens below threshold', async () => {
       const ctx = createContext({
         sessionId,
         isMainSession: true,
@@ -298,8 +298,8 @@ describe('step-handlers', () => {
       });
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({
         stepNumber: 0,
         finishReason: 'stop',
         usage: { inputTokens: 50000, outputTokens: 50, totalTokens: 50050 },
@@ -308,7 +308,7 @@ describe('step-handlers', () => {
       expect(ctx.needsCompaction).toBe(false);
     });
 
-    test('does not set needsCompaction for non-main sessions', () => {
+    test('does not set needsCompaction for non-main sessions', async () => {
       const ctx = createContext({
         sessionId,
         isMainSession: false,
@@ -317,8 +317,8 @@ describe('step-handlers', () => {
       });
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({
         stepNumber: 0,
         finishReason: 'stop',
         usage: { inputTokens: 110000, outputTokens: 50, totalTokens: 110050 },
@@ -327,7 +327,7 @@ describe('step-handlers', () => {
       expect(ctx.needsCompaction).toBe(false);
     });
 
-    test('does not set needsCompaction when contextWindow is undefined', () => {
+    test('does not set needsCompaction when contextWindow is undefined', async () => {
       const ctx = createContext({
         sessionId,
         isMainSession: true,
@@ -336,8 +336,8 @@ describe('step-handlers', () => {
       });
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({
         stepNumber: 0,
         finishReason: 'stop',
         usage: { inputTokens: 110000, outputTokens: 50, totalTokens: 110050 },
@@ -346,7 +346,7 @@ describe('step-handlers', () => {
       expect(ctx.needsCompaction).toBe(false);
     });
 
-    test('sets needsCompaction when tokens exactly equal threshold', () => {
+    test('sets needsCompaction when tokens exactly equal threshold', async () => {
       const ctx = createContext({
         sessionId,
         isMainSession: true,
@@ -355,8 +355,8 @@ describe('step-handlers', () => {
       });
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({
         stepNumber: 0,
         finishReason: 'stop',
         usage: { inputTokens: 100000, outputTokens: 50, totalTokens: 100050 },
@@ -369,19 +369,19 @@ describe('step-handlers', () => {
   // ── Multi-step flow ──────────────────────────────────────────
 
   describe('multi-step flow', () => {
-    test('tracks multiple steps correctly', () => {
+    test('tracks multiple steps correctly', async () => {
       const ctx = createContext();
       const callbacks = createStepCallbacks(ctx);
 
-      callbacks.experimental_onStepStart({ stepNumber: 0 });
-      callbacks.onStepFinish({
+      await callbacks.experimental_onStepStart({ stepNumber: 0 });
+      await callbacks.onStepFinish({
         stepNumber: 0,
         finishReason: 'tool-calls',
         usage: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
       });
 
-      callbacks.experimental_onStepStart({ stepNumber: 1 });
-      callbacks.onStepFinish({
+      await callbacks.experimental_onStepStart({ stepNumber: 1 });
+      await callbacks.onStepFinish({
         stepNumber: 1,
         finishReason: 'stop',
         usage: { inputTokens: 200, outputTokens: 100, totalTokens: 300 },

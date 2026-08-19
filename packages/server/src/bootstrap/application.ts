@@ -39,6 +39,7 @@ import {
   createJean2SessionExecution,
   jean2StorageBundle,
 } from '@/adapters/capek';
+import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import {
   createJean2AgentPreconfigPort,
   createJean2AgentWorkspacePort,
@@ -158,7 +159,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   const scheduling = createSchedulingHttpApplication({
     repository: schedulingRepository,
     workspaces: {
-      getWorkspace: (id) => jean2StorageBundle.workspaces.get(id),
+      getWorkspace,
     },
     execution: schedulingExecution,
   });

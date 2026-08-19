@@ -161,7 +161,7 @@ export interface SessionRepositoryPort {
     beforeSequence: number,
     limit: number,
   ): TranscriptPage;
-  reconcileCompaction(sessionId: string): number;
+  reconcileCompaction(sessionId: string): Promise<number>;
   reconcileOrphanedToolCalls(sessionId: string): number;
 
   listQueuedMessages(sessionId: string): QueuedMessage[];

@@ -40,7 +40,7 @@ function configureBindings(overrides: BindingOverrides = {}): void {
     },
     workspaces: {
       ...jean2StorageBundle.workspaces,
-      get: () => overrides.workspace ?? null,
+      get: async () => overrides.workspace ?? null,
     },
   };
   configureStorage(storage);

@@ -49,13 +49,13 @@ function buildCompactionRecoveryDeps(): CompactionRecoveryDeps & CompactionRecov
   };
 }
 
-export function reconcileSessionCompaction(
+export async function reconcileSessionCompaction(
   sessionId: string,
   options: ReconcileOptions = {},
-): number {
+): Promise<number> {
   return reconcileSessionWithDeps(sessionId, buildCompactionRecoveryDeps(), options);
 }
 
-export function reconcileAllSessionsCompaction(): number {
+export async function reconcileAllSessionsCompaction(): Promise<number> {
   return reconcileAllSessionsWithDeps(buildCompactionRecoveryDeps());
 }

@@ -147,7 +147,7 @@ export function createSessionLifecycleApplication<Origin>(
 
       const isRunning = deps.execution.isSessionActive(session.id);
 
-      deps.repository.reconcileCompaction(session.id);
+      await deps.repository.reconcileCompaction(session.id);
       if (!isRunning) {
         deps.repository.reconcileOrphanedToolCalls(session.id);
       }

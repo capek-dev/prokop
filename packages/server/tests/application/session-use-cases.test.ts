@@ -123,7 +123,7 @@ function makeRepository(overrides: Partial<SessionRepositoryPort> = {}): Session
     listMessages: () => [],
     listLatestMessagesWithPartsPage: () => ({ messages: [], pagination: { hasOlder: false, oldestSequence: null, newestSequence: null, limit: 50 } }),
     listMessagesWithPartsBeforeSequence: () => ({ messages: [], pagination: { hasOlder: false, oldestSequence: null, newestSequence: null, limit: 50 } }),
-    reconcileCompaction: () => 0,
+    reconcileCompaction: async () => 0,
     reconcileOrphanedToolCalls: () => 0,
     listQueuedMessages: () => [],
     addMessageToQueue: () => ({ id: 'q-1', sessionId: 'sess-1', content: 'queued', position: 0, createdAt: 1 }),
@@ -570,7 +570,7 @@ describe('application session use cases', () => {
         getSession: () => resumeSession,
         listLatestMessagesWithPartsPage: () => transcriptPage as never,
         listQueuedMessages: () => [queued],
-        reconcileCompaction: () => { order.push('reconcile-compaction'); return 0; },
+        reconcileCompaction: async () => { order.push('reconcile-compaction'); return 0; },
         reconcileOrphanedToolCalls: () => { order.push('reconcile-tools'); return 0; },
       });
       const pendingAsks: PendingAskPort = {

@@ -19,6 +19,7 @@ import { createJean2SessionRepository } from '@/adapters/jean2/session-repositor
 import { createScheduledJobRepository } from '@/infrastructure/sqlite/scheduled-job-repository';
 import { createSessionSearchQueryRepository } from '@/infrastructure/sqlite/session-search-query-repository';
 import { getDatabase } from '@/infrastructure/sqlite/database';
+import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 
 /** S5 session-search host dependencies. The query port is the SQLite
  * infrastructure repository with an injected store accessor; session and
@@ -38,7 +39,7 @@ function createSessionSearchHostDeps(agents: AgentsApplication): Jean2SessionSea
         sessionRepository.listSessionsByAgent(agentId, limit),
     },
     workspaces: {
-      getWorkspace: (id) => jean2StorageBundle.workspaces.get(id),
+      getWorkspace,
     },
   };
 }

@@ -123,6 +123,7 @@ describe('Čapek composition root', () => {
       '@/infrastructure/sqlite/scheduled-job-repository',
       '@/infrastructure/sqlite/database',
       '@/infrastructure/sqlite/message-store',
+      '@/infrastructure/sqlite/workspaces',
     ];
     for (const imp of imports) {
       expect(allowedSpecifiers).toContain(imp.specifier);
