@@ -302,9 +302,9 @@ describe('C5 workflow composed scope ownership', () => {
     const agentScope = await createCurrentAgentScope(processScope);
     try {
       const service = agentScope.require(capekWorkflowDomainKey);
-      expect(service.canSpawn('root')).toBe(true);
-      expect(service.canSpawn('child-2')).toBe(false);
-      expect(service.tools[0].isEnabled?.('ws-wf', 'child-2')).toBe(false);
+      expect(await service.canSpawn('root')).toBe(true);
+      expect(await service.canSpawn('child-2')).toBe(false);
+      expect(await service.tools[0].isEnabled?.('ws-wf', 'child-2')).toBe(false);
 
       const blocked = await service.resolveDefinition({
         sessionId: 'child-2',

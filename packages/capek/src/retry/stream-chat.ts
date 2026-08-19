@@ -137,12 +137,12 @@ export async function* streamChatWithRetry(
   const maxDelayMs = policyOptions.maxDelayMs ?? policy.defaults.maxDelayMs;
   const jitterRatio = policyOptions.jitterRatio ?? policy.defaults.jitterRatio;
   const circuitKey = policy.circuitKey(options.providerId, options.modelId);
-  const abortController = interruptManager.registerSession(options.sessionId);
-  const session = getSession(options.sessionId);
+  const session = await getSession(options.sessionId);
+  const abortController = interruptManager.registerSession(options.sessionId, session?.parentId ?? undefined);
   const isMainSession = session && !session.parentId;
 
   if (isMainSession) {
-    const updatedSession = updateSession(options.sessionId, { runningAt: new Date().toISOString() });
+    const updatedSession = await updateSession(options.sessionId, { runningAt: new Date().toISOString() });
     if (updatedSession) {
       emitSessionUpdated(updatedSession);
     }
@@ -303,7 +303,7 @@ export async function* streamChatWithRetry(
     interruptManager.unregisterSession(options.sessionId);
     rejectPendingAsksBySession(options.sessionId);
     if (isMainSession) {
-      const updatedSession = updateSession(options.sessionId, { runningAt: null });
+      const updatedSession = await updateSession(options.sessionId, { runningAt: null });
       if (updatedSession) {
         emitSessionUpdated(updatedSession);
       }

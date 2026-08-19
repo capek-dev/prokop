@@ -76,7 +76,9 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
   const { sessionId: _sessionId, preconfig, messages, modelId, providerId, variant, workspacePath, workspaceId, maxSteps, compactionPolicy } = options;
 
   const managesSessionLifecycle = !options.retryAbortController;
-  const abortController = options.retryAbortController ?? interruptManager.registerSession(_sessionId);
+  const session = await getSession(_sessionId);
+  const abortController = options.retryAbortController
+    ?? interruptManager.registerSession(_sessionId, session?.parentId ?? undefined);
 
   // Initialize MCP for workspace
   if (workspacePath) {
@@ -86,10 +88,9 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
   }
 
   // Check if this is a main session (not a subagent) and set runningAt
-  const session = getSession(_sessionId);
   const isMainSession = session && !session.parentId;
   if (isMainSession && managesSessionLifecycle) {
-    const updatedSession = updateSession(_sessionId, { runningAt: new Date().toISOString() });
+    const updatedSession = await updateSession(_sessionId, { runningAt: new Date().toISOString() });
     if (updatedSession) {
       emitSessionUpdated(updatedSession);
     }
@@ -218,7 +219,7 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
     cost: 0,
   };
 
-  createMessage(assistantMessage);
+  await createMessage(assistantMessage);
   yield { type: 'message.created', message: assistantMessage };
 
   // Set up event queue for callbacks
@@ -249,8 +250,8 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
         }
         const interruptedMessage = buildInterruptedMessage(assistantMessage);
         yield { type: 'message.updated', message: interruptedMessage };
-        updateMessage(messageId, interruptedMessage, { syncFts: false });
-        syncMessageFts(messageId);
+        await updateMessage(messageId, interruptedMessage, { syncFts: false });
+        await syncMessageFts(messageId);
         return;
       }
 
@@ -299,8 +300,8 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
       }
       const interruptedMessage = buildInterruptedMessage(assistantMessage);
       yield { type: 'message.updated', message: interruptedMessage };
-      updateMessage(messageId, interruptedMessage, { syncFts: false });
-      syncMessageFts(messageId);
+      await updateMessage(messageId, interruptedMessage, { syncFts: false });
+      await syncMessageFts(messageId);
       return;
     }
 
@@ -311,8 +312,8 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
         error: classified.message,
       };
       yield { type: 'message.updated', message: errorMessage };
-      updateMessage(messageId, errorMessage, { syncFts: false });
-      syncMessageFts(messageId);
+      await updateMessage(messageId, errorMessage, { syncFts: false });
+      await syncMessageFts(messageId);
       yield createErrorEvent(classified);
       return;
     }
@@ -324,7 +325,7 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
       rejectPendingAsksBySession(_sessionId);
 
       if (isMainSession) {
-        const updatedSession = updateSession(_sessionId, { runningAt: null });
+        const updatedSession = await updateSession(_sessionId, { runningAt: null });
         if (updatedSession) {
           emitSessionUpdated(updatedSession);
         }
@@ -357,7 +358,7 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
   yield { type: 'message.updated', message: finalMessage };
 
   // Sync FTS once after all final parts and message state are persisted
-  syncMessageFts(messageId);
+  await syncMessageFts(messageId);
 
   if (usageData) {
     yield {

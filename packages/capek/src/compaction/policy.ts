@@ -87,7 +87,7 @@ export interface CompactionService {
   clearCompactionFailure(sessionId: string): void;
   /** Replay policy: the replay text used after a successful compaction, or
    * null when the history has no prior user turn to replay. */
-  buildReplayText(sessionId: string): string | null;
+  buildReplayText(sessionId: string): Promise<string | null>;
   /** Per-session compaction concurrency guard. */
   isCompactionActive(sessionId: string): boolean;
   beginCompaction(sessionId: string): void;
@@ -202,8 +202,8 @@ export function createCompactionService(
     clearCompactionFailure(sessionId: string): void {
       failureCooldownState.delete(sessionId);
     },
-    buildReplayText(sessionId: string): string | null {
-      const allMessages = listMessagesWithParts(sessionId);
+    async buildReplayText(sessionId: string): Promise<string | null> {
+      const allMessages = await listMessagesWithParts(sessionId);
 
       for (let i = allMessages.length - 2; i >= 0; i--) {
         const m = allMessages[i];

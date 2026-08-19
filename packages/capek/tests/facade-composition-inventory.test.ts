@@ -79,7 +79,7 @@ describe('createAgent composition inventory', () => {
     expect(entry.context.depth).toBe(0);
     expect(entry.context.sessionId).toBe(result.sessionId);
 
-    const session = bundle.conversation.getSession(result.sessionId);
+    const session = await bundle.conversation.getSession(result.sessionId);
     expect(session).not.toBeNull();
     expect(session).toMatchObject({
       preconfigId: 'capek-default',

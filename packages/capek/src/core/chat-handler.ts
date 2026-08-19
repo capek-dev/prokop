@@ -107,7 +107,7 @@ async function runSingleChatTurn<Origin>(
   provider: string,
   workspacePath: string | null | undefined,
   additionalPaths: string[] | undefined,
-  session: NonNullable<ReturnType<typeof getSession>>,
+  session: NonNullable<Awaited<ReturnType<typeof getSession>>>,
   attachments?: Array<{ id: string; kind: string }>,
   responseFormat?: ResponseFormat,
   existingUserMessageId?: string,
@@ -125,7 +125,7 @@ async function runSingleChatTurn<Origin>(
       role: 'user' as const,
       createdAt: Date.now(),
     };
-    createMessage(userMessage);
+    await createMessage(userMessage);
 
     const textPartId = crypto.randomUUID();
     const textPart = {
@@ -177,7 +177,7 @@ async function runSingleChatTurn<Origin>(
     }
   }
 
-  const { messages: history } = buildEffectiveContextHistory(sessionId);
+  const { messages: history } = await buildEffectiveContextHistory(sessionId);
 
   const askBroadcastFn: AskBroadcastFn = (message) => {
     if (message.type === 'ask.request') {
@@ -426,8 +426,8 @@ async function runSingleChatTurn<Origin>(
       }
     }
 
-    const wasInterrupted = (() => {
-      const msgs = listMessagesWithParts(sessionId);
+    const wasInterrupted = await (async () => {
+      const msgs = await listMessagesWithParts(sessionId);
       const lastAssistant = [...msgs].reverse().find(m => m.message.role === 'assistant');
       return lastAssistant && 'status' in lastAssistant.message
         ? lastAssistant.message.status === 'interrupted'
@@ -465,7 +465,7 @@ export async function regenerateSessionTitle<Origin>(
   sessionId: string,
   options?: { force?: boolean },
 ): Promise<void> {
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) {
     console.warn('[session-title] Skipping title generation: session not found', sessionId);
     return;
@@ -480,7 +480,7 @@ export async function regenerateSessionTitle<Origin>(
   }
 
   try {
-    const messages = listMessagesWithParts(sessionId);
+    const messages = await listMessagesWithParts(sessionId);
     console.info('[session-title] Generating session title', {
       sessionId,
       force: options?.force === true,
@@ -498,7 +498,7 @@ export async function regenerateSessionTitle<Origin>(
       });
       return;
     }
-    const updated = updateSession(sessionId, { title });
+    const updated = await updateSession(sessionId, { title });
     if (updated) {
       console.info('[session-title] Updated session title', { sessionId, title });
       deliverToSession(ctx, sessionId, { kind: 'session', action: 'renamed', session: updated });
@@ -528,7 +528,7 @@ export async function handleChat<Origin>(
   goalCondition?: string,
   goalMaxTurns?: number,
 ): Promise<void> {
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) {
     deliverToOrigin(ctx, origin, { kind: 'failure', category: 'generic', code: 'not_found', message: 'Session not found' });
     return;
@@ -647,11 +647,11 @@ export async function handleChat<Origin>(
         return;
       }
 
-      const currentSession = getSession(sessionId);
+      const currentSession = await getSession(sessionId);
       const isMainSession = currentSession && !currentSession.parentId;
 
       if (isMainSession && !getCompactionService().shouldSkipCompaction(sessionId)) {
-        const replayText = getCompactionService().buildReplayText(sessionId);
+        const replayText = await getCompactionService().buildReplayText(sessionId);
         const execResult = await executeCompaction(sessionId, 'overflow');
 
         if (execResult.ok) {
@@ -688,7 +688,7 @@ export async function handleChat<Origin>(
     }
 
     if (result.streamCompleted && result.needsAutoCompaction) {
-      const currentSession = getSession(sessionId);
+      const currentSession = await getSession(sessionId);
       if (currentSession && !currentSession.parentId && !getCompactionService().shouldSkipCompaction(sessionId)) {
         const execResult = await executeCompaction(sessionId, 'auto');
         if (execResult.ok) {
@@ -727,7 +727,7 @@ export async function handleSessionEditMessage<Origin>(
   msg: { sessionId: string; messageId: string; content: string },
 ): Promise<void> {
   try {
-    const session = getSession(msg.sessionId);
+    const session = await getSession(msg.sessionId);
     if (!session) {
       deliverToOrigin(ctx, origin, {
         kind: 'failure',
@@ -761,7 +761,7 @@ export async function handleSessionEditMessage<Origin>(
       return;
     }
 
-    const target = getMessage(msg.messageId);
+    const target = await getMessage(msg.messageId);
     if (!target || target.sessionId !== msg.sessionId || target.role !== 'user') {
       deliverToOrigin(ctx, origin, {
         kind: 'failure',
@@ -801,7 +801,7 @@ export async function handleSessionEditMessage<Origin>(
       keepTarget: true,
     });
 
-    const currentState = listLatestMessagesWithPartsPage(msg.sessionId, 50);
+    const currentState = await listLatestMessagesWithPartsPage(msg.sessionId, 50);
     deliverToSession(ctx, msg.sessionId, {
       kind: 'session',
       action: 'state',

@@ -133,7 +133,7 @@ export class SandboxLanguageModel {
   }
 
   async doStream(options: SandboxModelCallOptions): Promise<{ stream: ReadableStream<unknown> }> {
-    const context = this.createContext(options, 'stream');
+    const context = await this.createContext(options, 'stream');
     const response = await getSandboxController().waitForResponse(context, options.abortSignal);
     const stream = wrapStreamWithCompletion(this.responseToStream(response), context.callId);
 
@@ -146,7 +146,7 @@ export class SandboxLanguageModel {
     usage: typeof defaultGenerateUsage;
     warnings: [];
   }> {
-    const context = this.createContext(options, 'generate');
+    const context = await this.createContext(options, 'generate');
     const response = await getSandboxController().waitForResponse(context, options.abortSignal);
 
     try {
@@ -156,14 +156,14 @@ export class SandboxLanguageModel {
     }
   }
 
-  private createContext(
+  private async createContext(
     options: SandboxModelCallOptions,
     mode: 'stream' | 'generate',
-  ): LlmCallContext {
+  ): Promise<LlmCallContext> {
     return {
       callId: randomUUID(),
       sessionId: this.sessionId,
-      depth: this.computeDepth(),
+      depth: await this.computeDepth(),
       mode,
       messages: options.prompt.map((message) => ({
         role: message.role,
@@ -270,13 +270,13 @@ export class SandboxLanguageModel {
     };
   }
 
-  private computeDepth(): number {
+  private async computeDepth(): Promise<number> {
     let depth = 0;
-    let session = getSession(this.sessionId);
+    let session = await getSession(this.sessionId);
 
     while (session?.parentId) {
       depth += 1;
-      session = getSession(session.parentId);
+      session = await getSession(session.parentId);
     }
 
     return depth;

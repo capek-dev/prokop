@@ -390,7 +390,7 @@ describe('C5 goal evaluator behavior', () => {
       turn: 2,
       maxTurns: 4,
     }, {
-      listTranscript: () => [],
+      listTranscript: async () => [],
       orchestrator: {
         run: async (options) => {
           calls.push({ ...options });
@@ -627,8 +627,8 @@ describe('C5 goal loop lifecycle with injected deps', () => {
       ...createInMemoryStorageBundle(),
       conversation: {
         ...createInMemoryStorageBundle().conversation,
-        getSession: (id) => sessions.get(id) ?? null,
-        updateSession: (id, updates) => {
+        getSession: async (id) => sessions.get(id) ?? null,
+        updateSession: async (id, updates) => {
           const current = sessions.get(id);
           if (!current) return null;
           const updated = { ...current, ...updates } as Session;
@@ -659,8 +659,8 @@ describe('goal domain live adoption accessor', () => {
       ...createInMemoryStorageBundle(),
       conversation: {
         ...createInMemoryStorageBundle().conversation,
-        getSession: (id) => sessions.get(id) ?? null,
-        updateSession: (id, updates) => {
+        getSession: async (id) => sessions.get(id) ?? null,
+        updateSession: async (id, updates) => {
           const current = sessions.get(id);
           if (!current) return null;
           const updated = { ...current, ...updates } as Session;

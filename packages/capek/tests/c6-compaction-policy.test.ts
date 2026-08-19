@@ -383,7 +383,7 @@ describe('C6 default compaction service contract', () => {
     expect(service.shouldSkipCompaction(SESSION_ID)).toBe(false);
   });
 
-  test('buildReplayText reproduces the exact replay selection', () => {
+  test('buildReplayText reproduces the exact replay selection', async () => {
     seedMainSession();
     seedUserMessage(SESSION_ID, 'user-1', 'Explain TypeScript.', 1000);
     seedAssistantMessage(SESSION_ID, 'assistant-1', 'TypeScript adds static types.', 2000);
@@ -391,14 +391,14 @@ describe('C6 default compaction service contract', () => {
     seedAssistantMessage(SESSION_ID, 'assistant-2', 'Sure.', 4000);
     // The newest user message starts with "Continue:" so the replay search
     // falls back to the previous real user turn.
-    expect(getCompactionService().buildReplayText(SESSION_ID)).toBe('Replay: Explain TypeScript.');
+    expect(await getCompactionService().buildReplayText(SESSION_ID)).toBe('Replay: Explain TypeScript.');
   });
 
-  test('buildReplayText returns null without a prior user turn and skips compaction-only turns', () => {
+  test('buildReplayText returns null without a prior user turn and skips compaction-only turns', async () => {
     seedMainSession();
     seedUserMessage(SESSION_ID, 'user-1', 'Continue from the summary.', 1000);
     seedAssistantMessage(SESSION_ID, 'assistant-1', 'Ok.', 2000);
-    expect(getCompactionService().buildReplayText(SESSION_ID)).toBeNull();
+    expect(await getCompactionService().buildReplayText(SESSION_ID)).toBeNull();
   });
 
   test('the per-session concurrency guard is owned by the service instance', () => {
@@ -423,7 +423,7 @@ describe('C6 compaction task pipeline on memory storage', () => {
     const trigger = await createCompactionTrigger(SESSION_ID, 'overflow');
     expect(trigger.reason).toBe('overflow');
 
-    const triggerMsg = listMessagesWithParts(SESSION_ID).find((m) => m.message.id === trigger.messageId);
+    const triggerMsg = (await listMessagesWithParts(SESSION_ID)).find((m) => m.message.id === trigger.messageId);
     expect(triggerMsg?.message.role).toBe('user');
     const part = triggerMsg?.parts.find((p) => p.type === 'compaction') as CompactionPart;
     expect(part.auto).toBe(true);
@@ -470,7 +470,7 @@ describe('C6 compaction task pipeline on memory storage', () => {
     expect(result.textParts).toHaveLength(1);
     expect(result.textParts[0].text).toBe('## Summary\n\nCompacted conversation summary.');
 
-    const persisted = listMessagesWithParts(SESSION_ID).find(
+    const persisted = (await listMessagesWithParts(SESSION_ID)).find(
       (m) => m.message.id === result.summaryMessage.id,
     );
     expect(persisted?.parts.some((p) => p.type === 'text')).toBe(true);
@@ -555,7 +555,7 @@ describe('C6 compaction task pipeline on memory storage', () => {
       events.push({ kind: event.kind, action: (event as { action?: string }).action ?? '' });
     });
 
-    const failed = listMessagesWithParts(SESSION_ID).find((m) => {
+    const failed = (await listMessagesWithParts(SESSION_ID)).find((m) => {
       const message = m.message as AssistantMessage;
       return message.role === 'assistant' && message.mode === 'compact_failed';
     });
@@ -589,7 +589,7 @@ describe('C6 compaction task pipeline on memory storage', () => {
       ),
     ).rejects.toThrow('aborted');
 
-    const summary = listMessagesWithParts(SESSION_ID).find(
+    const summary = (await listMessagesWithParts(SESSION_ID)).find(
       (m) => m.message.role === 'assistant' && (m.message as AssistantMessage).summary === true,
     );
     expect(summary).toBeUndefined();
@@ -676,11 +676,11 @@ describe('C6 compaction executor', () => {
     expect(typeof result.triggerMessageId).toBe('string');
 
     // Compacting flag: turned on at start, cleared exactly once on failure.
-    expect(getSession(SESSION_ID)?.compacting).toBe(false);
+    expect((await getSession(SESSION_ID))?.compacting).toBe(false);
     expect(sessionOrder).toEqual(['compacting=true', 'compacting=false']);
 
     // Append-only failure record persisted against the trigger.
-    const failure = listMessagesWithParts(SESSION_ID).find(({ message }) => {
+    const failure = (await listMessagesWithParts(SESSION_ID)).find(({ message }) => {
       const assistant = message as AssistantMessage;
       return assistant.role === 'assistant' && assistant.mode === 'compact_failed';
     });
@@ -838,7 +838,7 @@ describe('C6 compaction recovery policy', () => {
     const count = await reconcileSessionCompaction(SESSION_ID, deps);
     expect(count).toBe(1);
 
-    const failed = listMessagesWithParts(SESSION_ID).find((m) => {
+    const failed = (await listMessagesWithParts(SESSION_ID)).find((m) => {
       const message = m.message as AssistantMessage;
       return message.mode === 'compact_failed';
     });

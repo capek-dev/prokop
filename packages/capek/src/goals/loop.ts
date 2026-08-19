@@ -35,24 +35,24 @@ export interface GoalLoopOptions {
 }
 
 export interface GoalLoopDeps {
-  getSession(id: string): Session | null;
-  updateSession(id: string, updates: Partial<Session>): Session | null;
+  getSession(id: string): Session | null | Promise<Session | null>;
+  updateSession(id: string, updates: Partial<Session>): Session | null | Promise<Session | null>;
   evaluate(options: EvaluateGoalOptions): ReturnType<typeof evaluateGoalWithDeps>;
   broadcastSessionUpdatedDefault(session: Session): void;
 }
 
-function updateGoalStateWithDeps(
+async function updateGoalStateWithDeps(
   deps: GoalLoopDeps,
   sessionId: string,
   updates: Partial<GoalState>,
   broadcastSessionUpdatedFn?: BroadcastSessionFn,
-): void {
-  const session = deps.getSession(sessionId);
+): Promise<void> {
+  const session = await deps.getSession(sessionId);
   if (!session) return;
   const metadata = session.metadata ?? {};
   const existingGoal = metadata.goal as GoalState | undefined;
   if (!existingGoal) return;
-  const updated = deps.updateSession(sessionId, { metadata: { ...metadata, goal: { ...existingGoal, ...updates } } });
+  const updated = await deps.updateSession(sessionId, { metadata: { ...metadata, goal: { ...existingGoal, ...updates } } });
   if (updated) (broadcastSessionUpdatedFn ?? deps.broadcastSessionUpdatedDefault)(updated);
 }
 
@@ -92,7 +92,7 @@ export async function runGoalLoopWithDeps(
     hasInitialPrompt: !!initialPrompt,
   });
 
-  const session = deps.getSession(sessionId);
+  const session = await deps.getSession(sessionId);
   if (!session) {
     console.error('[goal:loop] Session not found', { sessionId });
     return;
@@ -104,17 +104,17 @@ export async function runGoalLoopWithDeps(
     status: 'active',
     startedAt: Date.now(),
   };
-  const initialized = deps.updateSession(sessionId, { metadata: { ...(session.metadata ?? {}), goal: goalState } });
+  const initialized = await deps.updateSession(sessionId, { metadata: { ...(session.metadata ?? {}), goal: goalState } });
   if (initialized) (broadcastSessUpdated ?? deps.broadcastSessionUpdatedDefault)(initialized);
 
   let nextTurnContent = initialPrompt || condition;
   for (let turn = 1; turn <= maxTurns; turn++) {
     if (abortSignal?.aborted) {
       console.log('[goal:loop] Aborted before turn', { turn });
-      updateGoalStateWithDeps(deps, sessionId, { status: 'cancelled', completedAt: Date.now() }, broadcastSessUpdated);
+      await updateGoalStateWithDeps(deps, sessionId, { status: 'cancelled', completedAt: Date.now() }, broadcastSessUpdated);
       return;
     }
-    updateGoalStateWithDeps(deps, sessionId, { currentTurn: turn }, broadcastSessUpdated);
+    await updateGoalStateWithDeps(deps, sessionId, { currentTurn: turn }, broadcastSessUpdated);
     console.log('[goal:loop] Starting turn', { turn, maxTurns, contentPreview: nextTurnContent.slice(0, 80) });
 
     const result = await runTurn(nextTurnContent);
@@ -122,19 +122,19 @@ export async function runGoalLoopWithDeps(
 
     if (result.interrupted) {
       console.log('[goal:loop] Turn was interrupted, stopping goal loop', { turn });
-      updateGoalStateWithDeps(deps, sessionId, { status: 'cancelled', completedAt: Date.now() }, broadcastSessUpdated);
+      await updateGoalStateWithDeps(deps, sessionId, { status: 'cancelled', completedAt: Date.now() }, broadcastSessUpdated);
       return;
     }
 
     if (!result.streamCompleted) {
       console.log('[goal:loop] Turn stream did not complete, stopping goal loop', { turn });
-      updateGoalStateWithDeps(deps, sessionId, { status: 'failed', completedAt: Date.now() }, broadcastSessUpdated);
+      await updateGoalStateWithDeps(deps, sessionId, { status: 'failed', completedAt: Date.now() }, broadcastSessUpdated);
       return;
     }
 
     if (abortSignal?.aborted) {
       console.log('[goal:loop] Aborted after turn', { turn });
-      updateGoalStateWithDeps(deps, sessionId, { status: 'cancelled', completedAt: Date.now() }, broadcastSessUpdated);
+      await updateGoalStateWithDeps(deps, sessionId, { status: 'cancelled', completedAt: Date.now() }, broadcastSessUpdated);
       return;
     }
 
@@ -156,12 +156,12 @@ export async function runGoalLoopWithDeps(
     }
     if (evaluation.goalMet) {
       console.log('[goal:loop] GOAL MET!', { turn, reason: evaluation.reason });
-      updateGoalStateWithDeps(deps, sessionId, { status: 'met', completedAt: Date.now() }, broadcastSessUpdated);
+      await updateGoalStateWithDeps(deps, sessionId, { status: 'met', completedAt: Date.now() }, broadcastSessUpdated);
       return;
     }
     nextTurnContent = buildContinuationMessage(condition, evaluation.reason, evaluation.remainingWork);
     console.log('[goal:loop] Prepared continuation for next turn', { turn, continuationPreview: nextTurnContent.slice(0, 80) });
   }
   console.log('[goal:loop] Max turns reached without meeting goal', { maxTurns });
-  updateGoalStateWithDeps(deps, sessionId, { status: 'failed', completedAt: Date.now() }, broadcastSessUpdated);
+  await updateGoalStateWithDeps(deps, sessionId, { status: 'failed', completedAt: Date.now() }, broadcastSessUpdated);
 }

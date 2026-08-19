@@ -56,18 +56,18 @@ export async function buildAiSdkTools(
   } = options;
 
   // Resolve root session ID by walking up the parent chain
-  const rootSessionId = explicitRootSessionId ?? (() => {
+  const rootSessionId = explicitRootSessionId ?? (await (async () => {
     let current = sessionId;
-    let session = getSession(current);
+    let session = await getSession(current);
     while (session?.parentId) {
       current = session.parentId;
-      session = getSession(current);
+      session = await getSession(current);
     }
     return current;
-  })();
+  })());
 
   // Resolve execution scopes for capability filtering (separate from ask-routing root)
-  const executionScopes = resolveToolExecutionScopes(sessionId);
+  const executionScopes = await resolveToolExecutionScopes(sessionId);
 
   const canSpawn = canSpawnSubagents === true
     || (Array.isArray(canSpawnSubagents) && canSpawnSubagents.length > 0);

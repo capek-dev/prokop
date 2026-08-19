@@ -58,7 +58,7 @@ function bindInteraction(
     ...storage,
     conversation: {
       ...storage.conversation,
-      getSession: () => session ?? null,
+      getSession: async () => session ?? null,
     },
   });
   const bindings = {

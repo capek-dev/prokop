@@ -28,31 +28,28 @@ function summarizeToolState(toolPart: ToolPart): string {
   return `(${state.status})`;
 }
 
-function buildTranscriptSummary(
-  listTranscript: (sessionId: string) => MessageWithParts[],
+async function buildTranscriptSummary(
+  listTranscript: (sessionId: string) => MessageWithParts[] | Promise<MessageWithParts[]>,
   sessionId: string,
-): string {
-  return listTranscript(sessionId)
-    .slice(-MAX_TRANSCRIPT_MESSAGES)
-    .map((entry) => {
-      if (entry.message.role === 'user') {
-        const text = entry.parts
-          .filter((part): part is TextPart => part.type === 'text')
-          .map((part) => part.text || '')
-          .join('');
-        return text ? `[USER]: ${text}` : '';
-      }
-      if (entry.message.role === 'assistant') {
-        return entry.parts.map((part) => {
-          if (part.type === 'text' && part.text) return `[ASSISTANT]: ${part.text}`;
-          if (part.type === 'tool') return `[TOOL: ${part.name}]: ${summarizeToolState(part)}`;
-          return '';
-        }).filter(Boolean).join('\n');
-      }
-      return '';
-    })
-    .filter(Boolean)
-    .join('\n\n');
+): Promise<string> {
+  const messages = await listTranscript(sessionId);
+  return messages.slice(-MAX_TRANSCRIPT_MESSAGES).map((entry) => {
+    if (entry.message.role === 'user') {
+      const text = entry.parts
+        .filter((part): part is TextPart => part.type === 'text')
+        .map((part) => part.text || '')
+        .join('');
+      return text ? `[USER]: ${text}` : '';
+    }
+    if (entry.message.role === 'assistant') {
+      return entry.parts.map((part) => {
+        if (part.type === 'text' && part.text) return `[ASSISTANT]: ${part.text}`;
+        if (part.type === 'tool') return `[TOOL: ${part.name}]: ${summarizeToolState(part)}`;
+        return '';
+      }).filter(Boolean).join('\n');
+    }
+    return '';
+  }).filter(Boolean).join('\n\n');
 }
 
 /** Structural copy of the shared orchestrator-session contract result. The
@@ -78,7 +75,7 @@ export interface GoalOrchestratorTurnResult {
 }
 
 export interface GoalEvaluatorDeps {
-  listTranscript(sessionId: string): MessageWithParts[];
+  listTranscript(sessionId: string): MessageWithParts[] | Promise<MessageWithParts[]>;
   orchestrator: {
     run(options: GoalOrchestratorTurnOptions): Promise<GoalOrchestratorTurnResult>;
   };
@@ -116,7 +113,7 @@ export async function evaluateGoalWithDeps(
     conditionPreview: options.condition.slice(0, 80),
   });
 
-  const transcript = buildTranscriptSummary(deps.listTranscript, options.sessionId);
+  const transcript = await buildTranscriptSummary(deps.listTranscript, options.sessionId);
   const system = [
     'You are a goal evaluator. Your job is to determine if a completion condition',
     'has been met based on the conversation transcript of an AI agent working on a task.',

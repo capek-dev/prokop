@@ -443,7 +443,7 @@ class StandaloneAgent implements Agent {
     lifecycleSignal: AbortSignal,
   ): Promise<AgentResult> {
     if (createNewSession) {
-      this.#storage.storage.conversation.createSession({
+      await this.#storage.storage.conversation.createSession({
         id: sessionId,
         workspaceId: this.#workspace,
         preconfigId: 'capek-default',
@@ -455,13 +455,13 @@ class StandaloneAgent implements Agent {
         selectedModel: this.#selection.modelId,
         selectedProvider: this.#selection.providerId,
       });
-    } else if (!getSession(sessionId)) {
+    } else if (!(await getSession(sessionId))) {
       throw new Error(`Session not found: ${sessionId}`);
     }
 
     emit({ type: 'session.started', sessionId });
     if (input !== undefined) await this.#appendUserMessage(sessionId, inputText(input));
-    const history = buildEffectiveContextHistory(sessionId).messages;
+    const history = (await buildEffectiveContextHistory(sessionId)).messages;
     const preconfig: Preconfig = {
       id: 'capek-default',
       name: 'Capek',
@@ -592,7 +592,7 @@ class StandaloneAgent implements Agent {
       options?.signal?.removeEventListener('abort', interruptFromSignal);
     }
 
-    return this.#result(
+    return await this.#result(
       sessionId,
       lastAssistant,
       usage,
@@ -603,7 +603,7 @@ class StandaloneAgent implements Agent {
 
   async #appendUserMessage(sessionId: string, text: string): Promise<void> {
     const messageId = randomUUID();
-    createMessage({
+    await createMessage({
       id: messageId,
       sessionId,
       role: 'user',
@@ -618,14 +618,14 @@ class StandaloneAgent implements Agent {
     }, sessionId, { syncFts: false });
   }
 
-  #result(
+  async #result(
     sessionId: string,
     message: AssistantMessage | null,
     usage: UsageSummary | undefined,
     error: AgentError | undefined,
     interruptedByCaller: boolean,
-  ): AgentResult {
-    const stored = message ? getMessageWithParts(message.id) : null;
+  ): Promise<AgentResult> {
+    const stored = message ? await getMessageWithParts(message.id) : null;
     const parts = (stored?.parts ?? []) as Part[];
     const text = parts
       .filter((part): part is Extract<Part, { type: 'text' }> => part.type === 'text')

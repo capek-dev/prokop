@@ -51,7 +51,7 @@ export const WORKFLOW_TOOL_CONTRIBUTION_ORDER = 690;
 export interface WorkflowDomainService {
   readonly tools: readonly DomainToolPayload[];
   /** Depth gate shared by the workflow tool payload. */
-  canSpawn(sessionId: string): boolean;
+  canSpawn(sessionId: string): boolean | Promise<boolean>;
   resolveDefinition(
     options: GetWorkflowToolDefinitionOptions,
   ): Promise<WorkflowToolDefinition | null>;
@@ -64,7 +64,7 @@ export const capekWorkflowDomainKey = serviceKey<WorkflowDomainService>(
 );
 
 interface WorkflowPayloadDeps {
-  canSpawn(sessionId: string): boolean;
+  canSpawn(sessionId: string): boolean | Promise<boolean>;
   resolveDefinition(
     options: GetWorkflowToolDefinitionOptions,
   ): Promise<WorkflowToolDefinition | null>;
@@ -77,8 +77,8 @@ function workflowPayload(deps: WorkflowPayloadDeps): DomainToolPayload {
     name: placeholder.name,
     description: placeholder.description,
     inputSchema: placeholder.inputSchema,
-    isEnabled: (workspaceId, sessionId) =>
-      typeof sessionId === 'string' && deps.canSpawn(sessionId),
+    isEnabled: async (workspaceId, sessionId) =>
+      typeof sessionId === 'string' && await deps.canSpawn(sessionId),
     resolveDefinition: async (sessionId, options) => {
       const definition = await deps.resolveDefinition({
         sessionId,
@@ -153,12 +153,12 @@ export function workflowDomainPlugin(id: string): CapekPlugin<unknown> {
       const service: WorkflowDomainService = {
         tools: [
           workflowPayload({
-            canSpawn: (sessionId) => subagent.canSpawnSubagent(sessionId),
-            resolveDefinition: (options) => {
+            canSpawn: async (sessionId) => subagent.canSpawnSubagent(sessionId),
+            resolveDefinition: async (options) => {
               // The composed path resolves targets through the subagent
               // domain service's scope-captured deps; it never reads module
               // globals.
-              const maximumDepthReached = !subagent.canSpawnSubagent(options.sessionId);
+              const maximumDepthReached = !(await subagent.canSpawnSubagent(options.sessionId));
               return subagent.resolveTargets({
                 ...options,
                 maximumDepthReached,
@@ -168,9 +168,9 @@ export function workflowDomainPlugin(id: string): CapekPlugin<unknown> {
             execute: (input, options) => executeWorkflowWithDeps(input, options, serviceDeps),
           }),
         ],
-        canSpawn: (sessionId) => subagent.canSpawnSubagent(sessionId),
-        resolveDefinition: (options) => {
-          const maximumDepthReached = !subagent.canSpawnSubagent(options.sessionId);
+        canSpawn: async (sessionId) => subagent.canSpawnSubagent(sessionId),
+        resolveDefinition: async (options) => {
+          const maximumDepthReached = !(await subagent.canSpawnSubagent(options.sessionId));
           return subagent.resolveTargets({
             ...options,
             maximumDepthReached,

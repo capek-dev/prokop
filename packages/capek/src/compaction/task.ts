@@ -75,7 +75,7 @@ export async function createCompactionTrigger(
 ): Promise<CompactionTrigger> {
   // Minimum validation: at least 1 user + 1 assistant message needed for meaningful compaction.
   // A single agent turn with heavy tool use can produce enough context to warrant compaction.
-  const { messages: effectiveHistory } = buildEffectiveContextHistory(sessionId);
+  const { messages: effectiveHistory } = await buildEffectiveContextHistory(sessionId);
   const nonSystemCount = effectiveHistory.filter(
     (m: MessageWithParts) => m.message.role !== 'system',
   ).length;
@@ -95,7 +95,7 @@ export async function createCompactionTrigger(
     createdAt: now,
   };
 
-  createMessage(triggerMessage);
+  await createMessage(triggerMessage);
 
   // Create a standard CompactionPart (metadata-only per spec)
   const compactionPart: CompactionPart = {
@@ -343,7 +343,7 @@ export async function processCompactionTask(
   abortSignal?: AbortSignal,
 ): Promise<CompactionTaskResult> {
   // Get the trigger message
-  const allMessages = listMessagesWithParts(sessionId);
+  const allMessages = await listMessagesWithParts(sessionId);
   const triggerMsgWithParts = allMessages.find((m: MessageWithParts) => m.message.id === triggerMessageId);
 
   if (!triggerMsgWithParts) {
@@ -454,7 +454,7 @@ export async function processCompactionTask(
     completedAt: now,
   };
 
-  createMessage(assistantMessage);
+  await createMessage(assistantMessage);
 
   // Create a text part with the summary content
   const textPartId = randomUUID();
@@ -522,7 +522,7 @@ export async function persistCompactionFailure(
     error: errorMessage,
   };
 
-  createMessage(assistantMessage);
+  await createMessage(assistantMessage);
 
   const textPartId = randomUUID();
   const textPart: TextPart = {

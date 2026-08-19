@@ -21,40 +21,40 @@ export function getStorage(): StorageBundle {
   return activeStorage();
 }
 
-export const createSession = (...args: Parameters<StorageBundle['conversation']['createSession']>) =>
+export const createSession = async (...args: Parameters<StorageBundle['conversation']['createSession']>) =>
   activeStorage().conversation.createSession(...args);
-export const getSession = (...args: Parameters<StorageBundle['conversation']['getSession']>) =>
+export const getSession = async (...args: Parameters<StorageBundle['conversation']['getSession']>) =>
   activeStorage().conversation.getSession(...args);
-export const updateSession = (...args: Parameters<StorageBundle['conversation']['updateSession']>) =>
+export const updateSession = async (...args: Parameters<StorageBundle['conversation']['updateSession']>) =>
   activeStorage().conversation.updateSession(...args);
-export const getChildSessions = (...args: Parameters<StorageBundle['conversation']['getChildSessions']>) =>
+export const getChildSessions = async (...args: Parameters<StorageBundle['conversation']['getChildSessions']>) =>
   activeStorage().conversation.getChildSessions(...args);
-export const createMessage = (...args: Parameters<StorageBundle['conversation']['createMessage']>) =>
+export const createMessage = async (...args: Parameters<StorageBundle['conversation']['createMessage']>) =>
   activeStorage().conversation.createMessage(...args);
-export const getMessage = (...args: Parameters<StorageBundle['conversation']['getMessage']>) =>
+export const getMessage = async (...args: Parameters<StorageBundle['conversation']['getMessage']>) =>
   activeStorage().conversation.getMessage(...args);
-export const getMessageWithParts = (...args: Parameters<StorageBundle['conversation']['getMessageWithParts']>) =>
+export const getMessageWithParts = async (...args: Parameters<StorageBundle['conversation']['getMessageWithParts']>) =>
   activeStorage().conversation.getMessageWithParts(...args);
-export function updateMessage(
+export async function updateMessage(
   id: string,
   updates: Parameters<StorageBundle['conversation']['updateMessage']>[1],
   options?: { syncFts?: boolean },
 ) {
   const current = activeStorage();
-  const result = current.conversation.updateMessage(id, updates);
-  if (result && options?.syncFts !== false) current.index.syncMessage(id);
+  const result = await current.conversation.updateMessage(id, updates);
+  if (result && options?.syncFts !== false) await current.index.syncMessage(id);
   return result;
 }
-export const deleteMessage = (...args: Parameters<StorageBundle['conversation']['deleteMessage']>) => {
+export const deleteMessage = async (...args: Parameters<StorageBundle['conversation']['deleteMessage']>) => {
   const current = activeStorage();
-  current.index.removeMessage?.(args[0]);
+  await current.index.removeMessage?.(args[0]);
   return current.conversation.deleteMessage(...args);
 };
-export const listMessagesWithParts = (...args: Parameters<StorageBundle['conversation']['listMessagesWithParts']>) =>
+export const listMessagesWithParts = async (...args: Parameters<StorageBundle['conversation']['listMessagesWithParts']>) =>
   activeStorage().conversation.listMessagesWithParts(...args);
-export const listLatestMessagesWithPartsPage = (...args: Parameters<StorageBundle['conversation']['listLatestMessagesWithPartsPage']>) =>
+export const listLatestMessagesWithPartsPage = async (...args: Parameters<StorageBundle['conversation']['listLatestMessagesWithPartsPage']>) =>
   activeStorage().conversation.listLatestMessagesWithPartsPage(...args);
-export const buildEffectiveContextHistory = (...args: Parameters<StorageBundle['conversation']['buildEffectiveContextHistory']>) =>
+export const buildEffectiveContextHistory = async (...args: Parameters<StorageBundle['conversation']['buildEffectiveContextHistory']>) =>
   activeStorage().conversation.buildEffectiveContextHistory(...args);
 export async function createPart(
   part: Parameters<StorageBundle['conversation']['createPart']>[0],
@@ -64,7 +64,7 @@ export async function createPart(
   const current = activeStorage();
   const result = await current.conversation.createPart(part, sessionId);
   if (result && options?.syncFts !== false && (part.type === 'text' || part.type === 'tool')) {
-    current.index.syncMessage(part.messageId);
+    await current.index.syncMessage(part.messageId);
   }
   return result;
 }
@@ -84,7 +84,7 @@ export async function updatePart(
   const result = await current.conversation.updatePart(id, updates);
   if (result && options?.syncFts !== false
     && (previous?.type === 'text' || previous?.type === 'tool' || result.type === 'text' || result.type === 'tool')) {
-    current.index.syncMessage(result.messageId);
+    await current.index.syncMessage(result.messageId);
   }
   return result;
 }
@@ -94,7 +94,7 @@ export const transitionToolToRunningByCallId = async (...args: Parameters<Storag
   activeStorage().conversation.transitionToolToRunningByCallId(...args);
 export const transitionToolToInterrupted = async (...args: Parameters<StorageBundle['conversation']['transitionToolToInterrupted']>) =>
   activeStorage().conversation.transitionToolToInterrupted(...args);
-export const syncMessageFts = (messageId: string): void => activeStorage().index.syncMessage(messageId);
+export const syncMessageFts = async (messageId: string): Promise<void> => activeStorage().index.syncMessage(messageId);
 export const createToolOutputArtifact = (...args: Parameters<StorageBundle['toolOutputArtifacts']['create']>) =>
   activeStorage().toolOutputArtifacts.create(...args);
 export const getToolOutputArtifactPage = (...args: Parameters<StorageBundle['toolOutputArtifacts']['getPage']>) =>

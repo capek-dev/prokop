@@ -59,7 +59,7 @@ export const SELF_DELEGATION_SECTION_ID = 'self-delegation';
 export interface SubagentDomainService {
   readonly tools: readonly DomainToolPayload[];
   /** Depth gate shared by the task tool payload. */
-  canSpawnSubagent(sessionId: string): boolean;
+  canSpawnSubagent(sessionId: string): Promise<boolean>;
   resolveTargets(options: ResolveSubagentTargetsOptions): Promise<Preconfig[]>;
   /** Composed leaf execution for other C5 domains (workflow): runs the task
    * execution path over this domain's scope-captured deps, never module
@@ -105,7 +105,7 @@ export function broadcastsFromHost(host: RuntimeHost): SubagentServiceBroadcasts
 }
 
 interface TaskPayloadDeps {
-  canSpawn: (sessionId: string) => boolean;
+  canSpawn: (sessionId: string) => boolean | Promise<boolean>;
   resolveDefinition: (
     options: GetSubagentToolDefinitionOptions,
   ) => Promise<ToolDefinition | null>;
@@ -118,8 +118,8 @@ function taskPayload(deps: TaskPayloadDeps): DomainToolPayload {
     name: placeholder.name,
     description: placeholder.description,
     inputSchema: placeholder.inputSchema,
-    isEnabled: (workspaceId, sessionId) =>
-      typeof sessionId === 'string' && deps.canSpawn(sessionId),
+    isEnabled: async (workspaceId, sessionId) =>
+      typeof sessionId === 'string' && await deps.canSpawn(sessionId),
     resolveDefinition: async (sessionId, options) => {
       const definition = await deps.resolveDefinition({
         sessionId,
@@ -189,9 +189,9 @@ export function subagentDomainPlugin(id: string): CapekPlugin<unknown> {
         preconfigSource ? preconfigSource.listSubagents() : Promise.resolve([]);
 
       const sessionAccess: SubagentServiceSessionAccess = {
-        getSession: (sessionId) => storage.conversation.getSession(sessionId),
-        createSession: (session) => storage.conversation.createSession(session),
-        updateSession: (sessionId, updates) => storage.conversation.updateSession(sessionId, updates),
+        getSession: async (sessionId) => storage.conversation.getSession(sessionId),
+        createSession: async (session) => storage.conversation.createSession(session),
+        updateSession: async (sessionId, updates) => storage.conversation.updateSession(sessionId, updates),
         getWorkspaceAutoApproveSeverity: async (workspaceId) => storage.workspaces.getAutoApproveSeverity(workspaceId),
       };
 
@@ -208,15 +208,15 @@ export function subagentDomainPlugin(id: string): CapekPlugin<unknown> {
       const service: SubagentDomainService = {
         tools: [
           taskPayload({
-            canSpawn: (sessionId) => canSpawnSubagentWithDeps(sessionId, sessionAccess.getSession),
-            resolveDefinition: (options) => {
+            canSpawn: async (sessionId) => canSpawnSubagentWithDeps(sessionId, sessionAccess.getSession),
+            resolveDefinition: async (options) => {
               // The composed path resolves targets through the scope-captured
               // storage and preconfig sources; it never reads module globals.
               const deps = {
                 getSession: sessionAccess.getSession,
                 listPreconfigs: listSubagentPreconfigsScoped,
               };
-              const maximumDepthReached = !canSpawnSubagentWithDeps(options.sessionId, deps.getSession);
+              const maximumDepthReached = !(await canSpawnSubagentWithDeps(options.sessionId, deps.getSession));
               return resolveEffectiveSubagentTargets({
                 ...options,
                 maximumDepthReached,
@@ -226,19 +226,19 @@ export function subagentDomainPlugin(id: string): CapekPlugin<unknown> {
             execute: (input) => executeSubagentWithDeps(input, serviceDeps) as unknown as Promise<Record<string, unknown>>,
           }),
         ],
-        canSpawnSubagent: (sessionId) => canSpawnSubagentWithDeps(sessionId, sessionAccess.getSession),
+        canSpawnSubagent: async (sessionId) => canSpawnSubagentWithDeps(sessionId, sessionAccess.getSession),
         execute: (input) => executeSubagentWithDeps(input, serviceDeps),
         listSubagents: listSubagentPreconfigsScoped,
         resolveTargets: (options) => resolveEffectiveSubagentTargets(options, {
           getSession: sessionAccess.getSession,
           listPreconfigs: listSubagentPreconfigsScoped,
         }),
-        selfDelegationAvailable: (sessionId, preconfigId, allowSelfAsSubagent) =>
+        selfDelegationAvailable: async (sessionId, preconfigId, allowSelfAsSubagent) =>
           resolveEffectiveSubagentTargets({
             sessionId,
             canSpawnSubagents: true,
             allowSelfAsSubagent,
-            maximumDepthReached: !canSpawnSubagentWithDeps(sessionId, sessionAccess.getSession),
+            maximumDepthReached: !(await canSpawnSubagentWithDeps(sessionId, sessionAccess.getSession)),
           }, {
             getSession: sessionAccess.getSession,
             listPreconfigs: listSubagentPreconfigsScoped,

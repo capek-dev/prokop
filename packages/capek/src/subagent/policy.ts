@@ -29,7 +29,7 @@ export interface ResolveSubagentTargetsOptions {
 }
 
 export interface SubagentTargetResolutionDeps {
-  getSession?: (id: string) => Session | null;
+  getSession?: (id: string) => Session | null | Promise<Session | null>;
   listPreconfigs?: () => Promise<Preconfig[]>;
 }
 
@@ -74,10 +74,10 @@ export function getSubagentResumeError(
 /** Ancestry collection with the session lookup injected. The default
  * parameter keeps the pre-C5 module-accessor signature for the legacy
  * unscoped path; composed scopes pass their captured storage lookup. */
-export function collectSubagentAncestry(
+export async function collectSubagentAncestry(
   sessionId: string,
-  getSession: (id: string) => Session | null = runtimeGetSession,
-): SubagentAncestry {
+  getSession: (id: string) => Session | null | Promise<Session | null> = runtimeGetSession,
+): Promise<SubagentAncestry> {
   const preconfigIds: string[] = [];
   const visitedSessionIds = new Set<string>();
   let currentSessionId: string | null = sessionId;
@@ -85,7 +85,7 @@ export function collectSubagentAncestry(
 
   while (currentSessionId && !visitedSessionIds.has(currentSessionId)) {
     visitedSessionIds.add(currentSessionId);
-    const session = getSession(currentSessionId);
+    const session = await getSession(currentSessionId);
     if (!session) break;
 
     if (session.preconfigId) {
@@ -170,8 +170,8 @@ export async function resolveEffectiveSubagentTargets(
     || (Array.isArray(options.canSpawnSubagents) && options.canSpawnSubagents.length > 0);
   if (!spawningEnabled || options.maximumDepthReached) return [];
 
-  const ancestry = collectSubagentAncestry(options.sessionId, getSession);
-  const currentSession = getSession(options.sessionId);
+  const ancestry = await collectSubagentAncestry(options.sessionId, getSession);
+  const currentSession = await getSession(options.sessionId);
   const currentPreconfigId = currentSession?.preconfigId ?? options.currentPreconfig?.id ?? null;
   const allowSelfAsSubagent = options.allowSelfAsSubagent
     ?? options.currentPreconfig?.allowSelfAsSubagent
