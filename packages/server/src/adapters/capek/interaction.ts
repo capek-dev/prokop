@@ -18,21 +18,27 @@ import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications
 import type { Jean2CompatibilityBindings } from './types';
 
 export const jean2InteractionBindings: Jean2CompatibilityBindings['interaction'] = {
-  createPendingAsk,
-  removePendingAsk,
-  removePendingAsksByToolCallId,
-  getPermissionRequestByRequestId,
-  resolvePermissionRequestByRequestId,
-  expirePermissionRequest,
-  expireOldPermissionRequests,
-  cancelPendingRequestsBySession,
-  listPendingAsksBySession,
-  listPendingAsksByRootSession,
-  listPendingRequestsByRootSession,
-  matchGrant,
-  createGrantFromOptions,
-  getSessionAutoApproveSeverity: (sessionId: string) => getSession(sessionId)?.autoApproveSeverity ?? undefined,
+  createPendingAsk: async (record) => createPendingAsk(record),
+  removePendingAsk: async (id) => {
+    removePendingAsk(id);
+  },
+  removePendingAsksByToolCallId: async (toolCallId) => {
+    removePendingAsksByToolCallId(toolCallId);
+  },
+  getPermissionRequestByRequestId: async (requestId) => getPermissionRequestByRequestId(requestId),
+  resolvePermissionRequestByRequestId: async (requestId, status, resolution) =>
+    resolvePermissionRequestByRequestId(requestId, status, resolution),
+  expirePermissionRequest: async (id) => expirePermissionRequest(id),
+  expireOldPermissionRequests: async (maxAgeMs) => expireOldPermissionRequests(maxAgeMs),
+  cancelPendingRequestsBySession: async (sessionId) => cancelPendingRequestsBySession(sessionId),
+  listPendingAsksBySession: async (sessionId) => listPendingAsksBySession(sessionId),
+  listPendingAsksByRootSession: async (rootSessionId) => listPendingAsksByRootSession(rootSessionId),
+  listPendingRequestsByRootSession: async (rootSessionId) => listPendingRequestsByRootSession(rootSessionId),
+  matchGrant: async (params) => matchGrant(params),
+  createGrantFromOptions: async (params) => createGrantFromOptions(params),
+  getSessionAutoApproveSeverity: async (sessionId) => getSession(sessionId)?.autoApproveSeverity ?? undefined,
   getPermissionTimeoutMs,
-  notifyPermissionRequired: (requestId: string, rootSessionId: string) =>
-    getJean2NotificationsApplication().notifyPermissionRequired(requestId, rootSessionId),
+  notifyPermissionRequired: async (requestId: string, rootSessionId: string) => {
+    getJean2NotificationsApplication().notifyPermissionRequired(requestId, rootSessionId);
+  },
 };

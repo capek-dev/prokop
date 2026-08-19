@@ -167,7 +167,7 @@ describe('S5 session-search host wiring', () => {
     resetTestDatabase();
   });
 
-  test('the installed host delegates search to the infrastructure sqlite repository', () => {
+  test('the installed host delegates search to the infrastructure sqlite repository', async () => {
     const host = getSessionSearchHost();
     expect(host).toBe(focused.jean2SessionSearchHost);
 
@@ -176,7 +176,7 @@ describe('S5 session-search host wiring', () => {
     createMessage(createTestUserMessage(session.id, { id: 'cm1', createdAt: 100 }));
     createPart(createTestTextPart('cm1', 'composed search'), session.id);
 
-    const results = host.searchMessages({
+    const results = await host.searchMessages({
       query: 'composed',
       roleFilter: ['user', 'assistant'],
       limit: 10,

@@ -38,12 +38,12 @@ describe('SQLite session-search query repository', () => {
   }
 
   describe('search', () => {
-    test('returns the exact result shape for a matching message', () => {
+    test('returns the exact result shape for a matching message', async () => {
       seedWorkspace({ id: 'ws-search' });
       const session = seedSession('ws-search');
       seedIndexedMessage(session.id, 'm1', 'hello searchable world', 100);
 
-      const results = query.searchMessages({
+      const results = await query.searchMessages({
         query: 'searchable',
         workspaceId: 'ws-search',
         roleFilter: ['user', 'assistant'],
@@ -65,7 +65,7 @@ describe('SQLite session-search query repository', () => {
       expect(results[0]!.content.length).toBeLessThanOrEqual(500);
     });
 
-    test('orders results by newest, oldest, and relevance', () => {
+    test('orders results by newest, oldest, and relevance', async () => {
       seedWorkspace({ id: 'ws-search' });
       const session = seedSession('ws-search');
       seedIndexedMessage(session.id, 'm1', 'alpha beta', 100);
@@ -78,16 +78,16 @@ describe('SQLite session-search query repository', () => {
         limit: 10,
       };
 
-      expect(query.searchMessages({ ...baseOptions, sort: 'newest' }).map((r) => r.messageId))
+      expect((await query.searchMessages({ ...baseOptions, sort: 'newest' })).map((r) => r.messageId))
         .toEqual(['m3', 'm2', 'm1']);
-      expect(query.searchMessages({ ...baseOptions, sort: 'oldest' }).map((r) => r.messageId))
+      expect((await query.searchMessages({ ...baseOptions, sort: 'oldest' })).map((r) => r.messageId))
         .toEqual(['m1', 'm2', 'm3']);
 
-      const relevance = query.searchMessages({ ...baseOptions, sort: 'relevance' });
+      const relevance = await query.searchMessages({ ...baseOptions, sort: 'relevance' });
       expect(relevance.map((r) => r.rank)).toEqual([1, 2, 3]);
     });
 
-    test('pins raw row rank for newest and oldest sorts without normalizing', () => {
+    test('pins raw row rank for newest and oldest sorts without normalizing', async () => {
       seedWorkspace({ id: 'ws-search' });
       const session = seedSession('ws-search');
       seedIndexedMessage(session.id, 'm1', 'alpha beta', 100);
@@ -99,7 +99,7 @@ describe('SQLite session-search query repository', () => {
       expect(rawRanks).toHaveLength(2);
       const rawByMessage = new Map(rawRanks.map((row) => [row.message_id, row.rank]));
 
-      const newest = query.searchMessages({
+      const newest = await query.searchMessages({
         query: 'alpha',
         roleFilter: ['user'],
         limit: 10,
@@ -110,7 +110,7 @@ describe('SQLite session-search query repository', () => {
         expect(result.rank).toBe(rawByMessage.get(result.messageId)!);
       }
 
-      const oldest = query.searchMessages({
+      const oldest = await query.searchMessages({
         query: 'alpha',
         roleFilter: ['user'],
         limit: 10,
@@ -122,7 +122,7 @@ describe('SQLite session-search query repository', () => {
       }
     });
 
-    test('respects workspace, session, role, and limit filters', () => {
+    test('respects workspace, session, role, and limit filters', async () => {
       seedWorkspace({ id: 'ws-a' });
       seedWorkspace({ id: 'ws-b' });
       const sessionA = seedSession('ws-a');
@@ -131,7 +131,7 @@ describe('SQLite session-search query repository', () => {
       seedIndexedMessage(sessionA.id, 'ma2', 'needle two', 200);
       seedIndexedMessage(sessionB.id, 'mb1', 'needle three', 300);
 
-      const all = query.searchMessages({
+      const all = await query.searchMessages({
         query: 'needle',
         roleFilter: ['user', 'assistant'],
         limit: 10,
@@ -139,7 +139,7 @@ describe('SQLite session-search query repository', () => {
       });
       expect(all.map((r) => r.messageId)).toEqual(['mb1', 'ma2', 'ma1']);
 
-      const workspaceFiltered = query.searchMessages({
+      const workspaceFiltered = await query.searchMessages({
         query: 'needle',
         workspaceId: 'ws-a',
         roleFilter: ['user', 'assistant'],
@@ -148,7 +148,7 @@ describe('SQLite session-search query repository', () => {
       });
       expect(workspaceFiltered.map((r) => r.messageId)).toEqual(['ma2', 'ma1']);
 
-      const sessionFiltered = query.searchMessages({
+      const sessionFiltered = await query.searchMessages({
         query: 'needle',
         sessionId: sessionA.id,
         roleFilter: ['user', 'assistant'],
@@ -157,7 +157,7 @@ describe('SQLite session-search query repository', () => {
       });
       expect(sessionFiltered.map((r) => r.messageId)).toEqual(['ma2', 'ma1']);
 
-      const roleFiltered = query.searchMessages({
+      const roleFiltered = await query.searchMessages({
         query: 'needle',
         roleFilter: ['assistant'],
         limit: 10,
@@ -165,7 +165,7 @@ describe('SQLite session-search query repository', () => {
       });
       expect(roleFiltered).toEqual([]);
 
-      const limited = query.searchMessages({
+      const limited = await query.searchMessages({
         query: 'needle',
         roleFilter: ['user', 'assistant'],
         limit: 2,
@@ -174,14 +174,14 @@ describe('SQLite session-search query repository', () => {
       expect(limited.map((r) => r.messageId)).toEqual(['mb1', 'ma2']);
     });
 
-    test('falls back to a quoted plain query when the sanitized query fails', () => {
+    test('falls back to a quoted plain query when the sanitized query fails', async () => {
       seedWorkspace({ id: 'ws-search' });
       const session = seedSession('ws-search');
       seedIndexedMessage(session.id, 'm1', 'unclosed case', 100);
 
       // The unbalanced quote survives sanitization and makes the first MATCH
       // fail; the fallback strips it and searches the plain phrase.
-      const results = query.searchMessages({
+      const results = await query.searchMessages({
         query: '"unclosed',
         roleFilter: ['user', 'assistant'],
         limit: 10,
@@ -191,18 +191,18 @@ describe('SQLite session-search query repository', () => {
       expect(results.map((r) => r.messageId)).toEqual(['m1']);
     });
 
-    test('returns empty for queries that sanitize to nothing', () => {
+    test('returns empty for queries that sanitize to nothing', async () => {
       seedWorkspace({ id: 'ws-search' });
       const session = seedSession('ws-search');
       seedIndexedMessage(session.id, 'm1', 'hello world', 100);
 
-      expect(query.searchMessages({
+      expect(await query.searchMessages({
         query: '***',
         roleFilter: ['user', 'assistant'],
         limit: 10,
         sort: 'relevance',
       })).toEqual([]);
-      expect(query.searchMessages({
+      expect(await query.searchMessages({
         query: '   ',
         roleFilter: ['user', 'assistant'],
         limit: 10,
@@ -210,14 +210,14 @@ describe('SQLite session-search query repository', () => {
       })).toEqual([]);
     });
 
-    test('returns empty for an empty role filter without touching the index', () => {
+    test('returns empty for an empty role filter without touching the index', async () => {
       seedWorkspace({ id: 'ws-search' });
       const session = seedSession('ws-search');
       seedIndexedMessage(session.id, 'm1', 'hello world', 100);
 
       // Pre-S5 this relied on the swallowed `IN ()` SQL error; the external
       // result is unchanged, but the early return is now explicit.
-      expect(query.searchMessages({
+      expect(await query.searchMessages({
         query: 'hello',
         roleFilter: [],
         limit: 10,
@@ -225,17 +225,17 @@ describe('SQLite session-search query repository', () => {
       })).toEqual([]);
     });
 
-    test('returns empty instead of surfacing errors when the fts table is missing', () => {
+    test('returns empty instead of surfacing errors when the fts table is missing', async () => {
       const rawDb = new Database(':memory:');
       try {
         const repo = createSessionSearchQueryRepository(() => rawDb);
-        expect(repo.searchMessages({
+        expect(await repo.searchMessages({
           query: 'anything',
           roleFilter: ['user'],
           limit: 10,
           sort: 'relevance',
         })).toEqual([]);
-        expect(repo.searchMessages({
+        expect(await repo.searchMessages({
           query: '"unclosed',
           roleFilter: ['user'],
           limit: 10,
@@ -261,70 +261,70 @@ describe('SQLite session-search query repository', () => {
   });
 
   describe('counts', () => {
-    test('counts total, before, and after with the original boundaries', () => {
+    test('counts total, before, and after with the original boundaries', async () => {
       seedWorkspace({ id: 'ws-search' });
       const session = seedSession('ws-search');
       seedIndexedMessage(session.id, 'm1', 'one', 100);
       seedIndexedMessage(session.id, 'm2', 'two', 200);
       seedIndexedMessage(session.id, 'm3', 'three', 300);
 
-      expect(query.countSessionMessages(session.id)).toBe(3);
-      expect(query.countSessionMessages('missing')).toBe(0);
-      expect(query.countMessagesBefore(session.id, 100)).toBe(0);
-      expect(query.countMessagesBefore(session.id, 200)).toBe(1);
-      expect(query.countMessagesBefore(session.id, 400)).toBe(3);
-      expect(query.countMessagesAfter(session.id, 300)).toBe(0);
-      expect(query.countMessagesAfter(session.id, 200)).toBe(1);
-      expect(query.countMessagesAfter(session.id, 0)).toBe(3);
+      expect(await query.countSessionMessages(session.id)).toBe(3);
+      expect(await query.countSessionMessages('missing')).toBe(0);
+      expect(await query.countMessagesBefore(session.id, 100)).toBe(0);
+      expect(await query.countMessagesBefore(session.id, 200)).toBe(1);
+      expect(await query.countMessagesBefore(session.id, 400)).toBe(3);
+      expect(await query.countMessagesAfter(session.id, 300)).toBe(0);
+      expect(await query.countMessagesAfter(session.id, 200)).toBe(1);
+      expect(await query.countMessagesAfter(session.id, 0)).toBe(3);
     });
   });
 
   describe('message lookups and surrounding lists', () => {
-    test('returns latest and anchored messages in the original order and shape', () => {
+    test('returns latest and anchored messages in the original order and shape', async () => {
       seedWorkspace({ id: 'ws-search' });
       const session = seedSession('ws-search');
       seedIndexedMessage(session.id, 'm1', 'one', 100);
       seedIndexedMessage(session.id, 'm2', 'two', 200);
       seedIndexedMessage(session.id, 'm3', 'three', 300);
 
-      expect(query.getLatestMessage(session.id)).toEqual({ id: 'm3', timestamp: 300 });
-      expect(query.getLatestMessage('missing')).toBeNull();
-      expect(query.getMessage('m2', session.id)).toEqual({ id: 'm2', timestamp: 200 });
-      expect(query.getMessage('m2', 'other-session')).toBeNull();
-      expect(query.getMessage('missing', session.id)).toBeNull();
+      expect(await query.getLatestMessage(session.id)).toEqual({ id: 'm3', timestamp: 300 });
+      expect(await query.getLatestMessage('missing')).toBeNull();
+      expect(await query.getMessage('m2', session.id)).toEqual({ id: 'm2', timestamp: 200 });
+      expect(await query.getMessage('m2', 'other-session')).toBeNull();
+      expect(await query.getMessage('missing', session.id)).toBeNull();
 
-      expect(query.listMessagesBefore(session.id, 300, 10)).toEqual([
+      expect(await query.listMessagesBefore(session.id, 300, 10)).toEqual([
         { id: 'm2', role: 'user', timestamp: 200 },
         { id: 'm1', role: 'user', timestamp: 100 },
       ]);
-      expect(query.listMessagesBefore(session.id, 300, 1)).toEqual([
+      expect(await query.listMessagesBefore(session.id, 300, 1)).toEqual([
         { id: 'm2', role: 'user', timestamp: 200 },
       ]);
-      expect(query.listMessagesAfter(session.id, 100, 10)).toEqual([
+      expect(await query.listMessagesAfter(session.id, 100, 10)).toEqual([
         { id: 'm2', role: 'user', timestamp: 200 },
         { id: 'm3', role: 'user', timestamp: 300 },
       ]);
-      expect(query.listMessagesAfter(session.id, 100, 1)).toEqual([
+      expect(await query.listMessagesAfter(session.id, 100, 1)).toEqual([
         { id: 'm2', role: 'user', timestamp: 200 },
       ]);
     });
   });
 
   describe('summaries and content extraction', () => {
-    test('summarizes role, timestamp, text content, and tool names', () => {
+    test('summarizes role, timestamp, text content, and tool names', async () => {
       seedWorkspace({ id: 'ws-search' });
       const session = seedSession('ws-search');
       createMessage(createTestUserMessage(session.id, { id: 'm1', createdAt: 100 }));
       createPart(createTestTextPart('m1', 'hello world'), session.id);
       createPart(createTestToolPart('m1', { name: 'read-file' }), session.id);
 
-      expect(query.getMessageSummary('m1')).toEqual({
+      expect(await query.getMessageSummary('m1')).toEqual({
         role: 'user',
         timestamp: 100,
         content: 'hello world',
         toolName: 'read-file',
       });
-      expect(query.getMessageSummary('missing')).toBeNull();
+      expect(await query.getMessageSummary('missing')).toBeNull();
 
       expect(getMessageContentForFts(getDatabase(), 'm1')).toEqual({
         content: 'hello world',
@@ -332,13 +332,13 @@ describe('SQLite session-search query repository', () => {
       });
     });
 
-    test('extracts empty content for messages without indexable parts', () => {
+    test('extracts empty content for messages without indexable parts', async () => {
       seedWorkspace({ id: 'ws-search' });
       const session = seedSession('ws-search');
       createMessage(createTestUserMessage(session.id, { id: 'm1', createdAt: 100 }));
 
       expect(getMessageContentForFts(getDatabase(), 'm1')).toEqual({ content: '', toolName: '' });
-      expect(query.getMessageSummary('m1')).toEqual({
+      expect(await query.getMessageSummary('m1')).toEqual({
         role: 'user',
         timestamp: 100,
         content: '',

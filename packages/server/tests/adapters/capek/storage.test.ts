@@ -9,25 +9,12 @@ import {
   jean2StorageBundle,
 } from '@/adapters/capek/storage';
 import {
-  buildEffectiveContextHistory,
   createMessage,
   createPart,
-  deleteMessage,
   getMessage,
-  getMessageWithParts,
   getPart,
-  getPartsByMessage,
-  getPartsBySession,
-  listLatestMessagesWithPartsPage,
-  listMessagesWithParts,
-  persistStreamingPartSnapshots,
-  syncMessageFts,
-  transitionToolToInterrupted,
-  transitionToolToRunningByCallId,
   updateMessage,
 } from '@/infrastructure/sqlite/message-store';
-import { createSession, getChildSessions, getSession, updateSession } from '@/infrastructure/sqlite/session-store';
-import { getWorkspace, getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
 import { jean2ToolOutputArtifactStore } from '@/infrastructure/sqlite/tool-output-artifacts';
 import { searchMessages } from '@/infrastructure/sqlite/session-search-query-repository';
 import { getDatabase } from '@/infrastructure/sqlite/database';

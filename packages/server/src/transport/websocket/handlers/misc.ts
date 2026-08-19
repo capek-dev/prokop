@@ -47,8 +47,8 @@ export function handleNotificationAcknowledge(
 }
 
 export interface AskResponseDependencies {
-  resolveAsk(toolCallId: string, response: unknown, requestId?: string): boolean;
-  getSessionIdForPendingAsk(toolCallId: string, requestId?: string): string | null;
+  resolveAsk(toolCallId: string, response: unknown, requestId?: string): Promise<boolean>;
+  getSessionIdForPendingAsk(toolCallId: string, requestId?: string): Promise<string | null>;
   getAuthorityForPendingAsk(toolCallId: string): AskAuthority | undefined;
 }
 
@@ -58,14 +58,14 @@ const askResponseDependencies: AskResponseDependencies = {
   getAuthorityForPendingAsk,
 };
 
-export function handleAskResponseWithDependencies(
+export async function handleAskResponseWithDependencies(
   ctx: RouterContext<ConnectionId>,
   ws: ConnectionId,
   msg: AskResponseMessage,
   dependencies: AskResponseDependencies,
-): void {
+): Promise<void> {
   const { toolCallId, response, requestId } = msg;
-  const askSessionId = dependencies.getSessionIdForPendingAsk(toolCallId, requestId);
+  const askSessionId = await dependencies.getSessionIdForPendingAsk(toolCallId, requestId);
   if (askSessionId) {
     const controlState = getControlState(askSessionId);
     const senderClientId = getClientIdForConnection(ws);
@@ -109,15 +109,15 @@ export function handleAskResponseWithDependencies(
       return;
     }
   }
-  dependencies.resolveAsk(toolCallId, response, requestId);
+  await dependencies.resolveAsk(toolCallId, response, requestId);
 }
 
-export function handleAskResponse(
+export async function handleAskResponse(
   ctx: RouterContext<ConnectionId>,
   ws: ConnectionId,
   msg: AskResponseMessage,
-): void {
-  handleAskResponseWithDependencies(ctx, ws, msg, askResponseDependencies);
+): Promise<void> {
+  await handleAskResponseWithDependencies(ctx, ws, msg, askResponseDependencies);
 }
 
 export function handleSandboxRespond(
