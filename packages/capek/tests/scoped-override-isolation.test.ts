@@ -218,12 +218,12 @@ describe('scoped override isolation', () => {
     expect(resumedA.discovered).toEqual(['a-tool']);
     expect(resumedB.discovered).toEqual(['b-tool']);
 
-    expect(storageA.conversation.getSession('session-A')?.id).toBe('session-A');
-    expect(storageB.conversation.getSession('session-B')?.id).toBe('session-B');
-    expect(storageA.conversation.getSession('session-B')).toBeNull();
-    expect(storageB.conversation.getSession('session-A')).toBeNull();
-    expect(defaultStorage.conversation.getSession('session-A')).toBeNull();
-    expect(defaultStorage.conversation.getSession('session-B')).toBeNull();
+    expect((await storageA.conversation.getSession('session-A'))?.id).toBe('session-A');
+    expect((await storageB.conversation.getSession('session-B'))?.id).toBe('session-B');
+    expect(await storageA.conversation.getSession('session-B')).toBeNull();
+    expect(await storageB.conversation.getSession('session-A')).toBeNull();
+    expect(await defaultStorage.conversation.getSession('session-A')).toBeNull();
+    expect(await defaultStorage.conversation.getSession('session-B')).toBeNull();
 
     expect(getStorage()).toBe(defaultStorage);
     expect(getRuntimeConfiguration()).toBe(defaultConfiguration);

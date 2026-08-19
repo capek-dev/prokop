@@ -107,7 +107,7 @@ export function createSchedulerToolFallbackPayload(): DomainToolPayload {
   return schedulerPayload({
     isEnabled: async (workspaceId, sessionId) => schedulingGate(
       (await getWorkspace(workspaceId))?.settings?.scheduling,
-      typeof sessionId === 'string' ? getSession(sessionId) : null,
+      typeof sessionId === 'string' ? await getSession(sessionId) : null,
     ),
     run: (input, context, risk) => executeSchedulerTool(
       input,
@@ -141,7 +141,7 @@ export function schedulerDomainPlugin(id: string): CapekPlugin<unknown> {
       const isEnabled = async (workspaceId: string, sessionId?: string): Promise<boolean> =>
         schedulingGate(
           (await storage.workspaces.get(workspaceId))?.settings?.scheduling,
-          typeof sessionId === 'string' ? storage.conversation.getSession(sessionId) : null,
+          typeof sessionId === 'string' ? await storage.conversation.getSession(sessionId) : null,
         );
       const payload = schedulerPayload({
         isEnabled,

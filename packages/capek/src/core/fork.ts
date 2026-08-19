@@ -57,15 +57,15 @@ function copyPart(part: Part, newMessageId: string, newPartId: string): Part {
 
 export async function forkSession(options: ForkOptions): Promise<ForkResult> {
   const { sessionId, targetMessageId, title } = options;
-  const sourceSession = getSession(sessionId);
+  const sourceSession = await getSession(sessionId);
   if (!sourceSession) throw new Error('Source session not found');
 
-  const allMessages = listMessagesWithParts(sessionId);
+  const allMessages = await listMessagesWithParts(sessionId);
   const targetIndex = allMessages.findIndex((entry) => entry.message.id === targetMessageId);
   if (targetIndex === -1) throw new Error('Target message not found');
 
   const messagesToFork = allMessages.slice(0, targetIndex + 1);
-  const forkedSession = createSession({
+  const forkedSession = await createSession({
     id: generateId(),
     workspaceId: sourceSession.workspaceId,
     preconfigId: sourceSession.preconfigId,
@@ -89,7 +89,7 @@ export async function forkSession(options: ForkOptions): Promise<ForkResult> {
   for (const { message, parts } of messagesToFork) {
     const newMessageId = idMap.get(message.id)!;
     const newMessage = copyMessage(message, forkedSession.id, newMessageId, idMap);
-    createMessage(newMessage);
+    await createMessage(newMessage);
     const newParts: Part[] = [];
     for (const part of parts) {
       const newPart = copyPart(part, newMessageId, generateId());

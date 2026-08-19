@@ -75,7 +75,7 @@ export async function executeCompaction(
   }
 
   let triggerMessageId: string | null = null;
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session || session.parentId) {
     return {
       ok: false,
@@ -112,13 +112,13 @@ export async function executeCompaction(
   );
 
   service.beginCompaction(sessionId);
-  const compactingSession = updateSession(sessionId, { compacting: true });
+  const compactingSession = await updateSession(sessionId, { compacting: true });
   if (compactingSession) broadcastSessUpdate(compactingSession);
 
   try {
     const trigger = await createCompactionTrigger(sessionId, reason);
     triggerMessageId = trigger.messageId;
-    const triggerMsg = getMessageWithParts(trigger.messageId);
+    const triggerMsg = await getMessageWithParts(trigger.messageId);
     if (triggerMsg) {
       broadcast({ kind: 'message', action: 'created', message: triggerMsg.message });
       for (const part of triggerMsg.parts) broadcast({ kind: 'part', action: 'created', sessionId, part });
@@ -128,7 +128,7 @@ export async function executeCompaction(
     broadcast({ kind: 'message', action: 'created', message: result.summaryMessage });
     for (const part of result.textParts) broadcast({ kind: 'part', action: 'created', sessionId, part });
 
-    const completedSession = updateSession(sessionId, {
+    const completedSession = await updateSession(sessionId, {
       promptTokens: result.tokensUsed.prompt,
       completionTokens: result.tokensUsed.completion,
       totalTokens: result.tokensUsed.prompt + result.tokensUsed.completion,
@@ -150,7 +150,7 @@ export async function executeCompaction(
       reason,
     };
   } catch (err: unknown) {
-    const updatedSession = updateSession(sessionId, { compacting: false });
+    const updatedSession = await updateSession(sessionId, { compacting: false });
     if (updatedSession) broadcastSessUpdate(updatedSession);
     const errorMessage = err instanceof Error ? err.message : 'Compaction failed';
     if (triggerMessageId) await persistCompactionFailure(sessionId, triggerMessageId, errorMessage, broadcast);

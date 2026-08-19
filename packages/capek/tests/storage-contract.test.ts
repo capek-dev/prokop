@@ -69,11 +69,11 @@ function runConversationContract(name: string, createStore: () => ConversationSt
   describe(name, () => {
     test('preserves deterministic ordering, snapshots, tool state, compaction, deletion, and child resume', async () => {
       const store = createStore();
-      store.createSession(session('root'));
-      store.createSession(session('child-b', 'root', '2026-01-01T00:00:01.000Z'));
-      store.createSession(session('child-a', 'root', '2026-01-01T00:00:01.000Z'));
-      store.createSession(session('orphan', 'missing-parent', '2026-01-01T00:00:01.000Z'));
-      store.updateSession('root', {
+      await store.createSession(session('root'));
+      await store.createSession(session('child-b', 'root', '2026-01-01T00:00:01.000Z'));
+      await store.createSession(session('child-a', 'root', '2026-01-01T00:00:01.000Z'));
+      await store.createSession(session('orphan', 'missing-parent', '2026-01-01T00:00:01.000Z'));
+      await store.updateSession('root', {
         runningAt: '2026-01-01T00:00:03.000Z',
         promptTokens: 4,
         completionTokens: 2,
@@ -81,7 +81,7 @@ function runConversationContract(name: string, createStore: () => ConversationSt
         title: 'Updated',
         metadata: { goal: { status: 'active' } },
       });
-      expect(store.getSession('root')).toMatchObject({
+      expect(await store.getSession('root')).toMatchObject({
         runningAt: '2026-01-01T00:00:03.000Z',
         promptTokens: 4,
         completionTokens: 2,
@@ -89,21 +89,21 @@ function runConversationContract(name: string, createStore: () => ConversationSt
         title: 'Updated',
         metadata: { goal: { status: 'active' } },
       });
-      expect(store.getChildSessions('root').map(child => child.id)).toEqual(['child-b', 'child-a']);
-      expect(store.getSession('orphan')?.parentId).toBe('missing-parent');
+      expect((await store.getChildSessions('root')).map(child => child.id)).toEqual(['child-b', 'child-a']);
+      expect((await store.getSession('orphan'))?.parentId).toBe('missing-parent');
 
-      store.createMessage(message('old', 'user', 100));
+      await store.createMessage(message('old', 'user', 100));
       await store.createPart({ id: 'part-z', messageId: 'old', type: 'text', text: 'old-z', createdAt: 5 }, 'root');
       await store.createPart({ id: 'part-a', messageId: 'old', type: 'text', text: 'old-a', createdAt: 5 }, 'root');
-      store.createMessage(message('trigger', 'user', 50));
+      await store.createMessage(message('trigger', 'user', 50));
       await store.createPart({ id: 'trigger-part', messageId: 'trigger', type: 'compaction', auto: false, createdAt: 6 }, 'root');
-      store.createMessage(message('summary', 'assistant', 40, {
+      await store.createMessage(message('summary', 'assistant', 40, {
         summary: true,
         mode: 'compaction',
         parentId: 'trigger',
       }));
       await store.createPart({ id: 'summary-text', messageId: 'summary', type: 'text', text: 'summary', createdAt: 7 }, 'root');
-      store.createMessage(message('after', 'user', 30));
+      await store.createMessage(message('after', 'user', 30));
       await store.createPart({ id: 'stream', messageId: 'after', type: 'text', text: '', createdAt: 8 }, 'root');
       const tool: ToolPart = {
         id: 'tool',
@@ -128,7 +128,7 @@ function runConversationContract(name: string, createStore: () => ConversationSt
         createdAt: 10,
       }, 'root');
 
-      expect(store.listMessagesWithParts('root').map(entry => entry.message.id)).toEqual([
+      expect((await store.listMessagesWithParts('root')).map(entry => entry.message.id)).toEqual([
         'old', 'trigger', 'summary', 'after',
       ]);
       expect((await store.getPartsByMessage('old')).map(part => part.id)).toEqual(['part-z', 'part-a']);
@@ -184,14 +184,14 @@ function runConversationContract(name: string, createStore: () => ConversationSt
         childSessionId: 'child-a',
       });
 
-      const history = store.buildEffectiveContextHistory('root');
+      const history = await store.buildEffectiveContextHistory('root');
       expect(history.latestCompactionBoundary).toBe('trigger');
       expect(history.messages.map(entry => entry.message.id)).toEqual(['trigger', 'summary', 'after']);
-      expect(store.deleteMessage('after')).toBe(true);
+      expect(await store.deleteMessage('after')).toBe(true);
       expect(await store.getPart('stream')).toBeNull();
-      expect(store.listLatestMessagesWithPartsPage('root', 2).messages.map(entry => entry.message.id))
+      expect((await store.listLatestMessagesWithPartsPage('root', 2)).messages.map(entry => entry.message.id))
         .toEqual(['trigger', 'summary']);
-      expect(store.listLatestMessagesWithPartsPage('root', 2).pagination.hasOlder).toBe(true);
+      expect((await store.listLatestMessagesWithPartsPage('root', 2)).pagination.hasOlder).toBe(true);
       store.close?.();
     });
   });
@@ -210,23 +210,23 @@ describe('D2-017 FTS read-your-writes invariant', () => {
     const indexCalls: string[] = [];
     const indexedText = new Map<string, string>();
     bundle.index = {
-      syncMessage: (messageId) => {
+      syncMessage: async (messageId) => {
         indexCalls.push(messageId);
-        const entry = bundle.conversation.getMessageWithParts(messageId);
+        const entry = await bundle.conversation.getMessageWithParts(messageId);
         const text = entry?.parts
           .filter((part): part is Extract<typeof part, { type: 'text' }> => part.type === 'text')
           .map(part => part.text)
           .join('') ?? '';
         indexedText.set(messageId, text);
       },
-      removeMessage: (messageId) => {
+      removeMessage: async (messageId) => {
         indexedText.delete(messageId);
       },
     };
 
     await withStorage(bundle, async () => {
-      bundle.conversation.createSession(session('root'));
-      bundle.conversation.createMessage(message('fts-message', 'user', 100));
+      await bundle.conversation.createSession(session('root'));
+      await bundle.conversation.createMessage(message('fts-message', 'user', 100));
       await createRuntimePart({
         id: 'fts-part',
         messageId: 'fts-message',
@@ -237,7 +237,7 @@ describe('D2-017 FTS read-your-writes invariant', () => {
       await updateRuntimePart('fts-part', { text: 'finalized content' }, { syncFts: false });
 
       expect(indexCalls).toEqual([]);
-      syncMessageFts('fts-message');
+      await syncMessageFts('fts-message');
       expect(indexCalls).toEqual(['fts-message']);
       expect(indexedText.get('fts-message')).toBe('finalized content');
 
@@ -299,32 +299,32 @@ runToolOutputArtifactContract('SQLite tool output artifact store', () => {
 });
 
 describe('storage persistence and queue contracts', () => {
-  test('creates missing parent directories for SQLite paths', () => {
+  test('creates missing parent directories for SQLite paths', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'capek-nested-storage-'));
     temporaryDirectories.push(directory);
     const store = createSqliteConversationStore({
       path: join(directory, 'missing', 'nested', 'conversation.sqlite'),
     });
 
-    store.createSession(session('root'));
-    expect(store.getSession('root')?.id).toBe('root');
+    await store.createSession(session('root'));
+    expect((await store.getSession('root'))?.id).toBe('root');
     store.close();
   });
 
-  test('reopens SQLite and resumes sequence, child, and transcript state', () => {
+  test('reopens SQLite and resumes sequence, child, and transcript state', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'capek-reopen-'));
     temporaryDirectories.push(directory);
     const path = join(directory, 'conversation.sqlite');
     const first = createSqliteConversationStore({ path });
-    first.createSession(session('root'));
-    first.createSession(session('child-a', 'root'));
-    first.createMessage(message('first', 'user', 1));
+    await first.createSession(session('root'));
+    await first.createSession(session('child-a', 'root'));
+    await first.createMessage(message('first', 'user', 1));
     first.close();
 
     const reopened = createSqliteConversationStore({ path });
-    reopened.createMessage(message('second', 'user', 0));
-    expect(reopened.listMessagesWithParts('root').map(entry => entry.message.id)).toEqual(['first', 'second']);
-    expect(reopened.getChildSessions('root').map(child => child.id)).toEqual(['child-a']);
+    await reopened.createMessage(message('second', 'user', 0));
+    expect((await reopened.listMessagesWithParts('root')).map(entry => entry.message.id)).toEqual(['first', 'second']);
+    expect((await reopened.getChildSessions('root')).map(child => child.id)).toEqual(['child-a']);
     reopened.close();
   });
 

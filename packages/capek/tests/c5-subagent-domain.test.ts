@@ -296,8 +296,8 @@ describe('C5 subagent composed scope ownership', () => {
         });
         expect(Object.keys(tools)).toEqual(['retrieve-tool-output']);
       });
-      expect(agentScope.require(capekSubagentDomainKey).canSpawnSubagent('child-2')).toBe(false);
-      expect(agentScope.require(capekSubagentDomainKey).canSpawnSubagent('root')).toBe(true);
+      expect(await agentScope.require(capekSubagentDomainKey).canSpawnSubagent('child-2')).toBe(false);
+      expect(await agentScope.require(capekSubagentDomainKey).canSpawnSubagent('root')).toBe(true);
     } finally {
       await agentScope.dispose();
       await processScope.dispose();

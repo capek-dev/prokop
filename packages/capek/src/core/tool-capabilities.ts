@@ -8,13 +8,13 @@ const RESTRICTED_CAPABILITIES: Record<ToolExecutionScope, ReadonlySet<string>> =
   scheduled: new Set(['interactive-user-input']),
 };
 
-export function resolveToolExecutionScopes(
+export async function resolveToolExecutionScopes(
   sessionId: string,
-  sessionLookup: (id: string) => Session | null = getSession,
-): ReadonlySet<ToolExecutionScope> {
+  sessionLookup: (id: string) => Session | null | Promise<Session | null> = getSession,
+): Promise<ReadonlySet<ToolExecutionScope>> {
   const scopes = new Set<ToolExecutionScope>();
   const visited = new Set<string>();
-  let current = sessionLookup(sessionId);
+  let current = await sessionLookup(sessionId);
 
   if (!current) {
     return scopes;
@@ -38,7 +38,7 @@ export function resolveToolExecutionScopes(
       break;
     }
 
-    current = sessionLookup(current.parentId);
+    current = await sessionLookup(current.parentId);
   }
 
   return scopes;

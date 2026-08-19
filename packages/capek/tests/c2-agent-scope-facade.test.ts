@@ -170,7 +170,7 @@ describe('createAgent through the agent scope', () => {
     expect(entry.context.modelId).toBe('gpt-4o-mini');
     expect(entry.context.sessionId).toBe(result.sessionId);
 
-    const session = bundle.conversation.getSession(result.sessionId);
+    const session = await bundle.conversation.getSession(result.sessionId);
     expect(session).toMatchObject({
       preconfigId: 'capek-default',
       selectedModel: 'gpt-4o-mini',
@@ -228,10 +228,10 @@ describe('simultaneous facade agents', () => {
 
     expect(results[0].status).toBe('completed');
     expect(results[1].status).toBe('completed');
-    expect(conversationA.getSession(results[0].sessionId)).not.toBeNull();
-    expect(conversationB.getSession(results[1].sessionId)).not.toBeNull();
-    expect(conversationA.getSession(results[1].sessionId)).toBeNull();
-    expect(conversationB.getSession(results[0].sessionId)).toBeNull();
+    expect(await conversationA.getSession(results[0].sessionId)).not.toBeNull();
+    expect(await conversationB.getSession(results[1].sessionId)).not.toBeNull();
+    expect(await conversationA.getSession(results[1].sessionId)).toBeNull();
+    expect(await conversationB.getSession(results[0].sessionId)).toBeNull();
 
     await agentA.close();
     await agentB.close();

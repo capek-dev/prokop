@@ -67,9 +67,9 @@ export interface SubagentOutput {
 }
 
 export interface SubagentServiceSessionAccess {
-  getSession(id: string): Session | null;
-  createSession(session: Omit<Session, 'createdAt' | 'updatedAt'> & { createdAt?: string; updatedAt?: string }): Session;
-  updateSession(id: string, updates: SessionUpdates): Session | null;
+  getSession(id: string): Session | null | Promise<Session | null>;
+  createSession(session: Omit<Session, 'createdAt' | 'updatedAt'> & { createdAt?: string; updatedAt?: string }): Session | Promise<Session>;
+  updateSession(id: string, updates: SessionUpdates): Session | null | Promise<Session | null>;
   getWorkspaceAutoApproveSeverity(workspaceId: string): Promise<Session['autoApproveSeverity']>;
 }
 
@@ -176,21 +176,21 @@ Note: Subagent depth is limited to 2 levels. You cannot spawn further subagents 
   };
 }
 
-function computeSessionDepth(sessionId: string, getSessionFn: (id: string) => Session | null): number {
-  return collectSubagentAncestry(sessionId, getSessionFn).depth;
+async function computeSessionDepth(sessionId: string, getSessionFn: (id: string) => Session | null | Promise<Session | null>): Promise<number> {
+  return (await collectSubagentAncestry(sessionId, getSessionFn)).depth;
 }
 
 /** Unscoped depth gate: reads the module-level session accessor. */
-export function canSpawnSubagent(sessionId: string): boolean {
+export async function canSpawnSubagent(sessionId: string): Promise<boolean> {
   return canSpawnSubagentWithDeps(sessionId, getSession);
 }
 
 /** Composed depth gate over the captured session lookup. */
-export function canSpawnSubagentWithDeps(
+export async function canSpawnSubagentWithDeps(
   sessionId: string,
-  getSessionFn: (id: string) => Session | null,
-): boolean {
-  const depth = computeSessionDepth(sessionId, getSessionFn);
+  getSessionFn: (id: string) => Session | null | Promise<Session | null>,
+): Promise<boolean> {
+  const depth = await computeSessionDepth(sessionId, getSessionFn);
   return depth < MAX_SUBAGENT_DEPTH;
 }
 
@@ -214,13 +214,13 @@ export async function getSubagentToolDefinition(
 /** Composed definition resolution over injected lookups. */
 export async function resolveTaskToolDefinitionWithDeps(
   options: GetSubagentToolDefinitionOptions,
-  deps: { getSession: (id: string) => Session | null; listPreconfigs: () => Promise<Preconfig[]> },
+  deps: { getSession: (id: string) => Promise<Session | null>; listPreconfigs: () => Promise<Preconfig[]> },
 ): Promise<ToolDefinition | null> {
   const subagents = await resolveEffectiveSubagentTargets({
     sessionId: options.sessionId,
     canSpawnSubagents: options.canSpawnSubagents,
     allowSelfAsSubagent: options.allowSelfAsSubagent,
-    maximumDepthReached: !canSpawnSubagentWithDeps(options.sessionId, deps.getSession),
+    maximumDepthReached: !(await canSpawnSubagentWithDeps(options.sessionId, deps.getSession)),
   } as ResolveSubagentTargetsOptions, deps);
 
   if (subagents.length === 0) return null;
@@ -304,7 +304,7 @@ async function runSubagent(
   }
 
   // Get parent session for model inheritance
-  const parentSession = getSessionFn(sessionId);
+  const parentSession = await getSessionFn(sessionId);
 
   // Resolve parent's actual model using same fallback chain as main chat:
   // session > parent preconfig > config default
@@ -315,7 +315,7 @@ async function runSubagent(
   const parentProviderId = resolveProviderId(parentSession, parentPreconfig);
 
   // Check depth limit
-  const currentDepth = computeSessionDepth(sessionId, getSessionFn);
+  const currentDepth = await computeSessionDepth(sessionId, getSessionFn);
   if (currentDepth >= MAX_SUBAGENT_DEPTH) {
     return {
       task_id: '',
@@ -347,7 +347,7 @@ async function runSubagent(
     };
   }
 
-  const ancestry = collectSubagentAncestry(sessionId, getSessionFn);
+  const ancestry = await collectSubagentAncestry(sessionId, getSessionFn);
   const policy = evaluateSubagentTarget({
     targetPreconfigId: subagent_type,
     currentPreconfigId: parentSession?.preconfigId ?? null,
@@ -370,11 +370,15 @@ async function runSubagent(
   const abortHandler = () => {
     wasAborted = true;
     if (childSession) {
-      updateSessionFn(childSession.id, { subagentStatus: 'interrupted' });
-      const updatedSession = getSessionFn(childSession.id);
-      if (updatedSession) {
-        broadcastSessUpdated(updatedSession);
-      }
+      void (async () => {
+        await updateSessionFn(childSession!.id, { subagentStatus: 'interrupted' });
+        const updatedSession = await getSessionFn(childSession!.id);
+        if (updatedSession) {
+          broadcastSessUpdated(updatedSession);
+        }
+      })().catch((err: unknown) => {
+        console.error('[executeSubagent] Failed to persist abort status', err);
+      });
     }
   };
 
@@ -403,7 +407,7 @@ async function runSubagent(
     }
 
     if (task_id) {
-      childSession = getSessionFn(task_id);
+      childSession = await getSessionFn(task_id);
       if (!childSession) {
         childSession = null;
       } else {
@@ -417,12 +421,12 @@ async function runSubagent(
         }
 
         resumeFromHistory = true;
-        updateSessionFn(childSession.id, { subagentStatus: 'running' });
+        await updateSessionFn(childSession.id, { subagentStatus: 'running' });
       }
     }
 
     if (!childSession) {
-      childSession = createSessionFn({
+      childSession = await createSessionFn({
         id: randomUUID(),
         workspaceId: workspaceId || parentSession?.workspaceId || '',
         preconfigId: subagent_type,
@@ -502,14 +506,14 @@ async function runSubagent(
 
     // Update subagent status based on execution result
     if (result.error) {
-      updateSessionFn(childSession.id, { subagentStatus: 'error' });
-      const updatedSession = getSessionFn(childSession.id);
+      await updateSessionFn(childSession.id, { subagentStatus: 'error' });
+      const updatedSession = await getSessionFn(childSession.id);
       if (updatedSession) {
         broadcastSessUpdated(updatedSession);
       }
     } else {
-      updateSessionFn(childSession.id, { subagentStatus: 'completed' });
-      const updatedSession = getSessionFn(childSession.id);
+      await updateSessionFn(childSession.id, { subagentStatus: 'completed' });
+      const updatedSession = await getSessionFn(childSession.id);
       if (updatedSession) {
         broadcastSessUpdated(updatedSession);
       }
@@ -561,8 +565,8 @@ async function runSubagent(
     });
 
     if (childSession) {
-      updateSessionFn(childSession.id, { subagentStatus: abortSignal?.aborted ? 'interrupted' : 'error' });
-      const updatedSession = getSessionFn(childSession.id);
+      await updateSessionFn(childSession.id, { subagentStatus: abortSignal?.aborted ? 'interrupted' : 'error' });
+      const updatedSession = await getSessionFn(childSession.id);
       if (updatedSession) {
         broadcastSessUpdated(updatedSession);
       }

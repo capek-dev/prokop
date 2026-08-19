@@ -98,15 +98,15 @@ function bindRuntime(
     ...overrides.storage,
     conversation: {
       ...storage.conversation,
-      getSession: (id: string) => state.sessions.get(id) ?? null,
-      updateSession: (id: string, updates: Partial<Session>) => {
+      getSession: async (id: string) => state.sessions.get(id) ?? null,
+      updateSession: async (id: string, updates: Partial<Session>) => {
         const current = state.sessions.get(id);
         if (!current) return null;
         const updated = { ...current, ...updates } as Session;
         state.sessions.set(id, updated);
         return updated;
       },
-      createSession: (input: Session) => {
+      createSession: async (input: Session) => {
         const created = {
           ...input,
           createdAt: input.createdAt ?? '2026-01-01T00:00:00.000Z',
@@ -115,11 +115,11 @@ function bindRuntime(
         state.sessions.set(created.id, created);
         return created;
       },
-      createMessage: (message: Message) => {
+      createMessage: async (message: Message) => {
         state.messages.push(message);
         return message;
       },
-      updateMessage: (id: string, updates: Partial<Message>) => {
+      updateMessage: async (id: string, updates: Partial<Message>) => {
         const index = state.messages.findIndex((message) => message.id === id);
         if (index === -1) return null;
         state.messages[index] = { ...state.messages[index], ...updates } as Message;
@@ -129,7 +129,7 @@ function bindRuntime(
         state.parts.push(part);
         return part;
       },
-      buildEffectiveContextHistory: (sessionId: string) => ({
+      buildEffectiveContextHistory: async (sessionId: string) => ({
         messages: state.messages
           .filter((message) => message.sessionId === sessionId)
           .map((message) => ({
@@ -139,7 +139,7 @@ function bindRuntime(
         latestCompactionBoundary: null,
         hasCompaction: false,
       }),
-      listMessagesWithParts: (sessionId: string) => state.messages
+      listMessagesWithParts: async (sessionId: string) => state.messages
         .filter((message) => message.sessionId === sessionId)
         .map((message) => ({
           message,
@@ -371,7 +371,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
     bindRuntime(state, {
       storage: {
         conversation: {
-          buildEffectiveContextHistory: () => ({
+          buildEffectiveContextHistory: async () => ({
             messages: [priorMessage],
             latestCompactionBoundary: null,
             hasCompaction: false,
@@ -637,7 +637,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
     bindRuntime(state, {
       storage: {
         conversation: {
-          updateMessage: (id, updates) => {
+          updateMessage: async (id, updates) => {
             const index = state.messages.findIndex((message) => message.id === id);
             if (index === -1) return null;
             state.messages[index] = { ...state.messages[index], ...updates } as Message;
@@ -701,7 +701,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
     bindRuntime(state, {
       storage: {
         conversation: {
-          updateMessage: (id, updates) => {
+          updateMessage: async (id, updates) => {
             const index = state.messages.findIndex((message) => message.id === id);
             if (index === -1) return null;
             state.messages[index] = { ...state.messages[index], ...updates } as Message;
@@ -710,7 +710,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
             }
             return state.messages[index];
           },
-          updateSession: (id, updates) => {
+          updateSession: async (id, updates) => {
             const current = state.sessions.get(id);
             if (!current) return null;
             if (updates.promptTokens !== undefined) order.push('usage.persisted');
@@ -771,7 +771,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
     bindRuntime(state, {
       storage: {
         conversation: {
-          updateSession: (id, updates) => {
+          updateSession: async (id, updates) => {
             const current = state.sessions.get(id);
             if (!current) return null;
             if (updates.promptTokens !== undefined) order.push('usage.persisted');
@@ -975,13 +975,13 @@ describe.serial('Phase 2 orchestration contracts', () => {
     ]);
   });
 
-  test('enforces depth and resume ownership contracts', () => {
+  test('enforces depth and resume ownership contracts', async () => {
     const state = createState();
     state.sessions.set('grandchild', session('grandchild', 'child'));
     bindRuntime(state);
-    expect(canSpawnSubagent('root')).toBe(true);
-    expect(canSpawnSubagent('child')).toBe(true);
-    expect(canSpawnSubagent('grandchild')).toBe(false);
+    expect(await canSpawnSubagent('root')).toBe(true);
+    expect(await canSpawnSubagent('child')).toBe(true);
+    expect(await canSpawnSubagent('grandchild')).toBe(false);
     const child = { parentId: 'parent-1', preconfigId: 'research' };
     expect(getSubagentResumeError(child, 'parent-2', 'research')).toContain('does not belong');
     expect(getSubagentResumeError(child, 'parent-1', 'coding')).toContain('not "coding"');

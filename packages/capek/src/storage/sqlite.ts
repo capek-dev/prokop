@@ -97,7 +97,7 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
 
   let closed = false;
   const store: SqliteConversationStore = {
-    createSession(input) {
+    async createSession(input) {
       const now = new Date().toISOString();
       const session = clone({
         ...input,
@@ -115,12 +115,12 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
       transaction.immediate(session);
       return clone(session);
     },
-    getSession(id) {
+    async getSession(id) {
       const row = db.query('SELECT record FROM capek_sessions WHERE id = ?').get(id) as { record: string } | null;
       return row ? parse<Session>(row.record) : null;
     },
-    updateSession(id, updates: SessionUpdates) {
-      const current = store.getSession(id);
+    async updateSession(id, updates: SessionUpdates) {
+      const current = await store.getSession(id);
       if (!current) return null;
       const updated = { ...current, ...updates, updatedAt: new Date().toISOString() } as Session;
       db.run(
@@ -129,12 +129,12 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
       );
       return clone(updated);
     },
-    getChildSessions(parentId) {
+    async getChildSessions(parentId) {
       return (db.query(
         'SELECT record FROM capek_sessions WHERE parent_id = ? ORDER BY created_at ASC, rowid ASC',
       ).all(parentId) as Array<{ record: string }>).map(row => parse<Session>(row.record));
     },
-    createMessage(message) {
+    async createMessage(message) {
       const transaction = db.transaction((value: Message) => {
         const sequenceRow = db.query(
           'SELECT next_sequence FROM capek_session_sequences WHERE session_id = ?',
@@ -152,16 +152,16 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
       transaction.immediate(message);
       return clone(message);
     },
-    getMessage(id) {
+    async getMessage(id) {
       const row = db.query('SELECT record FROM capek_messages WHERE id = ?').get(id) as { record: string } | null;
       return row ? parse<Message>(row.record) : null;
     },
-    getMessageWithParts(messageId) {
-      const message = store.getMessage(messageId);
+    async getMessageWithParts(messageId) {
+      const message = await store.getMessage(messageId);
       return message ? { message, parts: getPartsByMessage(messageId) } : null;
     },
-    updateMessage(id, updates) {
-      const current = store.getMessage(id);
+    async updateMessage(id, updates) {
+      const current = await store.getMessage(id);
       if (!current) return null;
       const updated = { ...current, ...updates } as Message;
       db.run(
@@ -170,13 +170,13 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
       );
       return clone(updated);
     },
-    deleteMessage(messageId) {
+    async deleteMessage(messageId) {
       return db.run('DELETE FROM capek_messages WHERE id = ?', [messageId]).changes > 0;
     },
-    listMessagesWithParts(sessionId) {
+    async listMessagesWithParts(sessionId) {
       return withParts(listRows(sessionId));
     },
-    listLatestMessagesWithPartsPage(sessionId, limit = 50): TranscriptPageResult {
+    async listLatestMessagesWithPartsPage(sessionId, limit = 50): Promise<TranscriptPageResult> {
       const effectiveLimit = Math.min(Math.max(limit, 1), 100);
       const descending = db.query(
         'SELECT * FROM capek_messages WHERE session_id = ? ORDER BY sequence DESC, created_at DESC, id DESC LIMIT ?',
@@ -196,7 +196,7 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
         },
       };
     },
-    buildEffectiveContextHistory(sessionId) {
+    async buildEffectiveContextHistory(sessionId) {
       const rows = listRows(sessionId);
       let boundary: MessageRow | undefined;
       for (let index = rows.length - 1; index >= 0; index -= 1) {

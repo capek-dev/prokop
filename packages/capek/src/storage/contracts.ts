@@ -64,18 +64,18 @@ export type SessionUpdates = Partial<Pick<Session,
 >>;
 
 export interface ConversationStore {
-  createSession(session: Omit<Session, 'createdAt' | 'updatedAt'> & { createdAt?: string; updatedAt?: string }): Session;
-  getSession(id: string): Session | null;
-  updateSession(id: string, updates: SessionUpdates): Session | null;
-  getChildSessions(parentId: string): Session[];
-  createMessage(message: Message): Message;
-  getMessage(id: string): Message | null;
-  getMessageWithParts(messageId: string): MessageWithParts | null;
-  updateMessage(id: string, updates: Partial<Message>): Message | null;
-  deleteMessage(messageId: string): boolean;
-  listMessagesWithParts(sessionId: string): MessageWithParts[];
-  listLatestMessagesWithPartsPage(sessionId: string, limit?: number): TranscriptPageResult;
-  buildEffectiveContextHistory(sessionId: string): EffectiveContextHistory;
+  createSession(session: Omit<Session, 'createdAt' | 'updatedAt'> & { createdAt?: string; updatedAt?: string }): Promise<Session>;
+  getSession(id: string): Promise<Session | null>;
+  updateSession(id: string, updates: SessionUpdates): Promise<Session | null>;
+  getChildSessions(parentId: string): Promise<Session[]>;
+  createMessage(message: Message): Promise<Message>;
+  getMessage(id: string): Promise<Message | null>;
+  getMessageWithParts(messageId: string): Promise<MessageWithParts | null>;
+  updateMessage(id: string, updates: Partial<Message>): Promise<Message | null>;
+  deleteMessage(messageId: string): Promise<boolean>;
+  listMessagesWithParts(sessionId: string): Promise<MessageWithParts[]>;
+  listLatestMessagesWithPartsPage(sessionId: string, limit?: number): Promise<TranscriptPageResult>;
+  buildEffectiveContextHistory(sessionId: string): Promise<EffectiveContextHistory>;
   createPart(part: Part, sessionId: string): Promise<Part>;
   getPart(id: string): Promise<Part | null>;
   getPartsByMessage(messageId: string): Promise<Part[]>;
@@ -140,8 +140,8 @@ export interface ResponseFormatStore {
 }
 
 export interface ConversationIndex {
-  syncMessage(messageId: string): void;
-  removeMessage?(messageId: string): void;
+  syncMessage(messageId: string): Promise<void>;
+  removeMessage?(messageId: string): Promise<void>;
 }
 
 export interface StorageBundle {

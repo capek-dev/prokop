@@ -61,11 +61,11 @@ export async function runOrchestratorSession(options: OrchestratorSessionOptions
     broadcastSessionCreated: broadcastSessCreated = emitSessionCreated,
     broadcastSessionUpdated: broadcastSessUpdated = emitSessionUpdated,
   } = options;
-  const parentSession = getSession(parentSessionId);
+  const parentSession = await getSession(parentSessionId);
   const config = getModelsConfig();
   const modelId = parentSession?.selectedModel || config.defaultModel;
   const providerId = parentSession?.selectedProvider || config.defaultProvider;
-  const session = createSession({
+  const session = await createSession({
     id: randomUUID(),
     workspaceId: parentSession?.workspaceId || '',
     preconfigId: null,
@@ -86,7 +86,7 @@ export async function runOrchestratorSession(options: OrchestratorSessionOptions
     const userMsgId = randomUUID();
     const userMessage: UserMessage = { id: userMsgId, sessionId: session.id, role: 'user', createdAt: Date.now() };
     const userTextPart: TextPart = { id: randomUUID(), messageId: userMsgId, createdAt: Date.now(), type: 'text', text: userPrompt };
-    createMessage(userMessage);
+    await createMessage(userMessage);
     await createPart(userTextPart, session.id);
     broadcast({ kind: 'message', action: 'created', message: userMessage });
     broadcast({ kind: 'part', action: 'created', sessionId: session.id, part: userTextPart });
@@ -132,12 +132,12 @@ export async function runOrchestratorSession(options: OrchestratorSessionOptions
       completedAt: Date.now(),
       ...(parsedJson ? { structuredOutput: { formatName: title, data: parsedJson } } : {}),
     };
-    createMessage(assistantMessage);
+    await createMessage(assistantMessage);
     await createPart(assistantTextPart, session.id);
     broadcast({ kind: 'message', action: 'created', message: assistantMessage });
     broadcast({ kind: 'part', action: 'created', sessionId: session.id, part: assistantTextPart });
-    updateSession(session.id, { subagentStatus: 'completed' });
-    const updatedSession = getSession(session.id);
+    await updateSession(session.id, { subagentStatus: 'completed' });
+    const updatedSession = await getSession(session.id);
     if (updatedSession) broadcastSessUpdated(updatedSession);
     return { text, json: parsedJson, sessionId: session.id };
   } catch (err) {
@@ -153,8 +153,8 @@ export async function runOrchestratorSession(options: OrchestratorSessionOptions
       stack: err instanceof Error ? err.stack?.split('\n').slice(0, 5).join('\n') : undefined,
     });
 
-    updateSession(session.id, { subagentStatus: abortSignal?.aborted ? 'interrupted' : 'error' });
-    const updatedSession = getSession(session.id);
+    await updateSession(session.id, { subagentStatus: abortSignal?.aborted ? 'interrupted' : 'error' });
+    const updatedSession = await getSession(session.id);
     if (updatedSession) broadcastSessUpdated(updatedSession);
     throw err;
   }

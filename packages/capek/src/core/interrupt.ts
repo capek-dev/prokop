@@ -20,8 +20,9 @@ interface SessionAbortContext {
 
 export class InterruptManager {
   private sessionContexts = new Map<string, SessionAbortContext>();
+  private pendingParentLinks = new Map<string, Promise<void>>();
 
-  registerSession(sessionId: string): AbortController {
+  registerSession(sessionId: string, parentId?: string): AbortController {
     if (this.sessionContexts.has(sessionId)) {
       throw new Error(`Session ${sessionId} already has an active execution`);
     }
@@ -36,19 +37,30 @@ export class InterruptManager {
 
     this.sessionContexts.set(sessionId, context);
 
-    const session = getSession(sessionId);
-    if (session?.parentId) {
-      const parentContext = this.sessionContexts.get(session.parentId);
-      if (parentContext) {
-        parentContext.childSessionIds.add(sessionId);
+    const linkToParent = (resolvedParentId: string): void => {
+      const parentContext = this.sessionContexts.get(resolvedParentId);
+      if (!parentContext) return;
+      parentContext.childSessionIds.add(sessionId);
+      const listener = () => {
+        void this.interruptSession(sessionId, 'cascade');
+      };
+      context.parentId = resolvedParentId;
+      context.parentAbortListener = listener;
+      parentContext.controller.signal.addEventListener('abort', listener);
+    };
 
-        const listener = () => {
-          this.interruptSession(sessionId, 'cascade');
-        };
-        context.parentId = session.parentId;
-        context.parentAbortListener = listener;
-        parentContext.controller.signal.addEventListener('abort', listener);
-      }
+    if (parentId) {
+      linkToParent(parentId);
+    } else {
+      const pending = getSession(sessionId).then(session => {
+        if (session?.parentId) linkToParent(session.parentId);
+      }).catch((err: unknown) => {
+        console.error('[interrupt] Failed to resolve session parent', err);
+      });
+      this.pendingParentLinks.set(sessionId, pending);
+      void pending.finally(() => {
+        if (this.pendingParentLinks.get(sessionId) === pending) this.pendingParentLinks.delete(sessionId);
+      });
     }
 
     return controller;
@@ -78,6 +90,7 @@ export class InterruptManager {
     const cascadedTo: string[] = [];
     const interruptedTools: string[] = [];
     const rejectedAsks: string[] = [];
+    await Promise.all(this.pendingParentLinks.values());
 
     if (context) {
       for (const [toolCallId, { controller: toolController }] of context.toolControllers) {
@@ -107,14 +120,14 @@ export class InterruptManager {
 
     // Only set subagentStatus for actual subagent sessions (those with a parentId)
     // Main sessions should not have their status changed to error on interrupt
-    const session = getSession(sessionId);
+    const session = await getSession(sessionId);
     if (session?.parentId) {
-      updateSession(sessionId, {
+      await updateSession(sessionId, {
         subagentStatus: 'interrupted',
       });
     }
 
-    const childSessions = getChildSessions(sessionId);
+    const childSessions = await getChildSessions(sessionId);
     for (const child of childSessions) {
       if (child.subagentStatus === 'running') {
         const childResult = await this.interruptSession(child.id, 'cascade');

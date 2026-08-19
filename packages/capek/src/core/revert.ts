@@ -13,7 +13,7 @@ interface RevertOptions {
 
 export async function revertToStep(options: RevertOptions): Promise<RevertResult> {
   const { sessionId, targetMessageId, keepTarget = false } = options;
-  const allMessages = listMessagesWithParts(sessionId);
+  const allMessages = await listMessagesWithParts(sessionId);
   const targetIndex = allMessages.findIndex((entry) => entry.message.id === targetMessageId);
   if (targetIndex === -1) throw new Error('Target message not found');
 
@@ -26,12 +26,12 @@ export async function revertToStep(options: RevertOptions): Promise<RevertResult
   for (const { message, parts } of messagesToDelete) {
     partCountRemoved += parts.length;
     removedMessageIds.push(message.id);
-    deleteMessage(message.id);
+    await deleteMessage(message.id);
   }
 
-  for (const { message } of listMessagesWithParts(sessionId)) {
+  for (const { message } of await listMessagesWithParts(sessionId)) {
     if (message.role === 'assistant' && message.status === 'streaming') {
-      updateMessage(message.id, { status: 'error', error: 'Reverted before completion' });
+      await updateMessage(message.id, { status: 'error', error: 'Reverted before completion' });
     }
   }
 

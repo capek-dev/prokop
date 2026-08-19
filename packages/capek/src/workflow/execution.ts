@@ -102,7 +102,7 @@ export interface WorkflowExecutionOptions {
 
 /** Injected dependencies captured by the workflow domain plugin. */
 export interface WorkflowServiceDeps {
-  canSpawn(sessionId: string): boolean;
+  canSpawn(sessionId: string): boolean | Promise<boolean>;
   listSubagents(): Promise<import('@capekai/types').Preconfig[]>;
   executeLeaf(input: SubagentInput): Promise<SubagentOutput>;
   orchestrator: { run(options: OrchestratorSessionOptions): Promise<OrchestratorSessionResult> };
@@ -164,7 +164,7 @@ async function runWorkflow(
   });
 
   // Check depth limit — workflow leaf agents spawn as children of this session
-  if (!deps.canSpawn(options.sessionId)) {
+  if (!(await deps.canSpawn(options.sessionId))) {
     console.warn('[workflow] Blocked: max subagent depth reached', { sessionId: options.sessionId });
     return {
       workflow_id: workflowId,
@@ -417,13 +417,13 @@ export async function getWorkflowToolDefinition(
 /** Composed definition resolution over injected lookups. */
 export async function resolveWorkflowToolDefinitionWithDeps(
   options: GetWorkflowToolDefinitionOptions,
-  deps: { getSession: (id: string) => import('@capekai/types').Session | null; listPreconfigs: () => Promise<import('@capekai/types').Preconfig[]> },
+  deps: { getSession: (id: string) => Promise<import('@capekai/types').Session | null>; listPreconfigs: () => Promise<import('@capekai/types').Preconfig[]> },
 ): Promise<WorkflowToolDefinition | null> {
   const subagents = await resolveEffectiveSubagentTargets({
     sessionId: options.sessionId,
     canSpawnSubagents: options.canSpawnSubagents,
     allowSelfAsSubagent: options.allowSelfAsSubagent,
-    maximumDepthReached: !canSpawnSubagentWithDeps(options.sessionId, deps.getSession),
+    maximumDepthReached: !(await canSpawnSubagentWithDeps(options.sessionId, deps.getSession)),
   } as ResolveSubagentTargetsOptions, deps);
 
   if (subagents.length === 0) return null;

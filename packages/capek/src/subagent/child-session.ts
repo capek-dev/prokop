@@ -67,7 +67,7 @@ export async function executeChildSession(options: {
 
   if (resumeFromHistory) {
     // Load full history with parts (same function handleChat uses)
-    const { messages: historyMessages } = buildEffectiveContextHistory(childSessionId);
+    const { messages: historyMessages } = await buildEffectiveContextHistory(childSessionId);
 
     // Create the new user message
     const newMsgId = randomUUID();
@@ -85,7 +85,7 @@ export async function executeChildSession(options: {
       text: prompt,
     };
     messages = [...historyMessages, { message: newMessage, parts: [textPart] }];
-    createMessage(newMessage);
+    await createMessage(newMessage);
     await createPart(textPart, childSessionId);
   } else {
     const msgId = randomUUID();
@@ -103,7 +103,7 @@ export async function executeChildSession(options: {
       text: prompt,
     };
     messages = [{ message: userMessage, parts: [textPart] }];
-    createMessage(userMessage);
+    await createMessage(userMessage);
     await createPart(textPart, childSessionId);
   }
 
@@ -118,17 +118,17 @@ export async function executeChildSession(options: {
     abortSignal?.addEventListener('abort', abortHandler, { once: true });
   }
 
-  function findRootSessionId(sessionId: string): string {
+  async function findRootSessionId(sessionId: string): Promise<string> {
     let current = sessionId;
-    let session = getSession(current);
+    let session = await getSession(current);
     while (session?.parentId) {
       current = session.parentId;
-      session = getSession(current);
+      session = await getSession(current);
     }
     return current;
   }
 
-  const rootSessionId = findRootSessionId(childSessionId);
+  const rootSessionId = await findRootSessionId(childSessionId);
 
   const askBroadcastFn: AskBroadcastFn = (message) => {
     // Route permission asks to the root session so the user always sees them
@@ -208,15 +208,15 @@ export async function executeChildSession(options: {
       if ('structuredOutput' in event.message && event.message.structuredOutput) {
         structuredOutput = event.message.structuredOutput as StructuredOutputData;
       }
-      updateMessage(event.message.id, event.message, { syncFts: false });
+      await updateMessage(event.message.id, event.message, { syncFts: false });
       if (event.message.mode !== 'retry_failed') {
         emitTerminal(event.message, childSessionId);
       }
       broadcastToSessionFn({ kind: 'message', action: 'updated', message: event.message });
     } else if (event.type === 'usage') {
-      const currentSession = getSession(childSessionId);
+      const currentSession = await getSession(childSessionId);
       if (currentSession) {
-        updateSession(childSessionId, {
+        await updateSession(childSessionId, {
           promptTokens: event.usage.promptTokens,
           completionTokens: event.usage.completionTokens,
           totalTokens: event.usage.totalTokens,

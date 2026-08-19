@@ -56,7 +56,7 @@ export function createInMemoryConversationStore(): ConversationStore {
     }));
 
   const store: ConversationStore = {
-    createSession(input) {
+    async createSession(input) {
       const now = new Date().toISOString();
       const session = copy({
         ...input,
@@ -68,24 +68,24 @@ export function createInMemoryConversationStore(): ConversationStore {
       sessions.set(session.id, session);
       return copy(session);
     },
-    getSession(id) {
+    async getSession(id) {
       const session = sessions.get(id);
       return session ? copy(session) : null;
     },
-    updateSession(id, updates: SessionUpdates) {
+    async updateSession(id, updates: SessionUpdates) {
       const current = sessions.get(id);
       if (!current) return null;
       const updated = copy({ ...current, ...updates, updatedAt: new Date().toISOString() }) as Session;
       sessions.set(id, updated);
       return copy(updated);
     },
-    getChildSessions(parentId) {
+    async getChildSessions(parentId) {
       return [...sessions.values()]
         .filter(session => session.parentId === parentId)
         .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
         .map(copy);
     },
-    createMessage(message) {
+    async createMessage(message) {
       if (!sessions.has(message.sessionId)) throw new Error(`Session does not exist: ${message.sessionId}`);
       if (messages.has(message.id)) throw new Error(`Message already exists: ${message.id}`);
       const sequence = nextSequence.get(message.sessionId) ?? 1;
@@ -93,29 +93,29 @@ export function createInMemoryConversationStore(): ConversationStore {
       messages.set(message.id, { message: copy(message), sequence });
       return copy(message);
     },
-    getMessage(id) {
+    async getMessage(id) {
       const record = messages.get(id);
       return record ? copy(record.message) : null;
     },
-    getMessageWithParts(messageId) {
+    async getMessageWithParts(messageId) {
       const record = messages.get(messageId);
       return record ? { message: copy(record.message), parts: getPartsByMessage(messageId) } : null;
     },
-    updateMessage(id, updates) {
+    async updateMessage(id, updates) {
       const current = messages.get(id);
       if (!current) return null;
       current.message = copy({ ...current.message, ...updates }) as Message;
       return copy(current.message);
     },
-    deleteMessage(messageId) {
+    async deleteMessage(messageId) {
       if (!messages.delete(messageId)) return false;
       for (const [id, record] of parts) {
         if (record.part.messageId === messageId) parts.delete(id);
       }
       return true;
     },
-    listMessagesWithParts,
-    listLatestMessagesWithPartsPage(sessionId, limit = 50): TranscriptPageResult {
+    async listMessagesWithParts(sessionId) { return listMessagesWithParts(sessionId); },
+    async listLatestMessagesWithPartsPage(sessionId, limit = 50): Promise<TranscriptPageResult> {
       const effectiveLimit = Math.min(Math.max(limit, 1), 100);
       const ordered = orderedMessages(sessionId);
       const selected = ordered.slice(-effectiveLimit);
@@ -132,7 +132,7 @@ export function createInMemoryConversationStore(): ConversationStore {
         },
       };
     },
-    buildEffectiveContextHistory(sessionId) {
+    async buildEffectiveContextHistory(sessionId) {
       const ordered = orderedMessages(sessionId);
       let boundary: StoredMessage | undefined;
       for (let index = ordered.length - 1; index >= 0; index -= 1) {
@@ -308,7 +308,7 @@ export function createInMemoryStorageBundle(records: InMemoryAuxiliaryRecords = 
   const responseFormatStore: ResponseFormatStore = {
     get: async id => copy(responseFormats.get(id) ?? null),
   };
-  const index: ConversationIndex = { syncMessage: () => {} };
+  const index: ConversationIndex = { syncMessage: async () => {} };
   return {
     conversation: createInMemoryConversationStore(),
     toolOutputArtifacts: createInMemoryToolOutputArtifactStore(),
