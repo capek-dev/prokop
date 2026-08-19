@@ -1,5 +1,5 @@
 /**
- * Internal workspace policy entrypoint (`@capekai/core/internal/workspace`).
+ * Public workspace policy entrypoint (`@capekai/core/workspace`).
  *
  * Exposes exactly the workspace path policy identities the Jean2 server
  * consumes through its workspace-paths adapter: containment and

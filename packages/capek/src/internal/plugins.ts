@@ -1,4 +1,4 @@
-/** Internal composition plugin inventory for embedding hosts. */
+/** Public composition plugin inventory for embedding hosts. */
 
 export {
   contextSourcesValuePlugin,

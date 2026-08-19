@@ -1,5 +1,5 @@
 /**
- * Internal tools entrypoint (`@capekai/core/internal/tools`).
+ * Public tools entrypoint (`@capekai/core/tools`).
  *
  * Exposes exactly the tool-registry and artifact identities the Jean2
  * server consumes: scanning, listing, tool-path configuration, the tool
@@ -13,6 +13,7 @@ export {
   configureToolsPath,
   getTool,
   listTools,
+  loadToolModule,
   scanTools,
 } from '../tools/registry';
 export {

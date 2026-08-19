@@ -1,5 +1,5 @@
 /**
- * Internal ask authority entrypoint (`@capekai/core/internal/ask-authority`).
+ * Public ask authority entrypoint (`@capekai/core/ask-authority`).
  *
  * Exposes exactly the pending-ask permission identities the Jean2 server
  * consumes at the wire boundary: response resolution, pending-ask session

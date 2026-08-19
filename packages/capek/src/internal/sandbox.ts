@@ -1,5 +1,5 @@
 /**
- * Internal sandbox entrypoint (`@capekai/core/internal/sandbox`).
+ * Public sandbox entrypoint (`@capekai/core/sandbox`).
  *
  * Exposes exactly the sandbox identities the Jean2 server consumes: the
  * process controller, provider registration, and the wire message types

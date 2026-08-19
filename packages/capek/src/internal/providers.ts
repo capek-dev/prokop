@@ -1,5 +1,5 @@
 /**
- * Internal providers entrypoint (`@capekai/core/internal/providers`).
+ * Public providers entrypoint (`@capekai/core/providers`).
  *
  * Exposes exactly the provider-registry identities the Jean2 server
  * consumes: registration, lookup, status, connect/disconnect, model

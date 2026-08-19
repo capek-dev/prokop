@@ -1,5 +1,5 @@
 /**
- * Internal configuration entrypoint (`@capekai/core/internal/configuration`).
+ * Public configuration entrypoint (`@capekai/core/configuration`).
  *
  * Exposes exactly the runtime-configuration identities the Jean2 server
  * consumes through its runtime-configuration adapter: the configuration

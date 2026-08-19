@@ -1,5 +1,5 @@
 /**
- * Internal host-composition entrypoint (`@capekai/core/internal/hosts`).
+ * Public host-composition entrypoint (`@capekai/core/hosts`).
  *
  * Exposes exactly the process-global host configuration the Jean2 server
  * bootstrap installs: runtime host bindings, session-search and scheduler

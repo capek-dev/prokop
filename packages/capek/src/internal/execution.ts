@@ -1,5 +1,5 @@
 /**
- * Internal execution entrypoint (`@capekai/core/internal/execution`).
+ * Public execution entrypoint (`@capekai/core/execution`).
  *
  * Exposes exactly the agent execution identities the Jean2 server consumes
  * through its execution port: chat, edit, title regeneration, compaction,
