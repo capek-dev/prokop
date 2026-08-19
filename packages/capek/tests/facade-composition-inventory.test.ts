@@ -81,11 +81,7 @@ describe('createAgent composition inventory', () => {
     const agent = createAgent({
       model: 'openai/gpt-4o-mini',
       workspace: root,
-      interaction: 'terminal',
-      terminal: {
-        request: async () => ({ type: 'form', answers: [] }),
-        close: () => {},
-      },
+      interaction: async () => ({ type: 'form', answers: [] }),
       sandbox: {
         onEvent: captureHistory(() => {}, history),
       },

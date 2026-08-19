@@ -233,17 +233,6 @@ describe('createAgent facade', () => {
     await agent.close();
   });
 
-  test('does not block when terminal interaction is configured but unused', async () => {
-    const root = await workspace();
-    const agent = createAgent({
-      model: 'openai/gpt-4o-mini',
-      workspace: root,
-      interaction: 'terminal',
-    });
-
-    await agent.close();
-  });
-
   test('denies unsafe tool permissions without an interaction handler', async () => {
     const root = await workspace();
     const agent = createAgent({
@@ -447,29 +436,20 @@ describe('createAgent facade', () => {
     await agent.close();
   });
 
-  test('closes terminal interaction when interrupted', async () => {
+  test('interrupt settles a run with a pending interaction request', async () => {
     const root = await workspace();
     let requested!: () => void;
     const requestStarted = new Promise<void>((resolve) => {
       requested = resolve;
     });
-    let closeCount = 0;
     const agent = createAgent({
       model: 'openai/gpt-4o-mini',
       workspace: root,
       tools: localTools(),
-      interaction: 'terminal',
-      terminal: {
-        request: async (_message, signal) => {
+      interaction: () =>
+        new Promise(() => {
           requested();
-          await new Promise<void>((_resolve, reject) => {
-            signal.addEventListener('abort', () => reject(signal.reason), { once: true });
-          });
-        },
-        close: () => {
-          closeCount += 1;
-        },
-      },
+        }),
       sandbox: {
         rules: [{
           match: { mode: 'stream', hasToolResults: false },
@@ -489,7 +469,6 @@ describe('createAgent facade', () => {
     const result = await running;
 
     expect(result.status).toBe('interrupted');
-    expect(closeCount).toBeGreaterThan(0);
     await agent.close();
   });
 
@@ -501,41 +480,6 @@ describe('createAgent facade', () => {
 
     await expect(Promise.all([agent.close(), agent.close()])).resolves.toEqual([undefined, undefined]);
     await rejected;
-  });
-
-  test('aborts the captured terminal signal when a run settles', async () => {
-    const root = await workspace();
-    let capturedSignal: AbortSignal | undefined;
-    const agent = createAgent({
-      model: 'openai/gpt-4o-mini',
-      workspace: root,
-      tools: localTools(),
-      interaction: 'terminal',
-      terminal: {
-        request: async (_message, signal) => {
-          capturedSignal = signal;
-          return { type: 'form', answers: [{ answer: true }] };
-        },
-        close: () => {},
-      },
-      sandbox: {
-        rules: [{
-          match: { mode: 'stream', hasToolResults: false },
-          response: {
-            type: 'tool-call',
-            toolName: 'question',
-            args: { title: 'Choose', questions: [{ type: 'confirm', question: 'Continue?' }] },
-          },
-          maxUses: 1,
-        }],
-      },
-    });
-
-    const result = await agent.run('ask');
-
-    expect(result.status).toBe('completed');
-    expect(capturedSignal?.aborted).toBe(true);
-    await agent.close();
   });
 
   test('persists large tool results as scoped artifacts retrievable through the Agent API', async () => {
