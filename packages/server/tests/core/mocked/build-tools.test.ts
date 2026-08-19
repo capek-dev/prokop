@@ -30,7 +30,7 @@ function configureBindings(overrides: BindingOverrides = {}): void {
     ...jean2StorageBundle,
     conversation: {
       ...jean2StorageBundle.conversation,
-      getSession: (id) => {
+      getSession: async (id) => {
         if (overrides.sessionNotFound) return null;
         const session = overrides.sessions?.[id];
         return session

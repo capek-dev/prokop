@@ -114,7 +114,7 @@ describe('subagent ancestry collection', () => {
     resetTestDatabase();
   });
 
-  test('walks nearest parent first and skips null preconfig IDs', () => {
+  test('walks nearest parent first and skips null preconfig IDs', async () => {
     const root = seedSession('ws1', { id: 'root', preconfigId: 'A' });
     const orchestrator = seedSession('ws1', {
       id: 'orchestrator',
@@ -127,13 +127,13 @@ describe('subagent ancestry collection', () => {
       preconfigId: 'B',
     });
 
-    expect(collectSubagentAncestry(child.id)).toEqual({
+    expect(await collectSubagentAncestry(child.id)).toEqual({
       preconfigIds: ['B', 'A'],
       depth: 2,
     });
   });
 
-  test('stops safely when session parent links form a cycle', () => {
+  test('stops safely when session parent links form a cycle', async () => {
     const first = seedSession('ws1', { id: 'first', preconfigId: 'A' });
     const second = seedSession('ws1', {
       id: 'second',
@@ -142,7 +142,7 @@ describe('subagent ancestry collection', () => {
     });
     updateSession(first.id, { parentId: second.id });
 
-    expect(collectSubagentAncestry(second.id)).toEqual({
+    expect(await collectSubagentAncestry(second.id)).toEqual({
       preconfigIds: ['B', 'A'],
       depth: 2,
     });

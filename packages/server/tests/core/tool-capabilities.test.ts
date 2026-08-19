@@ -53,7 +53,7 @@ describe('resolveToolExecutionScopes', () => {
   test('returns empty scope set when session is missing', async () => {
     mockSessionLookup({});
     const { resolveToolExecutionScopes } = await import('@capekai/core/execution');
-    expect(resolveToolExecutionScopes('missing', sessionLookup)).toEqual(new Set());
+    expect(await resolveToolExecutionScopes('missing', sessionLookup)).toEqual(new Set());
   });
 
   test('returns empty scope set for a top-level interactive session', async () => {
@@ -74,7 +74,7 @@ describe('resolveToolExecutionScopes', () => {
       },
     });
     const { resolveToolExecutionScopes } = await import('@capekai/core/execution');
-    expect(resolveToolExecutionScopes('top-1', sessionLookup)).toEqual(new Set());
+    expect(await resolveToolExecutionScopes('top-1', sessionLookup)).toEqual(new Set());
   });
 
   test('adds subsession when current session has a parent', async () => {
@@ -109,7 +109,7 @@ describe('resolveToolExecutionScopes', () => {
       },
     });
     const { resolveToolExecutionScopes } = await import('@capekai/core/execution');
-    const scopes = resolveToolExecutionScopes('child-1', sessionLookup);
+    const scopes = await resolveToolExecutionScopes('child-1', sessionLookup);
     expect(scopes.has('subsession')).toBe(true);
     expect(scopes.has('scheduled')).toBe(false);
   });
@@ -132,7 +132,7 @@ describe('resolveToolExecutionScopes', () => {
       },
     });
     const { resolveToolExecutionScopes } = await import('@capekai/core/execution');
-    const scopes = resolveToolExecutionScopes('sched-1', sessionLookup);
+    const scopes = await resolveToolExecutionScopes('sched-1', sessionLookup);
     expect(scopes.has('subsession')).toBe(false);
     expect(scopes.has('scheduled')).toBe(true);
   });
@@ -169,7 +169,7 @@ describe('resolveToolExecutionScopes', () => {
       },
     });
     const { resolveToolExecutionScopes } = await import('@capekai/core/execution');
-    const scopes = resolveToolExecutionScopes('child-1', sessionLookup);
+    const scopes = await resolveToolExecutionScopes('child-1', sessionLookup);
     expect(scopes.has('subsession')).toBe(true);
     expect(scopes.has('scheduled')).toBe(true);
   });
@@ -192,7 +192,7 @@ describe('resolveToolExecutionScopes', () => {
       },
     });
     const { resolveToolExecutionScopes } = await import('@capekai/core/execution');
-    const scopes = resolveToolExecutionScopes('root-1', sessionLookup);
+    const scopes = await resolveToolExecutionScopes('root-1', sessionLookup);
     expect(scopes.has('scheduled')).toBe(false);
   });
 
@@ -214,7 +214,7 @@ describe('resolveToolExecutionScopes', () => {
       },
     });
     const { resolveToolExecutionScopes } = await import('@capekai/core/execution');
-    const scopes = resolveToolExecutionScopes('root-1', sessionLookup);
+    const scopes = await resolveToolExecutionScopes('root-1', sessionLookup);
     expect(scopes.has('scheduled')).toBe(false);
   });
 
@@ -235,7 +235,7 @@ describe('resolveToolExecutionScopes', () => {
     };
     mockSessionLookup({ a: cyc });
     const { resolveToolExecutionScopes } = await import('@capekai/core/execution');
-    const scopes = resolveToolExecutionScopes('a', sessionLookup);
+    const scopes = await resolveToolExecutionScopes('a', sessionLookup);
     expect(scopes.has('subsession')).toBe(true);
     expect(scopes.has('scheduled')).toBe(false);
   });
@@ -258,7 +258,7 @@ describe('resolveToolExecutionScopes', () => {
       },
     });
     const { resolveToolExecutionScopes } = await import('@capekai/core/execution');
-    const scopes = resolveToolExecutionScopes('child-1', sessionLookup);
+    const scopes = await resolveToolExecutionScopes('child-1', sessionLookup);
     expect(scopes.has('subsession')).toBe(true);
     expect(scopes.has('scheduled')).toBe(false);
   });

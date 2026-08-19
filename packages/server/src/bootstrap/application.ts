@@ -37,7 +37,6 @@ import {
   configureJean2PreconfigSource,
   createJean2ProviderRegistryPort,
   createJean2SessionExecution,
-  jean2StorageBundle,
 } from '@/adapters/capek';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import {

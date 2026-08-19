@@ -39,14 +39,14 @@ import { jean2ToolOutputArtifactStore } from '@/infrastructure/sqlite/tool-outpu
 
 export const jean2StorageBundle: StorageBundle = {
   conversation: {
-    createSession,
-    createMessage,
-    getMessage,
-    getMessageWithParts,
-    deleteMessage,
-    updateMessage: (id, updates) => updateMessage(id, updates, { syncFts: false }),
-    getSession,
-    updateSession,
+    createSession: async (...args) => createSession(...args),
+    createMessage: async (...args) => createMessage(...args),
+    getMessage: async (...args) => getMessage(...args),
+    getMessageWithParts: async (...args) => getMessageWithParts(...args),
+    deleteMessage: async (...args) => deleteMessage(...args),
+    updateMessage: async (id, updates) => updateMessage(id, updates, { syncFts: false }),
+    getSession: async (...args) => getSession(...args),
+    updateSession: async (...args) => updateSession(...args),
     transitionToolToInterrupted: async (...args) => transitionToolToInterrupted(...args),
     getPartsByMessage: async (...args) => getPartsByMessage(...args),
     createPart: async (part, sessionId) => createPart(part, sessionId, { syncFts: false }),
@@ -54,11 +54,11 @@ export const jean2StorageBundle: StorageBundle = {
     getPart: async (...args) => getPart(...args),
     persistStreamingPartSnapshots: async (...args) => persistStreamingPartSnapshots(...args),
     transitionToolToRunningByCallId: async (...args) => transitionToolToRunningByCallId(...args),
-    getChildSessions,
-    listMessagesWithParts,
-    listLatestMessagesWithPartsPage,
+    getChildSessions: async (...args) => getChildSessions(...args),
+    listMessagesWithParts: async (...args) => listMessagesWithParts(...args),
+    listLatestMessagesWithPartsPage: async (...args) => listLatestMessagesWithPartsPage(...args),
     getPartsBySession: async (...args) => getPartsBySession(...args),
-    buildEffectiveContextHistory,
+    buildEffectiveContextHistory: async (...args) => buildEffectiveContextHistory(...args),
   },
   toolOutputArtifacts: jean2ToolOutputArtifactStore,
   queue: {
@@ -72,7 +72,7 @@ export const jean2StorageBundle: StorageBundle = {
     getAutoApproveSeverity: async (...args) => getWorkspaceAutoApproveSeverity(...args),
   },
   responseFormats: { get: async (...args) => getResponseFormat(...args) },
-  index: { syncMessage: syncMessageFts },
+  index: { syncMessage: async (...args) => syncMessageFts(...args) },
 };
 
 export function configureJean2Storage(): void {

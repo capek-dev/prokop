@@ -10,7 +10,6 @@ import {
   configureJean2ToolSource,
 } from '@/adapters/capek';
 import type { Jean2SchedulerHostDeps } from '@/adapters/capek/scheduler';
-import { jean2StorageBundle } from '@/adapters/capek/storage';
 import type { Jean2SessionSearchHostDeps } from '@/adapters/capek/session-search';
 import { createWiredAgentsApplication } from '@/bootstrap/application';
 import type { AgentsApplication } from '@/application/agents';
