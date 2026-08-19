@@ -70,28 +70,28 @@ function makePermissionAsk(overrides: Partial<PermissionAsk> = {}): PermissionAs
   };
 }
 
-function makeHost(state: InteractionState, matchGrant: RuntimeHost['interaction']['matchGrant'] = () => ({
+function makeHost(state: InteractionState, matchGrant: RuntimeHost['interaction']['matchGrant'] = async () => ({
   matched: false,
   grant: null,
 })): RuntimeHost {
   return {
     interaction: {
-      createPendingAsk: (record: Omit<PendingAskRecord, 'id'>) => {
+      createPendingAsk: async (record: Omit<PendingAskRecord, 'id'>) => {
         const created = { ...record, id: `row-${state.records.size + 1}` };
         state.records.set(created.requestId, created);
         return created.id;
       },
-      removePendingAsk: (id: string) => {
+      removePendingAsk: async (id: string) => {
         const record = [...state.records.values()].find(candidate => candidate.id === id);
         if (record) state.records.delete(record.requestId);
       },
-      removePendingAsksByToolCallId: (toolCallId: string) => {
+      removePendingAsksByToolCallId: async (toolCallId: string) => {
         for (const [requestId, record] of state.records) {
           if (record.toolCallId === toolCallId) state.records.delete(requestId);
         }
       },
-      getPermissionRequestByRequestId: (requestId: string) => state.records.get(requestId) ?? null,
-      resolvePermissionRequestByRequestId: (
+      getPermissionRequestByRequestId: async (requestId: string) => state.records.get(requestId) ?? null,
+      resolvePermissionRequestByRequestId: async (
         requestId: string,
         status: 'approved' | 'denied',
         response: unknown,
@@ -102,14 +102,14 @@ function makeHost(state: InteractionState, matchGrant: RuntimeHost['interaction'
         state.resolutions.push({ requestId, status, response });
         return true;
       },
-      expirePermissionRequest: (id: string) => {
+      expirePermissionRequest: async (id: string) => {
         const record = [...state.records.values()].find(candidate => candidate.id === id);
         if (!record || record.status !== 'pending') return false;
         record.status = 'expired';
         return true;
       },
-      expireOldPermissionRequests: () => 0,
-      cancelPendingRequestsBySession: (sessionId: string) => {
+      expireOldPermissionRequests: async () => 0,
+      cancelPendingRequestsBySession: async (sessionId: string) => {
         let count = 0;
         for (const record of state.records.values()) {
           if (record.sessionId === sessionId && record.status === 'pending') {
@@ -119,21 +119,21 @@ function makeHost(state: InteractionState, matchGrant: RuntimeHost['interaction'
         }
         return count;
       },
-      listPendingAsksBySession: (sessionId: string) =>
+      listPendingAsksBySession: async (sessionId: string) =>
         [...state.records.values()].filter(record => record.sessionId === sessionId),
-      listPendingAsksByRootSession: (rootSessionId: string) =>
+      listPendingAsksByRootSession: async (rootSessionId: string) =>
         [...state.records.values()].filter(record => record.rootSessionId === rootSessionId),
-      listPendingRequestsByRootSession: (rootSessionId: string) =>
+      listPendingRequestsByRootSession: async (rootSessionId: string) =>
         [...state.records.values()].filter(record =>
           record.status === 'pending' && (record.rootSessionId === rootSessionId || record.sessionId === rootSessionId)),
       matchGrant,
-      createGrantFromOptions: (options: unknown) => {
+      createGrantFromOptions: async (options: unknown) => {
         state.grants.push(options);
         return null;
       },
-      getSessionAutoApproveSeverity: () => state.autoApproveSeverity,
+      getSessionAutoApproveSeverity: async () => state.autoApproveSeverity,
       getPermissionTimeoutMs: () => state.permissionTimeoutMs,
-      notifyPermissionRequired: (requestId: string, rootSessionId: string) => {
+      notifyPermissionRequired: async (requestId: string, rootSessionId: string) => {
         state.notifications.push({ requestId, rootSessionId });
       },
     },
@@ -169,6 +169,10 @@ function state(): InteractionState {
 }
 
 let runtime: InteractionState;
+
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 beforeEach(() => {
   runtime = state();
@@ -233,7 +237,7 @@ describe('C6 permission policy contract', () => {
     expect(service.isPermissionApproved({ type: 'permission', grant: 'always' })).toBe(false);
   });
 
-  test('orders risks and bounds server auto-approval by session severity', () => {
+  test('orders risks and bounds server auto-approval by session severity', async () => {
     const service = makePolicy();
     expect(service.isRiskAtOrBelow('low', 'medium')).toBe(true);
     expect(service.isRiskAtOrBelow('medium', 'medium')).toBe(true);
@@ -243,16 +247,16 @@ describe('C6 permission policy contract', () => {
     const high = makePermissionAsk({ risk: 'high' });
 
     runtime.autoApproveSeverity = 'off';
-    expect(service.shouldAutoApprove('session', ask)).toBe(false);
+    expect(await service.shouldAutoApprove('session', ask)).toBe(false);
     runtime.autoApproveSeverity = undefined;
-    expect(service.shouldAutoApprove('session', ask)).toBe(false);
+    expect(await service.shouldAutoApprove('session', ask)).toBe(false);
     runtime.autoApproveSeverity = 'medium';
-    expect(service.shouldAutoApprove('session', ask)).toBe(true);
-    expect(service.shouldAutoApprove('session', high)).toBe(false);
+    expect(await service.shouldAutoApprove('session', ask)).toBe(true);
+    expect(await service.shouldAutoApprove('session', high)).toBe(false);
     // No risk on the ask never auto-approves.
-    expect(service.shouldAutoApprove('session', makePermissionAsk())).toBe(false);
+    expect(await service.shouldAutoApprove('session', makePermissionAsk())).toBe(false);
     // Non-permission asks never auto-approve.
-    expect(service.shouldAutoApprove('session', { type: 'text', question: 'Q?', target: 'human' } as Ask)).toBe(false);
+    expect(await service.shouldAutoApprove('session', { type: 'text', question: 'Q?', target: 'human' } as Ask)).toBe(false);
   });
 
   test('derives permission keys with the exact precedence', () => {
@@ -390,13 +394,14 @@ describe('C6 scoped permission lifecycle', () => {
     const askApi = service.createAskApi('session', 'shared-call', 'fixture', broadcast);
     const generic = askApi({ type: 'text', question: 'First?', target: 'human' }) as Promise<unknown>;
     const permission = askApi(makePermissionAsk()) as Promise<unknown>;
+    await flush();
     const permissionId = [...runtime.records.values()].find(record => record.isPermission)!.requestId;
 
-    expect(service.resolveAsk('shared-call', { type: 'text', value: 'generic' }, 'shared-call#1')).toBe(true);
+    expect(await service.resolveAsk('shared-call', { type: 'text', value: 'generic' }, 'shared-call#1')).toBe(true);
     expect(await generic).toBe('generic');
     expect(runtime.records.get(permissionId)?.status).toBe('pending');
 
-    expect(service.resolvePermission(permissionId, { type: 'permission', grant: 'once' })).toBe(true);
+    expect(await service.resolvePermission(permissionId, { type: 'permission', grant: 'once' })).toBe(true);
     expect(await permission).toBe(true);
   });
 
@@ -405,14 +410,15 @@ describe('C6 scoped permission lifecycle', () => {
     const askApi = service.createAskApi('session', 'identity-call', 'fixture', broadcast);
     const generic = askApi({ type: 'text', question: 'First?', target: 'human' }) as Promise<unknown>;
     const permission = askApi(makePermissionAsk()) as Promise<unknown>;
+    await flush();
     const permissionId = [...runtime.records.values()].find(record => record.isPermission)!.requestId;
 
     // Resolve the permission through resolveAsk with the permission requestId
     // even though the generic alias for the same toolCallId exists first.
-    expect(service.resolveAsk('identity-call', { type: 'permission', grant: 'once' }, permissionId)).toBe(true);
+    expect(await service.resolveAsk('identity-call', { type: 'permission', grant: 'once' }, permissionId)).toBe(true);
     expect(await permission).toBe(true);
     expect(runtime.records.get('identity-call#1')?.status).toBe('pending');
-    expect(service.resolveAsk('identity-call', { type: 'text', value: 'done' })).toBe(true);
+    expect(await service.resolveAsk('identity-call', { type: 'text', value: 'done' })).toBe(true);
     expect(await generic).toBe('done');
   });
 
@@ -422,10 +428,11 @@ describe('C6 scoped permission lifecycle', () => {
     const first = askApi({ type: 'text', question: 'First?', target: 'human' }) as Promise<unknown>;
     const second = askApi({ type: 'confirm', question: 'Second?', target: 'human' }) as Promise<unknown>;
 
+    await flush();
     expect([...runtime.records.keys()]).toEqual(['alias-call#1', 'alias-call#2']);
-    expect(service.resolveAsk('alias-call', { type: 'text', value: 'alpha' })).toBe(true);
+    expect(await service.resolveAsk('alias-call', { type: 'text', value: 'alpha' })).toBe(true);
     expect(await first).toBe('alpha');
-    expect(service.resolveAsk('alias-call', { type: 'confirm', confirmed: true })).toBe(true);
+    expect(await service.resolveAsk('alias-call', { type: 'confirm', confirmed: true })).toBe(true);
     expect(await second).toBe(true);
   });
 
@@ -449,10 +456,11 @@ describe('C6 scoped permission lifecycle', () => {
         broadcastFn: broadcast,
         timeoutMs: 5000,
       });
+      await flush();
       const requestId = [...runtime.records.values()].find(
         record => record.toolCallId === `malformed-${index}`,
       )!.requestId;
-      expect(service.resolvePermission(requestId, outcome)).toBe(true);
+      expect(await service.resolvePermission(requestId, outcome)).toBe(true);
       expect(await decision).toBe(false);
       expect(runtime.records.get(requestId)?.status).toBe('denied');
     }
@@ -461,7 +469,7 @@ describe('C6 scoped permission lifecycle', () => {
     expect(runtime.resolutions.at(-1)?.response).toEqual({ type: 'permission', grant: 'forever' });
   });
 
-  test('records no-waiter decisions for audit and returns false', () => {
+  test('records no-waiter decisions for audit and returns false', async () => {
     const service = makeService();
     runtime.records.set('restart-request', {
       id: 'row-restart',
@@ -476,7 +484,7 @@ describe('C6 scoped permission lifecycle', () => {
       createdAt: Date.now(),
     });
 
-    expect(service.resolvePermission('restart-request', { type: 'permission', grant: 'workspace' })).toBe(false);
+    expect(await service.resolvePermission('restart-request', { type: 'permission', grant: 'workspace' })).toBe(false);
     expect(runtime.records.get('restart-request')?.status).toBe('approved');
     expect(runtime.resolutions).toHaveLength(1);
     expect(runtime.grants).toHaveLength(0);
@@ -500,7 +508,7 @@ describe('C6 scoped permission lifecycle', () => {
 
   test('reuses matching grants before creating or broadcasting a request', async () => {
     const service = makeService();
-    const matchHost = makeHost(runtime, () => ({ matched: true, grant: null }));
+    const matchHost = makeHost(runtime, async () => ({ matched: true, grant: null }));
     configureRuntimeHost(matchHost);
     const approved = await service.requestPermission({
       sessionId: 'session',
@@ -548,12 +556,13 @@ describe('C6 scoped permission lifecycle', () => {
       timeoutMs: 5000,
     });
 
-    const pending = service.getPendingRequestsByRootSession('session');
+    await flush();
+    const pending = await service.getPendingRequestsByRootSession('session');
     expect(pending).toHaveLength(1);
     expect(pending[0].status).toBe('pending');
     const requestId = pending[0].requestId;
 
-    expect(service.resolvePermission(requestId, { type: 'permission', grant: 'workspace' })).toBe(true);
+    expect(await service.resolvePermission(requestId, { type: 'permission', grant: 'workspace' })).toBe(true);
     expect(await promise).toBe(true);
     expect(runtime.grants).toHaveLength(1);
   });
@@ -569,8 +578,9 @@ describe('C6 scoped permission lifecycle', () => {
       risk: 'low',
     })) as Promise<unknown>;
 
+    await flush();
     const requestId = [...runtime.records.values()].find(record => record.toolName === 'scheduler')!.requestId;
-    expect(service.resolvePermission(requestId, { type: 'permission', grant: 'deny' })).toBe(true);
+    expect(await service.resolvePermission(requestId, { type: 'permission', grant: 'deny' })).toBe(true);
     expect(await approval).toBe(false);
 
     const approval2 = askApi(makePermissionAsk({
@@ -580,10 +590,11 @@ describe('C6 scoped permission lifecycle', () => {
       intents: [],
       risk: 'low',
     })) as Promise<unknown>;
+    await flush();
     const secondRequestId = [...runtime.records.values()].find(
       record => record.toolName === 'scheduler' && record.status === 'pending',
     )!.requestId;
-    expect(service.resolvePermission(secondRequestId, { type: 'permission', grant: 'session' })).toBe(true);
+    expect(await service.resolvePermission(secondRequestId, { type: 'permission', grant: 'session' })).toBe(true);
     expect(await approval2).toBe(true);
     expect(runtime.grants).toHaveLength(1);
     expect(runtime.grants[0]).toMatchObject({
@@ -600,7 +611,7 @@ describe('C6 scoped permission lifecycle', () => {
     first.catch(() => {});
     second.catch(() => {});
 
-    expect(service.rejectPendingAsksByToolCallId('cleanup-call', new Error('ended'))).toHaveLength(2);
+    expect(await service.rejectPendingAsksByToolCallId('cleanup-call', new Error('ended'))).toHaveLength(2);
     await expect(first).rejects.toThrow('ended');
     await expect(second).rejects.toThrow('ended');
     expect(runtime.records).toHaveLength(0);
@@ -615,7 +626,8 @@ describe('C6 scoped permission lifecycle', () => {
       timeoutMs: 5000,
     });
     permission.catch(() => {});
-    expect(service.rejectPendingAsksBySession('session', new Error('interrupted')).length).toBeGreaterThanOrEqual(1);
+    await flush();
+    expect((await service.rejectPendingAsksBySession('session', new Error('interrupted'))).length).toBeGreaterThanOrEqual(1);
     await expect(permission).rejects.toThrow('interrupted');
   });
 });
@@ -691,8 +703,8 @@ describe('C6 scoped permission policy composition', () => {
       pendingA.catch(() => {});
       expect(runtimeA.hasPendingAsk('isolated-call')).toBe(true);
       expect(runtimeB.hasPendingAsk('isolated-call')).toBe(false);
-      enterAgentScope(scopeA, () => {
-        runtimeA.rejectPendingAsksBySession('session', new Error('cleanup'));
+      await enterAgentScope(scopeA, async () => {
+        await runtimeA.rejectPendingAsksBySession('session', new Error('cleanup'));
       });
     } finally {
       await scopeA.dispose();
@@ -714,12 +726,12 @@ describe('C6 permission API and request manager surfaces', () => {
     const pending = askApi({ type: 'text', question: 'Forwarded?', target: 'human' }) as Promise<unknown>;
 
     expect(hasPendingAsk('forwarded-call')).toBe(true);
-    expect(getSessionIdForPendingAsk('forwarded-call')).toBe('session');
+    expect(await getSessionIdForPendingAsk('forwarded-call')).toBe('session');
     expect(getAuthorityForPendingAsk('forwarded-call')).toEqual({
       visibilityScope: 'controller_only',
       resolutionMode: 'controller_only',
     });
-    expect(resolveAsk('forwarded-call', { type: 'text', value: 'yes' })).toBe(true);
+    expect(await resolveAsk('forwarded-call', { type: 'text', value: 'yes' })).toBe(true);
     expect(await pending).toBe('yes');
 
     const permission = forwardedRequestPermission({
@@ -731,10 +743,11 @@ describe('C6 permission API and request manager surfaces', () => {
       broadcastFn: broadcast,
       timeoutMs: 5000,
     });
+    await flush();
     const requestId = [...runtime.records.values()].find(record => record.isPermission)!.requestId;
     expect(forwardedHasWaiter(requestId)).toBe(true);
     expect(forwardedWaiterCount()).toBe(1);
-    expect(forwardedResolvePermission(requestId, { type: 'permission', grant: 'once' })).toBe(true);
+    expect(await forwardedResolvePermission(requestId, { type: 'permission', grant: 'once' })).toBe(true);
     expect(await permission).toBe(true);
 
     const rejectPending = forwardedRequestPermission({
@@ -747,12 +760,13 @@ describe('C6 permission API and request manager surfaces', () => {
       timeoutMs: 5000,
     });
     rejectPending.catch(() => {});
-    expect(forwardedRejectPermissionsBySession('session', new Error('interrupted')).length).toBeGreaterThanOrEqual(1);
+    await flush();
+    expect((await forwardedRejectPermissionsBySession('session', new Error('interrupted'))).length).toBeGreaterThanOrEqual(1);
     await expect(rejectPending).rejects.toThrow('interrupted');
 
-    expect(forwardedGetPending('session')).toHaveLength(0);
-    expect(rejectAsk('missing-call', new Error('x'))).toBe(false);
-    expect(rejectPendingAsksByToolCallId('missing-call', new Error('x'))).toHaveLength(0);
-    expect(rejectPendingAsksBySession('missing-session', new Error('x'))).toHaveLength(0);
+    expect(await forwardedGetPending('session')).toHaveLength(0);
+    expect(await rejectAsk('missing-call', new Error('x'))).toBe(false);
+    expect(await rejectPendingAsksByToolCallId('missing-call', new Error('x'))).toHaveLength(0);
+    expect(await rejectPendingAsksBySession('missing-session', new Error('x'))).toHaveLength(0);
   });
 });

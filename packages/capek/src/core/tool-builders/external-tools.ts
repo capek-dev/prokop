@@ -127,7 +127,7 @@ export async function buildExternalTools(options: ExternalToolsOptions): Promise
           return result.result;
         } finally {
           interruptManager.unregisterToolExecution(sessionId, toolCallId);
-          rejectPendingAsksByToolCallId(toolCallId);
+          await rejectPendingAsksByToolCallId(toolCallId);
         }
       },
     });

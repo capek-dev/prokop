@@ -64,7 +64,7 @@ export async function executeSessionSearchToolWithHost(host: SessionSearchHost, 
 }
 
 async function runSessionSearch(host: SessionSearchHost, input: Record<string, unknown>, workspaceId: string, currentSessionId: string, includeToolResults: boolean, risk: PermissionRiskLevel, askFn?: (ask: PermissionAsk) => Promise<unknown>, agentId?: string | null): Promise<SessionSearchResult> {
-  const workspace = host.getWorkspace(workspaceId);
+  const workspace = await host.getWorkspace(workspaceId);
   if (!workspace) return { success: false, mode: 'search', title: 'Workspace not found', error: 'Workspace not found' };
   const query = input.query as string | undefined;
   const scope = (input.scope as string) || 'workspace';
@@ -83,59 +83,69 @@ async function runSessionSearch(host: SessionSearchHost, input: Record<string, u
   return { success: false, mode: 'search', title: 'Invalid arguments', error: 'Provide "action": "list" to enumerate sessions, "query" for search mode, or "sessionId" for read-around mode.' };
 }
 
-function executeList(host: SessionSearchHost, workspaceId: string, currentSessionId: string, input: Record<string, unknown>, scope: string, agentId?: string | null): SessionSearchResult {
+async function executeList(host: SessionSearchHost, workspaceId: string, currentSessionId: string, input: Record<string, unknown>, scope: string, agentId?: string | null): Promise<SessionSearchResult> {
   const limit = Math.min(Math.max((input.limit as number) || 10, 1), 20);
   let sessions: Session[];
   let label: string;
   if (scope === 'agent' && agentId) {
-    sessions = host.listAgentSessions(agentId, limit);
+    sessions = await host.listAgentSessions(agentId, limit);
     label = 'agent sessions (cross-workspace)';
   } else {
-    sessions = host.listWorkspaceSessions(workspaceId);
+    sessions = await host.listWorkspaceSessions(workspaceId);
     label = scope === 'current_session' ? 'current session' : 'workspace';
   }
   const limited = sessions.slice(0, limit);
   if (limited.length === 0) return { success: true, mode: 'list', title: 'No sessions found', sessions: [] };
-  const entries = limited.map((session) => ({ id: session.id, title: session.title || '(untitled)', messageCount: host.countSessionMessages(session.id), updatedAt: session.updatedAt, ...(session.id === currentSessionId && { isCurrent: true }) })) as SessionListEntry[];
+  const entries: SessionListEntry[] = [];
+  for (const session of limited) {
+    entries.push({ id: session.id, title: session.title || '(untitled)', messageCount: await host.countSessionMessages(session.id), updatedAt: session.updatedAt, ...(session.id === currentSessionId && { isCurrent: true }) } as SessionListEntry);
+  }
   return { success: true, mode: 'list', title: `${sessions.length} session${sessions.length === 1 ? '' : 's'} (${label})`, sessions: entries };
 }
 
-function executeSearch(host: SessionSearchHost, query: string, scope: string, workspaceId: string, currentSessionId: string, includeTools: boolean, input: Record<string, unknown>, agentId?: string | null): SessionSearchResult {
+async function executeSearch(host: SessionSearchHost, query: string, scope: string, workspaceId: string, currentSessionId: string, includeTools: boolean, input: Record<string, unknown>, agentId?: string | null): Promise<SessionSearchResult> {
   const limit = Math.min(Math.max((input.limit as number) || 5, 1), 20);
   const sort = ((input.sort as string) || 'relevance') as 'relevance' | 'newest' | 'oldest';
   let roles = (input.roleFilter as string[] | undefined) ?? (includeTools ? ['user', 'assistant', 'tool'] : ['user', 'assistant']);
   roles = roles.filter((role) => ['user', 'assistant', 'tool'].includes(role));
   if (roles.length === 0) roles = ['user', 'assistant'];
-  const results = host.searchMessages({ query, workspaceId: scope === 'agent' ? undefined : workspaceId, agentId: scope === 'agent' ? agentId ?? undefined : undefined, sessionId: scope === 'current_session' ? currentSessionId : undefined, roleFilter: roles, limit, sort });
+  const results = await host.searchMessages({ query, workspaceId: scope === 'agent' ? undefined : workspaceId, agentId: scope === 'agent' ? agentId ?? undefined : undefined, sessionId: scope === 'current_session' ? currentSessionId : undefined, roleFilter: roles, limit, sort });
   if (results.length === 0) return { success: true, mode: 'search', title: 'No prior context found', query, scope, results: [] };
+  const mappedResults: NonNullable<SessionSearchResult['results']> = [];
+  for (const result of results) {
+    mappedResults.push({ sessionId: result.sessionId, sessionTitle: result.sessionTitle, messageId: result.messageId, role: result.role, timestamp: result.timestamp, snippet: result.content, rank: result.rank, messagesBefore: await host.countMessagesBefore(result.sessionId, result.timestamp), messagesAfter: await host.countMessagesAfter(result.sessionId, result.timestamp) });
+  }
   return {
     success: true, mode: 'search', title: `Searched ${scope === 'current_session' ? 'current session' : scope === 'agent' ? 'agent sessions (cross-workspace)' : 'workspace sessions'}`, query, scope,
-    results: results.map((result) => ({ sessionId: result.sessionId, sessionTitle: result.sessionTitle, messageId: result.messageId, role: result.role, timestamp: result.timestamp, snippet: result.content, rank: result.rank, messagesBefore: host.countMessagesBefore(result.sessionId, result.timestamp), messagesAfter: host.countMessagesAfter(result.sessionId, result.timestamp) })),
+    results: mappedResults,
   };
 }
 
-function executeReadAround(host: SessionSearchHost, sessionId: string, anchorId: string | undefined, workspaceId: string, input: Record<string, unknown>, agentId?: string | null): SessionSearchResult {
-  const session = host.getSession(sessionId);
+async function executeReadAround(host: SessionSearchHost, sessionId: string, anchorId: string | undefined, workspaceId: string, input: Record<string, unknown>, agentId?: string | null): Promise<SessionSearchResult> {
+  const session = await host.getSession(sessionId);
   if (!session) return { success: false, mode: 'read', title: 'Session not found', error: 'Session not found' };
   if (session.workspaceId !== workspaceId && !(agentId && session.agentId === agentId)) return { success: false, mode: 'read', title: 'Access denied', error: 'Session does not belong to current workspace or agent' };
   let inferred = false;
-  let anchor = anchorId ? host.getMessage(anchorId, sessionId) : null;
+  let anchor = anchorId ? await host.getMessage(anchorId, sessionId) : null;
   if (!anchorId) {
-    anchor = host.getLatestMessage(sessionId);
+    anchor = await host.getLatestMessage(sessionId);
     inferred = true;
     if (!anchor) return { success: false, mode: 'read', title: 'Empty session', error: 'Session has no messages' };
   }
   if (!anchor) return { success: false, mode: 'read', title: 'Message not found', error: 'Anchor message not found in session' };
   const window = Math.min(Math.max((input.window as number) || 8, 1), 25);
   const half = Math.floor(window / 2);
-  const ids = [...host.listMessagesBefore(sessionId, anchor.timestamp, half).reverse().map((message) => message.id), anchor.id, ...host.listMessagesAfter(sessionId, anchor.timestamp, half).map((message) => message.id)];
-  const messages = ids.flatMap((id) => {
-    const summary = host.getMessageSummary(id);
-    if (!summary) return [];
+  const before = await host.listMessagesBefore(sessionId, anchor.timestamp, half);
+  const after = await host.listMessagesAfter(sessionId, anchor.timestamp, half);
+  const ids = [...before.reverse().map((message) => message.id), anchor.id, ...after.map((message) => message.id)];
+  const messages: NonNullable<SessionSearchResult['messages']> = [];
+  for (const id of ids) {
+    const summary = await host.getMessageSummary(id);
+    if (!summary) continue;
     let text = summary.content;
     if (summary.toolName) text = text ? `${text} [tool: ${summary.toolName}]` : `[tool: ${summary.toolName}]`;
     if (text.length > MAX_CONTENT_LENGTH) text = `${text.slice(0, MAX_CONTENT_LENGTH)}...`;
-    return [{ id, role: summary.role, timestamp: summary.timestamp, content: text || '(no text content)' }];
-  });
-  return { success: true, mode: 'read', title: inferred ? 'Read latest session context' : 'Read session context', sessionId, sessionTitle: session.title, anchorMessageId: anchor.id, ...(inferred && { anchorInferred: true }), messagesBefore: host.countMessagesBefore(sessionId, anchor.timestamp), messagesAfter: host.countMessagesAfter(sessionId, anchor.timestamp), messages };
+    messages.push({ id, role: summary.role, timestamp: summary.timestamp, content: text || '(no text content)' });
+  }
+  return { success: true, mode: 'read', title: inferred ? 'Read latest session context' : 'Read session context', sessionId, sessionTitle: session.title, anchorMessageId: anchor.id, ...(inferred && { anchorInferred: true }), messagesBefore: await host.countMessagesBefore(sessionId, anchor.timestamp), messagesAfter: await host.countMessagesAfter(sessionId, anchor.timestamp), messages };
 }

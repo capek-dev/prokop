@@ -61,25 +61,29 @@ import {
   updateSession,
 } from '../src/storage/runtime';
 
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 function minimalHost(): RuntimeHost {
   return {
     interaction: {
-      createPendingAsk: () => 'pending',
-      removePendingAsk: () => {},
-      removePendingAsksByToolCallId: () => {},
-      getPermissionRequestByRequestId: () => null,
-      resolvePermissionRequestByRequestId: () => false,
-      expirePermissionRequest: () => false,
-      expireOldPermissionRequests: () => 0,
-      cancelPendingRequestsBySession: () => 0,
-      listPendingAsksBySession: () => [],
-      listPendingAsksByRootSession: () => [],
-      listPendingRequestsByRootSession: () => [],
-      matchGrant: () => ({ matched: false, grant: null }),
-      createGrantFromOptions: () => null,
-      getSessionAutoApproveSeverity: () => undefined,
+      createPendingAsk: async () => 'pending',
+      removePendingAsk: async () => {},
+      removePendingAsksByToolCallId: async () => {},
+      getPermissionRequestByRequestId: async () => null,
+      resolvePermissionRequestByRequestId: async () => false,
+      expirePermissionRequest: async () => false,
+      expireOldPermissionRequests: async () => 0,
+      cancelPendingRequestsBySession: async () => 0,
+      listPendingAsksBySession: async () => [],
+      listPendingAsksByRootSession: async () => [],
+      listPendingRequestsByRootSession: async () => [],
+      matchGrant: async () => ({ matched: false, grant: null }),
+      createGrantFromOptions: async () => null,
+      getSessionAutoApproveSeverity: async () => undefined,
       getPermissionTimeoutMs: () => 30 * 60 * 1000,
-      notifyPermissionRequired: () => {},
+      notifyPermissionRequired: async () => {},
     },
     delivery: { emit: () => {} },
     titles: {
@@ -102,19 +106,19 @@ function minimalHost(): RuntimeHost {
 
 function minimalSearchHost(): SessionSearchHost {
   return {
-    getWorkspace: () => null,
-    getSession: () => null,
-    listWorkspaceSessions: () => [],
-    listAgentSessions: () => [],
-    countSessionMessages: () => 0,
-    searchMessages: () => [],
-    countMessagesBefore: () => 0,
-    countMessagesAfter: () => 0,
-    getLatestMessage: () => null,
-    getMessage: () => null,
-    listMessagesBefore: () => [],
-    listMessagesAfter: () => [],
-    getMessageSummary: () => null,
+    getWorkspace: async () => null,
+    getSession: async () => null,
+    listWorkspaceSessions: async () => [],
+    listAgentSessions: async () => [],
+    countSessionMessages: async () => 0,
+    searchMessages: async () => [],
+    countMessagesBefore: async () => 0,
+    countMessagesAfter: async () => 0,
+    getLatestMessage: async () => null,
+    getMessage: async () => null,
+    listMessagesBefore: async () => [],
+    listMessagesAfter: async () => [],
+    getMessageSummary: async () => null,
   };
 }
 
@@ -211,43 +215,43 @@ function configureInteractionHost(state: InteractionState): void {
   const host: RuntimeHost = {
     ...minimalHost(),
     interaction: {
-      createPendingAsk: (record) => {
+      createPendingAsk: async (record) => {
         const created = { ...record, id: `row-${state.records.size + 1}` };
         state.records.set(created.requestId, created);
         return created.id;
       },
-      removePendingAsk: (id) => {
+      removePendingAsk: async (id) => {
         const record = [...state.records.values()].find((candidate) => candidate.id === id);
         if (record) state.records.delete(record.requestId);
       },
-      removePendingAsksByToolCallId: () => {},
-      getPermissionRequestByRequestId: (requestId) => state.records.get(requestId) ?? null,
-      resolvePermissionRequestByRequestId: (requestId, status, response) => {
+      removePendingAsksByToolCallId: async () => {},
+      getPermissionRequestByRequestId: async (requestId) => state.records.get(requestId) ?? null,
+      resolvePermissionRequestByRequestId: async (requestId, status, response) => {
         const record = state.records.get(requestId);
         if (!record || record.status !== 'pending') return false;
         record.status = status;
         state.resolutions.push({ requestId, status, response });
         return true;
       },
-      expirePermissionRequest: (id) => {
+      expirePermissionRequest: async (id) => {
         const record = [...state.records.values()].find((candidate) => candidate.id === id);
         if (!record || record.status !== 'pending') return false;
         record.status = 'expired';
         return true;
       },
-      expireOldPermissionRequests: () => 0,
-      cancelPendingRequestsBySession: () => 0,
-      listPendingAsksBySession: () => [],
-      listPendingAsksByRootSession: () => [],
-      listPendingRequestsByRootSession: () => [],
-      matchGrant: () => ({ matched: false, grant: null }),
-      createGrantFromOptions: (options) => {
+      expireOldPermissionRequests: async () => 0,
+      cancelPendingRequestsBySession: async () => 0,
+      listPendingAsksBySession: async () => [],
+      listPendingAsksByRootSession: async () => [],
+      listPendingRequestsByRootSession: async () => [],
+      matchGrant: async () => ({ matched: false, grant: null }),
+      createGrantFromOptions: async (options) => {
         state.grants.push(options);
         return null;
       },
-      getSessionAutoApproveSeverity: () => undefined,
+      getSessionAutoApproveSeverity: async () => undefined,
       getPermissionTimeoutMs: () => 5000,
-      notifyPermissionRequired: () => {},
+      notifyPermissionRequired: async () => {},
     },
   };
   configureRuntimeHost(host);
@@ -360,7 +364,7 @@ describe('C6 mandatory invariants below configurable policy', () => {
       isValidPermissionResponse: (response: unknown): response is import('@capekai/tool').AskPermissionResponse => true,
       isPermissionApproved: () => true,
       isRiskAtOrBelow: () => true,
-      shouldAutoApprove: () => false,
+      shouldAutoApprove: async () => false,
       buildPermissionKey: () => 'evil',
       isDangerousShellIdentity: () => false,
     };
@@ -376,6 +380,7 @@ describe('C6 mandatory invariants below configurable policy', () => {
         broadcastFn: () => {},
         timeoutMs: 5000,
       });
+      await flush();
       const requestId = [...state.records.values()].find(
         (record) => record.toolCallId === 'evil-call',
       )!.requestId;
@@ -383,7 +388,7 @@ describe('C6 mandatory invariants below configurable policy', () => {
       // Live path: the server handler routes through resolveAsk with the
       // requestId. The runtime validates with the module-level validator,
       // never with the replacement's advice.
-      expect(resolveAsk('evil-call', malformed, requestId)).toBe(true);
+      expect(await resolveAsk('evil-call', malformed, requestId)).toBe(true);
       expect(await pending).toBe(false);
     });
 
@@ -415,7 +420,7 @@ describe('C6 mandatory invariants below configurable policy', () => {
       isValidPermissionResponse: (response: unknown): response is import('@capekai/tool').AskPermissionResponse => true,
       isPermissionApproved: () => true,
       isRiskAtOrBelow: () => true,
-      shouldAutoApprove: () => false,
+      shouldAutoApprove: async () => false,
       buildPermissionKey: () => '/workspace/build/',
       isDangerousShellIdentity: () => false,
     };
@@ -444,6 +449,7 @@ describe('C6 mandatory invariants below configurable policy', () => {
         broadcastFn: () => {},
         timeoutMs: 5000,
       });
+      await flush();
       const requestId = [...state.records.values()].find(
         (record) => record.toolCallId === 'delete-call',
       )!.requestId;
@@ -451,7 +457,7 @@ describe('C6 mandatory invariants below configurable policy', () => {
       // A valid-shaped workspace approval resolves (the response shape is
       // valid), but the runtime persists only the canonical buildGrantParams
       // output, so the out-of-policy scope creates no grant.
-      expect(resolveAsk('delete-call', { type: 'permission', grant: 'workspace' }, requestId)).toBe(true);
+      expect(await resolveAsk('delete-call', { type: 'permission', grant: 'workspace' }, requestId)).toBe(true);
       expect(await pending).toBe(true);
     });
 

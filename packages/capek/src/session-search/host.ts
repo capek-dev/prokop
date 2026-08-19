@@ -12,11 +12,11 @@ export interface SearchMessageResult {
 }
 
 export interface SessionSearchHost {
-  getWorkspace(id: string): Workspace | null;
-  getSession(id: string): Session | null;
-  listWorkspaceSessions(workspaceId: string): Session[];
-  listAgentSessions(agentId: string, limit: number): Session[];
-  countSessionMessages(sessionId: string): number;
+  getWorkspace(id: string): Promise<Workspace | null>;
+  getSession(id: string): Promise<Session | null>;
+  listWorkspaceSessions(workspaceId: string): Promise<Session[]>;
+  listAgentSessions(agentId: string, limit: number): Promise<Session[]>;
+  countSessionMessages(sessionId: string): Promise<number>;
   searchMessages(options: {
     query: string;
     workspaceId?: string;
@@ -25,30 +25,30 @@ export interface SessionSearchHost {
     roleFilter: string[];
     limit: number;
     sort: 'relevance' | 'newest' | 'oldest';
-  }): SearchMessageResult[];
-  countMessagesBefore(sessionId: string, timestamp: number): number;
-  countMessagesAfter(sessionId: string, timestamp: number): number;
-  getLatestMessage(sessionId: string): { id: string; timestamp: number } | null;
-  getMessage(messageId: string, sessionId: string): { id: string; timestamp: number } | null;
-  listMessagesBefore(sessionId: string, timestamp: number, limit: number): Array<{ id: string; role: string; timestamp: number }>;
-  listMessagesAfter(sessionId: string, timestamp: number, limit: number): Array<{ id: string; role: string; timestamp: number }>;
-  getMessageSummary(messageId: string): { role: string; timestamp: number; content: string; toolName: string } | null;
+  }): Promise<SearchMessageResult[]>;
+  countMessagesBefore(sessionId: string, timestamp: number): Promise<number>;
+  countMessagesAfter(sessionId: string, timestamp: number): Promise<number>;
+  getLatestMessage(sessionId: string): Promise<{ id: string; timestamp: number } | null>;
+  getMessage(messageId: string, sessionId: string): Promise<{ id: string; timestamp: number } | null>;
+  listMessagesBefore(sessionId: string, timestamp: number, limit: number): Promise<Array<{ id: string; role: string; timestamp: number }>>;
+  listMessagesAfter(sessionId: string, timestamp: number, limit: number): Promise<Array<{ id: string; role: string; timestamp: number }>>;
+  getMessageSummary(messageId: string): Promise<{ role: string; timestamp: number; content: string; toolName: string } | null>;
 }
 
 const emptyHost: SessionSearchHost = {
-  getWorkspace: () => null,
-  getSession: () => null,
-  listWorkspaceSessions: () => [],
-  listAgentSessions: () => [],
-  countSessionMessages: () => 0,
-  searchMessages: () => [],
-  countMessagesBefore: () => 0,
-  countMessagesAfter: () => 0,
-  getLatestMessage: () => null,
-  getMessage: () => null,
-  listMessagesBefore: () => [],
-  listMessagesAfter: () => [],
-  getMessageSummary: () => null,
+  getWorkspace: async () => null,
+  getSession: async () => null,
+  listWorkspaceSessions: async () => [],
+  listAgentSessions: async () => [],
+  countSessionMessages: async () => 0,
+  searchMessages: async () => [],
+  countMessagesBefore: async () => 0,
+  countMessagesAfter: async () => 0,
+  getLatestMessage: async () => null,
+  getMessage: async () => null,
+  listMessagesBefore: async () => [],
+  listMessagesAfter: async () => [],
+  getMessageSummary: async () => null,
 };
 
 let host = emptyHost;

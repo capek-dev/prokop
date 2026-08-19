@@ -25,7 +25,7 @@ export function requestPermission(params: RequestPermissionParams): Promise<unkn
   return getPermissionRuntimeService().requestPermission(params);
 }
 
-export function resolvePermission(requestId: string, response: unknown): boolean {
+export async function resolvePermission(requestId: string, response: unknown): Promise<boolean> {
   return getPermissionRuntimeService().resolvePermission(requestId, response);
 }
 
@@ -33,19 +33,19 @@ export function rejectPermission(requestId: string, error: Error): boolean {
   return getPermissionRuntimeService().rejectPermission(requestId, error);
 }
 
-export function rejectPermissionsByToolCallId(toolCallId: string, error?: Error): string[] {
+export async function rejectPermissionsByToolCallId(toolCallId: string, error?: Error): Promise<string[]> {
   return getPermissionRuntimeService().rejectPermissionsByToolCallId(toolCallId, error);
 }
 
-export function rejectPermissionsBySession(sessionId: string, error?: Error): string[] {
+export async function rejectPermissionsBySession(sessionId: string, error?: Error): Promise<string[]> {
   return getPermissionRuntimeService().rejectPermissionsBySession(sessionId, error);
 }
 
-export function getPendingRequestsByRootSession(rootSessionId: string): PendingAskRecord[] {
+export async function getPendingRequestsByRootSession(rootSessionId: string): Promise<PendingAskRecord[]> {
   return getPermissionRuntimeService().getPendingRequestsByRootSession(rootSessionId);
 }
 
-export function expireOldRequests(maxAgeMs: number): number {
+export async function expireOldRequests(maxAgeMs: number): Promise<number> {
   return getPermissionRuntimeService().expireOldRequests(maxAgeMs);
 }
 

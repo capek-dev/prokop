@@ -110,7 +110,7 @@ export class InterruptManager {
     }
 
     // Reject any pending asks for this session to unblock waiting tool executions
-    const pendingAskIds = rejectPendingAsksBySession(sessionId);
+    const pendingAskIds = await rejectPendingAsksBySession(sessionId);
     rejectedAsks.push(...pendingAskIds);
 
     // Reject any pending sandbox calls for this session to unblock waitForResponse()

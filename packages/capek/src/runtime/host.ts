@@ -53,22 +53,22 @@ export interface CreateGrantParams {
 }
 
 export interface InteractionHost {
-  createPendingAsk(record: Omit<PendingAskRecord, 'id'>): string;
-  removePendingAsk(id: string): void;
-  removePendingAsksByToolCallId(toolCallId: string): void;
-  getPermissionRequestByRequestId(requestId: string): PendingAskRecord | null;
-  resolvePermissionRequestByRequestId(requestId: string, status: 'approved' | 'denied', resolution?: unknown): boolean;
-  expirePermissionRequest(id: string): boolean;
-  expireOldPermissionRequests(maxAgeMs: number): number;
-  cancelPendingRequestsBySession(sessionId: string): number;
-  listPendingAsksBySession(sessionId: string): PendingAskRecord[];
-  listPendingAsksByRootSession(rootSessionId: string): PendingAskRecord[];
-  listPendingRequestsByRootSession(rootSessionId: string): PendingAskRecord[];
-  matchGrant(params: MatchGrantParams): { matched: boolean; grant: PermissionGrant | null };
-  createGrantFromOptions(params: CreateGrantParams): PermissionGrant | null;
-  getSessionAutoApproveSeverity(sessionId: string): AutoApproveSeverity | undefined;
+  createPendingAsk(record: Omit<PendingAskRecord, 'id'>): Promise<string>;
+  removePendingAsk(id: string): Promise<void>;
+  removePendingAsksByToolCallId(toolCallId: string): Promise<void>;
+  getPermissionRequestByRequestId(requestId: string): Promise<PendingAskRecord | null>;
+  resolvePermissionRequestByRequestId(requestId: string, status: 'approved' | 'denied', resolution?: unknown): Promise<boolean>;
+  expirePermissionRequest(id: string): Promise<boolean>;
+  expireOldPermissionRequests(maxAgeMs: number): Promise<number>;
+  cancelPendingRequestsBySession(sessionId: string): Promise<number>;
+  listPendingAsksBySession(sessionId: string): Promise<PendingAskRecord[]>;
+  listPendingAsksByRootSession(rootSessionId: string): Promise<PendingAskRecord[]>;
+  listPendingRequestsByRootSession(rootSessionId: string): Promise<PendingAskRecord[]>;
+  matchGrant(params: MatchGrantParams): Promise<{ matched: boolean; grant: PermissionGrant | null }>;
+  createGrantFromOptions(params: CreateGrantParams): Promise<PermissionGrant | null>;
+  getSessionAutoApproveSeverity(sessionId: string): Promise<AutoApproveSeverity | undefined>;
   getPermissionTimeoutMs(): number;
-  notifyPermissionRequired(requestId: string, rootSessionId: string): void;
+  notifyPermissionRequired(requestId: string, rootSessionId: string): Promise<void>;
 }
 
 export interface DeliveryHost {

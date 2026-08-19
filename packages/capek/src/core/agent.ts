@@ -322,7 +322,7 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
   } finally {
     if (managesSessionLifecycle) {
       interruptManager.unregisterSession(_sessionId);
-      rejectPendingAsksBySession(_sessionId);
+      await rejectPendingAsksBySession(_sessionId);
 
       if (isMainSession) {
         const updatedSession = await updateSession(_sessionId, { runningAt: null });

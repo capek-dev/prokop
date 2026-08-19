@@ -48,7 +48,7 @@ function permissionAsk(overrides: Partial<PermissionAsk> = {}): PermissionAsk {
 function bindInteraction(
   state: InteractionState,
   session?: Session,
-  matchGrant: RuntimeHost['interaction']['matchGrant'] = () => ({
+  matchGrant: RuntimeHost['interaction']['matchGrant'] = async () => ({
     matched: false,
     grant: null,
   }),
@@ -63,22 +63,22 @@ function bindInteraction(
   });
   const bindings = {
     interaction: {
-      createPendingAsk: (record: Omit<PendingAskRecord, 'id'>) => {
+      createPendingAsk: async (record: Omit<PendingAskRecord, 'id'>) => {
         const created = { ...record, id: `row-${state.records.size + 1}` };
         state.records.set(created.requestId, created);
         return created.id;
       },
-      removePendingAsk: (id: string) => {
+      removePendingAsk: async (id: string) => {
         const record = [...state.records.values()].find(candidate => candidate.id === id);
         if (record) state.records.delete(record.requestId);
       },
-      removePendingAsksByToolCallId: (toolCallId: string) => {
+      removePendingAsksByToolCallId: async (toolCallId: string) => {
         for (const [requestId, record] of state.records) {
           if (record.toolCallId === toolCallId) state.records.delete(requestId);
         }
       },
-      getPermissionRequestByRequestId: (requestId: string) => state.records.get(requestId) ?? null,
-      resolvePermissionRequestByRequestId: (
+      getPermissionRequestByRequestId: async (requestId: string) => state.records.get(requestId) ?? null,
+      resolvePermissionRequestByRequestId: async (
         requestId: string,
         status: 'approved' | 'denied',
         response: unknown,
@@ -89,14 +89,14 @@ function bindInteraction(
         state.resolutions.push({ requestId, status, response });
         return true;
       },
-      expirePermissionRequest: (id: string) => {
+      expirePermissionRequest: async (id: string) => {
         const record = [...state.records.values()].find(candidate => candidate.id === id);
         if (!record || record.status !== 'pending') return false;
         record.status = 'expired';
         return true;
       },
-      expireOldPermissionRequests: () => 0,
-      cancelPendingRequestsBySession: (sessionId: string) => {
+      expireOldPermissionRequests: async () => 0,
+      cancelPendingRequestsBySession: async (sessionId: string) => {
         let count = 0;
         for (const record of state.records.values()) {
           if (record.sessionId === sessionId && record.status === 'pending') {
@@ -106,21 +106,21 @@ function bindInteraction(
         }
         return count;
       },
-      listPendingAsksBySession: (sessionId: string) =>
+      listPendingAsksBySession: async (sessionId: string) =>
         [...state.records.values()].filter(record => record.sessionId === sessionId),
-      listPendingAsksByRootSession: (rootSessionId: string) =>
+      listPendingAsksByRootSession: async (rootSessionId: string) =>
         [...state.records.values()].filter(record => record.rootSessionId === rootSessionId),
-      listPendingRequestsByRootSession: (rootSessionId: string) =>
+      listPendingRequestsByRootSession: async (rootSessionId: string) =>
         [...state.records.values()].filter(record =>
           record.status === 'pending' && (record.rootSessionId === rootSessionId || record.sessionId === rootSessionId)),
       matchGrant,
-      createGrantFromOptions: (options: unknown) => {
+      createGrantFromOptions: async (options: unknown) => {
         state.grants.push(options);
         return null;
       },
-      getSessionAutoApproveSeverity: () => session?.autoApproveSeverity,
+      getSessionAutoApproveSeverity: async () => session?.autoApproveSeverity,
       getPermissionTimeoutMs: () => 5000,
-      notifyPermissionRequired: (requestId: string, rootSessionId: string) => {
+      notifyPermissionRequired: async (requestId: string, rootSessionId: string) => {
         state.notifications.push({ requestId, rootSessionId });
       },
     },
@@ -138,6 +138,10 @@ function state(): InteractionState {
   };
 }
 
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 describe('package-owned generic ask lifecycle', () => {
   let runtime: InteractionState;
 
@@ -146,8 +150,8 @@ describe('package-owned generic ask lifecycle', () => {
     bindInteraction(runtime);
   });
 
-  afterEach(() => {
-    rejectPendingAsksBySession('session', new Error('test cleanup'));
+  afterEach(async () => {
+    await rejectPendingAsksBySession('session', new Error('test cleanup'));
   });
 
   test('extracts values and preserves insertion-order toolCallId aliases', async () => {
@@ -155,10 +159,11 @@ describe('package-owned generic ask lifecycle', () => {
     const first = askApi({ type: 'text', question: 'First?', target: 'human' }) as Promise<unknown>;
     const second = askApi({ type: 'confirm', question: 'Second?', target: 'human' }) as Promise<unknown>;
 
+    await flush();
     expect([...runtime.records.keys()]).toEqual(['tool-call#1', 'tool-call#2']);
-    expect(resolveAsk('tool-call', { type: 'text', value: 'alpha' })).toBe(true);
+    expect(await resolveAsk('tool-call', { type: 'text', value: 'alpha' })).toBe(true);
     expect(await first).toBe('alpha');
-    expect(resolveAsk('tool-call', { type: 'confirm', confirmed: true })).toBe(true);
+    expect(await resolveAsk('tool-call', { type: 'confirm', confirmed: true })).toBe(true);
     expect(await second).toBe(true);
   });
 
@@ -176,8 +181,8 @@ describe('package-owned generic ask lifecycle', () => {
       resolutionMode: 'first_eligible',
       requiredCapabilities: ['browser_tabs'],
     });
-    expect(getSessionIdForPendingAsk('capability-call')).toBe('session');
-    expect(resolveAsk('capability-call', { type: 'client_capability', result: 'tab-1' })).toBe(true);
+    expect(await getSessionIdForPendingAsk('capability-call')).toBe('session');
+    expect(await resolveAsk('capability-call', { type: 'client_capability', result: 'tab-1' })).toBe(true);
     expect(await pending).toBe('tab-1');
 
     const permission = requestPermission({
@@ -188,9 +193,10 @@ describe('package-owned generic ask lifecycle', () => {
       broadcastFn: message => runtime.broadcasts.push(message),
       timeoutMs: 5000,
     });
+    await flush();
     const requestId = [...runtime.records.values()].find(record => record.isPermission)?.requestId;
     expect(requestId).toBeDefined();
-    expect(resolveAsk('wrong-tool-call', { type: 'permission', grant: 'once' }, requestId)).toBe(true);
+    expect(await resolveAsk('wrong-tool-call', { type: 'permission', grant: 'once' }, requestId)).toBe(true);
     expect(await permission).toBe(true);
   });
 
@@ -198,7 +204,7 @@ describe('package-owned generic ask lifecycle', () => {
     const askApi = createAskApi('session', 'replay-call', 'fixture', message => runtime.broadcasts.push(message));
     const pending = askApi({ type: 'text', question: 'Replay?', target: 'human' }) as Promise<unknown>;
 
-    expect(resolveAsk('replay-call', { type: 'text', value: 'answered' }, 'replay-call#1')).toBe(true);
+    expect(await resolveAsk('replay-call', { type: 'text', value: 'answered' }, 'replay-call#1')).toBe(true);
     expect(await pending).toBe('answered');
     expect(runtime.records).toHaveLength(0);
   });
@@ -207,13 +213,14 @@ describe('package-owned generic ask lifecycle', () => {
     const askApi = createAskApi('session', 'shared-call', 'fixture', message => runtime.broadcasts.push(message));
     const generic = askApi({ type: 'text', question: 'First?', target: 'human' }) as Promise<unknown>;
     const permission = askApi(permissionAsk()) as Promise<unknown>;
+    await flush();
     const permissionId = [...runtime.records.values()].find(record => record.isPermission)!.requestId;
 
-    expect(resolveAsk('shared-call', { type: 'text', value: 'generic' }, 'shared-call#1')).toBe(true);
+    expect(await resolveAsk('shared-call', { type: 'text', value: 'generic' }, 'shared-call#1')).toBe(true);
     expect(await generic).toBe('generic');
     expect(runtime.records.get(permissionId)?.status).toBe('pending');
 
-    expect(resolvePermission(permissionId, { type: 'permission', grant: 'once' })).toBe(true);
+    expect(await resolvePermission(permissionId, { type: 'permission', grant: 'once' })).toBe(true);
     expect(await permission).toBe(true);
   });
 
@@ -224,7 +231,7 @@ describe('package-owned generic ask lifecycle', () => {
     first.catch(() => {});
     second.catch(() => {});
 
-    expect(rejectPendingAsksByToolCallId('cleanup-call', new Error('ended'))).toHaveLength(2);
+    expect(await rejectPendingAsksByToolCallId('cleanup-call', new Error('ended'))).toHaveLength(2);
     await expect(first).rejects.toThrow('ended');
     await expect(second).rejects.toThrow('ended');
     expect(runtime.records).toHaveLength(0);
@@ -235,7 +242,7 @@ describe('package-owned generic ask lifecycle', () => {
       target: 'human',
     }) as Promise<unknown>;
     sessionAsk.catch(() => {});
-    expect(rejectPendingAsksBySession('session', new Error('interrupted'))).toHaveLength(1);
+    expect(await rejectPendingAsksBySession('session', new Error('interrupted'))).toHaveLength(1);
     await expect(sessionAsk).rejects.toThrow('interrupted');
   });
 });
@@ -248,8 +255,8 @@ describe('package-owned permission lifecycle and policy', () => {
     bindInteraction(runtime);
   });
 
-  afterEach(() => {
-    rejectPermissionsBySession('session', new Error('test cleanup'));
+  afterEach(async () => {
+    await rejectPermissionsBySession('session', new Error('test cleanup'));
   });
 
   test('approves, denies, persists grants, and binds session grants to the root', async () => {
@@ -263,9 +270,11 @@ describe('package-owned permission lifecycle and policy', () => {
       broadcastFn: message => runtime.broadcasts.push(message),
       timeoutMs: 5000,
     });
+    await flush();
     const approvedId = [...runtime.records.keys()][0];
     resolvePermission(approvedId, { type: 'permission', grant: 'session' });
     expect(await approved).toBe(true);
+    await flush();
     expect(runtime.grants).toHaveLength(1);
     expect(runtime.grants[0]).toMatchObject({
       grantOptions: { scope: 'session', boundRootSessionId: 'session' },
@@ -280,6 +289,7 @@ describe('package-owned permission lifecycle and policy', () => {
       broadcastFn: message => runtime.broadcasts.push(message),
       timeoutMs: 5000,
     });
+    await flush();
     const deniedId = [...runtime.records.keys()].find(id => id !== approvedId)!;
     resolvePermission(deniedId, { type: 'permission', grant: 'deny' });
     expect(await denied).toBe(false);
@@ -304,17 +314,18 @@ describe('package-owned permission lifecycle and policy', () => {
         broadcastFn: message => runtime.broadcasts.push(message),
         timeoutMs: 5000,
       });
+      await flush();
       const requestId = [...runtime.records.values()].find(
         record => record.toolCallId === `malformed-${index}`,
       )!.requestId;
-      expect(resolvePermission(requestId, outcome)).toBe(true);
+      expect(await resolvePermission(requestId, outcome)).toBe(true);
       expect(await decision).toBe(false);
       expect(runtime.records.get(requestId)?.status).toBe('denied');
     }
     expect(runtime.grants).toHaveLength(0);
   });
 
-  test('records no-waiter decisions for audit and returns false', () => {
+  test('records no-waiter decisions for audit and returns false', async () => {
     const requestId = 'restart-request';
     runtime.records.set(requestId, {
       id: 'row-restart',
@@ -329,12 +340,12 @@ describe('package-owned permission lifecycle and policy', () => {
       createdAt: Date.now(),
     });
 
-    expect(resolvePermission(requestId, { type: 'permission', grant: 'workspace' })).toBe(false);
+    expect(await resolvePermission(requestId, { type: 'permission', grant: 'workspace' })).toBe(false);
     expect(runtime.records.get(requestId)?.status).toBe('approved');
     expect(runtime.resolutions).toHaveLength(1);
   });
 
-  test('preserves malformed no-waiter responses in the denied audit record', () => {
+  test('preserves malformed no-waiter responses in the denied audit record', async () => {
     const requestId = 'malformed-restart-request';
     const response = { type: 'text', value: 'yes' };
     runtime.records.set(requestId, {
@@ -350,7 +361,7 @@ describe('package-owned permission lifecycle and policy', () => {
       createdAt: Date.now(),
     });
 
-    expect(resolvePermission(requestId, response)).toBe(false);
+    expect(await resolvePermission(requestId, response)).toBe(false);
     expect(runtime.records.get(requestId)?.status).toBe('denied');
     expect(runtime.resolutions).toContainEqual({ requestId, status: 'denied', response });
   });
@@ -380,13 +391,14 @@ describe('package-owned permission lifecycle and policy', () => {
       timeoutMs: 5000,
     });
     pending.catch(() => {});
+    await flush();
     expect(runtime.records).toHaveLength(1);
-    rejectPermissionsBySession('session', new Error('test cleanup'));
+    await rejectPermissionsBySession('session', new Error('test cleanup'));
     await expect(pending).rejects.toThrow('test cleanup');
   });
 
   test('reuses matching grants before creating or broadcasting a request', async () => {
-    bindInteraction(runtime, undefined, () => ({ matched: true, grant: null }));
+    bindInteraction(runtime, undefined, async () => ({ matched: true, grant: null }));
 
     const approved = await requestPermission({
       sessionId: 'session',
