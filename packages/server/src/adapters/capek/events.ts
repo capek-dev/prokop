@@ -6,7 +6,7 @@ import {
   broadcastToSessionEvent,
   sendToAskTargetsEvent,
   sendToControllerEvent,
-} from '@/core/broadcast';
+} from '@/transport/websocket/broadcast';
 import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
 
 export function mapCapekEventToServerMessage(event: RuntimeEvent): ServerMessage | null {

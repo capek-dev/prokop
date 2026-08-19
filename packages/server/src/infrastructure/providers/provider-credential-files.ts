@@ -1,12 +1,12 @@
 import type { ProviderCredentialStatus, ProviderCredentialsResponse } from '@jean2/sdk';
 import { getJean2EnvValue, reloadJean2Env } from '@/infrastructure/runtime/environment';
 import { getEnvFilePath } from '@/infrastructure/runtime/paths';
-import { atomicWriteFile, readFileSafe } from '@/configuration/files';
+import { atomicWriteFile, readFileSafe } from '@/config/files';
 import {
   ConfigurationNotFoundError,
   ConfigurationPersistenceError,
   ConfigurationValidationError,
-} from '@/configuration/errors';
+} from '@/config/errors';
 import {
   getSupportedProviderCredential,
   mergeEnvLine,

@@ -2,7 +2,7 @@ import {
   clearProviderCredential,
   listProviderCredentials,
   setProviderCredential,
-} from '@/configuration/provider-credentials';
+} from '@/config/provider-credentials';
 import type { ProviderCredentialPort } from '@/application/ports/provider-accounts';
 
 /**

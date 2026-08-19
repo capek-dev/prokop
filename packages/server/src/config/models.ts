@@ -1,7 +1,7 @@
 import { resolveModelsPath, clearModelsCache, type ModelsConfig, type ProviderDefinition, type ModelDefinition } from '@/config';
-import { atomicWriteFile } from '@/configuration/files';
+import { atomicWriteFile } from '@/config/files';
 import { existsSync, readFileSync } from 'fs';
-import { ConfigurationNotFoundError, ConfigurationValidationError, ConfigurationConflictError } from '@/configuration/errors';
+import { ConfigurationNotFoundError, ConfigurationValidationError, ConfigurationConflictError } from '@/config/errors';
 import { getJean2EnvValue } from '@/infrastructure/runtime/environment';
 import { getProviderStatus } from '@/adapters/capek/contracts';
 import type {

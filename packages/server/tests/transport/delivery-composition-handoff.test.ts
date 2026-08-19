@@ -4,7 +4,7 @@ import { type RuntimeDelivery, type RuntimeEvent } from '@capekai/core';
 import { jean2DeliveryBindings } from '@/adapters/capek/delivery';
 import { deliverCapekEvent } from '@/adapters/capek/events';
 import { createBunWebSocketAdapter } from '@/transport/websocket/bun-adapter';
-import { installDeliveryPort } from '@/core/broadcast';
+import { installDeliveryPort } from '@/transport/websocket/broadcast';
 import { unregisterConnection } from '@/transport/websocket/connection-registry';
 
 const sockets: unknown[] = [];

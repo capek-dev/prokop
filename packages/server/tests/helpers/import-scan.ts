@@ -51,6 +51,8 @@ export interface DependencyRule {
   forbiddenSpecifiers?: SpecifierMatcher[];
   /** Files inside these directories are exempt from the whole rule. */
   allowedInDirs?: string[];
+  /** Files inside these directories are governed by a more specific rule instead. */
+  excludedDirs?: string[];
   /**
    * Whitelist mode for relative specifiers resolving inside the package source root.
    * 'own-concern' expands to the appliesTo directory that contains the importing file.
@@ -271,6 +273,9 @@ export function evaluateRules(
         continue;
       }
       if (rule.allowedInDirs?.some((dir) => isWithin(file.path, dir))) {
+        continue;
+      }
+      if (rule.excludedDirs?.some((dir) => isWithin(file.path, dir))) {
         continue;
       }
 

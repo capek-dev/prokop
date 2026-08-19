@@ -1,4 +1,4 @@
-// packages/server/src/auth/middleware.ts
+// Transport HTTP auth middleware (Bearer or query token)
 import type { Context, Next } from 'hono';
 import { validateToken, isAuthEnabled } from './token';
 

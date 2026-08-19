@@ -18,9 +18,9 @@ import {
   clearModelsCache,
 } from '@/config';
 import { runMigrations } from '@/infrastructure/sqlite/database';
-import { initializePreconfigs, migrateUuidPreconfigs } from '@/infrastructure/configuration/preconfig';
+import { initializePreconfigs, migrateUuidPreconfigs } from '@/infrastructure/config/preconfig';
 import defaultModelsJson from '@/config/models.json';
-import { installRecommendedTools } from '@/tools/tools-cli';
+import { installRecommendedTools } from '@/cli/tools-cli';
 
 export interface InitOptions {
   databasePath?: string;

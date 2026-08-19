@@ -15,7 +15,7 @@ import {
   broadcastEvent,
   broadcastSessionUpdated,
   type BroadcastSessionFn,
-} from '@/core/broadcast';
+} from '@/transport/websocket/broadcast';
 import { findOrphanedCompactionTriggers } from '@/infrastructure/sqlite/message-store';
 import { getSession, listSessions, updateSession } from '@/infrastructure/sqlite/session-store';
 

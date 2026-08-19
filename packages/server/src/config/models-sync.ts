@@ -1,6 +1,6 @@
 import type { ModelsConfig, ProviderDefinition } from '@/config';
-import { getModelsDocument, saveModelsDocument, validateModelsDocument } from '@/configuration/models';
-import { ConfigurationValidationError } from '@/configuration/errors';
+import { getModelsDocument, saveModelsDocument, validateModelsDocument } from '@/config/models';
+import { ConfigurationValidationError } from '@/config/errors';
 
 const MODELS_REGISTRY_URL =
   process.env.JEAN2_MODELS_REGISTRY_URL ||

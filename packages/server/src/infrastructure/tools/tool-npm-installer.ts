@@ -6,7 +6,7 @@ import {
   checkVersionAge,
   resolveMaxSatisfying,
   extractIntegrity,
-} from '@/services/npm-utils';
+} from './npm-utils';
 import { PROTECTED_SDK_PACKAGE } from '@/domains/tool-installation';
 
 const PROTECTED_DEPENDENCIES = [PROTECTED_SDK_PACKAGE];

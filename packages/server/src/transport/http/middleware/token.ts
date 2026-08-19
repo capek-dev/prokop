@@ -1,4 +1,4 @@
-// packages/server/src/auth/token.ts
+// Transport HTTP auth token validation (env-var based)
 
 /**
  * Auth token management — env-var only.

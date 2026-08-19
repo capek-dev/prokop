@@ -1,7 +1,7 @@
-import * as models from '@/configuration/models';
-import * as modelsSync from '@/configuration/models-sync';
-import * as prompts from '@/configuration/prompts';
-import * as preconfigs from '@/configuration/preconfigs';
+import * as models from '@/config/models';
+import * as modelsSync from '@/config/models-sync';
+import * as prompts from '@/config/prompts';
+import * as preconfigs from '@/config/preconfigs';
 import { listPrompts } from '@/prompts/registry';
 import type {
   ModelsConfigurationPort,

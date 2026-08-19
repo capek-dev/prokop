@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { validate } from './validate';
-import type { ConfigurationApplication } from '@/application/configuration';
+import type { ConfigurationApplication } from '@/application/config';
 import type { ProvidersApplication } from '@/application/providers';
 import {
   createPreconfigSchema,

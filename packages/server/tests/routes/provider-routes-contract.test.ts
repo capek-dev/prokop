@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { Hono } from 'hono';
-import type { ConfigurationApplication } from '@/application/configuration';
+import type { ConfigurationApplication } from '@/application/config';
 import type { ProvidersApplication } from '@/application/providers';
 import type { ProviderDescriptor } from '@jean2/sdk';
 
-mock.module('@/configuration/models', () => ({
+mock.module('@/config/models', () => ({
   getModelsConfigWithStatus: () => ({ providers: [], defaultModel: '', defaultProvider: '' }),
   createProvider: async (input: unknown) => input,
   updateProvider: async (id: string, input: unknown) => ({ id, ...(input as object) }),
@@ -14,17 +14,17 @@ mock.module('@/configuration/models', () => ({
   deleteModel: async () => ({ success: true }),
   setDefaults: async (input: unknown) => input,
 }));
-mock.module('@/configuration/models-sync', () => ({
+mock.module('@/config/models-sync', () => ({
   syncModels: async (mode: string) => ({ mode }),
 }));
-mock.module('@/configuration/prompts', () => ({
+mock.module('@/config/prompts', () => ({
   listPromptConfigs: async () => [],
   getPromptConfig: async () => null,
   createPromptConfig: async (input: unknown) => input,
   updatePromptConfig: async (_name: string, input: unknown) => input,
   deletePromptConfig: async () => {},
 }));
-mock.module('@/configuration/preconfigs', () => ({
+mock.module('@/config/preconfigs', () => ({
   listValidatedPreconfigs: async () => [],
   createValidatedPreconfig: async (input: unknown) => input,
   updateValidatedPreconfig: async (_id: string, input: unknown) => input,
@@ -34,7 +34,7 @@ mock.module('@/prompts/registry', () => ({
   listPrompts: async () => [],
 }));
 
-const { registerConfigRoutes } = await import('@/routes/config');
+const { registerConfigRoutes } = await import('@/transport/http/routes/config');
 
 const descriptor: ProviderDescriptor = {
   id: 'codex',

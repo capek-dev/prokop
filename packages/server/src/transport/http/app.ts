@@ -1,8 +1,8 @@
 /**
  * Hono Application Setup
  *
- * Core application configuration for the AI Agent Server.
- * Route handlers are organized in src/routes/ modules.
+ * HTTP transport composition: middleware, route registration, and error
+ * presentation. Route handlers live in transport/http/routes/ modules.
  */
 
 import { Hono } from 'hono';
@@ -12,34 +12,29 @@ import { logger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
 import { ZodError } from 'zod';
 
-import { requireAuth, isPublicRoute } from '@/auth/middleware';
-import { isAuthEnabled } from '@/auth/token';
+import { requireAuth, isPublicRoute } from '@/transport/http/middleware/auth';
+import { isAuthEnabled } from '@/transport/http/middleware/token';
 import { getClientEnabled } from '@/infrastructure/runtime/environment';
-import { ensurePromptsDir } from '@/prompts/registry';
 import { VERSION } from '@/version';
 import { HttpError } from '@/application/http-errors';
 import { createWiredApplication, type WiredApplication } from '@/bootstrap/application';
 
 // Route modules
 import { registerSessionRoutes } from '@/transport/http/routes/sessions';
-import { registerWorkspaceRoutes } from '@/routes/workspaces';
-import { registerFileRoutes } from '@/routes/files';
-import { registerToolRoutes } from '@/routes/tools';
-import { registerMcpRoutes } from '@/routes/mcp';
-import { registerConfigRoutes } from '@/routes/config';
-import '@/providers';
-import { registerSandboxRoutes } from '@/sandbox/routes';
-import { registerResponseFormatRoutes } from '@/routes/response-formats';
-import { registerSchedulerRoutes } from '@/routes/scheduler';
-import { registerAgentRoutes } from '@/routes/agents';
-import { registerMaintenanceRoutes } from '@/routes/maintenance';
-import { registerNotificationRoutes } from '@/routes/notifications';
+import { registerWorkspaceRoutes } from '@/transport/http/routes/workspaces';
+import { registerFileRoutes } from '@/transport/http/routes/files';
+import { registerToolRoutes } from '@/transport/http/routes/tools';
+import { registerMcpRoutes } from '@/transport/http/routes/mcp';
+import { registerConfigRoutes } from '@/transport/http/routes/config';
+import { registerSandboxRoutes } from '@/transport/http/routes/sandbox';
+import { registerResponseFormatRoutes } from '@/transport/http/routes/response-formats';
+import { registerSchedulerRoutes } from '@/transport/http/routes/scheduler';
+import { registerAgentRoutes } from '@/transport/http/routes/agents';
+import { registerMaintenanceRoutes } from '@/transport/http/routes/maintenance';
+import { registerNotificationRoutes } from '@/transport/http/routes/notifications';
 
 export function createApp(application?: WiredApplication) {
   const wired = application ?? createWiredApplication();
-
-  // Ensure prompts directory exists
-  ensurePromptsDir();
 
   const app = new Hono();
 

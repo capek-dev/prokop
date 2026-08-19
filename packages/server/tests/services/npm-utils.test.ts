@@ -11,7 +11,7 @@ import {
   resolveMaxSatisfying,
   extractIntegrity,
   checkVersionAge,
-} from '@/services/npm-utils';
+} from '@/infrastructure/tools/npm-utils';
 
 function createTempDir(): string {
   return join(tmpdir(), `jean2-test-npm-utils-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);

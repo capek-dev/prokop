@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { Hono } from 'hono';
-import type { ConfigurationApplication } from '@/application/configuration';
+import type { ConfigurationApplication } from '@/application/config';
 
 const createValidatedPreconfig = mock(async (data: Record<string, unknown>) => ({
   ...data,
@@ -11,14 +11,14 @@ const updateValidatedPreconfig = mock(async (id: string, data: Record<string, un
   id,
 }));
 
-mock.module('@/configuration/preconfigs', () => ({
+mock.module('@/config/preconfigs', () => ({
   listValidatedPreconfigs: mock(async () => []),
   createValidatedPreconfig,
   updateValidatedPreconfig,
   deleteValidatedPreconfig: mock(async () => undefined),
 }));
 
-const { registerConfigRoutes } = await import('@/routes/config');
+const { registerConfigRoutes } = await import('@/transport/http/routes/config');
 
 function fakeConfiguration(): ConfigurationApplication {
   return {
