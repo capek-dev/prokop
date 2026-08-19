@@ -22,10 +22,7 @@ import {
   configurePreconfigSource,
 } from '../src/context/sources';
 import { configureRuntimeConfiguration } from '../src/configuration/runtime';
-import {
-  enterAgentScope,
-  resetSharedProcessScopeForTests,
-} from '../src/plugins/compose';
+import { enterAgentScope } from '../src/plugins/compose';
 import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
 import {
   CURRENT_MEMORY_DOMAIN_PLUGIN_ID,
@@ -126,7 +123,6 @@ function configureEnvironment(): void {
 afterEach(async () => {
   configureEnvironment();
   resetDomainToolFallbacksForTests();
-  await resetSharedProcessScopeForTests();
   for (const path of roots.splice(0)) await rm(path, { recursive: true, force: true });
 });
 

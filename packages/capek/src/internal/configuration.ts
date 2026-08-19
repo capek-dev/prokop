@@ -14,3 +14,9 @@ export {
   withRuntimeConfiguration,
 } from '../configuration/runtime';
 export type { RuntimeConfiguration } from '../configuration/contracts';
+export { createDefaultRuntimeConfiguration } from '../configuration/defaults';
+export {
+  createSingleModelConfiguration,
+  resolveModelSpecifier,
+  type ModelSpecifierSelection,
+} from '../configuration/single-model';

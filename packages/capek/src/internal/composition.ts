@@ -2,8 +2,11 @@
 
 export {
   createAgentScope,
+  createComposition,
   createProcessScope,
   enterAgentScope,
+  facadeProcessPlugins,
+  type Composition,
 } from '../plugins/compose';
 export type {
   AgentScopeHandle,

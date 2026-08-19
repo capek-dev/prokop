@@ -5,6 +5,8 @@
  * callback starts, so no async work runs with unseeded accessors.
  */
 
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { withRuntimeConfiguration } from '../configuration/runtime';
 import { withContextAssembler } from '../context/assembler';
 import { withContextSources } from '../context/sources';
@@ -15,7 +17,7 @@ import { withPermissionRuntimeService } from '../permission/runtime';
 import { withWorkspaceService } from '../workspace/policy';
 import { withToolOutputService } from '../tool-output/policy';
 import { withGoalDomain } from '../goals/service';
-import { createAgentScope, createProcessScope } from '../kernel/kernel';
+import { createAgentScope } from '../kernel/kernel';
 export { createAgentScope, createProcessScope } from '../kernel/kernel';
 import type { AgentScopeHandle, ProcessScopeHandle } from '../kernel/types';
 import { withProviderOverrides } from '../providers/registry';
@@ -25,12 +27,14 @@ import {
   withContributedDomainToolPayloads,
   type DomainToolPayload,
 } from '../runtime/domain-tool-source';
-import { withRuntimeHost } from '../runtime/host';
+import { withRuntimeHost, getRuntimeHost, type RuntimeHost } from '../runtime/host';
+import { createStandaloneHost } from '../runtime/standalone-host';
 import { withSandboxController } from '../sandbox/controller';
 import { withStorage } from '../storage/runtime';
 import { withToolRegistryResolver } from '../tools/registry';
 import { withWorkspaceToolDiscovery } from '../tools/tool-source';
-import { createFacadeAgentPlugins, facadeProcessPlugins, type FacadeScopeValues } from './facade-plugins';
+import { createFacadeAgentPlugins, type FacadeScopeValues } from './facade-plugins';
+export { facadeProcessPlugins } from './facade-plugins';
 import { capekGoalDomainKey } from './goal-domain';
 import {
   capekContextAssemblerKey,
@@ -50,78 +54,41 @@ import {
   capekWorkspaceToolDiscoveryKey,
 } from './service-keys';
 
-export interface FacadeComposition {
+export interface Composition {
   readonly processScope: ProcessScopeHandle;
   readonly agentScope: AgentScopeHandle;
 }
 
-let sharedProcessScopePromise: Promise<ProcessScopeHandle> | null = null;
-let sharedScopeFactory: () => Promise<ProcessScopeHandle> = () =>
-  createProcessScope([...facadeProcessPlugins()]);
-
-/** One lazily created current process scope shared by all facade agents. The
- * process plugins hold only process-global registries and hosts, so sharing
- * is safe; every per-agent value lives in the agent scope.
- *
- * Honest constraints:
- * - The scope is created on the first facade agent and kept for the process
- *   lifetime. Later `configureX()` calls do not refresh the hosts bound at
- *   creation; per-agent values still enter through the agent scope.
- * - Failed creation clears the cache so the next agent retries instead of
- *   inheriting a rejected scope.
- * - The facade process scope is a separate instance from application process
- *   scopes created by an embedding host. */
-export function getSharedFacadeProcessScope(): Promise<ProcessScopeHandle> {
-  if (sharedProcessScopePromise === null) {
-    const promise = sharedScopeFactory();
-    sharedProcessScopePromise = promise;
-    void promise.catch(() => {
-      if (sharedProcessScopePromise === promise) {
-        sharedProcessScopePromise = null;
-      }
-    });
-  }
-  return sharedProcessScopePromise;
-}
-
-/** Test-only failure seam for the shared facade process scope. Exported from
- * this module only; no package subpath re-exports it. */
-export function setSharedProcessScopeFactoryForTests(
-  factory: () => Promise<ProcessScopeHandle>,
-): void {
-  sharedScopeFactory = factory;
-}
-
-/** Test-only reset seam for the shared facade process scope. Disposes the
- * previously cached scope (and its live child scopes) before clearing the
- * cache so tests never leak composed scopes across cases. A failed creation
- * left no scope to dispose; the cache reset alone covers that path.
- * Production lifetime semantics are untouched: the reset is exported from
- * this module only and no package subpath re-exports it. */
-export async function resetSharedProcessScopeForTests(): Promise<void> {
-  const pending = sharedProcessScopePromise;
-  sharedScopeFactory = () => createProcessScope([...facadeProcessPlugins()]);
-  sharedProcessScopePromise = null;
-  if (pending === null) return;
-  try {
-    const scope = await pending;
-    await scope.dispose();
-  } catch {
-    // Failed creation left no scope to dispose; the cache reset above
-    // already cleared it.
-  }
-}
-
-/** Composes one facade agent scope above the shared facade process scope. */
-export async function createFacadeAgentComposition(
+/** Composes one agent scope above an explicit process scope using the
+ * package's curated plugin set. The C6 policy providers read the ambient
+ * runtime host (tool-output temp root) at activation, so composition runs
+ * inside `withRuntimeHost`; when no host is configured ambiently, the
+ * reference standalone host is installed for the composition's duration.
+ * The caller owns both scopes' lifetimes:
+ * `await composition.agentScope.dispose()` and
+ * `await composition.processScope.dispose()` when done. Multiple agent
+ * scopes may share one process scope concurrently. */
+export async function createComposition(
+  processScope: ProcessScopeHandle,
   values: FacadeScopeValues,
-): Promise<FacadeComposition> {
-  const processScope = await getSharedFacadeProcessScope();
-  const agentScope = await createAgentScope(
-    processScope,
-    [...createFacadeAgentPlugins(values)],
-  );
-  return { processScope, agentScope };
+): Promise<Composition> {
+  let ambient: RuntimeHost | undefined;
+  try {
+    ambient = getRuntimeHost();
+  } catch {
+    // No ambient host configured; the reference standalone host covers
+    // composition-time activation reads (tool-output temp root).
+    ambient = undefined;
+  }
+  return withRuntimeHost(ambient ?? createStandaloneHost({
+    workspace: process.cwd(),
+    sandboxActive: false,
+    tempRoot: join(tmpdir(), 'capek-composition'),
+  }), () =>
+    createAgentScope(
+      processScope,
+      [...createFacadeAgentPlugins(values)],
+    ).then((agentScope): Composition => ({ processScope, agentScope })));
 }
 
 /**
@@ -129,7 +96,7 @@ export async function createFacadeAgentComposition(
  * and then runs the callback. Seeding order is fixed: storage, runtime
  * configuration, runtime host, context sources, provider overrides, optional
  * tool resolver, tool source, sandbox controller, context assembler. The
- * optional resolver layer is omitted when no provider contributed it,
+ * optional resolver layer is omitted when no plugin contributed it,
  * exactly like the unseeded installed-tool path today. The scope's
  * assembler is bound to this scope at composition time and seeded here
  * through the context-assembler ALS runtime, so ordered context assembly

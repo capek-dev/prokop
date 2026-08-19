@@ -8,6 +8,7 @@
 
 import type { RuntimeConfiguration } from '../configuration/contracts';
 import type { ContextSources } from '../context/sources';
+import type { LoadedTool } from '@capekai/tool';
 import type { CapekPlugin } from '../kernel/types';
 import type { ConnectableProvider } from '../providers/types';
 import type { RuntimeHost } from '../runtime/host';
@@ -18,6 +19,7 @@ import type { WorkspaceToolDiscovery } from '../tools/tool-source';
 import { getSchedulerHost } from '../scheduler/host';
 import { getSessionSearchHost } from '../session-search/host';
 import { createContextSectionsPlugin } from './context-sections';
+import { loadedToolsPlugin } from './loaded-tools';
 import { retryPolicyPlugin } from './retry-policy';
 import { compactionPolicyPlugin } from './compaction-policy';
 import { permissionPolicyPlugin } from './permission-policy';
@@ -70,8 +72,10 @@ export interface FacadeScopeValues {
   /** Host-supplied plugins appended after the facade's own (external tool
    * contributions land here). */
   profilePlugins?: readonly CapekPlugin<unknown>[];
-  /** Temporary C2 test compatibility alias. */
-  codingPlugins?: readonly CapekPlugin<unknown>[];
+  /** Convenience: loaded tools contributed by one generated plugin, as with
+   * the former `createAgent({ tools })` option. Equivalent to passing
+   * `loadedToolsPlugin('facade.loaded-tools', tools)` in profilePlugins. */
+  loadedTools?: readonly LoadedTool[];
   sandboxController: SandboxController;
   providerOverrides: ReadonlyMap<string, ConnectableProvider>;
 }
@@ -119,6 +123,7 @@ export function createFacadeAgentPlugins(values: FacadeScopeValues): readonly Ca
       : toolResolverValuePlugin('facade.tool-resolver', values.toolResolver),
     sandboxControllerValuePlugin('facade.sandbox-controller', values.sandboxController),
     providerOverridesValuePlugin('facade.provider-overrides', values.providerOverrides),
-    ...(values.profilePlugins ?? values.codingPlugins ?? []),
+    ...(values.loadedTools?.length ? [loadedToolsPlugin('facade.loaded-tools', values.loadedTools)] : []),
+    ...(values.profilePlugins ?? []),
   ];
 }

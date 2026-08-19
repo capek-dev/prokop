@@ -57,6 +57,7 @@ export {
   facadeProcessPlugins,
   type FacadeScopeValues,
 } from '../plugins/facade-plugins';
+export { loadedToolsPlugin } from '../plugins/loaded-tools';
 export {
   getContextSources,
 } from '../context/sources';

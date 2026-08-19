@@ -25,6 +25,7 @@ export {
   type TitleHost,
   type WorkspaceCapabilityBindings,
 } from '../runtime/host';
+export { createStandaloneHost } from '../runtime/standalone-host';
 export { installSchedulerToolFallback } from '../plugins/scheduler-domain';
 export { installSessionSearchToolFallback } from '../plugins/session-search-domain';
 export { installTaskToolFallback } from '../plugins/subagent-domain';

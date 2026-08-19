@@ -71,12 +71,6 @@ const c0Rules: DependencyRule[] = [
     },
   },
   {
-    name: 'facade-no-optional-domains',
-    rationale: 'The facade composes core services and must not depend on optional domain plugins.',
-    appliesTo: [dir('facade')],
-    forbiddenResolvedDirs: [dir('memory'), dir('skills'), dir('session-search'), dir('scheduler'), dir('subagent'), dir('workflow'), dir('goals')],
-  },
-  {
     name: 'tools-no-core',
     rationale: 'Tools are capability providers and must not import the runtime core outside the named contract edges.',
     appliesTo: [dir('tools')],
@@ -333,22 +327,10 @@ const c0Rules: DependencyRule[] = [
     ],
   },
   {
-    name: 'plugins-no-facade',
-    rationale: 'Plugins must not import the facade.',
-    appliesTo: [dir('plugins')],
-    forbiddenResolvedDirs: [dir('facade')],
-  },
-  {
     name: 'plugins-no-core',
     rationale: 'C2 provider plugins wrap current seam contracts only; the turn-execution core is composed later and must not be imported by plugins.',
     appliesTo: [dir('plugins')],
     forbiddenResolvedDirs: [dir('core')],
-  },
-  {
-    name: 'facade-composes-through-plugins',
-    rationale: 'The facade composes the agent scope through the plugins layer; importing the kernel directly would bypass the service-key contracts.',
-    appliesTo: [dir('facade')],
-    forbiddenResolvedDirs: [dir('kernel')],
   },
   {
     name: 'core-no-kernel',
@@ -358,8 +340,8 @@ const c0Rules: DependencyRule[] = [
   },
   {
     name: 'facade-core-no-standard-tool-list',
-    rationale: 'The runtime core and the facade consume effective contributed tools. The fixed standard tool list is installed coding-bundle behavior in the plugins and bundles layers only.',
-    appliesTo: [dir('facade'), dir('core')],
+    rationale: 'The runtime core consumes effective contributed tools. The fixed standard tool list is installed coding-bundle behavior in the plugins layer only.',
+    appliesTo: [dir('core')],
     forbiddenSpecifiers: [
       { exact: '../tools/standard-tools' },
     ],
@@ -558,10 +540,9 @@ describe('C0 internal dependency boundaries', () => {
     expect(violations).toEqual([]);
   });
 
-  test('the runtime core and facade never import the hardcoded standard tool list', () => {
+  test('the runtime core never imports the hardcoded standard tool list', () => {
     const files = [
       ...scanDirectory(dir('core')),
-      ...scanDirectory(dir('facade')),
     ];
     const violations: string[] = [];
     for (const file of files) {

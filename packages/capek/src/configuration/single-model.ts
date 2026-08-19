@@ -1,21 +1,32 @@
-import type { RuntimeConfiguration } from '../configuration/contracts';
-import { createDefaultRuntimeConfiguration } from '../configuration/defaults';
-import { parseModelSpecifier } from '../core/provider-utils';
+import type { RuntimeConfiguration } from './contracts';
+import { createDefaultRuntimeConfiguration } from './defaults';
 
-export interface FacadeModelSelection {
+export interface ModelSpecifierSelection {
   modelId: string;
   providerId: string;
 }
 
-export function resolveFacadeModel(model: string): FacadeModelSelection {
-  const parsed = parseModelSpecifier(model);
+/** Splits a `provider/model` string on the first separator; the provider
+ * part is kept as-is (matching `parseModelSpecifier` for known provider
+ * ids); a bare model gets no provider. Self-contained so the
+ * configuration leaf concern stays import-clean. */
+export function resolveModelSpecifier(model: string): ModelSpecifierSelection {
+  const separator = model.indexOf('/');
+  if (separator <= 0 || separator === model.length - 1) {
+    return { modelId: model, providerId: 'openai' };
+  }
   return {
-    modelId: parsed.modelId,
-    providerId: parsed.providerId ?? 'openai',
+    providerId: model.slice(0, separator),
+    modelId: model.slice(separator + 1),
   };
 }
 
-export function createFacadeConfiguration(selection: FacadeModelSelection): RuntimeConfiguration {
+/** A starter `RuntimeConfiguration` for exactly one model string: wraps the
+ * package defaults, answers `findModel` for the given selection with a
+ * synthetic 128k entry, exposes it through `getModelsConfig`, and resolves
+ * API keys from the conventional `<PROVIDER>_API_KEY` env vars. Copy and
+ * extend when you outgrow one model. */
+export function createSingleModelConfiguration(selection: ModelSpecifierSelection): RuntimeConfiguration {
   const defaults = createDefaultRuntimeConfiguration();
   return {
     ...defaults,

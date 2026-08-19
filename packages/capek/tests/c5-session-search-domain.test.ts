@@ -30,11 +30,7 @@ import {
 import { buildAiSdkTools } from '../src/core/build-tools';
 import { createAgentScope } from '../src/kernel/kernel';
 import type { CapekPlugin, PluginContext } from '../src/kernel/types';
-import {
-  createFacadeAgentComposition,
-  enterAgentScope,
-  resetSharedProcessScopeForTests,
-} from '../src/plugins/compose';
+import { createComposition, enterAgentScope } from '../src/plugins/compose';
 import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
 import { CURRENT_CONTEXT_SECTION_IDS } from '../src/plugins/context-sections';
 import { currentAgentPlugins } from './helpers/composition';
@@ -222,7 +218,6 @@ afterEach(async () => {
   configureEnvironment();
   resetDomainToolFallbacksForTests();
   resetProviders();
-  await resetSharedProcessScopeForTests();
   clearCache();
   for (const path of roots.splice(0)) await rm(path, { recursive: true, force: true });
 });
@@ -942,7 +937,8 @@ describe('C5 facade and current context parity', () => {
     const fixed = await buildSystemMessage(data);
     expect(fixed).toContain('You can use session_search');
 
-    const facade = await createFacadeAgentComposition({
+    const facadeProcess = await createCurrentProcessScope();
+    const facade = await createComposition(facadeProcess, {
       storage,
       configuration: createDefaultRuntimeConfiguration(),
       host: minimalHost(),
@@ -961,7 +957,7 @@ describe('C5 facade and current context parity', () => {
       expect(facadeGuidance?.pluginId).toBe('facade.context-sections');
     } finally {
       await facade.agentScope.dispose();
-      await facade.processScope.dispose();
+      await facadeProcess.dispose();
     }
 
     const currentProcess = await createCurrentProcessScope();

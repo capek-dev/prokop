@@ -16,9 +16,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { AssistantMessage, GoalState, Session, TextPart } from '@capekai/types';
 import { configureRuntimeConfiguration } from '../src/configuration/runtime';
-import {
-  resetSharedProcessScopeForTests,
-} from '../src/plugins/compose';
 import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
 import {
   CURRENT_GOAL_DOMAIN_PLUGIN_ID,
@@ -110,7 +107,6 @@ function configureEnvironment(): void {
 
 afterEach(async () => {
   configureEnvironment();
-  await resetSharedProcessScopeForTests();
 });
 
 interface FakeLoopState {
