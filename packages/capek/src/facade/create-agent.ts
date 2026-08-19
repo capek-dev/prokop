@@ -26,7 +26,7 @@ import { withRuntimeHost } from '../runtime/host';
 import { createAgentRuntime } from '../runtime/agent-runtime';
 import type { AgentDriver } from '../runtime/agent-runtime';
 import type { DefaultDriverInput } from '../runtime/default-agent-driver';
-import { createAgentStorage } from '../storage/options';
+import { createAgentStorage, type AgentStorageComposition } from '../storage/options';
 import { scanTools } from '../tools/registry';
 import {
   buildEffectiveContextHistory,
@@ -203,7 +203,7 @@ class StandaloneAgent implements Agent {
   #interaction: CreateAgentOptions['interaction'];
   #sandboxActive: boolean;
   #sandboxController: SandboxController;
-  #storage: ReturnType<typeof createAgentStorage>;
+  #storagePromise: Promise<AgentStorageComposition>;
   #selection: ReturnType<typeof resolveFacadeModel>;
   #configuration: ReturnType<typeof createFacadeConfiguration>;
   #bindings: ReturnType<typeof createStandaloneBindings>;
@@ -235,7 +235,9 @@ class StandaloneAgent implements Agent {
     if (typeof options.sandbox === 'object' && options.sandbox.onEvent) {
       this.#sandboxController.setBroadcast(options.sandbox.onEvent);
     }
-    this.#storage = createAgentStorage(options.storage);
+    // Storage creation is async (sqlite loads dynamically), so composition
+    // awaits it; run/close/diagnostics observe failures through #composition.
+    this.#storagePromise = createAgentStorage(options.storage);
     this.#selection = resolveFacadeModel(options.model);
     this.#configuration = createFacadeConfiguration(this.#selection);
     this.#bindings = createStandaloneBindings({
@@ -248,17 +250,18 @@ class StandaloneAgent implements Agent {
  // and the standalone agent is that host. The ALS context propagates
     // through the composition promise chain.
     this.#composition = withRuntimeHost(this.#bindings, () =>
-      resolveFacadeTools(options).then((toolPlugins) =>
-        createFacadeAgentComposition({
-          storage: this.#storage.storage,
-          configuration: this.#configuration,
-          host: this.#bindings,
-          contextSources: {},
-          workspaceToolDiscovery: {},
-          sandboxController: this.#sandboxController,
-          providerOverrides: this.#providerOverrides,
-          profilePlugins: toolPlugins,
-        })));
+      this.#storagePromise.then(({ storage }) =>
+        resolveFacadeTools(options).then((toolPlugins) =>
+          createFacadeAgentComposition({
+            storage,
+            configuration: this.#configuration,
+            host: this.#bindings,
+            contextSources: {},
+            workspaceToolDiscovery: {},
+            sandboxController: this.#sandboxController,
+            providerOverrides: this.#providerOverrides,
+            profilePlugins: toolPlugins,
+          }))));
     // An idle agent must never surface an unhandled rejection when scope
     // composition fails. run/close and the test accessor await this same
     // promise and still observe the original rejection.
@@ -362,7 +365,8 @@ class StandaloneAgent implements Agent {
       if (!this.#storageClosed) {
         this.#storageClosed = true;
         try {
-          this.#storage.close();
+          const storage = await this.#storagePromise;
+          storage.close();
         } catch (error: unknown) {
           cleanupError ??= error;
         }
@@ -449,7 +453,8 @@ class StandaloneAgent implements Agent {
     lifecycleSignal: AbortSignal,
   ): Promise<AgentResult> {
     if (createNewSession) {
-      await this.#storage.storage.conversation.createSession({
+      const { storage } = await this.#storagePromise;
+      await storage.conversation.createSession({
         id: sessionId,
         workspaceId: this.#workspace,
         preconfigId: 'capek-default',
