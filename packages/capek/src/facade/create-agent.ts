@@ -2,8 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { stdin, stdout } from 'node:process';
-import { createInterface, type Interface as ReadlineInterface } from 'node:readline/promises';
 import type {
   AskRequestMessage, AssistantMessage, Part, Preconfig, ServerMessage } from '@capekai/types';
 import type { LoadedTool } from '@capekai/tool';
@@ -63,11 +61,6 @@ function ensureFacadeDefaultAssembler(): void {
   facadeDefaultAssemblerInstalled = true;
 }
 
-export interface TerminalInteraction {
-  request(message: AskRequestMessage, signal: AbortSignal): Promise<unknown>;
-  close(): void;
-}
-
 export interface CreateAgentOptions {
   model: string;
   workspace: string;
@@ -79,8 +72,11 @@ export interface CreateAgentOptions {
   toolsPath?: string;
   storage?: AgentStorageOption;
   prompt?: string;
-  interaction?: false | 'terminal' | ((request: AskRequestMessage) => unknown | Promise<unknown>);
-  terminal?: TerminalInteraction;
+  /** Answers ctx.ask() requests: false denies permissions and hides the
+ * question tool; a function receives each AskRequestMessage and returns the
+ * answer (a plain value, or a typed resolution like
+ * { type: 'permission', grant: 'session' }). */
+  interaction?: false | ((request: AskRequestMessage) => unknown | Promise<unknown>);
   sandbox?: boolean | {
     rules?: AutoResponderRule[];
     onEvent?: (event: SandboxControlEvent) => void;
@@ -184,37 +180,6 @@ async function resolveFacadeTools(options: CreateAgentOptions): Promise<readonly
   return merged.length === 0 ? [] : [customToolsPlugin(merged)];
 }
 
-class ReadlineTerminalInteraction implements TerminalInteraction {
-  #interface: ReadlineInterface | null = null;
-
-  async request(message: AskRequestMessage, signal: AbortSignal): Promise<unknown> {
-    this.close();
-    const terminal = createInterface({ input: stdin, output: stdout });
-    this.#interface = terminal;
-    try {
-      if (message.ask.type === 'permission') {
-        const answer = await terminal.question(`${message.ask.question} [y/N] `, { signal });
-        return answer.trim().toLowerCase() === 'y';
-      }
-      const prompt = 'question' in message.ask ? message.ask.question : 'Provide the requested client capability response.';
-      const answer = await terminal.question(`${prompt}\nEnter JSON or text: `, { signal });
-      try {
-        return JSON.parse(answer);
-      } catch {
-        return answer;
-      }
-    } finally {
-      if (this.#interface === terminal) this.#interface = null;
-      terminal.close();
-    }
-  }
-
-  close(): void {
-    this.#interface?.close();
-    this.#interface = null;
-  }
-}
-
 export function createAgent(options: CreateAgentOptions): Agent {
   return new StandaloneAgent(options);
 }
@@ -243,7 +208,6 @@ class StandaloneAgent implements Agent {
   #configuration: ReturnType<typeof createFacadeConfiguration>;
   #bindings: ReturnType<typeof createStandaloneBindings>;
   #providerOverrides = new Map([['sandbox', new SandboxProvider()]]);
-  #terminal: TerminalInteraction;
   #tempRoot: string;
   #composition: Promise<FacadeComposition>;
   #scopeDisposed = false;
@@ -261,7 +225,6 @@ class StandaloneAgent implements Agent {
     this.#workspace = options.workspace;
     this.#prompt = options.prompt?.trim() || DEFAULT_PROMPT;
     this.#interaction = options.interaction ?? false;
-    this.#terminal = options.terminal ?? new ReadlineTerminalInteraction();
     this.#tempRoot = join(tmpdir(), 'capek', randomUUID());
     this.#sandboxActive = Boolean(options.sandbox);
     this.#sandboxController = new SandboxController(
@@ -377,7 +340,6 @@ class StandaloneAgent implements Agent {
     const activePromise = this.#activePromise;
     const sessionId = this.#activeSessionId;
     this.#activeAbort?.abort(new Error('Agent closed'));
-    this.#terminal.close();
     this.#closePromise = (async () => {
       let cleanupError: unknown;
       if (sessionId) {
@@ -543,7 +505,7 @@ class StandaloneAgent implements Agent {
         workspacePath: this.#workspace,
         workspaceId: this.#workspace,
         maxSteps: options?.maxSteps,
-        broadcastFn: (message) => this.#handleAsk(message, lifecycleSignal),
+        broadcastFn: (message) => this.#handleAsk(message),
       })) {
         if (event.type === 'message.created' || event.type === 'message.updated') {
           if (event.message.role !== 'assistant') continue;
@@ -699,7 +661,6 @@ class StandaloneAgent implements Agent {
   async #interruptSession(sessionId: string): Promise<void> {
     if (this.#activeSessionId === sessionId) {
       this.#activeAbort?.abort(new Error('Agent interrupted'));
-      this.#terminal.close();
     } else if (this.#closed) {
       // The run already settled during close; nothing is left to interrupt
       // and the composed scope may already be disposed.
@@ -713,20 +674,18 @@ class StandaloneAgent implements Agent {
       enterAgentScope(agentScope, () => callback(agentScope)));
   }
 
-  #handleAsk(message: ServerMessage, lifecycleSignal: AbortSignal): void {
+  #handleAsk(message: ServerMessage): void {
     if (message.type !== 'ask.request') return;
     queueMicrotask(() => {
-      void this.#resolveInteraction(message as AskRequestMessage, lifecycleSignal);
+      void this.#resolveInteraction(message as AskRequestMessage);
     });
   }
 
-  async #resolveInteraction(message: AskRequestMessage, lifecycleSignal: AbortSignal): Promise<void> {
+  async #resolveInteraction(message: AskRequestMessage): Promise<void> {
     let response: unknown;
     let interactionError: unknown;
     try {
-      if (this.#interaction === 'terminal') {
-        response = await this.#terminal.request(message, lifecycleSignal);
-      } else if (typeof this.#interaction === 'function') {
+      if (typeof this.#interaction === 'function') {
         response = await this.#interaction(message);
       }
     } catch (error: unknown) {
