@@ -1,6 +1,6 @@
 {
   "name": "@capekai/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -72,7 +72,7 @@
     "zhipu-ai-provider": "^0.2.2"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && bun scripts/add-js-extensions.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests",
     "test": "bun test tests"
