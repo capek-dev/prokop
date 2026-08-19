@@ -1,6 +1,6 @@
 {
   "name": "@capekai/types",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -28,7 +28,7 @@
     "@capekai/tool": "workspace:*"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && bun scripts/add-js-extensions.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test tests"
   },
