@@ -195,7 +195,7 @@ export function createJean2SessionRepository(
       return toTranscriptPage(listMessagesWithPartsBeforeSequence(sessionId, beforeSequence, limit));
     },
 
-    reconcileCompaction(sessionId: string): number {
+    async reconcileCompaction(sessionId: string): Promise<number> {
       return reconcileSessionCompaction(sessionId);
     },
 

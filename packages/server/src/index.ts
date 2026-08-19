@@ -104,7 +104,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   const application = createWiredApplication(agents);
   installWireApplication({ session: application.session, control: application.control, providers: application.providers, notifications: application.notifications, permissions: application.permissions });
   cleanupRunningSessionsOnStartup();
-  reconcileAllSessionsCompaction();
+  await reconcileAllSessionsCompaction();
   reconcileAllOrphanedToolCalls();
   cleanupAllPendingAsks();
 

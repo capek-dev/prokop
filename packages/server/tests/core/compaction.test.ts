@@ -156,13 +156,13 @@ describe('compaction', () => {
   // createCompactionTrigger
   // ===========================================================================
   describe('createCompactionTrigger', () => {
-    test('creates trigger with manual reason', () => {
+    test('creates trigger with manual reason', async () => {
       createUserMsg('msg1', 1000);
       addTextPart('msg1', 'Hello');
       createAssistantMsg('msg2', {}, 2000);
       addTextPart('msg2', 'Hi there');
 
-      const trigger = createCompactionTrigger(sessionId, 'manual');
+      const trigger = await createCompactionTrigger(sessionId, 'manual');
       expect(trigger.messageId).toBeDefined();
       expect(trigger.reason).toBe('manual');
 
@@ -177,13 +177,13 @@ describe('compaction', () => {
       expect(compactionPart.overflow).toBeFalsy();
     });
 
-    test('creates trigger with auto reason', () => {
+    test('creates trigger with auto reason', async () => {
       createUserMsg('msg1', 1000);
       addTextPart('msg1', 'Hello');
       createAssistantMsg('msg2', {}, 2000);
       addTextPart('msg2', 'Hi there');
 
-      const trigger = createCompactionTrigger(sessionId, 'auto');
+      const trigger = await createCompactionTrigger(sessionId, 'auto');
       expect(trigger.reason).toBe('auto');
 
       const allMsgs = listMessagesWithParts(sessionId);
@@ -193,13 +193,13 @@ describe('compaction', () => {
       expect(compactionPart.auto).toBe(true);
     });
 
-    test('creates trigger with overflow reason', () => {
+    test('creates trigger with overflow reason', async () => {
       createUserMsg('msg1', 1000);
       addTextPart('msg1', 'Hello');
       createAssistantMsg('msg2', {}, 2000);
       addTextPart('msg2', 'Hi there');
 
-      const trigger = createCompactionTrigger(sessionId, 'overflow');
+      const trigger = await createCompactionTrigger(sessionId, 'overflow');
       expect(trigger.reason).toBe('overflow');
 
       const allMsgs = listMessagesWithParts(sessionId);
@@ -210,17 +210,17 @@ describe('compaction', () => {
       expect(compactionPart.overflow).toBe(true);
     });
 
-    test('throws when fewer than 2 non-system messages', () => {
+    test('throws when fewer than 2 non-system messages', async () => {
       createUserMsg('msg1', 1000);
       addTextPart('msg1', 'Hello');
 
-      expect(() => createCompactionTrigger(sessionId, 'manual')).toThrow(
+      await expect(createCompactionTrigger(sessionId, 'manual')).rejects.toThrow(
         'Not enough messages for compaction',
       );
     });
 
-    test('throws when no messages exist', () => {
-      expect(() => createCompactionTrigger(sessionId, 'manual')).toThrow(
+    test('throws when no messages exist', async () => {
+      await expect(createCompactionTrigger(sessionId, 'manual')).rejects.toThrow(
         'Not enough messages for compaction',
       );
     });
@@ -240,7 +240,7 @@ describe('compaction', () => {
       createAssistantMsg('msg4', {}, 4000);
       addTextPart('msg4', 'TypeScript adds static types and more.');
 
-      const trigger = createCompactionTrigger(sessionId, 'manual');
+      const trigger = await createCompactionTrigger(sessionId, 'manual');
       const policy = resolveCompactionPolicy('gpt-4o', 'openai');
 
       const result = await processCompactionTask(
@@ -268,7 +268,7 @@ describe('compaction', () => {
       createAssistantMsg('msg2', {}, 2000);
       addTextPart('msg2', 'Hi');
 
-      const trigger = createCompactionTrigger(sessionId, 'manual');
+      const trigger = await createCompactionTrigger(sessionId, 'manual');
       const policy = resolveCompactionPolicy('gpt-4o', 'openai');
 
       const result = await processCompactionTask(
@@ -316,7 +316,7 @@ describe('compaction', () => {
       createAssistantMsg('msg4', {}, 4000);
       addTextPart('msg4', 'You are welcome');
 
-      const trigger = createCompactionTrigger(sessionId, 'manual');
+      const trigger = await createCompactionTrigger(sessionId, 'manual');
       const policy = resolveCompactionPolicy('gpt-4o', 'openai', {
         preserveRecentToolCount: 0,
         preserveSmallToolChars: 0,
@@ -363,7 +363,7 @@ describe('compaction', () => {
       createAssistantMsg('msg4', {}, 4000);
       addTextPart('msg4', 'Done');
 
-      const trigger = createCompactionTrigger(sessionId, 'manual');
+      const trigger = await createCompactionTrigger(sessionId, 'manual');
       const policy = resolveCompactionPolicy('gpt-4o', 'openai', {
         preserveRecentToolCount: 0,
         preserveSmallToolChars: 0,
@@ -410,7 +410,7 @@ describe('compaction', () => {
       createAssistantMsg('msg4', {}, 4000);
       addTextPart('msg4', 'Done');
 
-      const trigger = createCompactionTrigger(sessionId, 'manual');
+      const trigger = await createCompactionTrigger(sessionId, 'manual');
       const policy = resolveCompactionPolicy('gpt-4o', 'openai', {
         preserveRecentToolCount: 0,
         preserveSmallToolChars: 200,
@@ -452,7 +452,7 @@ describe('compaction', () => {
       createAssistantMsg('msg2', {}, 2000);
       addTextPart('msg2', 'Hi');
 
-      const trigger = createCompactionTrigger(sessionId, 'manual');
+      const trigger = await createCompactionTrigger(sessionId, 'manual');
       const policy = resolveCompactionPolicy('gpt-4o', 'openai');
 
       await expect(
@@ -468,8 +468,8 @@ describe('compaction', () => {
   // persistCompactionFailure
   // ===========================================================================
   describe('persistCompactionFailure', () => {
-    test('creates error message with compact_failed mode', () => {
-      persistCompactionFailure(sessionId, 'trigger-1', 'Model API error', broadcastFn);
+    test('creates error message with compact_failed mode', async () => {
+      await persistCompactionFailure(sessionId, 'trigger-1', 'Model API error', broadcastFn);
 
       const allMsgs = listMessagesWithParts(sessionId);
       const failedMsg = allMsgs.find(m => {
@@ -488,8 +488,8 @@ describe('compaction', () => {
       expect(textPart).toBeDefined();
     });
 
-    test('broadcasts failure events', () => {
-      persistCompactionFailure(sessionId, 'trigger-1', 'Timeout', broadcastFn);
+    test('broadcasts failure events', async () => {
+      await persistCompactionFailure(sessionId, 'trigger-1', 'Timeout', broadcastFn);
 
       expect(broadcastMessages.length).toBeGreaterThanOrEqual(2);
       expect(broadcastMessages).toContainEqual(expect.objectContaining({ kind: 'message', action: 'created' }));

@@ -50,54 +50,54 @@ describe('stream-handlers', () => {
   // ── handleTextDelta ──────────────────────────────────────────
 
   describe('handleTextDelta', () => {
-    test('creates new text part on first delta', () => {
+    test('creates new text part on first delta', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleTextDelta({ text: 'Hello' });
+      await handlers.handleTextDelta({ text: 'Hello' });
 
       expect(ctx.currentText).toBe('Hello');
       expect(ctx.currentTextPartId).not.toBeNull();
     });
 
-    test('appends to existing text part on subsequent deltas', () => {
+    test('appends to existing text part on subsequent deltas', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleTextDelta({ text: 'Hello' });
-      handlers.handleTextDelta({ text: ' world' });
+      await handlers.handleTextDelta({ text: 'Hello' });
+      await handlers.handleTextDelta({ text: ' world' });
 
       expect(ctx.currentText).toBe('Hello world');
       expect(ctx.currentTextPartId).not.toBeNull();
     });
 
-    test('ignores empty string delta', () => {
+    test('ignores empty string delta', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleTextDelta({ text: '' });
+      await handlers.handleTextDelta({ text: '' });
 
       expect(ctx.currentText).toBe('');
       expect(ctx.currentTextPartId).toBeNull();
     });
 
-    test('ignores undefined text delta', () => {
+    test('ignores undefined text delta', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleTextDelta({ text: undefined });
+      await handlers.handleTextDelta({ text: undefined });
 
       expect(ctx.currentText).toBe('');
       expect(ctx.currentTextPartId).toBeNull();
     });
 
-    test('accumulates text across multiple deltas', () => {
+    test('accumulates text across multiple deltas', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleTextDelta({ text: 'a' });
-      handlers.handleTextDelta({ text: 'b' });
-      handlers.handleTextDelta({ text: 'c' });
+      await handlers.handleTextDelta({ text: 'a' });
+      await handlers.handleTextDelta({ text: 'b' });
+      await handlers.handleTextDelta({ text: 'c' });
 
       expect(ctx.currentText).toBe('abc');
     });
@@ -106,53 +106,53 @@ describe('stream-handlers', () => {
   // ── handleReasoningDelta ─────────────────────────────────────
 
   describe('handleReasoningDelta', () => {
-    test('creates new reasoning part on first delta', () => {
+    test('creates new reasoning part on first delta', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleReasoningDelta({ text: 'Thinking...' });
+      await handlers.handleReasoningDelta({ text: 'Thinking...' });
 
       expect(ctx.currentReasoning).toBe('Thinking...');
       expect(ctx.currentReasoningPartId).not.toBeNull();
     });
 
-    test('appends to existing reasoning part on subsequent deltas', () => {
+    test('appends to existing reasoning part on subsequent deltas', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleReasoningDelta({ text: 'Step 1' });
-      handlers.handleReasoningDelta({ text: ' Step 2' });
+      await handlers.handleReasoningDelta({ text: 'Step 1' });
+      await handlers.handleReasoningDelta({ text: ' Step 2' });
 
       expect(ctx.currentReasoning).toBe('Step 1 Step 2');
     });
 
-    test('ignores empty string delta', () => {
+    test('ignores empty string delta', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleReasoningDelta({ text: '' });
+      await handlers.handleReasoningDelta({ text: '' });
 
       expect(ctx.currentReasoning).toBe('');
       expect(ctx.currentReasoningPartId).toBeNull();
     });
 
-    test('ignores undefined text delta', () => {
+    test('ignores undefined text delta', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleReasoningDelta({ text: undefined });
+      await handlers.handleReasoningDelta({ text: undefined });
 
       expect(ctx.currentReasoning).toBe('');
       expect(ctx.currentReasoningPartId).toBeNull();
     });
 
-    test('accumulates reasoning across multiple deltas', () => {
+    test('accumulates reasoning across multiple deltas', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleReasoningDelta({ text: 'a' });
-      handlers.handleReasoningDelta({ text: 'b' });
-      handlers.handleReasoningDelta({ text: 'c' });
+      await handlers.handleReasoningDelta({ text: 'a' });
+      await handlers.handleReasoningDelta({ text: 'b' });
+      await handlers.handleReasoningDelta({ text: 'c' });
 
       expect(ctx.currentReasoning).toBe('abc');
     });
@@ -161,11 +161,11 @@ describe('stream-handlers', () => {
   // ── handleToolCall ───────────────────────────────────────────
 
   describe('handleToolCall', () => {
-    test('creates tool part with pending state', () => {
+    test('creates tool part with pending state', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleToolCall({
+      await handlers.handleToolCall({
         toolCallId: 'call-1',
         toolName: 'read-file',
         input: { path: '/test.txt' },
@@ -179,15 +179,15 @@ describe('stream-handlers', () => {
       expect(toolPart.state.status).toBe('pending');
     });
 
-    test('resets text state after tool call', () => {
+    test('resets text state after tool call', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleTextDelta({ text: 'Some text' });
+      await handlers.handleTextDelta({ text: 'Some text' });
       expect(ctx.currentText).toBe('Some text');
       expect(ctx.currentTextPartId).not.toBeNull();
 
-      handlers.handleToolCall({
+      await handlers.handleToolCall({
         toolCallId: 'call-1',
         toolName: 'read-file',
         input: {},
@@ -197,15 +197,15 @@ describe('stream-handlers', () => {
       expect(ctx.currentTextPartId).toBeNull();
     });
 
-    test('resets reasoning state after tool call', () => {
+    test('resets reasoning state after tool call', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleReasoningDelta({ text: 'Thinking' });
+      await handlers.handleReasoningDelta({ text: 'Thinking' });
       expect(ctx.currentReasoning).toBe('Thinking');
       expect(ctx.currentReasoningPartId).not.toBeNull();
 
-      handlers.handleToolCall({
+      await handlers.handleToolCall({
         toolCallId: 'call-1',
         toolName: 'read-file',
         input: {},
@@ -215,11 +215,11 @@ describe('stream-handlers', () => {
       expect(ctx.currentReasoningPartId).toBeNull();
     });
 
-    test('parses string input as JSON', () => {
+    test('parses string input as JSON', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleToolCall({
+      await handlers.handleToolCall({
         toolCallId: 'call-1',
         toolName: 'edit',
         input: '{"path":"/foo","old":"a","new":"b"}',
@@ -228,11 +228,11 @@ describe('stream-handlers', () => {
       expect(ctx.toolParts[0].state.input).toEqual({ path: '/foo', old: 'a', new: 'b' });
     });
 
-    test('handles null input gracefully', () => {
+    test('handles null input gracefully', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleToolCall({
+      await handlers.handleToolCall({
         toolCallId: 'call-1',
         toolName: 'test-tool',
         input: null,
@@ -241,12 +241,12 @@ describe('stream-handlers', () => {
       expect(ctx.toolParts[0].state.input).toEqual({});
     });
 
-    test('supports multiple tool calls', () => {
+    test('supports multiple tool calls', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'tool-a', input: {} });
-      handlers.handleToolCall({ toolCallId: 'call-2', toolName: 'tool-b', input: {} });
+      await handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'tool-a', input: {} });
+      await handlers.handleToolCall({ toolCallId: 'call-2', toolName: 'tool-b', input: {} });
 
       expect(ctx.toolParts).toHaveLength(2);
       expect(ctx.toolParts[0].callId).toBe('call-1');
@@ -257,90 +257,90 @@ describe('stream-handlers', () => {
   // ── handleToolResult ─────────────────────────────────────────
 
   describe('handleToolResult', () => {
-    test('updates existing tool part to completed status', () => {
+    test('updates existing tool part to completed status', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'read-file', input: {} });
-      handlers.handleToolResult({ toolCallId: 'call-1', output: 'file contents' });
+      await handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'read-file', input: {} });
+      await handlers.handleToolResult({ toolCallId: 'call-1', output: 'file contents' });
 
       expect(ctx.toolParts[0].state.status).toBe('completed');
       expect((ctx.toolParts[0].state as { output: unknown }).output).toBe('file contents');
     });
 
-    test('parses JSON string output', () => {
+    test('parses JSON string output', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
-      handlers.handleToolResult({ toolCallId: 'call-1', output: '{"key":"value"}' });
+      await handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
+      await handlers.handleToolResult({ toolCallId: 'call-1', output: '{"key":"value"}' });
 
       const state = ctx.toolParts[0].state as { output: unknown };
       expect(state.output).toEqual({ key: 'value' });
     });
 
-    test('keeps non-JSON string output as-is', () => {
+    test('keeps non-JSON string output as-is', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
-      handlers.handleToolResult({ toolCallId: 'call-1', output: 'plain text result' });
+      await handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
+      await handlers.handleToolResult({ toolCallId: 'call-1', output: 'plain text result' });
 
       const state = ctx.toolParts[0].state as { output: unknown };
       expect(state.output).toBe('plain text result');
     });
 
-    test('extracts value from object with value property', () => {
+    test('extracts value from object with value property', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
-      handlers.handleToolResult({ toolCallId: 'call-1', output: { value: 'extracted' } });
+      await handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
+      await handlers.handleToolResult({ toolCallId: 'call-1', output: { value: 'extracted' } });
 
       const state = ctx.toolParts[0].state as { output: unknown };
       expect(state.output).toBe('extracted');
     });
 
-    test('detects error result and sets error status', () => {
+    test('detects error result and sets error status', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
-      handlers.handleToolResult({ toolCallId: 'call-1', output: { error: 'Something went wrong' } });
+      await handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
+      await handlers.handleToolResult({ toolCallId: 'call-1', output: { error: 'Something went wrong' } });
 
       const state = ctx.toolParts[0].state as { status: string; error: string };
       expect(state.status).toBe('error');
       expect(state.error).toBe('Something went wrong');
     });
 
-    test('preserves input when completing tool', () => {
+    test('preserves input when completing tool', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'edit', input: { path: '/foo' } });
-      handlers.handleToolResult({ toolCallId: 'call-1', output: 'done' });
+      await handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'edit', input: { path: '/foo' } });
+      await handlers.handleToolResult({ toolCallId: 'call-1', output: 'done' });
 
       const state = ctx.toolParts[0].state as { input: unknown };
       expect(state.input).toEqual({ path: '/foo' });
     });
 
-    test('ignores result for unknown tool call id', () => {
+    test('ignores result for unknown tool call id', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
-      handlers.handleToolResult({ toolCallId: 'nonexistent', output: 'orphan result' });
+      await handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
+      await handlers.handleToolResult({ toolCallId: 'nonexistent', output: 'orphan result' });
 
       expect(ctx.toolParts).toHaveLength(1);
       expect(ctx.toolParts[0].state.status).toBe('pending');
     });
 
-    test('handles tool result with direct object output (no value property)', () => {
+    test('handles tool result with direct object output (no value property)', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
-      handlers.handleToolResult({ toolCallId: 'call-1', output: { files: ['a.ts', 'b.ts'] } });
+      await handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
+      await handlers.handleToolResult({ toolCallId: 'call-1', output: { files: ['a.ts', 'b.ts'] } });
 
       const state = ctx.toolParts[0].state as { output: unknown };
       expect(state.output).toEqual({ files: ['a.ts', 'b.ts'] });
@@ -350,17 +350,17 @@ describe('stream-handlers', () => {
   // ── Full flow ────────────────────────────────────────────────
 
   describe('full streaming flow', () => {
-    test('text -> tool call -> text creates two text parts', () => {
+    test('text -> tool call -> text creates two text parts', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleTextDelta({ text: 'Before tool' });
+      await handlers.handleTextDelta({ text: 'Before tool' });
       const firstTextPartId = ctx.currentTextPartId;
 
-      handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
-      handlers.handleToolResult({ toolCallId: 'call-1', output: 'ok' });
+      await handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'test', input: {} });
+      await handlers.handleToolResult({ toolCallId: 'call-1', output: 'ok' });
 
-      handlers.handleTextDelta({ text: 'After tool' });
+      await handlers.handleTextDelta({ text: 'After tool' });
       const secondTextPartId = ctx.currentTextPartId;
 
       expect(firstTextPartId).not.toBeNull();
@@ -369,13 +369,13 @@ describe('stream-handlers', () => {
       expect(ctx.currentText).toBe('After tool');
     });
 
-    test('reasoning -> text -> tool call flow', () => {
+    test('reasoning -> text -> tool call flow', async () => {
       const ctx = createContext();
       const handlers = createStreamHandlers(ctx);
 
-      handlers.handleReasoningDelta({ text: 'Let me think...' });
-      handlers.handleTextDelta({ text: 'I will read a file.' });
-      handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'read-file', input: { path: '/test' } });
+      await handlers.handleReasoningDelta({ text: 'Let me think...' });
+      await handlers.handleTextDelta({ text: 'I will read a file.' });
+      await handlers.handleToolCall({ toolCallId: 'call-1', toolName: 'read-file', input: { path: '/test' } });
 
       expect(ctx.currentText).toBe('');
       expect(ctx.currentReasoning).toBe('');
