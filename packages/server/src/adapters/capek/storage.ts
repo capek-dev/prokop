@@ -62,16 +62,16 @@ export const jean2StorageBundle: StorageBundle = {
   },
   toolOutputArtifacts: jean2ToolOutputArtifactStore,
   queue: {
-    addMessage: addMessageToQueue,
-    delete: deleteQueuedMessage,
-    peek: getNextQueuedMessage,
+    addMessage: async (...args) => addMessageToQueue(...args),
+    delete: async (...args) => deleteQueuedMessage(...args),
+    peek: async (...args) => getNextQueuedMessage(...args),
   },
-  attachments: { get: getAttachment },
+  attachments: { get: async (...args) => getAttachment(...args) },
   workspaces: {
     get: getWorkspace,
     getAutoApproveSeverity: getWorkspaceAutoApproveSeverity,
   },
-  responseFormats: { get: getResponseFormat },
+  responseFormats: { get: async (...args) => getResponseFormat(...args) },
   index: { syncMessage: syncMessageFts },
 };
 
