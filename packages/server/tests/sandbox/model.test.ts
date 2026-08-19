@@ -20,7 +20,7 @@ async function collectStreamChunks(response: SandboxResponse): Promise<unknown[]
   });
 
   const streamPromise = model.doStream(createCallOptions());
-  await Promise.resolve();
+  await new Promise<void>(resolve => setTimeout(resolve, 0));
 
   const pendingCall = sandboxController.getPendingCalls()[0];
   expect(pendingCall).toBeDefined();
@@ -214,7 +214,7 @@ describe('SandboxLanguageModel', () => {
     });
 
     const streamPromise = model.doStream(createCallOptions());
-    await Promise.resolve();
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
 
     const pendingCall = sandboxController.getPendingCalls()[0];
     expect(pendingCall).toBeDefined();
@@ -234,7 +234,7 @@ describe('SandboxLanguageModel', () => {
     });
 
     const generatePromise = model.doGenerate(createCallOptions());
-    await Promise.resolve();
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
 
     const pendingCall = sandboxController.getPendingCalls()[0];
     expect(pendingCall).toBeDefined();

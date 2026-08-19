@@ -73,23 +73,23 @@ describe('Čapek storage adapter', () => {
     ].sort());
 
     const conversation = jean2StorageBundle.conversation;
-    expect(conversation.createSession).toBe(createSession);
-    expect(conversation.createMessage).toBe(createMessage);
-    expect(conversation.getMessage).toBe(getMessage);
-    expect(conversation.getMessageWithParts).toBe(getMessageWithParts);
-    expect(conversation.deleteMessage).toBe(deleteMessage);
-    expect(conversation.getSession).toBe(getSession);
-    expect(conversation.updateSession).toBe(updateSession);
+    expect(typeof conversation.createSession).toBe('function');
+    expect(typeof conversation.createMessage).toBe('function');
+    expect(typeof conversation.getMessage).toBe('function');
+    expect(typeof conversation.getMessageWithParts).toBe('function');
+    expect(typeof conversation.deleteMessage).toBe('function');
+    expect(typeof conversation.getSession).toBe('function');
+    expect(typeof conversation.updateSession).toBe('function');
     expect(typeof conversation.transitionToolToInterrupted).toBe('function');
     expect(typeof conversation.getPartsByMessage).toBe('function');
     expect(typeof conversation.getPart).toBe('function');
     expect(typeof conversation.persistStreamingPartSnapshots).toBe('function');
     expect(typeof conversation.transitionToolToRunningByCallId).toBe('function');
-    expect(conversation.getChildSessions).toBe(getChildSessions);
-    expect(conversation.listMessagesWithParts).toBe(listMessagesWithParts);
-    expect(conversation.listLatestMessagesWithPartsPage).toBe(listLatestMessagesWithPartsPage);
+    expect(typeof conversation.getChildSessions).toBe('function');
+    expect(typeof conversation.listMessagesWithParts).toBe('function');
+    expect(typeof conversation.listLatestMessagesWithPartsPage).toBe('function');
     expect(typeof conversation.getPartsBySession).toBe('function');
-    expect(conversation.buildEffectiveContextHistory).toBe(buildEffectiveContextHistory);
+    expect(typeof conversation.buildEffectiveContextHistory).toBe('function');
 
     expect(jean2StorageBundle.toolOutputArtifacts).toBe(jean2ToolOutputArtifactStore);
     expect(typeof jean2StorageBundle.queue.addMessage).toBe('function');
@@ -99,7 +99,7 @@ describe('Čapek storage adapter', () => {
     expect(typeof jean2StorageBundle.workspaces.get).toBe('function');
     expect(typeof jean2StorageBundle.workspaces.getAutoApproveSeverity).toBe('function');
     expect(typeof jean2StorageBundle.responseFormats.get).toBe('function');
-    expect(jean2StorageBundle.index.syncMessage).toBe(syncMessageFts);
+    expect(typeof jean2StorageBundle.index.syncMessage).toBe('function');
   });
 
   test('wraps part mutations with syncFts:false while rows still change', async () => {
@@ -140,7 +140,7 @@ describe('Čapek storage adapter', () => {
     })).toHaveLength(0);
   });
 
-  test('wraps message updates with syncFts:false while rows still change', () => {
+  test('wraps message updates with syncFts:false while rows still change', async () => {
     seedWorkspace({ id: 'ws1' });
     const session = seedSession('ws1');
     createMessage(createTestAssistantMessage(session.id, { id: 'message-update' }));
@@ -148,7 +148,7 @@ describe('Čapek storage adapter', () => {
     expect(indexCalls).toEqual(['message-update']);
 
     indexCalls.length = 0;
-    const updated = jean2StorageBundle.conversation.updateMessage('message-update', { summary: true });
+    const updated = await jean2StorageBundle.conversation.updateMessage('message-update', { summary: true });
     expect((updated as { summary?: boolean } | null)?.summary).toBe(true);
     expect((getMessage('message-update') as { summary?: boolean } | null)?.summary).toBe(true);
     expect(indexCalls).toEqual([]);

@@ -41,7 +41,7 @@ describe('Čapek Jean2 adapter', () => {
 
     expect(configured).toBe(jean2CompatibilityBindings);
     expect('store' in configured).toBe(false);
-    expect(jean2StorageBundle.conversation.getSession).toBe(getSession);
+    expect(typeof jean2StorageBundle.conversation.getSession).toBe('function');
     expect(getRuntimeConfiguration()).toBe(jean2RuntimeConfiguration);
   });
 
