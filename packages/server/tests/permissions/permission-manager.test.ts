@@ -417,7 +417,7 @@ describe('permission request manager', () => {
 
   describe('reconnect', () => {
     test('getPendingRequestsByRootSession returns pending after request created', async () => {
-      requestPermission({
+      const promise = requestPermission({
         sessionId,
         rootSessionId: sessionId,
         workspaceId,
@@ -427,11 +427,17 @@ describe('permission request manager', () => {
         broadcastFn,
         timeoutMs: 5000,
       });
+      // Settle the waiter inside the test so its 5s timer never leaks
+      // past the file and fires into a torn-down database.
+      promise.catch(() => {});
 
       const pending = getPendingRequestsByRootSession(sessionId);
       expect(pending).toHaveLength(1);
       expect(pending[0].requestId).toBeDefined();
       expect(pending[0].status).toBe('pending');
+
+      rejectPermission(pending[0].requestId, new Error('test teardown'));
+      await promise.catch(() => {});
     });
 
     test('pending request can be resolved after reconnect', async () => {

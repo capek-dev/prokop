@@ -93,6 +93,19 @@ export function initializeSchema(db: Database): void {
     perfDiagnosticsEnabled: PERF_DIAGNOSTICS_ENABLED,
   });
 
+  // The unmerged tool-output-compression experiment created an incompatible
+  // `tool_output_artifacts` shape (`part_id`/`call_id`, no `tool_call_id`).
+  // Preserve its rows under a distinct name and recreate the current shape.
+  const artifactColumns = db
+    .query('PRAGMA table_info(tool_output_artifacts)')
+    .all() as Array<{ name: string }>;
+  const preUnificationExists = db
+    .query("SELECT name FROM sqlite_master WHERE type='table' AND name='tool_output_artifacts_pre_unification'")
+    .get() != null;
+  if (artifactColumns.length > 0 && !artifactColumns.some((col) => col.name === 'tool_call_id') && !preUnificationExists) {
+    db.run('ALTER TABLE tool_output_artifacts RENAME TO tool_output_artifacts_pre_unification');
+  }
+
   db.run(`CREATE TABLE IF NOT EXISTS tool_output_artifacts (
     id TEXT PRIMARY KEY,
     session_id TEXT NOT NULL,
