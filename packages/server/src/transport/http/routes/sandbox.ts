@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { sandboxController, type AutoResponderRule, type SandboxResponse } from '@/adapters/capek/contracts';
-import { isSandboxActive } from '@/sandbox';
+import { isSandboxActive } from '@/infrastructure/sandbox';
 
 interface AutoResponderRequestBody {
   rules?: AutoResponderRule[];

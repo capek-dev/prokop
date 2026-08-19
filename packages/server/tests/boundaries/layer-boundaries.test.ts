@@ -53,7 +53,7 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
   'packages/server/src/adapters/capek/runtime-configuration.ts': [
     '@/config', '@/infrastructure/runtime/environment',
   ],
-  'packages/server/src/adapters/capek/sandbox.ts': ['@/sandbox'],
+  'packages/server/src/adapters/capek/sandbox.ts': ['@/infrastructure/sandbox'],
   'packages/server/src/adapters/capek/storage.ts': [
     '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/session-store',
     '@/infrastructure/sqlite/queued-messages', '@/infrastructure/sqlite/attachments',
@@ -119,7 +119,7 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
   ],
   'packages/server/src/adapters/jean2/configuration.ts': [
     '@/config/models', '@/config/models-sync', '@/config/prompts',
-    '@/config/preconfigs', '@/prompts/registry',
+    '@/config/preconfigs', '@/config/prompts-registry',
   ],
   'packages/server/src/adapters/jean2/maintenance.ts': ['@/infrastructure/sqlite/cleanup'],
   'packages/server/src/adapters/jean2/response-formats.ts': ['@/infrastructure/sqlite/response-formats'],
@@ -163,7 +163,7 @@ const layerHttpRoutesLegacyExceptions: Record<string, string[]> = {};
 // here until the route is migrated onto a sandbox application port.
 const layerHttpRoutesSandboxExceptions: Record<string, string[]> = {
   'packages/server/src/transport/http/routes/sandbox.ts': [
-    '@/adapters/capek/contracts', '@/sandbox',
+    '@/adapters/capek/contracts', '@/infrastructure/sandbox',
   ],
 };
 
@@ -178,6 +178,7 @@ const layerBootstrapExceptions: Record<string, string[]> = {};
 const layerInfrastructureExceptions: Record<string, string[]> = {
   'packages/server/src/infrastructure/sqlite/database.ts': ['@/config', '@/utils/perf'],
   'packages/server/src/infrastructure/mcp/manager.ts': ['@/version'],
+  'packages/server/src/infrastructure/daemon/index.ts': ['@/config'],
   'packages/server/src/infrastructure/session-title.ts': ['@/config'],
   'packages/server/src/infrastructure/tools/distribution.ts': ['@/config'],
   'packages/server/src/infrastructure/tools/tool-installer.ts': ['@/config'],
@@ -1738,7 +1739,7 @@ describe('server layer boundaries', () => {
       '@/config/models-sync',
       '@/config/preconfigs',
       '@/config/prompts',
-      '@/prompts/registry',
+      '@/config/prompts-registry',
     ].sort());
   });
 

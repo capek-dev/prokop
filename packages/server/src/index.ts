@@ -37,7 +37,7 @@ import { cleanupAllPendingAsks } from '@/infrastructure/sqlite/pending-asks';
 import { cleanupOrphanedData } from '@/infrastructure/sqlite/cleanup';
 import { getPort, getHost } from '@/config';
 import { validateToken, isAuthEnabled } from '@/transport/http/middleware/token';
-import { ensurePromptsDir } from '@/prompts/registry';
+import { ensurePromptsDir } from '@/config/prompts-registry';
 // Static side-effect: OAuth providers register with Capek at module load,
 // before any provider lookup (P2 requirement).
 import '@/providers';
@@ -54,7 +54,7 @@ import {
   getClientPort,
   getLLMDeepseekApiKey,
 } from '@/infrastructure/runtime/environment';
-import { activateSandbox } from '@/sandbox';
+import { activateSandbox } from '@/infrastructure/sandbox';
 import {
   createClientLauncher,
   prepareAndLaunchClient,
