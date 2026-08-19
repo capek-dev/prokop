@@ -30,7 +30,7 @@ mock.module('@/config/preconfigs', () => ({
   updateValidatedPreconfig: async (_id: string, input: unknown) => input,
   deleteValidatedPreconfig: async () => {},
 }));
-mock.module('@/prompts/registry', () => ({
+mock.module('@/config/prompts-registry', () => ({
   listPrompts: async () => [],
 }));
 

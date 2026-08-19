@@ -6,7 +6,7 @@ import {
   getRuntimeConfiguration,
 } from '@capekai/core/configuration';
 import { SandboxLanguageModel } from '@capekai/core/sandbox';
-import { activateSandbox, deactivateSandbox } from '@/sandbox';
+import { activateSandbox, deactivateSandbox } from '@/infrastructure/sandbox';
 
 let originalRuntimeConfiguration: ReturnType<typeof getRuntimeConfiguration>;
 

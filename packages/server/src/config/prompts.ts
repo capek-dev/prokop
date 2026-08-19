@@ -1,7 +1,7 @@
 import type { PromptInfo, CreatePromptRequest, UpdatePromptRequest } from '@jean2/sdk';
 import { join } from 'path';
 import { unlink } from 'fs/promises';
-import { listPrompts, getPrompt, clearPromptsCache, parsePromptFile } from '@/prompts/registry';
+import { listPrompts, getPrompt, clearPromptsCache, parsePromptFile } from '@/config/prompts-registry';
 import { atomicWriteFile } from './files';
 import {
   ConfigurationValidationError,

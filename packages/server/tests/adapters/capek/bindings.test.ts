@@ -11,7 +11,7 @@ import { jean2SandboxBindings } from '@/adapters/capek/sandbox';
 import { jean2TitleBindings } from '@/adapters/capek/titles';
 import { jean2WorkspaceBindings } from '@/adapters/capek/workspace';
 import { generateSessionTitle, hasManualSessionTitle, isDefaultSessionTitle } from '@/infrastructure/session-title';
-import { isSandboxActive } from '@/sandbox';
+import { isSandboxActive } from '@/infrastructure/sandbox';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import {

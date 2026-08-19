@@ -14,7 +14,7 @@ import {
   getStatus,
   tailLogs,
   type DaemonOptions,
-} from '@/daemon';
+} from '@/infrastructure/daemon';
 
 import { initJean2, type InitOptions } from '@/cli/init';
 import { runMigrations, getDatabase } from '@/infrastructure/sqlite/database';

@@ -3,7 +3,7 @@ import { tmpdir } from 'os';
 import { existsSync, statSync, openSync, renameSync } from 'fs';
 
 import { VERSION } from '@/version';
-import { getStatus, stopDaemon, getLogFilePath } from '@/daemon';
+import { getStatus, stopDaemon, getLogFilePath } from '@/infrastructure/daemon';
 import { getToolEnv } from '@/infrastructure/runtime/environment';
 import { isInitialized } from '@/config';
 
