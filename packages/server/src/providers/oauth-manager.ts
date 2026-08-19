@@ -6,7 +6,7 @@
  * The client-side handles receiving the redirect and posting the code back.
  */
 import type { OAuthProviderConfig, OAuthRedirectStrategy } from '@jean2/sdk';
-import { broadcastEvent } from '@/core/broadcast';
+import { broadcastEvent } from '@/transport/websocket/broadcast';
 import { getProvider, getProviderStatus, type TokenResponse } from '@/adapters/capek/contracts';
 import {
   buildAuthorizationUrl,

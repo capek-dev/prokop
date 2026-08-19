@@ -2,10 +2,10 @@ globalThis.AI_SDK_LOG_WARNINGS = false;
 
 import { readFileSync } from 'fs';
 
-import { createApp } from '@/app';
+import { createApp } from '@/transport/http/app';
 import { createRuntime } from '@/bootstrap/create-runtime';
 import { createWiredApplication } from '@/bootstrap/application';
-import { installDeliveryPort } from '@/core/broadcast';
+import { installDeliveryPort } from '@/transport/websocket/broadcast';
 import { installWireApplication } from '@/transport/websocket/application';
 import { resolveAskDeliveryTargets, type AskDeliveryInventories } from '@/domains/controllers';
 import { createBunWebSocketAdapter, type WsData } from '@/transport/websocket/bun-adapter';
@@ -36,7 +36,11 @@ import { reconcileAllOrphanedToolCalls } from '@/infrastructure/sqlite/message-s
 import { cleanupAllPendingAsks } from '@/infrastructure/sqlite/pending-asks';
 import { cleanupOrphanedData } from '@/infrastructure/sqlite/cleanup';
 import { getPort, getHost } from '@/config';
-import { validateToken, isAuthEnabled } from '@/auth/token';
+import { validateToken, isAuthEnabled } from '@/transport/http/middleware/token';
+import { ensurePromptsDir } from '@/prompts/registry';
+// Static side-effect: OAuth providers register with Capek at module load,
+// before any provider lookup (P2 requirement).
+import '@/providers';
 import {
   getLLMOpenAIApiKey,
   getLLMOpenRouterApiKey,
@@ -55,8 +59,8 @@ import {
   createClientLauncher,
   prepareAndLaunchClient,
   type ClientLauncher,
-} from '@/services/client-launcher';
-import { startPushRetryScheduler, stopPushRetryScheduler, cleanupPushData } from '@/services/web-push/retry-scheduler';
+} from '@/infrastructure/runtime/client-launcher';
+import { startPushRetryScheduler, stopPushRetryScheduler, cleanupPushData } from '@/infrastructure/web-push/retry-scheduler';
 import {
   startProviderAccountLifecycle,
   stopProviderAccountLifecycle,
@@ -92,6 +96,10 @@ function resolveAskTargetConnections(
 }
 
 async function startServer(options?: ServerOptions): Promise<ServerInstance> {
+  // Prompts directory is ensured before first registry scan. Provider
+  // registration happens at module load via the static import above.
+  ensurePromptsDir();
+
   const agents = createRuntime();
   const application = createWiredApplication(agents);
   installWireApplication({ session: application.session, control: application.control, providers: application.providers, notifications: application.notifications, permissions: application.permissions });

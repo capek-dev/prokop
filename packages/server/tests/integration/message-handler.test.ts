@@ -6,7 +6,7 @@ import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
 import { seedWorkspaceWithSession } from '#tests/seed';
 import { createMockBroadcast } from '#tests/mocks';
-import { installDeliveryPort, type DeliveryPort } from '@/core/broadcast';
+import { installDeliveryPort, type DeliveryPort } from '@/transport/websocket/broadcast';
 import {
   createSession,
   getSession,

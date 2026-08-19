@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
-import { registerToolRoutes } from '@/routes/tools';
+import { registerToolRoutes } from '@/transport/http/routes/tools';
 import { HttpError } from '@/application/http-errors';
 import type { ToolsHttpApplication } from '@/application/tools';
 import type { LoadedTool, ToolDefinition } from '@jean2/sdk';

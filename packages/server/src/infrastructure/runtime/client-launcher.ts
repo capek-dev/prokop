@@ -6,8 +6,8 @@ import {
   createArborist,
   fetchPackageMetadata,
   extractIntegrity,
-} from '@/services/npm-utils';
-import { createStaticRequestHandler } from '@/services/client-static-server';
+} from '@/infrastructure/tools/npm-utils';
+import { createStaticRequestHandler } from './client-static-server';
 
 const CLIENT_PACKAGE = '@jean2/client';
 const MANIFEST_FILE = '.client-manifest.json';

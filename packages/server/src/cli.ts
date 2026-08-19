@@ -4,7 +4,7 @@
 import '@/infrastructure/runtime/environment';  // This loads .env automatically
 
 import { startServer, type ServerOptions } from '@/index';
-import { runClientCommand } from '@/services/client-launcher';
+import { runClientCommand } from '@/infrastructure/runtime/client-launcher';
 import { isInitialized } from '@/config';
 import { getDatabasePath } from '@/infrastructure/runtime/environment';
 import {
@@ -16,15 +16,15 @@ import {
   type DaemonOptions,
 } from '@/daemon';
 
-import { initJean2, type InitOptions } from '@/init';
+import { initJean2, type InitOptions } from '@/cli/init';
 import { runMigrations, getDatabase } from '@/infrastructure/sqlite/database';
-import { runToolsCommand, type ToolsCommandArgs } from '@/tools/tools-cli';
-import { performUpdate, type UpdateOptions } from '@/update';
-import { syncModels, type SyncResult } from '@/configuration/models-sync';
+import { runToolsCommand, type ToolsCommandArgs } from '@/cli/tools-cli';
+import { performUpdate, type UpdateOptions } from '@/cli/update';
+import { syncModels, type SyncResult } from '@/config/models-sync';
 import { cleanupOrphanedData, vacuumDatabase, formatBytes } from '@/infrastructure/sqlite/cleanup';
 import { VERSION } from '@/version';
 
-import '@/tools/clack-utils';
+import '@/cli/clack-utils';
 
 // Parse command line arguments
 const args = process.argv.slice(2);

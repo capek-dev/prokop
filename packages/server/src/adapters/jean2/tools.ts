@@ -1,9 +1,9 @@
 import { jean2ToolCatalog } from '@/adapters/capek/tool-source';
-import { listToolEnvVars, setToolEnvVar } from '@/configuration/tool-env';
+import { listToolEnvVars, setToolEnvVar } from '@/config/tool-env';
 import {
   ConfigurationPersistenceError,
   ConfigurationValidationError,
-} from '@/configuration/errors';
+} from '@/config/errors';
 import type {
   ToolCatalogPort,
   ToolEnvironmentPort,

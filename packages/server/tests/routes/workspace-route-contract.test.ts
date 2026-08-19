@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
-import { registerWorkspaceRoutes } from '@/routes/workspaces';
+import { registerWorkspaceRoutes } from '@/transport/http/routes/workspaces';
 import { HttpError } from '@/application/http-errors';
 import type { WorkspaceApplication } from '@/application/workspaces';
 import type { PinnedMessage, Session, Workspace } from '@jean2/sdk';

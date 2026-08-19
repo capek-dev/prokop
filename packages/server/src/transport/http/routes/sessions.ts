@@ -1,7 +1,7 @@
 import type { Hono } from 'hono';
 import type { SessionStatus } from '@jean2/sdk';
-import { validate } from '@/routes/validate';
-import { createSessionSchema, updateSessionSchema } from '@/routes/schemas';
+import { validate } from './validate';
+import { createSessionSchema, updateSessionSchema } from './schemas';
 import {
   BadRequestError,
   ForbiddenError,

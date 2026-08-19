@@ -1,6 +1,5 @@
 import type { ServerMessage, Session, AskAuthority } from '@jean2/sdk';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
-import { getConnectionBySocket } from '@/transport/websocket/connection-registry';
 
 export type BroadcastFn = (message: ServerMessage) => void;
 
@@ -33,11 +32,6 @@ export function installDeliveryPort(port: DeliveryPort): void {
   installedPort = port;
 }
 
-function toConnectionId(excludeWs: unknown): ConnectionId | undefined {
-  if (excludeWs === undefined || excludeWs === null) return undefined;
-  return getConnectionBySocket(excludeWs)?.connectionId;
-}
-
 export function broadcastSessionCreated(session: Session): void {
   const message: ServerMessage = {
     type: 'session.created',
@@ -47,13 +41,16 @@ export function broadcastSessionCreated(session: Session): void {
   installedPort?.broadcast(message);
 }
 
-export function broadcastSessionCreatedExclude(session: Session, excludeWs: unknown): void {
+export function broadcastSessionCreatedExclude(
+  session: Session,
+  excludeConnectionId?: ConnectionId,
+): void {
   const message: ServerMessage = {
     type: 'session.created',
     session,
   };
 
-  installedPort?.broadcast(message, toConnectionId(excludeWs));
+  installedPort?.broadcast(message, excludeConnectionId);
 }
 
 export function broadcastSessionUpdated(session: Session): void {

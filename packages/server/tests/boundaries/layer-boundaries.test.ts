@@ -20,7 +20,7 @@ const domainsDir = resolve(serverSourceRoot, 'domains');
 const infrastructureDir = resolve(serverSourceRoot, 'infrastructure');
 const adaptersDir = resolve(serverSourceRoot, 'adapters');
 const adaptersCapekDir = resolve(adaptersDir, 'capek');
-const routesDir = resolve(serverSourceRoot, 'routes');
+const routesDir = resolve(serverSourceRoot, 'transport/http/routes');
 const utilsDir = resolve(serverSourceRoot, 'utils');
 const layerDirs = [bootstrapDir, transportDir, applicationDir, domainsDir, infrastructureDir, adaptersDir];
 const infrastructureSqliteDir = resolve(infrastructureDir, 'sqlite');
@@ -42,10 +42,10 @@ const serverWebSocketExceptions: Record<string, string[]> = {};
 
 const layerAdaptersLegacyExceptions: Record<string, string[]> = {
   'packages/server/src/adapters/capek/context-sources.ts': [
-    '@/infrastructure/configuration/preconfig', '@/infrastructure/runtime/paths',
+    '@/infrastructure/config/preconfig', '@/infrastructure/runtime/paths',
   ],
   'packages/server/src/adapters/capek/events.ts': [
-    '@/core/broadcast',
+    '@/transport/websocket/broadcast',
   ],
   'packages/server/src/adapters/capek/interaction.ts': [
     '@/infrastructure/sqlite/pending-asks', '@/infrastructure/sqlite/permissions', '@/infrastructure/sqlite/session-store', '@/infrastructure/runtime/environment',
@@ -61,7 +61,7 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
     '@/infrastructure/sqlite/workspaces',
   ],
   'packages/server/src/adapters/capek/compaction-recovery.ts': [
-    '@/core/broadcast', '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/session-store',
+    '@/transport/websocket/broadcast', '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/session-store',
   ],
   'packages/server/src/adapters/capek/titles.ts': ['@/infrastructure/session-title'],
   'packages/server/src/adapters/capek/tool-source.ts': [
@@ -77,14 +77,14 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
     '@/infrastructure/sqlite/scheduled-job-store',
   ],
   'packages/server/src/adapters/jean2/scheduled-job-execution.ts': [
-    '@/config', '@/infrastructure/configuration/preconfig', '@/infrastructure/scheduling/scheduled-job-runner',
+    '@/config', '@/infrastructure/config/preconfig', '@/infrastructure/scheduling/scheduled-job-runner',
     '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/workspaces', '@/infrastructure/sqlite/scheduled-job-store',
   ],
   'packages/server/src/adapters/jean2/terminal.ts': [
     '@/infrastructure/sqlite/database', '@/infrastructure/sqlite/terminal-session-repository',
   ],
   'packages/server/src/adapters/jean2/agent-workspace.ts': [
-    '@/infrastructure/configuration/preconfig', '@/infrastructure/sqlite/workspaces',
+    '@/infrastructure/config/preconfig', '@/infrastructure/sqlite/workspaces',
   ],
   'packages/server/src/adapters/jean2/workspace.ts': [
     '@/infrastructure/sqlite/workspaces', '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/pinned-messages',
@@ -92,13 +92,13 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
   ],
 
   'packages/server/src/adapters/jean2/tools.ts': [
-    '@/configuration/tool-env', '@/configuration/errors',
+    '@/config/tool-env', '@/config/errors',
   ],
   'packages/server/src/adapters/jean2/oauth.ts': [
     '@/providers/oauth-manager',
   ],
   'packages/server/src/adapters/jean2/provider-credentials.ts': [
-    '@/configuration/provider-credentials',
+    '@/config/provider-credentials',
   ],
   'packages/server/src/adapters/jean2/mcp.ts': [
     '@/infrastructure/mcp/lifecycle', '@/infrastructure/sqlite/workspaces',
@@ -118,8 +118,8 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
     '@/infrastructure/tools/distribution',
   ],
   'packages/server/src/adapters/jean2/configuration.ts': [
-    '@/configuration/models', '@/configuration/models-sync', '@/configuration/prompts',
-    '@/configuration/preconfigs', '@/prompts/registry',
+    '@/config/models', '@/config/models-sync', '@/config/prompts',
+    '@/config/preconfigs', '@/prompts/registry',
   ],
   'packages/server/src/adapters/jean2/maintenance.ts': ['@/infrastructure/sqlite/cleanup'],
   'packages/server/src/adapters/jean2/response-formats.ts': ['@/infrastructure/sqlite/response-formats'],
@@ -136,16 +136,34 @@ const aiSdkExceptions: Record<string, string[]> = {};
 // permission application.
 const layerTransportLegacyExceptions: Record<string, string[]> = {};
 
+// The HTTP app composition file needs three composition-root reads that the
+// transport whitelist does not cover: the version constant for /api/info,
+// the client-enabled feature flag, and the wired application fallback for
+// callers that construct the app without a pre-built application. All are
+// pinned here until createApp takes an explicit feature/config contract.
+const layerTransportAppExceptions: Record<string, string[]> = {
+  'packages/server/src/transport/http/app.ts': [
+    '@/version',
+    '@/infrastructure/runtime/environment',
+    '@/bootstrap/application',
+  ],
+};
+
 // HTTP route legacy exceptions are empty. The session route's presentation-helper
 // exception is documented separately in the transport rule below.
 const layerHttpRoutesLegacyExceptions: Record<string, string[]> = {};
 
-// S3 per-file exceptions for transport presentation helpers still living at
-// legacy paths. The session route file uses the shared zod validation and
-// session schemas; neither imports store or Capek implementations.
-const layerTransportHttpPresentationExceptions: Record<string, string[]> = {
-  'packages/server/src/transport/http/routes/sessions.ts': [
-    '@/routes/validate', '@/routes/schemas',
+// HTTP route legacy exceptions are empty. The session route uses relative
+// presentation helpers that resolve inside the routes directory, so no
+// transport presentation exceptions remain.
+
+// The sandbox route moved from src/sandbox/routes.ts into the unified HTTP
+// routes directory. It still reads the sandbox controller through the Capek
+// contracts seam and the sandbox activation flag directly; both are pinned
+// here until the route is migrated onto a sandbox application port.
+const layerHttpRoutesSandboxExceptions: Record<string, string[]> = {
+  'packages/server/src/transport/http/routes/sandbox.ts': [
+    '@/adapters/capek/contracts', '@/sandbox',
   ],
 };
 
@@ -163,11 +181,12 @@ const layerInfrastructureExceptions: Record<string, string[]> = {
   'packages/server/src/infrastructure/session-title.ts': ['@/config'],
   'packages/server/src/infrastructure/tools/distribution.ts': ['@/config'],
   'packages/server/src/infrastructure/tools/tool-installer.ts': ['@/config'],
-  'packages/server/src/infrastructure/tools/tool-npm-installer.ts': ['@/services/npm-utils'],
   'packages/server/src/infrastructure/providers/provider-credential-files.ts': [
-    '@/configuration/errors', '@/configuration/files',
+    '@/config/errors', '@/config/files',
   ],
-  'packages/server/src/infrastructure/web-push/sender.ts': ['@/services/web-push/credentials'],
+  'packages/server/src/infrastructure/web-push/retry-scheduler.ts': [
+    '@/adapters/jean2/notifications',
+  ],
 };
 
 const globalBaselineRules: DependencyRule[] = [
@@ -233,8 +252,9 @@ const layerRules: DependencyRule[] = [
   },
   {
     name: 'layer-transport',
-    rationale: 'Transport may invoke application services. No SQLite, AI SDK, or Capek implementation imports. Remaining exceptions are the misc seam plus the session route presentation helpers, all recorded for S9.',
+    rationale: 'Transport may invoke application services. No SQLite, AI SDK, or Capek implementation imports. HTTP route files are governed by the stricter layer-http-routes rule; the app composition file carries pinned composition-root exceptions (version, client flag, wired application fallback).',
     appliesTo: [transportDir],
+    excludedDirs: [routesDir],
     forbiddenSpecifiers: [
       { exact: 'bun:sqlite' },
       { exact: 'ai' },
@@ -244,7 +264,7 @@ const layerRules: DependencyRule[] = [
     allowedResolvedDirs: [transportDir, applicationDir, adaptersCapekDir],
     exceptions: {
       ...layerTransportLegacyExceptions,
-      ...layerTransportHttpPresentationExceptions,
+      ...layerTransportAppExceptions,
     },
   },
   {
@@ -302,7 +322,10 @@ const layerRules: DependencyRule[] = [
       { prefix: '@capekai/core' },
     ],
     allowedResolvedDirs: [routesDir, transportDir, applicationDir, utilsDir],
-    exceptions: layerHttpRoutesLegacyExceptions,
+    exceptions: {
+      ...layerHttpRoutesLegacyExceptions,
+      ...layerHttpRoutesSandboxExceptions,
+    },
   },
 ];
 
@@ -383,10 +406,10 @@ describe('server layer boundaries', () => {
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
 
     expect(result.violations).toEqual([
-      'packages/server/src/transport/http/routes/sessions.ts imports ../../../store/sessions (value) [rule: layer-transport]',
-      'packages/server/src/transport/http/routes/sessions.ts imports ai (value) [rule: layer-transport]',
-      'packages/server/src/transport/http/routes/sessions.ts imports @capekai/core/compat/jean2 (value) [rule: layer-transport]',
-      'packages/server/src/transport/http/routes/sessions.ts imports bun:sqlite (value) [rule: layer-transport]',
+      'packages/server/src/transport/http/routes/sessions.ts imports ../../../store/sessions (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/sessions.ts imports ai (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/sessions.ts imports @capekai/core/compat/jean2 (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/sessions.ts imports bun:sqlite (value) [rule: layer-http-routes]',
     ]);
   });
 
@@ -509,7 +532,7 @@ describe('server layer boundaries', () => {
         sourceText: "import { x } from '@capekai/core/compat/jean2';\n",
       },
       {
-        path: resolve(serverSourceRoot, 'routes/notifications.ts'),
+        path: resolve(routesDir, 'notifications.ts'),
         sourceText: "import { y } from '@capekai/core/compat/jean2';\n",
       },
     ];
@@ -521,7 +544,7 @@ describe('server layer boundaries', () => {
     // S8 emptied the exception map, so every barrel consumer is flagged.
     expect(result.violations).toEqual([
       'packages/server/src/providers/codex.ts imports @capekai/core/compat/jean2 (value) [rule: no-direct-compat-barrel]',
-      'packages/server/src/routes/notifications.ts imports @capekai/core/compat/jean2 (value) [rule: no-direct-compat-barrel]',
+      'packages/server/src/transport/http/routes/notifications.ts imports @capekai/core/compat/jean2 (value) [rule: no-direct-compat-barrel]',
     ]);
     expect(compatBarrelExceptions).toEqual({});
   });
@@ -540,7 +563,7 @@ describe('server layer boundaries', () => {
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
 
     expect(result.violations).toEqual([
-      'packages/server/src/transport/http/routes/sessions.ts imports @/store/sessions (value) [rule: layer-transport]',
+      'packages/server/src/transport/http/routes/sessions.ts imports @/store/sessions (value) [rule: layer-http-routes]',
     ]);
   });
 
@@ -656,9 +679,9 @@ describe('server layer boundaries', () => {
       expect(compatList).toEqual([]);
     }
 
-    expect(layerTransportHttpPresentationExceptions['packages/server/src/transport/http/routes/sessions.ts']).toEqual([
-      '@/routes/validate', '@/routes/schemas',
-    ]);
+    // The session route's presentation helpers are relative imports inside the
+    // routes directory; no transport presentation exception remains.
+    expect(layerHttpRoutesLegacyExceptions['packages/server/src/transport/http/routes/sessions.ts']).toBeUndefined();
 
     const imports = scanDirectory(serverSourceRoot)
       .flatMap((file) => parseImports(file.sourceText, file.path).map((imp) => ({ file, imp })));
@@ -676,7 +699,7 @@ describe('server layer boundaries', () => {
     }
     expect(offenders).toEqual([]);
 
-    expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain('packages/server/src/routes/sessions.ts');
+    expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain('packages/server/src/transport/http/routes/sessions.ts');
   });
 
   test('S9 gate: permission wire handlers use the wired permission application', () => {
@@ -757,7 +780,7 @@ describe('server layer boundaries', () => {
 
   test('S4 gate: the scheduler route invokes only the scheduling application and presentation helpers', () => {
     expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain(
-      'packages/server/src/routes/scheduler.ts',
+      'packages/server/src/transport/http/routes/scheduler.ts',
     );
 
     const routePath = resolve(routesDir, 'scheduler.ts');
@@ -796,8 +819,8 @@ describe('server layer boundaries', () => {
 
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
     expect(result.violations).toEqual([
-      'packages/server/src/routes/scheduler.ts imports @/store/scheduled-jobs (value) [rule: layer-http-routes]',
-      'packages/server/src/routes/scheduler.ts imports @/scheduler/runner (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/scheduler.ts imports @/store/scheduled-jobs (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/scheduler.ts imports @/scheduler/runner (value) [rule: layer-http-routes]',
     ]);
   });
 
@@ -885,7 +908,7 @@ describe('server layer boundaries', () => {
       '@capekai/core/execution',
       '@/application/ports/session',
       '@/adapters/capek/events',
-      '@/core/broadcast',
+      '@/transport/websocket/broadcast',
       '@/infrastructure/sqlite/message-store',
       '@/infrastructure/sqlite/session-store',
     ].sort());
@@ -940,7 +963,7 @@ describe('server layer boundaries', () => {
 
   test('S4 gate: the agents route invokes only the agents application and presentation helpers', () => {
     expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain(
-      'packages/server/src/routes/agents.ts',
+      'packages/server/src/transport/http/routes/agents.ts',
     );
 
     const routePath = resolve(routesDir, 'agents.ts');
@@ -978,8 +1001,8 @@ describe('server layer boundaries', () => {
 
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
     expect(result.violations).toEqual([
-      'packages/server/src/routes/agents.ts imports @/agents/storage (value) [rule: layer-http-routes]',
-      'packages/server/src/routes/agents.ts imports @/agents/memory (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/agents.ts imports @/agents/storage (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/agents.ts imports @/agents/memory (value) [rule: layer-http-routes]',
     ]);
   });
 
@@ -991,7 +1014,7 @@ describe('server layer boundaries', () => {
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
       '@/application/ports/agents',
-      '@/infrastructure/configuration/preconfig',
+      '@/infrastructure/config/preconfig',
       '@/infrastructure/sqlite/workspaces',
     ].sort());
   });
@@ -1230,7 +1253,7 @@ describe('server layer boundaries', () => {
 
   test('S4 gate: the workspaces route invokes only the workspace application and presentation helpers', () => {
     expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain(
-      'packages/server/src/routes/workspaces.ts',
+      'packages/server/src/transport/http/routes/workspaces.ts',
     );
 
     const routePath = resolve(routesDir, 'workspaces.ts');
@@ -1271,9 +1294,9 @@ describe('server layer boundaries', () => {
 
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
     expect(result.violations).toEqual([
-      'packages/server/src/routes/workspaces.ts imports @/store (value) [rule: layer-http-routes]',
-      'packages/server/src/routes/workspaces.ts imports @/services/terminal (value) [rule: layer-http-routes]',
-      'packages/server/src/routes/workspaces.ts imports @/mcp (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/workspaces.ts imports @/store (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/workspaces.ts imports @/services/terminal (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/workspaces.ts imports @/mcp (value) [rule: layer-http-routes]',
     ]);
   });
 
@@ -1371,7 +1394,7 @@ describe('server layer boundaries', () => {
 
   test('S5 gate: the files route invokes only the files application and presentation helpers', () => {
     expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain(
-      'packages/server/src/routes/files.ts',
+      'packages/server/src/transport/http/routes/files.ts',
     );
 
     const routePath = resolve(routesDir, 'files.ts');
@@ -1415,8 +1438,8 @@ describe('server layer boundaries', () => {
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
 
     expect(result.violations).toEqual([
-      'packages/server/src/routes/files.ts imports @/store (value) [rule: layer-http-routes]',
-      'packages/server/src/routes/files.ts imports @/services/files (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/files.ts imports @/store (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/files.ts imports @/services/files (value) [rule: layer-http-routes]',
     ]);
   });
 
@@ -1540,10 +1563,10 @@ describe('server layer boundaries', () => {
 
   test('S4 gate: the tools route invokes only the tools application and presentation helpers', () => {
     expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain(
-      'packages/server/src/routes/tools.ts',
+      'packages/server/src/transport/http/routes/tools.ts',
     );
     expect(Object.keys(compatBarrelExceptions)).not.toContain(
-      'packages/server/src/routes/tools.ts',
+      'packages/server/src/transport/http/routes/tools.ts',
     );
 
     const routePath = resolve(routesDir, 'tools.ts');
@@ -1559,7 +1582,7 @@ describe('server layer boundaries', () => {
     ];
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
 
-    const forbiddenPrefixes = ['@/store', '@/configuration', '@capekai/core', '@/tools'];
+    const forbiddenPrefixes = ['@/store', '@/config', '@capekai/core', '@/tools'];
     for (const imp of imports) {
       for (const prefix of forbiddenPrefixes) {
         expect(imp.specifier.startsWith(prefix)).toBe(false);
@@ -1573,21 +1596,21 @@ describe('server layer boundaries', () => {
         path: resolve(routesDir, 'tools.ts'),
         sourceText: [
           "import { listTools } from '@capekai/core/compat/jean2';",
-          "import * as toolEnv from '@/configuration/tool-env';",
+          "import * as toolEnv from '@/config/tool-env';",
         ].join('\n'),
       },
     ];
 
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
     expect(result.violations).toEqual([
-      'packages/server/src/routes/tools.ts imports @capekai/core/compat/jean2 (value) [rule: layer-http-routes]',
-      'packages/server/src/routes/tools.ts imports @/configuration/tool-env (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/tools.ts imports @capekai/core/compat/jean2 (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/tools.ts imports @/config/tool-env (value) [rule: layer-http-routes]',
     ]);
   });
 
   test('S5 gate: the mcp route invokes only the mcp application and presentation helpers', () => {
     expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain(
-      'packages/server/src/routes/mcp.ts',
+      'packages/server/src/transport/http/routes/mcp.ts',
     );
 
     const routePath = resolve(routesDir, 'mcp.ts');
@@ -1625,8 +1648,8 @@ describe('server layer boundaries', () => {
 
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
     expect(result.violations).toEqual([
-      'packages/server/src/routes/mcp.ts imports @/store (value) [rule: layer-http-routes]',
-      'packages/server/src/routes/mcp.ts imports @/mcp (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/mcp.ts imports @/store (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/mcp.ts imports @/mcp (value) [rule: layer-http-routes]',
     ]);
   });
 
@@ -1711,10 +1734,10 @@ describe('server layer boundaries', () => {
     expect(file).toBeDefined();
     expect(parseImports(file!.sourceText, file!.path).map((imp) => imp.specifier).sort()).toEqual([
       '@/application/ports/configuration',
-      '@/configuration/models',
-      '@/configuration/models-sync',
-      '@/configuration/preconfigs',
-      '@/configuration/prompts',
+      '@/config/models',
+      '@/config/models-sync',
+      '@/config/preconfigs',
+      '@/config/prompts',
       '@/prompts/registry',
     ].sort());
   });
@@ -1736,8 +1759,8 @@ describe('server layer boundaries', () => {
     expect(toolsImports.map((imp) => imp.specifier).sort()).toEqual([
       '@/adapters/capek/tool-source',
       '@/application/ports/tool-distribution',
-      '@/configuration/errors',
-      '@/configuration/tool-env',
+      '@/config/errors',
+      '@/config/tool-env',
     ].sort());
   });
 
@@ -1759,7 +1782,7 @@ describe('server layer boundaries', () => {
       '@/adapters/capek/execution-scope',
       '@/application/ports/scheduling',
       '@/config',
-      '@/infrastructure/configuration/preconfig',
+      '@/infrastructure/config/preconfig',
       '@/infrastructure/scheduling/scheduled-job-runner',
       '@/infrastructure/sqlite/scheduled-job-store',
       '@/infrastructure/sqlite/session-store',
@@ -1840,8 +1863,8 @@ describe('server layer boundaries', () => {
     }
     expect(maintenance!.sourceText).toContain('maintenance.vacuum');
     expect(formats!.sourceText).toContain('responseFormats.list');
-    expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain('packages/server/src/routes/maintenance.ts');
-    expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain('packages/server/src/routes/response-formats.ts');
+    expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain('packages/server/src/transport/http/routes/maintenance.ts');
+    expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain('packages/server/src/transport/http/routes/response-formats.ts');
   });
 
   test('S9 gate: MCP and tool implementations live under infrastructure', () => {
@@ -1927,7 +1950,7 @@ describe('server layer boundaries', () => {
     expect(file!.sourceText).toContain('configuration.models');
     expect(file!.sourceText).toContain('configuration.prompts');
     expect(file!.sourceText).toContain('configuration.preconfigs');
-    expect(parseImports(file!.sourceText, file!.path).some((imp) => imp.specifier.startsWith('@/configuration/'))).toBe(false);
+    expect(parseImports(file!.sourceText, file!.path).some((imp) => imp.specifier.startsWith('@/config/'))).toBe(false);
   });
 
   test('S9 gate: the config route delegates provider routes to the providers application without importing provider implementations', () => {
@@ -1940,22 +1963,22 @@ describe('server layer boundaries', () => {
       imports.some((imp) => imp.specifier === '@/application/providers'),
     ).toBe(true);
     for (const imp of imports) {
-      expect(imp.specifier).not.toBe('@/configuration/provider-credentials');
+      expect(imp.specifier).not.toBe('@/config/provider-credentials');
       expect(imp.specifier).not.toBe('@/providers/oauth-manager');
       expect(imp.specifier).not.toBe('@capekai/core/compat/jean2');
     }
     // The retired exception entries are pinned.
     expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain(
-      'packages/server/src/routes/config.ts',
+      'packages/server/src/transport/http/routes/config.ts',
     );
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@/application/configuration',
+      '@/application/config',
       '@/application/providers',
       './schemas',
       './validate',
       'hono',
     ].sort());
-    expect(Object.keys(compatBarrelExceptions)).not.toContain('packages/server/src/routes/config.ts');
+    expect(Object.keys(compatBarrelExceptions)).not.toContain('packages/server/src/transport/http/routes/config.ts');
   });
 
   test('S4 gate: the provider wire handlers invoke the providers application and import no Capek compat entrypoints', () => {
@@ -2021,7 +2044,7 @@ describe('server layer boundaries', () => {
     const credentialImports = parseImports(credentialFile!.sourceText, credentialFile!.path);
     expect(credentialImports.map((imp) => imp.specifier).sort()).toEqual([
       '@/application/ports/provider-accounts',
-      '@/configuration/provider-credentials',
+      '@/config/provider-credentials',
     ].sort());
   });
 
@@ -2100,7 +2123,7 @@ describe('server layer boundaries', () => {
 
   test('S4 gate: the notifications route invokes only the notifications application and presentation helpers', () => {
     expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain(
-      'packages/server/src/routes/notifications.ts',
+      'packages/server/src/transport/http/routes/notifications.ts',
     );
 
     const routePath = resolve(routesDir, 'notifications.ts');
@@ -2131,15 +2154,15 @@ describe('server layer boundaries', () => {
         path: resolve(routesDir, 'notifications.ts'),
         sourceText: [
           "import { upsertPushSubscription } from '@/store';",
-          "import { getVapidCredentials } from '@/services/web-push/credentials';",
+          "import { getVapidCredentials } from '@/infrastructure/web-push/credentials';",
         ].join('\n'),
       },
     ];
 
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
     expect(result.violations).toEqual([
-      'packages/server/src/routes/notifications.ts imports @/store (value) [rule: layer-http-routes]',
-      'packages/server/src/routes/notifications.ts imports @/services/web-push/credentials (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/notifications.ts imports @/store (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/notifications.ts imports @/infrastructure/web-push/credentials (value) [rule: layer-http-routes]',
     ]);
   });
 
@@ -2206,7 +2229,7 @@ describe('server layer boundaries', () => {
 
 
   test('S4 gate: the web-push retry scheduler consumes the notification domain and the adapter', () => {
-    const retryPath = resolve(serverSourceRoot, 'services/web-push/retry-scheduler.ts');
+    const retryPath = resolve(serverSourceRoot, 'infrastructure/web-push/retry-scheduler.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === retryPath);
     expect(file).toBeDefined();
 

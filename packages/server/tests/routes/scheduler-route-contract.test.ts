@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
-import { registerSchedulerRoutes } from '@/routes/scheduler';
+import { registerSchedulerRoutes } from '@/transport/http/routes/scheduler';
 import { HttpError } from '@/application/http-errors';
 import type { SchedulingHttpApplication } from '@/application/scheduling';
 import type { ScheduledJob } from '@jean2/sdk';

@@ -26,6 +26,6 @@ export * from './mcp';
 export * from './providers';
 export * from './notifications';
 export * from './permissions';
-export * from './configuration';
+export * from './config';
 export * from './maintenance';
 export * from './response-formats';

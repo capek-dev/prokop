@@ -9,7 +9,7 @@
  * so tools never need to handle token refresh logic.
  */
 import type { GmailProviderConfig, ProviderStatus } from '@jean2/sdk';
-import { broadcastEvent } from '@/core/broadcast';
+import { broadcastEvent } from '@/transport/websocket/broadcast';
 import { registerProvider, type ConnectableProvider, type TokenResponse } from '@/adapters/capek/contracts';
 import { loadProviderConfig, saveProviderConfig, deleteProviderConfig } from '@/infrastructure/providers/provider-config-files';
 import {

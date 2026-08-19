@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
-import { registerMcpRoutes } from '@/routes/mcp';
+import { registerMcpRoutes } from '@/transport/http/routes/mcp';
 import { HttpError } from '@/application/http-errors';
 import type { McpHttpApplication } from '@/application/mcp';
 import type { McpStatus } from '@jean2/sdk';

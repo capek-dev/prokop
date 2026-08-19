@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
 import { homedir } from 'os';
 import { join, resolve } from 'path';
-import { registerFileRoutes } from '@/routes/files';
+import { registerFileRoutes } from '@/transport/http/routes/files';
 import { HttpError } from '@/application/http-errors';
 import type { FilesApplication } from '@/application/files';
 

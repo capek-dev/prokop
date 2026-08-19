@@ -3,7 +3,7 @@ import {
   getVapidCredentials,
   isWebPushAvailable,
   sendWebPush,
-} from '@/services/web-push/credentials';
+} from './credentials';
 
 export function createWebPushSender(): NotificationSenderPort {
   return {

@@ -4,7 +4,7 @@ import {
   prepareAndLaunchClient,
   type ClientLauncher,
   type LaunchResult,
-} from '@/services/client-launcher';
+} from '@/infrastructure/runtime/client-launcher';
 
 function createLauncher(overrides: Partial<ClientLauncher> = {}): ClientLauncher {
   return {

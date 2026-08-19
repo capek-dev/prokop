@@ -10,7 +10,7 @@ import {
   sendToAskTargetsEvent,
   sendToControllerEvent,
   type DeliveryPort,
-} from '@/core/broadcast';
+} from '@/transport/websocket/broadcast';
 import { type ConnectionId } from '@/transport/websocket/connection-id';
 import { registerConnection, unregisterConnection } from '@/transport/websocket/connection-registry';
 
@@ -49,7 +49,7 @@ describe('core broadcast delivery port', () => {
 
     broadcastEvent({ type: 'error', code: 'x', message: 'y' });
     broadcastSessionCreated({ id: 's1' } as never);
-    broadcastSessionCreatedExclude({ id: 's2' } as never, excludeWs);
+    broadcastSessionCreatedExclude({ id: 's2' } as never, excludeConnectionId);
     broadcastSessionUpdated({ id: 's3' } as never);
 
     expect(calls.map(({ message }) => message.type)).toEqual([

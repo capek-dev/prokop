@@ -13,7 +13,7 @@ import {
   getPreconfig,
   listPreconfigs,
   listSubagentPreconfigs,
-} from '@/infrastructure/configuration/preconfig';
+} from '@/infrastructure/config/preconfig';
 import { getGlobalAgentsPath } from '@/infrastructure/runtime/paths';
 
 function makeAgentsApplication(calls: string[]): AgentsApplication {

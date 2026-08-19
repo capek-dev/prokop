@@ -5,7 +5,7 @@ import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
-import { createStaticRequestHandler } from '@/services/client-static-server';
+import { createStaticRequestHandler } from '@/infrastructure/runtime/client-static-server';
 
 let distPath: string;
 let server: http.Server;

@@ -10,7 +10,7 @@ import { workspacePathPolicyPort } from '@/adapters/capek/workspace-paths';
 import { createFilePreview } from '@/infrastructure/filesystem/file-preview';
 
 const getFilePreview = createFilePreview(workspacePathPolicyPort);
-import { registerFileRoutes } from '@/routes/files';
+import { registerFileRoutes } from '@/transport/http/routes/files';
 import { HttpError } from '@/application/http-errors';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
