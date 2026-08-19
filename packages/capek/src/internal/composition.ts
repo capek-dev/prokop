@@ -1,4 +1,4 @@
-/** Internal package-owned generic composition entrypoint. */
+/** Public package-owned generic composition entrypoint. */
 
 export {
   createAgentScope,

@@ -4,15 +4,15 @@ import { dirname, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 import * as rootApi from '@capekai/core';
 import { capekPackagePhase, createAgent } from '@capekai/core';
-import * as compositionApi from '@capekai/core/internal/composition';
-import * as hostsApi from '@capekai/core/internal/hosts';
-import * as executionApi from '@capekai/core/internal/execution';
-import * as providersApi from '@capekai/core/internal/providers';
-import * as toolsApi from '@capekai/core/internal/tools';
-import * as askAuthorityApi from '@capekai/core/internal/ask-authority';
-import * as sandboxApi from '@capekai/core/internal/sandbox';
-import * as workspaceApi from '@capekai/core/internal/workspace';
-import * as configurationApi from '@capekai/core/internal/configuration';
+import * as compositionApi from '@capekai/core/composition';
+import * as hostsApi from '@capekai/core/hosts';
+import * as executionApi from '@capekai/core/execution';
+import * as providersApi from '@capekai/core/providers';
+import * as toolsApi from '@capekai/core/tools';
+import * as askAuthorityApi from '@capekai/core/ask-authority';
+import * as sandboxApi from '@capekai/core/sandbox';
+import * as workspaceApi from '@capekai/core/workspace';
+import * as configurationApi from '@capekai/core/configuration';
 import { createInMemoryConversationStore } from '@capekai/core/storage';
 
 const repositoryRoot = resolve(import.meta.dir, '../../..');
@@ -107,7 +107,7 @@ describe('package boundary', () => {
     expect('streamChatWithRetry' in rootApi).toBe(false);
   });
 
-  test('internal composition subpath exposes exactly the narrow composition surface', () => {
+  test('composition subpath exposes exactly the narrow composition surface', () => {
     expect(Object.keys(compositionApi).sort()).toEqual([
       'C2_PROCESS_KEYS',
       'C2_REQUIRED_AGENT_KEYS',
@@ -138,7 +138,7 @@ describe('package boundary', () => {
   });
 
 
-  test('internal hosts subpath exposes exactly the host configuration surface', () => {
+  test('hosts subpath exposes exactly the host configuration surface', () => {
     expect(Object.keys(hostsApi).sort()).toEqual([
       'addEntry',
       'buildSkillManageToolDescription',
@@ -178,7 +178,7 @@ describe('package boundary', () => {
     ].sort());
   });
 
-  test('internal execution subpath exposes exactly the execution surface', () => {
+  test('execution subpath exposes exactly the execution surface', () => {
     expect(Object.keys(executionApi).sort()).toEqual([
       'ApiErrorType',
       'buildAiSdkTools',
@@ -234,7 +234,7 @@ describe('package boundary', () => {
     ].sort());
   });
 
-  test('internal providers subpath exposes exactly the provider surface', () => {
+  test('providers subpath exposes exactly the provider surface', () => {
     expect(Object.keys(providersApi).sort()).toEqual([
       'connectProvider',
       'createCapabilityTool',
@@ -252,7 +252,7 @@ describe('package boundary', () => {
     ].sort());
   });
 
-  test('internal tools subpath exposes exactly the tool surface', () => {
+  test('tools subpath exposes exactly the tool surface', () => {
     expect(Object.keys(toolsApi).sort()).toEqual([
       'ArtifactError',
       'clearCache',
@@ -265,6 +265,7 @@ describe('package boundary', () => {
       'getTool',
       'getToolSource',
       'listTools',
+      'loadToolModule',
       'readInstallManifest',
       'scanTools',
       'stripVisualization',
@@ -274,7 +275,7 @@ describe('package boundary', () => {
     ].sort());
   });
 
-  test('internal ask-authority subpath exposes exactly the pending-ask surface', () => {
+  test('ask-authority subpath exposes exactly the pending-ask surface', () => {
     expect(Object.keys(askAuthorityApi).sort()).toEqual([
       'ASK_TIMEOUT',
       'createAskApi',
@@ -292,7 +293,7 @@ describe('package boundary', () => {
     ].sort());
   });
 
-  test('internal sandbox subpath exposes exactly the sandbox surface', () => {
+  test('sandbox subpath exposes exactly the sandbox surface', () => {
     expect(Object.keys(sandboxApi).sort()).toEqual([
       'SandboxController',
       'SandboxLanguageModel',
@@ -301,7 +302,7 @@ describe('package boundary', () => {
     ].sort());
   });
 
-  test('internal workspace subpath exposes exactly the workspace policy surface', () => {
+  test('workspace subpath exposes exactly the workspace policy surface', () => {
     expect(Object.keys(workspaceApi).sort()).toEqual([
       'expandPath',
       'isInsideUnselectedAdditionalRoot',
@@ -314,7 +315,7 @@ describe('package boundary', () => {
     ].sort());
   });
 
-  test('internal configuration subpath exposes exactly the runtime configuration surface', () => {
+  test('configuration subpath exposes exactly the runtime configuration surface', () => {
     expect(Object.keys(configurationApi).sort()).toEqual([
       'configureRuntimeConfiguration',
       'getApiKeyForProvider',

@@ -43,7 +43,7 @@ function getDefaultToolsPath(): string | null {
   return defaultToolsPath;
 }
 
-async function loadToolModule(toolDir: string): Promise<LoadedTool | null> {
+export async function loadToolModule(toolDir: string): Promise<LoadedTool | null> {
   const toolName = basename(toolDir);
   const toolsBasePath = dirname(toolDir);
   const manifest = readInstallManifest(toolsBasePath, toolName);
