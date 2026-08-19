@@ -1,7 +1,5 @@
 import type { ConversationStore, StorageBundle } from './contracts';
 import { createInMemoryStorageBundle } from './memory';
-import { createSqliteConversationStore } from './sqlite';
-import { createSqliteToolOutputArtifactStore } from './tool-output-artifacts';
 
 export type AgentStorageOption =
   | ConversationStore
@@ -33,21 +31,29 @@ function isStorageDescriptor(
       && keys[1] === 'type');
 }
 
-export function createAgentStorage(option?: AgentStorageOption): AgentStorageComposition {
+function memoryComposition(): AgentStorageComposition {
+  return {
+    storage: createInMemoryStorageBundle(),
+    close: () => {},
+  };
+}
+
+/** The sqlite driver is imported dynamically: importing the package entry
+ * must not pull bun:sqlite into runtimes that only use memory or custom
+ * stores. The driver loads only when { type: 'sqlite' } is requested. */
+export async function createAgentStorage(option?: AgentStorageOption): Promise<AgentStorageComposition> {
   if (!option) {
-    return {
-      storage: createInMemoryStorageBundle(),
-      close: () => {},
-    };
+    return memoryComposition();
   }
 
   if (isStorageDescriptor(option)) {
     if (option.type === 'memory') {
-      return {
-        storage: createInMemoryStorageBundle(),
-        close: () => {},
-      };
+      return memoryComposition();
     }
+    const [{ createSqliteConversationStore }, { createSqliteToolOutputArtifactStore }] = await Promise.all([
+      import('./sqlite'),
+      import('./sqlite-tool-output-artifacts'),
+    ]);
     const conversation = createSqliteConversationStore({ path: option.path });
     const toolOutputArtifacts = createSqliteToolOutputArtifactStore({ path: option.path });
     return {
