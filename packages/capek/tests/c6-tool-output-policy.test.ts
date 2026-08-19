@@ -166,20 +166,20 @@ describe('C6 tool-output policy contract', () => {
     expect(TOOL_OUTPUT_PREVIEW_CHARS).toBe(10_000);
   });
 
-  test('passes below-threshold results through untouched', () => {
-    expect(applyToolOutputPolicy('small', context())).toBe('small');
+  test('passes below-threshold results through untouched', async () => {
+    expect(await applyToolOutputPolicy('small', context())).toBe('small');
     const object = { value: 'small' };
-    expect(applyToolOutputPolicy(object, context())).toBe(object);
+    expect(await applyToolOutputPolicy(object, context())).toBe(object);
   });
 
-  test('preserves the _visualization overlay below the threshold', () => {
+  test('preserves the _visualization overlay below the threshold', async () => {
     const withVisualization = { value: 'small', _visualization: { type: 'diff' } };
-    expect(applyToolOutputPolicy(withVisualization, context())).toBe(withVisualization);
+    expect(await applyToolOutputPolicy(withVisualization, context())).toBe(withVisualization);
   });
 
-  test('strings above the threshold become a text artifact envelope', () => {
+  test('strings above the threshold become a text artifact envelope', async () => {
     const large = 'x'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS + 1);
-    const result = applyToolOutputPolicy(large, context());
+    const result = await applyToolOutputPolicy(large, context());
     expect(isToolOutputArtifactReference(result)).toBe(true);
     const reference = result as ToolOutputArtifactReference;
     expect(reference.format).toBe('text');
@@ -189,18 +189,18 @@ describe('C6 tool-output policy contract', () => {
     expect(reference.message).toBe(
       `Exact output is available with ${RETRIEVE_TOOL_OUTPUT_NAME} using artifactId ${reference.artifactId}.`,
     );
-    const page = retrieveToolOutput('tool-output-session', { artifactId: reference.artifactId });
+    const page = await retrieveToolOutput('tool-output-session', { artifactId: reference.artifactId });
     expect(page?.format).toBe('text');
     expect(page?.totalChars).toBe(large.length);
     expect(page?.complete).toBe(false);
   });
 
-  test('objects above the threshold become a json artifact envelope with the visualization stripped from persisted content', () => {
+  test('objects above the threshold become a json artifact envelope with the visualization stripped from persisted content', async () => {
     const large = {
       content: 'y'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS),
       _visualization: { type: 'chart', data: 'z'.repeat(60_000) },
     };
-    const result = applyToolOutputPolicy(large, context());
+    const result = await applyToolOutputPolicy(large, context());
     expect(isToolOutputArtifactReference(result)).toBe(true);
     const reference = result as ToolOutputArtifactReference & { _visualization?: unknown };
     expect(reference.format).toBe('json');
@@ -209,16 +209,16 @@ describe('C6 tool-output policy contract', () => {
     );
     expect(reference._visualization).toEqual({ type: 'chart', data: 'z'.repeat(60_000) });
 
-    const page = retrieveToolOutput('tool-output-session', { artifactId: reference.artifactId });
+    const page = await retrieveToolOutput('tool-output-session', { artifactId: reference.artifactId });
     expect(page).not.toBeNull();
     expect(page!.content).not.toContain('_visualization');
     expect(page!.content).toContain('content');
   });
 
-  test('serialization failures fail open with the exact bounded preview', () => {
+  test('serialization failures fail open with the exact bounded preview', async () => {
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
-    const result = applyToolOutputPolicy(cyclic, context());
+    const result = await applyToolOutputPolicy(cyclic, context());
     expect(result).toEqual({
       type: 'tool-output-preview',
       preview: '[object Object]',
@@ -227,7 +227,7 @@ describe('C6 tool-output policy contract', () => {
       message: 'Exact tool output was not persisted. Only this bounded preview is available.',
     });
 
-    expect(applyToolOutputPolicy(undefined, context())).toEqual({
+    expect(await applyToolOutputPolicy(undefined, context())).toEqual({
       type: 'tool-output-preview',
       preview: 'undefined',
       totalChars: null,
@@ -235,16 +235,16 @@ describe('C6 tool-output policy contract', () => {
       message: 'Exact tool output was not persisted. Only this bounded preview is available.',
     });
 
-    const bigintResult = applyToolOutputPolicy(123n, context());
+    const bigintResult = await applyToolOutputPolicy(123n, context());
     expect(bigintResult).toMatchObject({ type: 'tool-output-preview', preview: '123' });
 
-    expect(applyToolOutputPolicy(Symbol('s'), context())).toMatchObject({
+    expect(await applyToolOutputPolicy(Symbol('s'), context())).toMatchObject({
       type: 'tool-output-preview',
       preview: 'Symbol(s)',
     });
   });
 
-  test('artifact persistence failures fail open with the content length', () => {
+  test('artifact persistence failures fail open with the content length', async () => {
     const bundle = createInMemoryStorageBundle();
     const failing: StorageBundle = {
       ...bundle,
@@ -257,7 +257,7 @@ describe('C6 tool-output policy contract', () => {
     };
     configureStorage(failing);
     const large = 'x'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS + 100);
-    const result = applyToolOutputPolicy(large, context());
+    const result = await applyToolOutputPolicy(large, context());
     expect(result).toMatchObject({
       type: 'tool-output-preview',
       totalChars: large.length,
@@ -267,13 +267,13 @@ describe('C6 tool-output policy contract', () => {
     expect((result as { preview: string }).preview).toHaveLength(TOOL_OUTPUT_PREVIEW_CHARS);
   });
 
-  test('malformed, foreign, and unknown ids fail closed', () => {
+  test('malformed, foreign, and unknown ids fail closed', async () => {
     const large = 'x'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS + 1);
-    const result = applyToolOutputPolicy(large, context()) as ToolOutputArtifactReference;
+    const result = await applyToolOutputPolicy(large, context()) as ToolOutputArtifactReference;
 
-    expect(retrieveToolOutput('tool-output-session', { artifactId: 'not-a-uuid' })).toBeNull();
-    expect(retrieveToolOutput('tool-output-session', { artifactId: '00000000-0000-4000-8000-000000000000' })).toBeNull();
-    expect(retrieveToolOutput('other-session', { artifactId: result.artifactId })).toBeNull();
+    expect(await retrieveToolOutput('tool-output-session', { artifactId: 'not-a-uuid' })).toBeNull();
+    expect(await retrieveToolOutput('tool-output-session', { artifactId: '00000000-0000-4000-8000-000000000000' })).toBeNull();
+    expect(await retrieveToolOutput('other-session', { artifactId: result.artifactId })).toBeNull();
 
     // The retrieval tool reports the exact failure string.
     const outcome = retrieveToolOutputStandardTool.execute(
@@ -283,25 +283,25 @@ describe('C6 tool-output policy contract', () => {
     expect(outcome).resolves.toEqual({ success: false, error: 'Tool output artifact not found' });
   });
 
-  test('retrieval pages clamp offset and limit exactly', () => {
+  test('retrieval pages clamp offset and limit exactly', async () => {
     const large = 'a'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS + 5);
-    const result = applyToolOutputPolicy(large, context()) as ToolOutputArtifactReference;
-    const page = retrieveToolOutput('tool-output-session', {
+    const result = await applyToolOutputPolicy(large, context()) as ToolOutputArtifactReference;
+    const page = (await retrieveToolOutput('tool-output-session', {
       artifactId: result.artifactId,
       offset: large.length - 5,
       limit: 20_000,
-    })!;
+    }))!;
     expect(page.content).toBe('a'.repeat(5));
     expect(page.complete).toBe(true);
     expect(page.nextOffset).toBeNull();
   });
 
-  test('custom frozen options change the envelope thresholds only', () => {
+  test('custom frozen options change the envelope thresholds only', async () => {
     const service = createToolOutputService({
       id: 'custom',
       options: makeOptions({ thresholdChars: 10, previewChars: 5 }),
     });
-    const result = withToolOutputService(service, () =>
+    const result = await withToolOutputService(service, async () =>
       applyToolOutputPolicy('0123456789abc', context())) as ToolOutputArtifactReference;
     expect(isToolOutputArtifactReference(result)).toBe(true);
     expect(result.preview).toBe('01234');
@@ -461,7 +461,7 @@ describe('C6 scoped tool-output policy composition', () => {
 });
 
 describe('C6 tool-output memory and sqlite parity', () => {
-  test('memory and sqlite stores produce identical pages for the same artifact', () => {
+  test('memory and sqlite stores produce identical pages for the same artifact', async () => {
     const memory = createInMemoryToolOutputArtifactStore();
     const sqlitePath = join(tempDir('c6-parity'), 'artifacts.sqlite');
     // The standalone SQLite artifact store declares a foreign key against
@@ -476,7 +476,7 @@ describe('C6 tool-output memory and sqlite parity', () => {
     const content = 'p'.repeat(30_000);
 
     for (const store of [memory, sqlite] as ToolOutputArtifactStore[]) {
-      const artifact = store.create({
+      const artifact = await store.create({
         sessionId: 'parity-session',
         toolCallId: 'call-1',
         toolName: 'fixture',
@@ -484,13 +484,13 @@ describe('C6 tool-output memory and sqlite parity', () => {
         format: 'text',
       });
       expect(artifact.size).toBe(content.length);
-      const page = store.getPage('parity-session', artifact.id, 0, 20_000)!;
+      const page = (await store.getPage('parity-session', artifact.id, 0, 20_000))!;
       expect(page.content).toBe('p'.repeat(20_000));
       expect(page.totalChars).toBe(30_000);
       expect(page.complete).toBe(false);
       expect(page.nextOffset).toBe(20_000);
-      expect(store.getPage('foreign-session', artifact.id)).toBeNull();
-      expect(store.getPage('parity-session', 'malformed')).toBeNull();
+      expect(await store.getPage('foreign-session', artifact.id)).toBeNull();
+      expect(await store.getPage('parity-session', 'malformed')).toBeNull();
     }
     (sqlite as { close?: () => void }).close?.();
   });

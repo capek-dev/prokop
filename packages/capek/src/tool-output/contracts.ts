@@ -87,12 +87,12 @@ export interface ToolOutputArtifactService {
   /** Frozen composition-time options. */
   readonly options: Readonly<ToolOutputPolicyOptions>;
   /** Applies the artifact envelope decision to one tool result. */
-  applyToolOutputPolicy(result: unknown, context: ToolOutputPolicyContext): unknown;
+  applyToolOutputPolicy(result: unknown, context: ToolOutputPolicyContext): Promise<unknown>;
   /** Session-scoped retrieval over the active storage bundle. */
   retrieveToolOutput(
     sessionId: string,
     input: { artifactId: string; offset?: number; limit?: number },
-  ): ToolOutputArtifactPage | null;
+  ): Promise<ToolOutputArtifactPage | null>;
   /** Builds the AI SDK retrieval tool bound to a session. */
   buildRetrieveToolOutputAiTool(sessionId: string): Tool;
   /** Wraps a tool map with the policy; per-service WeakSet excludes

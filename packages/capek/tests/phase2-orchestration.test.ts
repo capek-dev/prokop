@@ -822,9 +822,9 @@ describe.serial('Phase 2 orchestration contracts', () => {
     bindRuntime(state, {
       storage: {
         queue: {
-          addMessage: () => queued[0],
-          peek: () => queued[0] ?? null,
-          delete: (id) => {
+          addMessage: async () => queued[0],
+          peek: async () => queued[0] ?? null,
+          delete: async (id) => {
             order.push(`queue.deleted:${id}`);
             queued.splice(0, 1);
             return true;

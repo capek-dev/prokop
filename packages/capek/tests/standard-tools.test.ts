@@ -130,7 +130,7 @@ describe('bundled standard tools', () => {
   test('retrieves bounded output in the implicit session scope without permission', async () => {
     const root = await createRoot();
     const storage = createInMemoryStorageBundle();
-    const artifact = storage.toolOutputArtifacts.create({
+    const artifact = await storage.toolOutputArtifacts.create({
       sessionId: 'standard-tools-test',
       toolCallId: 'large-call',
       toolName: 'large-tool',

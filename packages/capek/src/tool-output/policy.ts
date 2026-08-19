@@ -115,7 +115,7 @@ export function createToolOutputService(
   const options = createOptions.options ?? defaultOptions();
   const outputPolicyWrappedTools = new WeakSet<object>();
 
-  function applyToolOutputPolicy(result: unknown, context: ToolOutputPolicyContext): unknown {
+  async function applyToolOutputPolicy(result: unknown, context: ToolOutputPolicyContext): Promise<unknown> {
     const visualization = result && typeof result === 'object' && !Array.isArray(result)
       ? (result as Record<string, unknown>)._visualization
       : undefined;
@@ -135,7 +135,7 @@ export function createToolOutputService(
 
     const preview = content.slice(0, options.previewChars);
     try {
-      const artifact = createToolOutputArtifact({
+      const artifact = await createToolOutputArtifact({
         sessionId: context.sessionId,
         ...(context.workspaceId ? { workspaceId: context.workspaceId } : {}),
         toolCallId: context.toolCallId,
@@ -158,10 +158,10 @@ export function createToolOutputService(
     }
   }
 
-  function retrieveToolOutput(
+  async function retrieveToolOutput(
     sessionId: string,
     input: { artifactId: string; offset?: number; limit?: number },
-  ): ToolOutputArtifactPage | null {
+  ): Promise<ToolOutputArtifactPage | null> {
     return getToolOutputArtifactPage(sessionId, input.artifactId, input.offset, input.limit);
   }
 
@@ -171,7 +171,7 @@ export function createToolOutputService(
   ): Promise<ToolResult> {
     // C6 step 6: the execution path uses the NON-REPLACEABLE runtime
     // retrieval, so a replaced provider can never return foreign pages.
-    const page = retrieveToolOutputForSession(sessionId, {
+    const page = await retrieveToolOutputForSession(sessionId, {
       artifactId: String(input.artifactId ?? ''),
       ...(input.offset === undefined ? {} : { offset: Number(input.offset) }),
       ...(input.limit === undefined ? {} : { limit: Number(input.limit) }),
@@ -338,7 +338,7 @@ export function resetDefaultToolOutputServiceForTests(): void {
 export function retrieveToolOutputForSession(
   sessionId: string,
   input: { artifactId: string; offset?: number; limit?: number },
-): ToolOutputArtifactPage | null {
+): Promise<ToolOutputArtifactPage | null> {
   return getToolOutputArtifactPage(sessionId, input.artifactId, input.offset, input.limit);
 }
 
@@ -348,7 +348,7 @@ export function getRetrieveToolOutputStandardTool(): LoadedTool {
     definition: retrievalDefinitionBase,
     path: 'builtin:@capekai/core',
     execute: async (input: Record<string, unknown>, context: ToolContext): Promise<ToolResult> => {
-      const page = retrieveToolOutputForSession(context.sessionId, {
+      const page = await retrieveToolOutputForSession(context.sessionId, {
         artifactId: String(input.artifactId ?? ''),
         ...(input.offset === undefined ? {} : { offset: Number(input.offset) }),
         ...(input.limit === undefined ? {} : { limit: Number(input.limit) }),
@@ -363,14 +363,14 @@ export function getRetrieveToolOutputStandardTool(): LoadedTool {
 /** Stable singleton used by the standard coding capability inventory. */
 export const retrieveToolOutputStandardTool: LoadedTool = getRetrieveToolOutputStandardTool();
 
-export function applyToolOutputPolicy(result: unknown, context: ToolOutputPolicyContext): unknown {
+export async function applyToolOutputPolicy(result: unknown, context: ToolOutputPolicyContext): Promise<unknown> {
   return getToolOutputService().applyToolOutputPolicy(result, context);
 }
 
-export function retrieveToolOutput(
+export async function retrieveToolOutput(
   sessionId: string,
   input: { artifactId: string; offset?: number; limit?: number },
-): ToolOutputArtifactPage | null {
+): Promise<ToolOutputArtifactPage | null> {
   return getToolOutputService().retrieveToolOutput(sessionId, input);
 }
 

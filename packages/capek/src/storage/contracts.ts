@@ -116,18 +116,18 @@ export interface ToolOutputArtifactPage {
 }
 
 export interface ToolOutputArtifactStore {
-  create(input: CreateToolOutputArtifact): ToolOutputArtifact;
-  getPage(sessionId: string, artifactId: string, offset?: number, limit?: number): ToolOutputArtifactPage | null;
+  create(input: CreateToolOutputArtifact): Promise<ToolOutputArtifact>;
+  getPage(sessionId: string, artifactId: string, offset?: number, limit?: number): Promise<ToolOutputArtifactPage | null>;
 }
 
 export interface MessageQueueStore {
-  addMessage(sessionId: string, content: string, attachments?: Array<{ id: string; kind: string }>): QueuedMessage;
-  peek(sessionId: string): QueuedMessage | null;
-  delete(id: string): boolean;
+  addMessage(sessionId: string, content: string, attachments?: Array<{ id: string; kind: string }>): Promise<QueuedMessage>;
+  peek(sessionId: string): Promise<QueuedMessage | null>;
+  delete(id: string): Promise<boolean>;
 }
 
 export interface AttachmentStore {
-  get(sessionId: string, attachmentId: string): AttachmentRecord | null;
+  get(sessionId: string, attachmentId: string): Promise<AttachmentRecord | null>;
 }
 
 export interface WorkspaceStore {
@@ -136,7 +136,7 @@ export interface WorkspaceStore {
 }
 
 export interface ResponseFormatStore {
-  get(id: string): ResponseFormat | null;
+  get(id: string): Promise<ResponseFormat | null>;
 }
 
 export interface ConversationIndex {

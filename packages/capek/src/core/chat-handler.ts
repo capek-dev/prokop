@@ -61,7 +61,7 @@ async function drainQueue<Origin>(
   ctx: RuntimeRequestContext<Origin>,
   sessionId: string,
 ): Promise<{ content: string; attachments?: Array<{ id: string; kind: string }> } | null> {
-  const nextMsg = getNextQueuedMessage(sessionId);
+  const nextMsg = await getNextQueuedMessage(sessionId);
 
   if (!nextMsg) {
     return null;
@@ -74,7 +74,7 @@ async function drainQueue<Origin>(
     queueId: nextMsg.id,
   });
 
-  deleteQueuedMessage(nextMsg.id);
+  await deleteQueuedMessage(nextMsg.id);
 
   return {
     content: nextMsg.content,
@@ -144,7 +144,7 @@ async function runSingleChatTurn<Origin>(
 
   if (attachments && attachments.length > 0) {
     for (const attachment of attachments) {
-      const attachmentRecord = getAttachment(sessionId, attachment.id);
+      const attachmentRecord = await getAttachment(sessionId, attachment.id);
       if (!attachmentRecord) continue;
 
       const partId = crypto.randomUUID();
@@ -545,7 +545,7 @@ export async function handleChat<Origin>(
   }
 
   if (interruptManager.isSessionActive(sessionId)) {
-    const queuedMessage = addMessageToQueue(sessionId, content, attachments);
+    const queuedMessage = await addMessageToQueue(sessionId, content, attachments);
     ctx.attachOriginToSession(origin, sessionId);
     deliverToOrigin(ctx, origin, { kind: 'queue', action: 'added', sessionId, message: queuedMessage });
     return;
@@ -580,7 +580,8 @@ export async function handleChat<Origin>(
     return;
   }
 
-  const responseFormat = responseFormatId ? getResponseFormat(responseFormatId) ?? undefined : undefined;
+  const responseFormatRecord = responseFormatId ? await getResponseFormat(responseFormatId) : null;
+  const responseFormat = responseFormatRecord ?? undefined;
 
   if (goalCondition) {
     const goalAbortController = new AbortController();

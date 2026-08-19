@@ -24,28 +24,28 @@ function policyContext(toolName = 'synthetic') {
 }
 
 describe('tool output artifact policy', () => {
-  test('keeps the 50k threshold and returns a 10k persisted preview above it', () => {
+  test('keeps the 50k threshold and returns a 10k persisted preview above it', async () => {
     const storage = createInMemoryStorageBundle();
-    withStorage(storage, () => {
+    await withStorage(storage, async () => {
       const exact = 'x'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS - 2);
-      expect(applyToolOutputPolicy(exact, policyContext())).toBe(exact);
+      expect(await applyToolOutputPolicy(exact, policyContext())).toBe(exact);
 
-      const output = applyToolOutputPolicy('x'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS), policyContext());
+      const output = await applyToolOutputPolicy('x'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS), policyContext());
       expect(isToolOutputArtifactReference(output)).toBe(true);
       if (!isToolOutputArtifactReference(output)) throw new Error('Expected artifact reference');
       expect(output.preview).toHaveLength(TOOL_OUTPUT_PREVIEW_CHARS);
       expect(output.artifactId).not.toContain('/');
-      expect(getToolOutputArtifactPage('session-1', output.artifactId, 0, 20)?.content).toBe('x'.repeat(20));
-      expect(getToolOutputArtifactPage('other-session', output.artifactId)).toBeNull();
+      expect((await getToolOutputArtifactPage('session-1', output.artifactId, 0, 20))?.content).toBe('x'.repeat(20));
+      expect(await getToolOutputArtifactPage('other-session', output.artifactId)).toBeNull();
     });
   });
 
-  test('fails open with bounded output for circular values and persistence failure', () => {
+  test('fails open with bounded output for circular values and persistence failure', async () => {
     const circular: Record<string, unknown> = {};
     circular.self = circular;
     const memory = createInMemoryStorageBundle();
-    withStorage(memory, () => {
-      const output = applyToolOutputPolicy(circular, policyContext()) as Record<string, unknown>;
+    await withStorage(memory, async () => {
+      const output = await applyToolOutputPolicy(circular, policyContext()) as Record<string, unknown>;
       expect(output.type).toBe('tool-output-preview');
       expect(output).not.toHaveProperty('artifactId');
       expect((output.preview as string).length).toBeLessThanOrEqual(TOOL_OUTPUT_PREVIEW_CHARS);
@@ -53,23 +53,23 @@ describe('tool output artifact policy', () => {
 
     const failing = createInMemoryStorageBundle();
     failing.toolOutputArtifacts = {
-      create: () => {
+      create: async () => {
         throw new Error('persistence failed');
       },
-      getPage: () => null,
+      getPage: async () => null,
     };
-    withStorage(failing, () => {
-      const output = applyToolOutputPolicy('x'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS), policyContext()) as Record<string, unknown>;
+    await withStorage(failing, async () => {
+      const output = await applyToolOutputPolicy('x'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS), policyContext()) as Record<string, unknown>;
       expect(output.type).toBe('tool-output-preview');
       expect(output).not.toHaveProperty('artifactId');
       expect(output.preview).toHaveLength(TOOL_OUTPUT_PREVIEW_CHARS);
     });
   });
 
-  test('bounds oversized success data that contains an error field', () => {
+  test('bounds oversized success data that contains an error field', async () => {
     const storage = createInMemoryStorageBundle();
-    withStorage(storage, () => {
-      const output = applyToolOutputPolicy({
+    await withStorage(storage, async () => {
+      const output = await applyToolOutputPolicy({
         success: true,
         error: null,
         content: 'x'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS),
@@ -79,29 +79,29 @@ describe('tool output artifact policy', () => {
     });
   });
 
-  test('preserves serializable falsy results and fails open for undefined', () => {
+  test('preserves serializable falsy results and fails open for undefined', async () => {
     const storage = createInMemoryStorageBundle();
-    withStorage(storage, () => {
-      expect(applyToolOutputPolicy(null, policyContext())).toBeNull();
-      expect(applyToolOutputPolicy(false, policyContext())).toBe(false);
-      expect(applyToolOutputPolicy(0, policyContext())).toBe(0);
-      const output = applyToolOutputPolicy(undefined, policyContext()) as Record<string, unknown>;
+    await withStorage(storage, async () => {
+      expect(await applyToolOutputPolicy(null, policyContext())).toBeNull();
+      expect(await applyToolOutputPolicy(false, policyContext())).toBe(false);
+      expect(await applyToolOutputPolicy(0, policyContext())).toBe(0);
+      const output = await applyToolOutputPolicy(undefined, policyContext()) as Record<string, unknown>;
       expect(output.type).toBe('tool-output-preview');
       expect(output.preview).toBe('undefined');
       expect(output).not.toHaveProperty('artifactId');
     });
   });
 
-  test('preserves visualization metadata on artifact references', () => {
+  test('preserves visualization metadata on artifact references', async () => {
     const storage = createInMemoryStorageBundle();
-    withStorage(storage, () => {
-      const output = applyToolOutputPolicy({
+    await withStorage(storage, async () => {
+      const output = await applyToolOutputPolicy({
         content: 'x'.repeat(TOOL_OUTPUT_THRESHOLD_CHARS),
         _visualization: { type: 'todo-list', items: [] },
       }, policyContext()) as Record<string, unknown>;
       expect(output.type).toBe('tool-output-artifact');
       expect(output._visualization).toEqual({ type: 'todo-list', items: [] });
-      const page = getToolOutputArtifactPage('session-1', output.artifactId as string);
+      const page = await getToolOutputArtifactPage('session-1', output.artifactId as string);
       expect(page?.content).not.toContain('_visualization');
     });
   });

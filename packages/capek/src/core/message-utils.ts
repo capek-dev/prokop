@@ -28,14 +28,14 @@ interface ModelCapabilities {
   };
 }
 
-function resolveAttachmentPath(part: ImagePart | FilePart): { absolutePath: string; mimeType: string } | null {
+async function resolveAttachmentPath(part: ImagePart | FilePart): Promise<{ absolutePath: string; mimeType: string } | null> {
   const urlWithoutQuery = part.url.split('?')[0];
   const match = urlWithoutQuery.match(/^\/api\/sessions\/([^/]+)\/attachments\/([^/]+)\/content$/);
   if (!match) return null;
 
   const [, sessionId, attachmentId] = match;
   try {
-    const attachment = getAttachment(sessionId, attachmentId);
+    const attachment = await getAttachment(sessionId, attachmentId);
     if (!attachment) return null;
     return { absolutePath: attachment.absolutePath, mimeType: attachment.mimeType };
   } catch {
@@ -149,7 +149,7 @@ export async function convertToAiSdkMessages(
         if (modelCapabilities?.input?.image) {
           imageParts.push(part);
         } else {
-          const attachmentRecord = resolveAttachmentPath(part);
+          const attachmentRecord = await resolveAttachmentPath(part);
           const fallbackText = attachmentRecord
             ? `User attached an image.\nFile path: ${attachmentRecord.absolutePath}\nIf the image contents matter, ask the user to describe it or inspect the file if your runtime supports access to that path.`
             : 'User attached an image (file path unavailable).';
@@ -159,7 +159,7 @@ export async function convertToAiSdkMessages(
         if (modelCapabilities?.input?.file && modelCapabilities.input.file.includes(part.mimeType)) {
           fileParts.push(part);
         } else {
-          const attachmentRecord = resolveAttachmentPath(part);
+          const attachmentRecord = await resolveAttachmentPath(part);
           const fallbackText = attachmentRecord
             ? `User attached a file: ${part.filename || 'unnamed'} (type: ${part.mimeType}).\nFile path: ${attachmentRecord.absolutePath}\nIf the file contents matter, ask the user to describe it or inspect the file if your runtime supports access to that path.`
             : `User attached a file: ${part.filename || 'unnamed'} (type: ${part.mimeType}).`;
@@ -196,7 +196,7 @@ export async function convertToAiSdkMessages(
     }
 
     for (const imgPart of imageParts) {
-      const resolved = resolveAttachmentPath(imgPart);
+      const resolved = await resolveAttachmentPath(imgPart);
       if (resolved) {
         try {
           const file = Bun.file(resolved.absolutePath);
@@ -209,7 +209,7 @@ export async function convertToAiSdkMessages(
     }
 
     for (const filePart of fileParts) {
-      const resolved = resolveAttachmentPath(filePart);
+      const resolved = await resolveAttachmentPath(filePart);
       if (resolved) {
         try {
           const file = Bun.file(resolved.absolutePath);

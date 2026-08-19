@@ -314,7 +314,7 @@ class StandaloneAgent implements Agent {
     options: { offset?: number; limit?: number } = {},
   ) {
     if (this.#closed) throw new Error('Agent is closed');
-    return this.#scope(() => getToolOutputArtifactPage(
+    return this.#scope(async () => await getToolOutputArtifactPage(
       sessionId,
       artifactId,
       options.offset,

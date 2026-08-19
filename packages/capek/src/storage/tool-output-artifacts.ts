@@ -78,12 +78,12 @@ function createArtifact(input: CreateToolOutputArtifact): ToolOutputArtifact {
 export function createInMemoryToolOutputArtifactStore(): ToolOutputArtifactStore {
   const artifacts = new Map<string, ToolOutputArtifact>();
   return {
-    create(input) {
+    async create(input) {
       const artifact = createArtifact(input);
       artifacts.set(artifact.id, copy(artifact));
       return copy(artifact);
     },
-    getPage(sessionId, artifactId, offset, limit) {
+    async getPage(sessionId, artifactId, offset, limit) {
       if (!isToolOutputArtifactId(artifactId)) return null;
       const artifact = artifacts.get(artifactId);
       if (!artifact || artifact.sessionId !== sessionId) return null;
@@ -132,7 +132,7 @@ export function createSqliteToolOutputArtifactStore(options: { path: string }): 
   `);
   let closed = false;
   return {
-    create(input) {
+    async create(input) {
       const artifact = createArtifact(input);
       db.run(
         `INSERT INTO capek_tool_output_artifacts
@@ -152,7 +152,7 @@ export function createSqliteToolOutputArtifactStore(options: { path: string }): 
       );
       return copy(artifact);
     },
-    getPage(sessionId, artifactId, offset, limit) {
+    async getPage(sessionId, artifactId, offset, limit) {
       if (!isToolOutputArtifactId(artifactId)) return null;
       const row = db.query(
         'SELECT * FROM capek_tool_output_artifacts WHERE id = ? AND session_id = ?',

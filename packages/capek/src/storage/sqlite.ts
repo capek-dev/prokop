@@ -32,6 +32,9 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
   mkdirSync(dirname(options.path), { recursive: true });
   const db = new Database(options.path, { create: true, strict: true });
   db.exec('PRAGMA journal_mode = WAL');
+  // WAL pairing: process-crash-safe commits; OS-loss tail accepted (agent
+  // transcripts, not ledgers). Single-writer invariant: only this process writes.
+  db.exec('PRAGMA synchronous = NORMAL');
   db.exec('PRAGMA foreign_keys = ON');
   db.exec('PRAGMA busy_timeout = 5000');
   db.exec(`
