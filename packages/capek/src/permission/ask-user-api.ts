@@ -35,19 +35,19 @@ export function createAskApi(
   );
 }
 
-export function resolveAsk(toolCallId: string, response: unknown, requestId?: string): boolean {
+export async function resolveAsk(toolCallId: string, response: unknown, requestId?: string): Promise<boolean> {
   return getPermissionRuntimeService().resolveAsk(toolCallId, response, requestId);
 }
 
-export function rejectAsk(toolCallId: string, error: Error): boolean {
+export async function rejectAsk(toolCallId: string, error: Error): Promise<boolean> {
   return getPermissionRuntimeService().rejectAsk(toolCallId, error);
 }
 
-export function rejectPendingAsksByToolCallId(toolCallId: string, error?: Error): string[] {
+export async function rejectPendingAsksByToolCallId(toolCallId: string, error?: Error): Promise<string[]> {
   return getPermissionRuntimeService().rejectPendingAsksByToolCallId(toolCallId, error);
 }
 
-export function rejectPendingAsksBySession(sessionId: string, error?: Error): string[] {
+export async function rejectPendingAsksBySession(sessionId: string, error?: Error): Promise<string[]> {
   return getPermissionRuntimeService().rejectPendingAsksBySession(sessionId, error);
 }
 
@@ -59,12 +59,12 @@ export function getAuthorityForPendingAsk(toolCallId: string): AskAuthority | un
   return getPermissionRuntimeService().getAuthorityForPendingAsk(toolCallId);
 }
 
-export function getSessionIdForPendingAsk(toolCallId: string, requestId?: string): string | null {
+export async function getSessionIdForPendingAsk(toolCallId: string, requestId?: string): Promise<string | null> {
   return getPermissionRuntimeService().getSessionIdForPendingAsk(toolCallId, requestId);
 }
 
-export const listPendingAsksBySession = (sessionId: string): PendingAskRecord[] =>
+export const listPendingAsksBySession = (sessionId: string): Promise<PendingAskRecord[]> =>
   getPermissionRuntimeService().listPendingAsksBySession(sessionId);
 
-export const listPendingAsksByRootSession = (rootSessionId: string): PendingAskRecord[] =>
+export const listPendingAsksByRootSession = (rootSessionId: string): Promise<PendingAskRecord[]> =>
   getPermissionRuntimeService().listPendingAsksByRootSession(rootSessionId);

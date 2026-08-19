@@ -55,6 +55,10 @@ import { clearCache } from '../src/tools/registry';
 import { STANDARD_TOOL_NAMES } from '../src/tools/standard-tools';
 import { configureToolSource } from '../src/tools/tool-source';
 
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 const roots: string[] = [];
 
 async function tempDir(label: string): Promise<string> {
@@ -66,22 +70,22 @@ async function tempDir(label: string): Promise<string> {
 function minimalHost(): RuntimeHost {
   return {
     interaction: {
-      createPendingAsk: () => 'pending',
-      removePendingAsk: () => {},
-      removePendingAsksByToolCallId: () => {},
-      getPermissionRequestByRequestId: () => null,
-      resolvePermissionRequestByRequestId: () => false,
-      expirePermissionRequest: () => false,
-      expireOldPermissionRequests: () => 0,
-      cancelPendingRequestsBySession: () => 0,
-      listPendingAsksBySession: () => [],
-      listPendingAsksByRootSession: () => [],
-      listPendingRequestsByRootSession: () => [],
-      matchGrant: () => ({ matched: false, grant: null }),
-      createGrantFromOptions: () => null,
-      getSessionAutoApproveSeverity: () => undefined,
+      createPendingAsk: async () => 'pending',
+      removePendingAsk: async () => {},
+      removePendingAsksByToolCallId: async () => {},
+      getPermissionRequestByRequestId: async () => null,
+      resolvePermissionRequestByRequestId: async () => false,
+      expirePermissionRequest: async () => false,
+      expireOldPermissionRequests: async () => 0,
+      cancelPendingRequestsBySession: async () => 0,
+      listPendingAsksBySession: async () => [],
+      listPendingAsksByRootSession: async () => [],
+      listPendingRequestsByRootSession: async () => [],
+      matchGrant: async () => ({ matched: false, grant: null }),
+      createGrantFromOptions: async () => null,
+      getSessionAutoApproveSeverity: async () => undefined,
       getPermissionTimeoutMs: () => 30 * 60 * 1000,
-      notifyPermissionRequired: () => {},
+      notifyPermissionRequired: async () => {},
     },
     delivery: { emit: () => {} },
     titles: {
@@ -111,18 +115,18 @@ function permissionAwareHost(): RuntimeHost {
     ...base,
     interaction: {
       ...base.interaction,
-      createPendingAsk: (record) => {
+      createPendingAsk: async (record) => {
         const id = `pending-${records.size}`;
         records.set(record.requestId, { ...record, id });
         return id;
       },
-      getPermissionRequestByRequestId: (requestId) => records.get(requestId) ?? null,
-      resolvePermissionRequestByRequestId: (requestId, status) => {
+      getPermissionRequestByRequestId: async (requestId) => records.get(requestId) ?? null,
+      resolvePermissionRequestByRequestId: async (requestId, status) => {
         const record = records.get(requestId);
         if (record) record.status = status;
         return Boolean(record);
       },
-      expirePermissionRequest: (requestId) => records.delete(requestId),
+      expirePermissionRequest: async (requestId) => records.delete(requestId),
     },
   };
 }
@@ -395,6 +399,7 @@ describe('C5 scheduler composed execution', () => {
           createInput,
           { toolCallId: 'call-denied', messages: [] },
         );
+        await flush();
         expect(pendingRequestId).not.toBeNull();
         resolvePermission(pendingRequestId!, { type: 'permission', grant: 'deny' });
         expect(await deniedPromise).toEqual({ error: 'USER_REJECTION' });
@@ -404,6 +409,7 @@ describe('C5 scheduler composed execution', () => {
           createInput,
           { toolCallId: 'call-approved', messages: [] },
         );
+        await flush();
         expect(pendingRequestId).not.toBeNull();
         resolvePermission(pendingRequestId!, { type: 'permission', grant: 'once' });
         expect(await approvedPromise).toEqual({
@@ -517,6 +523,7 @@ describe('C5 scheduler composed execution', () => {
           createInput,
           { toolCallId: 'call-captured-risk', messages: [] },
         );
+        await flush();
         expect(pendingRequestId).not.toBeNull();
         resolvePermission(pendingRequestId!, { type: 'permission', grant: 'deny' });
         expect(await deniedPromise).toEqual({ error: 'USER_REJECTION' });

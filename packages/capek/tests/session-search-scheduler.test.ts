@@ -43,19 +43,19 @@ const session = (id: string, workspaceId = workspace.id): Session => ({
 
 function searchHost(overrides: Partial<SessionSearchHost> = {}): SessionSearchHost {
   return {
-    getWorkspace: () => workspace,
-    getSession: (id) => session(id),
-    listWorkspaceSessions: () => [session('current'), session('other')],
-    listAgentSessions: () => [],
-    countSessionMessages: () => 2,
-    searchMessages: () => [],
-    countMessagesBefore: () => 0,
-    countMessagesAfter: () => 0,
-    getLatestMessage: () => null,
-    getMessage: () => null,
-    listMessagesBefore: () => [],
-    listMessagesAfter: () => [],
-    getMessageSummary: () => null,
+    getWorkspace: async () => workspace,
+    getSession: async (id) => session(id),
+    listWorkspaceSessions: async () => [session('current'), session('other')],
+    listAgentSessions: async () => [],
+    countSessionMessages: async () => 2,
+    searchMessages: async () => [],
+    countMessagesBefore: async () => 0,
+    countMessagesAfter: async () => 0,
+    getLatestMessage: async () => null,
+    getMessage: async () => null,
+    listMessagesBefore: async () => [],
+    listMessagesAfter: async () => [],
+    getMessageSummary: async () => null,
     ...overrides,
   };
 }
@@ -109,7 +109,7 @@ describe('session search host seam', () => {
   test('keeps list read-only and applies the existing default list limit', async () => {
     let asked = false;
     const sessions = Array.from({ length: 12 }, (_, index) => session(`session-${index}`));
-    configureSessionSearchHost(searchHost({ listWorkspaceSessions: () => sessions }));
+    configureSessionSearchHost(searchHost({ listWorkspaceSessions: async () => sessions }));
 
     const result = await executeSessionSearchTool(
       { action: 'list' },
@@ -131,7 +131,7 @@ describe('session search host seam', () => {
   test('passes search scope, roles, limits, and sort to the host', async () => {
     let received: Parameters<SessionSearchHost['searchMessages']>[0] | undefined;
     configureSessionSearchHost(searchHost({
-      searchMessages(options) {
+      async searchMessages(options) {
         received = options;
         return [];
       },
@@ -159,7 +159,7 @@ describe('session search host seam', () => {
   test('rejects agent scope outside an agent session', async () => {
     let searched = false;
     configureSessionSearchHost(searchHost({
-      searchMessages() {
+      async searchMessages() {
         searched = true;
         return [];
       },
@@ -190,15 +190,15 @@ describe('session search host seam', () => {
 
   test('reads around the latest message and bounds content', async () => {
     configureSessionSearchHost(searchHost({
-      getLatestMessage: () => ({ id: 'message-2', timestamp: 2 }),
-      listMessagesBefore: () => [{ id: 'message-1', role: 'user', timestamp: 1 }],
-      getMessageSummary: (id) => ({
+      getLatestMessage: async () => ({ id: 'message-2', timestamp: 2 }),
+      listMessagesBefore: async () => [{ id: 'message-1', role: 'user', timestamp: 1 }],
+      getMessageSummary: async (id) => ({
         role: id === 'message-1' ? 'user' : 'assistant',
         timestamp: id === 'message-1' ? 1 : 2,
         content: 'x'.repeat(2100),
         toolName: '',
       }),
-      countMessagesBefore: () => 1,
+      countMessagesBefore: async () => 1,
     }));
 
     const result = await executeSessionSearchTool(

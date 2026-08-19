@@ -26,18 +26,18 @@ export function createStandaloneBindings(options: StandaloneBindingsOptions): Ru
 
   return {
     interaction: {
-      createPendingAsk(record) {
+      async createPendingAsk(record) {
         const id = `standalone-ask-${++sequence}`;
         pending.set(id, { ...record, id });
         recordIdByRequest.set(record.requestId, id);
         return id;
       },
-      removePendingAsk(id) {
+      async removePendingAsk(id) {
         const record = pending.get(id);
         if (record) recordIdByRequest.delete(record.requestId);
         pending.delete(id);
       },
-      removePendingAsksByToolCallId(toolCallId) {
+      async removePendingAsksByToolCallId(toolCallId) {
         for (const record of records()) {
           if (record.toolCallId === toolCallId) {
             pending.delete(record.id);
@@ -45,20 +45,20 @@ export function createStandaloneBindings(options: StandaloneBindingsOptions): Ru
           }
         }
       },
-      getPermissionRequestByRequestId: byRequest,
-      resolvePermissionRequestByRequestId(requestId, status, resolution) {
+      getPermissionRequestByRequestId: async (requestId) => byRequest(requestId),
+      async resolvePermissionRequestByRequestId(requestId, status, resolution) {
         const record = byRequest(requestId);
         if (!record || record.status !== 'pending') return false;
         pending.set(record.id, { ...record, status, resolution, resolvedAt: Date.now() });
         return true;
       },
-      expirePermissionRequest(id) {
+      async expirePermissionRequest(id) {
         const record = pending.get(id);
         if (!record || record.status !== 'pending') return false;
         pending.set(id, { ...record, status: 'expired', resolvedAt: Date.now() });
         return true;
       },
-      expireOldPermissionRequests(maxAgeMs) {
+      async expireOldPermissionRequests(maxAgeMs) {
         const cutoff = Date.now() - maxAgeMs;
         let count = 0;
         for (const record of records()) {
@@ -69,7 +69,7 @@ export function createStandaloneBindings(options: StandaloneBindingsOptions): Ru
         }
         return count;
       },
-      cancelPendingRequestsBySession(sessionId) {
+      async cancelPendingRequestsBySession(sessionId) {
         let count = 0;
         for (const record of records()) {
           if (record.sessionId === sessionId && record.status === 'pending') {
@@ -79,14 +79,14 @@ export function createStandaloneBindings(options: StandaloneBindingsOptions): Ru
         }
         return count;
       },
-      listPendingAsksBySession: (sessionId) => records().filter((record) => record.sessionId === sessionId && record.status === 'pending'),
-      listPendingAsksByRootSession: (rootSessionId) => records().filter((record) => record.rootSessionId === rootSessionId && record.status === 'pending'),
-      listPendingRequestsByRootSession: (rootSessionId) => records().filter((record) => record.rootSessionId === rootSessionId && record.status === 'pending'),
-      matchGrant: () => ({ matched: false, grant: null }),
-      createGrantFromOptions: () => null as PermissionGrant | null,
-      getSessionAutoApproveSeverity: () => undefined as AutoApproveSeverity | undefined,
+      listPendingAsksBySession: async (sessionId) => records().filter((record) => record.sessionId === sessionId && record.status === 'pending'),
+      listPendingAsksByRootSession: async (rootSessionId) => records().filter((record) => record.rootSessionId === rootSessionId && record.status === 'pending'),
+      listPendingRequestsByRootSession: async (rootSessionId) => records().filter((record) => record.rootSessionId === rootSessionId && record.status === 'pending'),
+      matchGrant: async () => ({ matched: false, grant: null }),
+      createGrantFromOptions: async () => null as PermissionGrant | null,
+      getSessionAutoApproveSeverity: async () => undefined as AutoApproveSeverity | undefined,
       getPermissionTimeoutMs: () => 30 * 60 * 1000,
-      notifyPermissionRequired: () => {},
+      notifyPermissionRequired: async () => {},
     },
     delivery: {
       emit: () => {},

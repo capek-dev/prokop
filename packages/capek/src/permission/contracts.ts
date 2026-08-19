@@ -75,7 +75,7 @@ export interface AskPermissionPolicyService {
   isRiskAtOrBelow(risk: PermissionRiskLevel, max: PermissionRiskLevel): boolean;
   /** Server auto-approval advice: true when the session severity is above
    * off/undefined and the ask's risk is within it. */
-  shouldAutoApprove(sessionId: string, ask: Ask): boolean;
+  shouldAutoApprove(sessionId: string, ask: Ask): Promise<boolean>;
   /** Permission key precedence: first pattern, then resource, then tool name. */
   buildPermissionKey(
     toolName: string,
@@ -107,24 +107,24 @@ export interface PermissionRuntimeService {
     workspaceId?: string,
     rootSessionId?: string,
   ): AskApi;
-  resolveAsk(toolCallId: string, response: unknown, requestId?: string): boolean;
-  rejectAsk(toolCallId: string, error: Error): boolean;
-  rejectPendingAsksByToolCallId(toolCallId: string, error?: Error): string[];
-  rejectPendingAsksBySession(sessionId: string, error?: Error): string[];
+  resolveAsk(toolCallId: string, response: unknown, requestId?: string): Promise<boolean>;
+  rejectAsk(toolCallId: string, error: Error): Promise<boolean>;
+  rejectPendingAsksByToolCallId(toolCallId: string, error?: Error): Promise<string[]>;
+  rejectPendingAsksBySession(sessionId: string, error?: Error): Promise<string[]>;
   hasPendingAsk(toolCallId: string): boolean;
   getAuthorityForPendingAsk(toolCallId: string): AskAuthority | undefined;
-  getSessionIdForPendingAsk(toolCallId: string, requestId?: string): string | null;
-  listPendingAsksBySession(sessionId: string): PendingAskRecord[];
-  listPendingAsksByRootSession(rootSessionId: string): PendingAskRecord[];
+  getSessionIdForPendingAsk(toolCallId: string, requestId?: string): Promise<string | null>;
+  listPendingAsksBySession(sessionId: string): Promise<PendingAskRecord[]>;
+  listPendingAsksByRootSession(rootSessionId: string): Promise<PendingAskRecord[]>;
 
   // Permission lifecycle (former tools/permission-request-manager.ts surface).
   requestPermission(params: RequestPermissionParams): Promise<unknown>;
-  resolvePermission(requestId: string, response: unknown): boolean;
+  resolvePermission(requestId: string, response: unknown): Promise<boolean>;
   rejectPermission(requestId: string, error: Error): boolean;
-  rejectPermissionsByToolCallId(toolCallId: string, error?: Error): string[];
-  rejectPermissionsBySession(sessionId: string, error?: Error): string[];
-  getPendingRequestsByRootSession(rootSessionId: string): PendingAskRecord[];
-  expireOldRequests(maxAgeMs: number): number;
+  rejectPermissionsByToolCallId(toolCallId: string, error?: Error): Promise<string[]>;
+  rejectPermissionsBySession(sessionId: string, error?: Error): Promise<string[]>;
+  getPendingRequestsByRootSession(rootSessionId: string): Promise<PendingAskRecord[]>;
+  expireOldRequests(maxAgeMs: number): Promise<number>;
   hasPendingWaiter(requestId: string): boolean;
   getPendingWaiterCount(): number;
 }

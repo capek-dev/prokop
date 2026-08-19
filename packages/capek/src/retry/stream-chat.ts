@@ -301,7 +301,7 @@ export async function* streamChatWithRetry(
     }
   } finally {
     interruptManager.unregisterSession(options.sessionId);
-    rejectPendingAsksBySession(options.sessionId);
+    await rejectPendingAsksBySession(options.sessionId);
     if (isMainSession) {
       const updatedSession = await updateSession(options.sessionId, { runningAt: null });
       if (updatedSession) {

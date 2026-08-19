@@ -110,7 +110,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
           });
         } finally {
           interruptManager.unregisterToolExecution(sessionId, toolCallId);
-          rejectPendingAsksByToolCallId(toolCallId);
+          await rejectPendingAsksByToolCallId(toolCallId);
         }
       },
     });
@@ -194,7 +194,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
             });
           } finally {
             interruptManager.unregisterToolExecution(sessionId, toolCallId);
-            rejectPendingAsksByToolCallId(toolCallId);
+            await rejectPendingAsksByToolCallId(toolCallId);
           }
         },
       });
@@ -228,7 +228,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
           );
         } finally {
           interruptManager.unregisterToolExecution(sessionId, toolCallId);
-          rejectPendingAsksByToolCallId(toolCallId);
+          await rejectPendingAsksByToolCallId(toolCallId);
         }
       },
     });
@@ -262,7 +262,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
           );
         } finally {
           interruptManager.unregisterToolExecution(sessionId, toolCallId);
-          rejectPendingAsksByToolCallId(toolCallId);
+          await rejectPendingAsksByToolCallId(toolCallId);
         }
       },
     });

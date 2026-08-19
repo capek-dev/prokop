@@ -76,6 +76,10 @@ import { resolvePermission } from '../src/permission/permission-request-manager'
 import { clearCache } from '../src/tools/registry';
 import { configureToolSource } from '../src/tools/tool-source';
 
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 const roots: string[] = [];
 
 async function tempDir(label: string): Promise<string> {
@@ -87,22 +91,22 @@ async function tempDir(label: string): Promise<string> {
 function minimalHost(): RuntimeHost {
   return {
     interaction: {
-      createPendingAsk: () => 'pending',
-      removePendingAsk: () => {},
-      removePendingAsksByToolCallId: () => {},
-      getPermissionRequestByRequestId: () => null,
-      resolvePermissionRequestByRequestId: () => false,
-      expirePermissionRequest: () => false,
-      expireOldPermissionRequests: () => 0,
-      cancelPendingRequestsBySession: () => 0,
-      listPendingAsksBySession: () => [],
-      listPendingAsksByRootSession: () => [],
-      listPendingRequestsByRootSession: () => [],
-      matchGrant: () => ({ matched: false, grant: null }),
-      createGrantFromOptions: () => null,
-      getSessionAutoApproveSeverity: () => undefined,
+      createPendingAsk: async () => 'pending',
+      removePendingAsk: async () => {},
+      removePendingAsksByToolCallId: async () => {},
+      getPermissionRequestByRequestId: async () => null,
+      resolvePermissionRequestByRequestId: async () => false,
+      expirePermissionRequest: async () => false,
+      expireOldPermissionRequests: async () => 0,
+      cancelPendingRequestsBySession: async () => 0,
+      listPendingAsksBySession: async () => [],
+      listPendingAsksByRootSession: async () => [],
+      listPendingRequestsByRootSession: async () => [],
+      matchGrant: async () => ({ matched: false, grant: null }),
+      createGrantFromOptions: async () => null,
+      getSessionAutoApproveSeverity: async () => undefined,
       getPermissionTimeoutMs: () => 30 * 60 * 1000,
-      notifyPermissionRequired: () => {},
+      notifyPermissionRequired: async () => {},
     },
     delivery: { emit: () => {} },
     titles: {
@@ -132,18 +136,18 @@ function permissionAwareHost(): RuntimeHost {
     ...base,
     interaction: {
       ...base.interaction,
-      createPendingAsk: (record) => {
+      createPendingAsk: async (record) => {
         const id = `pending-${records.size}`;
         records.set(record.requestId, { ...record, id });
         return id;
       },
-      getPermissionRequestByRequestId: (requestId) => records.get(requestId) ?? null,
-      resolvePermissionRequestByRequestId: (requestId, status) => {
+      getPermissionRequestByRequestId: async (requestId) => records.get(requestId) ?? null,
+      resolvePermissionRequestByRequestId: async (requestId, status) => {
         const record = records.get(requestId);
         if (record) record.status = status;
         return Boolean(record);
       },
-      expirePermissionRequest: (requestId) => records.delete(requestId),
+      expirePermissionRequest: async (requestId) => records.delete(requestId),
     },
   };
 }
@@ -164,19 +168,19 @@ function minimalSchedulerHost(): SchedulerHost {
 function searchHost(overrides: Partial<SessionSearchHost> = {}): SessionSearchHost {
   const workspace = searchWorkspace(true);
   return {
-    getWorkspace: (id) => (id === workspace.id ? workspace : null),
-    getSession: () => null,
-    listWorkspaceSessions: () => [],
-    listAgentSessions: () => [],
-    countSessionMessages: () => 0,
-    searchMessages: () => [],
-    countMessagesBefore: () => 0,
-    countMessagesAfter: () => 0,
-    getLatestMessage: () => null,
-    getMessage: () => null,
-    listMessagesBefore: () => [],
-    listMessagesAfter: () => [],
-    getMessageSummary: () => null,
+    getWorkspace: async (id) => (id === workspace.id ? workspace : null),
+    getSession: async () => null,
+    listWorkspaceSessions: async () => [],
+    listAgentSessions: async () => [],
+    countSessionMessages: async () => 0,
+    searchMessages: async () => [],
+    countMessagesBefore: async () => 0,
+    countMessagesAfter: async () => 0,
+    getLatestMessage: async () => null,
+    getMessage: async () => null,
+    listMessagesBefore: async () => [],
+    listMessagesAfter: async () => [],
+    getMessageSummary: async () => null,
     ...overrides,
   };
 }
@@ -283,9 +287,9 @@ const foundShape = {
 
 function searchHostWithFound(): SessionSearchHost {
   return searchHost({
-    searchMessages: () => [foundResult],
-    countMessagesBefore: () => 3,
-    countMessagesAfter: () => 4,
+    searchMessages: async () => [foundResult],
+    countMessagesBefore: async () => 3,
+    countMessagesAfter: async () => 4,
   });
 }
 
@@ -327,7 +331,7 @@ describe('C5 session-search composed execution', () => {
 
     let received: Parameters<SessionSearchHost['searchMessages']>[0] | undefined;
     configureSessionSearchHost(searchHost({
-      searchMessages(options) {
+      async searchMessages(options) {
         received = options;
         return [];
       },
@@ -383,6 +387,7 @@ describe('C5 session-search composed execution', () => {
           { query: 'needle' },
           { toolCallId: 'call-denied', messages: [] },
         );
+        await flush();
         expect(pendingRequestId).not.toBeNull();
         resolvePermission(pendingRequestId!, { type: 'permission', grant: 'deny' });
         expect(await deniedPromise).toEqual({ error: 'USER_REJECTION' });
@@ -392,6 +397,7 @@ describe('C5 session-search composed execution', () => {
           { query: 'needle' },
           { toolCallId: 'call-approved', messages: [] },
         );
+        await flush();
         expect(pendingRequestId).not.toBeNull();
         resolvePermission(pendingRequestId!, { type: 'permission', grant: 'once' });
         expect(await approvedPromise).toEqual(foundShape);
@@ -406,7 +412,7 @@ describe('C5 session-search composed execution', () => {
     const { workspacePath } = await searchWorkspaceDir('missing-workspace');
     const workspace = searchWorkspace(true);
     configureStorage(createInMemoryStorageBundle({ workspaces: [workspace] }));
-    configureSessionSearchHost(searchHost({ getWorkspace: () => null }));
+    configureSessionSearchHost(searchHost({ getWorkspace: async () => null }));
 
     const processScope = await createCurrentProcessScope();
     const agentScope = await createCurrentAgentScope(processScope);
@@ -560,12 +566,12 @@ describe('C5 session-search composed execution', () => {
     configureRuntimeHost(permissionAwareHost());
     let received: Parameters<SessionSearchHost['searchMessages']>[0] | undefined;
     configureSessionSearchHost(searchHost({
-      searchMessages(options) {
+      async searchMessages(options) {
         received = options;
         return [foundResult];
       },
-      countMessagesBefore: () => 3,
-      countMessagesAfter: () => 4,
+      countMessagesBefore: async () => 3,
+      countMessagesAfter: async () => 4,
     }));
 
     const processScope = await createCurrentProcessScope();
@@ -594,6 +600,7 @@ describe('C5 session-search composed execution', () => {
           { query: 'needle', scope: 'workspace' },
           { toolCallId: 'call-captured-denied', messages: [] },
         );
+        await flush();
         expect(pendingRequestId).not.toBeNull();
         resolvePermission(pendingRequestId!, { type: 'permission', grant: 'deny' });
         expect(await deniedPromise).toEqual({ error: 'USER_REJECTION' });
@@ -603,6 +610,7 @@ describe('C5 session-search composed execution', () => {
           { query: 'needle', scope: 'workspace' },
           { toolCallId: 'call-captured-approved', messages: [] },
         );
+        await flush();
         expect(pendingRequestId).not.toBeNull();
         resolvePermission(pendingRequestId!, { type: 'permission', grant: 'once' });
         expect(await approvedPromise).toEqual(foundShape);

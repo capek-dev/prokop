@@ -694,7 +694,7 @@ class StandaloneAgent implements Agent {
       if (response === false || response === undefined || interactionError) {
         response = { type: 'permission', grant: 'deny' };
       }
-      resolveAsk(message.toolCallId, response, message.requestId);
+      await resolveAsk(message.toolCallId, response, message.requestId);
       return;
     }
 
@@ -702,10 +702,10 @@ class StandaloneAgent implements Agent {
       const messageText = interactionError instanceof Error
         ? interactionError.message
         : 'User interaction did not return a response';
-      rejectAsk(message.toolCallId, new Error(messageText));
+      await rejectAsk(message.toolCallId, new Error(messageText));
       return;
     }
-    resolveAsk(message.toolCallId, response, message.requestId);
+    await resolveAsk(message.toolCallId, response, message.requestId);
   }
 }
 

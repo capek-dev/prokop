@@ -225,12 +225,12 @@ export function createAskPermissionService(
     isValidPermissionResponse,
     isPermissionApproved,
     isRiskAtOrBelow,
-    shouldAutoApprove(sessionId: string, ask: Ask): boolean {
+    async shouldAutoApprove(sessionId: string, ask: Ask): Promise<boolean> {
       if (ask.type !== 'permission') return false;
       const risk = (ask as PermissionAsk).risk;
       if (!risk) return false;
 
-      const maxSeverity = interaction().getSessionAutoApproveSeverity(sessionId);
+      const maxSeverity = await interaction().getSessionAutoApproveSeverity(sessionId);
       if (!maxSeverity || maxSeverity === 'off') return false;
       if (!isRiskAtOrBelow(risk, maxSeverity)) return false;
 
