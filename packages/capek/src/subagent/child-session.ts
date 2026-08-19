@@ -60,7 +60,7 @@ export async function executeChildSession(options: {
   } = options;
 
   // Resolve additionalPaths from workspace
-  const workspace = workspaceId ? getWorkspace(workspaceId) : null;
+  const workspace = workspaceId ? await getWorkspace(workspaceId) : null;
   const additionalPaths = workspace?.additionalPaths;
 
   let messages: MessageWithParts[];
@@ -86,7 +86,7 @@ export async function executeChildSession(options: {
     };
     messages = [...historyMessages, { message: newMessage, parts: [textPart] }];
     createMessage(newMessage);
-    createPart(textPart, childSessionId);
+    await createPart(textPart, childSessionId);
   } else {
     const msgId = randomUUID();
     const userMessage: UserMessage = {
@@ -104,7 +104,7 @@ export async function executeChildSession(options: {
     };
     messages = [{ message: userMessage, parts: [textPart] }];
     createMessage(userMessage);
-    createPart(textPart, childSessionId);
+    await createPart(textPart, childSessionId);
   }
 
   const finalParts: Part[] = [];

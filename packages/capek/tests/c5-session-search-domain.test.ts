@@ -551,8 +551,8 @@ describe('C5 session-search composed execution', () => {
     const storage: StorageBundle = {
       ...base,
       workspaces: {
-        get: (id) => (id === workspace.id ? workspace : null),
-        getAutoApproveSeverity: (workspaceId) =>
+        get: async (id) => (id === workspace.id ? workspace : null),
+        getAutoApproveSeverity: async (workspaceId) =>
           workspaceId === workspace.id ? workspace.settings?.autoApproveSeverity ?? 'low' : 'low',
       },
     };
@@ -655,8 +655,8 @@ describe('C5 session-search domain composition', () => {
     const agentScope = await createCurrentAgentScope(processScope);
     try {
       const service = agentScope.require(capekSessionSearchDomainKey);
-      expect(service.isEnabled(workspace.id)).toBe(true);
-      expect(service.isEnabled('ws-missing')).toBe(false);
+      await expect(service.isEnabled(workspace.id)).resolves.toBe(true);
+      await expect(service.isEnabled('ws-missing')).resolves.toBe(false);
       expect(service.tools).toHaveLength(1);
       expect(service.tools[0]!.name).toBe('session_search');
       expect(service.tools[0]!.isEnabled).toBe(service.isEnabled);

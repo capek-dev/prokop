@@ -125,7 +125,7 @@ function bindRuntime(
         state.messages[index] = { ...state.messages[index], ...updates } as Message;
         return state.messages[index];
       },
-      createPart: (part: Part) => {
+      createPart: async (part: Part) => {
         state.parts.push(part);
         return part;
       },
@@ -149,8 +149,8 @@ function bindRuntime(
     },
     workspaces: {
       ...storage.workspaces,
-      get: () => null,
-      getAutoApproveSeverity: () => 'low' as const,
+      get: async () => null,
+      getAutoApproveSeverity: async () => 'low' as const,
     },
   });
   const bindings = {
@@ -527,7 +527,7 @@ describe.serial('Phase 2 orchestration contracts', () => {
       subagent_type: 'research',
       task_id: 'child',
       sessionId: 'root',
-      onSessionCreated: (childSessionId) => created.push(childSessionId),
+      onSessionCreated: (childSessionId) => { created.push(childSessionId); },
       executeChild: async () => ({ parts: [] }),
     });
 

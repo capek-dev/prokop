@@ -418,9 +418,9 @@ describe('C6 default compaction service contract', () => {
 });
 
 describe('C6 compaction task pipeline on memory storage', () => {
-  test('creates a trigger with the exact auto and overflow flags', () => {
+  test('creates a trigger with the exact auto and overflow flags', async () => {
     seedConversation();
-    const trigger = createCompactionTrigger(SESSION_ID, 'overflow');
+    const trigger = await createCompactionTrigger(SESSION_ID, 'overflow');
     expect(trigger.reason).toBe('overflow');
 
     const triggerMsg = listMessagesWithParts(SESSION_ID).find((m) => m.message.id === trigger.messageId);
@@ -430,17 +430,17 @@ describe('C6 compaction task pipeline on memory storage', () => {
     expect(part.overflow).toBe(true);
   });
 
-  test('rejects triggers without enough non-system messages', () => {
+  test('rejects triggers without enough non-system messages', async () => {
     seedMainSession();
     seedUserMessage(SESSION_ID, 'user-1', 'Only one turn.', 1000);
-    expect(() => createCompactionTrigger(SESSION_ID, 'manual')).toThrow(
+    await expect(createCompactionTrigger(SESSION_ID, 'manual')).rejects.toThrow(
       'Not enough messages for compaction',
     );
   });
 
   test('a successful compaction persists the exact summary message, part, and usage', async () => {
     seedConversation();
-    const trigger = createCompactionTrigger(SESSION_ID, 'manual');
+    const trigger = await createCompactionTrigger(SESSION_ID, 'manual');
     const policy = resolveCompactionPolicy('gpt-4o', 'openai');
 
     const result = await processCompactionTask(
@@ -497,7 +497,7 @@ describe('C6 compaction task pipeline on memory storage', () => {
       createdAt: 1502,
     });
 
-    const trigger = createCompactionTrigger(SESSION_ID, 'manual');
+    const trigger = await createCompactionTrigger(SESSION_ID, 'manual');
     const policy = resolveCompactionPolicy('gpt-4o', 'openai', {
       preserveRecentToolCount: 0,
       preserveSmallToolChars: 200,
@@ -511,7 +511,7 @@ describe('C6 compaction task pipeline on memory storage', () => {
       createFakeGenerateSummary({}),
     );
 
-    const parts = getPartsBySession(SESSION_ID);
+    const parts = await getPartsBySession(SESSION_ID);
     const bigOld = parts.find((p) => p.id === 'tp-big-old') as ToolPart;
     const small = parts.find((p) => p.id === 'tp-small') as ToolPart;
     const skill = parts.find((p) => p.id === 'tp-skill') as ToolPart;
@@ -522,7 +522,7 @@ describe('C6 compaction task pipeline on memory storage', () => {
 
   test('the incremental prompt includes the previous summary and skips pre-boundary content', async () => {
     seedConversation();
-    const firstTrigger = createCompactionTrigger(SESSION_ID, 'manual');
+    const firstTrigger = await createCompactionTrigger(SESSION_ID, 'manual');
     await processCompactionTask(
       SESSION_ID,
       firstTrigger.messageId,
@@ -532,7 +532,7 @@ describe('C6 compaction task pipeline on memory storage', () => {
     seedUserMessage(SESSION_ID, 'user-3', 'Tell me more.', 3000);
     seedAssistantMessage(SESSION_ID, 'assistant-3', 'More details.', 4000);
 
-    const secondTrigger = createCompactionTrigger(SESSION_ID, 'manual');
+    const secondTrigger = await createCompactionTrigger(SESSION_ID, 'manual');
     let prompt = '';
     await processCompactionTask(
       SESSION_ID,
@@ -551,7 +551,7 @@ describe('C6 compaction task pipeline on memory storage', () => {
   test('persists a compaction failure with the exact compact_failed shape and broadcasts', async () => {
     seedMainSession();
     const events: Array<{ kind: string; action: string }> = [];
-    persistCompactionFailure(SESSION_ID, 'trigger-1', 'Model API error', (event) => {
+    await persistCompactionFailure(SESSION_ID, 'trigger-1', 'Model API error', (event) => {
       events.push({ kind: event.kind, action: (event as { action?: string }).action ?? '' });
     });
 
@@ -575,7 +575,7 @@ describe('C6 compaction task pipeline on memory storage', () => {
 
   test('an aborted summary generation propagates and persists nothing', async () => {
     seedConversation();
-    const trigger = createCompactionTrigger(SESSION_ID, 'manual');
+    const trigger = await createCompactionTrigger(SESSION_ID, 'manual');
     const controller = new AbortController();
     controller.abort();
 
@@ -723,7 +723,7 @@ describe('C6 compaction executor', () => {
       const { deps, counters } = makeDeps({
         listOrphanedCompactionTriggers: () => [{ id: 'trigger-1' } as never],
       });
-      expect(reconcileSessionCompaction(SESSION_ID, deps)).toBe(0);
+      await expect(reconcileSessionCompaction(SESSION_ID, deps)).resolves.toBe(0);
       expect(counters.orphanCalls).toBe(0);
     } finally {
       service.endCompaction(SESSION_ID);
@@ -832,10 +832,10 @@ describe('C6 compaction recovery policy', () => {
     };
   }
 
-  test('reconciles one orphaned trigger with the exact interrupted failure', () => {
+  test('reconciles one orphaned trigger with the exact interrupted failure', async () => {
     seedMainSession();
     const deps = orphanTriggerDeps(['trigger-1']);
-    const count = reconcileSessionCompaction(SESSION_ID, deps);
+    const count = await reconcileSessionCompaction(SESSION_ID, deps);
     expect(count).toBe(1);
 
     const failed = listMessagesWithParts(SESSION_ID).find((m) => {
@@ -849,19 +849,19 @@ describe('C6 compaction recovery policy', () => {
     });
   });
 
-  test('returns zero when no orphaned triggers exist', () => {
+  test('returns zero when no orphaned triggers exist', async () => {
     seedMainSession();
-    expect(reconcileSessionCompaction(SESSION_ID, orphanTriggerDeps([]))).toBe(0);
+    await expect(reconcileSessionCompaction(SESSION_ID, orphanTriggerDeps([]))).resolves.toBe(0);
   });
 
-  test('skips reconciliation entirely while compaction is in flight', () => {
+  test('skips reconciliation entirely while compaction is in flight', async () => {
     seedMainSession();
     const { deps, counters } = makeDeps({
       listOrphanedCompactionTriggers: () => [{ id: 'trigger-1' } as never],
     });
     getCompactionService().beginCompaction(SESSION_ID);
     try {
-      expect(reconcileSessionCompaction(SESSION_ID, deps)).toBe(0);
+      await expect(reconcileSessionCompaction(SESSION_ID, deps)).resolves.toBe(0);
       expect(counters.orphanCalls).toBe(0);
       expect(counters.clears).toBe(0);
     } finally {
@@ -869,7 +869,7 @@ describe('C6 compaction recovery policy', () => {
     }
   });
 
-  test('clears a stuck compacting flag and broadcasts the updated session', () => {
+  test('clears a stuck compacting flag and broadcasts the updated session', async () => {
     seedMainSession();
     const updated = { id: SESSION_ID } as never;
     const { deps, counters } = makeDeps({
@@ -879,25 +879,25 @@ describe('C6 compaction recovery policy', () => {
         return updated;
       },
     });
-    expect(reconcileSessionCompaction(SESSION_ID, deps)).toBe(0);
+    await expect(reconcileSessionCompaction(SESSION_ID, deps)).resolves.toBe(0);
     expect(counters.clears).toBe(1);
     expect(counters.sessionUpdates).toBe(1);
   });
 
-  test('broadcast false silences session updates but still reconciles', () => {
+  test('broadcast false silences session updates but still reconciles', async () => {
     seedMainSession();
     const { deps, counters } = makeDeps({
       isSessionCompacting: () => true,
       listOrphanedCompactionTriggers: () => [{ id: 'trigger-1' } as never],
     });
-    const count = reconcileSessionCompaction(SESSION_ID, deps, { broadcast: false });
+    const count = await reconcileSessionCompaction(SESSION_ID, deps, { broadcast: false });
     expect(count).toBe(1);
     expect(counters.clears).toBe(1);
     expect(counters.sessionUpdates).toBe(0);
     expect(counters.broadcasts).toBe(0);
   });
 
-  test('reconcileAllSessionsCompaction aggregates counts and disables per-session broadcast', () => {
+  test('reconcileAllSessionsCompaction aggregates counts and disables per-session broadcast', async () => {
     seedMainSession('session-a');
     seedMainSession('session-b');
     const { deps, counters } = makeDeps({
@@ -907,7 +907,7 @@ describe('C6 compaction recovery policy', () => {
         return sessionId === 'session-a' ? [{ id: 't1' } as never] : [];
       },
     });
-    expect(reconcileAllSessionsCompaction(deps)).toBe(1);
+    await expect(reconcileAllSessionsCompaction(deps)).resolves.toBe(1);
     expect(counters.broadcasts).toBe(0);
     expect(counters.orphanCalls).toBe(2);
   });

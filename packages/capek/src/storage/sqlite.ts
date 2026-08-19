@@ -215,7 +215,7 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
         hasCompaction: Boolean(boundary),
       };
     },
-    createPart(part, sessionId) {
+    async createPart(part, sessionId) {
       const message = db.query(
         'SELECT session_id FROM capek_messages WHERE id = ?',
       ).get(part.messageId) as { session_id: string } | null;
@@ -229,18 +229,20 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
       );
       return clone(part);
     },
-    getPart(id) {
+    async getPart(id) {
       const row = db.query('SELECT record FROM capek_parts WHERE id = ?').get(id) as { record: string } | null;
       return row ? parse<Part>(row.record) : null;
     },
-    getPartsByMessage,
-    getPartsBySession(sessionId) {
+    async getPartsByMessage(messageId) {
+      return getPartsByMessage(messageId);
+    },
+    async getPartsBySession(sessionId) {
       return (db.query(
         'SELECT record FROM capek_parts WHERE session_id = ? ORDER BY created_at ASC, rowid ASC',
       ).all(sessionId) as Array<{ record: string }>).map(row => parse<Part>(row.record));
     },
-    updatePart(id, updates) {
-      const current = store.getPart(id);
+    async updatePart(id, updates) {
+      const current = await store.getPart(id);
       if (!current) return null;
       const updated = { ...current, ...updates } as Part;
       db.run(
@@ -255,7 +257,7 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
       );
       return clone(updated);
     },
-    persistStreamingPartSnapshots(snapshots: StreamingPartSnapshot[]) {
+    async persistStreamingPartSnapshots(snapshots: StreamingPartSnapshot[]) {
       const transaction = db.transaction((values: StreamingPartSnapshot[]) => {
         const select = db.prepare(
           'SELECT record FROM capek_parts WHERE id = ? AND message_id = ? AND session_id = ? AND type = ?',
@@ -273,7 +275,7 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
       });
       return transaction.immediate(snapshots);
     },
-    transitionToolToRunningByCallId(sessionId, callId, childSessionId) {
+    async transitionToolToRunningByCallId(sessionId, callId, childSessionId) {
       const rows = db.query(
         `SELECT record FROM capek_parts
          WHERE session_id = ? AND call_id = ? AND type = 'tool'
@@ -282,7 +284,7 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
       const toolPart = rows.map(row => parse<ToolPart>(row.record))
         .find(part => part.state.status === 'pending');
       if (!toolPart) return null;
-      return store.updatePart(toolPart.id, {
+      return await store.updatePart(toolPart.id, {
         state: {
           status: 'running',
           input: toolPart.state.input,
@@ -291,11 +293,11 @@ export function createSqliteConversationStore(options: { path: string }): Sqlite
         },
       }) as ToolPart;
     },
-    transitionToolToInterrupted(partId, reason) {
-      const current = store.getPart(partId);
+    async transitionToolToInterrupted(partId, reason) {
+      const current = await store.getPart(partId);
       if (!current || current.type !== 'tool') return null;
       const now = Date.now();
-      return store.updatePart(partId, {
+      return await store.updatePart(partId, {
         state: {
           status: 'interrupted',
           input: current.state.input,

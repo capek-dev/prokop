@@ -448,7 +448,7 @@ describe('C5 subagent execution with injected deps', () => {
         state.sessions.set(updated.id, updated);
         return updated;
       },
-      getWorkspaceAutoApproveSeverity: () => 'low',
+      getWorkspaceAutoApproveSeverity: async () => 'low',
     };
 
     const deps: SubagentServiceDeps = {

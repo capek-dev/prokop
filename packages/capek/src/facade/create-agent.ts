@@ -460,7 +460,7 @@ class StandaloneAgent implements Agent {
     }
 
     emit({ type: 'session.started', sessionId });
-    if (input !== undefined) this.#appendUserMessage(sessionId, inputText(input));
+    if (input !== undefined) await this.#appendUserMessage(sessionId, inputText(input));
     const history = buildEffectiveContextHistory(sessionId).messages;
     const preconfig: Preconfig = {
       id: 'capek-default',
@@ -601,7 +601,7 @@ class StandaloneAgent implements Agent {
     );
   }
 
-  #appendUserMessage(sessionId: string, text: string): void {
+  async #appendUserMessage(sessionId: string, text: string): Promise<void> {
     const messageId = randomUUID();
     createMessage({
       id: messageId,
@@ -609,7 +609,7 @@ class StandaloneAgent implements Agent {
       role: 'user',
       createdAt: Date.now(),
     });
-    createPart({
+    await createPart({
       id: randomUUID(),
       messageId,
       type: 'text',

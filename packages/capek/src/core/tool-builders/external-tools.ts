@@ -71,7 +71,7 @@ export async function buildExternalTools(options: ExternalToolsOptions): Promise
   const shouldIncludeTask = taskPayload !== null
     && !toolNames.includes('task')
     && canSpawn
-    && taskPayload.isEnabled?.(workspaceId ?? '', sessionId) === true;
+    && await taskPayload.isEnabled?.(workspaceId ?? '', sessionId) === true;
 
   // Phase 1a: registry tools in toolNames order, exactly as pre-C5.
   for (const name of toolNames) {
@@ -157,8 +157,8 @@ export async function buildExternalTools(options: ExternalToolsOptions): Promise
               },
               workspacePath,
               abortSignal: toolAbortController.signal,
-              onSessionCreated: (childSessionId: string) => {
-                const updatedPart = transitionToolToRunningByCallId(sessionId, toolCallId, childSessionId);
+              onSessionCreated: async (childSessionId: string) => {
+                const updatedPart = await transitionToolToRunningByCallId(sessionId, toolCallId, childSessionId);
                 if (updatedPart) {
                   broadcast({ kind: 'part', action: 'updated', sessionId, part: updatedPart });
                 }

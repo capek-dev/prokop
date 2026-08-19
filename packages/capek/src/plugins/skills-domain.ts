@@ -163,13 +163,13 @@ function skillManagementGuidanceSection(storage: StorageBundle): SkillSectionCon
     id: 'skill-management-guidance',
     phase: 'workspace',
     order: 40,
-    provide: (build) => {
+    provide: async (build) => {
       const data = validateContextAssemblyData(build.data);
       if (!data.workspaceId) return null;
-      return storage.workspaces.get(data.workspaceId)?.settings?.skills?.managementEnabled
+      return (await storage.workspaces.get(data.workspaceId))?.settings?.skills?.managementEnabled
         ? getHostGuidance().skillManage
         : null;
-    },
+    }
   };
 }
 

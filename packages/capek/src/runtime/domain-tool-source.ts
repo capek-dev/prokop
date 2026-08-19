@@ -37,7 +37,7 @@ export interface DomainToolPayload {
   readonly inputSchema: Readonly<Record<string, unknown>>;
   /** The domain's availability predicate (workspace settings gate). The
    * owning domain uses the same predicate for its context contribution. */
-  readonly isEnabled?: (workspaceId: string, sessionId?: string) => boolean;
+  readonly isEnabled?: (workspaceId: string, sessionId?: string) => boolean | Promise<boolean>;
   /** Optional per-build definition resolver for tools whose description or
    * schema depends on per-session data (the task tool's resolved subagent
    * list, the workflow tool's allowed leaf agents). Returns null when the

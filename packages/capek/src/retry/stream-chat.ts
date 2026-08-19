@@ -55,20 +55,20 @@ export type StreamChatEvent =
 
 export type StreamChatFn = (options: ChatOptions) => AsyncGenerator<StreamChatEvent>;
 
-function finalizeFailedAttempt(
+async function finalizeFailedAttempt(
   message: AssistantMessage | null,
   classifiedError: { message: string },
   retryFailed: boolean,
-): MessageEvent[] {
+): Promise<MessageEvent[]> {
   if (!message) return [];
 
   const events: MessageEvent[] = [];
-  const parts = getPartsByMessage(message.id);
+  const parts = await getPartsByMessage(message.id);
   for (const part of parts) {
     if (part.type !== 'tool') continue;
     const toolPart = part as ToolPart;
     if (toolPart.state.status !== 'pending' && toolPart.state.status !== 'running') continue;
-    const interruptedPart = transitionToolToInterrupted(toolPart.id, 'error');
+    const interruptedPart = await transitionToolToInterrupted(toolPart.id, 'error');
     if (interruptedPart) {
       events.push({ type: 'part.updated', sessionId: message.sessionId, part: interruptedPart });
     }
@@ -229,7 +229,7 @@ export async function* streamChatWithRetry(
           rawError: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : err,
         });
 
-        for (const event of finalizeFailedAttempt(lastAssistantMessage, classifiedError, canRetry)) {
+        for (const event of await finalizeFailedAttempt(lastAssistantMessage, classifiedError, canRetry)) {
           yield event;
         }
 

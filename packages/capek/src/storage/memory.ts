@@ -157,7 +157,7 @@ export function createInMemoryConversationStore(): ConversationStore {
         hasCompaction: Boolean(boundary),
       };
     },
-    createPart(part, sessionId) {
+    async createPart(part, sessionId) {
       const message = messages.get(part.messageId);
       if (!message || message.message.sessionId !== sessionId) throw new Error(`Message does not exist in session: ${part.messageId}`);
       if (parts.has(part.id)) throw new Error(`Part already exists: ${part.id}`);
@@ -168,24 +168,26 @@ export function createInMemoryConversationStore(): ConversationStore {
       });
       return copy(part);
     },
-    getPart(id) {
+    async getPart(id) {
       const record = parts.get(id);
       return record ? copy(record.part) : null;
     },
-    getPartsByMessage,
-    getPartsBySession(sessionId) {
+    async getPartsByMessage(messageId) {
+      return getPartsByMessage(messageId);
+    },
+    async getPartsBySession(sessionId) {
       return [...parts.values()]
         .filter(record => record.sessionId === sessionId)
         .map(record => copy(record.part))
         .sort(compareParts);
     },
-    updatePart(id, updates) {
+    async updatePart(id, updates) {
       const current = parts.get(id);
       if (!current) return null;
       current.part = copy({ ...current.part, ...updates }) as Part;
       return copy(current.part);
     },
-    persistStreamingPartSnapshots(snapshots: StreamingPartSnapshot[]) {
+    async persistStreamingPartSnapshots(snapshots: StreamingPartSnapshot[]) {
       let count = 0;
       for (const snapshot of snapshots) {
         const record = parts.get(snapshot.id);
@@ -198,7 +200,7 @@ export function createInMemoryConversationStore(): ConversationStore {
       }
       return count;
     },
-    transitionToolToRunningByCallId(sessionId, callId, childSessionId) {
+    async transitionToolToRunningByCallId(sessionId, callId, childSessionId) {
       const candidates = [...parts.values()]
         .filter(record => record.sessionId === sessionId
           && record.part.type === 'tool'
@@ -212,7 +214,7 @@ export function createInMemoryConversationStore(): ConversationStore {
         });
       const toolPart = candidates[0]?.part as ToolPart | undefined;
       if (!toolPart || toolPart.state.status !== 'pending') return null;
-      return store.updatePart(toolPart.id, {
+      return await store.updatePart(toolPart.id, {
         state: {
           status: 'running',
           input: toolPart.state.input,
@@ -221,11 +223,11 @@ export function createInMemoryConversationStore(): ConversationStore {
         },
       }) as ToolPart;
     },
-    transitionToolToInterrupted(partId, reason) {
+    async transitionToolToInterrupted(partId, reason) {
       const current = parts.get(partId)?.part;
       if (!current || current.type !== 'tool') return null;
       const now = Date.now();
-      return store.updatePart(partId, {
+      return await store.updatePart(partId, {
         state: {
           status: 'interrupted',
           input: current.state.input,
@@ -300,8 +302,8 @@ export function createInMemoryStorageBundle(records: InMemoryAuxiliaryRecords = 
     get: async (sessionId, attachmentId) => copy(attachments.get(`${sessionId}:${attachmentId}`) ?? null),
   };
   const workspaceStore: WorkspaceStore = {
-    get: id => copy(workspaces.get(id) ?? null),
-    getAutoApproveSeverity: id => workspaces.get(id)?.settings.autoApproveSeverity ?? 'low',
+    get: async id => copy(workspaces.get(id) ?? null),
+    getAutoApproveSeverity: async id => workspaces.get(id)?.settings.autoApproveSeverity ?? 'low',
   };
   const responseFormatStore: ResponseFormatStore = {
     get: async id => copy(responseFormats.get(id) ?? null),

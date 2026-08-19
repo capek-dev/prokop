@@ -174,7 +174,7 @@ function workspaceMemorySections(storage: StorageBundle): readonly MemorySection
       provide: async (build) => {
         const data = validateContextAssemblyData(build.data);
         if (!data.workspaceId) return null;
-        const workspace = storage.workspaces.get(data.workspaceId);
+        const workspace = await storage.workspaces.get(data.workspaceId);
         if (!workspace?.settings?.memory?.enabled || !data.workspacePath) return null;
         return loadMemoryInstructions(getHostLayout().workspaceMemoryDir(data.workspacePath));
       },
@@ -183,10 +183,10 @@ function workspaceMemorySections(storage: StorageBundle): readonly MemorySection
       id: 'memory-guidance',
       phase: 'workspace',
       order: 30,
-      provide: (build) => {
+      provide: async (build) => {
         const data = validateContextAssemblyData(build.data);
         if (!data.workspaceId) return null;
-        const workspace = storage.workspaces.get(data.workspaceId);
+        const workspace = await storage.workspaces.get(data.workspaceId);
         return workspace?.settings?.memory?.enabled && data.workspacePath ? getHostGuidance().memory : null;
       },
     },

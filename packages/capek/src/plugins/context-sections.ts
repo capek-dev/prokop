@@ -150,7 +150,7 @@ const LEGACY_MEMORY_SKILLS_SECTIONS: readonly SectionContribution[] = [
     provide: async (context) => {
       const data = requiredData(context);
       if (!data.workspaceId) return null;
-      const workspace = getWorkspace(data.workspaceId);
+      const workspace = await getWorkspace(data.workspaceId);
       if (!workspace?.settings?.memory?.enabled || !data.workspacePath) return null;
       return loadMemoryInstructions(getHostLayout().workspaceMemoryDir(data.workspacePath));
     },
@@ -159,10 +159,10 @@ const LEGACY_MEMORY_SKILLS_SECTIONS: readonly SectionContribution[] = [
     id: 'memory-guidance',
     phase: 'workspace',
     order: 30,
-    provide: (context) => {
+    provide: async (context) => {
       const data = requiredData(context);
       if (!data.workspaceId) return null;
-      const workspace = getWorkspace(data.workspaceId);
+      const workspace = await getWorkspace(data.workspaceId);
       return workspace?.settings?.memory?.enabled && data.workspacePath ? getHostGuidance().memory : null;
     },
   },
@@ -170,10 +170,10 @@ const LEGACY_MEMORY_SKILLS_SECTIONS: readonly SectionContribution[] = [
     id: 'skill-management-guidance',
     phase: 'workspace',
     order: 40,
-    provide: (context) => {
+    provide: async (context) => {
       const data = requiredData(context);
       if (!data.workspaceId) return null;
-      return getWorkspace(data.workspaceId)?.settings?.skills?.managementEnabled
+      return (await getWorkspace(data.workspaceId))?.settings?.skills?.managementEnabled
         ? getHostGuidance().skillManage
         : null;
     },

@@ -56,43 +56,43 @@ export const listLatestMessagesWithPartsPage = (...args: Parameters<StorageBundl
   activeStorage().conversation.listLatestMessagesWithPartsPage(...args);
 export const buildEffectiveContextHistory = (...args: Parameters<StorageBundle['conversation']['buildEffectiveContextHistory']>) =>
   activeStorage().conversation.buildEffectiveContextHistory(...args);
-export function createPart(
+export async function createPart(
   part: Parameters<StorageBundle['conversation']['createPart']>[0],
   sessionId: string,
   options?: { syncFts?: boolean },
 ) {
   const current = activeStorage();
-  const result = current.conversation.createPart(part, sessionId);
-  if (options?.syncFts !== false && (part.type === 'text' || part.type === 'tool')) {
+  const result = await current.conversation.createPart(part, sessionId);
+  if (result && options?.syncFts !== false && (part.type === 'text' || part.type === 'tool')) {
     current.index.syncMessage(part.messageId);
   }
   return result;
 }
-export const getPart = (...args: Parameters<StorageBundle['conversation']['getPart']>) =>
+export const getPart = async (...args: Parameters<StorageBundle['conversation']['getPart']>) =>
   activeStorage().conversation.getPart(...args);
-export const getPartsByMessage = (...args: Parameters<StorageBundle['conversation']['getPartsByMessage']>) =>
+export const getPartsByMessage = async (...args: Parameters<StorageBundle['conversation']['getPartsByMessage']>) =>
   activeStorage().conversation.getPartsByMessage(...args);
-export const getPartsBySession = (...args: Parameters<StorageBundle['conversation']['getPartsBySession']>) =>
+export const getPartsBySession = async (...args: Parameters<StorageBundle['conversation']['getPartsBySession']>) =>
   activeStorage().conversation.getPartsBySession(...args);
-export function updatePart(
+export async function updatePart(
   id: string,
   updates: Record<string, unknown>,
   options?: { syncFts?: boolean },
 ) {
   const current = activeStorage();
-  const previous = current.conversation.getPart(id);
-  const result = current.conversation.updatePart(id, updates);
+  const previous = await current.conversation.getPart(id);
+  const result = await current.conversation.updatePart(id, updates);
   if (result && options?.syncFts !== false
     && (previous?.type === 'text' || previous?.type === 'tool' || result.type === 'text' || result.type === 'tool')) {
     current.index.syncMessage(result.messageId);
   }
   return result;
 }
-export const persistStreamingPartSnapshots = (...args: Parameters<StorageBundle['conversation']['persistStreamingPartSnapshots']>) =>
+export const persistStreamingPartSnapshots = async (...args: Parameters<StorageBundle['conversation']['persistStreamingPartSnapshots']>) =>
   activeStorage().conversation.persistStreamingPartSnapshots(...args);
-export const transitionToolToRunningByCallId = (...args: Parameters<StorageBundle['conversation']['transitionToolToRunningByCallId']>) =>
+export const transitionToolToRunningByCallId = async (...args: Parameters<StorageBundle['conversation']['transitionToolToRunningByCallId']>) =>
   activeStorage().conversation.transitionToolToRunningByCallId(...args);
-export const transitionToolToInterrupted = (...args: Parameters<StorageBundle['conversation']['transitionToolToInterrupted']>) =>
+export const transitionToolToInterrupted = async (...args: Parameters<StorageBundle['conversation']['transitionToolToInterrupted']>) =>
   activeStorage().conversation.transitionToolToInterrupted(...args);
 export const syncMessageFts = (messageId: string): void => activeStorage().index.syncMessage(messageId);
 export const createToolOutputArtifact = (...args: Parameters<StorageBundle['toolOutputArtifacts']['create']>) =>
@@ -107,9 +107,9 @@ export const deleteQueuedMessage = (...args: Parameters<StorageBundle['queue']['
   activeStorage().queue.delete(...args);
 export const getAttachment = (...args: Parameters<StorageBundle['attachments']['get']>) =>
   activeStorage().attachments.get(...args);
-export const getWorkspace = (...args: Parameters<StorageBundle['workspaces']['get']>) =>
+export const getWorkspace = async (...args: Parameters<StorageBundle['workspaces']['get']>) =>
   activeStorage().workspaces.get(...args);
-export const getWorkspaceAutoApproveSeverity = (...args: Parameters<StorageBundle['workspaces']['getAutoApproveSeverity']>) =>
+export const getWorkspaceAutoApproveSeverity = async (...args: Parameters<StorageBundle['workspaces']['getAutoApproveSeverity']>) =>
   activeStorage().workspaces.getAutoApproveSeverity(...args);
 export const getResponseFormat = (...args: Parameters<StorageBundle['responseFormats']['get']>) =>
   activeStorage().responseFormats.get(...args);

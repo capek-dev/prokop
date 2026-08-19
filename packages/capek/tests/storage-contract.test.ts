@@ -15,6 +15,14 @@ import {
   type ConversationStore,
   type ToolOutputArtifactStore,
 } from '@capekai/core/storage';
+import { createInMemoryStorageBundle } from '../src/storage/memory';
+import {
+  createPart as createRuntimePart,
+  deleteMessage as deleteRuntimeMessage,
+  syncMessageFts,
+  updatePart as updateRuntimePart,
+  withStorage,
+} from '../src/storage/runtime';
 
 const temporaryDirectories: string[] = [];
 
@@ -59,7 +67,7 @@ function message(id: string, role: Message['role'], createdAt: number, extra: Pa
 
 function runConversationContract(name: string, createStore: () => ConversationStore & Partial<ClosableStore>): void {
   describe(name, () => {
-    test('preserves deterministic ordering, snapshots, tool state, compaction, deletion, and child resume', () => {
+    test('preserves deterministic ordering, snapshots, tool state, compaction, deletion, and child resume', async () => {
       const store = createStore();
       store.createSession(session('root'));
       store.createSession(session('child-b', 'root', '2026-01-01T00:00:01.000Z'));
@@ -85,18 +93,18 @@ function runConversationContract(name: string, createStore: () => ConversationSt
       expect(store.getSession('orphan')?.parentId).toBe('missing-parent');
 
       store.createMessage(message('old', 'user', 100));
-      store.createPart({ id: 'part-z', messageId: 'old', type: 'text', text: 'old-z', createdAt: 5 }, 'root');
-      store.createPart({ id: 'part-a', messageId: 'old', type: 'text', text: 'old-a', createdAt: 5 }, 'root');
+      await store.createPart({ id: 'part-z', messageId: 'old', type: 'text', text: 'old-z', createdAt: 5 }, 'root');
+      await store.createPart({ id: 'part-a', messageId: 'old', type: 'text', text: 'old-a', createdAt: 5 }, 'root');
       store.createMessage(message('trigger', 'user', 50));
-      store.createPart({ id: 'trigger-part', messageId: 'trigger', type: 'compaction', auto: false, createdAt: 6 }, 'root');
+      await store.createPart({ id: 'trigger-part', messageId: 'trigger', type: 'compaction', auto: false, createdAt: 6 }, 'root');
       store.createMessage(message('summary', 'assistant', 40, {
         summary: true,
         mode: 'compaction',
         parentId: 'trigger',
       }));
-      store.createPart({ id: 'summary-text', messageId: 'summary', type: 'text', text: 'summary', createdAt: 7 }, 'root');
+      await store.createPart({ id: 'summary-text', messageId: 'summary', type: 'text', text: 'summary', createdAt: 7 }, 'root');
       store.createMessage(message('after', 'user', 30));
-      store.createPart({ id: 'stream', messageId: 'after', type: 'text', text: '', createdAt: 8 }, 'root');
+      await store.createPart({ id: 'stream', messageId: 'after', type: 'text', text: '', createdAt: 8 }, 'root');
       const tool: ToolPart = {
         id: 'tool',
         messageId: 'after',
@@ -106,14 +114,14 @@ function runConversationContract(name: string, createStore: () => ConversationSt
         state: { status: 'pending', input: { task: true } },
         createdAt: 9,
       };
-      store.createPart(tool, 'root');
-      store.createPart({
+      await store.createPart(tool, 'root');
+      await store.createPart({
         ...tool,
         id: 'duplicate-z',
         callId: 'duplicate-call',
         createdAt: 10,
       }, 'root');
-      store.createPart({
+      await store.createPart({
         ...tool,
         id: 'duplicate-a',
         callId: 'duplicate-call',
@@ -123,39 +131,39 @@ function runConversationContract(name: string, createStore: () => ConversationSt
       expect(store.listMessagesWithParts('root').map(entry => entry.message.id)).toEqual([
         'old', 'trigger', 'summary', 'after',
       ]);
-      expect(store.getPartsByMessage('old').map(part => part.id)).toEqual(['part-z', 'part-a']);
-      store.updatePart('part-z', { createdAt: 11 });
-      expect(store.getPartsByMessage('old').map(part => part.id)).toEqual(['part-a', 'part-z']);
-      expect(store.getPartsBySession('root').at(-1)?.id).toBe('part-z');
-      expect(() => store.createPart({
+      expect((await store.getPartsByMessage('old')).map(part => part.id)).toEqual(['part-z', 'part-a']);
+      await store.updatePart('part-z', { createdAt: 11 });
+      expect((await store.getPartsByMessage('old')).map(part => part.id)).toEqual(['part-a', 'part-z']);
+      expect((await store.getPartsBySession('root')).at(-1)?.id).toBe('part-z');
+      await expect(store.createPart({
         id: 'wrong-session-part',
         messageId: 'old',
         type: 'text',
         text: 'wrong',
         createdAt: 5,
-      }, 'child-a')).toThrow('Message does not exist in session: old');
-      expect(() => store.createPart({
+      }, 'child-a')).rejects.toThrow('Message does not exist in session: old');
+      await expect(store.createPart({
         id: 'missing-message-part',
         messageId: 'missing',
         type: 'text',
         text: 'missing',
         createdAt: 5,
-      }, 'root')).toThrow('Message does not exist in session: missing');
-      expect(store.persistStreamingPartSnapshots([
+      }, 'root')).rejects.toThrow('Message does not exist in session: missing');
+      expect(await store.persistStreamingPartSnapshots([
         { id: 'stream', messageId: 'after', sessionId: 'root', type: 'text', text: 'saved', createdAt: 8 },
         { id: 'stream', messageId: 'wrong', sessionId: 'root', type: 'text', text: 'wrong', createdAt: 8 },
       ])).toBe(1);
-      expect(store.getPart('stream')).toMatchObject({ text: 'saved' });
+      expect(await store.getPart('stream')).toMatchObject({ text: 'saved' });
 
-      const latestDuplicate = store.transitionToolToRunningByCallId('root', 'duplicate-call');
+      const latestDuplicate = await store.transitionToolToRunningByCallId('root', 'duplicate-call');
       expect(latestDuplicate?.id).toBe('duplicate-a');
-      expect((store.getPart('duplicate-z') as ToolPart).state.status).toBe('pending');
-      expect((store.getPart('duplicate-a') as ToolPart).state.status).toBe('running');
+      expect((await store.getPart('duplicate-z') as ToolPart).state.status).toBe('pending');
+      expect((await store.getPart('duplicate-a') as ToolPart).state.status).toBe('running');
 
-      const running = store.transitionToolToRunningByCallId('root', 'call-1', 'child-a');
+      const running = await store.transitionToolToRunningByCallId('root', 'call-1', 'child-a');
       expect(running?.state).toMatchObject({ status: 'running', childSessionId: 'child-a' });
-      const latest = store.getPart('tool') as ToolPart;
-      store.updatePart('tool', {
+      const latest = await store.getPart('tool') as ToolPart;
+      await store.updatePart('tool', {
         state: {
           status: 'completed',
           input: latest.state.input,
@@ -165,11 +173,11 @@ function runConversationContract(name: string, createStore: () => ConversationSt
           childSessionId: 'childSessionId' in latest.state ? latest.state.childSessionId : undefined,
         },
       });
-      expect((store.getPart('tool') as ToolPart).state).toMatchObject({
+      expect((await store.getPart('tool') as ToolPart).state).toMatchObject({
         status: 'completed',
         childSessionId: 'child-a',
       });
-      const interrupted = store.transitionToolToInterrupted('tool', 'cascade');
+      const interrupted = await store.transitionToolToInterrupted('tool', 'cascade');
       expect(interrupted?.state).toMatchObject({
         status: 'interrupted',
         reason: 'cascade',
@@ -180,7 +188,7 @@ function runConversationContract(name: string, createStore: () => ConversationSt
       expect(history.latestCompactionBoundary).toBe('trigger');
       expect(history.messages.map(entry => entry.message.id)).toEqual(['trigger', 'summary', 'after']);
       expect(store.deleteMessage('after')).toBe(true);
-      expect(store.getPart('stream')).toBeNull();
+      expect(await store.getPart('stream')).toBeNull();
       expect(store.listLatestMessagesWithPartsPage('root', 2).messages.map(entry => entry.message.id))
         .toEqual(['trigger', 'summary']);
       expect(store.listLatestMessagesWithPartsPage('root', 2).pagination.hasOlder).toBe(true);
@@ -194,6 +202,49 @@ runConversationContract('SQLite conversation store', () => {
   const directory = mkdtempSync(join(tmpdir(), 'capek-storage-'));
   temporaryDirectories.push(directory);
   return createSqliteConversationStore({ path: join(directory, 'conversation.sqlite') });
+});
+
+describe('D2-017 FTS read-your-writes invariant', () => {
+  test('indexes finalized part content after async writes and removes it on delete', async () => {
+    const bundle = createInMemoryStorageBundle();
+    const indexCalls: string[] = [];
+    const indexedText = new Map<string, string>();
+    bundle.index = {
+      syncMessage: (messageId) => {
+        indexCalls.push(messageId);
+        const entry = bundle.conversation.getMessageWithParts(messageId);
+        const text = entry?.parts
+          .filter((part): part is Extract<typeof part, { type: 'text' }> => part.type === 'text')
+          .map(part => part.text)
+          .join('') ?? '';
+        indexedText.set(messageId, text);
+      },
+      removeMessage: (messageId) => {
+        indexedText.delete(messageId);
+      },
+    };
+
+    await withStorage(bundle, async () => {
+      bundle.conversation.createSession(session('root'));
+      bundle.conversation.createMessage(message('fts-message', 'user', 100));
+      await createRuntimePart({
+        id: 'fts-part',
+        messageId: 'fts-message',
+        type: 'text',
+        text: 'final content',
+        createdAt: 101,
+      }, 'root', { syncFts: false });
+      await updateRuntimePart('fts-part', { text: 'finalized content' }, { syncFts: false });
+
+      expect(indexCalls).toEqual([]);
+      syncMessageFts('fts-message');
+      expect(indexCalls).toEqual(['fts-message']);
+      expect(indexedText.get('fts-message')).toBe('finalized content');
+
+      expect(await deleteRuntimeMessage('fts-message')).toBe(true);
+      expect(indexedText.has('fts-message')).toBe(false);
+    });
+  });
 });
 
 function runToolOutputArtifactContract(name: string, createStore: () => ToolOutputArtifactStore & Partial<ClosableStore>): void {
