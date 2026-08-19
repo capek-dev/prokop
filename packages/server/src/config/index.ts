@@ -15,6 +15,7 @@ import {
   getDefaultDatabasePath as getDefaultDatabasePathFromPaths,
   getToolsDir,
 } from '@/infrastructure/runtime/paths';
+import { validateModelsDocument } from './schema';
 
 // NotInitializedError for when config doesn't exist
 export class NotInitializedError extends Error {
@@ -67,53 +68,8 @@ export function resolveModelsPath(): string {
   return getModelsPath() || getModelsConfigPath();
 }
 
-// Validate models config structure
-function validateModelsConfig(config: unknown): config is ModelsConfig {
-  if (!config || typeof config !== 'object') {
-    return false;
-  }
-  
-  const c = config as Record<string, unknown>;
-  
-  if (!Array.isArray(c.providers)) {
-    return false;
-  }
-  
-  if (typeof c.defaultModel !== 'string') {
-    return false;
-  }
-  
-  if (typeof c.defaultProvider !== 'string') {
-    return false;
-  }
-  
-  // Validate each provider has required fields
-  for (const provider of c.providers) {
-    if (!provider || typeof provider !== 'object') {
-      return false;
-    }
-    const p = provider as Record<string, unknown>;
-    if (typeof p.id !== 'string' || typeof p.name !== 'string' || !Array.isArray(p.models)) {
-      return false;
-    }
-    
-    // Validate each model has required fields
-    for (const model of p.models) {
-      if (!model || typeof model !== 'object') {
-        return false;
-      }
-      const m = model as Record<string, unknown>;
-      if (typeof m.id !== 'string' || typeof m.name !== 'string' || typeof m.contextWindow !== 'number') {
-        return false;
-      }
-      if (m.tier !== 'budget' && m.tier !== 'standard' && m.tier !== 'premium') {
-        return false;
-      }
-    }
-  }
-  
-  return true;
-}
+// Validate models config structure via the single strict schema validator
+// (P3.1): shared with config/models.ts and config/models-sync.ts.
 
 // Load models config from file (with caching)
 function loadModelsConfig(): ModelsConfig {
@@ -131,7 +87,7 @@ function loadModelsConfig(): ModelsConfig {
     const content = readFileSync(modelsPath, 'utf-8');
     const config = JSON.parse(content);
     
-    if (!validateModelsConfig(config)) {
+    if (!validateModelsDocument(config)) {
       throw new ModelsConfigInvalidError(modelsPath, 'schema validation failed');
     }
     
