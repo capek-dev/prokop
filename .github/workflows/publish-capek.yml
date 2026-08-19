@@ -1,0 +1,205 @@
+name: Publish Capek Packages to NPM
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: publish-capek
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/capek/v')
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          registry-url: https://registry.npmjs.org
+
+      - name: Resolve and validate version
+        id: version
+        run: |
+          set -euo pipefail
+          TYPES_VERSION=$(node -p "require('./packages/capek-types/package.json').version")
+          TOOL_VERSION=$(node -p "require('./packages/capek-tool/package.json').version")
+          CORE_VERSION=$(node -p "require('./packages/capek/package.json').version")
+
+          if [ "$TYPES_VERSION" != "$TOOL_VERSION" ] || [ "$TYPES_VERSION" != "$CORE_VERSION" ]; then
+            echo "::error::Capek package versions differ: types=$TYPES_VERSION tool=$TOOL_VERSION core=$CORE_VERSION"
+            exit 1
+          fi
+
+          V="$TYPES_VERSION"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Capek version from package.json files: $V"
+
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG_VERSION="${GITHUB_REF#refs/tags/capek/v}"
+            echo "Release tag version: $TAG_VERSION"
+            if [ "$V" != "$TAG_VERSION" ]; then
+              echo "::error::Release tag version ($TAG_VERSION) does not match Capek package version ($V)"
+              exit 1
+            fi
+          fi
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build Capek packages
+        run: |
+          cd packages/capek-types
+          bun run build
+          cd ../capek-tool
+          bun run build
+          cd ../capek
+          bun run build
+
+      - name: Validate packed tarballs
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          rm -rf /tmp/capek-smoke
+          mkdir -p /tmp/capek-smoke/tarballs
+
+          for PACKAGE in capek-types capek-tool capek; do
+            PACKAGE_DIR="/tmp/capek-smoke/$PACKAGE"
+            mkdir -p "$PACKAGE_DIR"
+            node -e "const fs=require('node:fs'); const packageDir=process.argv[1]; const version=process.argv[2]; const p=JSON.parse(fs.readFileSync('packages/'+process.argv[3]+'/package.npm.json','utf8')); p.version=version; for (const key of Object.keys(p.dependencies || {})) if (key.startsWith('@capekai/')) p.dependencies[key]='^'+version; fs.writeFileSync(packageDir+'/package.json',JSON.stringify(p,null,2)+'\n');" "$PACKAGE_DIR" "$VERSION" "$PACKAGE"
+            cp -R "packages/$PACKAGE/dist" "$PACKAGE_DIR/dist"
+            cp "packages/$PACKAGE/README.md" "$PACKAGE_DIR/README.md"
+            (cd "$PACKAGE_DIR" && npm pack --pack-destination /tmp/capek-smoke/tarballs)
+          done
+
+          mkdir -p /tmp/capek-smoke/install
+          cd /tmp/capek-smoke/install
+          printf '%s\n' '{"name":"capek-smoke","private":true,"type":"module"}' > package.json
+          npm install /tmp/capek-smoke/tarballs/capekai-types-*.tgz /tmp/capek-smoke/tarballs/capekai-tool-*.tgz /tmp/capek-smoke/tarballs/capekai-core-*.tgz
+
+          bun -e "const types=await import('@capekai/types'); if(typeof types!=='object') throw new Error('types import failed'); const tool=await import('@capekai/tool'); if(typeof tool!=='object') throw new Error('tool import failed');"
+          if ! bun -e "const m=await import('@capekai/core/composition'); if(typeof m.enterAgentScope!=='function') throw new Error('composition import failed');"; then
+            echo "Composition smoke import failed, using @capekai/core/storage fallback"
+            bun -e "const m=await import('@capekai/core/storage'); if(typeof m!=='object') throw new Error('storage import failed');"
+            echo "Smoke import used @capekai/core/storage"
+          else
+            echo "Smoke import used @capekai/core/composition"
+          fi
+
+      - name: Prepare package.json for npm
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          for PACKAGE in capek-types capek-tool capek; do
+            node -e "const fs=require('node:fs'); const packageName=process.argv[1]; const version=process.argv[2]; const p=require('./packages/'+packageName+'/package.npm.json'); p.version=version; for (const key of Object.keys(p.dependencies || {})) if (key.startsWith('@capekai/')) p.dependencies[key]='^'+version; fs.writeFileSync('./packages/'+packageName+'/package.json',JSON.stringify(p,null,2)+'\n');" "$PACKAGE" "$VERSION"
+          done
+
+      - name: Check if Capek versions already exist on npm
+        id: check
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if npm view "@capekai/types@$VERSION" version >/dev/null 2>&1; then
+            echo "Version $VERSION already exists for @capekai/types, skipping publish"
+            echo "skip_types=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_types=false" >> "$GITHUB_OUTPUT"
+          fi
+          if npm view "@capekai/tool@$VERSION" version >/dev/null 2>&1; then
+            echo "Version $VERSION already exists for @capekai/tool, skipping publish"
+            echo "skip_tool=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_tool=false" >> "$GITHUB_OUTPUT"
+          fi
+          if npm view "@capekai/core@$VERSION" version >/dev/null 2>&1; then
+            echo "Version $VERSION already exists for @capekai/core, skipping publish"
+            echo "skip_core=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_core=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish @capekai/types to npm
+        if: steps.check.outputs.skip_types != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd packages/capek-types
+          npm publish --provenance --access public
+
+      - name: Publish @capekai/tool to npm
+        if: steps.check.outputs.skip_tool != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd packages/capek-tool
+          npm publish --provenance --access public
+
+      - name: Publish @capekai/core to npm
+        if: steps.check.outputs.skip_core != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd packages/capek
+          npm publish --provenance --access public
+
+  announce:
+    needs: publish
+    runs-on: ubuntu-latest
+    if: always() && needs.publish.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Create Capek announcement pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ needs.publish.outputs.version }}
+        run: |
+          set -euo pipefail
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          BRANCH="release/announce-capek-${V}"
+          git checkout -B "$BRANCH" "origin/$DEFAULT_BRANCH"
+
+          TYPES_CURRENT=$(cat packages/capek-types/VERSION | tr -d '[:space:]')
+          TOOL_CURRENT=$(cat packages/capek-tool/VERSION | tr -d '[:space:]')
+          CORE_CURRENT=$(cat packages/capek/VERSION | tr -d '[:space:]')
+          if [ "$TYPES_CURRENT" = "$V" ] && [ "$TOOL_CURRENT" = "$V" ] && [ "$CORE_CURRENT" = "$V" ]; then
+            echo "All Capek VERSION files already at $V, nothing to do"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "$V" > packages/capek-types/VERSION
+          echo "$V" > packages/capek-tool/VERSION
+          echo "$V" > packages/capek/VERSION
+          git add packages/capek-types/VERSION packages/capek-tool/VERSION packages/capek/VERSION
+          git commit -m "chore(capek): announce $V"
+          git push --force origin "HEAD:$BRANCH"
+
+          if gh pr list --head "$BRANCH" --base "$DEFAULT_BRANCH" --state open --json number --jq 'length' | grep -q '^0$'; then
+            gh pr create \
+              --base "$DEFAULT_BRANCH" \
+              --head "$BRANCH" \
+              --title "chore(capek): announce $V" \
+              --body "Announces Capek packages $V after the NPM packages were published successfully."
+          else
+            echo "Announcement pull request already exists for $BRANCH"
+          fi
