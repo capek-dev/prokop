@@ -585,7 +585,7 @@ describe('Integration: WebSocket message handlers', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect((askEvents[0] as any).toolCallId).toBe('call-1');
 
-      const resolved = resolveAsk('call-1', { type: 'text', value: 'Jean' });
+      const resolved = await resolveAsk('call-1', { type: 'text', value: 'Jean' });
       expect(resolved).toBe(true);
 
       const response = await askPromise;

@@ -47,21 +47,21 @@ export interface SessionSearchMessageSummary {
  * queries exactly: ordering, sanitization, fallback, snippet bounds, and
  * return shapes are unchanged. */
 export interface SessionSearchQueryPort {
-  searchMessages(options: SessionSearchOptions): SessionSearchMessageResult[];
-  countSessionMessages(sessionId: string): number;
-  countMessagesBefore(sessionId: string, timestamp: number): number;
-  countMessagesAfter(sessionId: string, timestamp: number): number;
-  getLatestMessage(sessionId: string): SessionSearchMessageRef | null;
-  getMessage(messageId: string, sessionId: string): SessionSearchMessageRef | null;
+  searchMessages(options: SessionSearchOptions): Promise<SessionSearchMessageResult[]>;
+  countSessionMessages(sessionId: string): Promise<number>;
+  countMessagesBefore(sessionId: string, timestamp: number): Promise<number>;
+  countMessagesAfter(sessionId: string, timestamp: number): Promise<number>;
+  getLatestMessage(sessionId: string): Promise<SessionSearchMessageRef | null>;
+  getMessage(messageId: string, sessionId: string): Promise<SessionSearchMessageRef | null>;
   listMessagesBefore(
     sessionId: string,
     timestamp: number,
     limit: number,
-  ): SessionSearchMessageListItem[];
+  ): Promise<SessionSearchMessageListItem[]>;
   listMessagesAfter(
     sessionId: string,
     timestamp: number,
     limit: number,
-  ): SessionSearchMessageListItem[];
-  getMessageSummary(messageId: string): SessionSearchMessageSummary | null;
+  ): Promise<SessionSearchMessageListItem[]>;
+  getMessageSummary(messageId: string): Promise<SessionSearchMessageSummary | null>;
 }

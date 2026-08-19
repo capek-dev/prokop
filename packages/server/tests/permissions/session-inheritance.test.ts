@@ -1,5 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace, seedSession } from '#tests/seed';
 import { requestPermission, resolvePermission } from '@capekai/core/ask-authority';
@@ -79,6 +83,7 @@ describe('session permission inheritance across subagents', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg1 = broadcastMessages[0] as { requestId: string };
       resolvePermission(msg1.requestId, { type: 'permission', grant: 'session' });
       await promise1;
@@ -136,6 +141,7 @@ describe('session permission inheritance across subagents', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg1 = broadcastMessages[0] as { requestId: string };
       resolvePermission(msg1.requestId, { type: 'permission', grant: 'session' });
       await promise1;
@@ -187,6 +193,7 @@ describe('session permission inheritance across subagents', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg1 = broadcastMessages[0] as { requestId: string };
       resolvePermission(msg1.requestId, { type: 'permission', grant: 'session' });
       await promise1;
@@ -257,6 +264,7 @@ describe('session permission inheritance across subagents', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg1 = broadcastMessages[0] as { requestId: string };
       resolvePermission(msg1.requestId, { type: 'permission', grant: 'session' });
       await promise1;
@@ -275,7 +283,9 @@ describe('session permission inheritance across subagents', () => {
       });
 
       // Should have broadcast (i.e., not auto-approved)
+      await flush();
       expect(broadcastMessages).toHaveLength(1);
+
       const msg2 = broadcastMessages[0] as { type: string; requestId: string };
       expect(msg2.type).toBe('ask.request');
 
@@ -311,6 +321,7 @@ describe('session permission inheritance across subagents', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg1 = broadcastMessages[0] as { requestId: string };
       resolvePermission(msg1.requestId, { type: 'permission', grant: 'workspace' });
       await promise1;
@@ -355,6 +366,7 @@ describe('session permission inheritance across subagents', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg1 = broadcastMessages[0] as { requestId: string };
       resolvePermission(msg1.requestId, { type: 'permission', grant: 'workspace' });
       await promise1;

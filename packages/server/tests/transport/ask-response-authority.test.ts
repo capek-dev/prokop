@@ -34,11 +34,11 @@ const askState = {
 };
 
 const askDependencies: AskResponseDependencies = {
-  resolveAsk: (toolCallId, response, requestId) => {
+  resolveAsk: async (toolCallId, response, requestId) => {
     askState.resolveCalls.push({ toolCallId, response, requestId });
     return false;
   },
-  getSessionIdForPendingAsk: (toolCallId) =>
+  getSessionIdForPendingAsk: async (toolCallId) =>
     askState.sessionByTool.get(toolCallId) ?? null,
   getAuthorityForPendingAsk: (toolCallId) =>
     askState.authorityByTool.get(toolCallId),
@@ -138,7 +138,7 @@ async function dispatch(
     response,
     requestId,
   };
-  handleAskResponseWithDependencies(ctx, sender, msg, askDependencies);
+  await handleAskResponseWithDependencies(ctx, sender, msg, askDependencies);
 }
 
 function rejection(sent: ServerMessage[]): Extract<ServerMessage, { type: 'ask.response_rejected' }> {

@@ -29,38 +29,38 @@ let activeDeps: Jean2SessionSearchHostDeps | null = null;
 /** Module-level host identity preserved for the S1 forwarding path. Null
  * deps answer with the Capek empty-host semantics (null, zero, empty lists). */
 export const jean2SessionSearchHost: SessionSearchHost = {
-  getWorkspace: (id) => activeDeps?.workspaces.getWorkspace(id) ?? null,
-  getSession: (id) => activeDeps?.sessions.getSession(id) ?? null,
-  listWorkspaceSessions: (workspaceId) => activeDeps?.sessions.listWorkspaceSessions(workspaceId) ?? [],
-  listAgentSessions: (agentId, limit) => activeDeps?.sessions.listAgentSessions(agentId, limit) ?? [],
-  countSessionMessages: (sessionId) => activeDeps?.query.countSessionMessages(sessionId) ?? 0,
-  searchMessages: (options) => activeDeps?.query.searchMessages(options) ?? [],
-  countMessagesBefore: (sessionId, timestamp) => activeDeps?.query.countMessagesBefore(sessionId, timestamp) ?? 0,
-  countMessagesAfter: (sessionId, timestamp) => activeDeps?.query.countMessagesAfter(sessionId, timestamp) ?? 0,
-  getLatestMessage: (sessionId) => activeDeps?.query.getLatestMessage(sessionId) ?? null,
-  getMessage: (messageId, sessionId) => activeDeps?.query.getMessage(messageId, sessionId) ?? null,
-  listMessagesBefore: (sessionId, timestamp, limit) =>
+  getWorkspace: async (id) => activeDeps?.workspaces.getWorkspace(id) ?? null,
+  getSession: async (id) => activeDeps?.sessions.getSession(id) ?? null,
+  listWorkspaceSessions: async (workspaceId) => activeDeps?.sessions.listWorkspaceSessions(workspaceId) ?? [],
+  listAgentSessions: async (agentId, limit) => activeDeps?.sessions.listAgentSessions(agentId, limit) ?? [],
+  countSessionMessages: async (sessionId) => activeDeps?.query.countSessionMessages(sessionId) ?? 0,
+  searchMessages: async (options) => activeDeps?.query.searchMessages(options) ?? [],
+  countMessagesBefore: async (sessionId, timestamp) => activeDeps?.query.countMessagesBefore(sessionId, timestamp) ?? 0,
+  countMessagesAfter: async (sessionId, timestamp) => activeDeps?.query.countMessagesAfter(sessionId, timestamp) ?? 0,
+  getLatestMessage: async (sessionId) => activeDeps?.query.getLatestMessage(sessionId) ?? null,
+  getMessage: async (messageId, sessionId) => activeDeps?.query.getMessage(messageId, sessionId) ?? null,
+  listMessagesBefore: async (sessionId, timestamp, limit) =>
     activeDeps?.query.listMessagesBefore(sessionId, timestamp, limit) ?? [],
-  listMessagesAfter: (sessionId, timestamp, limit) =>
+  listMessagesAfter: async (sessionId, timestamp, limit) =>
     activeDeps?.query.listMessagesAfter(sessionId, timestamp, limit) ?? [],
-  getMessageSummary: (messageId) => activeDeps?.query.getMessageSummary(messageId) ?? null,
+  getMessageSummary: async (messageId) => activeDeps?.query.getMessageSummary(messageId) ?? null,
 };
 
 export function createJean2SessionSearchHost(deps: Jean2SessionSearchHostDeps): SessionSearchHost {
   return {
-    getWorkspace: (id) => deps.workspaces.getWorkspace(id),
-    getSession: (id) => deps.sessions.getSession(id),
-    listWorkspaceSessions: (workspaceId) => deps.sessions.listWorkspaceSessions(workspaceId),
-    listAgentSessions: (agentId, limit) => deps.sessions.listAgentSessions(agentId, limit),
-    countSessionMessages: (sessionId) => deps.query.countSessionMessages(sessionId),
-    searchMessages: (options) => deps.query.searchMessages(options),
-    countMessagesBefore: (sessionId, timestamp) => deps.query.countMessagesBefore(sessionId, timestamp),
-    countMessagesAfter: (sessionId, timestamp) => deps.query.countMessagesAfter(sessionId, timestamp),
-    getLatestMessage: (sessionId) => deps.query.getLatestMessage(sessionId),
-    getMessage: (messageId, sessionId) => deps.query.getMessage(messageId, sessionId),
-    listMessagesBefore: (sessionId, timestamp, limit) => deps.query.listMessagesBefore(sessionId, timestamp, limit),
-    listMessagesAfter: (sessionId, timestamp, limit) => deps.query.listMessagesAfter(sessionId, timestamp, limit),
-    getMessageSummary: (messageId) => deps.query.getMessageSummary(messageId),
+    getWorkspace: async (id) => deps.workspaces.getWorkspace(id),
+    getSession: async (id) => deps.sessions.getSession(id),
+    listWorkspaceSessions: async (workspaceId) => deps.sessions.listWorkspaceSessions(workspaceId),
+    listAgentSessions: async (agentId, limit) => deps.sessions.listAgentSessions(agentId, limit),
+    countSessionMessages: async (sessionId) => deps.query.countSessionMessages(sessionId),
+    searchMessages: async (options) => deps.query.searchMessages(options),
+    countMessagesBefore: async (sessionId, timestamp) => deps.query.countMessagesBefore(sessionId, timestamp),
+    countMessagesAfter: async (sessionId, timestamp) => deps.query.countMessagesAfter(sessionId, timestamp),
+    getLatestMessage: async (sessionId) => deps.query.getLatestMessage(sessionId),
+    getMessage: async (messageId, sessionId) => deps.query.getMessage(messageId, sessionId),
+    listMessagesBefore: async (sessionId, timestamp, limit) => deps.query.listMessagesBefore(sessionId, timestamp, limit),
+    listMessagesAfter: async (sessionId, timestamp, limit) => deps.query.listMessagesAfter(sessionId, timestamp, limit),
+    getMessageSummary: async (messageId) => deps.query.getMessageSummary(messageId),
   };
 }
 

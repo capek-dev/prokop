@@ -10,6 +10,10 @@ import {
 } from '@/infrastructure/sqlite/permissions';
 import type { Ask, PermissionAsk } from '@jean2/sdk';
 
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 // =============================================================================
 // Test Suite E — Permission Request Manager Integration Tests
 // Test Suite F — Mandatory Regression Tests
@@ -126,13 +130,14 @@ describe('permission request manager', () => {
       });
 
       // Should have broadcast since not auto-approved
+      await flush();
       expect(broadcastMessages).toHaveLength(1);
       const msg = broadcastMessages[0] as { type: string; requestId: string };
       expect(msg.type).toBe('ask.request');
       expect(msg.requestId).toBeDefined();
 
       // Clean up — resolve the pending request
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'once' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'once' });
       await promise;
     });
   });
@@ -153,6 +158,7 @@ describe('permission request manager', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       expect(broadcastMessages).toHaveLength(1);
       const msg = broadcastMessages[0] as { type: string; requestId: string; ask: Ask };
       expect(msg.type).toBe('ask.request');
@@ -160,7 +166,7 @@ describe('permission request manager', () => {
       expect(hasPendingWaiter(msg.requestId)).toBe(true);
 
       // Resolve with workspace approval
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
       const result = await promise;
       expect(result).toBe(true);
     });
@@ -176,8 +182,9 @@ describe('permission request manager', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'deny' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'deny' });
       const result = await promise;
       expect(result).toBe(false);
     });
@@ -199,8 +206,9 @@ describe('permission request manager', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
       await promise;
 
       // Verify grant was persisted
@@ -226,8 +234,9 @@ describe('permission request manager', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'once' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'once' });
       await promise;
 
       // Once scope should NOT create a persisted grant
@@ -246,8 +255,9 @@ describe('permission request manager', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'session' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'session' });
       await promise;
 
       const grants = getWorkspaceGrants(workspaceId);
@@ -288,9 +298,10 @@ describe('permission request manager', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
       // User tries to approve with workspace, but it's not in allowedScopes
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
       await promise;
 
       // No grant should be persisted — workspace is not in allowedScopes
@@ -325,8 +336,9 @@ describe('permission request manager', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'session' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'session' });
       await promise;
 
       // Non-persistable → no grant should be persisted
@@ -371,13 +383,14 @@ describe('permission request manager', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      rejectPermission(msg.requestId, new Error('Session interrupted'));
+      await rejectPermission(msg.requestId, new Error('Session interrupted'));
 
       await expect(promise).rejects.toThrow('Session interrupted');
     });
 
-    test('rejectPermissionsBySession cancels DB records for session', () => {
+    test('rejectPermissionsBySession cancels DB records for session', async () => {
       // Create two requests (synchronously — don't await the promises)
       requestPermission({
         sessionId,
@@ -399,12 +412,13 @@ describe('permission request manager', () => {
         timeoutMs: 5000,
       }).catch(() => {});
 
+      await flush();
       // Reject all pending for this session
-      const rejectedIds = rejectPermissionsBySession(sessionId, new Error('Session interrupted'));
+      const rejectedIds = await rejectPermissionsBySession(sessionId, new Error('Session interrupted'));
       expect(rejectedIds.length).toBeGreaterThanOrEqual(1);
 
       // Verify DB records were cancelled
-      const asks = listPendingAsksBySession(sessionId);
+      const asks = await listPendingAsksBySession(sessionId);
       for (const ask of asks) {
         expect(ask.status).toBe('cancelled');
       }
@@ -431,12 +445,13 @@ describe('permission request manager', () => {
       // past the file and fires into a torn-down database.
       promise.catch(() => {});
 
-      const pending = getPendingRequestsByRootSession(sessionId);
+      await flush();
+      const pending = await getPendingRequestsByRootSession(sessionId);
       expect(pending).toHaveLength(1);
       expect(pending[0].requestId).toBeDefined();
       expect(pending[0].status).toBe('pending');
 
-      rejectPermission(pending[0].requestId, new Error('test teardown'));
+      await rejectPermission(pending[0].requestId, new Error('test teardown'));
       await promise.catch(() => {});
     });
 
@@ -452,12 +467,13 @@ describe('permission request manager', () => {
         timeoutMs: 5000,
       });
 
-      const pending = getPendingRequestsByRootSession(sessionId);
+      await flush();
+      const pending = await getPendingRequestsByRootSession(sessionId);
       expect(pending).toHaveLength(1);
 
       // Resolve using the requestId from the DB
       const requestId = pending[0].requestId;
-      resolvePermission(requestId, { type: 'permission', grant: 'workspace' });
+      await resolvePermission(requestId, { type: 'permission', grant: 'workspace' });
 
       const result = await promise;
       expect(result).toBe(true);
@@ -530,8 +546,9 @@ describe('mandatory regression tests', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
       await promise;
 
       // Verify persisted grant
@@ -555,8 +572,9 @@ describe('mandatory regression tests', () => {
         broadcastFn,
         timeoutMs: 5000,
       });
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
       await promise;
 
       // Now check that package.json is NOT matched
@@ -581,8 +599,9 @@ describe('mandatory regression tests', () => {
         broadcastFn,
         timeoutMs: 5000,
       });
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
       await promise1;
 
       // Second request for .env should auto-approve
@@ -611,8 +630,9 @@ describe('mandatory regression tests', () => {
         broadcastFn,
         timeoutMs: 5000,
       });
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
       await promise;
 
       // Check no shell-command grant for "cat" exists
@@ -665,8 +685,9 @@ describe('mandatory regression tests', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'session' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'session' });
       await promise;
 
       const grants = getWorkspaceGrants(workspaceId);
@@ -688,9 +709,10 @@ describe('mandatory regression tests', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
       // User tries to give workspace, but it's not in allowedScopes
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'workspace' });
       await promise;
 
       // No grant should be persisted — workspace is not in allowedScopes
@@ -709,8 +731,9 @@ describe('mandatory regression tests', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'session' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'session' });
       await promise;
 
       // Nested path should match (from same root session)
@@ -769,13 +792,14 @@ describe('mandatory regression tests', () => {
       });
 
       // Simulate: client reconnects and server re-sends pending asks
-      const pending = getPendingRequestsByRootSession(sessionId);
+      await flush();
+      const pending = await getPendingRequestsByRootSession(sessionId);
       expect(pending).toHaveLength(1);
       expect(pending[0].status).toBe('pending');
       const requestId = pending[0].requestId;
 
       // Client responds using the requestId
-      resolvePermission(requestId, { type: 'permission', grant: 'workspace' });
+      await resolvePermission(requestId, { type: 'permission', grant: 'workspace' });
 
       const result = await promise;
       expect(result).toBe(true);
@@ -822,9 +846,10 @@ describe('mandatory regression tests', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
       // User approves with "session" even though only "once" is allowed
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'session' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'session' });
       await promise;
 
       // No grant should be persisted (non-persistable → capped to once → not persisted)
@@ -860,8 +885,9 @@ describe('mandatory regression tests', () => {
         timeoutMs: 5000,
       });
 
+      await flush();
       const msg = broadcastMessages[0] as { requestId: string };
-      resolvePermission(msg.requestId, { type: 'permission', grant: 'session' });
+      await resolvePermission(msg.requestId, { type: 'permission', grant: 'session' });
       await promise;
 
       const grants = getWorkspaceGrants(workspaceId);

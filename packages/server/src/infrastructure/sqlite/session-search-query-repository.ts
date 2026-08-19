@@ -252,14 +252,14 @@ export function createSessionSearchQueryRepository(
   getDb: SessionSearchDatabaseAccessor,
 ): SessionSearchQueryPort {
   return {
-    searchMessages: (options) => searchMessages(getDb(), options),
-    countSessionMessages: (sessionId) => countSessionMessages(getDb(), sessionId),
-    countMessagesBefore: (sessionId, timestamp) => countMessagesBefore(getDb(), sessionId, timestamp),
-    countMessagesAfter: (sessionId, timestamp) => countMessagesAfter(getDb(), sessionId, timestamp),
-    getLatestMessage: (sessionId) => getLatestMessage(getDb(), sessionId),
-    getMessage: (messageId, sessionId) => getMessage(getDb(), messageId, sessionId),
-    listMessagesBefore: (sessionId, timestamp, limit) => listMessagesBefore(getDb(), sessionId, timestamp, limit),
-    listMessagesAfter: (sessionId, timestamp, limit) => listMessagesAfter(getDb(), sessionId, timestamp, limit),
-    getMessageSummary: (messageId) => getMessageSummary(getDb(), messageId),
+    searchMessages: async (options) => searchMessages(getDb(), options),
+    countSessionMessages: async (sessionId) => countSessionMessages(getDb(), sessionId),
+    countMessagesBefore: async (sessionId, timestamp) => countMessagesBefore(getDb(), sessionId, timestamp),
+    countMessagesAfter: async (sessionId, timestamp) => countMessagesAfter(getDb(), sessionId, timestamp),
+    getLatestMessage: async (sessionId) => getLatestMessage(getDb(), sessionId),
+    getMessage: async (messageId, sessionId) => getMessage(getDb(), messageId, sessionId),
+    listMessagesBefore: async (sessionId, timestamp, limit) => listMessagesBefore(getDb(), sessionId, timestamp, limit),
+    listMessagesAfter: async (sessionId, timestamp, limit) => listMessagesAfter(getDb(), sessionId, timestamp, limit),
+    getMessageSummary: async (messageId) => getMessageSummary(getDb(), messageId),
   };
 }
