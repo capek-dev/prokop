@@ -21,7 +21,7 @@ import {
 } from '../src/kernel/kernel';
 import type { CapekPlugin, PluginContext } from '../src/kernel/types';
 import {
-  createFacadeAgentComposition,
+  createComposition,
   enterAgentScope,
 } from '../src/plugins/compose';
 import {
@@ -375,16 +375,18 @@ describe('C2 agent scope entry', () => {
       },
     };
 
-    const { agentScope } = await createFacadeAgentComposition({
-      storage,
-      configuration,
-      host,
-      contextSources: {},
-      workspaceToolDiscovery: toolSource,
-      toolResolver: { get: () => null, list: () => [] },
-      sandboxController: controller,
-      providerOverrides: new Map(),
-    });
+    const { agentScope, processScope } = await createComposition(
+      await createCurrentProcessScope(),
+      {
+        storage,
+        configuration,
+        host,
+        contextSources: {},
+        workspaceToolDiscovery: toolSource,
+        toolResolver: { get: () => null, list: () => [] },
+        sandboxController: controller,
+        providerOverrides: new Map(),
+      });
 
     let observedSyncSeeding = false;
     await enterAgentScope(agentScope, async () => {
@@ -400,19 +402,22 @@ describe('C2 agent scope entry', () => {
     expect(observedSyncSeeding).toBe(true);
 
     await agentScope.dispose();
+    await processScope.dispose();
   });
 
-  test('entering a facade composition resolves contributed tools through the seeded resolver', async () => {
+  test('entering a composition resolves contributed tools through the seeded resolver', async () => {
     const storage = createInMemoryStorageBundle();
-    const { agentScope } = await createFacadeAgentComposition({
-      storage,
-      configuration: createDefaultRuntimeConfiguration(),
-      host: minimalHost(),
-      contextSources: {},
-      workspaceToolDiscovery: {},
-      sandboxController: new SandboxController(),
-      providerOverrides: new Map(),
-    });
+    const { agentScope, processScope } = await createComposition(
+      await createCurrentProcessScope(),
+      {
+        storage,
+        configuration: createDefaultRuntimeConfiguration(),
+        host: minimalHost(),
+        contextSources: {},
+        workspaceToolDiscovery: {},
+        sandboxController: new SandboxController(),
+        providerOverrides: new Map(),
+      });
 
     const resolved = await enterAgentScope(agentScope, async () => {
       const retrieval = await getTool('retrieve-tool-output');
@@ -421,19 +426,22 @@ describe('C2 agent scope entry', () => {
     expect(resolved).toBe('retrieve-tool-output');
 
     await agentScope.dispose();
+    await processScope.dispose();
   });
 
   test('facade plugin ids are deterministic and cover the agent seams plus the resolver', async () => {
-    const { agentScope } = await createFacadeAgentComposition({
-      storage: createInMemoryStorageBundle(),
-      configuration: createDefaultRuntimeConfiguration(),
-      host: minimalHost(),
-      contextSources: {},
-      workspaceToolDiscovery: {},
-      toolResolver: { get: () => null, list: () => [] },
-      sandboxController: new SandboxController(),
-      providerOverrides: new Map(),
-    });
+    const { agentScope, processScope } = await createComposition(
+      await createCurrentProcessScope(),
+      {
+        storage: createInMemoryStorageBundle(),
+        configuration: createDefaultRuntimeConfiguration(),
+        host: minimalHost(),
+        contextSources: {},
+        workspaceToolDiscovery: {},
+        toolResolver: { get: () => null, list: () => [] },
+        sandboxController: new SandboxController(),
+        providerOverrides: new Map(),
+      });
 
     const facadePlugins = agentScope.snapshot().plugins
       .filter((plugin) => plugin.id.startsWith('facade.'))
@@ -458,6 +466,7 @@ describe('C2 agent scope entry', () => {
     expect(facadePlugins).toEqual(expectedFacadeIds);
 
     await agentScope.dispose();
+    await processScope.dispose();
   });
 
   test('missing required service composition fails rather than seeding partial state', async () => {

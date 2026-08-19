@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 import * as rootApi from '@capekai/core';
-import { capekPackagePhase, createAgent } from '@capekai/core';
+import { capekPackagePhase } from '@capekai/core';
 import * as compositionApi from '@capekai/core/composition';
 import * as hostsApi from '@capekai/core/hosts';
 import * as executionApi from '@capekai/core/execution';
@@ -96,13 +96,13 @@ function resolvesWithin(specifier: string, importer: string, target: string): bo
 describe('package boundary', () => {
   test('declared package entrypoints import by package name', () => {
     expect(capekPackagePhase).toBe(9);
-    expect(typeof createAgent).toBe('function');
     expect(typeof createInMemoryConversationStore).toBe('function');
   });
 
-  test('root exports only the facade and package marker values', () => {
-    expect(Object.keys(rootApi).sort()).toEqual(['capekPackagePhase', 'createAgent']);
+  test('root exports only type re-exports and the package marker value', () => {
+    expect(Object.keys(rootApi).sort()).toEqual(['capekPackagePhase']);
     expect('handleChat' in rootApi).toBe(false);
+    expect('createAgent' in rootApi).toBe(false);
     expect('setJean2CompatibilityBindings' in rootApi).toBe(false);
     expect('streamChatWithRetry' in rootApi).toBe(false);
   });
@@ -127,8 +127,10 @@ describe('package boundary', () => {
       'capekToolResolverKey',
       'capekWorkspaceToolDiscoveryKey',
       'createAgentScope',
+      'createComposition',
       'createProcessScope',
       'enterAgentScope',
+      'facadeProcessPlugins',
     ].sort());
     expect(typeof compositionApi.createProcessScope).toBe('function');
     expect(typeof compositionApi.createAgentScope).toBe('function');
@@ -148,6 +150,7 @@ describe('package boundary', () => {
       'configureRuntimeHost',
       'configureSchedulerHost',
       'configureSessionSearchHost',
+      'createStandaloneHost',
       'entriesToContent',
       'executeMemoryTool',
       'executeSchedulerTool',
@@ -318,8 +321,11 @@ describe('package boundary', () => {
   test('configuration subpath exposes exactly the runtime configuration surface', () => {
     expect(Object.keys(configurationApi).sort()).toEqual([
       'configureRuntimeConfiguration',
+      'createDefaultRuntimeConfiguration',
+      'createSingleModelConfiguration',
       'getApiKeyForProvider',
       'getRuntimeConfiguration',
+      'resolveModelSpecifier',
       'withRuntimeConfiguration',
     ].sort());
   });

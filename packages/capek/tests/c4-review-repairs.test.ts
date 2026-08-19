@@ -14,11 +14,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createDefaultRuntimeConfiguration } from '../src/configuration/defaults';
 import { buildAiSdkTools } from '../src/core/build-tools';
 import type { CapekPlugin, ToolDefinition as KernelToolDefinition } from '../src/kernel/types';
-import {
-  createFacadeAgentComposition,
-  enterAgentScope,
-  resetSharedProcessScopeForTests,
-} from '../src/plugins/compose';
+import { createComposition, enterAgentScope } from '../src/plugins/compose';
+import { resetProviders } from '../src/providers/registry';
 import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
 import { capekToolResolverKey } from '../src/plugins/service-keys';
 import { CURRENT_SCHEDULER_DOMAIN_PLUGIN_ID } from '../src/plugins/scheduler-domain';
@@ -107,8 +104,8 @@ function testCapabilityPlugin(
   };
 }
 
-function facadeComposition(extraPlugins: readonly CapekPlugin<unknown>[]) {
-  return createFacadeAgentComposition({
+async function facadeComposition(extraPlugins: readonly CapekPlugin<unknown>[]) {
+  return createComposition(await createCurrentProcessScope(), {
     storage: createInMemoryStorageBundle(),
     configuration: createDefaultRuntimeConfiguration(),
     host: minimalHost(),
@@ -126,7 +123,11 @@ type LooseToolExecute = (
 ) => Promise<Record<string, unknown>>;
 
 afterEach(async () => {
-  await resetSharedProcessScopeForTests();
+  resetProviders();
+});
+
+afterEach(async () => {
+  resetProviders();
 });
 
 beforeEach(() => {

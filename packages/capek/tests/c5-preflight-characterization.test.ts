@@ -27,10 +27,7 @@ import {
 import { createAgentScope, createProcessScope } from '../src/kernel/kernel';
 import { LifecycleError } from '../src/kernel/errors';
 import { CURRENT_CONTEXT_SECTION_IDS } from '../src/plugins/context-sections';
-import {
-  enterAgentScope,
-  resetSharedProcessScopeForTests,
-} from '../src/plugins/compose';
+import { enterAgentScope } from '../src/plugins/compose';
 import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
 import { resetProviders } from '../src/providers/registry';
 import { configureRuntimeHost, type RuntimeHost } from '../src/runtime/host';
@@ -154,7 +151,6 @@ afterEach(async () => {
   configureEnvironment();
   resetDomainToolFallbacksForTests();
   resetProviders();
-  await resetSharedProcessScopeForTests();
   clearCache();
   for (const path of roots.splice(0)) await rm(path, { recursive: true, force: true });
 });
@@ -562,5 +558,4 @@ describe('C5 context contribution order and provenance', () => {
       await agentScope.dispose();
       await processScope.dispose();
     }
-  });
-});
+  });});

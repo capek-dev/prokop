@@ -20,10 +20,7 @@ import { join } from 'node:path';
 import type { ScheduledJob, Session, Workspace } from '@capekai/types';
 import { buildAiSdkTools } from '../src/core/build-tools';
 import { createAgentScope } from '../src/kernel/kernel';
-import {
-  enterAgentScope,
-  resetSharedProcessScopeForTests,
-} from '../src/plugins/compose';
+import { enterAgentScope } from '../src/plugins/compose';
 import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
 import { currentAgentPlugins } from './helpers/composition';
 import {
@@ -233,7 +230,6 @@ afterEach(async () => {
   configureEnvironment();
   resetDomainToolFallbacksForTests();
   resetProviders();
-  await resetSharedProcessScopeForTests();
   clearCache();
   for (const path of roots.splice(0)) await rm(path, { recursive: true, force: true });
 });

@@ -1,19 +1,23 @@
 import { join } from 'node:path';
-import type {
-  AutoApproveSeverity, ServerMessage } from '@capekai/types'
+import type { AutoApproveSeverity } from '@capekai/types';
 import { PermissionGrant } from '@capekai/tool';
 import type {
   PendingAskRecord,
   RuntimeHost,
-} from '../runtime/host';
+} from './host';
 
-interface StandaloneBindingsOptions {
+interface StandaloneHostOptions {
   workspace: string;
   sandboxActive: boolean;
   tempRoot: string;
 }
 
-export function createStandaloneBindings(options: StandaloneBindingsOptions): RuntimeHost {
+/** The reference headless `RuntimeHost`. In-memory pending-ask bookkeeping,
+ * no grant persistence (every permission ask reaches the host every time),
+ * no auto-approve, no-op delivery/titles, process env for tool workspaces.
+ * Copy this as the starting point for your own host and replace the
+ * behavior you care about. */
+export function createStandaloneHost(options: StandaloneHostOptions): RuntimeHost {
   const pending = new Map<string, PendingAskRecord>();
   const recordIdByRequest = new Map<string, string>();
   let sequence = 0;
@@ -111,8 +115,4 @@ export function createStandaloneBindings(options: StandaloneBindingsOptions): Ru
       isSandboxActive: () => options.sandboxActive,
     },
   };
-}
-
-export function isAskRequest(message: ServerMessage): message is Extract<ServerMessage, { type: 'ask.request' }> {
-  return message.type === 'ask.request';
 }

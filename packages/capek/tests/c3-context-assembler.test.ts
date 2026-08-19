@@ -29,13 +29,9 @@ import {
 import { DuplicateContributionError, LifecycleError, MalformedPluginError } from '../src/kernel/errors';
 import { createAgentScope, createProcessScope } from '../src/kernel/kernel';
 import type { CapekPlugin, PluginContext } from '../src/kernel/types';
-import { createAgent } from '../src/facade/create-agent';
-import {
-  createFacadeAgentComposition,
-  enterAgentScope,
-  resetSharedProcessScopeForTests,
-} from '../src/plugins/compose';
+import { createComposition, enterAgentScope } from '../src/plugins/compose';
 import { createCurrentAgentScope, createCurrentProcessScope } from './helpers/composition';
+import { StandaloneAgent } from './helpers/standalone-agent';
 import {
   createContextSectionsPlugin,
   createOrderedContextAssembler,
@@ -147,7 +143,6 @@ function configureEnvironment(): void {
 afterEach(async () => {
   configureEnvironment();
   resetProviders();
-  await resetSharedProcessScopeForTests();
   for (const path of roots.splice(0)) await rm(path, { recursive: true, force: true });
 });
 
@@ -717,10 +712,10 @@ describe('C3 facade and isolation', () => {
     };
   }
 
-  test('facade real runs build the system message through the ordered assembler', async () => {
-    const root = await workspace('facade-run');
+  test('composition real runs build the system message through the ordered assembler', async () => {
+    const root = await workspace('composition-run');
     const history: SandboxHistoryEntry[] = [];
-    const agent = createAgent({
+    const agent = new StandaloneAgent({
       model: 'openai/gpt-4o-mini',
       workspace: root,
       prompt: 'CUSTOM-PROMPT',
@@ -745,8 +740,9 @@ describe('C3 facade and isolation', () => {
     await agent.close();
   });
 
-  test('two interleaved facade scopes assemble isolated context through their own sources', async () => {
-    const compositionA = await createFacadeAgentComposition({
+  test('two interleaved agent scopes assemble isolated context through their own sources', async () => {
+    const sharedProcessScope = await createCurrentProcessScope();
+    const compositionA = await createComposition(sharedProcessScope, {
       storage: createInMemoryStorageBundle(),
       configuration: createDefaultRuntimeConfiguration(),
       host: minimalHost(),
@@ -761,7 +757,7 @@ describe('C3 facade and isolation', () => {
       sandboxController: new SandboxController(),
       providerOverrides: new Map(),
     });
-    const compositionB = await createFacadeAgentComposition({
+    const compositionB = await createComposition(sharedProcessScope, {
       storage: createInMemoryStorageBundle(),
       configuration: createDefaultRuntimeConfiguration(),
       host: minimalHost(),
@@ -797,6 +793,7 @@ describe('C3 facade and isolation', () => {
     } finally {
       await compositionA.agentScope.dispose();
       await compositionB.agentScope.dispose();
+      await sharedProcessScope.dispose();
     }
   });
 });
