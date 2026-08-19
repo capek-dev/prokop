@@ -15,7 +15,7 @@ import {
   initiateOAuthFlow,
   refreshTokens,
   getDefaultRedirectUri,
-} from './oauth-manager';
+} from '../oauth/oauth-manager';
 import {
   applyCodexRefresh,
   buildCodexConfig,

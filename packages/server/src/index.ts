@@ -40,7 +40,7 @@ import { validateToken, isAuthEnabled } from '@/transport/http/middleware/token'
 import { ensurePromptsDir } from '@/config/prompts-registry';
 // Static side-effect: OAuth providers register with Capek at module load,
 // before any provider lookup (P2 requirement).
-import '@/providers';
+import '@/infrastructure/providers';
 import {
   getLLMOpenAIApiKey,
   getLLMOpenRouterApiKey,
@@ -64,7 +64,7 @@ import { startPushRetryScheduler, stopPushRetryScheduler, cleanupPushData } from
 import {
   startProviderAccountLifecycle,
   stopProviderAccountLifecycle,
-} from '@/providers';
+} from '@/infrastructure/providers';
 
 export interface ServerOptions {
   port?: number;

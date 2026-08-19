@@ -95,7 +95,7 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
     '@/config/tool-env', '@/config/errors',
   ],
   'packages/server/src/adapters/jean2/oauth.ts': [
-    '@/providers/oauth-manager',
+    '@/infrastructure/oauth/oauth-manager',
   ],
   'packages/server/src/adapters/jean2/provider-credentials.ts': [
     '@/config/provider-credentials',
@@ -184,6 +184,12 @@ const layerInfrastructureExceptions: Record<string, string[]> = {
   'packages/server/src/infrastructure/tools/tool-installer.ts': ['@/config'],
   'packages/server/src/infrastructure/providers/provider-credential-files.ts': [
     '@/config/errors', '@/config/files',
+  ],
+  'packages/server/src/infrastructure/oauth/oauth-manager.ts': [
+    '@/transport/websocket/broadcast',
+  ],
+  'packages/server/src/infrastructure/providers/gmail.ts': [
+    '@/transport/websocket/broadcast',
   ],
   'packages/server/src/infrastructure/web-push/retry-scheduler.ts': [
     '@/adapters/jean2/notifications',
@@ -1965,7 +1971,7 @@ describe('server layer boundaries', () => {
     ).toBe(true);
     for (const imp of imports) {
       expect(imp.specifier).not.toBe('@/config/provider-credentials');
-      expect(imp.specifier).not.toBe('@/providers/oauth-manager');
+      expect(imp.specifier).not.toBe('@/infrastructure/oauth/oauth-manager');
       expect(imp.specifier).not.toBe('@capekai/core/compat/jean2');
     }
     // The retired exception entries are pinned.
@@ -2036,7 +2042,7 @@ describe('server layer boundaries', () => {
     const oauthImports = parseImports(oauthFile!.sourceText, oauthFile!.path);
     expect(oauthImports.map((imp) => imp.specifier).sort()).toEqual([
       '@/application/ports/provider-accounts',
-      '@/providers/oauth-manager',
+      '@/infrastructure/oauth/oauth-manager',
     ].sort());
 
     const credentialPath = resolve(adaptersDir, 'jean2/provider-credentials.ts');
@@ -2080,7 +2086,7 @@ describe('server layer boundaries', () => {
   });
 
   test('S4 gate: the oauth manager and providers consume the provider-accounts domain policy', () => {
-    const managerPath = resolve(serverSourceRoot, 'providers/oauth-manager.ts');
+    const managerPath = resolve(serverSourceRoot, 'infrastructure/oauth/oauth-manager.ts');
     const managerFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === managerPath);
     expect(managerFile).toBeDefined();
     const managerImports = parseImports(managerFile!.sourceText, managerFile!.path);
@@ -2095,7 +2101,7 @@ describe('server layer boundaries', () => {
       ),
     ).toBe(true);
 
-    const codexPath = resolve(serverSourceRoot, 'providers/codex.ts');
+    const codexPath = resolve(serverSourceRoot, 'infrastructure/providers/codex.ts');
     const codexFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === codexPath);
     expect(codexFile).toBeDefined();
     const codexImports = parseImports(codexFile!.sourceText, codexFile!.path);

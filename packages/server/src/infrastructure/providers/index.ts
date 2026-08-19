@@ -4,7 +4,7 @@ import {
   startGmailProviderLifecycle,
   stopGmailBackgroundRefresh,
 } from './gmail';
-import { disposeOAuthFlows } from './oauth-manager';
+import { disposeOAuthFlows } from '../oauth/oauth-manager';
 
 export {
   registerOAuthConfig,
@@ -12,7 +12,7 @@ export {
   completeOAuthFlow,
   handleServerCallback,
   refreshTokens,
-} from './oauth-manager';
+} from '../oauth/oauth-manager';
 
 export function startProviderAccountLifecycle(): void {
   startGmailProviderLifecycle();

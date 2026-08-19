@@ -17,7 +17,7 @@ import {
   initiateOAuthFlow,
   refreshTokens,
   OAuthTokenRefreshError,
-} from './oauth-manager';
+} from '../oauth/oauth-manager';
 import {
   applyGmailRefresh,
   buildGmailConfig,
