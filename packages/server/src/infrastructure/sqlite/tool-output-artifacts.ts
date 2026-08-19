@@ -89,6 +89,7 @@ export function getToolOutputArtifactPage(
 }
 
 export const jean2ToolOutputArtifactStore: ToolOutputArtifactStore = {
-  create: createToolOutputArtifact,
-  getPage: getToolOutputArtifactPage,
+  create: async input => createToolOutputArtifact(input),
+  getPage: async (sessionId, artifactId, offset, limit) =>
+    getToolOutputArtifactPage(sessionId, artifactId, offset, limit),
 };

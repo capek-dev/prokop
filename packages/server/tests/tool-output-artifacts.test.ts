@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createApp } from '@/transport/http/app';
 import { jean2StorageBundle } from '@/adapters/capek';
-import {
-  createToolOutputArtifact,
-  getToolOutputArtifactPage,
-} from '@/infrastructure/sqlite/tool-output-artifacts';
+import { createToolOutputArtifact } from '@/infrastructure/sqlite/tool-output-artifacts';
 import { deleteSession } from '@/infrastructure/sqlite/session-store';
 import { deleteWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { getDatabase } from '@/infrastructure/sqlite/database';
@@ -32,9 +29,9 @@ describe('Jean2 tool output artifacts', () => {
     resetTestDataDir();
   });
 
-  test('adapts scoped storage with malformed and cross-session denial', () => {
-    expect(jean2StorageBundle.toolOutputArtifacts.create).toBe(createToolOutputArtifact);
-    const artifact = jean2StorageBundle.toolOutputArtifacts.create({
+  test('adapts scoped storage with malformed and cross-session denial', async () => {
+    expect(typeof jean2StorageBundle.toolOutputArtifacts.create).toBe('function');
+    const artifact = await jean2StorageBundle.toolOutputArtifacts.create({
       sessionId: 'session-1',
       workspaceId: 'workspace-1',
       toolCallId: 'call-1',
@@ -43,9 +40,9 @@ describe('Jean2 tool output artifacts', () => {
       format: 'text',
     });
 
-    expect(getToolOutputArtifactPage('session-1', 'malformed')).toBeNull();
-    expect(getToolOutputArtifactPage('session-2', artifact.id)).toBeNull();
-    expect(getToolOutputArtifactPage('session-1', artifact.id, 5, 30_000)).toMatchObject({
+    expect(await jean2StorageBundle.toolOutputArtifacts.getPage('session-1', 'malformed')).toBeNull();
+    expect(await jean2StorageBundle.toolOutputArtifacts.getPage('session-2', artifact.id)).toBeNull();
+    expect(await jean2StorageBundle.toolOutputArtifacts.getPage('session-1', artifact.id, 5, 30_000)).toMatchObject({
       offset: 5,
       limit: 20_000,
       totalChars: 30_000,

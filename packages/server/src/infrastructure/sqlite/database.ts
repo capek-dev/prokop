@@ -45,6 +45,10 @@ class DatabaseSingleton {
       mkdirSync(dirname(dbPath), { recursive: true });
       const db = new Database(dbPath);
       db.run('PRAGMA journal_mode = WAL');
+      // WAL pairing: NORMAL keeps committed transactions process-crash-safe;
+      // only OS/power loss can lose the WAL tail (reconciliation + FTS
+      // backfill cover it). Single-writer invariant: only this process writes.
+      db.run('PRAGMA synchronous = NORMAL');
       db.run('PRAGMA foreign_keys = ON');
       initializeSchema(db);
       this.dbDefault = db;

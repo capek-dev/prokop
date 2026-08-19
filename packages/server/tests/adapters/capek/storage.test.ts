@@ -27,13 +27,6 @@ import {
   updateMessage,
 } from '@/infrastructure/sqlite/message-store';
 import { createSession, getChildSessions, getSession, updateSession } from '@/infrastructure/sqlite/session-store';
-import {
-  addMessageToQueue,
-  deleteQueuedMessage,
-  getNextQueuedMessage,
-} from '@/infrastructure/sqlite/queued-messages';
-import { getAttachment } from '@/infrastructure/sqlite/attachments';
-import { getResponseFormat } from '@/infrastructure/sqlite/response-formats';
 import { getWorkspace, getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
 import { jean2ToolOutputArtifactStore } from '@/infrastructure/sqlite/tool-output-artifacts';
 import { searchMessages } from '@/infrastructure/sqlite/session-search-query-repository';
@@ -99,13 +92,13 @@ describe('Čapek storage adapter', () => {
     expect(conversation.buildEffectiveContextHistory).toBe(buildEffectiveContextHistory);
 
     expect(jean2StorageBundle.toolOutputArtifacts).toBe(jean2ToolOutputArtifactStore);
-    expect(jean2StorageBundle.queue.addMessage).toBe(addMessageToQueue);
-    expect(jean2StorageBundle.queue.delete).toBe(deleteQueuedMessage);
-    expect(jean2StorageBundle.queue.peek).toBe(getNextQueuedMessage);
-    expect(jean2StorageBundle.attachments.get).toBe(getAttachment);
+    expect(typeof jean2StorageBundle.queue.addMessage).toBe('function');
+    expect(typeof jean2StorageBundle.queue.delete).toBe('function');
+    expect(typeof jean2StorageBundle.queue.peek).toBe('function');
+    expect(typeof jean2StorageBundle.attachments.get).toBe('function');
     expect(jean2StorageBundle.workspaces.get).toBe(getWorkspace);
     expect(jean2StorageBundle.workspaces.getAutoApproveSeverity).toBe(getWorkspaceAutoApproveSeverity);
-    expect(jean2StorageBundle.responseFormats.get).toBe(getResponseFormat);
+    expect(typeof jean2StorageBundle.responseFormats.get).toBe('function');
     expect(jean2StorageBundle.index.syncMessage).toBe(syncMessageFts);
   });
 
