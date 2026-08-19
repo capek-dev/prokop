@@ -39,6 +39,8 @@ import {
   type GoalLoopDeps,
   type RunTurnFn,
 } from '../src/goals/loop';
+import { getGoalDomain, withGoalDomain } from '../src/goals/service';
+import { enterAgentScope } from '../src/plugins/compose';
 import { configureRuntimeHost, type RuntimeHost } from '../src/runtime/host';
 import { configureStorage, createInMemoryStorageBundle } from '../src/storage';
 import { STANDARD_TOOL_NAMES } from '../src/tools/standard-tools';
@@ -646,5 +648,77 @@ describe('C5 goal loop lifecycle with injected deps', () => {
     });
 
     expect(goalStateOf(state.session)?.status).toBe('met');
+  });
+});
+
+describe('goal domain live adoption accessor', () => {
+  test('the accessor returns the module-path fallback outside a composed scope', async () => {
+    const state: FakeLoopState = { session: makeSession(), broadcasts: [], turns: [] };
+    const sessions = new Map<string, Session>([[state.session.id, state.session]]);
+    configureStorage({
+      ...createInMemoryStorageBundle(),
+      conversation: {
+        ...createInMemoryStorageBundle().conversation,
+        getSession: (id) => sessions.get(id) ?? null,
+        updateSession: (id, updates) => {
+          const current = sessions.get(id);
+          if (!current) return null;
+          const updated = { ...current, ...updates } as Session;
+          sessions.set(id, updated);
+          state.session = updated;
+          return updated;
+        },
+      },
+    });
+
+    await getGoalDomain().runGoalLoop({
+      sessionId: 'goal-sess',
+      condition: 'accessor fallback',
+      maxTurns: 1,
+      runTurn: async () => ({ streamCompleted: true, interrupted: false }),
+      evaluate: async () => ({ goalMet: true, reason: 'done' }),
+    });
+
+    expect(goalStateOf(state.session)?.status).toBe('met');
+  });
+
+  test('a seeded service wins over the module-path fallback', async () => {
+    const calls: string[] = [];
+    withGoalDomain(
+      {
+        evaluateGoal: () => {
+          throw new Error('not under test');
+        },
+        runGoalLoop: async (options) => {
+          calls.push(options.condition);
+        },
+      },
+      async () => {
+        await getGoalDomain().runGoalLoop({
+          sessionId: 'seeded',
+          condition: 'seeded service',
+          maxTurns: 1,
+          runTurn: async () => ({ streamCompleted: true, interrupted: false }),
+        });
+      },
+    );
+
+    expect(calls).toEqual(['seeded service']);
+  });
+
+  test('a composed agent scope with the goal plugin seeds the accessor', async () => {
+    const seen: string[] = [];
+    const processScope = await createCurrentProcessScope();
+    const agentScope = await createCurrentAgentScope(processScope);
+    try {
+      const service = agentScope.require(capekGoalDomainKey);
+      await enterAgentScope(agentScope, async () => {
+        seen.push(getGoalDomain() === service ? 'scoped' : 'fallback');
+      });
+    } finally {
+      await agentScope.dispose();
+      await processScope.dispose();
+    }
+    expect(seen).toEqual(['scoped']);
   });
 });

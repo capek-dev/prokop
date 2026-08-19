@@ -14,6 +14,7 @@ import { withAskPermissionPolicy } from '../permission/policy';
 import { withPermissionRuntimeService } from '../permission/runtime';
 import { withWorkspaceService } from '../workspace/policy';
 import { withToolOutputService } from '../tool-output/policy';
+import { withGoalDomain } from '../goals/service';
 import { createAgentScope, createProcessScope } from '../kernel/kernel';
 export { createAgentScope, createProcessScope } from '../kernel/kernel';
 import type { AgentScopeHandle, ProcessScopeHandle } from '../kernel/types';
@@ -31,6 +32,7 @@ import { withToolRegistryResolver } from '../tools/registry';
 import { withToolSource } from '../tools/tool-source';
 import { codingFacadeProfile, type FacadeProfile } from '../profiles/facade';
 import { createFacadeAgentPlugins, facadeProcessPlugins, type FacadeScopeValues } from './facade-plugins';
+import { capekGoalDomainKey } from './goal-domain';
 import {
   capekContextAssemblerKey,
   capekContextSourcesKey,
@@ -161,6 +163,7 @@ export function enterAgentScope<T>(scope: AgentScopeHandle, callback: () => T): 
   const sandboxController = scope.require(capekSandboxControllerKey);
   const toolResolver = scope.optional(capekToolResolverKey);
   const contextAssembler = scope.require(capekContextAssemblerKey);
+  const goalDomain = scope.optional(capekGoalDomainKey);
 
   const domainToolPayloads = new Map<string, DomainToolPayload>();
   for (const tool of scope.listTools()) {
@@ -178,20 +181,25 @@ export function enterAgentScope<T>(scope: AgentScopeHandle, callback: () => T): 
       withToolSource(toolSource, () =>
         withSandboxController(sandboxController, inner)));
 
+  const resolveGoalDomain = goalDomain === undefined
+    ? (inner: () => T): T => inner()
+    : (inner: () => T): T => withGoalDomain(goalDomain, inner);
+
   return withContributedDomainToolPayloads(domainToolPayloads, () =>
-    withContextAssembler(contextAssembler, () =>
-      withRetryPolicy(retryPolicy, () =>
-        withCompactionService(compactionService, () =>
-          withAskPermissionPolicy(permissionPolicy, () =>
-            withPermissionRuntimeService(permissionRuntime, () =>
-              withWorkspaceService(workspacePolicy, () =>
-                withToolOutputService(toolOutputPolicy, () =>
-                  withStorage(storage, () =>
-                    withRuntimeConfiguration(configuration, () =>
-                      withRuntimeHost(host, () =>
-                        withContextSources(contextSources, () =>
-                          withProviderOverrides(providerOverrides, () =>
-                            resolveTools(callback))))))))))))));
+    resolveGoalDomain(() =>
+      withContextAssembler(contextAssembler, () =>
+        withRetryPolicy(retryPolicy, () =>
+          withCompactionService(compactionService, () =>
+            withAskPermissionPolicy(permissionPolicy, () =>
+              withPermissionRuntimeService(permissionRuntime, () =>
+                withWorkspaceService(workspacePolicy, () =>
+                  withToolOutputService(toolOutputPolicy, () =>
+                    withStorage(storage, () =>
+                      withRuntimeConfiguration(configuration, () =>
+                        withRuntimeHost(host, () =>
+                          withContextSources(contextSources, () =>
+                            withProviderOverrides(providerOverrides, () =>
+                              resolveTools(callback)))))))))))))));
 }
 
 export type {

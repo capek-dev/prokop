@@ -304,8 +304,6 @@ describe('C5 minimal composition isolation', () => {
       expect(agentScope.snapshot().contextSections).toEqual([]);
       expect(agentScope.listTools()).toEqual([]);
       expect(agentScope.listContextSections()).toEqual([]);
-      expect(agentScope.listCapabilityGuards()).toEqual([]);
-      expect(agentScope.listProjections()).toEqual([]);
     } finally {
       await agentScope.dispose();
       await processScope.dispose();

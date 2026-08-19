@@ -139,53 +139,6 @@ export interface EventListenerContribution {
   handle(event: KernelEvent): void | Promise<void>;
 }
 
-/** An authorization decision from a capability guard. Unknown or malformed
- * responses deny; this union is the only accepted answer shape. */
-export type CapabilityDecision =
-  | { readonly allowed: true }
-  | { readonly allowed: false; readonly reason: string };
-
-/** A capability use a guard is asked to authorize. Dependency-free
- * structural data: the kernel builds and consumes requests without
- * importing any runtime package. */
-export interface CapabilityRequest {
-  readonly capability: ServiceKey<unknown>;
-  readonly requestedBy: string;
-  readonly context?: Readonly<Record<string, unknown>>;
-}
-
-/** A capability guard contribution. The C1 kernel registers guards and
- * lists them in deterministic order but does not execute a policy
- * pipeline: evaluate is validated as a callback and never invoked by the
- * kernel. Diagnostics expose metadata only, never the callback. */
-export interface CapabilityGuardContribution {
-  readonly id: string;
-  readonly order: number;
-  evaluate(
-    request: CapabilityRequest,
-  ): CapabilityDecision | Promise<CapabilityDecision>;
-}
-
-/** A committed runtime event handed to a projection. Dependency-free
- * structural data: the kernel never imports a runtime package to build or
- * consume committed events. */
-export interface CommittedEvent {
-  readonly type: string;
-  readonly at: number;
-  readonly payload?: Readonly<Record<string, unknown>>;
-}
-
-/** A projection contribution. The C1 kernel registers projections and
- * lists them in deterministic order but never invokes project or rebuild;
- * both are validated as callbacks only. Omitted orders default to 0.
- * Diagnostics expose eventTypes and order, never the callbacks. */
-export interface ProjectionContribution {
-  readonly id: string;
-  readonly eventTypes: readonly string[];
-  readonly order?: number;
-  project(event: CommittedEvent): void | Promise<void>;
-  rebuild?(): void | Promise<void>;
-}
 
 export type ScopeStatus = 'active' | 'disposing' | 'disposed';
 export type PluginStatus = 'pending' | 'active' | 'failed' | 'disposed';
@@ -228,20 +181,6 @@ export interface ListenerDiagnostic {
   readonly scopeKind: RuntimeScope;
 }
 
-export interface CapabilityGuardDiagnostic {
-  readonly id: string;
-  readonly order: number;
-  readonly pluginId: string;
-  readonly scopeKind: RuntimeScope;
-}
-
-export interface ProjectionDiagnostic {
-  readonly id: string;
-  readonly order: number;
-  readonly pluginId: string;
-  readonly scopeKind: RuntimeScope;
-  readonly eventTypes: readonly string[];
-}
 
 /** Read-only composition inventory. Never contains plugin options or service
  * values, so it is safe to surface to support and tests. */
@@ -255,8 +194,6 @@ export interface ScopeDiagnosticsSnapshot {
   readonly tools: readonly ToolDiagnostic[];
   readonly contextSections: readonly ContextSectionDiagnostic[];
   readonly listeners: readonly ListenerDiagnostic[];
-  readonly capabilityGuards: readonly CapabilityGuardDiagnostic[];
-  readonly projections: readonly ProjectionDiagnostic[];
   readonly runId?: string;
   readonly runStatus?: RunStatus;
   readonly runOutcome?: RunTerminalOutcome;
@@ -289,8 +226,6 @@ export interface PluginContext {
    * `ContextBuildContext.data` after the kernel validates it is an object. */
   buildContext<TData = unknown>(data?: TData): Promise<readonly ProvidedContextSection[]>;
   contributeListener(contribution: EventListenerContribution): Disposable;
-  contributeCapabilityGuard(contribution: CapabilityGuardContribution): Disposable;
-  contributeProjection(contribution: ProjectionContribution): Disposable;
   registerCleanupBarrier(barrier: CleanupBarrier): Disposable;
   readonly diagnostics: CompositionDiagnostics;
 }
@@ -330,8 +265,6 @@ export interface ScopeHandle {
   snapshot(): ScopeDiagnosticsSnapshot;
   listTools(): readonly EffectiveTool[];
   listContextSections(): readonly EffectiveContextSection[];
-  listCapabilityGuards(): readonly CapabilityGuardDiagnostic[];
-  listProjections(): readonly ProjectionDiagnostic[];
   /** Assembles effective context sections in deterministic order. Null
    * sections are omitted without shifting the others. The optional `data`
    * must be an object when present and is passed through to every section

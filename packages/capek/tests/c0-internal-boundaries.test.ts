@@ -96,9 +96,12 @@ const c0Rules: DependencyRule[] = [
   },
   {
     name: 'core-no-optional-domains',
-    rationale: 'Optional domains are plugins; core must not import memory, skills, session-search, or scheduler implementations.',
+    rationale: 'Optional domains are plugins; core must not import memory, skills, session-search, scheduler, or goals implementations. The goals accessor seam (`../goals/service`) is the one allowed edge, mirroring the C6 policy accessors: chat-handler resolves the scoped goal domain service through it and never touches the implementation.',
     appliesTo: [dir('core')],
-    forbiddenResolvedDirs: [dir('memory'), dir('skills'), dir('session-search'), dir('scheduler')],
+    forbiddenResolvedDirs: [dir('memory'), dir('skills'), dir('session-search'), dir('scheduler'), dir('goals')],
+    exceptions: {
+      'packages/capek/src/core/chat-handler.ts': ['../goals/service'],
+    },
   },
   {
     name: 'plugins-no-session-search-ownership',
