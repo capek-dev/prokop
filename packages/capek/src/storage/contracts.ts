@@ -76,14 +76,14 @@ export interface ConversationStore {
   listMessagesWithParts(sessionId: string): MessageWithParts[];
   listLatestMessagesWithPartsPage(sessionId: string, limit?: number): TranscriptPageResult;
   buildEffectiveContextHistory(sessionId: string): EffectiveContextHistory;
-  createPart(part: Part, sessionId: string): Part;
-  getPart(id: string): Part | null;
-  getPartsByMessage(messageId: string): Part[];
-  getPartsBySession(sessionId: string): Part[];
-  updatePart(id: string, updates: Record<string, unknown>): Part | null;
-  persistStreamingPartSnapshots(snapshots: StreamingPartSnapshot[]): number;
-  transitionToolToRunningByCallId(sessionId: string, callId: string, childSessionId?: string): ToolPart | null;
-  transitionToolToInterrupted(partId: string, reason: 'user_request' | 'timeout' | 'error' | 'cascade'): ToolPart | null;
+  createPart(part: Part, sessionId: string): Promise<Part>;
+  getPart(id: string): Promise<Part | null>;
+  getPartsByMessage(messageId: string): Promise<Part[]>;
+  getPartsBySession(sessionId: string): Promise<Part[]>;
+  updatePart(id: string, updates: Record<string, unknown>): Promise<Part | null>;
+  persistStreamingPartSnapshots(snapshots: StreamingPartSnapshot[]): Promise<number>;
+  transitionToolToRunningByCallId(sessionId: string, callId: string, childSessionId?: string): Promise<ToolPart | null>;
+  transitionToolToInterrupted(partId: string, reason: 'user_request' | 'timeout' | 'error' | 'cascade'): Promise<ToolPart | null>;
 }
 
 export type ToolOutputArtifactFormat = 'json' | 'text';
@@ -131,8 +131,8 @@ export interface AttachmentStore {
 }
 
 export interface WorkspaceStore {
-  get(id: string): Workspace | null;
-  getAutoApproveSeverity(workspaceId: string): AutoApproveSeverity;
+  get(id: string): Promise<Workspace | null>;
+  getAutoApproveSeverity(workspaceId: string): Promise<AutoApproveSeverity>;
 }
 
 export interface ResponseFormatStore {

@@ -77,7 +77,7 @@ export async function runOrchestratorSession(options: OrchestratorSessionOptions
     subagentStatus: 'running',
     selectedModel: modelId,
     selectedProvider: providerId,
-    autoApproveSeverity: getWorkspaceAutoApproveSeverity(parentSession?.workspaceId || ''),
+    autoApproveSeverity: await getWorkspaceAutoApproveSeverity(parentSession?.workspaceId || ''),
   });
   broadcastSessCreated(session);
   console.log(`[workflow:${agentName}] Session created`, { sessionId: session.id, modelId, providerId });
@@ -87,7 +87,7 @@ export async function runOrchestratorSession(options: OrchestratorSessionOptions
     const userMessage: UserMessage = { id: userMsgId, sessionId: session.id, role: 'user', createdAt: Date.now() };
     const userTextPart: TextPart = { id: randomUUID(), messageId: userMsgId, createdAt: Date.now(), type: 'text', text: userPrompt };
     createMessage(userMessage);
-    createPart(userTextPart, session.id);
+    await createPart(userTextPart, session.id);
     broadcast({ kind: 'message', action: 'created', message: userMessage });
     broadcast({ kind: 'part', action: 'created', sessionId: session.id, part: userTextPart });
 
@@ -133,7 +133,7 @@ export async function runOrchestratorSession(options: OrchestratorSessionOptions
       ...(parsedJson ? { structuredOutput: { formatName: title, data: parsedJson } } : {}),
     };
     createMessage(assistantMessage);
-    createPart(assistantTextPart, session.id);
+    await createPart(assistantTextPart, session.id);
     broadcast({ kind: 'message', action: 'created', message: assistantMessage });
     broadcast({ kind: 'part', action: 'created', sessionId: session.id, part: assistantTextPart });
     updateSession(session.id, { subagentStatus: 'completed' });

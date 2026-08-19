@@ -46,7 +46,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
   } = options;
 
   const tools: ToolMap = {};
-  const workspace = getWorkspace(workspaceId);
+  const workspace = await getWorkspace(workspaceId);
   if (!workspace) return tools;
 
   // The generic contributed-domain-tool payload map is resolved once and
@@ -124,7 +124,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
   // definition exactly like pre-C5.
   const workflowPayload = domainPayload('workflow');
   const workflowSettings = workspace.settings?.workflow;
-  if (workflowSettings?.enabled && canSpawn && workflowPayload?.isEnabled?.(workspaceId, sessionId) === true) {
+  if (workflowPayload && workflowSettings?.enabled && canSpawn && await workflowPayload.isEnabled?.(workspaceId, sessionId) === true) {
     const workflowDefinition = await workflowPayload.resolveDefinition?.(sessionId, {
       canSpawnSubagents,
       allowSelfAsSubagent,
@@ -207,7 +207,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
   // exactly like pre-C5 and passed through the execution context.
   const sessionSearchPayload = domainPayload('session_search');
   const searchSettings = workspace.settings?.sessionSearch;
-  if (sessionSearchPayload && sessionSearchPayload.isEnabled?.(workspaceId, sessionId) === true) {
+  if (sessionSearchPayload && await sessionSearchPayload.isEnabled?.(workspaceId, sessionId) === true) {
     tools['session_search'] = tool({
       description: sessionSearchPayload.description,
       inputSchema: jsonSchema(sessionSearchPayload.inputSchema as Record<string, unknown>),
@@ -241,7 +241,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
   // at build time exactly like pre-C5 and passed through the execution
   // context.
   const schedulerPayload = domainPayload('scheduler');
-  if (schedulerPayload && schedulerPayload.isEnabled?.(workspaceId, sessionId) === true) {
+  if (schedulerPayload && await schedulerPayload.isEnabled?.(workspaceId, sessionId) === true) {
     const schedulingRisk: PermissionRiskLevel = workspace.settings?.scheduling?.permissionRisk ?? 'none';
     tools['scheduler'] = tool({
       description: schedulerPayload.description,

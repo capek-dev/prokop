@@ -37,16 +37,16 @@ export function createStreamHandlers(ctx: StreamHandlerContext) {
     return Date.now() - lastPersistedAt >= STREAM_PART_PERSIST_INTERVAL_MS;
   }
 
-  function persistText(syncFts: boolean): void {
+  async function persistText(syncFts: boolean): Promise<void> {
     if (!ctx.currentTextPartId || ctx.currentText === persistence.persistedText) return;
     if (syncFts) {
       // Final flush persists the complete text; message finalization performs explicit FTS sync.
-      updatePart(ctx.currentTextPartId, { text: ctx.currentText }, { syncFts: false });
+      await updatePart(ctx.currentTextPartId, { text: ctx.currentText }, { syncFts: false });
       persistence.persistedText = ctx.currentText;
       persistence.lastTextPersistedAt = Date.now();
     } else {
       // Intermediate snapshot: no read-before-write
-      persistStreamingPartSnapshots([{
+      await persistStreamingPartSnapshots([{
         id: ctx.currentTextPartId,
         messageId: ctx.messageId,
         sessionId: ctx.sessionId,
@@ -59,14 +59,14 @@ export function createStreamHandlers(ctx: StreamHandlerContext) {
     }
   }
 
-  function persistReasoning(syncFts: boolean): void {
+  async function persistReasoning(syncFts: boolean): Promise<void> {
     if (!ctx.currentReasoningPartId || ctx.currentReasoning === persistence.persistedReasoning) return;
     if (syncFts) {
-      updatePart(ctx.currentReasoningPartId, { text: ctx.currentReasoning }, { syncFts: false });
+      await updatePart(ctx.currentReasoningPartId, { text: ctx.currentReasoning }, { syncFts: false });
       persistence.persistedReasoning = ctx.currentReasoning;
       persistence.lastReasoningPersistedAt = Date.now();
     } else {
-      persistStreamingPartSnapshots([{
+      await persistStreamingPartSnapshots([{
         id: ctx.currentReasoningPartId,
         messageId: ctx.messageId,
         sessionId: ctx.sessionId,
@@ -96,7 +96,7 @@ export function createStreamHandlers(ctx: StreamHandlerContext) {
   }
 
   return {
-    handleTextDelta(delta: { text: string | undefined }): void {
+    async handleTextDelta(delta: { text: string | undefined }): Promise<void> {
       const textContent = delta.text || '';
       if (textContent) {
         ctx.currentText += textContent;
@@ -104,7 +104,7 @@ export function createStreamHandlers(ctx: StreamHandlerContext) {
         if (ctx.currentTextPartId) {
           ctx.yieldFn({ type: 'part.append', sessionId: ctx.sessionId, partId: ctx.currentTextPartId, field: 'text', delta: textContent });
           if (shouldPersist(persistence.lastTextPersistedAt)) {
-            persistText(false);
+            await persistText(false);
           }
         } else {
           ctx.currentTextPartId = randomUUID();
@@ -117,14 +117,14 @@ export function createStreamHandlers(ctx: StreamHandlerContext) {
             text: textContent,
           };
           ctx.yieldFn({ type: 'part.created', sessionId: ctx.sessionId, part: textPart });
-          createPart(textPart, ctx.sessionId, { syncFts: false });
+          await createPart(textPart, ctx.sessionId, { syncFts: false });
           persistence.persistedText = textContent;
           persistence.lastTextPersistedAt = Date.now();
         }
       }
     },
 
-    handleReasoningDelta(delta: { text: string | undefined }): void {
+    async handleReasoningDelta(delta: { text: string | undefined }): Promise<void> {
       const reasoningContent = delta.text || '';
       if (reasoningContent) {
         ctx.currentReasoning += reasoningContent;
@@ -132,7 +132,7 @@ export function createStreamHandlers(ctx: StreamHandlerContext) {
         if (ctx.currentReasoningPartId) {
           ctx.yieldFn({ type: 'part.append', sessionId: ctx.sessionId, partId: ctx.currentReasoningPartId, field: 'reasoning', delta: reasoningContent });
           if (shouldPersist(persistence.lastReasoningPersistedAt)) {
-            persistReasoning(false);
+            await persistReasoning(false);
           }
         } else {
           ctx.currentReasoningPartId = randomUUID();
@@ -145,15 +145,15 @@ export function createStreamHandlers(ctx: StreamHandlerContext) {
             text: reasoningContent,
           };
           ctx.yieldFn({ type: 'part.created', sessionId: ctx.sessionId, part: reasoningPart });
-          createPart(reasoningPart, ctx.sessionId, { syncFts: false });
+          await createPart(reasoningPart, ctx.sessionId, { syncFts: false });
           persistence.persistedReasoning = reasoningContent;
           persistence.lastReasoningPersistedAt = Date.now();
         }
       }
     },
 
-    handleToolCall(delta: { toolCallId: string; toolName: string; input: unknown }): void {
-      this.flushPending();
+    async handleToolCall(delta: { toolCallId: string; toolName: string; input: unknown }): Promise<void> {
+      await this.flushPending();
 
       const toolPartId = randomUUID();
       const toolPart: ToolPart = {
@@ -171,17 +171,17 @@ export function createStreamHandlers(ctx: StreamHandlerContext) {
       ctx.toolParts.push(toolPart);
 
       ctx.yieldFn({ type: 'part.created', sessionId: ctx.sessionId, part: toolPart });
-      createPart(toolPart, ctx.sessionId, { syncFts: false });
+      await createPart(toolPart, ctx.sessionId, { syncFts: false });
 
       resetTextState();
       resetReasoningState();
     },
 
-    handleToolResult(delta: { toolCallId: string; output: unknown }): void {
+    async handleToolResult(delta: { toolCallId: string; output: unknown }): Promise<void> {
       const existingToolPart = ctx.toolParts.find((tp) => tp.callId === delta.toolCallId);
 
       if (existingToolPart) {
-        const latestPart = getPart(existingToolPart.id) as ToolPart | null;
+        const latestPart = await getPart(existingToolPart.id) as ToolPart | null;
         const latestState = latestPart?.state;
 
         let resultData: unknown;
@@ -230,13 +230,13 @@ export function createStreamHandlers(ctx: StreamHandlerContext) {
         }
 
         ctx.yieldFn({ type: 'part.updated', sessionId: ctx.sessionId, part: updatedToolPart });
-        updatePart(updatedToolPart.id, { state: updatedToolPart.state }, { syncFts: false });
+        await updatePart(updatedToolPart.id, { state: updatedToolPart.state }, { syncFts: false });
       }
     },
 
-    flushPending(): void {
-      persistText(true);
-      persistReasoning(true);
+    async flushPending(): Promise<void> {
+      await persistText(true);
+      await persistReasoning(true);
     },
   };
 }

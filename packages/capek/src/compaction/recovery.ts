@@ -51,11 +51,11 @@ export interface ReconcileOptions {
  *
  * Returns the number of orphaned triggers reconciled.
  */
-export function reconcileSessionCompaction(
+export async function reconcileSessionCompaction(
   sessionId: string,
   deps: CompactionRecoveryDeps,
   options: ReconcileOptions = {},
-): number {
+): Promise<number> {
   const { broadcast = true } = options;
   const broadcastFn: BroadcastFn = broadcast ? deps.broadcast : () => {};
   const broadcastSessUpdate = broadcast ? deps.broadcastSessionUpdated : () => {};
@@ -87,7 +87,7 @@ export function reconcileSessionCompaction(
   for (const trigger of orphanedTriggers) {
     // Idempotent: once persisted, the failure message becomes the outcome,
     // so the orphan query (NOT EXISTS outcome.parent_id) stops matching.
-    persistCompactionFailure(
+    await persistCompactionFailure(
       sessionId,
       trigger.id,
       'Compaction interrupted (session recovered after crash or interruption)',
@@ -111,7 +111,7 @@ export function reconcileSessionCompaction(
  *
  * Returns total count of orphaned triggers reconciled.
  */
-export function reconcileAllSessionsCompaction(deps: CompactionRecoveryDeps): number {
+export async function reconcileAllSessionsCompaction(deps: CompactionRecoveryDeps): Promise<number> {
   const sessionIds = new Set(deps.listSessionIds());
 
   if (sessionIds.size === 0) {
@@ -128,7 +128,7 @@ export function reconcileAllSessionsCompaction(deps: CompactionRecoveryDeps): nu
   // Startup path: disable broadcasting since the broadcast callback may not
   // be registered yet when this runs at server startup.
   for (const sessionId of sessionIds) {
-    totalReconciled += reconcileSessionCompaction(sessionId, deps, { broadcast: false });
+    totalReconciled += await reconcileSessionCompaction(sessionId, deps, { broadcast: false });
   }
 
   console.log(

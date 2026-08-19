@@ -43,14 +43,14 @@ export interface ChatOptions {
   retryAbortController?: AbortController;
 }
 
-function collectInterruptedToolPartEvents(
+async function collectInterruptedToolPartEvents(
   toolParts: ToolPart[],
   sessionId: string,
-): MessageEvent[] {
+): Promise<MessageEvent[]> {
   const events: MessageEvent[] = [];
   for (const toolPart of toolParts) {
     if (toolPart.state.status === 'pending' || toolPart.state.status === 'running') {
-      const updatedPart = transitionToolToInterrupted(toolPart.id, 'user_request');
+      const updatedPart = await transitionToolToInterrupted(toolPart.id, 'user_request');
       if (updatedPart) {
         events.push({ type: 'part.updated', sessionId, part: updatedPart });
       }
@@ -243,8 +243,8 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
   try {
     for await (const delta of result.fullStream) {
       if (abortController.signal.aborted) {
-        handlers.flushPending();
-        for (const event of collectInterruptedToolPartEvents(streamCtx.toolParts, _sessionId)) {
+        await handlers.flushPending();
+        for (const event of await collectInterruptedToolPartEvents(streamCtx.toolParts, _sessionId)) {
           yield event;
         }
         const interruptedMessage = buildInterruptedMessage(assistantMessage);
@@ -256,16 +256,16 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
 
       switch (delta.type) {
       case 'text-delta':
-        handlers.handleTextDelta(delta);
+        await handlers.handleTextDelta(delta);
         break;
       case 'reasoning-delta':
-        handlers.handleReasoningDelta(delta);
+        await handlers.handleReasoningDelta(delta);
         break;
       case 'tool-call':
-        handlers.handleToolCall(delta);
+        await handlers.handleToolCall(delta);
         break;
       case 'tool-result':
-        handlers.handleToolResult(delta);
+        await handlers.handleToolResult(delta);
         break;
       case 'error': {
         const error = (delta as { type: 'error'; error: unknown }).error;
@@ -278,9 +278,9 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
         yield event;
       }
     }
-    handlers.flushPending();
+    await handlers.flushPending();
   } catch (err) {
-    handlers.flushPending();
+    await handlers.flushPending();
     const classified = classifyApiError(err);
 
     console.error('[streamChat] AI SDK error', {
@@ -294,7 +294,7 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<MessageE
     });
 
     if (abortController.signal.aborted) {
-      for (const event of collectInterruptedToolPartEvents(streamCtx.toolParts, _sessionId)) {
+      for (const event of await collectInterruptedToolPartEvents(streamCtx.toolParts, _sessionId)) {
         yield event;
       }
       const interruptedMessage = buildInterruptedMessage(assistantMessage);

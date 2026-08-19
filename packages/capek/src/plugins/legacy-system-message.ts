@@ -54,10 +54,10 @@ export const legacySessionSearchGuidanceSection: ContextSectionContribution<Cont
   id: 'session-search-guidance',
   phase: 'workspace',
   order: 50,
-  provide: (context) => {
+  provide: async (context) => {
     const data = validateContextAssemblyData(context.data);
     if (!data.workspaceId) return null;
-    return getWorkspace(data.workspaceId)?.settings?.sessionSearch?.enabled
+    return (await getWorkspace(data.workspaceId))?.settings?.sessionSearch?.enabled
       ? getHostGuidance().sessionSearch
       : null;
   },
@@ -130,7 +130,7 @@ export async function buildSystemMessage(options: SystemMessageOptions): Promise
 
   // Add workspace-gated guidance sections
   if (workspaceId) {
-    const workspace = getWorkspace(workspaceId);
+    const workspace = await getWorkspace(workspaceId);
     if (workspace?.settings?.memory?.enabled && workspacePath) {
       const memorySection = await loadMemoryInstructions(getHostLayout().workspaceMemoryDir(workspacePath));
       if (memorySection) {

@@ -47,7 +47,7 @@ export type CallbackEvent = MessageEvent | {
 
 export function createStepCallbacks(ctx: StepCallbacksContext) {
   return {
-    experimental_onStepStart: (stepStartEvent: { stepNumber: number }) => {
+    experimental_onStepStart: async (stepStartEvent: { stepNumber: number }) => {
       const stepNumber = stepStartEvent.stepNumber + 1;
 
       const startedStepPart = createStepPart({
@@ -61,9 +61,9 @@ export function createStepCallbacks(ctx: StepCallbacksContext) {
       if (ctx.yieldFn) {
         ctx.yieldFn({ type: 'part.created', sessionId: ctx.sessionId, part: startedStepPart });
       }
-      createPart(startedStepPart, ctx.sessionId);
+      await createPart(startedStepPart, ctx.sessionId);
     },
-    onStepFinish: (stepFinishEvent: { stepNumber: number; finishReason: string | null; usage?: StepUsage; totalUsage?: StepUsage }) => {
+    onStepFinish: async (stepFinishEvent: { stepNumber: number; finishReason: string | null; usage?: StepUsage; totalUsage?: StepUsage }) => {
       const stepNumber = stepFinishEvent.stepNumber + 1;
 
       const stepUsage = stepFinishEvent.usage;
@@ -122,7 +122,7 @@ export function createStepCallbacks(ctx: StepCallbacksContext) {
       if (ctx.yieldFn) {
         ctx.yieldFn({ type: 'part.updated', sessionId: ctx.sessionId, part: finishedStepPart });
       }
-      updatePart(finishedStepPart.id, {
+      await updatePart(finishedStepPart.id, {
         status: finishedStepPart.status,
         finishReason: finishedStepPart.finishReason,
         tokens: finishedStepPart.tokens,

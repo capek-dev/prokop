@@ -142,7 +142,7 @@ function taskPayload(deps: TaskPayloadDeps): DomainToolPayload {
         workspaceId: typeof context.workspaceId === 'string' ? context.workspaceId : undefined,
         workspacePath: typeof context.workspacePath === 'string' ? context.workspacePath : undefined,
         abortSignal: context.abortSignal as AbortSignal | undefined,
-        onSessionCreated: context.onSessionCreated as ((childSessionId: string) => void) | undefined,
+        onSessionCreated: context.onSessionCreated as ((childSessionId: string) => void | Promise<void>) | undefined,
         allowedSubagentIds: context.allowedSubagentIds as string[] | undefined,
         broadcast: context.broadcast as BroadcastFn | undefined,
         ...(input.outputSchema ? { outputSchema: input.outputSchema as Record<string, unknown> } : {}),
@@ -192,7 +192,7 @@ export function subagentDomainPlugin(id: string): CapekPlugin<unknown> {
         getSession: (sessionId) => storage.conversation.getSession(sessionId),
         createSession: (session) => storage.conversation.createSession(session),
         updateSession: (sessionId, updates) => storage.conversation.updateSession(sessionId, updates),
-        getWorkspaceAutoApproveSeverity: (workspaceId) => storage.workspaces.getAutoApproveSeverity(workspaceId),
+        getWorkspaceAutoApproveSeverity: async (workspaceId) => storage.workspaces.getAutoApproveSeverity(workspaceId),
       };
 
       const serviceDeps: SubagentServiceDeps = {

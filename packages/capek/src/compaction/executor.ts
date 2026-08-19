@@ -116,7 +116,7 @@ export async function executeCompaction(
   if (compactingSession) broadcastSessUpdate(compactingSession);
 
   try {
-    const trigger = createCompactionTrigger(sessionId, reason);
+    const trigger = await createCompactionTrigger(sessionId, reason);
     triggerMessageId = trigger.messageId;
     const triggerMsg = getMessageWithParts(trigger.messageId);
     if (triggerMsg) {
@@ -153,7 +153,7 @@ export async function executeCompaction(
     const updatedSession = updateSession(sessionId, { compacting: false });
     if (updatedSession) broadcastSessUpdate(updatedSession);
     const errorMessage = err instanceof Error ? err.message : 'Compaction failed';
-    if (triggerMessageId) persistCompactionFailure(sessionId, triggerMessageId, errorMessage, broadcast);
+    if (triggerMessageId) await persistCompactionFailure(sessionId, triggerMessageId, errorMessage, broadcast);
     return { ok: false, error: errorMessage, triggerMessageId, reason, skipped: false };
   } finally {
     service.endCompaction(sessionId);

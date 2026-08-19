@@ -69,10 +69,10 @@ New messages since that summary:
  * Creates a compaction trigger message and returns it.
  * The trigger is persisted to the database as a user message with a standard CompactionPart.
  */
-export function createCompactionTrigger(
+export async function createCompactionTrigger(
   sessionId: string,
   reason: CompactionTriggerReason,
-): CompactionTrigger {
+): Promise<CompactionTrigger> {
   // Minimum validation: at least 1 user + 1 assistant message needed for meaningful compaction.
   // A single agent turn with heavy tool use can produce enough context to warrant compaction.
   const { messages: effectiveHistory } = buildEffectiveContextHistory(sessionId);
@@ -107,7 +107,7 @@ export function createCompactionTrigger(
     overflow: reason === 'overflow',
   };
 
-  createPart(compactionPart, sessionId);
+  await createPart(compactionPart, sessionId);
 
   return {
     messageId: triggerMessageId,
@@ -188,12 +188,12 @@ export function estimateToolOutputSize(output: unknown): number {
  * This preserves important recent context while still reducing context size
  * for older, larger tool outputs that are less likely to be relevant.
  */
-function markToolsAsCompacted(
+async function markToolsAsCompacted(
   sessionId: string,
   compactedMessageIds: string[],
   policy: CompactionPolicy,
-): void {
-  const allParts = getPartsBySession(sessionId);
+): Promise<void> {
+  const allParts = await getPartsBySession(sessionId);
   const now = Date.now();
 
   // Gather eligible completed tool parts within compacted messages
@@ -248,7 +248,7 @@ function markToolsAsCompacted(
     // Only clear tools that exceed the clear threshold
     // (already know they exceed preserveSmallToolChars since we filtered above)
     if (candidate.outputSize > policy.toolClearCharsThreshold) {
-      updatePart(candidate.part.id, {
+      await updatePart(candidate.part.id, {
         state: {
           ...candidate.part.state,
           compactedAt: now,
@@ -465,12 +465,12 @@ export async function processCompactionTask(
     type: 'text',
     text: summary,
   };
-  createPart(textPart, sessionId);
+  await createPart(textPart, sessionId);
 
   // Mark tool results as compacted so they can be pruned in future context
   // WS4: Now passes policy for budget-aware pruning
   const compactedMessageIds = messagesToCompact.map((m: MessageWithParts) => m.message.id);
-  markToolsAsCompacted(sessionId, compactedMessageIds, policy);
+  await markToolsAsCompacted(sessionId, compactedMessageIds, policy);
 
   const trigger: CompactionTrigger = {
     messageId: triggerMessageId,
@@ -494,12 +494,12 @@ export async function processCompactionTask(
  * NOTE: This should only be called AFTER a trigger has been created.
  * If validation fails before trigger creation, do not call this function.
  */
-export function persistCompactionFailure(
+export async function persistCompactionFailure(
   sessionId: string,
   triggerMessageId: string,
   errorMessage: string,
   broadcast: BroadcastFn = emitRuntimeEvent,
-): void {
+): Promise<void> {
   const now = Date.now();
   const msgId = randomUUID();
 
@@ -533,7 +533,7 @@ export function persistCompactionFailure(
     text: `Compaction failed: ${errorMessage}`,
   };
 
-  createPart(textPart, sessionId);
+  await createPart(textPart, sessionId);
 
   broadcast({ kind: 'message', action: 'created', message: assistantMessage });
   broadcast({ kind: 'part', action: 'created', sessionId, part: textPart });

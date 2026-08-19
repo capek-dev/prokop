@@ -41,7 +41,7 @@ export interface SchedulerDomainService {
   /** Single availability predicate: workspace settings gate plus the
    * current-session scheduled-job recursion gate, shared by the tool
    * payload. */
-  isEnabled(workspaceId: string, sessionId?: string): boolean;
+  isEnabled(workspaceId: string, sessionId?: string): boolean | Promise<boolean>;
 }
 
 export const capekSchedulerDomainKey = serviceKey<SchedulerDomainService>(
@@ -62,7 +62,7 @@ function schedulingGate(
 }
 
 interface SchedulerPayloadDeps {
-  readonly isEnabled: (workspaceId: string, sessionId?: string) => boolean;
+  readonly isEnabled: (workspaceId: string, sessionId?: string) => boolean | Promise<boolean>;
   readonly run: (
     input: Record<string, unknown>,
     context: DomainToolExecuteContext,
@@ -105,8 +105,8 @@ function schedulerPayload(deps: SchedulerPayloadDeps): DomainToolPayload {
  * at module load. */
 export function createSchedulerToolFallbackPayload(): DomainToolPayload {
   return schedulerPayload({
-    isEnabled: (workspaceId, sessionId) => schedulingGate(
-      getWorkspace(workspaceId)?.settings?.scheduling,
+    isEnabled: async (workspaceId, sessionId) => schedulingGate(
+      (await getWorkspace(workspaceId))?.settings?.scheduling,
       typeof sessionId === 'string' ? getSession(sessionId) : null,
     ),
     run: (input, context, risk) => executeSchedulerTool(
@@ -138,9 +138,9 @@ export function schedulerDomainPlugin(id: string): CapekPlugin<unknown> {
     setup(context: PluginContext) {
       const storage: StorageBundle = context.require(capekStorageKey);
       const host: SchedulerHost = context.require(capekSchedulerHostKey);
-      const isEnabled = (workspaceId: string, sessionId?: string): boolean =>
+      const isEnabled = async (workspaceId: string, sessionId?: string): Promise<boolean> =>
         schedulingGate(
-          storage.workspaces.get(workspaceId)?.settings?.scheduling,
+          (await storage.workspaces.get(workspaceId))?.settings?.scheduling,
           typeof sessionId === 'string' ? storage.conversation.getSession(sessionId) : null,
         );
       const payload = schedulerPayload({

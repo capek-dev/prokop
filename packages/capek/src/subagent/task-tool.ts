@@ -47,7 +47,7 @@ export interface SubagentInput {
   workspaceId?: string;
   workspacePath?: string;
   abortSignal?: AbortSignal;
-  onSessionCreated?: (childSessionId: string) => void;
+  onSessionCreated?: (childSessionId: string) => void | Promise<void>;
   allowedSubagentIds?: string[];
   broadcast?: BroadcastFn;
   broadcastSessionCreated?: BroadcastSessionFn;
@@ -70,7 +70,7 @@ export interface SubagentServiceSessionAccess {
   getSession(id: string): Session | null;
   createSession(session: Omit<Session, 'createdAt' | 'updatedAt'> & { createdAt?: string; updatedAt?: string }): Session;
   updateSession(id: string, updates: SessionUpdates): Session | null;
-  getWorkspaceAutoApproveSeverity(workspaceId: string): Session['autoApproveSeverity'];
+  getWorkspaceAutoApproveSeverity(workspaceId: string): Promise<Session['autoApproveSeverity']>;
 }
 
 export interface SubagentServicePreconfigs {
@@ -439,7 +439,7 @@ async function runSubagent(
           ? subagentPreconfig.provider
           : parentProviderId,
         selectedVariant: subagentPreconfig.variant ?? null,
-        autoApproveSeverity: getWorkspaceAutoApproveSeverityFn(workspaceId || ''),
+        autoApproveSeverity: await getWorkspaceAutoApproveSeverityFn(workspaceId || ''),
       });
 
       broadcastSessCreated(childSession);
@@ -447,7 +447,7 @@ async function runSubagent(
 
     // Notify caller of the child session ID immediately
     if (onSessionCreated) {
-      onSessionCreated(childSession.id);
+      await onSessionCreated(childSession.id);
     }
 
     // Add abort listener to update child session status if parent aborts

@@ -79,7 +79,7 @@ export async function forkSession(options: ForkOptions): Promise<ForkResult> {
     promptTokens: sourceSession.promptTokens,
     completionTokens: sourceSession.completionTokens,
     totalTokens: sourceSession.totalTokens,
-    autoApproveSeverity: sourceSession.autoApproveSeverity ?? getWorkspaceAutoApproveSeverity(sourceSession.workspaceId),
+    autoApproveSeverity: sourceSession.autoApproveSeverity ?? await getWorkspaceAutoApproveSeverity(sourceSession.workspaceId),
   });
 
   const forkedMessages: MessageWithParts[] = [];
@@ -90,11 +90,12 @@ export async function forkSession(options: ForkOptions): Promise<ForkResult> {
     const newMessageId = idMap.get(message.id)!;
     const newMessage = copyMessage(message, forkedSession.id, newMessageId, idMap);
     createMessage(newMessage);
-    const newParts = parts.map((part) => {
+    const newParts: Part[] = [];
+    for (const part of parts) {
       const newPart = copyPart(part, newMessageId, generateId());
-      createPart(newPart, forkedSession.id);
-      return newPart;
-    });
+      await createPart(newPart, forkedSession.id);
+      newParts.push(newPart);
+    }
     forkedMessages.push({ message: newMessage, parts: newParts });
   }
 

@@ -194,8 +194,8 @@ function mutableWorkspaceStorage(workspace: Workspace): StorageBundle {
   return {
     ...base,
     workspaces: {
-      get: (id) => (id === workspace.id ? workspace : null),
-      getAutoApproveSeverity: (workspaceId) =>
+      get: async (id) => (id === workspace.id ? workspace : null),
+      getAutoApproveSeverity: async (workspaceId) =>
         workspaceId === workspace.id ? workspace.settings?.autoApproveSeverity ?? 'low' : 'low',
     },
   };
@@ -661,10 +661,10 @@ describe('C5 scheduler visibility gates', () => {
     const agentScope = await createCurrentAgentScope(processScope);
     try {
       const service = agentScope.require(capekSchedulerDomainKey);
-      expect(service.isEnabled(workspace.id, 'sess-sched')).toBe(true);
-      expect(service.isEnabled(workspace.id, 'scheduled-run')).toBe(false);
-      expect(service.isEnabled(workspace.id, 'missing-session')).toBe(true);
-      expect(service.isEnabled('ws-missing', 'sess-sched')).toBe(false);
+      await expect(service.isEnabled(workspace.id, 'sess-sched')).resolves.toBe(true);
+      await expect(service.isEnabled(workspace.id, 'scheduled-run')).resolves.toBe(false);
+      await expect(service.isEnabled(workspace.id, 'missing-session')).resolves.toBe(true);
+      await expect(service.isEnabled('ws-missing', 'sess-sched')).resolves.toBe(false);
       expect(service.tools).toHaveLength(1);
       expect(service.tools[0]!.name).toBe('scheduler');
       expect(service.tools[0]!.isEnabled).toBe(service.isEnabled);

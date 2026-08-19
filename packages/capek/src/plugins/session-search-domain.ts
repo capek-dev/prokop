@@ -45,7 +45,7 @@ export interface SessionSearchDomainService {
   readonly tools: readonly DomainToolPayload[];
   /** Single availability predicate for the workspace settings gate,
    * shared by the tool gate and the guidance section. */
-  isEnabled(workspaceId: string): boolean;
+  isEnabled(workspaceId: string): boolean | Promise<boolean>;
   readonly guidance: string;
 }
 
@@ -55,7 +55,7 @@ export const capekSessionSearchDomainKey = serviceKey<SessionSearchDomainService
 );
 
 interface SessionSearchPayloadDeps {
-  readonly isEnabled: (workspaceId: string) => boolean;
+  readonly isEnabled: (workspaceId: string) => boolean | Promise<boolean>;
   readonly run: (
     input: Record<string, unknown>,
     context: DomainToolExecuteContext,
@@ -112,8 +112,8 @@ function sessionSearchPayload(deps: SessionSearchPayloadDeps): DomainToolPayload
  * never at module load. */
 export function createSessionSearchToolFallbackPayload(): DomainToolPayload {
   return sessionSearchPayload({
-    isEnabled: (workspaceId) => Boolean(
-      getWorkspace(workspaceId)?.settings?.sessionSearch?.enabled,
+    isEnabled: async (workspaceId) => Boolean(
+      (await getWorkspace(workspaceId))?.settings?.sessionSearch?.enabled,
     ),
     run: (input, context, includeToolResults, risk, agentId) => executeSessionSearchTool(
       input,
@@ -148,8 +148,8 @@ export function sessionSearchDomainPlugin(id: string): CapekPlugin<unknown> {
     setup(context: PluginContext) {
       const storage: StorageBundle = context.require(capekStorageKey);
       const host: SessionSearchHost = context.require(capekSessionSearchHostKey);
-      const isEnabled = (workspaceId: string): boolean => Boolean(
-        storage.workspaces.get(workspaceId)?.settings?.sessionSearch?.enabled,
+      const isEnabled = async (workspaceId: string): Promise<boolean> => Boolean(
+        (await storage.workspaces.get(workspaceId))?.settings?.sessionSearch?.enabled,
       );
       const payload = sessionSearchPayload({
         isEnabled,
@@ -175,10 +175,10 @@ export function sessionSearchDomainPlugin(id: string): CapekPlugin<unknown> {
         id: SESSION_SEARCH_GUIDANCE_SECTION_ID,
         phase: 'workspace',
         order: 50,
-        provide: (build) => {
+        provide: async (build) => {
           const data = validateContextAssemblyData(build.data);
           if (!data.workspaceId) return null;
-          return isEnabled(data.workspaceId) ? service.guidance : null;
+          return await isEnabled(data.workspaceId) ? service.guidance : null;
         },
       };
 

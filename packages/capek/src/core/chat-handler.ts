@@ -135,7 +135,7 @@ async function runSingleChatTurn<Origin>(
       type: 'text' as const,
       text: content,
     };
-    createPart(textPart, sessionId);
+    await createPart(textPart, sessionId);
 
     deliverToSession(ctx, sessionId, { kind: 'message', action: 'created', message: userMessage });
     deliverToSession(ctx, sessionId, { kind: 'part', action: 'created', sessionId, part: textPart });
@@ -159,7 +159,7 @@ async function runSingleChatTurn<Origin>(
           url: serverUrl,
           mimeType: attachmentRecord.mimeType,
         };
-        createPart(imagePart, sessionId);
+        await createPart(imagePart, sessionId);
         deliverToSession(ctx, sessionId, { kind: 'part', action: 'created', sessionId, part: imagePart });
       } else {
         const filePart = {
@@ -171,7 +171,7 @@ async function runSingleChatTurn<Origin>(
           mimeType: attachmentRecord.mimeType,
           filename: attachmentRecord.filename,
         };
-        createPart(filePart, sessionId);
+        await createPart(filePart, sessionId);
         deliverToSession(ctx, sessionId, { kind: 'part', action: 'created', sessionId, part: filePart });
       }
     }
@@ -551,7 +551,7 @@ export async function handleChat<Origin>(
     return;
   }
 
-  const workspace = session.workspaceId ? getWorkspace(session.workspaceId) : null;
+  const workspace = session.workspaceId ? await getWorkspace(session.workspaceId) : null;
   const workspacePath = workspace?.path;
   const additionalPaths = workspace?.additionalPaths;
 
@@ -773,7 +773,7 @@ export async function handleSessionEditMessage<Origin>(
       return;
     }
 
-    const parts = getPartsByMessage(msg.messageId);
+    const parts = await getPartsByMessage(msg.messageId);
     const textPart = parts.find((p) => p.type === 'text');
     if (!textPart || textPart.type !== 'text') {
       deliverToOrigin(ctx, origin, {
@@ -785,7 +785,7 @@ export async function handleSessionEditMessage<Origin>(
       });
       return;
     }
-    const updatedPart = updatePart(textPart.id, { text: msg.content });
+    const updatedPart = await updatePart(textPart.id, { text: msg.content });
     if (updatedPart) {
       deliverToSession(ctx, msg.sessionId, {
         kind: 'part',
@@ -809,7 +809,7 @@ export async function handleSessionEditMessage<Origin>(
       messages: currentState.messages,
     });
 
-    const workspace = session.workspaceId ? getWorkspace(session.workspaceId) : null;
+    const workspace = session.workspaceId ? await getWorkspace(session.workspaceId) : null;
     const workspacePath = workspace?.path;
     const additionalPaths = workspace?.additionalPaths;
 
