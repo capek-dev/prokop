@@ -1,8 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
-import { getDefaultCompactionPolicy, resolveCompactionPolicy, createCompactionTrigger, processCompactionTask, persistCompactionFailure } from '@capekai/core/internal/execution';
-import { type GenerateSummaryFn } from '@capekai/core/internal/execution';
+import { getDefaultCompactionPolicy, resolveCompactionPolicy, createCompactionTrigger, processCompactionTask, persistCompactionFailure } from '@capekai/core/execution';
+import { type GenerateSummaryFn } from '@capekai/core/execution';
 import { createMessage, createPart, getPartsBySession, listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
 import type { AssistantMessage, CompactionPart, ToolPart } from '@jean2/sdk';
 import { type RuntimeEvent } from '@capekai/core';

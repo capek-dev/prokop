@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { MockLanguageModelV3, convertArrayToReadableStream } from 'ai/test';
 import type { AssistantMessage, ToolPart } from '@jean2/sdk';
-import { withProviderOverrides } from '@capekai/core/internal/providers';
-import { getRuntimeConfiguration, withRuntimeConfiguration } from '@capekai/core/internal/configuration';
-import { getRuntimeHost as getJean2CompatibilityBindings, withRuntimeHost as withJean2CompatibilityBindings } from '@capekai/core/internal/hosts';
+import { withProviderOverrides } from '@capekai/core/providers';
+import { getRuntimeConfiguration, withRuntimeConfiguration } from '@capekai/core/configuration';
+import { getRuntimeHost as getJean2CompatibilityBindings, withRuntimeHost as withJean2CompatibilityBindings } from '@capekai/core/hosts';
 import { type RuntimeEvent } from '@capekai/core';
-import { type ConnectableProvider, type ModelFactoryOptions } from '@capekai/core/internal/providers';
+import { type ConnectableProvider, type ModelFactoryOptions } from '@capekai/core/providers';
 import { getStorage } from '@capekai/core/storage';
 import { createRuntime } from '@/bootstrap/create-runtime';
-import { executeCompaction, isCompactionActive } from '@capekai/core/internal/execution';
-import { convertToAiSdkMessages } from '@capekai/core/internal/execution';
+import { executeCompaction, isCompactionActive } from '@capekai/core/execution';
+import { convertToAiSdkMessages } from '@capekai/core/execution';
 import { createSession, getSession } from '@/infrastructure/sqlite/session-store';
 import {
   createMessage,

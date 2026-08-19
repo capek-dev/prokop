@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { configureSessionSearchHost, getSessionSearchHost } from '@capekai/core/internal/hosts';
+import { configureSessionSearchHost, getSessionSearchHost } from '@capekai/core/hosts';
 import {
   configureJean2SessionSearchHost,
   createJean2SessionSearchHost,

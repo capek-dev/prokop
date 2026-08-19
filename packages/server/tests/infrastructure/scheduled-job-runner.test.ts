@@ -9,7 +9,7 @@ import type { ScheduledJobRunnerDeps } from '@/infrastructure/scheduling/schedul
 const executeChildSession = mock(async (_input: unknown) => ({ error: 'run failed' }));
 const findProviderFromModel = mock(() => 'inferred-provider');
 
-mock.module('@capekai/core/internal/providers', () => ({
+mock.module('@capekai/core/providers', () => ({
   executeChildSession,
   findProviderFromModel,
 }));

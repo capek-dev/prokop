@@ -21,7 +21,7 @@ import {
   getParticipantClientIds,
   getParticipantConnections,
 } from '@/transport/websocket/control-registry';
-import { scanTools } from '@capekai/core/internal/tools';
+import { scanTools } from '@/adapters/capek/contracts';
 import { closeDatabase, getDatabase } from '@/infrastructure/sqlite/database';
 import { backfillFts } from '@/infrastructure/session-search/fts';
 import type { ServerMessage, AskAuthority } from '@jean2/sdk';

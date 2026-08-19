@@ -3,7 +3,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
 import { createMessage } from '@/infrastructure/sqlite/message-store';
-import { createStreamHandlers, type StreamHandlerContext } from '@capekai/core/internal/execution';
+import { createStreamHandlers, type StreamHandlerContext } from '@capekai/core/execution';
 
 describe('stream-handlers', () => {
   let sessionId: string;

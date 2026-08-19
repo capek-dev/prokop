@@ -8,7 +8,7 @@ import {
   reconcileSessionCompactionWithDeps as reconcileSessionWithDeps,
   type CompactionRecoveryDeps,
   type RuntimeEventSink,
-} from '@capekai/core/internal/execution';
+} from '@capekai/core/execution';
 import type { CompactionRecoveryPort } from '@/application/ports/session';
 import { mapCapekEventToServerMessage } from '@/adapters/capek/events';
 import {

@@ -5,7 +5,7 @@ import {
   type AgentSource,
   type InstructionSource,
   type PreconfigSource,
-} from '@capekai/core/internal/hosts';
+} from '@capekai/core/hosts';
 import type { AgentsApplication } from '@/application/agents';
 import {
   getDefaultPreconfig,

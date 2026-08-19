@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { createRuntime } from '@/bootstrap/create-runtime';
-import { buildStreamConfig } from '@capekai/core/internal/execution';
+import { buildStreamConfig } from '@capekai/core/execution';
 
 describe('buildStreamConfig provider options', () => {
   beforeEach(() => createRuntime());

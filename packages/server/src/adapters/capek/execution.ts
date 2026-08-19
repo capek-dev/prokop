@@ -7,7 +7,7 @@ import {
   interruptManager,
   regenerateSessionTitle as regenerateCapekSessionTitle,
   revertToStep as revertCapekToStep,
-} from '@capekai/core/internal/execution';
+} from '@capekai/core/execution';
 import type {
   CompactionExecutionOutcome,
   ForkExecutionResult,

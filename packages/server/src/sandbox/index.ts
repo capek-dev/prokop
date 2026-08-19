@@ -1,5 +1,4 @@
-import { registerProvider } from '@capekai/core/internal/providers';
-import { sandboxController, SandboxProvider, type AutoResponderRule, type SandboxControlEvent } from '@capekai/core/internal/sandbox';
+import { registerProvider, sandboxController, SandboxProvider, type AutoResponderRule, type SandboxControlEvent } from '@/adapters/capek/contracts';
 
 const defaultAutoResponderRules: AutoResponderRule[] = [
   {

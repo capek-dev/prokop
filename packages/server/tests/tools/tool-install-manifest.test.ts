@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-import { readInstallManifest, writeInstallManifest, getManifestPath, type InstallManifest } from '@capekai/core/internal/tools';
+import { readInstallManifest, writeInstallManifest, getManifestPath, type InstallManifest } from '@capekai/core/tools';
 
 const FIXTURE_MANIFEST: InstallManifest = {
   toolName: 'test-tool',

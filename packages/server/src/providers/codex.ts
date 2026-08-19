@@ -8,7 +8,7 @@ import {
   registerProvider,
   type ConnectableProvider,
   type TokenResponse,
-} from '@capekai/core/internal/providers';
+} from '@/adapters/capek/contracts';
 import { loadProviderConfig, saveProviderConfig, deleteProviderConfig } from '@/infrastructure/providers/provider-config-files';
 import {
   registerOAuthConfig,

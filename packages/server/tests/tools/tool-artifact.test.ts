@@ -5,7 +5,7 @@ import { tmpdir } from 'os';
 import * as tar from 'tar';
 import { createHash } from 'crypto';
 
-import { downloadArtifact, verifyChecksum, extractArtifact, validateArtifactStructure, ArtifactError } from '@capekai/core/internal/tools';
+import { downloadArtifact, verifyChecksum, extractArtifact, validateArtifactStructure, ArtifactError } from '@capekai/core/tools';
 
 const FIXTURE_DIR = resolve(import.meta.dir, 'fixtures', 'test-fixture-tool');
 

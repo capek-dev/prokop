@@ -1,7 +1,7 @@
 import {
   configureRuntimeConfiguration,
   type RuntimeConfiguration,
-} from '@capekai/core/internal/configuration';
+} from '@capekai/core/configuration';
 import {
   findModel,
   findModelVariant,

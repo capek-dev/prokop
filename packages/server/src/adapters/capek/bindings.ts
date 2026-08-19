@@ -11,14 +11,14 @@ import {
   installWorkflowToolFallback,
   setDefaultContextAssembler,
   type RuntimeHost,
-} from '@capekai/core/internal/hosts';
+} from '@capekai/core/hosts';
 import { jean2DeliveryBindings } from './delivery';
 import { jean2InteractionBindings } from './interaction';
 import { jean2SandboxBindings } from './sandbox';
 import { jean2TitleBindings } from './titles';
 import { jean2WorkspaceBindings } from './workspace';
 
-export type { RuntimeHost as Jean2CompatibilityBindings } from '@capekai/core/internal/hosts';
+export type { RuntimeHost as Jean2CompatibilityBindings } from '@capekai/core/hosts';
 
 export const jean2CompatibilityBindings = {
   interaction: jean2InteractionBindings,

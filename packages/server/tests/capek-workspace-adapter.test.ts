@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { resolve } from 'path';
-import { createWorkspaceCapability } from '@capekai/core/internal/execution';
+import { createWorkspaceCapability } from '@capekai/core/execution';
 import { jean2CompatibilityBindings } from '@/adapters/capek';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { ServerMessage } from '@jean2/sdk';
-import { createAskApi, hasPendingAsk, rejectPendingAsksByToolCallId } from '@capekai/core/internal/ask-authority';
+import { createAskApi, hasPendingAsk, rejectPendingAsksByToolCallId } from '@capekai/core/ask-authority';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
 import { resetTestDataDir, setupTestDataDir } from '#tests/test-dir';

@@ -8,7 +8,7 @@ import {
   resolvePath as serviceResolvePath,
   resolveRootForQuery,
   selectEditableRoot,
-} from '@capekai/core/internal/workspace';
+} from '@capekai/core/workspace';
 import type { WorkspacePathPolicyPort } from '@/application/ports/workspace-paths';
 
 /**

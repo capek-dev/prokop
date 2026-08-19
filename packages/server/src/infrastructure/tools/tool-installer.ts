@@ -1,9 +1,8 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import type { LoadedTool } from '@jean2/sdk';
 import { resolveToolsPath, getDefaultToolsPath } from '@/config';
-import { clearCache as clearToolsCache, downloadArtifact, verifyChecksum, extractArtifact, validateArtifactStructure, ArtifactError, readInstallManifest, writeInstallManifest, type InstallManifest } from '@capekai/core/internal/tools';
+import { clearCache as clearToolsCache, downloadArtifact, verifyChecksum, extractArtifact, validateArtifactStructure, ArtifactError, readInstallManifest, writeInstallManifest, loadToolModule } from '@/adapters/capek/contracts';
 import {
   buildSourceInstallManifest,
   buildUrlInstallManifest,
@@ -20,7 +19,7 @@ import {
 import { installDependencies, NpmInstallError } from './tool-npm-installer';
 import { bundleTool } from './tool-bundler';
 
-export type { InstallManifest } from '@capekai/core/internal/tools';
+export type { InstallManifest } from '@/adapters/capek/contracts';
 
 export interface InstallResult {
   success: boolean;
@@ -446,23 +445,7 @@ export async function getInstalledTools(
       const toolDir = join(toolsDir, toolName);
 
       const manifest = readInstallManifest(toolsDir, toolName);
-      const toolJsPath = join(toolDir, 'tool.js');
-      const toolTsPath = join(toolDir, 'tool.ts');
-
-      if (!existsSync(toolJsPath) && !existsSync(toolTsPath)) continue;
-
-      const modulePath = existsSync(toolJsPath) ? toolJsPath : toolTsPath;
-
-      let loadedTool: LoadedTool | null = null;
-      try {
-        const module = await import(modulePath);
-        if (module.definition && typeof module.execute === 'function') {
-          loadedTool = module as LoadedTool;
-        }
-      } catch {
-        continue;
-      }
-
+      const loadedTool = await loadToolModule(toolDir);
       if (!loadedTool) continue;
 
       const version = readVersion(toolDir) ||

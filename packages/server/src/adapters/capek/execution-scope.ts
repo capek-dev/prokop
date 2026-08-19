@@ -1,4 +1,4 @@
-import { enterAgentScope } from '@capekai/core/internal/composition';
+import { enterAgentScope } from '@capekai/core/composition';
 import {
   createJean2RuntimeComposition,
   type Jean2RuntimeComposition,

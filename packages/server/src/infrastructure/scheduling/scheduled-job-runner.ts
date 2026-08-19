@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { Preconfig, ScheduledJob, Session } from '@jean2/sdk';
-import { executeChildSession, findProviderFromModel } from '@capekai/core/internal/providers';
+import { executeChildSession, findProviderFromModel } from '@/adapters/capek/contracts';
 import type {
   ScheduledJobRepositoryPort,
   ScheduledRunModelsConfigPort,

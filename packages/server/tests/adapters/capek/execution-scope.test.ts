@@ -7,7 +7,7 @@ import type {
   handleSessionEditMessage as CapekHandleSessionEditMessage,
   regenerateSessionTitle as CapekRegenerateSessionTitle,
   revertToStep as CapekRevertToStep,
-} from '@capekai/core/internal/execution';
+} from '@capekai/core/execution';
 import {
   configureStorage,
   createInMemoryStorageBundle,

@@ -6,7 +6,7 @@ import {
   type AgentScopeHandle,
   type ContextAssemblyData,
   type ProcessScopeHandle,
-} from '@capekai/core/internal/composition';
+} from '@capekai/core/composition';
 import { jean2AgentPlugins, jean2ProcessPlugins } from './profile';
 
 export interface Jean2RuntimeComposition {
