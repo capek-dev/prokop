@@ -9,7 +9,7 @@ export {
   createSqliteConversationStore,
   type SqliteConversationStore,
 } from './storage/sqlite';
-export { createAgentStorage, type AgentStorageComposition, type AgentStorageOption } from './storage/options';
+export { createAgentStorage, type AgentStorage, type AgentStorageOption } from './storage/options';
 export {
   buildToolOutputArtifactPage,
   createArtifact,

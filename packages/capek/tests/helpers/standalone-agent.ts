@@ -14,7 +14,7 @@ import { createSingleModelConfiguration, resolveModelSpecifier } from '@capekai/
 import { createStandaloneHost } from '@capekai/core/hosts';
 import { SandboxController, SandboxProvider } from '@capekai/core/sandbox';
 import type { AutoResponderRule, SandboxControlEvent } from '@capekai/core/sandbox';
-import { createAgentStorage, type AgentStorageComposition, type AgentStorageOption } from '@capekai/core/storage';
+import { createAgentStorage, type AgentStorage, type AgentStorageOption } from '@capekai/core/storage';
 import { streamChatWithRetry } from '@capekai/core/execution';
 import { rejectAsk, resolveAsk } from '../../src/permission/ask-user-api';
 import type { Preconfig } from '@capekai/types';
@@ -53,7 +53,7 @@ function defaultSandboxRules(): AutoResponderRule[] {
 export class StandaloneAgent {
   readonly #options: StandaloneAgentOptions;
   readonly #composition: Promise<Composition>;
-  readonly #storage: Promise<AgentStorageComposition>;
+  readonly #storage: Promise<AgentStorage>;
   readonly #selection: ReturnType<typeof resolveModelSpecifier>;
   readonly #sandboxController: SandboxController;
   readonly #tempRoot: string;
@@ -80,7 +80,7 @@ export class StandaloneAgent {
       const storage = await storagePromise;
       const processScope = await createProcessScope([...facadeProcessPlugins()]);
       return createComposition(processScope, {
-        storage: storage.storage,
+        storage,
         configuration: createSingleModelConfiguration(selection),
         host: createStandaloneHost({
           workspace: options.workspace,
@@ -104,7 +104,7 @@ export class StandaloneAgent {
     if (this.#closed) throw new Error('Agent is closed');
     const sessionId = randomUUID();
     const { agentScope } = await this.#composition;
-    const { storage } = await this.#storage;
+    const storage = await this.#storage;
     return enterAgentScope(agentScope, async () => {
       await storage.conversation.createSession({
         id: sessionId,
