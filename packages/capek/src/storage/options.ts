@@ -6,8 +6,10 @@ export type AgentStorageOption =
   | { type: 'memory' }
   | { type: 'sqlite'; path: string };
 
-export interface AgentStorageComposition {
-  storage: StorageBundle;
+/** The storage bundle plus a close() for resources the chosen driver owns
+ * (e.g. sqlite handles). The bundle is spread directly: use the result as a
+ * StorageBundle anywhere, call close() when you are done with it. */
+export interface AgentStorage extends StorageBundle {
   close(): void;
 }
 
@@ -31,9 +33,9 @@ function isStorageDescriptor(
       && keys[1] === 'type');
 }
 
-function memoryComposition(): AgentStorageComposition {
+function memoryComposition(): AgentStorage {
   return {
-    storage: createInMemoryStorageBundle(),
+    ...createInMemoryStorageBundle(),
     close: () => {},
   };
 }
@@ -41,7 +43,7 @@ function memoryComposition(): AgentStorageComposition {
 /** The sqlite driver is imported dynamically: importing the package entry
  * must not pull bun:sqlite into runtimes that only use memory or custom
  * stores. The driver loads only when { type: 'sqlite' } is requested. */
-export async function createAgentStorage(option?: AgentStorageOption): Promise<AgentStorageComposition> {
+export async function createAgentStorage(option?: AgentStorageOption): Promise<AgentStorage> {
   if (!option) {
     return memoryComposition();
   }
@@ -57,10 +59,8 @@ export async function createAgentStorage(option?: AgentStorageOption): Promise<A
     const conversation = createSqliteConversationStore({ path: option.path });
     const toolOutputArtifacts = createSqliteToolOutputArtifactStore({ path: option.path });
     return {
-      storage: {
-        ...composeConversationStore(conversation),
-        toolOutputArtifacts,
-      },
+      ...composeConversationStore(conversation),
+      toolOutputArtifacts,
       close: () => {
         toolOutputArtifacts.close();
         conversation.close();
@@ -69,7 +69,7 @@ export async function createAgentStorage(option?: AgentStorageOption): Promise<A
   }
 
   return {
-    storage: composeConversationStore(option),
+    ...composeConversationStore(option),
     close: () => {},
   };
 }
