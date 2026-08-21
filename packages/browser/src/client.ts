@@ -1,5 +1,5 @@
 // =============================================================================
-// Jean2Browser Client
+// ProkopaiBrowser Client
 //
 // Wraps the SDK client for the Chrome extension environment.
 // Uses a custom WebSocket constructor backed by Chrome's WebSocket API.
@@ -9,8 +9,8 @@
 // capabilities, not session participation.
 // =============================================================================
 
-import { Jean2Client } from '@jean2/sdk';
-import type { ClientDescriptor } from '@jean2/sdk';
+import { ProkopaiClient } from '@prokopai/sdk';
+import type { ClientDescriptor } from '@prokopai/sdk';
 import type { ExtensionConfig } from './types';
 
 export type AskRequestHandler = (
@@ -37,7 +37,7 @@ const EXTENSION_CAPABILITIES = [
 ] as const;
 
 export class BrowserClient {
-  private client: Jean2Client | null = null;
+  private client: ProkopaiClient | null = null;
   private askHandler: AskRequestHandler | null = null;
   private disconnectHandler: DisconnectHandler | null = null;
   private _connected = false;
@@ -58,12 +58,12 @@ export class BrowserClient {
     const descriptor: ClientDescriptor = {
       clientId,
       clientType: 'extension',
-      displayName: 'Jean2Browser',
+      displayName: 'ProkopaiBrowser',
       interactionMode: 'headless',
       capabilities: [...EXTENSION_CAPABILITIES],
     };
 
-    this.client = new Jean2Client({
+    this.client = new ProkopaiClient({
       url: config.serverUrl,
       token: config.token ?? '',
       clientDescriptor: descriptor,
@@ -72,12 +72,12 @@ export class BrowserClient {
 
     this.client.on('connected', () => {
       this._connected = true;
-      console.log('[browser] Connected to Jean2 server');
+      console.log('[browser] Connected to Prokopai server');
     });
 
     this.client.on('disconnected', ({ code, reason, wasClean }) => {
       this._connected = false;
-      console.log('[browser] Disconnected from Jean2 server:', code, reason);
+      console.log('[browser] Disconnected from Prokopai server:', code, reason);
       this.disconnectHandler?.(code, reason, wasClean);
     });
 

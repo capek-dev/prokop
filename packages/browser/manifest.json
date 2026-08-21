@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Jean2Browser",
-  "description": "Jean2 browser automation extension - enables AI to read, navigate, and interact with web pages",
+  "name": "ProkopaiBrowser",
+  "description": "Prokopai browser automation extension - enables AI to read, navigate, and interact with web pages",
   "version": "0.5.0",
   "permissions": [
     "storage",
@@ -30,7 +30,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Jean2Browser",
+    "default_title": "ProkopaiBrowser",
     "default_popup": "popup.html"
   }
 }

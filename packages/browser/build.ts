@@ -1,5 +1,5 @@
 // =============================================================================
-// Jean2Browser Build Script
+// ProkopaiBrowser Build Script
 //
 // Bundles the browser extension for loading in Chrome.
 // Output: dist/ directory containing manifest.json + bundled JS files.

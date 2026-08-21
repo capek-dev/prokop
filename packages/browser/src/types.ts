@@ -1,5 +1,5 @@
 // =============================================================================
-// Jean2Browser Types
+// ProkopaiBrowser Types
 // =============================================================================
 
 export interface ActiveTabData {
@@ -119,8 +119,8 @@ export interface ExtensionConfig {
 }
 
 export const STORAGE_KEYS = {
-  CLIENT_ID: 'jean2_browser_client_id',
-  CONFIG: 'jean2_browser_config',
+  CLIENT_ID: 'prokopai_browser_client_id',
+  CONFIG: 'prokopai_browser_config',
 } as const;
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';

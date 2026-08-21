@@ -1,8 +1,8 @@
 // =============================================================================
-// Jean2Browser Background Service Worker
+// ProkopaiBrowser Background Service Worker
 //
 // Main extension runtime:
-// - Connects to Jean2 server on startup
+// - Connects to Prokopai server on startup
 // - Routes client_capability asks to the appropriate handler
 // - Supports: active_tab_read, browser_dom_action, browser_navigate,
 //             browser_screenshot, browser_discover_elements
@@ -26,7 +26,7 @@ import type {
 } from './types';
 
 const MAX_TEXT_LENGTH = 50_000;
-const RECONNECT_ALARM = 'jean2-reconnect';
+const RECONNECT_ALARM = 'prokopai-reconnect';
 const RECONNECT_ALARM_PERIOD_MINUTES = 0.5; // 30 seconds
 const INITIAL_RECONNECT_DELAY_MS = 1_000;
 const MAX_RECONNECT_DELAY_MS = 60_000;
@@ -473,7 +473,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     clearReconnectTimeout();
     // Save config first, then connect
     chrome.storage.local.set(
-      { jean2_browser_config: { serverUrl, token: token || undefined } },
+      { prokopai_browser_config: { serverUrl, token: token || undefined } },
       () => {
         if (browserClient) {
           browserClient.disconnect().then(() => {
