@@ -2,8 +2,8 @@ Set-StrictMode -Version Latest
 
 $VERSION_FILE_URL = "https://raw.githubusercontent.com/jean2ai/jean2/refs/heads/main/packages/server/VERSION"
 $REPO = "jean2ai/jean2"
-$INSTALL_DIR = "$HOME\.jean2\bin"
-$BINARY_NAME = "jean2.exe"
+$INSTALL_DIR = "$HOME.prokopai\bin"
+$BINARY_NAME = "prokopai.exe"
 $BINARY_PATH = ""
 
 $Force = $false
@@ -51,7 +51,7 @@ Install or update Jean2 server binary from GitHub Releases.
 
 OPTIONS:
   --Version <ver>      Install a specific version (default: latest)
-  --InstallDir <path>  Install to custom directory (default: ~/.jean2/bin)
+  --InstallDir <path>  Install to custom directory (default: ~/.prokopai/bin)
   --Force              Reinstall/update even if same version
   --NoPath             Skip adding to PATH
   --Help               Show this help message
@@ -61,10 +61,10 @@ BEHAVIOR:
   Update: Stops running daemon, replaces binary, runs migrations, restarts.
 
 EXAMPLES:
-  install-jean2.ps1                   # Install latest version
-  install-jean2.ps1 --Version 0.4.5  # Install specific version
-  install-jean2.ps1 --Force           # Reinstall/update current version
-  install-jean2.ps1 --NoPath          # Install without modifying PATH
+  install-prokopai.ps1                   # Install latest version
+  install-prokopai.ps1 --Version 0.4.5  # Install specific version
+  install-prokopai.ps1 --Force           # Reinstall/update current version
+  install-prokopai.ps1 --NoPath          # Install without modifying PATH
 
 "@
   }
@@ -137,12 +137,12 @@ EXAMPLES:
     return "unknown"
   }
 
-  function is_jean2_running {
+  function is_prokopai_running {
     $output = & $BINARY_PATH status 2>&1 | Out-String
     return $output -match "Daemon is running"
   }
 
-  function stop_jean2 {
+  function stop_prokopai {
     info "Stopping Jean2 daemon..."
 
     $null = & $BINARY_PATH stop 2>&1
@@ -152,7 +152,7 @@ EXAMPLES:
 
     Start-Sleep -Seconds 1
 
-    if (is_jean2_running) {
+    if (is_prokopai_running) {
       error "Jean2 daemon is still running after stop command. Update aborted."
     }
 
@@ -177,7 +177,7 @@ EXAMPLES:
     success "Migrations completed successfully"
   }
 
-  function start_jean2 {
+  function start_prokopai {
     param([string]$NewBinary)
 
     info "Starting Jean2 daemon..."
@@ -189,14 +189,14 @@ EXAMPLES:
 
     Start-Sleep -Seconds 1
 
-    if (is_jean2_running_with_binary $NewBinary) {
+    if (is_prokopai_running_with_binary $NewBinary) {
       success "Jean2 daemon started successfully"
     } else {
       warn "Jean2 daemon may not have started correctly"
     }
   }
 
-  function is_jean2_running_with_binary {
+  function is_prokopai_running_with_binary {
     param([string]$Binary)
     $output = & $Binary status 2>&1 | Out-String
     return $output -match "Daemon is running"
@@ -205,7 +205,7 @@ EXAMPLES:
   function download_binary {
     param([string]$Version)
 
-    $url = "https://github.com/$REPO/releases/download/server%2Fv$Version/jean2-windows.exe"
+    $url = "https://github.com/$REPO/releases/download/server%2Fv$Version/prokopai-windows.exe"
 
     info "Downloading Jean2 for windows..."
     info "URL: $url"
@@ -276,10 +276,10 @@ EXAMPLES:
     }
 
     info "Checking if Jean2 daemon is running..."
-    if (is_jean2_running) {
+    if (is_prokopai_running) {
       $wasRunning = $true
       info "Jean2 daemon is running"
-      stop_jean2
+      stop_prokopai
     } else {
       info "Jean2 daemon is not running"
     }
@@ -303,7 +303,7 @@ EXAMPLES:
     }
 
     if ($wasRunning) {
-      start_jean2 $newBinary
+      start_prokopai $newBinary
     } else {
       info "Jean2 was not running before update, not starting"
     }

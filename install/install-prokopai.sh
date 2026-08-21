@@ -4,8 +4,8 @@ set -euo pipefail
 
 VERSION_FILE_URL="https://raw.githubusercontent.com/jean2ai/jean2/refs/heads/main/packages/server/VERSION"
 REPO="jean2ai/jean2"
-INSTALL_DIR="${HOME}/.jean2/bin"
-BINARY_NAME="jean2"
+INSTALL_DIR="${HOME}/.prokopai/bin"
+BINARY_NAME="prokopai"
 BINARY_PATH=""
 
 FORCE=false
@@ -74,7 +74,7 @@ Install or update Jean2 server binary from GitHub Releases.
 
 OPTIONS:
   --version <ver>      Install a specific version (default: latest)
-  --install-dir <path>  Install to custom directory (default: ~/.jean2/bin)
+  --install-dir <path>  Install to custom directory (default: ~/.prokopai/bin)
   --force              Reinstall/update even if same version
   --no-path            Skip adding to PATH
   --help               Show this help message
@@ -170,7 +170,7 @@ check_existing_install() {
   echo "$current_version"
 }
 
-is_jean2_running() {
+is_prokopai_running() {
   local status_output
   status_output=$("$BINARY_PATH" status 2>&1 || true)
   
@@ -181,7 +181,7 @@ is_jean2_running() {
   fi
 }
 
-stop_jean2() {
+stop_prokopai() {
   info "Stopping Jean2 daemon..."
   
   if ! "$BINARY_PATH" stop 2>&1; then
@@ -190,7 +190,7 @@ stop_jean2() {
   
   sleep 1
   
-  if is_jean2_running; then
+  if is_prokopai_running; then
     error "Jean2 daemon is still running after stop command. Update aborted."
   fi
   
@@ -219,7 +219,7 @@ run_migrations() {
   success "Migrations completed successfully"
 }
 
-start_jean2() {
+start_prokopai() {
   local new_binary="$1"
   
   info "Starting Jean2 daemon..."
@@ -230,14 +230,14 @@ start_jean2() {
   
   sleep 1
   
-  if is_jean2_running_with_binary "$new_binary"; then
+  if is_prokopai_running_with_binary "$new_binary"; then
     success "Jean2 daemon started successfully"
   else
     warn "Jean2 daemon may not have started correctly"
   fi
 }
 
-is_jean2_running_with_binary() {
+is_prokopai_running_with_binary() {
   local binary="$1"
   local status_output
   status_output=$("$binary" status 2>&1 || true)
@@ -250,7 +250,7 @@ is_jean2_running_with_binary() {
 }
 
 download_binary() {
-  local url="https://github.com/${REPO}/releases/download/server%2Fv${VERSION}/jean2-${OS}"
+  local url="https://github.com/${REPO}/releases/download/server%2Fv${VERSION}/prokopai-${OS}"
 
   info "Downloading Jean2 for $OS..."
   info "URL: $url"
@@ -357,10 +357,10 @@ update_existing_install() {
   fi
   
   info "Checking if Jean2 daemon is running..."
-  if is_jean2_running; then
+  if is_prokopai_running; then
     was_running=true
     info "Jean2 daemon is running"
-    stop_jean2
+    stop_prokopai
   else
     info "Jean2 daemon is not running"
   fi
@@ -385,7 +385,7 @@ update_existing_install() {
   fi
   
   if [[ "$was_running" == true ]]; then
-    start_jean2 "$new_binary"
+    start_prokopai "$new_binary"
   else
     info "Jean2 was not running before update, not starting"
   fi
