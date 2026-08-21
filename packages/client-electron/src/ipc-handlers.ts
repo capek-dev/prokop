@@ -13,7 +13,7 @@ const __dirname = dirname(__filename);
 // electron-store ESM/CJS interop: default export may be nested under `.default`
 const Store = (ElectronStore as unknown as { default?: typeof ElectronStore }).default || ElectronStore;
 const store = new Store({
-  name: 'jean2-config',
+  name: 'prokopai-config',
 });
 
 const SOUND_MAP: Record<string, string> = {
@@ -42,7 +42,7 @@ export function registerIpcHandlers(
   });
 
   ipcMain.handle('window:create', () => {
-    const createWindow = globalThis.__JEAN2_CREATE_WINDOW__;
+    const createWindow = globalThis.__PROKOPAI_CREATE_WINDOW__;
     if (createWindow) {
       createWindow();
     }

@@ -1,11 +1,11 @@
-import type { Jean2ElectronAPI } from './preload.js';
+import type { ProkopaiElectronAPI } from './preload.js';
 
 declare global {
   interface Window {
-    __JEAN2_ELECTRON__?: Jean2ElectronAPI;
+    __PROKOPAI_ELECTRON__?: ProkopaiElectronAPI;
   }
 
-  var __JEAN2_CREATE_WINDOW__: (() => import('electron').BrowserWindow) | undefined;
+  var __PROKOPAI_CREATE_WINDOW__: (() => import('electron').BrowserWindow) | undefined;
 }
 
 export {};

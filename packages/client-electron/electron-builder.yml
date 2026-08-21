@@ -1,5 +1,5 @@
-appId: com.jean2.app
-productName: Jean2
+appId: com.prokopai.app
+productName: Prokopai
 copyright: Copyright © 2026 Jean2
 
 directories:
@@ -26,9 +26,9 @@ mac:
   gatekeeperAssess: false
   type: distribution
   extendInfo:
-    NSCameraUsageDescription: Jean2 needs camera access for video calls
-    NSMicrophoneUsageDescription: Jean2 needs microphone access for audio calls
-    NSUserNotificationsUsageDescription: Jean2 needs notification access for alerts
+    NSCameraUsageDescription: Prokopai needs camera access for video calls
+    NSMicrophoneUsageDescription: Prokopai needs microphone access for audio calls
+    NSUserNotificationsUsageDescription: Prokopai needs notification access for alerts
 
 win:
   target:
@@ -43,13 +43,13 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Jean2
+  shortcutName: Prokopai
 
 msi:
   oneClick: false
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Jean2
+  shortcutName: Prokopai
 
 publish:
   provider: github

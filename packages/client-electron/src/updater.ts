@@ -95,7 +95,7 @@ export function setupUpdater(mainWindow: BrowserWindow): void {
       .showMessageBox(mainWindow, {
         type: 'info',
         title: 'Update Ready',
-        message: `Jean2 ${info.version} has been downloaded.`,
+        message: `Prokopai  has been downloaded.`,
         detail: 'The update will be installed when you restart the application.',
         buttons: ['Restart Now', 'Later'],
         defaultId: 0,

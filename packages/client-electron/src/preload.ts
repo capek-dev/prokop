@@ -14,7 +14,7 @@ export interface ViewBounds {
   height: number;
 }
 
-export interface Jean2ElectronAPI {
+export interface ProkopaiElectronAPI {
   platform: 'electron';
   store: ElectronStore;
   createWindow(): Promise<void>;
@@ -33,7 +33,7 @@ export interface Jean2ElectronAPI {
   syncTheme(mode: 'dark' | 'light'): void;
 }
 
-const electronAPI: Jean2ElectronAPI = {
+const electronAPI: ProkopaiElectronAPI = {
   platform: 'electron',
   store: {
     get: (key: string) => ipcRenderer.invoke('store:get', key),
@@ -85,12 +85,16 @@ const electronAPI: Jean2ElectronAPI = {
   syncTheme: (mode: 'dark' | 'light') => ipcRenderer.send('theme:sync', mode),
 };
 
-// Expose the API to the renderer process
+// Expose the API to the renderer process. Both the canonical and the
+// legacy global are exposed so an older bundled client build still finds
+// its Electron bridge during the rename transition.
+contextBridge.exposeInMainWorld('__PROKOPAI_ELECTRON__', electronAPI);
 contextBridge.exposeInMainWorld('__JEAN2_ELECTRON__', electronAPI);
 
 // Type declaration for the renderer
 declare global {
   interface Window {
-    __JEAN2_ELECTRON__?: Jean2ElectronAPI;
+    __PROKOPAI_ELECTRON__?: ProkopaiElectronAPI;
+    __JEAN2_ELECTRON__?: ProkopaiElectronAPI;
   }
 }

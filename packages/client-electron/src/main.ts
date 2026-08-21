@@ -92,15 +92,15 @@ function createWindow(): BrowserWindow {
 
   // Load the client
   const clientUrl = getClientUrl();
-  console.log(`[Jean2] Loading client from: ${clientUrl}`);
+  console.log(`[Prokopai] Loading client from: ${clientUrl}`);
   window.loadURL(clientUrl);
 
   window.webContents.on('did-finish-load', () => {
-    console.log('[Jean2] Client loaded successfully');
+    console.log('[Prokopai] Client loaded successfully');
   });
 
   window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
-    console.error(`[Jean2] Failed to load: ${errorCode} ${errorDescription} URL: ${validatedURL}`);
+    console.error(`[Prokopai] Failed to load: ${errorCode} ${errorDescription} URL: ${validatedURL}`);
   });
 
   // Open DevTools in development
@@ -116,10 +116,10 @@ function createSecondaryWindow(): BrowserWindow {
 }
 
 // Export for IPC handler
-globalThis.__JEAN2_CREATE_WINDOW__ = createSecondaryWindow;
+globalThis.__PROKOPAI_CREATE_WINDOW__ = createSecondaryWindow;
 
 app.whenReady().then(() => {
-  console.log('[Jean2] Application starting...');
+  console.log('[Prokopai] Application starting...');
 
   // Initialize managers
   webviewManager = new WebviewManager();
@@ -139,7 +139,7 @@ app.whenReady().then(() => {
     setupUpdater(mainWindow);
   }
 
-  console.log('[Jean2] Application ready');
+  console.log('[Prokopai] Application ready');
 });
 
 app.on('window-all-closed', () => {
@@ -170,7 +170,7 @@ app.on('second-instance', () => {
 
 // Handle quit on macOS when all windows are closed
 app.on('before-quit', () => {
-  console.log('[Jean2] Application quitting...');
+  console.log('[Prokopai] Application quitting...');
 
   // Stop the server if running
   if (serverManager) {
@@ -185,9 +185,9 @@ app.on('before-quit', () => {
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  console.error('[Jean2] Uncaught exception:', error);
+  console.error('[Prokopai] Uncaught exception:', error);
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('[Jean2] Unhandled rejection:', reason);
+  console.error('[Prokopai] Unhandled rejection:', reason);
 });

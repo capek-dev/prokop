@@ -101,7 +101,7 @@ packages/client-electron/
 
 ## API Reference
 
-The preload script exposes `window.__JEAN2_ELECTRON__` with the following interface:
+The preload script exposes `window.__PROKOPAI_ELECTRON__` with the following interface:
 
 ### Platform
 
@@ -117,17 +117,17 @@ interface Jean2ElectronAPI {
 Persistent key-value storage using electron-store:
 
 ```typescript
-await window.__JEAN2_ELECTRON__.store.get('key');
-await window.__JEAN2_ELECTRON__.store.set('key', { value: 123 });
-await window.__JEAN2_ELECTRON__.store.remove('key');
-await window.__JEAN2_ELECTRON__.store.clear();
+await window.__PROKOPAI_ELECTRON__.store.get('key');
+await window.__PROKOPAI_ELECTRON__.store.set('key', { value: 123 });
+await window.__PROKOPAI_ELECTRON__.store.remove('key');
+await window.__PROKOPAI_ELECTRON__.store.clear();
 ```
 
 ### Windows
 
 ```typescript
 // Create a new window
-await window.__JEAN2_ELECTRON__.createWindow();
+await window.__PROKOPAI_ELECTRON__.createWindow();
 ```
 
 ### Web Views
@@ -141,7 +141,7 @@ interface ViewBounds {
 }
 
 // Create an embedded web view
-const viewId = await window.__JEAN2_ELECTRON__.createWebview('https://example.com', {
+const viewId = await window.__PROKOPAI_ELECTRON__.createWebview('https://example.com', {
   x: 0,
   y: 0,
   width: 800,
@@ -149,7 +149,7 @@ const viewId = await window.__JEAN2_ELECTRON__.createWebview('https://example.co
 });
 
 // Resize an existing view
-await window.__JEAN2_ELECTRON__.resizeWebview(viewId, {
+await window.__PROKOPAI_ELECTRON__.resizeWebview(viewId, {
   x: 100,
   y: 100,
   width: 600,
@@ -157,7 +157,7 @@ await window.__JEAN2_ELECTRON__.resizeWebview(viewId, {
 });
 
 // Remove a view
-await window.__JEAN2_ELECTRON__.removeWebview(viewId);
+await window.__PROKOPAI_ELECTRON__.removeWebview(viewId);
 ```
 
 ### Accelerators
@@ -165,7 +165,7 @@ await window.__JEAN2_ELECTRON__.removeWebview(viewId);
 Listen for menu accelerator events:
 
 ```typescript
-const unsubscribe = window.__JEAN2_ELECTRON__.onAccelerator((accelerator) => {
+const unsubscribe = window.__PROKOPAI_ELECTRON__.onAccelerator((accelerator) => {
   switch (accelerator) {
     case 'toggle-sidebar':
       // Handle sidebar toggle
@@ -184,14 +184,14 @@ unsubscribe();
 
 ```typescript
 // Get server status
-const status = await window.__JEAN2_ELECTRON__.getServerStatus();
+const status = await window.__PROKOPAI_ELECTRON__.getServerStatus();
 console.log(status.running, status.port);
 
 // Start local server
-const { port } = await window.__JEAN2_ELECTRON__.startServer();
+const { port } = await window.__PROKOPAI_ELECTRON__.startServer();
 
 // Stop local server
-await window.__JEAN2_ELECTRON__.stopServer();
+await window.__PROKOPAI_ELECTRON__.stopServer();
 ```
 
 ### Auto-Updates
@@ -199,7 +199,7 @@ await window.__JEAN2_ELECTRON__.stopServer();
 Listen for updater events:
 
 ```typescript
-const unsubscribe = window.__JEAN2_ELECTRON__.onUpdaterEvent((event) => {
+const unsubscribe = window.__PROKOPAI_ELECTRON__.onUpdaterEvent((event) => {
   switch (event.type) {
     case 'checking':
       console.log('Checking for updates...');
@@ -225,7 +225,7 @@ unsubscribe();
 ### App Info
 
 ```typescript
-const version = await window.__JEAN2_ELECTRON__.getAppVersion();
+const version = await window.__PROKOPAI_ELECTRON__.getAppVersion();
 ```
 
 ## Keyboard Shortcuts

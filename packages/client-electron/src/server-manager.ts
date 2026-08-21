@@ -73,7 +73,7 @@ export class ServerManager {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: {
             ...process.env,
-            JEAN2_SERVER_PORT: String(this.port),
+            PROKOPAI_SERVER_PORT: String(this.port),
           },
         });
 
