@@ -3,15 +3,15 @@ import { MessageType } from '../src/messages';
 
 describe('messages', () => {
   test('all message types are defined', () => {
-    expect(MessageType.Init).toBe('jean2:init');
-    expect(MessageType.ThemeChanged).toBe('jean2:themeChanged');
-    expect(MessageType.WorkspaceChanged).toBe('jean2:workspaceChanged');
-    expect(MessageType.Ready).toBe('jean2:ready');
-    expect(MessageType.OpenFile).toBe('jean2:openFile');
-    expect(MessageType.ToggleTerminal).toBe('jean2:toggleTerminal');
-    expect(MessageType.ToggleExplorer).toBe('jean2:toggleExplorer');
-    expect(MessageType.Connected).toBe('jean2:connected');
-    expect(MessageType.Disconnected).toBe('jean2:disconnected');
+    expect(MessageType.Init).toBe('prokopai:init');
+    expect(MessageType.ThemeChanged).toBe('prokopai:themeChanged');
+    expect(MessageType.WorkspaceChanged).toBe('prokopai:workspaceChanged');
+    expect(MessageType.Ready).toBe('prokopai:ready');
+    expect(MessageType.OpenFile).toBe('prokopai:openFile');
+    expect(MessageType.ToggleTerminal).toBe('prokopai:toggleTerminal');
+    expect(MessageType.ToggleExplorer).toBe('prokopai:toggleExplorer');
+    expect(MessageType.Connected).toBe('prokopai:connected');
+    expect(MessageType.Disconnected).toBe('prokopai:disconnected');
   });
 
   test('no duplicate values', () => {
@@ -20,9 +20,9 @@ describe('messages', () => {
     expect(unique.size).toBe(values.length);
   });
 
-  test('every message type has a jean2: prefix', () => {
+  test('every message type has a prokopai: prefix', () => {
     for (const value of Object.values(MessageType)) {
-      expect(value.startsWith('jean2:')).toBe(true);
+      expect(value.startsWith('prokopai:')).toBe(true);
     }
   });
 });

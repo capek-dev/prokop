@@ -23,7 +23,7 @@ export async function createChatPanel(context: vscode.ExtensionContext) {
 
   state.panel = vscode.window.createWebviewPanel(
     'jean2.chat',
-    'Jean2 Chat',
+    'Prokopai Chat',
     vscode.ViewColumn.Two,
     {
       enableScripts: true,
@@ -35,14 +35,14 @@ export async function createChatPanel(context: vscode.ExtensionContext) {
     },
   );
 
-  console.log('[jean2code] Creating panel. Production:', isProduction, 'Port:', state.serverPort);
+  console.log('[prokopaicode] Creating panel. Production:', isProduction, 'Port:', state.serverPort);
 
   if (isProduction && state.serverPort === 0 && state.serverPromise) {
     state.panel.webview.html = '<html><body><p style="font-family:sans-serif;padding:20px">Starting...</p></body></html>';
     try {
       await state.serverPromise;
     } catch (err) {
-      console.error('[jean2code] Server failed to start:', err);
+      console.error('[prokopaicode] Server failed to start:', err);
       state.panel.webview.html = '<html><body><p style="font-family:sans-serif;padding:20px">Failed to start server.</p></body></html>';
       return;
     }
@@ -76,11 +76,11 @@ export async function createChatPanel(context: vscode.ExtensionContext) {
         }
         break;
       case MessageType.ToggleTerminal: {
-        const existing = vscode.window.terminals.filter((t) => t.name === 'Jean2');
+        const existing = vscode.window.terminals.filter((t) => t.name === 'Prokopai');
         if (existing.length > 0 && existing[0] === vscode.window.activeTerminal) {
           for (const t of existing) t.dispose();
         } else {
-          const terminal = vscode.window.createTerminal('Jean2');
+          const terminal = vscode.window.createTerminal('Prokopai');
           if (message.cwd) {
             terminal.sendText(`cd "${message.cwd}"`, true);
           }

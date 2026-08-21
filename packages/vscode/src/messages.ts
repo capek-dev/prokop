@@ -7,16 +7,16 @@
 
 // Extension → Webview
 export const MessageType = {
-  Init: 'jean2:init',
-  ThemeChanged: 'jean2:themeChanged',
-  WorkspaceChanged: 'jean2:workspaceChanged',
+  Init: 'prokopai:init',
+  ThemeChanged: 'prokopai:themeChanged',
+  WorkspaceChanged: 'prokopai:workspaceChanged',
   // Webview → Extension
-  Ready: 'jean2:ready',
-  OpenFile: 'jean2:openFile',
-  ToggleTerminal: 'jean2:toggleTerminal',
-  ToggleExplorer: 'jean2:toggleExplorer',
-  Connected: 'jean2:connected',
-  Disconnected: 'jean2:disconnected',
+  Ready: 'prokopai:ready',
+  OpenFile: 'prokopai:openFile',
+  ToggleTerminal: 'prokopai:toggleTerminal',
+  ToggleExplorer: 'prokopai:toggleExplorer',
+  Connected: 'prokopai:connected',
+  Disconnected: 'prokopai:disconnected',
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];

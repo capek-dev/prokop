@@ -8,7 +8,7 @@ import { createChatPanel } from './panel-manager';
 import { MessageType } from './messages';
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log(`[jean2code] v${VERSION} activated`);
+  console.log(`[prokopaicode] v${VERSION} activated`);
 
   const clientDistDir = getClientDistDir(context);
   if (clientDistDir) {
@@ -17,7 +17,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   createStatusBarItem(context);
 
-  const openChat = vscode.commands.registerCommand('jean2.openChat', () => {
+  const openChat = vscode.commands.registerCommand('prokopai.openChat', () => {
     createChatPanel(context);
   });
   context.subscriptions.push(openChat);
@@ -46,7 +46,7 @@ export function activate(context: vscode.ExtensionContext) {
     }),
   );
 
-  vscode.commands.executeCommand('jean2.openChat');
+  vscode.commands.executeCommand('prokopai.openChat');
 }
 
 export function deactivate() {

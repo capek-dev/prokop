@@ -50,7 +50,7 @@ export function startStaticServer(rootDir: string): Promise<number> {
       if (typeof addr === 'object' && addr) {
         state.serverPort = addr.port;
       }
-      console.log(`[jean2code] Static server ready on http://127.0.0.1:${state.serverPort}`);
+      console.log(`[prokopaicode] Static server ready on http://127.0.0.1:${state.serverPort}`);
       resolve(state.serverPort);
     });
 

@@ -1,9 +1,9 @@
 {
-  "name": "jean2code",
-  "displayName": "Jean2Code",
-  "description": "AI coding assistant for VS Code — chat with your codebase using Jean2",
+  "name": "prokopaicode",
+  "displayName": "ProkopaiCode",
+  "description": "AI coding assistant for VS Code — chat with your codebase using Prokopai",
   "version": "0.1.0",
-  "publisher": "jean2",
+  "publisher": "prokopai",
   "icon": "client-dist/icon-192.png",
   "engines": {
     "vscode": "^1.85.0"
@@ -30,23 +30,23 @@
   "contributes": {
     "commands": [
       {
-        "command": "jean2.openChat",
-        "title": "Jean2: Open Chat"
+        "command": "prokopai.openChat",
+        "title": "Prokopai: Open Chat"
       }
     ],
     "menus": {},
     "configuration": {
-      "title": "Jean2",
+      "title": "Prokopai",
       "properties": {
-        "jean2.serverUrl": {
+        "prokopai.serverUrl": {
           "type": "string",
           "default": "http://localhost:3000",
-          "description": "URL of the Jean2 server"
+          "description": "URL of the Prokopai server"
         },
-        "jean2.token": {
+        "prokopai.token": {
           "type": "string",
           "default": "",
-          "description": "Authentication token for the Jean2 server"
+          "description": "Authentication token for the Prokopai server"
         }
       }
     }

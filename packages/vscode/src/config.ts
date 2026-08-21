@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 export function getConfig() {
-  const config = vscode.workspace.getConfiguration('jean2');
+  const config = vscode.workspace.getConfiguration('prokopai');
   return {
     serverUrl: config.get<string>('serverUrl', 'http://localhost:3000'),
     token: config.get<string>('token', ''),

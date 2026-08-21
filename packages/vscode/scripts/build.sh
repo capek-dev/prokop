@@ -6,7 +6,7 @@ VSCODE_DIR="$(dirname "$SCRIPT_DIR")"
 ROOT_DIR="$(dirname "$(dirname "$VSCODE_DIR")")"
 CLIENT_DIR="$ROOT_DIR/packages/client"
 
-echo "=== Building Jean2 client for VSCode (embedded mode) ==="
+echo "=== Building Prokopai client for VSCode (embedded mode) ==="
 
 # Build client with relative base path for webview file:// loading
 # VITE_VSCODE_BUILD disables code-splitting so the bundle is one self-contained file.
