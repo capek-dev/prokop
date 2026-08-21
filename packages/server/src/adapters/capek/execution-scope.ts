@@ -1,4 +1,4 @@
-import { enterAgentScope } from '@capekai/core/composition';
+import { enterAgentScope, type AgentScopeHandle } from '@capekai/core/composition';
 import {
   createJean2RuntimeComposition,
   type Jean2RuntimeComposition,
@@ -13,6 +13,7 @@ let executionCompositionPromise: Promise<Jean2RuntimeComposition> | null = null;
 let compositionFactory: Jean2RuntimeCompositionFactory = createJean2RuntimeComposition;
 let lifecycle: ExecutionLifecycle = 'open';
 let disposalPromise: Promise<void> | null = null;
+let resolvedAgentScope: AgentScopeHandle | null = null;
 const activeExecutions = new Set<Promise<unknown>>();
 
 function requireOpenLifecycle(): void {
@@ -26,11 +27,18 @@ export function getJean2ExecutionComposition(): Promise<Jean2RuntimeComposition>
   if (executionCompositionPromise === null) {
     const promise = Promise.resolve().then(compositionFactory);
     executionCompositionPromise = promise;
-    void promise.catch(() => {
-      if (executionCompositionPromise === promise) {
-        executionCompositionPromise = null;
-      }
-    });
+    void promise.then(
+      (resolved) => {
+        if (executionCompositionPromise === promise) {
+          resolvedAgentScope = resolved.agentScope;
+        }
+      },
+      () => {
+        if (executionCompositionPromise === promise) {
+          executionCompositionPromise = null;
+        }
+      },
+    );
   }
   return executionCompositionPromise;
 }
@@ -58,6 +66,17 @@ export function withJean2ExecutionScope<T>(callback: () => Promise<T>): Promise<
     () => activeExecutions.delete(execution),
   );
   return execution;
+}
+
+/** Synchronously enters the composed agent scope once its composition has
+ * resolved. Wire-side ask resolution (ask.response routing, pending-ask
+ * lookups) arrives outside any execution context and must reach the same
+ * composed permission runtime that owns the live waiters. When the
+ * composition has not resolved yet, no composed waiter can exist, so the
+ * callback runs unscoped against the process-default runtime. */
+export function withJean2ComposedScopeSync<T>(callback: () => T): T {
+  const scope = resolvedAgentScope;
+  return scope === null ? callback() : enterAgentScope(scope, callback);
 }
 
 export function disposeJean2ExecutionScope(): Promise<void> {
@@ -90,6 +109,7 @@ export function disposeJean2ExecutionScope(): Promise<void> {
 
   disposalPromise = disposal.finally(() => {
     executionCompositionPromise = null;
+    resolvedAgentScope = null;
     lifecycle = 'closed';
   });
   return disposalPromise;
@@ -105,4 +125,5 @@ export function resetJean2ExecutionCompositionFactoryForTests(): void {
   compositionFactory = createJean2RuntimeComposition;
   lifecycle = 'open';
   disposalPromise = null;
+  resolvedAgentScope = null;
 }

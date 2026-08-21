@@ -1,5 +1,12 @@
 // Single seam for non-adapter server code to reach Capek public contracts.
 
+import {
+  getAuthorityForPendingAsk as capekGetAuthorityForPendingAsk,
+  getSessionIdForPendingAsk as capekGetSessionIdForPendingAsk,
+  resolveAsk as capekResolveAsk,
+} from '@capekai/core/ask-authority';
+import { withJean2ComposedScopeSync } from './execution-scope';
+
 export {
   createCapabilityTool,
   createOpenAiResponsesModel,
@@ -39,11 +46,28 @@ export {
   type SandboxRespondMessage,
 } from '@capekai/core/sandbox';
 
-export {
-  getAuthorityForPendingAsk,
-  getSessionIdForPendingAsk,
-  resolveAsk,
-} from '@capekai/core/ask-authority';
+// Wire-side ask resolution must land in the same composed permission runtime
+// that execution enters: the composed scope owns the live waiters, while the
+// process-default runtime capek falls back to outside any scope holds none.
+// Every ask-authority re-export routes through the composed scope when the
+// composition has resolved, so ask.response approval resolves the waiter the
+// running tool is blocked on. Before the composition resolves no composed
+// waiter can exist and the call runs unscoped unchanged.
+
+export function resolveAsk(toolCallId: string, response: unknown, requestId?: string): Promise<boolean> {
+  return withJean2ComposedScopeSync(() =>
+    capekResolveAsk(toolCallId, response, requestId));
+}
+
+export async function getSessionIdForPendingAsk(toolCallId: string, requestId?: string): Promise<string | null> {
+  return withJean2ComposedScopeSync(() =>
+    capekGetSessionIdForPendingAsk(toolCallId, requestId));
+}
+
+export function getAuthorityForPendingAsk(toolCallId: string) {
+  return withJean2ComposedScopeSync(() =>
+    capekGetAuthorityForPendingAsk(toolCallId));
+}
 
 export {
   buildToolOutputArtifactPage,
