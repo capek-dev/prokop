@@ -64,7 +64,7 @@ describe('@capekai/core/tool', () => {
   test('does not export Jean2 client or transport APIs', async () => {
     const authoring = await import('@capekai/core/tool');
 
-    expect(authoring).not.toHaveProperty('Jean2Client');
+    expect(authoring).not.toHaveProperty('ProkopaiClient');
     expect(authoring).not.toHaveProperty('WebSocketTransport');
     expect(authoring).not.toHaveProperty('HttpClient');
     expect(authoring).not.toHaveProperty('SessionsRestNamespace');
