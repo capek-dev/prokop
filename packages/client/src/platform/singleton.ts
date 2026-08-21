@@ -1,7 +1,6 @@
 import type { IJean2Platform, PlatformCapabilities } from './types';
 import { createElectronAdapter } from './adapters/electron';
 import { createBrowserAdapter } from './adapters/browser';
-import { createVSCodeAdapter } from './adapters/vscode';
 
 const _platform: IJean2Platform | null = null;
 
@@ -11,9 +10,6 @@ function detect(): IJean2Platform {
   }
   if (window.__PROKOPAI_ELECTRON__ ?? window.__JEAN2_ELECTRON__) {
     return createElectronAdapter();
-  }
-  if (typeof (window as unknown as Record<string, unknown>).acquireVsCodeApi === 'function') {
-    return createVSCodeAdapter();
   }
   return createBrowserAdapter();
 }

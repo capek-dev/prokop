@@ -76,14 +76,6 @@ describe('notificationSupport: detectNotificationSupport', () => {
     expect(detectNotificationSupport()).toBe('unsupported');
   });
 
-  it('returns unsupported when platform is vscode', async () => {
-    vi.doMock('@/platform', () => ({
-      platform: { id: 'vscode' },
-    }));
-    const { detectNotificationSupport } = await import('@/notifications/notificationSupport');
-    expect(detectNotificationSupport()).toBe('unsupported');
-  });
-
   it('returns insecure-context for HTTP without localhost', async () => {
     mockWebPlatform();
     Object.defineProperty(window, 'isSecureContext', {

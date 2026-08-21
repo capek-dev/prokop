@@ -34,18 +34,13 @@ export interface NotificationRegistrationMeta {
 /**
  * Detect the notification support level for the current environment.
  *
- * Excludes Electron and VS Code entirely from Web Push.
+ * Excludes Electron entirely from Web Push.
  * Detects insecure context (HTTP without localhost).
  * Detects iOS Safari tabs that are not installed as Home Screen apps.
  */
 export function detectNotificationSupport(): NotificationSupport {
   // Exclude Electron: uses native sounds, not browser Web Push
   if (platform.id === 'electron') {
-    return 'unsupported';
-  }
-
-  // Exclude VS Code embedded browser
-  if (platform.id === 'vscode') {
     return 'unsupported';
   }
 

@@ -40,11 +40,7 @@
     "test:server:coverage": "cd packages/server && bun test --coverage",
     "test:tools": "bun test tools",
     "test": "bun test packages/server packages/sdk packages/capek tools && bun run test:client",
-    "sandbox": "bun packages/sandbox-cli/src/cli.ts",
-    "build:vscode": "cd packages/vscode && bash scripts/build.sh",
-    "package:vscode": "cd packages/vscode && bun run package",
-    "typecheck:vscode": "cd packages/vscode && bun run typecheck",
-    "test:vscode": "cd packages/vscode && bun test"
+    "sandbox": "bun packages/sandbox-cli/src/cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
