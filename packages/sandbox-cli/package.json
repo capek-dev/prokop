@@ -1,5 +1,5 @@
 {
-  "name": "@jean2/sandbox-cli",
+  "name": "@prokopai/sandbox-cli",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -16,7 +16,7 @@ function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = {
     host: 'localhost',
     port: 3000,
-    token: process.env.JEAN2_API_TOKEN,
+    token: process.env.PROKOPAI_API_TOKEN ?? process.env.JEAN2_API_TOKEN,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
