@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { FileEntry } from '@jean2/sdk';
+import type { FileEntry } from '@prokopai/sdk';
 import { buildFilePathTree } from '@/components/files/filePathTree';
 
 describe('buildFilePathTree', () => {

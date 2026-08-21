@@ -6,7 +6,7 @@ import {
   isDocDirty,
   type FileDocIdentity,
 } from '@/stores/fileEditorStore';
-import type { EditableFileResponse, SaveFileResponse, FileRevisionConflictDetails } from '@jean2/sdk';
+import type { EditableFileResponse, SaveFileResponse, FileRevisionConflictDetails } from '@prokopai/sdk';
 
 const baseIdentity: FileDocIdentity = {
   serverId: 'server-1',

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Jean2Client, ScheduledJob, ScheduleKind, ScheduleConfig, AutoApproveSeverity } from '@jean2/sdk';
+import type { ProkopaiClient, ScheduledJob, ScheduleKind, ScheduleConfig, AutoApproveSeverity } from '@prokopai/sdk';
 import {
   Dialog,
   DialogContent,
@@ -33,7 +33,7 @@ import { Loader2 } from 'lucide-react';
 interface SchedulerJobModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   workspaceId: string | null;
   editingJob: ScheduledJob | null;
 }

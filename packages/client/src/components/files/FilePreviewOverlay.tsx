@@ -1,5 +1,5 @@
 import { Loader2, AlertCircle, RefreshCw, FileX, FilePenLine } from 'lucide-react';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import type { FilePreviewTarget } from '@/stores/uiStore';
 import {
   Dialog,
@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 interface FilePreviewOverlayProps {
   workspaceId: string | undefined;
   target: FilePreviewTarget | null;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenEdit?: () => void;

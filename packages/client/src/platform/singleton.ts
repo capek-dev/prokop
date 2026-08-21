@@ -9,7 +9,7 @@ function detect(): IJean2Platform {
   if (typeof window === 'undefined') {
     return createBrowserAdapter();
   }
-  if (window.__JEAN2_ELECTRON__) {
+  if (window.__PROKOPAI_ELECTRON__ ?? window.__JEAN2_ELECTRON__) {
     return createElectronAdapter();
   }
   if (typeof (window as unknown as Record<string, unknown>).acquireVsCodeApi === 'function') {

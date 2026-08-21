@@ -71,7 +71,7 @@ export function ThemeProvider({
   children,
   defaultMode = DEFAULT_MODE,
   defaultScheme = DEFAULT_SCHEME,
-  storageKey = 'jean2-theme-settings',
+  storageKey = 'prokopai-theme-settings',
   ...props
 }: ThemeProviderProps) {
   const [settings, setSettings] = useState<ThemeSettings>(() => {

@@ -1,4 +1,4 @@
-import type { SessionControlState, SessionControlUpdateReason } from '@jean2/sdk';
+import type { SessionControlState, SessionControlUpdateReason } from '@prokopai/sdk';
 import type { SessionHandlersContext } from './types';
 import { useSessionControlStore } from '@/stores/sessionControlStore';
 

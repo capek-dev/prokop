@@ -1,10 +1,10 @@
-import type { Jean2Client, ToolDefinition } from '@jean2/sdk';
+import type { ProkopaiClient, ToolDefinition } from '@prokopai/sdk';
 import { Check, Loader2, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useToolsQuery, useToolEnvVarsQuery } from '@/hooks/queries';
 
 interface PanelProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 export function ToolsPanel({ sdkClient }: PanelProps) {

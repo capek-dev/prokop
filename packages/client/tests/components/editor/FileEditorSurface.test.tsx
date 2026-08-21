@@ -1,6 +1,6 @@
 import { act, render } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import type { EditableFileResponse, Jean2Client } from '@jean2/sdk';
+import type { EditableFileResponse, ProkopaiClient } from '@prokopai/sdk';
 import { FileEditorSurface } from '@/components/editor/FileEditorSurface';
 import {
   useFileEditorStore,
@@ -63,7 +63,7 @@ describe('FileEditorSurface Git diff query lifecycle', () => {
     const secondId = openLoadedDoc(secondIdentity, 'second.ts');
     useFileEditorStore.getState().setActiveDoc(firstId);
 
-    const sdkClient = {} as Jean2Client;
+    const sdkClient = {} as ProkopaiClient;
     render(
       <FileEditorSurface
         sdkClient={sdkClient}

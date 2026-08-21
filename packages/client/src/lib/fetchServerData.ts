@@ -1,5 +1,5 @@
-import { HttpClient, HttpNamespace } from '@jean2/sdk';
-import type { CriticalServerData, SecondaryServerData } from '@jean2/sdk';
+import { HttpClient, HttpNamespace } from '@prokopai/sdk';
+import type { CriticalServerData, SecondaryServerData } from '@prokopai/sdk';
 
 export type { CriticalServerData, SecondaryServerData };
 

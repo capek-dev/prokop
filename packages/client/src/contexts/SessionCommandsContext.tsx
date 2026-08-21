@@ -4,7 +4,7 @@ import type {
   WorkspaceSettings,
   AttachmentKind,
   AskResponse,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import type { ResumeSessionOptions } from '@/stores/sessionStore';
 
 /**

@@ -1,4 +1,4 @@
-import type { AssistantMessage } from '@jean2/sdk';
+import type { AssistantMessage } from '@prokopai/sdk';
 import { AlertTriangle, Clock, Key, Server, ShieldAlert } from 'lucide-react';
 
 type ErrorType =

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useParams } from '@tanstack/react-router';
-import type { Session, Workspace, SavedServer, QuickConnection } from '@jean2/sdk';
+import type { Session, Workspace, SavedServer, QuickConnection } from '@prokopai/sdk';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useAskStore, type PendingAskRequest } from '@/stores/askStore';

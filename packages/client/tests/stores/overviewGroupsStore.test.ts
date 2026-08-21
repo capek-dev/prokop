@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import { mockLocalStorage } from '../helpers';
 import { useOverviewGroupsStore } from '@/stores/overviewGroupsStore';
-import type { QuickConnection } from '@jean2/sdk';
+import type { QuickConnection } from '@prokopai/sdk';
 
 const makeQc = (
   serverId: string,

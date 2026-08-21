@@ -20,7 +20,7 @@ export function PWAUpdateBanner() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <AlertTitle>Jean2 update ready</AlertTitle>
-            <AlertDescription>Restart Jean2 to use the latest version.</AlertDescription>
+            <AlertDescription>Restart Prokopai to use the latest version.</AlertDescription>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Button variant="ghost" size="sm" onClick={dismiss} disabled={isUpdating}>

@@ -13,7 +13,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import type { Preconfig } from '@jean2/sdk';
+import type { Preconfig } from '@prokopai/sdk';
 
 interface PreconfigSelectorProps {
   preconfigs: Preconfig[];

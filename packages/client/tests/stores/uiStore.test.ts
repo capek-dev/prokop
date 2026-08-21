@@ -104,16 +104,16 @@ describe('uiStore', () => {
 
       test('persists to localStorage', () => {
         useUIStore.getState().setChatFinishSoundEnabled(false);
-        expect(storage.getItem('jean2_sound_chat_finish_enabled')).toBe('false');
+        expect(storage.getItem('prokopai_sound_chat_finish_enabled')).toBe('false');
       });
 
       test('persists true to localStorage', () => {
         useUIStore.getState().setChatFinishSoundEnabled(true);
-        expect(storage.getItem('jean2_sound_chat_finish_enabled')).toBe('true');
+        expect(storage.getItem('prokopai_sound_chat_finish_enabled')).toBe('true');
       });
 
       test('reads persisted value from localStorage', () => {
-        storage.setItem('jean2_sound_chat_finish_enabled', 'false');
+        storage.setItem('prokopai_sound_chat_finish_enabled', 'false');
         useUIStore.setState({ chatFinishSoundEnabled: false });
         expect(useUIStore.getState().chatFinishSoundEnabled).toBe(false);
       });
@@ -131,16 +131,16 @@ describe('uiStore', () => {
 
       test('persists to localStorage', () => {
         useUIStore.getState().setPermissionSoundEnabled(false);
-        expect(storage.getItem('jean2_sound_permission_enabled')).toBe('false');
+        expect(storage.getItem('prokopai_sound_permission_enabled')).toBe('false');
       });
 
       test('persists true to localStorage', () => {
         useUIStore.getState().setPermissionSoundEnabled(true);
-        expect(storage.getItem('jean2_sound_permission_enabled')).toBe('true');
+        expect(storage.getItem('prokopai_sound_permission_enabled')).toBe('true');
       });
 
       test('reads persisted value from localStorage', () => {
-        storage.setItem('jean2_sound_permission_enabled', 'false');
+        storage.setItem('prokopai_sound_permission_enabled', 'false');
         useUIStore.setState({ permissionSoundEnabled: false });
         expect(useUIStore.getState().permissionSoundEnabled).toBe(false);
       });

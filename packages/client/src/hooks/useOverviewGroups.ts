@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { Workspace } from '@jean2/sdk';
+import type { Workspace } from '@prokopai/sdk';
 import { useOverviewGroupsStore } from '@/stores/overviewGroupsStore';
 import type { OverviewGroup } from '@/config/overviewGroupsTypes';
 

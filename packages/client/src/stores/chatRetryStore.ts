@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ChatRetryMessage } from '@jean2/sdk';
+import type { ChatRetryMessage } from '@prokopai/sdk';
 
 interface ChatRetryState {
   retryBySessionId: Record<string, ChatRetryMessage | undefined>;

@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import { RefreshCw, Loader2 } from 'lucide-react';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { LegendList } from '@legendapp/list/react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -11,7 +11,7 @@ import { RENDER_BUDGETS } from '@/lib/renderBudgets';
 
 interface FileTreeProps {
   workspaceId: string;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   onFileSelect?: (target: FileEntryActionTarget) => void;
   showHidden?: boolean;
   width?: number;

@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/command';
 import { useServerContext } from '@/contexts/ServerContext';
 import { useIsMobile } from '@/hooks/use-mobile';
-import type { QuickConnection } from '@jean2/sdk';
+import type { QuickConnection } from '@prokopai/sdk';
 
 interface QuickSwitcherProps {
   onSelectWorkspace?: (workspaceId: string) => void;

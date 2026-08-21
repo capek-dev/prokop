@@ -6,12 +6,12 @@ import {
   isSameOriginRoute,
   normalizeRoute,
   hasVisibleFocusedClient,
-  type Jean2PushPayloadV1,
+  type ProkopaiPushPayloadV1,
 } from '@/pwa/sw-logic';
 
 const ORIGIN = 'https://jean2.example.com';
 
-function makeValidPayload(overrides?: Partial<Jean2PushPayloadV1>): Jean2PushPayloadV1 {
+function makeValidPayload(overrides?: Partial<ProkopaiPushPayloadV1>): ProkopaiPushPayloadV1 {
   return {
     version: 1,
     eventId: 'message:msg1:completed',

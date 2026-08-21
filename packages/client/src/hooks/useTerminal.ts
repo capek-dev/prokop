@@ -3,7 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
-import type { Jean2Client, TerminalConnection } from '@jean2/sdk';
+import type { ProkopaiClient, TerminalConnection } from '@prokopai/sdk';
 
 export type TerminalStatus = 'connecting' | 'connected' | 'disconnected' | 'exited';
 
@@ -109,7 +109,7 @@ function showTerminalElement(terminal: Terminal | null): void {
 
 export interface UseTerminalConnectionOptions {
   terminal: Terminal | null;
-  sdkClient: Jean2Client;
+  sdkClient: ProkopaiClient;
   workspaceId: string;
   cwd: string;
   serverSessionId?: string | null;

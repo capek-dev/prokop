@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import type { Jean2Client, ResponseFormat } from '@jean2/sdk';
+import type { ProkopaiClient, ResponseFormat } from '@prokopai/sdk';
 import { useResponseFormatsQuery, useCreateResponseFormat, useUpdateResponseFormat, useDeleteResponseFormat } from '@/hooks/queries';
 import { Braces, Plus, Pencil, Trash2, ArrowLeft, Loader2, GripVertical, Code, Eye, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
 
 interface PanelProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 type FieldType = 'string' | 'number' | 'boolean' | 'array' | 'object';

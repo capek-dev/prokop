@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import {
   PANEL_DEFAULT_WIDTH,
   clampPanelWidth,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import {
   getSessionsPanelWidth,
   saveSessionsPanelWidth,

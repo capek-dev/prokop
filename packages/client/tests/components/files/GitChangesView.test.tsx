@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { GitDiffSummary } from '@jean2/sdk';
+import type { GitDiffSummary } from '@prokopai/sdk';
 import type { FileEntryActionTarget } from '@/components/files/FileEntryContextMenu';
 
 const mockUseGitStatusQuery = vi.fn();

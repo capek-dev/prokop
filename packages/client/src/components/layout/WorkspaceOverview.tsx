@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { Folder, Box, ChevronRight, Plus, Tag, Archive, MoreHorizontal, Layers } from 'lucide-react';
-import type { Session, Workspace } from '@jean2/sdk';
+import type { Session, Workspace } from '@prokopai/sdk';
 import {
   SidebarGroup,
   SidebarGroupContent,

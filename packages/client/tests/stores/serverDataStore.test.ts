@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import { useServerDataStore } from '@/stores/serverDataStore';
-import type { Workspace, ModelWithStatus, ProviderStatus } from '@jean2/sdk';
+import type { Workspace, ModelWithStatus, ProviderStatus } from '@prokopai/sdk';
 
 const mockWorkspace: Workspace = {
   id: 'ws-1',

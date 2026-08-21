@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RefreshCw, Trash2, Shield } from 'lucide-react';
-import type { PermissionGrant } from '@jean2/sdk';
+import type { PermissionGrant } from '@prokopai/sdk';
 import {
   Dialog,
   DialogContent,

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RefreshCw, Trash2 } from 'lucide-react';
-import type { PermissionGrant } from '@jean2/sdk';
+import type { PermissionGrant } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';

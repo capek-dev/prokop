@@ -6,7 +6,7 @@ import {
 } from '@/config/overviewGroupsStorage';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
 import type { OverviewGroupsDocument } from '@/config/overviewGroupsTypes';
-import type { QuickConnection } from '@jean2/sdk';
+import type { QuickConnection } from '@prokopai/sdk';
 
 const makeQc = (
   serverId: string,

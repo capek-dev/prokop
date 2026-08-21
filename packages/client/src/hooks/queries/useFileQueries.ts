@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
 
 const FILE_BROWSE_STALE_TIME_MS = 10_000;
 const FILE_CONTENT_STALE_TIME_MS = 5_000;
 
 export function useFileBrowseQuery(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | undefined,
   path?: string,
   opts?: { showHidden?: boolean; root?: string },
@@ -21,7 +21,7 @@ export function useFileBrowseQuery(
 }
 
 export function useFileSearchQuery(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | undefined,
   query: string,
   root?: string,
@@ -39,7 +39,7 @@ export function useFileSearchQuery(
 }
 
 export function useFileBrowseFsQuery(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   path: string,
   enabled = true,
 ) {
@@ -50,7 +50,7 @@ export function useFileBrowseFsQuery(
   });
 }
 
-export function useFileDrivesQuery(sdkClient: Jean2Client | null) {
+export function useFileDrivesQuery(sdkClient: ProkopaiClient | null) {
   return useQuery({
     queryKey: queryKeys.files.drives,
     queryFn: () => sdkClient!.http.files.drives(),
@@ -59,7 +59,7 @@ export function useFileDrivesQuery(sdkClient: Jean2Client | null) {
 }
 
 export function useFileParentQuery(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   currentPath: string,
   enabled = true,
 ) {
@@ -71,7 +71,7 @@ export function useFileParentQuery(
 }
 
 export function useFilePreviewQuery(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | undefined,
   path: string | undefined,
   root: string | undefined,
@@ -89,7 +89,7 @@ export function useFilePreviewQuery(
 }
 
 export function useFileGitDiffQuery(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | undefined,
   path: string | undefined,
   root: string | undefined,
@@ -114,7 +114,7 @@ export function useFileGitDiffQuery(
  * but with different caching semantics for the editor lifecycle.
  */
 export function useEditorGitDiffQuery(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | undefined,
   path: string | undefined,
   root: string | undefined,
@@ -132,7 +132,7 @@ export function useEditorGitDiffQuery(
 }
 
 export function useGitStatusQuery(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | undefined,
   root: string | undefined,
   enabled = true,

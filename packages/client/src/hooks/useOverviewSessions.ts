@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { Jean2Client, Session } from '@jean2/sdk';
+import type { ProkopaiClient, Session } from '@prokopai/sdk';
 import { useSessionStore } from '@/stores/sessionStore';
 import { queryKeys } from '@/lib/queryKeys';
 import { RENDER_BUDGETS } from '@/lib/renderBudgets';
@@ -8,7 +8,7 @@ import { RENDER_BUDGETS } from '@/lib/renderBudgets';
 const OVERVIEW_LIMIT_PER_WORKSPACE = RENDER_BUDGETS.overviewInitialPageSize;
 
 interface UseOverviewSessionsParams {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   workspaceIds: string[];
   connected: boolean;
 }

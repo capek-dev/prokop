@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import type { Jean2Client, ProviderStatus } from '@jean2/sdk';
+import type { ProkopaiClient, ProviderStatus } from '@prokopai/sdk';
 
 const mocks = vi.hoisted(() => ({
   providers: [] as ProviderStatus[],
@@ -22,7 +22,7 @@ vi.mock('@/hooks/queries', () => ({
 
 import { OAuthProvidersPanel } from '@/components/modals/configuration/OAuthProvidersPanel';
 
-const sdkClient = {} as Jean2Client;
+const sdkClient = {} as ProkopaiClient;
 
 describe('OAuthProvidersPanel', () => {
   beforeEach(() => {

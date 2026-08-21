@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import type { Jean2Client } from '@jean2/sdk';
-import type { ModelRuntimeStatus, ModelWithStatus } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
+import type { ModelRuntimeStatus, ModelWithStatus } from '@prokopai/sdk';
 import {
   useModelsConfigQuery,
   useCreateProvider,
@@ -40,7 +40,7 @@ import {
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
 
 interface PanelProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 interface ProviderConfig {

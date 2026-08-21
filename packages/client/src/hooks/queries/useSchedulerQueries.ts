@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Jean2Client, ScheduledJob, CreateScheduledJobInput, UpdateScheduledJobInput } from '@jean2/sdk';
+import type { ProkopaiClient, ScheduledJob, CreateScheduledJobInput, UpdateScheduledJobInput } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
 
 export function useScheduledJobs(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | null | undefined,
 ) {
   return useQuery({
@@ -21,7 +21,7 @@ export function useScheduledJobs(
 }
 
 export function useCreateScheduledJob(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | null | undefined,
 ) {
   const queryClient = useQueryClient();
@@ -40,7 +40,7 @@ export function useCreateScheduledJob(
 }
 
 export function useUpdateScheduledJob(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | null | undefined,
 ) {
   const queryClient = useQueryClient();
@@ -59,7 +59,7 @@ export function useUpdateScheduledJob(
 }
 
 export function useDeleteScheduledJob(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | null | undefined,
 ) {
   const queryClient = useQueryClient();
@@ -77,7 +77,7 @@ export function useDeleteScheduledJob(
 }
 
 export function usePauseScheduledJob(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | null | undefined,
 ) {
   const queryClient = useQueryClient();
@@ -96,7 +96,7 @@ export function usePauseScheduledJob(
 }
 
 export function useResumeScheduledJob(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | null | undefined,
 ) {
   const queryClient = useQueryClient();
@@ -115,7 +115,7 @@ export function useResumeScheduledJob(
 }
 
 export function useTriggerScheduledJob(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | null | undefined,
 ) {
   const queryClient = useQueryClient();

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { SavedServer } from '@jean2/sdk';
+import type { SavedServer } from '@prokopai/sdk';
 
 export type ServerStatus = 'checking' | 'online' | 'offline';
 

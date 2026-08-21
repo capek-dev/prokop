@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronRight, PinOff, Pin, Loader2 } from 'lucide-react';
-import type { Jean2Client, PinnedMessage } from '@jean2/sdk';
+import type { ProkopaiClient, PinnedMessage } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { usePinnedMessagesQuery, useUnpinMessageMutation } from '@/hooks/queries';
 import {
@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface PinnedMessagesPanelProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   workspaceId: string;
   currentSessionId: string | null;
   onNavigateToPinnedMessage: (sessionId: string, messageId: string) => void;

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useSessionStore } from '@/stores/sessionStore';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 
 /**
  * Automatically resume sessions that are visible on the board but don't have
@@ -13,7 +13,7 @@ import type { Jean2Client } from '@jean2/sdk';
  * - Reconnection after network drop
  */
 export function useBoardSessionLoader(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   connected: boolean,
 ): void {
   const resumedRef = useRef<Set<string>>(new Set());

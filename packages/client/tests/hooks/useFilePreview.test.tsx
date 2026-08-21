@@ -2,23 +2,23 @@ import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useFilePreview } from '@/hooks/useFilePreview';
 
-vi.mock('@jean2/sdk', () => ({
-  Jean2Client: vi.fn(),
+vi.mock('@prokopai/sdk', () => ({
+  ProkopaiClient: vi.fn(),
 }));
 
 const mockPreviewFn = vi.fn();
 
-function makeSdkClient(): Jean2Client {
+function makeSdkClient(): ProkopaiClient {
   return {
     http: {
       files: {
         preview: mockPreviewFn,
       },
     },
-  } as unknown as Jean2Client;
+  } as unknown as ProkopaiClient;
 }
 
 function makeWrapper(client: QueryClient) {

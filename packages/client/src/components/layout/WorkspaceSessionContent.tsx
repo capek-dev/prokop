@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChevronRight, CheckSquare, X, Archive, MoreHorizontal, Trash2, Tag } from 'lucide-react';
-import type { Session, ScheduledJob } from '@jean2/sdk';
+import type { Session, ScheduledJob } from '@prokopai/sdk';
 import {
   SidebarGroup,
   SidebarGroupContent,

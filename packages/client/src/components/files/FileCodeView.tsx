@@ -1,6 +1,6 @@
 import { Highlight, themes } from 'prism-react-renderer';
 import { memo, useMemo } from 'react';
-import type { GitDiffHunk } from '@jean2/sdk';
+import type { GitDiffHunk } from '@prokopai/sdk';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/providers/ThemeProvider';
 

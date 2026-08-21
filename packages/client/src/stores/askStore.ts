@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Ask, AskTarget, AskResponse } from '@jean2/sdk';
+import type { Ask, AskTarget, AskResponse } from '@prokopai/sdk';
 
 export interface PendingAskRequest {
   toolCallId: string;

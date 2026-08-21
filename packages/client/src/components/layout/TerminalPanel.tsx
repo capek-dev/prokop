@@ -10,8 +10,8 @@ import {
   type SessionInitData,
   type TerminalCache,
 } from '@/hooks/useTerminal';
-import type { TerminalEvent } from '@jean2/sdk';
-import type { TerminalEventsConnection } from '@jean2/sdk';
+import type { TerminalEvent } from '@prokopai/sdk';
+import type { TerminalEventsConnection } from '@prokopai/sdk';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useVisualViewport } from '@/hooks/useVisualViewport';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { cn } from '@/lib/utils';
 
 export interface TerminalPanelHandle {
@@ -40,7 +40,7 @@ interface TerminalPanelProps {
   workspaceId: string | undefined;
   workspacePath: string | undefined;
   workspaceName: string | undefined;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   isOpen: boolean;
   onOpen: () => void;
   onClose: () => void;
@@ -360,7 +360,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       onTitleChange: onTitleChange(connectionTarget.serverSessionId),
     } : {
       terminal: null,
-      sdkClient: null as unknown as import('@jean2/sdk').Jean2Client,
+      sdkClient: null as unknown as import('@prokopai/sdk').ProkopaiClient,
       workspaceId: '',
       cwd: '',
       onOutput: () => {},

@@ -2,13 +2,13 @@
  * Helper functions for panel width persistence
  */
 
-import type { SavedPanelWidth } from '@jean2/sdk';
+import type { SavedPanelWidth } from '@prokopai/sdk';
 import {
   PANEL_STORAGE_KEYS,
   PANEL_MIN_WIDTH,
   PANEL_MAX_WIDTH,
   clampPanelWidth,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 /**
  * Clamps a width value to valid panel bounds

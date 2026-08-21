@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import type { Session } from '@jean2/sdk';
+import type { Session } from '@prokopai/sdk';
 import type { SessionHandlersContext } from '@/handlers/serverMessage/types';
 
 vi.mock('@/components/providers/QueryProvider', () => ({

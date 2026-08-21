@@ -13,7 +13,7 @@ import {
   updateQuickConnection,
   reorderQuickConnections,
 } from '@/config/servers';
-import type { SavedServer } from '@jean2/sdk';
+import type { SavedServer } from '@prokopai/sdk';
 
 const makeServer = (id: string, overrides: Partial<SavedServer> = {}): SavedServer => ({
   id,

@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState, useEffect, useMemo } from 'react';
 import { X, RefreshCw, Search, ChevronDown, ChevronRight, Folder, File, Check } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
-import type { FileEntry, Jean2Client } from '@jean2/sdk';
+import type { FileEntry, ProkopaiClient } from '@prokopai/sdk';
 import { FileTree, type FileTreeHandle, GitChangesView, type GitChangesViewHandle } from '@/components/files';
 import { FileEntryContextMenu, type FileEntryActions, type FileEntryActionTarget } from '@/components/files/FileEntryContextMenu';
 import { FOLDER_ICON_COLOR, fileIconColor } from '@/components/files/fileIcons';
@@ -41,7 +41,7 @@ import { useFileSearchQuery } from '@/hooks/queries';
 import { queryKeys } from '@/lib/queryKeys';
 
 interface FilesPanelProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 export interface FilesPanelHandle {
@@ -217,7 +217,7 @@ function SearchResults({
   contextActions,
 }: {
   workspaceId: string;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   query: string;
   root: string | undefined;
   onFileSelect: (target: FileEntryActionTarget) => void;

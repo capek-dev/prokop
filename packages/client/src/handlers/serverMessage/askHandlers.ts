@@ -1,4 +1,4 @@
-import type { Ask, AskAuthority, AskResponse } from '@jean2/sdk';
+import type { Ask, AskAuthority, AskResponse } from '@prokopai/sdk';
 import type { SessionHandlersContext } from './types';
 import type { PendingAskRequest } from '@/stores/askStore';
 

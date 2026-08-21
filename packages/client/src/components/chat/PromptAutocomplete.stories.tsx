@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import type { PromptInfo } from '@jean2/sdk';
+import type { PromptInfo } from '@prokopai/sdk';
 import { PromptAutocomplete } from './PromptAutocomplete';
 
 const samplePrompts: PromptInfo[] = [

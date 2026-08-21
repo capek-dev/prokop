@@ -1,6 +1,6 @@
 import { useMemo, useEffect } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
-import type { Part } from '@jean2/sdk';
+import type { Part } from '@prokopai/sdk';
 import { useViewRefs } from '@/contexts/ViewRefsContext';
 import { useSessionManager } from '@/contexts/SessionManagerContext';
 import { AppMainContent } from '@/components/app/AppMainContent';

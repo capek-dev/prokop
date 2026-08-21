@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Jean2Client, CreatePromptRequest, UpdatePromptRequest } from '@jean2/sdk';
+import type { ProkopaiClient, CreatePromptRequest, UpdatePromptRequest } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
 import { useServerDataStore } from '@/stores/serverDataStore';
 
-export function usePromptsQuery(sdkClient: Jean2Client | null) {
+export function usePromptsQuery(sdkClient: ProkopaiClient | null) {
   return useQuery({
     queryKey: queryKeys.config.prompts,
     queryFn: () => sdkClient!.http.config.prompts.list(),
@@ -11,13 +11,13 @@ export function usePromptsQuery(sdkClient: Jean2Client | null) {
   });
 }
 
-async function syncPromptsToStoreAndCache(sdkClient: Jean2Client, queryClient: import('@tanstack/react-query').QueryClient) {
+async function syncPromptsToStoreAndCache(sdkClient: ProkopaiClient, queryClient: import('@tanstack/react-query').QueryClient) {
   const data = await sdkClient.http.config.prompts.list();
   useServerDataStore.getState().updatePrompts(data.prompts);
   queryClient.setQueryData(queryKeys.config.prompts, data);
 }
 
-export function useCreatePrompt(sdkClient: Jean2Client | null) {
+export function useCreatePrompt(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: CreatePromptRequest) =>
@@ -28,7 +28,7 @@ export function useCreatePrompt(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useUpdatePrompt(sdkClient: Jean2Client | null) {
+export function useUpdatePrompt(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ name, body }: { name: string; body: UpdatePromptRequest }) =>
@@ -39,7 +39,7 @@ export function useUpdatePrompt(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useDeletePrompt(sdkClient: Jean2Client | null) {
+export function useDeletePrompt(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (name: string) =>

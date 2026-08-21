@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -16,7 +16,7 @@ import {
 import { platform } from '@/platform';
 
 interface VersionInfoProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   enabled: boolean;
 }
 

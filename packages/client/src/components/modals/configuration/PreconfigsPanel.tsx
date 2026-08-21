@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import type { Jean2Client, ModelWithStatus } from '@jean2/sdk';
+import type { ProkopaiClient, ModelWithStatus } from '@prokopai/sdk';
 import { usePreconfigsQuery, useCreatePreconfig, useUpdatePreconfig, useDeletePreconfig, useToolsQuery } from '@/hooks/queries';
 import { Layers, Plus, Pencil, Copy, Trash2, ArrowLeft, Loader2, Star, Check, X, Cpu, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 import { useServerDataStore } from '@/stores/serverDataStore';
 
 interface PanelProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 interface Preconfig {

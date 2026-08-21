@@ -1,7 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { useParams } from '@tanstack/react-router';
 import { useShallow } from 'zustand/react/shallow';
-import type { Jean2Client, WorkspaceSettings, PermissionGrant } from '@jean2/sdk';
+import type { ProkopaiClient, WorkspaceSettings, PermissionGrant } from '@prokopai/sdk';
 import { useUIStore } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useFileEditorStore } from '@/stores/fileEditorStore';
@@ -22,7 +22,7 @@ const FilePreviewOverlay = lazy(() =>
 interface ServerDialogsProps {
   apiToken: string | null;
   isConnected: boolean;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   onLogout: () => void;
   onConfigurationClose: () => void;
   permissions: PermissionGrant[];

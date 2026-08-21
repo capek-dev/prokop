@@ -196,7 +196,7 @@ export const WithPendingPermission: Story = {
         toolCallId: mockId('call'),
         sessionId: session.id,
         toolName: 'shell',
-        ask: createPermissionAsk() as import('@jean2/sdk').Ask,
+        ask: createPermissionAsk() as import('@prokopai/sdk').Ask,
       },
     ],
   },

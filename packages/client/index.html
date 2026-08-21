@@ -6,19 +6,19 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>Jean2</title>
+    <title>Prokopai</title>
     <script>
       (function() {
         var settings = null;
         try {
-          var raw = localStorage.getItem('jean2-theme-settings');
+          var raw = localStorage.getItem('prokopai-theme-settings');
           if (raw) {
             settings = JSON.parse(raw);
           }
         } catch (_) {}
         if (!settings) {
           try {
-            var legacy = localStorage.getItem('jean2-theme');
+            var legacy = localStorage.getItem('prokopai-theme');
             if (legacy) {
               settings = JSON.parse(legacy);
             }

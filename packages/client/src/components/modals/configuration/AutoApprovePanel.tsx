@@ -1,5 +1,5 @@
 import { ShieldOff, Shield, ShieldCheck, ShieldAlert } from 'lucide-react';
-import type { AutoApproveSeverity } from '@jean2/sdk';
+import type { AutoApproveSeverity } from '@prokopai/sdk';
 import { Label } from '@/components/ui/label';
 
 type SeverityLevel = Exclude<AutoApproveSeverity, null>;

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useRouterState } from '@tanstack/react-router';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useSessionStore } from '@/stores/sessionStore';
 import { parseOpenSessionIds } from '@/stores/sessionBoardStore';
 
@@ -15,7 +15,7 @@ import { parseOpenSessionIds } from '@/stores/sessionBoardStore';
  * causes the route sync to eventually filter them out.
  */
 export function useOverviewRouteSessionLoader(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   connected: boolean,
 ): void {
   const sessions = useSessionStore(s => s.sessions);
@@ -57,7 +57,7 @@ export function useOverviewRouteSessionLoader(
 
     for (const id of unknownIds) {
       fetchedRef.current.add(id);
-      sdkClient.http.sessions.get(id).then((response: { session: import('@jean2/sdk').Session }) => {
+      sdkClient.http.sessions.get(id).then((response: { session: import('@prokopai/sdk').Session }) => {
         addSessionToFront(response.session);
       }).catch(() => {
         // Session not found or error - leave it absent.

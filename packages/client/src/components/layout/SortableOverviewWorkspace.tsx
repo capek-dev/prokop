@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, ArrowUp, ArrowDown, X } from 'lucide-react';
-import type { Workspace } from '@jean2/sdk';
+import type { Workspace } from '@prokopai/sdk';
 import type { StoreActions } from '@/hooks/useOverviewGroups';
 
 interface SortableOverviewContainerProps {

@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Jean2Client, CreateResponseFormatRequest, UpdateResponseFormatRequest } from '@jean2/sdk';
+import type { ProkopaiClient, CreateResponseFormatRequest, UpdateResponseFormatRequest } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
 
-export function useResponseFormatsQuery(sdkClient: Jean2Client | null) {
+export function useResponseFormatsQuery(sdkClient: ProkopaiClient | null) {
   return useQuery({
     queryKey: queryKeys.config.responseFormats,
     queryFn: () => sdkClient!.http.responseFormats.list(),
@@ -10,7 +10,7 @@ export function useResponseFormatsQuery(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useCreateResponseFormat(sdkClient: Jean2Client | null) {
+export function useCreateResponseFormat(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateResponseFormatRequest) =>
@@ -21,7 +21,7 @@ export function useCreateResponseFormat(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useUpdateResponseFormat(sdkClient: Jean2Client | null) {
+export function useUpdateResponseFormat(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: UpdateResponseFormatRequest }) =>
@@ -32,7 +32,7 @@ export function useUpdateResponseFormat(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useDeleteResponseFormat(sdkClient: Jean2Client | null) {
+export function useDeleteResponseFormat(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>

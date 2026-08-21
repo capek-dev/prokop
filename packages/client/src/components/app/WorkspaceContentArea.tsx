@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { SessionBoard } from '@/components/board/SessionBoard';
 import { FileEditorSurface } from '@/components/editor/FileEditorSurface';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { useServerDataStore } from '@/stores/serverDataStore';
 import { useFileEditorStore, hasOpenDocsForScope } from '@/stores/fileEditorStore';
 import { cn } from '@/lib/utils';
 
-const EDITOR_WIDTH_STORAGE_KEY = 'jean2_editor_width_pct';
+const EDITOR_WIDTH_STORAGE_KEY = 'prokopai_editor_width_pct';
 const EDITOR_MIN_PCT = 25;
 const EDITOR_MAX_PCT = 80;
 const EDITOR_DEFAULT_PCT = 50;
@@ -34,7 +34,7 @@ function saveEditorWidthPct(pct: number): void {
 }
 
 interface WorkspaceContentAreaProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   serverUrl: string | null;
 }
 

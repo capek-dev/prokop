@@ -13,7 +13,7 @@ import {
   WidgetType,
   type DecorationSet,
 } from '@codemirror/view';
-import type { GitDiffHunk } from '@jean2/sdk';
+import type { GitDiffHunk } from '@prokopai/sdk';
 
 // --- Public Types ---
 

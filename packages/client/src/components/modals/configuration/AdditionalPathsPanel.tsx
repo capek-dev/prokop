@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Folder, Plus, X, FolderSymlink } from 'lucide-react';
-import type { Workspace } from '@jean2/sdk';
+import type { Workspace } from '@prokopai/sdk';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -10,7 +10,7 @@ import { FOLDER_ICON_COLOR } from '@/components/files/fileIcons';
 interface AdditionalPathsPanelProps {
   workspace: Workspace;
   onSave: (workspaceId: string, additionalPaths: string[]) => void;
-  sdkClient: import('@jean2/sdk').Jean2Client | null;
+  sdkClient: import('@prokopai/sdk').ProkopaiClient | null;
 }
 
 export function AdditionalPathsPanel({

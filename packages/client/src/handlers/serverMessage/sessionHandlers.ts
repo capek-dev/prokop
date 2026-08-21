@@ -1,4 +1,4 @@
-import type { Session, MessageWithParts, SessionControlState } from '@jean2/sdk';
+import type { Session, MessageWithParts, SessionControlState } from '@prokopai/sdk';
 import type { SessionHandlersContext, SessionUsage } from './types';
 import { useSessionControlStore } from '@/stores/sessionControlStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -376,7 +376,7 @@ export function handleSessionRenamed(
 }
 
 export function handleSessionInterrupted(
-  msg: { type: 'session.interrupted'; sessionId: string; result: import('@jean2/sdk').SessionInterruptResult },
+  msg: { type: 'session.interrupted'; sessionId: string; result: import('@prokopai/sdk').SessionInterruptResult },
   ctx: SessionHandlersContext,
 ): void {
   const { sessionId, result } = msg;

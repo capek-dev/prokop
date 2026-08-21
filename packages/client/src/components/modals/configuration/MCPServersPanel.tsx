@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Server, RefreshCw, Plug, PlugZap, ExternalLink, AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import type { McpStatus, McpServerConfig, Jean2Client } from '@jean2/sdk';
+import type { McpStatus, McpServerConfig, ProkopaiClient } from '@prokopai/sdk';
 import { useMcpStatusQuery, useMcpConnect, useMcpDisconnect, useMcpStartAuth } from '@/hooks/queries';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,7 @@ interface ServerStatus {
 
 interface MCPServersPanelProps {
   workspaceId: string | undefined;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 function StatusBadge({ status }: { status: McpStatus }) {

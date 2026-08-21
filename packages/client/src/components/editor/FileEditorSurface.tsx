@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, AlertCircle, X, Save, RotateCcw, Eye, Code2, RefreshCw, GitBranch, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Jean2Client, FileRevisionConflictDetails } from '@jean2/sdk';
-import { ApiError } from '@jean2/sdk';
+import type { ProkopaiClient, FileRevisionConflictDetails } from '@prokopai/sdk';
+import { ApiError } from '@prokopai/sdk';
 import {
   useFileEditorStore,
   isDocDirty,
@@ -33,7 +33,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 interface FileEditorSurfaceProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   serverId: string;
   workspaceId: string | undefined;
 }
@@ -429,7 +429,7 @@ interface ActiveFileBodyProps {
   onReload: () => void;
   onCancelConflict: () => void;
   onRetry: () => void;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 function ActiveFileBody({

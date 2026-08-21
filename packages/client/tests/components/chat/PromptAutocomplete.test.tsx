@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
-import type { PromptInfo } from '@jean2/sdk';
+import type { PromptInfo } from '@prokopai/sdk';
 import { PromptAutocomplete } from '@/components/chat/PromptAutocomplete';
 
 const prompts: PromptInfo[] = [

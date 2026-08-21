@@ -1,4 +1,4 @@
-import type { ClientDescriptor } from '@jean2/sdk';
+import type { ClientDescriptor } from '@prokopai/sdk';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { getPlatform } from '@/lib/platform';
 
@@ -31,10 +31,10 @@ export function getDisplayName(): string {
   const platform = getPlatform();
   switch (platform) {
     case 'electron':
-      return 'Jean2 Desktop';
+      return 'Prokopai Desktop';
     case 'web':
     default:
-      return 'Jean2 Web';
+      return 'Prokopai Web';
   }
 }
 

@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Loader2, File, ChevronRight, Folder } from 'lucide-react';
-import type { FileEntry, GitDiffSummary } from '@jean2/sdk';
-import type { Jean2Client } from '@jean2/sdk';
+import type { FileEntry, GitDiffSummary } from '@prokopai/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
@@ -25,7 +25,7 @@ export interface GitChangesViewHandle {
 
 interface GitChangesViewProps {
   workspaceId: string;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   root?: string;
   mode: 'grouped' | 'flat';
   searchQuery?: string;

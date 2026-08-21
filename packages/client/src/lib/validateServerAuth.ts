@@ -1,4 +1,4 @@
-import { HttpClient } from '@jean2/sdk';
+import { HttpClient } from '@prokopai/sdk';
 import { normalizeServerUrl } from '@/config/auth';
 
 export interface ServerAuthResult {

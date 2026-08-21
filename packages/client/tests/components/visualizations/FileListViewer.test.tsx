@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
-import type { FileListItem } from '@jean2/sdk';
+import type { FileListItem } from '@prokopai/sdk';
 import { FileListViewer } from '@/components/visualizations/FileListViewer';
 
 describe('FileListViewer', () => {

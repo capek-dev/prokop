@@ -1,4 +1,4 @@
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import { ToolsPanel } from './tools/ToolsPanel';
 interface ToolsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 export function ToolsDialog({

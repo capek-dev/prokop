@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { FileEntry, FileListResponse, Jean2Client } from '@jean2/sdk';
+import type { FileEntry, FileListResponse, ProkopaiClient } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
 
 const FILE_BROWSE_STALE_TIME_MS = 10_000;
@@ -16,7 +16,7 @@ export interface VisibleFileNode {
 }
 
 interface UseFlatFileTreeParams {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   workspaceId: string;
   showHidden: boolean;
   root?: string;

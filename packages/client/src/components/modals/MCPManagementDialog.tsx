@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Server, RefreshCw, Plug, PlugZap, ExternalLink, AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import type { McpStatus, McpServerConfig } from '@jean2/sdk';
-import type { Jean2Client } from '@jean2/sdk';
+import type { McpStatus, McpServerConfig } from '@prokopai/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useMcpStatusQuery, useMcpConnect, useMcpDisconnect, useMcpStartAuth } from '@/hooks/queries';
 import {
   Dialog,
@@ -25,7 +25,7 @@ interface MCPManagementDialogProps {
   onOpenChange: (open: boolean) => void;
   workspaceId: string | undefined;
   workspacePath: string | undefined;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 function StatusBadge({ status }: { status: McpStatus }) {

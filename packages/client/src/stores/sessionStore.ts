@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Session, Message, Part, MessageWithParts, QueuedMessage } from '@jean2/sdk';
+import type { Session, Message, Part, MessageWithParts, QueuedMessage } from '@prokopai/sdk';
 
 // --- Session Usage ---
 export type SessionUsage = {

@@ -14,8 +14,8 @@ import type {
   PromptInfo,
   AttachmentKind,
   AskResponse,
-} from '@jean2/sdk';
-import type { Jean2Client } from '@jean2/sdk';
+} from '@prokopai/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import type { SessionHandlersContext, ModelInfo } from '@/handlers/serverMessage/types';
 
 import { useServerContext } from '@/contexts/ServerContext';
@@ -53,7 +53,7 @@ export interface UseServerSessionManagerReturn {
   serverUrl: string | null;
   apiToken: string | null;
 
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 
   currentSession: Session | null;
   sessions: Session[];
@@ -142,7 +142,7 @@ export function useServerSessionManager({
   removeFromQuickConnectionsByWorkspace,
   quickConnections,
 }: UseServerSessionManagerParams): UseServerSessionManagerReturn {
-  const sdkClientRef = useRef<Jean2Client | null>(null);
+  const sdkClientRef = useRef<ProkopaiClient | null>(null);
   const currentSessionIdRef = useRef<string | null>(null);
   const sessionsRef = useRef<Session[]>([]);
   const sessionAccessTimesRef = useRef<Map<string, number>>(new Map());

@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { Lock, Eye, ArrowDown, ShieldOff, Wifi } from 'lucide-react';
-import type { Jean2Client, Message } from '@jean2/sdk';
-import type { Session, MessageWithParts, QueuedMessage, AttachmentKind, AskResponse } from '@jean2/sdk';
+import type { ProkopaiClient, Message } from '@prokopai/sdk';
+import type { Session, MessageWithParts, QueuedMessage, AttachmentKind, AskResponse } from '@prokopai/sdk';
 import { MessageInput } from './MessageInput';
 import type { MessageInputHandle } from './MessageInput';
 import { VirtualizedTranscript } from './VirtualizedTranscript';
@@ -13,8 +13,8 @@ import { useTranscriptPagination } from '@/hooks/useTranscriptPagination';
 import { RetryStatus } from './RetryStatus';
 
 export interface DisplayItem {
-  message: import('@jean2/sdk').Message;
-  parts: import('@jean2/sdk').Part[];
+  message: import('@prokopai/sdk').Message;
+  parts: import('@prokopai/sdk').Part[];
   isQueued?: boolean;
   queueId?: string;
 }
@@ -23,7 +23,7 @@ interface ChatViewProps {
   session: Session;
   messagesWithParts: MessageWithParts[];
   queuedMessages: QueuedMessage[];
-  prompts?: import('@jean2/sdk').PromptInfo[];
+  prompts?: import('@prokopai/sdk').PromptInfo[];
   onSendMessage: (content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number }) => void;
   onRemoveFromQueue: (queueId: string) => void;
   pendingAskRequests: PendingAskRequest[];
@@ -40,7 +40,7 @@ interface ChatViewProps {
   compactionSuccess?: boolean;
   onClearCompactionSuccess?: () => void;
   serverUrl?: string;
-  sdkClient?: Jean2Client | null;
+  sdkClient?: ProkopaiClient | null;
   inputRef?: React.RefObject<MessageInputHandle | null>;
   scrollToBottomRef?: React.RefObject<(() => void) | null>;
   autoFollowToggleRef?: React.RefObject<{ toggle: () => void } | null>;
@@ -302,7 +302,7 @@ export function ChatView({
           prompts={prompts}
           sessionId={session.id}
           modelSupportsImage={modelSupportsImage}
-          goalState={(session.metadata as Record<string, unknown> | null)?.goal as import('@jean2/sdk').GoalState | null ?? null}
+          goalState={(session.metadata as Record<string, unknown> | null)?.goal as import('@prokopai/sdk').GoalState | null ?? null}
           isStreaming={isStreaming}
           onStopStreaming={onInterrupt}
         />

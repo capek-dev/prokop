@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
 
-export function useToolsQuery(sdkClient: Jean2Client | null) {
+export function useToolsQuery(sdkClient: ProkopaiClient | null) {
   return useQuery({
     queryKey: queryKeys.tools.all,
     queryFn: () => sdkClient!.http.tools.list(),
@@ -10,7 +10,7 @@ export function useToolsQuery(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useToolEnvVarsQuery(sdkClient: Jean2Client | null) {
+export function useToolEnvVarsQuery(sdkClient: ProkopaiClient | null) {
   return useQuery({
     queryKey: queryKeys.tools.envVars,
     queryFn: () => sdkClient!.http.tools.listEnvVars(),
@@ -18,7 +18,7 @@ export function useToolEnvVarsQuery(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useToolSetEnvVar(sdkClient: Jean2Client | null) {
+export function useToolSetEnvVar(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -30,7 +30,7 @@ export function useToolSetEnvVar(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useToolClearEnvVar(sdkClient: Jean2Client | null) {
+export function useToolClearEnvVar(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
 
   return useMutation({

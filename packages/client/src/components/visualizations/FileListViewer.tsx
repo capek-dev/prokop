@@ -1,6 +1,6 @@
 import { FileEdit, Plus, Trash2, Search, FileText, Copy } from 'lucide-react';
 import { useState, useMemo } from 'react';
-import type { FileListItem } from '@jean2/sdk';
+import type { FileListItem } from '@prokopai/sdk';
 import { cn } from '@/lib/utils';
 import { RENDER_BUDGETS } from '@/lib/renderBudgets';
 

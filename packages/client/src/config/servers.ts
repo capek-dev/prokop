@@ -1,11 +1,11 @@
 // packages/client/src/config/servers.ts
 
-import type { SavedServer, QuickConnection } from '@jean2/sdk';
+import type { SavedServer, QuickConnection } from '@prokopai/sdk';
 import { normalizeServerUrl } from './auth';
 
 const STORAGE_KEYS = {
-  SERVERS: 'jean2_servers',
-  QUICK_CONNECTIONS: 'jean2_quick_connections',
+  SERVERS: 'prokopai_servers',
+  QUICK_CONNECTIONS: 'prokopai_quick_connections',
 } as const;
 
 /**

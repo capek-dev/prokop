@@ -1,6 +1,6 @@
 import { memo, useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, ExternalLink, Copy, Check, Wrench, Loader2, CheckCircle, XCircle, Clock, Pause } from 'lucide-react';
-import type { ToolPart, AnyVisualization, AskResponse, Session } from '@jean2/sdk';
+import type { ToolPart, AnyVisualization, AskResponse, Session } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { VisualizationRenderer } from '@/components/visualizations';

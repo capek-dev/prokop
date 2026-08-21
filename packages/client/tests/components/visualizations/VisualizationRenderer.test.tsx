@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import type { AnyVisualization } from '@jean2/sdk';
+import type { AnyVisualization } from '@prokopai/sdk';
 import { VisualizationRenderer } from '@/components/visualizations/VisualizationRenderer';
 
 describe('VisualizationRenderer', () => {

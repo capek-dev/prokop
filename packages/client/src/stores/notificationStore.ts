@@ -7,7 +7,7 @@ import type {
 } from '@/notifications/notificationSupport';
 import { storage } from '@/lib/storage';
 
-const STORAGE_KEY = 'jean2_notification_registration';
+const STORAGE_KEY = 'prokopai_notification_registration';
 
 interface NotificationStore {
   support: NotificationSupport;
@@ -56,8 +56,8 @@ export const useNotificationStore: UseBoundStore<StoreApi<NotificationStore>> = 
   permission: 'denied',
   registration: null,
   error: null,
-  notifyCompletion: loadBoolean('jean2_notify_completion', true),
-  notifyPermission: loadBoolean('jean2_notify_permission', true),
+  notifyCompletion: loadBoolean('prokopai_notify_completion', true),
+  notifyPermission: loadBoolean('prokopai_notify_permission', true),
 
   setSupport: (support) => set({ support }),
   setRegistrationState: (registrationState) => set({ registrationState }),
@@ -71,11 +71,11 @@ export const useNotificationStore: UseBoundStore<StoreApi<NotificationStore>> = 
   },
   setError: (error) => set({ error }),
   setNotifyCompletion: (enabled) => {
-    try { localStorage.setItem('jean2_notify_completion', String(enabled)); } catch { /* ignore */ }
+    try { localStorage.setItem('prokopai_notify_completion', String(enabled)); } catch { /* ignore */ }
     set({ notifyCompletion: enabled });
   },
   setNotifyPermission: (enabled) => {
-    try { localStorage.setItem('jean2_notify_permission', String(enabled)); } catch { /* ignore */ }
+    try { localStorage.setItem('prokopai_notify_permission', String(enabled)); } catch { /* ignore */ }
     set({ notifyPermission: enabled });
   },
   reset: () => {

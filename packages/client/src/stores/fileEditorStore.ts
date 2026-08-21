@@ -3,7 +3,7 @@ import type {
   EditableFileResponse,
   FileRevisionConflictDetails,
   SaveFileResponse,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 /**
  * A single open document is uniquely identified by the combination of

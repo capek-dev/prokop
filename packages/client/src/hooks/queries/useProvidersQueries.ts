@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
-import type { OAuthRedirectStrategy } from '@jean2/sdk';
+import type { OAuthRedirectStrategy } from '@prokopai/sdk';
 
-export function useProvidersQuery(sdkClient: Jean2Client | null) {
+export function useProvidersQuery(sdkClient: ProkopaiClient | null) {
   return useQuery({
     queryKey: queryKeys.config.providers.all,
     queryFn: () => sdkClient!.http.providers.list(),
@@ -11,7 +11,7 @@ export function useProvidersQuery(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useProviderCredentialsQuery(sdkClient: Jean2Client | null) {
+export function useProviderCredentialsQuery(sdkClient: ProkopaiClient | null) {
   return useQuery({
     queryKey: queryKeys.config.providers.credentials,
     queryFn: () => sdkClient!.http.providers.listCredentials(),
@@ -19,7 +19,7 @@ export function useProviderCredentialsQuery(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useConnectProvider(sdkClient: Jean2Client | null) {
+export function useConnectProvider(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ providerId, redirectStrategy }: { providerId: string; redirectStrategy?: OAuthRedirectStrategy }) =>
@@ -30,7 +30,7 @@ export function useConnectProvider(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useDisconnectProvider(sdkClient: Jean2Client | null) {
+export function useDisconnectProvider(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (providerId: string) =>
@@ -41,7 +41,7 @@ export function useDisconnectProvider(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useCompleteOAuth(sdkClient: Jean2Client | null) {
+export function useCompleteOAuth(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: { flowId: string; code: string; state: string; redirectUri: string }) =>
@@ -52,7 +52,7 @@ export function useCompleteOAuth(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useSetProviderCredential(sdkClient: Jean2Client | null) {
+export function useSetProviderCredential(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ provider, body }: {
@@ -65,7 +65,7 @@ export function useSetProviderCredential(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useClearProviderCredential(sdkClient: Jean2Client | null) {
+export function useClearProviderCredential(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (provider: string) =>

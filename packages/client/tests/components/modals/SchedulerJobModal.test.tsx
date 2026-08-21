@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import type { Jean2Client, ScheduledJob } from '@jean2/sdk';
+import type { ProkopaiClient, ScheduledJob } from '@prokopai/sdk';
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
@@ -19,7 +19,7 @@ vi.mock('@/stores/serverDataStore', () => ({
 
 import { SchedulerJobModal } from '@/components/modals/SchedulerJobModal';
 
-const sdkClient = {} as Jean2Client;
+const sdkClient = {} as ProkopaiClient;
 const workspaceId = 'ws-1';
 
 function makeEditingJob(overrides: Partial<ScheduledJob> = {}): ScheduledJob {

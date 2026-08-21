@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { dedupeAndSortSessions } from '@/lib/sessionUtils';
-import type { Session } from '@jean2/sdk';
+import type { Session } from '@prokopai/sdk';
 
 function makeSession(id: string, updatedAt: string, overrides: Partial<Session> = {}): Session {
   return {

@@ -10,7 +10,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { OverviewGroupDialog } from '@/components/modals/OverviewGroupDialog';
 import { useOverviewGroupsStore } from '@/stores/overviewGroupsStore';
-import type { Workspace } from '@jean2/sdk';
+import type { Workspace } from '@prokopai/sdk';
 
 interface WorkspaceGroupMembershipMenuProps {
   workspace: Workspace;

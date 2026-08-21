@@ -1,6 +1,6 @@
 import { Copy, Check, User, Bot, X, Clock, Undo2, GitBranch, Pin, PinOff, Pencil, X as XIcon, Loader2 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import type { Message } from '@jean2/sdk';
+import type { Message } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';

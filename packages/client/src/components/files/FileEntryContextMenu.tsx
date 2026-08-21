@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Eye, Pencil } from 'lucide-react';
-import type { FileEntry } from '@jean2/sdk';
+import type { FileEntry } from '@prokopai/sdk';
 import type { DefaultFileOpenMode } from '@/stores/uiStore';
 import {
   ContextMenu,

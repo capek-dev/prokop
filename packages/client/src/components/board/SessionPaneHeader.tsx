@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { GripVertical, X } from 'lucide-react';
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
-import type { Session, Preconfig, Workspace } from '@jean2/sdk';
+import type { Session, Preconfig, Workspace } from '@prokopai/sdk';
 import { ChatHeader } from '@/components/chat/ChatHeader';
 import { Button } from '@/components/ui/button';
 import { useSessionStore } from '@/stores/sessionStore';

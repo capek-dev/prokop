@@ -1,4 +1,4 @@
-import type { Preconfig, Workspace } from '@jean2/sdk';
+import type { Preconfig, Workspace } from '@prokopai/sdk';
 
 /**
  * Returns the preconfig IDs selected for a workspace.

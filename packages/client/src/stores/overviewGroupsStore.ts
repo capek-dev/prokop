@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { QuickConnection } from '@jean2/sdk';
+import type { QuickConnection } from '@prokopai/sdk';
 import type { OverviewGroupsDocument } from '@/config/overviewGroupsTypes';
 import {
   loadOverviewGroups,

@@ -1,4 +1,4 @@
-interface Jean2ElectronAPI {
+interface ProkopaiElectronAPI {
   platform: 'electron';
   store: {
     get<T>(key: string): Promise<T | null>;
@@ -24,7 +24,8 @@ interface Jean2ElectronAPI {
 
 declare global {
   interface Window {
-    __JEAN2_ELECTRON__?: Jean2ElectronAPI;
+    __PROKOPAI_ELECTRON__?: ProkopaiElectronAPI;
+    __JEAN2_ELECTRON__?: ProkopaiElectronAPI;
   }
 }
 

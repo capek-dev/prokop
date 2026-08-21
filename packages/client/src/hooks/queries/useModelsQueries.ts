@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Jean2Client, CreateModelRequest } from '@jean2/sdk';
+import type { ProkopaiClient, CreateModelRequest } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
 import { useServerDataStore } from '@/stores/serverDataStore';
 
@@ -7,13 +7,13 @@ interface ModelsConfigResponse {
   providers: Array<{
     id: string;
     name: string;
-    models: Array<import('@jean2/sdk').ModelWithStatus>;
+    models: Array<import('@prokopai/sdk').ModelWithStatus>;
   }>;
   defaultModel: string;
   defaultProvider: string;
 }
 
-export function useModelsConfigQuery(sdkClient: Jean2Client | null) {
+export function useModelsConfigQuery(sdkClient: ProkopaiClient | null) {
   return useQuery({
     queryKey: queryKeys.config.models,
     queryFn: (): Promise<ModelsConfigResponse> =>
@@ -22,14 +22,14 @@ export function useModelsConfigQuery(sdkClient: Jean2Client | null) {
   });
 }
 
-async function syncModelsToStoreAndCache(sdkClient: Jean2Client, queryClient: import('@tanstack/react-query').QueryClient) {
+async function syncModelsToStoreAndCache(sdkClient: ProkopaiClient, queryClient: import('@tanstack/react-query').QueryClient) {
   const data = await sdkClient.http.config.models.get() as ModelsConfigResponse;
   const usableModels = data.providers.flatMap(p => p.models).filter(m => m.runtimeStatus?.usable);
   useServerDataStore.getState().updateModels(usableModels, data.defaultModel, data.defaultProvider);
   queryClient.setQueryData(queryKeys.config.models, data);
 }
 
-export function useCreateProvider(sdkClient: Jean2Client | null) {
+export function useCreateProvider(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { id: string; name: string }) =>
@@ -40,7 +40,7 @@ export function useCreateProvider(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useUpdateProvider(sdkClient: Jean2Client | null) {
+export function useUpdateProvider(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ providerId, body }: { providerId: string; body: { name: string } }) =>
@@ -51,7 +51,7 @@ export function useUpdateProvider(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useDeleteProvider(sdkClient: Jean2Client | null) {
+export function useDeleteProvider(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (providerId: string) =>
@@ -62,7 +62,7 @@ export function useDeleteProvider(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useCreateModel(sdkClient: Jean2Client | null) {
+export function useCreateModel(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ providerId, body }: { providerId: string; body: CreateModelRequest }) =>
@@ -73,7 +73,7 @@ export function useCreateModel(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useUpdateModel(sdkClient: Jean2Client | null) {
+export function useUpdateModel(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ providerId, modelId, body }: {
@@ -87,7 +87,7 @@ export function useUpdateModel(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useDeleteModel(sdkClient: Jean2Client | null) {
+export function useDeleteModel(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ providerId, modelId }: { providerId: string; modelId: string }) =>
@@ -98,7 +98,7 @@ export function useDeleteModel(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useSetModelDefaults(sdkClient: Jean2Client | null) {
+export function useSetModelDefaults(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: { defaultProvider: string; defaultModel: string }) =>
@@ -109,7 +109,7 @@ export function useSetModelDefaults(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useSyncModels(sdkClient: Jean2Client | null) {
+export function useSyncModels(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (mode: 'merge' | 'override') =>

@@ -6,7 +6,7 @@ Three deployment targets:
 
 - **Web / PWA** — Browser-based with offline support and installable as a PWA
 - **Electron Desktop** — Native macOS and Windows application with multi-window support
-- **Web CLI** — Run locally via `npx @jean2/client`
+- **Web CLI** — Run locally via `npx @prokopai/client`
 
 ## Features
 
@@ -60,11 +60,11 @@ bun run build:npx
 ## Running via npx
 
 ```bash
-npx @jean2/client
+npx @prokopai/client
 # Opens browser to http://localhost:3774
 
 # Custom port
-npx @jean2/client --port 8080
+npx @prokopai/client --port 8080
 ```
 
 The CLI bundles the built web assets and serves them with a static Node.js HTTP server.
@@ -132,7 +132,7 @@ packages/client/
 
 ## Architecture
 
-The client connects to a Jean2 server via WebSocket (`ws://host:port/ws?token=...`) for real-time events and REST (`http://host:port/api`) for initial data loading. Authentication is optional — when the server has `JEAN2_AUTH_TOKEN` set, all requests require the bearer token. When not set, all requests pass through without authentication.
+The client connects to a Jean2 server via WebSocket (`ws://host:port/ws?token=...`) for real-time events and REST (`http://host:port/api`) for initial data loading. Authentication is optional — when the server has `PROKOPAI_AUTH_TOKEN` set, all requests require the bearer token. When not set, all requests pass through without authentication.
 
 **WebSocket protocol** handles session CRUD, message streaming (including delta-based text append), part creation/updates, ask requests (permissions, questions, forms, client capabilities), permission responses, queue management, usage tracking, and compaction events. The `App.tsx` handler dispatches all `ServerMessage` types into React state.
 

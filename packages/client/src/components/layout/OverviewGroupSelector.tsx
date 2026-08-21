@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Workspace } from '@jean2/sdk';
+import type { Workspace } from '@prokopai/sdk';
 import {
   Check,
   ChevronsUpDown,

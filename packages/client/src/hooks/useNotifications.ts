@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useSdkClient } from '@/contexts/ServerClientContext';
 import { hydrateNotificationRegistration, useNotificationStore } from '@/stores/notificationStore';
 import { enableNotifications, disableNotifications, updatePreferences, reconcileSubscription, initNotificationSupport } from '@/notifications/subscriptionManager';
@@ -78,4 +78,4 @@ export function useNotifications(serverInfo: ServerInfo | null) {
 
 // Re-export the store hook for convenience
 export { useNotificationStore };
-export type { Jean2Client };
+export type { ProkopaiClient };

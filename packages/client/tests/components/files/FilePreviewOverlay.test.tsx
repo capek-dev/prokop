@@ -3,12 +3,12 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { Jean2Client, ServerError } from '@jean2/sdk';
+import { ProkopaiClient, ServerError } from '@prokopai/sdk';
 import FilePreviewOverlay from '@/components/files/FilePreviewOverlay';
 import type { FilePreviewTarget } from '@/stores/uiStore';
 
-vi.mock('@jean2/sdk', () => ({
-  Jean2Client: vi.fn(),
+vi.mock('@prokopai/sdk', () => ({
+  ProkopaiClient: vi.fn(),
   ServerError: class MockServerError extends Error {
     statusCode: number;
     constructor(message: string, statusCode: number) {
@@ -22,7 +22,7 @@ vi.mock('@jean2/sdk', () => ({
 const mockPreviewFn = vi.fn();
 const mockGitDiffFn = vi.fn();
 
-function makeSdkClient(): Jean2Client {
+function makeSdkClient(): ProkopaiClient {
   return {
     http: {
       files: {
@@ -30,7 +30,7 @@ function makeSdkClient(): Jean2Client {
         gitDiff: mockGitDiffFn,
       },
     },
-  } as unknown as Jean2Client;
+  } as unknown as ProkopaiClient;
 }
 
 function makeWrapper(client: QueryClient) {

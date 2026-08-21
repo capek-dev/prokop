@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import type { ResponseFormat } from '@jean2/sdk';
+import type { ResponseFormat } from '@prokopai/sdk';
 
 interface ResponseFormatSelectorProps {
   formats: ResponseFormat[];

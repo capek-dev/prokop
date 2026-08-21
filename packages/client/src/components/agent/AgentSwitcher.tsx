@@ -28,7 +28,7 @@ import {
 import { Bot, ChevronsUpDown, Check, Plus, MoreHorizontal, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PromoteDialog } from '@/components/agent/PromoteDialog';
-import type { Agent } from '@jean2/sdk';
+import type { Agent } from '@prokopai/sdk';
 
 export function AgentSwitcher() {
   const router = useRouter();

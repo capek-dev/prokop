@@ -1,5 +1,5 @@
 import { getSavedServers } from '@/config/servers';
-import type { SavedServer } from '@jean2/sdk';
+import type { SavedServer } from '@prokopai/sdk';
 
 export interface ServerRegistry {
   getServer: (id: string) => SavedServer | undefined;

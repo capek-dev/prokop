@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronLeft, Folder, Loader2, Check, Search, HardDrive } from 'lucide-react';
-import type { FileEntry } from '@jean2/sdk';
-import type { Jean2Client } from '@jean2/sdk';
+import type { FileEntry } from '@prokopai/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { join } from '@/lib/path';
 import {
   Dialog,
@@ -23,7 +23,7 @@ interface FolderPickerDialogProps {
   onSelect: (path: string) => void;
   initialPath?: string;
   title?: string;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 export function FolderPickerDialog({

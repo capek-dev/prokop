@@ -1,5 +1,5 @@
-import { getTerminalNotificationEventId } from '@jean2/sdk';
-import type { CompactionCompleteMessage, Message, Part, ToolPart } from '@jean2/sdk';
+import { getTerminalNotificationEventId } from '@prokopai/sdk';
+import type { CompactionCompleteMessage, Message, Part, ToolPart } from '@prokopai/sdk';
 import type { SessionHandlersContext, SessionUsage } from './types';
 import { useSessionStore } from '@/stores/sessionStore';
 import { queryClient } from '@/components/providers/QueryProvider';

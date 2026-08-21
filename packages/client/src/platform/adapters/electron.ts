@@ -1,7 +1,7 @@
 import type { IJean2Platform, PlatformSoundKey } from '../types';
 
 export function createElectronAdapter(): IJean2Platform {
-  const api = window.__JEAN2_ELECTRON__!;
+  const api = window.__PROKOPAI_ELECTRON__ ?? window.__JEAN2_ELECTRON__!;
 
   return {
     id: 'electron',

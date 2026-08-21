@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { Key, Boxes, FileText, Layers, Link2, Braces, Terminal, User, Palette, Keyboard, Wrench, FolderOpen } from 'lucide-react';
 import {
   Dialog,
@@ -44,7 +44,7 @@ function PanelLoadingFallback() {
 interface ConfigurationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   apiToken: string | null;
   isConnected: boolean;
   onLogout: () => void;
@@ -77,7 +77,7 @@ const SECTIONS: SectionDef[] = [
   { value: 'tools', label: 'Tools', icon: Wrench, group: 'server' },
 ];
 
-function renderPanel(value: ConfigurationSection, sdkClient: Jean2Client | null, extra: { apiToken: string | null; isConnected: boolean; onLogout: () => void; open: boolean }) {
+function renderPanel(value: ConfigurationSection, sdkClient: ProkopaiClient | null, extra: { apiToken: string | null; isConnected: boolean; onLogout: () => void; open: boolean }) {
   return (
     <Suspense fallback={<PanelLoadingFallback />}>
       {(() => {

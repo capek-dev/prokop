@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useProviderCredentialsQuery, useSetProviderCredential, useClearProviderCredential } from '@/hooks/queries';
 import { Key, Check, X, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 
 interface PanelProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 interface ProviderCredentialStatus {

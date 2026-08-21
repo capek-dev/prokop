@@ -1,4 +1,4 @@
-import type { ScheduledJob } from '@jean2/sdk';
+import type { ScheduledJob } from '@prokopai/sdk';
 
 export function formatNextRun(job: ScheduledJob, now: number = Date.now()): string {
   if (job.state === 'paused') return 'Paused';

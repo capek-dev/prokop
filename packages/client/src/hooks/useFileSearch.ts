@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { FileEntry } from '@jean2/sdk';
+import type { FileEntry } from '@prokopai/sdk';
 
 interface UseFileSearchOptions {
   workspaceId: string;

@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Jean2Client, PinnedMessage } from '@jean2/sdk';
+import type { ProkopaiClient, PinnedMessage } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
 
 export function usePinnedMessagesQuery(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | null | undefined,
 ) {
   return useQuery({
@@ -20,7 +20,7 @@ export function usePinnedMessagesQuery(
 }
 
 export function usePinMessageMutation(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | null | undefined,
 ) {
   const queryClient = useQueryClient();
@@ -39,7 +39,7 @@ export function usePinMessageMutation(
 }
 
 export function useUnpinMessageMutation(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | null | undefined,
 ) {
   const queryClient = useQueryClient();

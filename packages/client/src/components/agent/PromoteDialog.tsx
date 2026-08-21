@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Preconfig } from '@jean2/sdk';
+import type { Preconfig } from '@prokopai/sdk';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useSdkClient } from '@/contexts/ServerClientContext';
 import { usePromoteAgent } from '@/hooks/queries';

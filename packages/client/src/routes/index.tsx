@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import type { SavedServer } from '@jean2/sdk';
+import type { SavedServer } from '@prokopai/sdk';
 import { Plus, RefreshCw, Server, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useServerContext } from '@/contexts/ServerContext';

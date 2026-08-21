@@ -64,13 +64,13 @@ describe('notificationStore', () => {
   it('setNotifyCompletion updates state and persists to localStorage', () => {
     useNotificationStore.getState().setNotifyCompletion(false);
     expect(useNotificationStore.getState().notifyCompletion).toBe(false);
-    expect(localStorage.getItem('jean2_notify_completion')).toBe('false');
+    expect(localStorage.getItem('prokopai_notify_completion')).toBe('false');
   });
 
   it('setNotifyPermission updates state and persists to localStorage', () => {
     useNotificationStore.getState().setNotifyPermission(false);
     expect(useNotificationStore.getState().notifyPermission).toBe(false);
-    expect(localStorage.getItem('jean2_notify_permission')).toBe('false');
+    expect(localStorage.getItem('prokopai_notify_permission')).toBe('false');
   });
 
   it('setError sets error message', () => {

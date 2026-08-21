@@ -11,8 +11,8 @@ import type {
   AssistantMessage,
   AskResponse,
   StructuredOutputData,
-} from '@jean2/sdk';
-import { isAssistantMessage } from '@jean2/sdk';
+} from '@prokopai/sdk';
+import { isAssistantMessage } from '@prokopai/sdk';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Minimize2, RotateCcw, AlertTriangle, CheckCircle2 } from 'lucide-react';

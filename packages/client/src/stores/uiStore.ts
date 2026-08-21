@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { PermissionRiskLevel, ScheduledJob } from '@jean2/sdk';
+import type { PermissionRiskLevel, ScheduledJob } from '@prokopai/sdk';
 import type { UseBoundStore, StoreApi } from 'zustand';
 
 // --- Configuration Section (deep-linking) ---
@@ -77,9 +77,9 @@ interface SchedulerModalActions {
 }
 
 // --- Settings ---
-const CHAT_FINISH_SOUND_KEY = 'jean2_sound_chat_finish_enabled';
-const PERMISSION_SOUND_KEY = 'jean2_sound_permission_enabled';
-const DEFAULT_FILE_OPEN_MODE_KEY = 'jean2_default_file_open_mode';
+const CHAT_FINISH_SOUND_KEY = 'prokopai_sound_chat_finish_enabled';
+const PERMISSION_SOUND_KEY = 'prokopai_sound_permission_enabled';
+const DEFAULT_FILE_OPEN_MODE_KEY = 'prokopai_default_file_open_mode';
 
 const getStoredBoolean = (key: string, fallback: boolean): boolean => {
   if (typeof window === 'undefined') return fallback;
@@ -106,7 +106,7 @@ interface SettingsActions {
 }
 
 // --- Auto-Approve Severity ---
-const AUTO_APPROVE_KEY = 'jean2_auto_approve_severity';
+const AUTO_APPROVE_KEY = 'prokopai_auto_approve_severity';
 
 function loadAutoApproveMap(): Record<string, PermissionRiskLevel | 'off'> {
   if (typeof window === 'undefined') return {};

@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { ArrowUp, Square, Paperclip, AlertTriangle, Target, ChevronDown } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import type { FileEntry, PromptInfo, AttachmentKind } from '@jean2/sdk';
+import type { FileEntry, PromptInfo, AttachmentKind } from '@prokopai/sdk';
 import { FileAutocomplete } from '@/components/files/FileAutocomplete';
 import { PromptAutocomplete } from '@/components/chat/PromptAutocomplete';
 import { PendingAttachment } from './PendingAttachment';
@@ -29,11 +29,11 @@ interface MessageInputProps {
   onStopStreaming?: () => void;
   placeholder?: string;
   workspaceId?: string;
-  sdkClient?: Jean2Client | null;
+  sdkClient?: ProkopaiClient | null;
   prompts?: PromptInfo[];
   sessionId?: string;
   modelSupportsImage?: boolean;
-  goalState?: import('@jean2/sdk').GoalState | null;
+  goalState?: import('@prokopai/sdk').GoalState | null;
 }
 
 interface PendingAttachmentData {

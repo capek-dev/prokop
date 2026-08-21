@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
-import type { GitDiffChange, GitDiffHunk } from '@jean2/sdk';
+import type { GitDiffChange, GitDiffHunk } from '@prokopai/sdk';
 import {
   createGitDiffExtension,
   isGitDiffRemovedContentTruncated,

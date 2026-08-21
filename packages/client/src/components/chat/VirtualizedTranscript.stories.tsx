@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import type { MessageWithParts } from '@jean2/sdk';
+import type { MessageWithParts } from '@prokopai/sdk';
 import { VirtualizedTranscript } from './VirtualizedTranscript';
 import {
   createUserMessageWithParts,
@@ -251,7 +251,7 @@ export const WithPendingPermission: Story = {
         toolCallId: mockId('call'),
         sessionId: session.id,
         toolName: 'shell',
-        ask: createPermissionAsk() as import('@jean2/sdk').Ask,
+        ask: createPermissionAsk() as import('@prokopai/sdk').Ask,
       },
     ],
   },

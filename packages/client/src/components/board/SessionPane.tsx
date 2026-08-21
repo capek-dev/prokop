@@ -1,6 +1,6 @@
 import { useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
-import type { Part, Message, Jean2Client } from '@jean2/sdk';
+import type { Part, Message, ProkopaiClient } from '@prokopai/sdk';
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
 import { ChatView } from '@/components/chat/ChatView';
 import type { MessageInputHandle } from '@/components/chat/MessageInput';
@@ -21,7 +21,7 @@ import {
 import { SessionPaneHeader } from './SessionPaneHeader';
 import { useSessionPaneRegistry } from '@/contexts/SessionPaneRegistryContext';
 import type { SessionPaneHandle } from '@/contexts/SessionPaneRegistryContext';
-import type { QueuedMessage } from '@jean2/sdk';
+import type { QueuedMessage } from '@prokopai/sdk';
 
 const EMPTY_PARTS: Part[] = [];
 const EMPTY_QUEUE: QueuedMessage[] = [];
@@ -29,7 +29,7 @@ const DEFAULT_NAV_INTENT: SessionNavigationIntent = { mode: 'follow' };
 
 export interface SessionPaneProps {
   sessionId: string;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   serverUrl: string | null;
   isFocused: boolean;
   isCompact: boolean;
@@ -144,7 +144,7 @@ export function SessionPane({
 
   const handleSendMessage = useCallback((
     content: string,
-    attachments?: Array<{ id: string; kind: import('@jean2/sdk').AttachmentKind }>,
+    attachments?: Array<{ id: string; kind: import('@prokopai/sdk').AttachmentKind }>,
     responseFormatId?: string,
     goal?: { condition: string; maxTurns?: number },
   ) => {

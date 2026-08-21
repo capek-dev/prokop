@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import type { TodoListItem } from '@jean2/sdk';
+import type { TodoListItem } from '@prokopai/sdk';
 import { TodoList } from '@/components/visualizations/TodoList';
 
 const baseItem: TodoListItem = {

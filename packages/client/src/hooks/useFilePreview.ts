@@ -1,11 +1,11 @@
 import { useFilePreviewQuery } from '@/hooks/queries/useFileQueries';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 
 interface UseFilePreviewOptions {
   workspaceId: string | undefined;
   path: string | undefined;
   root?: string;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   enabled: boolean;
 }
 

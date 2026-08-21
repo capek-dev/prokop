@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SessionControlState } from '@jean2/sdk';
+import type { SessionControlState } from '@prokopai/sdk';
 
 export interface ActionRejection {
   sessionId: string;

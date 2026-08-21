@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Check, ChevronsUpDown, Cpu, Brain, Bot, Cog } from 'lucide-react';
-import type { Preconfig } from '@jean2/sdk';
+import type { Preconfig } from '@prokopai/sdk';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { Button } from '@/components/ui/button';
 import {

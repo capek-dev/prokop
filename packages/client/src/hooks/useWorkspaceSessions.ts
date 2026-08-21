@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useSessionStore } from '@/stores/sessionStore';
 import { queryKeys } from '@/lib/queryKeys';
 import { dedupeAndSortSessions } from '@/lib/sessionUtils';
@@ -8,7 +8,7 @@ import { dedupeAndSortSessions } from '@/lib/sessionUtils';
 const WORKSPACE_PAGE_SIZE = 100;
 
 interface UseWorkspaceSessionsParams {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   workspaceId: string | null;
   connected: boolean;
 }

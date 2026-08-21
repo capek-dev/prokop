@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
-import type { ScheduledJob, Session } from '@jean2/sdk';
+import type { ScheduledJob, Session } from '@prokopai/sdk';
 
 vi.mock('@/hooks/useNow', () => ({
   useNow: () => Date.now(),

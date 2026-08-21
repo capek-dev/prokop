@@ -5,8 +5,8 @@ import type {
   Preconfig,
   AttachmentKind,
   AskResponse,
-} from '@jean2/sdk';
-import type { Jean2Client } from '@jean2/sdk';
+} from '@prokopai/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import type { PendingSessionCreateIntent } from '@/stores/sessionBoardStore';
@@ -15,7 +15,7 @@ import type { ResumeSessionOptions } from '@/stores/sessionStore';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
 
 interface UseSessionCommandsParams {
-  clientRef: React.RefObject<Jean2Client | null>;
+  clientRef: React.RefObject<ProkopaiClient | null>;
   currentSession: Session | null;
   sessions: Session[];
   workspaces: Workspace[];

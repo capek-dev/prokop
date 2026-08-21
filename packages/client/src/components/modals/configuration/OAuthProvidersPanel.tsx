@@ -1,12 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Unplug, Copy, Check, ClipboardPaste, RefreshCw } from 'lucide-react';
-import type { Jean2Client, ProviderStatus } from '@jean2/sdk';
+import type { ProkopaiClient, ProviderStatus } from '@prokopai/sdk';
 import { useProvidersQuery, useConnectProvider, useDisconnectProvider, useCompleteOAuth } from '@/hooks/queries';
 import { Button } from '@/components/ui/button';
 
 interface PanelProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 interface PendingAuth {

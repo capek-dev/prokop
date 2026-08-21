@@ -5,7 +5,7 @@ import {useKeyboardShortcuts} from '@/hooks/useKeyboardShortcuts';
 import {useChatLayoutStore} from '@/stores/chatLayoutStore';
 import {useServerDataStore} from '@/stores/serverDataStore';
 import type {AppSidebarHandle} from '@/components/layout/AppSidebar';
-import type {Preconfig, Workspace} from '@jean2/sdk';
+import type {Preconfig, Workspace} from '@prokopai/sdk';
 import { platform, hasCapability } from '@/platform';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
 import { useBoardFocus } from '@/hooks/useBoardFocus';

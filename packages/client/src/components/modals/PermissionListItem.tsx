@@ -1,5 +1,5 @@
 import { Trash2, Shield, Eye, Pencil, Trash, Globe, Terminal } from 'lucide-react';
-import type { PermissionGrant } from '@jean2/sdk';
+import type { PermissionGrant } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 

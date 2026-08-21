@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { File, Folder, Loader2 } from 'lucide-react';
-import type { FileEntry } from '@jean2/sdk';
-import type { Jean2Client } from '@jean2/sdk';
+import type { FileEntry } from '@prokopai/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { FOLDER_ICON_COLOR } from './fileIcons';
@@ -15,7 +15,7 @@ interface FileAutocompleteProps {
   onSelect: (file: FileEntry) => void;
   onFilesChange: (files: FileEntry[]) => void;
   showHidden?: boolean;
-  sdkClient?: Jean2Client | null;
+  sdkClient?: ProkopaiClient | null;
 }
 
 function splitPath(filePath: string): { fileName: string; dirPath: string } {

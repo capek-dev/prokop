@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
 
 export function useWorkspaceTagsQuery(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | null,
 ) {
   return useQuery({

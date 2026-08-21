@@ -1,10 +1,10 @@
 import { useCallback, useRef } from 'react';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useSessionStore } from '@/stores/sessionStore';
 
 interface UseTranscriptPaginationParams {
   sessionId: string | undefined;
-  client: Jean2Client | null;
+  client: ProkopaiClient | null;
 }
 
 export function useTranscriptPagination({

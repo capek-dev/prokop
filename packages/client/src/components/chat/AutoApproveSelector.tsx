@@ -15,13 +15,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import type { AutoApproveSeverity } from '@jean2/sdk';
-import type { Jean2Client } from '@jean2/sdk';
+import type { AutoApproveSeverity } from '@prokopai/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useSessionStore } from '@/stores/sessionStore';
 
 interface AutoApproveSelectorProps {
   sessionId: string;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   disabled?: boolean;
 }
 

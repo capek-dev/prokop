@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import { useAskStore, type PendingAskRequest } from '@/stores/askStore';
-import type { Ask } from '@jean2/sdk';
+import type { Ask } from '@prokopai/sdk';
 
 const permissionAsk: Ask = { type: 'permission', question: 'Allow read-file?', resource: '/etc/passwd' };
 const genericAsk: Ask = { type: 'text', question: 'Continue?', target: 'human' };

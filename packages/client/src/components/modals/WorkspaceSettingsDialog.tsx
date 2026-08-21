@@ -1,6 +1,6 @@
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { Brain, Wrench, Search, Workflow, Server, Shield, FolderSymlink, Clock, ShieldCheck, Cog, Loader2 } from 'lucide-react';
-import type { Workspace, WorkspaceSettings, WorkspacePreconfigSettings, PermissionRiskLevel, PermissionGrant, Jean2Client, AutoApproveSeverity } from '@jean2/sdk';
+import type { Workspace, WorkspaceSettings, WorkspacePreconfigSettings, PermissionRiskLevel, PermissionGrant, ProkopaiClient, AutoApproveSeverity } from '@prokopai/sdk';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import {
   Dialog,
@@ -68,7 +68,7 @@ interface WorkspaceSettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   workspace: Workspace;
   onSave: (workspaceId: string, settings: WorkspaceSettings) => void;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   permissions: PermissionGrant[];
   onRefreshPermissions: () => void;
   onRevokePermission: (permissionId: string) => void;

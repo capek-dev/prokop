@@ -4,8 +4,8 @@ import type {
   AttachmentKind,
   AskResponse,
   Message,
-} from '@jean2/sdk';
-import type { Jean2Client } from '@jean2/sdk';
+} from '@prokopai/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
@@ -20,7 +20,7 @@ import { usePinnedMessagesQuery, usePinMessageMutation, useUnpinMessageMutation 
 
 export interface AppMainContentProps {
   serverUrl: string | null;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   messagesWithParts: MessageWithParts[];
   inputRef: React.RefObject<MessageInputHandle | null>;
   onRetry: () => void;

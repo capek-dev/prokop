@@ -15,7 +15,7 @@ import {
   Loader2,
   Bell,
 } from 'lucide-react';
-import type { ScheduledJob, Session } from '@jean2/sdk';
+import type { ScheduledJob, Session } from '@prokopai/sdk';
 import {
   Collapsible,
   CollapsibleContent,

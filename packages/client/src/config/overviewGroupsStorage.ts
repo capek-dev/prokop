@@ -1,4 +1,4 @@
-import type { QuickConnection } from '@jean2/sdk';
+import type { QuickConnection } from '@prokopai/sdk';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
 import type { OverviewGroup, OverviewGroupsDocument } from './overviewGroupsTypes';
 

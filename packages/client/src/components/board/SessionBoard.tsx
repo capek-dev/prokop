@@ -20,7 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useSessionBoardStore, serializeOpenSessionIds } from '@/stores/sessionBoardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
@@ -31,7 +31,7 @@ import { useBoardFocus } from '@/hooks/useBoardFocus';
 import { cn } from '@/lib/utils';
 
 export interface SessionBoardProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   serverUrl: string | null;
 }
 

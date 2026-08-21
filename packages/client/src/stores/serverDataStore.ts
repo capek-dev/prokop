@@ -6,7 +6,7 @@ import type {
   ModelWithStatus,
   ProviderStatus,
   Agent,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 interface ServerDataState {
   serverId: string | null;

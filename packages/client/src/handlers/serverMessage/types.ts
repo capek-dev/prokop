@@ -8,7 +8,7 @@ import type {
   Ask,
   AskResponse,
   SessionControlState,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import type { PendingAskRequest } from '@/stores/askStore';
 import type { CompletionRecord } from '@/stores/completionStore';
 
@@ -66,8 +66,8 @@ export interface SessionHandlersContext {
   removeStreamingSession: (sessionId: string) => void;
   addInterruptedSession: (sessionId: string) => void;
   removeInterruptedSession: (sessionId: string) => void;
-  setQueuedMessagesForSession: (sessionId: string, messages: import('@jean2/sdk').QueuedMessage[]) => void;
-  addQueuedMessage: (sessionId: string, message: import('@jean2/sdk').QueuedMessage) => void;
+  setQueuedMessagesForSession: (sessionId: string, messages: import('@prokopai/sdk').QueuedMessage[]) => void;
+  addQueuedMessage: (sessionId: string, message: import('@prokopai/sdk').QueuedMessage) => void;
   removeQueuedMessageById: (sessionId: string, queueId: string) => void;
   clearQueuedMessages: () => void;
   setCompactionSuccess: (success: boolean) => void;
@@ -89,7 +89,7 @@ export interface SessionHandlersContext {
   sessionsRef: React.MutableRefObject<Session[]>;
   flushPendingPartAppends: () => void;
   beginSessionContentLoad: (sessionId: string) => void;
-  replaceSessionContent: (sessionId: string, messagesWithParts: import('@jean2/sdk').MessageWithParts[], metadata?: { hasOlder?: boolean; oldestSequence?: number | null; newestSequence?: number | null }) => void;
+  replaceSessionContent: (sessionId: string, messagesWithParts: import('@prokopai/sdk').MessageWithParts[], metadata?: { hasOlder?: boolean; oldestSequence?: number | null; newestSequence?: number | null }) => void;
   failSessionContentLoad: (sessionId: string, error: string) => void;
   touchSessionContent: (sessionId: string) => void;
   setProviderStatuses: React.Dispatch<React.SetStateAction<ProviderStatus[]>>;
@@ -110,7 +110,7 @@ export interface SessionHandlersContext {
   replacePendingPermissionRequests: (requests: PendingAskRequest[]) => void;
   clearPendingAskRequests: () => void;
   clearPendingAskRequestsBySessionId: (sessionId: string) => void;
-  runAskHandlers: (target: import('@jean2/sdk').AskTarget, request: import('@/stores/askStore').PendingAskRequest) => Promise<AskResponse | undefined> | undefined;
+  runAskHandlers: (target: import('@prokopai/sdk').AskTarget, request: import('@/stores/askStore').PendingAskRequest) => Promise<AskResponse | undefined> | undefined;
   sendAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   acknowledgeNotification: (eventId: string, sessionId: string) => void;
   resumeSessionAfterCreate: (sessionId: string) => void;
@@ -124,7 +124,7 @@ export type SessionHandlers = {
   'session.deleted': (msg: { type: 'session.deleted'; sessionId: string }, ctx: SessionHandlersContext) => void;
   'session.updated': (msg: { type: 'session.updated'; session: Session }, ctx: SessionHandlersContext) => void;
   'session.renamed': (msg: { type: 'session.renamed'; session: Session }, ctx: SessionHandlersContext) => void;
-  'session.interrupted': (msg: { type: 'session.interrupted'; sessionId: string; result: import('@jean2/sdk').SessionInterruptResult }, ctx: SessionHandlersContext) => void;
+  'session.interrupted': (msg: { type: 'session.interrupted'; sessionId: string; result: import('@prokopai/sdk').SessionInterruptResult }, ctx: SessionHandlersContext) => void;
   'session.reverted': (msg: { type: 'session.reverted'; sessionId: string; revertedTo: { messageId: string | null; messageCount: number }; removed: { messageIds: string[]; partCount: number } }, ctx: SessionHandlersContext) => void;
   'session.forked': (msg: { type: 'session.forked'; originalSessionId: string; forkedSession: Session; messages: MessageWithParts[] }, ctx: SessionHandlersContext) => void;
   'session.state': (msg: { type: 'session.state'; sessionId: string; messages: MessageWithParts[] }, ctx: SessionHandlersContext) => void;
@@ -145,8 +145,8 @@ export type PermissionQueueHandlers = {
   'permission.revoked': (msg: { type: 'permission.revoked'; permissionId: string }, ctx: SessionHandlersContext) => void;
   'permission.all_revoked': (msg: { type: 'permission.all_revoked'; workspaceId: string; count: number }, ctx: SessionHandlersContext) => void;
   // Queue messages
-  'queue.list': (msg: { type: 'queue.list'; sessionId: string; messages: import('@jean2/sdk').QueuedMessage[] }, ctx: SessionHandlersContext) => void;
-  'queue.added': (msg: { type: 'queue.added'; sessionId: string; message: import('@jean2/sdk').QueuedMessage }, ctx: SessionHandlersContext) => void;
+  'queue.list': (msg: { type: 'queue.list'; sessionId: string; messages: import('@prokopai/sdk').QueuedMessage[] }, ctx: SessionHandlersContext) => void;
+  'queue.added': (msg: { type: 'queue.added'; sessionId: string; message: import('@prokopai/sdk').QueuedMessage }, ctx: SessionHandlersContext) => void;
   'queue.removed': (msg: { type: 'queue.removed'; sessionId: string; queueId: string }, ctx: SessionHandlersContext) => void;
   'queue.sending': (msg: { type: 'queue.sending'; sessionId: string; queueId: string }, ctx: SessionHandlersContext) => void;
 };

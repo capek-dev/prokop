@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import { mockLocalStorage } from '../helpers';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
-import { PANEL_DEFAULT_WIDTH, PANEL_MIN_WIDTH, PANEL_MAX_WIDTH } from '@jean2/sdk';
+import { PANEL_DEFAULT_WIDTH, PANEL_MIN_WIDTH, PANEL_MAX_WIDTH } from '@prokopai/sdk';
 
 describe('chatLayoutStore', () => {
   let storage: Storage;
@@ -35,7 +35,7 @@ describe('chatLayoutStore', () => {
     });
 
     test('reads persisted sessions panel width from localStorage', () => {
-      storage.setItem('jean2_sessions_panel_width', JSON.stringify({ width: 300 }));
+      storage.setItem('prokopai_sessions_panel_width', JSON.stringify({ width: 300 }));
       useChatLayoutStore.setState({
         sessionsPanelWidth: 300,
       });
@@ -43,7 +43,7 @@ describe('chatLayoutStore', () => {
     });
 
     test('reads persisted files panel width from localStorage', () => {
-      storage.setItem('jean2_files_panel_width', JSON.stringify({ width: 400 }));
+      storage.setItem('prokopai_files_panel_width', JSON.stringify({ width: 400 }));
       useChatLayoutStore.setState({
         filesPanelWidth: 400,
       });
@@ -97,13 +97,13 @@ describe('chatLayoutStore', () => {
 
     test('persists clamped width to localStorage', () => {
       useChatLayoutStore.getState().setSessionsPanelWidth(300);
-      const stored = storage.getItem('jean2_sessions_panel_width');
+      const stored = storage.getItem('prokopai_sessions_panel_width');
       expect(stored).toBe(JSON.stringify({ width: 300 }));
     });
 
     test('persists clamped value when input exceeds max', () => {
       useChatLayoutStore.getState().setSessionsPanelWidth(9999);
-      const stored = storage.getItem('jean2_sessions_panel_width');
+      const stored = storage.getItem('prokopai_sessions_panel_width');
       expect(stored).toBe(JSON.stringify({ width: PANEL_MAX_WIDTH }));
     });
   });
@@ -126,13 +126,13 @@ describe('chatLayoutStore', () => {
 
     test('persists clamped width to localStorage', () => {
       useChatLayoutStore.getState().setFilesPanelWidth(400);
-      const stored = storage.getItem('jean2_files_panel_width');
+      const stored = storage.getItem('prokopai_files_panel_width');
       expect(stored).toBe(JSON.stringify({ width: 400 }));
     });
 
     test('persists clamped value when input is below min', () => {
       useChatLayoutStore.getState().setFilesPanelWidth(0);
-      const stored = storage.getItem('jean2_files_panel_width');
+      const stored = storage.getItem('prokopai_files_panel_width');
       expect(stored).toBe(JSON.stringify({ width: PANEL_MIN_WIDTH }));
     });
   });

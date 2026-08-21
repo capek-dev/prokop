@@ -1,5 +1,5 @@
 import { Check, Star, Bot, Cog } from 'lucide-react';
-import type { Preconfig, WorkspacePreconfigSettings } from '@jean2/sdk';
+import type { Preconfig, WorkspacePreconfigSettings } from '@prokopai/sdk';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useServerDataStore } from '@/stores/serverDataStore';

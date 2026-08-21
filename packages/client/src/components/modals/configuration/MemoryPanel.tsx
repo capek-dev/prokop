@@ -1,4 +1,4 @@
-import type { PermissionRiskLevel } from '@jean2/sdk';
+import type { PermissionRiskLevel } from '@prokopai/sdk';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 

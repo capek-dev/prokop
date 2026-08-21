@@ -1,4 +1,4 @@
-import type { PermissionGrant, QueuedMessage } from '@jean2/sdk';
+import type { PermissionGrant, QueuedMessage } from '@prokopai/sdk';
 import type { SessionHandlersContext } from './types';
 
 export function handlePermissionList(

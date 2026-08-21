@@ -1,4 +1,4 @@
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { useNotificationStore } from '@/stores/notificationStore';
 import {
@@ -54,7 +54,7 @@ function clearBadge(): void {
  * the server through the SDK REST client.
  */
 export async function enableNotifications(
-  client: Jean2Client,
+  client: ProkopaiClient,
   serverId: string,
   serverName: string,
   serverUrl: string,
@@ -148,7 +148,7 @@ export async function enableNotifications(
  * Deletes the server registration, unsubscribes the browser subscription,
  * clears local metadata, and clears the app badge.
  */
-export async function disableNotifications(client: Jean2Client | null): Promise<void> {
+export async function disableNotifications(client: ProkopaiClient | null): Promise<void> {
   const store = useNotificationStore.getState();
   const { registration } = store;
 
@@ -181,7 +181,7 @@ export async function disableNotifications(client: Jean2Client | null): Promise<
  * Update notification preferences on the server for an active subscription.
  */
 export async function updatePreferences(
-  client: Jean2Client,
+  client: ProkopaiClient,
   preferences: { completion: boolean; permission: boolean },
 ): Promise<void> {
   const store = useNotificationStore.getState();
@@ -213,7 +213,7 @@ export async function updatePreferences(
  * Checks if the browser still has a valid PushSubscription and re-registers
  * it with the designated server if needed. Does NOT request permission.
  */
-export async function reconcileSubscription(client: Jean2Client | null): Promise<void> {
+export async function reconcileSubscription(client: ProkopaiClient | null): Promise<void> {
   const store = useNotificationStore.getState();
   const { support, registration } = store;
 

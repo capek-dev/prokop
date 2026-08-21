@@ -1,5 +1,5 @@
 import { Circle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import type { TodoListItem } from '@jean2/sdk';
+import type { TodoListItem } from '@prokopai/sdk';
 import { cn } from '@/lib/utils';
 
 interface TodoListProps {

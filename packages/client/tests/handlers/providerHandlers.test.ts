@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import type { ProviderStatus } from '@jean2/sdk';
+import type { ProviderStatus } from '@prokopai/sdk';
 import type { SessionHandlersContext } from '@/handlers/serverMessage/types';
 
 const { mockInvalidate } = vi.hoisted(() => ({ mockInvalidate: vi.fn() }));

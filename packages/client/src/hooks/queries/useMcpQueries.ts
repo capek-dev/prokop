@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
 
 export function useMcpStatusQuery(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   workspaceId: string | undefined,
 ) {
   return useQuery({
@@ -13,7 +13,7 @@ export function useMcpStatusQuery(
   });
 }
 
-export function useMcpConnect(sdkClient: Jean2Client | null) {
+export function useMcpConnect(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ workspaceId, name }: { workspaceId: string; name: string }) =>
@@ -24,7 +24,7 @@ export function useMcpConnect(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useMcpDisconnect(sdkClient: Jean2Client | null) {
+export function useMcpDisconnect(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ workspaceId, name }: { workspaceId: string; name: string }) =>
@@ -35,7 +35,7 @@ export function useMcpDisconnect(sdkClient: Jean2Client | null) {
   });
 }
 
-export function useMcpStartAuth(sdkClient: Jean2Client | null) {
+export function useMcpStartAuth(sdkClient: ProkopaiClient | null) {
   return useMutation({
     mutationFn: ({ workspaceId, name }: { workspaceId: string; name: string }) =>
       sdkClient!.http.mcp.startAuth(workspaceId, name),

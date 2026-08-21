@@ -1,4 +1,4 @@
-import type { GitDiffSummary, GitFileStatus } from '@jean2/sdk';
+import type { GitDiffSummary, GitFileStatus } from '@prokopai/sdk';
 import { cn } from '@/lib/utils';
 
 interface GitStatusBadgeProps {

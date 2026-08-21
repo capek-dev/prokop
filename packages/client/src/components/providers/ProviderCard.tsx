@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Loader2, Unplug, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { ProviderStatus } from '@jean2/sdk';
+import type { ProviderStatus } from '@prokopai/sdk';
 
 interface ProviderCardProps {
   provider: ProviderStatus;

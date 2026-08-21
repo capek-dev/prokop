@@ -3,14 +3,14 @@ import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { platform } from '@/platform';
 import type { TerminalPanelHandle } from '@/components/layout/TerminalPanel';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 
 const TerminalPanel = lazy(() =>
   import('@/components/layout/TerminalPanel').then((m) => ({ default: m.TerminalPanel })),
 );
 
 interface AppPanelsProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   terminalPanelRef: React.RefObject<TerminalPanelHandle | null>;
 }
 

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Jean2Client, Workspace } from '@jean2/sdk';
+import type { ProkopaiClient, Workspace } from '@prokopai/sdk';
 import type { RefObject } from 'react';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -17,7 +17,7 @@ interface RenameWorkspaceResult {
   workspace: Workspace;
 }
 
-export function useCreateWorkspaceMutation(clientRef: RefObject<Jean2Client | null>) {
+export function useCreateWorkspaceMutation(clientRef: RefObject<ProkopaiClient | null>) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -40,7 +40,7 @@ export function useCreateWorkspaceMutation(clientRef: RefObject<Jean2Client | nu
   });
 }
 
-export function useDeleteWorkspaceMutation(clientRef: RefObject<Jean2Client | null>) {
+export function useDeleteWorkspaceMutation(clientRef: RefObject<ProkopaiClient | null>) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -85,7 +85,7 @@ export function useDeleteWorkspaceMutation(clientRef: RefObject<Jean2Client | nu
   });
 }
 
-export function useRenameWorkspaceMutation(clientRef: RefObject<Jean2Client | null>) {
+export function useRenameWorkspaceMutation(clientRef: RefObject<ProkopaiClient | null>) {
   return useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }): Promise<RenameWorkspaceResult> => {
       const http = clientRef.current?.httpClient;
@@ -104,7 +104,7 @@ export function useRenameWorkspaceMutation(clientRef: RefObject<Jean2Client | nu
   });
 }
 
-export function useUpdateWorkspaceMutation(clientRef: RefObject<Jean2Client | null>) {
+export function useUpdateWorkspaceMutation(clientRef: RefObject<ProkopaiClient | null>) {
   return useMutation({
     mutationFn: async ({ id, additionalPaths }: { id: string; additionalPaths: string[] }): Promise<RenameWorkspaceResult> => {
       const http = clientRef.current?.httpClient;

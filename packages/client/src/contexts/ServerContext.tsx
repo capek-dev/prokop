@@ -19,7 +19,7 @@ import {
   removeQuickConnectionForWorkspace,
   reorderQuickConnections,
 } from '@/config/servers';
-import type { SavedServer, QuickConnection } from '@jean2/sdk';
+import type { SavedServer, QuickConnection } from '@prokopai/sdk';
 import { normalizeServerUrl } from '@/config/auth';
 import { checkLocalhostNoAuth } from '@/lib/validateServerAuth';
 import { useOverviewGroupsStore } from '@/stores/overviewGroupsStore';

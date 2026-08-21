@@ -1,5 +1,5 @@
-import { DRAFT_KEY_PREFIX, DRAFT_TTL_MS, cleanupExpiredDrafts as cleanupExpiredDraftsShared } from '@jean2/sdk';
-import type { SavedDraft } from '@jean2/sdk';
+import { DRAFT_KEY_PREFIX, DRAFT_TTL_MS, cleanupExpiredDrafts as cleanupExpiredDraftsShared } from '@prokopai/sdk';
+import type { SavedDraft } from '@prokopai/sdk';
 
 export function getDraftKey(sessionId: string): string {
   return `${DRAFT_KEY_PREFIX}${sessionId}`;

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { AskHandler } from '@/stores/askStore';
-import type { AskPermissionResponse, PermissionRiskLevel } from '@jean2/sdk';
+import type { AskPermissionResponse, PermissionRiskLevel } from '@prokopai/sdk';
 import { useAskStore } from '@/stores/askStore';
 import { useSessionStore } from '@/stores/sessionStore';
 

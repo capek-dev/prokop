@@ -1,4 +1,4 @@
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import LogoutButton from '@/components/LogoutButton';
@@ -8,7 +8,7 @@ interface AccountPanelProps {
   apiToken: string | null;
   isConnected: boolean;
   onLogout: () => void;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   open: boolean;
 }
 

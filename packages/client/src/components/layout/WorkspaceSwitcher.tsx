@@ -1,7 +1,7 @@
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useState, useEffect, useRef } from 'react';
 import { Check, ChevronsUpDown, Folder, Box, Plus, MoreHorizontal, Trash2, Pencil, FolderSymlink, Loader2 } from 'lucide-react';
-import type { Workspace } from '@jean2/sdk';
+import type { Workspace } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { FolderPickerDialog } from '@/components/modals/FolderPickerDialog';
 import { WorkspaceAdditionalPathsDialog } from '@/components/modals/WorkspaceAdditionalPathsDialog';
@@ -37,7 +37,7 @@ interface WorkspaceSwitcherProps {
   onDeleteWorkspace: (id: string) => void;
   onRenameWorkspace: (id: string, name: string) => void;
   onUpdateWorkspacePaths: (workspaceId: string, additionalPaths: string[]) => void;
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   isCreatingWorkspace?: boolean;
   deletingWorkspaceId?: string | null;
   isUpdatingWorkspace?: Record<string, boolean>;

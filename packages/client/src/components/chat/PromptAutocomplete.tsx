@@ -1,4 +1,4 @@
-import type { PromptInfo } from '@jean2/sdk';
+import type { PromptInfo } from '@prokopai/sdk';
 import { cn } from '@/lib/utils';
 import { MessageSquare } from 'lucide-react';
 

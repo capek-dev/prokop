@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import type { Ask } from '@jean2/sdk';
+import type { Ask } from '@prokopai/sdk';
 import type { PendingAskRequest } from '@/stores/askStore';
 import { AskQuestion } from './AskQuestion';
 

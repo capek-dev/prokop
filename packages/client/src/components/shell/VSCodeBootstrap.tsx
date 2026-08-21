@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { HttpClient, HttpNamespace } from '@jean2/sdk';
-import type { Workspace, SavedServer } from '@jean2/sdk';
+import { HttpClient, HttpNamespace } from '@prokopai/sdk';
+import type { Workspace, SavedServer } from '@prokopai/sdk';
 import { platform } from '@/platform';
 import type { PlatformInitConfig } from '@/platform';
 import { setSingleServer } from '@/config/servers';

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import type { Jean2Client, ToolEnvVarStatus, EnvVarSource } from '@jean2/sdk';
+import type { ProkopaiClient, ToolEnvVarStatus, EnvVarSource } from '@prokopai/sdk';
 import { useToolEnvVarsQuery, useToolSetEnvVar, useToolClearEnvVar } from '@/hooks/queries';
 import {
   Terminal, Check, X, Trash2, Eye, EyeOff, Loader2, Search,
@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/collapsible';
 
 interface PanelProps {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
 }
 
 interface Group {

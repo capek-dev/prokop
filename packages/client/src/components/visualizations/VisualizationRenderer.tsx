@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import type { AnyVisualization } from '@jean2/sdk';
+import type { AnyVisualization } from '@prokopai/sdk';
 import { DiffViewer } from './DiffViewer';
 import { CodeBlock } from './CodeBlock';
 import { FileListViewer } from './FileListViewer';

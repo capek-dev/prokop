@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { Jean2Client, HttpClient } from '@jean2/sdk';
-import type { ClientDescriptor } from '@jean2/sdk';
+import { ProkopaiClient, HttpClient } from '@prokopai/sdk';
+import type { ClientDescriptor } from '@prokopai/sdk';
 import type { SessionHandlersContext } from '@/handlers/serverMessage';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -22,11 +22,11 @@ export interface ConnectionLifecycleParams {
   currentSessionIdRef: RefObject<string | null>;
   handlerContextRef: RefObject<SessionHandlersContext | null>;
   handleLogout: () => void;
-  clientRef?: RefObject<Jean2Client | null>;
+  clientRef?: RefObject<ProkopaiClient | null>;
 }
 
 export interface ConnectionLifecycleReturn {
-  clientRef: RefObject<Jean2Client | null>;
+  clientRef: RefObject<ProkopaiClient | null>;
   retry: () => void;
 }
 
@@ -38,7 +38,7 @@ export function useConnectionLifecycle({
   handleLogout,
   clientRef: externalClientRef,
 }: ConnectionLifecycleParams): ConnectionLifecycleReturn {
-  const internalClientRef = useRef<Jean2Client | null>(null);
+  const internalClientRef = useRef<ProkopaiClient | null>(null);
   const clientRef = externalClientRef ?? internalClientRef;
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [clientDescriptor, setClientDescriptor] = useState<ClientDescriptor | null>(null);
@@ -74,7 +74,7 @@ export function useConnectionLifecycle({
     let cancelled = false;
 
     const createAndConnectClient = () => {
-      const client = new Jean2Client({
+      const client = new ProkopaiClient({
         url: serverUrl,
         ...(apiToken ? { token: apiToken } : {}),
         autoSyncPermissions: false,

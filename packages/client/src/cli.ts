@@ -28,7 +28,7 @@ server.on('error', (err) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Jean2 client running at http://localhost:${PORT}`);
+  console.log(`Prokopai client running at http://localhost:${PORT}`);
 });
 
 function shutdown(): void {

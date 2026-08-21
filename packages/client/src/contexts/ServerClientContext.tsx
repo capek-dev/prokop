@@ -1,8 +1,8 @@
 import { createContext, useContext, useMemo } from 'react';
-import type { Jean2Client } from '@jean2/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 
 export interface ServerClientValue {
-  sdkClient: Jean2Client | null;
+  sdkClient: ProkopaiClient | null;
   serverUrl: string | null;
   apiToken: string | null;
   connected: boolean;
@@ -20,7 +20,7 @@ export function useServerClient(): ServerClientValue {
   return ctx;
 }
 
-export function useSdkClient(): Jean2Client | null {
+export function useSdkClient(): ProkopaiClient | null {
   return useServerClient().sdkClient;
 }
 
@@ -33,7 +33,7 @@ export function useServerUrl(): string | null {
  * Does not trigger rerenders from session/ask/queue changes.
  */
 export function useServerClientMemo(
-  sdkClient: Jean2Client | null,
+  sdkClient: ProkopaiClient | null,
   serverUrl: string | null,
   apiToken: string | null,
   connected: boolean,

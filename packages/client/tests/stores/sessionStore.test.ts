@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import { useSessionStore } from '@/stores/sessionStore';
-import type { Session } from '@jean2/sdk';
+import type { Session } from '@prokopai/sdk';
 
 function makeSession(id: string, workspaceId: string, overrides: Partial<Session> = {}): Session {
   return {

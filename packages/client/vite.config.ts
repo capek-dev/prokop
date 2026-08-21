@@ -44,8 +44,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,mjs,cjs,css,html,ico,png,svg,woff2,json,mp3}'],
       },
       manifest: {
-        name: 'Jean2',
-        short_name: 'Jean2',
+        name: 'Prokopai',
+        short_name: 'Prokopai',
         description: 'AI Agent Client',
         display: 'standalone',
         display_override: ['window-controls-overlay', 'standalone'],
