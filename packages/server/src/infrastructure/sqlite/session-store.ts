@@ -5,7 +5,7 @@
  */
 
 import { getDatabase } from './database';
-import type { Session, SessionStatus, Workspace } from '@jean2/sdk';
+import type { Session, SessionStatus, Workspace } from '@prokopai/sdk';
 import { getWorkspace } from './workspaces';
 import { deleteAttachmentsForSession, deleteAttachmentsForWorkspace } from './attachments';
 import { removeSessionFromFts } from '@/infrastructure/session-search/fts';

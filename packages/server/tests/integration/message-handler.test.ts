@@ -28,7 +28,7 @@ import {
 import { executeCompaction, revertToStep, forkSession, interruptManager } from '@capekai/core/execution';
 import { resolveAsk, createAskApi } from '@capekai/core/ask-authority';
 import { getWorkspaceGrants, revokeGrant, revokeAllWorkspaceGrants } from '@/infrastructure/sqlite/permissions';
-import type { AssistantMessage, ToolPart, ServerMessage } from '@jean2/sdk';
+import type { AssistantMessage, ToolPart, ServerMessage } from '@prokopai/sdk';
 
 const broadcastMock = createMockBroadcast();
 

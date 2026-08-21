@@ -5,7 +5,7 @@ import type {
   GrantScope, 
   GrantMatcher,
   PermissionResource,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 // =============================================================================
 // Canonical Permission Contract - Server Implementation

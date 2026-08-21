@@ -3,7 +3,7 @@ import type {
   PushSubscriptionRecord,
   Session,
   WebPushSubscriptionInput,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 /**
  * Inward-facing notification ports (S4/S5). The reservation and delivery

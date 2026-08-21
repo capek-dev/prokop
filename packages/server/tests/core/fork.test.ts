@@ -4,7 +4,7 @@ import { seedWorkspaceWithSession } from '#tests/seed';
 import { forkSession } from '@capekai/core/execution';
 import { createMessage, createPart, listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
 import { getSession } from '@/infrastructure/sqlite/session-store';
-import type { AssistantMessage, ToolPart } from '@jean2/sdk';
+import type { AssistantMessage, ToolPart } from '@prokopai/sdk';
 
 describe('forkSession', () => {
   let sessionId: string;

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ScheduledJob, Session } from '@jean2/sdk';
+import type { ScheduledJob, Session } from '@prokopai/sdk';
 import { computeNextRun, scheduleDisplay } from '@/domains/scheduling/schedule';
 import {
   decideNextRunAfterAdvance,

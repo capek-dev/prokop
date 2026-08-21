@@ -1,5 +1,7 @@
+import { readEnv } from '@/infrastructure/runtime/env-compat';
+
 const PERF_DIAGNOSTICS_ENABLED =
-  process.env.JEAN2_PERF_DIAGNOSTICS === 'true';
+  readEnv('PERF_DIAGNOSTICS') === 'true';
 
 export interface PerfMeasurement {
   operation: string;

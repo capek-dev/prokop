@@ -1,5 +1,5 @@
 import type { ServerWebSocket, WebSocketHandler } from 'bun';
-import type { AskAuthority, ClientMessage, ServerMessage, SessionControlUpdateReason } from '@jean2/sdk';
+import type { AskAuthority, ClientMessage, ServerMessage, SessionControlUpdateReason } from '@prokopai/sdk';
 import type { ConnectionId } from './connection-id';
 import { registerConnection, unregisterConnection, touchConnection, getConnectionBySocket } from './connection-registry';
 import {
@@ -13,6 +13,7 @@ import { createDeliveryPort, participantConnectionIdsFor, controllerConnectionId
 import type { ClientEntry, RouterContext } from './router-context';
 import { handleClientMessage } from './message-router';
 import type { TerminalManager } from '../terminal/manager';
+import { readEnvInt } from '@/infrastructure/runtime/env-compat';
 import type { TerminalEventManager } from '../terminal/event-manager';
 import { encodeFrame, OPCODES } from '../terminal/frames';
 
@@ -281,7 +282,7 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
   }
 
   const websocket: BunWebSocketConfig = {
-    idleTimeout: parseInt(process.env.JEAN2_WS_IDLE_TIMEOUT || '255', 10),
+    idleTimeout: readEnvInt('WS_IDLE_TIMEOUT', 255),
 
     open(ws) {
       const wsData = ws.data;

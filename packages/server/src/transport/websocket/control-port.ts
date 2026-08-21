@@ -5,7 +5,7 @@ import type {
   SessionControlActionResult,
   SessionResumeControlResult,
 } from '@/application/ports/control';
-import type { ServerMessage, SessionControlUpdateReason, TakeoverDecision } from '@jean2/sdk';
+import type { ServerMessage, SessionControlUpdateReason, TakeoverDecision } from '@prokopai/sdk';
 import {
   buildControlUpdatedMessage,
   checkControllerGate,

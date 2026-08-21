@@ -1,4 +1,4 @@
-import type { Preconfig, Workspace, WorkspaceSettings } from '@jean2/sdk';
+import type { Preconfig, Workspace, WorkspaceSettings } from '@prokopai/sdk';
 
 /**
  * Ports for the agents domain (S4). The filesystem adapter implements

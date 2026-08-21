@@ -1,6 +1,6 @@
 import type { Hono } from 'hono';
 import { validate } from './validate';
-import type { SessionStatus } from '@jean2/sdk';
+import type { SessionStatus } from '@prokopai/sdk';
 import type { WorkspaceApplication } from '@/application/workspaces';
 import { BadRequestError, NotFoundError } from '@/application/http-errors';
 import { createWorkspaceSchema, updateWorkspaceSettingsSchema, pinMessageSchema } from './schemas';
@@ -63,7 +63,7 @@ export function registerWorkspaceRoutes(app: Hono, application: WorkspaceApplica
       const result = application.update(id, {
         name,
         additionalPaths,
-        settings: settings as import('@jean2/sdk').WorkspaceSettings | undefined,
+        settings: settings as import('@prokopai/sdk').WorkspaceSettings | undefined,
       });
       if (result.kind === 'no_fields') {
         throw new BadRequestError('Name, additionalPaths, or settings is required');

@@ -2,9 +2,10 @@
  * Centralized Path Resolution
  *
  * All data directory paths are resolved through a singleton Paths instance.
- * In production, the data directory defaults to ~/.jean2.
+ * In production, the data directory defaults to ~/.prokopai, falling back to
+ * ~/.jean2 (legacy, deprecated) when only that exists.
  * It can be overridden via:
- *   - JEAN2_DATA_DIR environment variable
+ *   - PROKOPAI_DATA_DIR (or legacy JEAN2_DATA_DIR) environment variable
  *   - Paths.configure({ dataDir }) (e.g. for CLI --data-dir flag, or tests)
  *
  * Usage:
@@ -16,8 +17,48 @@
  *   Paths.reset();
  */
 
+import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+
+export const PROKOPAI_DIR_NAME = '.prokopai';
+export const LEGACY_JEAN2_DIR_NAME = '.jean2';
+
+function getProkopaiHomeDir(): string {
+  return join(homedir(), PROKOPAI_DIR_NAME);
+}
+
+function getLegacyJean2HomeDir(): string {
+  return join(homedir(), LEGACY_JEAN2_DIR_NAME);
+}
+
+/**
+ * Default data-dir resolution with legacy fallback:
+ *   ~/.prokopai exists → it (legacy dir is never read)
+ *   ~/.jean2 exists    → it, with a one-time deprecation notice
+ *   neither            → ~/.prokopai (created on demand by init)
+ *
+ * Memoized until Paths.reset() so repeated getDataDir() calls stay cheap.
+ */
+function resolveDefaultDataDir(): string {
+  const prokopai = getProkopaiHomeDir();
+  if (existsSync(prokopai)) {
+    return prokopai;
+  }
+
+  const legacy = getLegacyJean2HomeDir();
+  if (existsSync(legacy)) {
+    console.warn(
+      `[prokopai] Using legacy data directory ${legacy}. ` +
+        `Run \`prokopai migrate\` to move it to ${prokopai}.`,
+    );
+    return legacy;
+  }
+
+  return prokopai;
+}
+
+let defaultDataDirCache: string | null = null;
 
 class PathsSingleton {
   private dataDirOverride: string | null = null;
@@ -35,19 +76,30 @@ class PathsSingleton {
    */
   reset(): void {
     this.dataDirOverride = null;
+    defaultDataDirCache = null;
   }
 
   /**
    * Get the root data directory.
    * Priority:
    *   1. Programmatic override (set via configure)
-   *   2. JEAN2_DATA_DIR env var
-   *   3. Default: ~/.jean2
+   *   2. PROKOPAI_DATA_DIR (or legacy JEAN2_DATA_DIR) env var
+   *   3. Default: ~/.prokopai, or ~/.jean2 when only the legacy dir exists
    */
   getDataDir(): string {
-    return this.dataDirOverride
-      || process.env.JEAN2_DATA_DIR
-      || join(homedir(), '.jean2');
+    if (this.dataDirOverride) {
+      return this.dataDirOverride;
+    }
+
+    const envDir = process.env.PROKOPAI_DATA_DIR ?? process.env.JEAN2_DATA_DIR;
+    if (envDir) {
+      return envDir;
+    }
+
+    if (!defaultDataDirCache) {
+      defaultDataDirCache = resolveDefaultDataDir();
+    }
+    return defaultDataDirCache;
   }
 
   // ── Top-level files ────────────────────────────────────────────
@@ -139,7 +191,7 @@ class PathsSingleton {
   }
 
   getBinaryPath(): string {
-    const binaryName = process.platform === 'win32' ? 'jean2.exe' : 'jean2';
+    const binaryName = process.platform === 'win32' ? 'prokopai.exe' : 'prokopai';
     return join(this.getBinDir(), binaryName);
   }
 }

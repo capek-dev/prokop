@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import type { PermissionAsk } from '@jean2/sdk';
+import type { PermissionAsk } from '@prokopai/sdk';
 import { mkdtempSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';

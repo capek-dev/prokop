@@ -1,4 +1,4 @@
-import type { McpServerConfig, McpStatus } from '@jean2/sdk';
+import type { McpServerConfig, McpStatus } from '@prokopai/sdk';
 
 /**
  * Inward-facing MCP lifecycle port (S5). The MCP process, discovery,

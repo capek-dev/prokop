@@ -5,7 +5,7 @@ import {
   jean2SchedulerHost,
   type Jean2SchedulerHostDeps,
 } from '@/adapters/capek/scheduler';
-import type { ScheduledJob } from '@jean2/sdk';
+import type { ScheduledJob } from '@prokopai/sdk';
 import type {
   ScheduledJobExecutionPort,
   ScheduledJobRepositoryPort,

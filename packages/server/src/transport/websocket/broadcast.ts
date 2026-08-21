@@ -1,4 +1,4 @@
-import type { ServerMessage, Session, AskAuthority } from '@jean2/sdk';
+import type { ServerMessage, Session, AskAuthority } from '@prokopai/sdk';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 
 export type BroadcastFn = (message: ServerMessage) => void;

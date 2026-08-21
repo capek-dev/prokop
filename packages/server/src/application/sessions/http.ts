@@ -3,7 +3,7 @@ import type {
   Message,
   Session,
   SessionStatus,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import type {
   AttachmentRecord,
   GroupedSessionPage,

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import type { AssistantMessage, Preconfig, ServerMessage } from '@jean2/sdk';
+import type { AssistantMessage, Preconfig, ServerMessage } from '@prokopai/sdk';
 import type { ServerWebSocket } from 'bun';
 import { runOrchestratorSession } from '@capekai/core/execution';
 import { executeChildSession } from '@capekai/core/providers';

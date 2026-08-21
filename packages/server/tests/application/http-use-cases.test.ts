@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { Session } from '@jean2/sdk';
+import type { Session } from '@prokopai/sdk';
 import { createSessionHttpApplication } from '@/application/sessions/http';
 import type { SessionRepositoryPort, TranscriptPage } from '@/application/ports/session';
 

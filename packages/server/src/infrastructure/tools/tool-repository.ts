@@ -1,4 +1,5 @@
-import type { ToolEnvVarStatus } from '@jean2/sdk';
+import type { ToolEnvVarStatus } from '@prokopai/sdk';
+import { readEnv } from '@/infrastructure/runtime/env-compat';
 import {
   applyRepositoryTemplate,
   resolveArtifactUrlFor,
@@ -25,7 +26,7 @@ const DEFAULT_REGISTRY_URL =
 const REPOSITORY_TIMEOUT = 10000;
 
 function getRegistryUrl(): string {
-  return process.env.JEAN2_TOOL_REGISTRY_URL || DEFAULT_REGISTRY_URL;
+  return readEnv('TOOL_REGISTRY_URL') || DEFAULT_REGISTRY_URL;
 }
 
 async function fetchText(url: string): Promise<string> {

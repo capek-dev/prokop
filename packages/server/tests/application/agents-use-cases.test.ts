@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { Preconfig, Workspace, WorkspaceSettings } from '@jean2/sdk';
+import type { Preconfig, Workspace, WorkspaceSettings } from '@prokopai/sdk';
 import { createAgentsApplication, type AgentsApplication } from '@/application/agents';
 import type {
   AgentDirectoryPort,
@@ -198,7 +198,7 @@ describe('agents application use cases', () => {
     expect(agent.id).toBe('coder');
     expect(agent.hasHome).toBe(true);
     expect(state.dirs.has('/data/agents/coder/skills')).toBe(true);
-    expect(state.dirs.has('/data/agents/coder/home/.jean2')).toBe(true);
+    expect(state.dirs.has('/data/agents/coder/home/.prokopai')).toBe(true);
     expect(state.workspaces.get('coder-home')).toMatchObject({
       id: 'coder-home',
       name: 'coder-home',

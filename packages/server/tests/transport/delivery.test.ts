@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ServerMessage } from '@jean2/sdk';
+import type { ServerMessage } from '@prokopai/sdk';
 import { createDeliveryPort } from '@/transport/websocket/delivery';
 import { createConnectionId, type ConnectionId } from '@/transport/websocket/connection-id';
 

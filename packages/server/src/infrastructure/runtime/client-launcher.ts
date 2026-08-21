@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import { join } from 'path';
 
 import { getClientDir } from '@/infrastructure/runtime/paths';
+import { readEnv } from '@/infrastructure/runtime/env-compat';
 import {
   createArborist,
   fetchPackageMetadata,
@@ -149,12 +150,12 @@ export async function runClientCommand(cliPath: string, port: number): Promise<v
   const https = await import('node:https');
   const fs = await import('node:fs');
 
-  const tlsEnabled = process.env.JEAN2_TLS_ENABLED === 'true';
+  const tlsEnabled = readEnv('TLS_ENABLED') === 'true';
   let tlsOptions: { cert: string; key: string } | undefined;
 
   if (tlsEnabled) {
-    const certPath = process.env.JEAN2_TLS_CERT_FILE;
-    const keyPath = process.env.JEAN2_TLS_KEY_FILE;
+    const certPath = readEnv('TLS_CERT_FILE');
+    const keyPath = readEnv('TLS_KEY_FILE');
     if (certPath && keyPath) {
       try {
         tlsOptions = {
@@ -167,7 +168,7 @@ export async function runClientCommand(cliPath: string, port: number): Promise<v
         process.exit(1);
       }
     } else {
-      console.error('[client] JEAN2_TLS_ENABLED is set but JEAN2_TLS_CERT_FILE and/or JEAN2_TLS_KEY_FILE are missing');
+      console.error('[client] TLS_ENABLED is set but TLS_CERT_FILE and/or TLS_KEY_FILE are missing');
       process.exit(1);
     }
   }
@@ -311,7 +312,7 @@ export function createClientLauncher(): ClientLauncher {
         };
       }
 
-      const clientProtocol = process.env.JEAN2_TLS_ENABLED === 'true' ? 'https' : 'http';
+      const clientProtocol = readEnv('TLS_ENABLED') === 'true' ? 'https' : 'http';
       const url = `${clientProtocol}://localhost:${port}`;
 
       try {
@@ -329,6 +330,7 @@ export function createClientLauncher(): ClientLauncher {
             stderr: 'inherit',
             env: {
               ...process.env,
+              PROKOPAI_SERVER_URL: `${clientProtocol}://${serverHost === '0.0.0.0' ? 'localhost' : serverHost}:${serverPort}`,
               JEAN2_SERVER_URL: `${clientProtocol}://${serverHost === '0.0.0.0' ? 'localhost' : serverHost}:${serverPort}`,
             },
           },

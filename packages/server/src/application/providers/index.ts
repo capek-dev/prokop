@@ -3,7 +3,7 @@ import type {
   ProviderCredentialsResponse,
   ProviderDescriptor,
   ProviderStatus,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import type {
   OAuthFlowPort,
   OAuthServerCallbackResult,
@@ -36,7 +36,7 @@ export interface ProvidersApplication {
   status(providerId: string): ProviderStatus;
   connect(
     providerId: string,
-    options?: { redirectStrategy?: import('@jean2/sdk').OAuthRedirectStrategy },
+    options?: { redirectStrategy?: import('@prokopai/sdk').OAuthRedirectStrategy },
   ): Promise<ProviderConnectOutcome>;
   disconnect(providerId: string): Promise<void>;
   completeOAuth(

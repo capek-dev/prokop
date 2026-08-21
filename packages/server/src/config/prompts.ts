@@ -1,4 +1,4 @@
-import type { PromptInfo, CreatePromptRequest, UpdatePromptRequest } from '@jean2/sdk';
+import type { PromptInfo, CreatePromptRequest, UpdatePromptRequest } from '@prokopai/sdk';
 import { join } from 'path';
 import { unlink } from 'fs/promises';
 import { listPrompts, getPrompt, clearPromptsCache, parsePromptFile } from '@/config/prompts-registry';

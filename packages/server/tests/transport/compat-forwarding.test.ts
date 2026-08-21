@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import type { AskAuthority, ServerMessage } from '@jean2/sdk';
+import type { AskAuthority, ServerMessage } from '@prokopai/sdk';
 import {
   broadcastEvent,
   broadcastSessionCreated,

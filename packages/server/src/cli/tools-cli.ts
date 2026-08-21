@@ -725,7 +725,7 @@ export function toolsHelp(): void {
     outdated              Check for available updates
 
   Environment:
-    JEAN2_TOOL_REGISTRY_URL  Custom registry URL (default: GitHub raw)
+    PROKOPAI_TOOL_REGISTRY_URL  Custom registry URL (default: GitHub raw)
 
   Examples:
     jean2 tools install                Interactive selection

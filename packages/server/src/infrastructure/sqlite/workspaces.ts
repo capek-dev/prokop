@@ -1,5 +1,5 @@
 import { getDatabase } from './database';
-import type { Workspace, WorkspaceSettings, AutoApproveSeverity } from '@jean2/sdk';
+import type { Workspace, WorkspaceSettings, AutoApproveSeverity } from '@prokopai/sdk';
 import {
   autoApproveSeverityOf,
   DEFAULT_WORKSPACE_SETTINGS,

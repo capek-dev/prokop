@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { registerAgentRoutes } from '@/transport/http/routes/agents';
 import { HttpError } from '@/application/http-errors';
 import type { AgentsApplication } from '@/application/agents';
-import type { Agent, Preconfig } from '@jean2/sdk';
+import type { Agent, Preconfig } from '@prokopai/sdk';
 
 function makeAgent(overrides: Partial<Agent> = {}): Agent {
   return {

@@ -1,5 +1,5 @@
 import type { Database } from 'bun:sqlite';
-import type { ResponseFormat } from '@jean2/sdk';
+import type { ResponseFormat } from '@prokopai/sdk';
 import { getDatabase } from './database';
 
 interface ResponseFormatRow {

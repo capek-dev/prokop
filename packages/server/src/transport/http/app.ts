@@ -15,6 +15,7 @@ import { ZodError } from 'zod';
 import { requireAuth, isPublicRoute } from '@/transport/http/middleware/auth';
 import { isAuthEnabled } from '@/transport/http/middleware/token';
 import { getClientEnabled } from '@/infrastructure/runtime/environment';
+import { readEnv } from '@/infrastructure/runtime/env-compat';
 import { VERSION } from '@/version';
 import { HttpError } from '@/application/http-errors';
 import { createWiredApplication, type WiredApplication } from '@/bootstrap/application';
@@ -119,7 +120,7 @@ export function createApp(application?: WiredApplication) {
   registerAgentRoutes(app, wired.agents);
   registerMaintenanceRoutes(app, wired.maintenance);
   registerNotificationRoutes(app, wired.notifications);
-  if (process.env.JEAN2_SANDBOX === 'true') {
+  if (readEnv('SANDBOX') === 'true') {
     registerSandboxRoutes(app);
   }
 

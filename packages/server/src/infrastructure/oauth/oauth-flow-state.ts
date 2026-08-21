@@ -1,4 +1,4 @@
-import type { OAuthProviderConfig } from '@jean2/sdk';
+import type { OAuthProviderConfig } from '@prokopai/sdk';
 import type { PkceCodes } from '@/domains/provider-accounts';
 
 export interface PendingOAuthFlow {

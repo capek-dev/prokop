@@ -1,4 +1,4 @@
-import type { AskAuthority, ServerMessage } from '@jean2/sdk';
+import type { AskAuthority, ServerMessage } from '@prokopai/sdk';
 
 /**
  * Application-facing delivery port.

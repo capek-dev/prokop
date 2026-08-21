@@ -61,8 +61,8 @@ import type {
   QueuedMessage,
   Session,
   SessionStatus,
-} from '@jean2/sdk';
-import type { Preconfig } from '@jean2/sdk';
+} from '@prokopai/sdk';
+import type { Preconfig } from '@prokopai/sdk';
 import type { SessionPageInfo, ToolOutputArtifactPage as SessionToolOutputArtifactPage } from '@/application/ports/session';
 
 function toTranscriptPage(result: {

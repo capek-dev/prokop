@@ -1,4 +1,4 @@
-import type { TakeoverDecision } from '@jean2/sdk';
+import type { TakeoverDecision } from '@prokopai/sdk';
 import type { ApplicationDeliveryPort } from '../ports/delivery';
 import type { SessionControlPort } from '../ports/control';
 

@@ -1,4 +1,4 @@
-import type { ProviderCredentialStatus, ProviderCredentialsResponse } from '@jean2/sdk';
+import type { ProviderCredentialStatus, ProviderCredentialsResponse } from '@prokopai/sdk';
 import { getJean2EnvValue, reloadJean2Env } from '@/infrastructure/runtime/environment';
 import { getEnvFilePath } from '@/infrastructure/runtime/paths';
 import { atomicWriteFile, readFileSafe } from '@/config/files';
@@ -9,6 +9,7 @@ import {
 } from '@/config/errors';
 import {
   getSupportedProviderCredential,
+  legacyEnvKeyFor,
   mergeEnvLine,
   PROVIDER_CREDENTIALS,
   removeEnvLine,
@@ -59,7 +60,14 @@ export async function clearProviderCredential(provider: string): Promise<Provide
       return { provider, configured: false };
     }
 
-    await atomicWriteFile(getEnvFilePath(), removeEnvLine(content, credential.envKey));
+    // Clear the canonical key and the legacy twin: a stale JEAN2_* value
+    // would resurrect the credential through the fallback read.
+    let updated = removeEnvLine(content, credential.envKey);
+    const legacyKey = legacyEnvKeyFor(credential.envKey);
+    if (legacyKey) {
+      updated = removeEnvLine(updated, legacyKey);
+    }
+    await atomicWriteFile(getEnvFilePath(), updated);
     reloadJean2Env();
     return { provider, configured: false };
   } catch (err: unknown) {

@@ -1,7 +1,7 @@
 import type { RouterContext } from '../router-context';
 import type { ConnectionId } from '../connection-id';
 import { createWirePorts, requireWireApplication } from '../application';
-import type { QueueAddMessage, QueueRemoveMessage } from '@jean2/sdk';
+import type { QueueAddMessage, QueueRemoveMessage } from '@prokopai/sdk';
 
 /**
  * Queue wire handlers (S3). Wire presentation only; the queue add and

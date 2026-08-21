@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { McpServerConfig, McpStatus } from '@jean2/sdk';
+import type { McpServerConfig, McpStatus } from '@prokopai/sdk';
 import {
   createMcpHttpApplication,
   type McpHttpApplication,

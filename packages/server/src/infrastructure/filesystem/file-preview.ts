@@ -8,7 +8,7 @@
 
 import { stat, readFile } from 'fs/promises';
 import { basename, extname, isAbsolute, join, resolve } from 'path';
-import type { FilePreviewResponse } from '@jean2/sdk';
+import type { FilePreviewResponse } from '@prokopai/sdk';
 import {
   FILE_PREVIEW_MAX_BYTES,
   isBinaryExtension,

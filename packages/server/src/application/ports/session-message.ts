@@ -21,7 +21,7 @@ import type {
   UserMessage,
   SystemMessage,
   AssistantMessage,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 export interface SessionMessageRepositoryHooks {
   events: SessionMessageEventPublisher;

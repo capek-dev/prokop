@@ -1,7 +1,7 @@
 import type { ServerWebSocket } from 'bun';
 
 type TerminalSocket = ServerWebSocket<unknown>;
-import type { TerminalEvent, TerminalSessionInfo } from '@jean2/sdk';
+import type { TerminalEvent, TerminalSessionInfo } from '@prokopai/sdk';
 
 export class TerminalEventManager {
   private listeners = new Map<string, Set<TerminalSocket>>();

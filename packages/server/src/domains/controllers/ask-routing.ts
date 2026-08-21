@@ -1,4 +1,4 @@
-import type { AskAuthority, ClientCapability } from '@jean2/sdk';
+import type { AskAuthority, ClientCapability } from '@prokopai/sdk';
 
 /**
  * Controller domain: ask response eligibility and ask delivery audience

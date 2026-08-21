@@ -8,6 +8,7 @@ import {
 import { resolveToolsPath } from '@/config';
 import { getTools, initializeWorkspace } from '@/infrastructure/mcp';
 import { getToolsDir } from '@/infrastructure/runtime/paths';
+import { readEnv } from '@/infrastructure/runtime/env-compat';
 
 /** The Jean2 workspace tool discovery: the MCP manager's per-workspace
  * client lifecycle and tool listing. */
@@ -28,7 +29,7 @@ export function configureJean2WorkspaceToolDiscovery(): void {
   try {
     configureToolsPath(resolveToolsPath());
   } catch {
-    configureToolsPath(process.env.JEAN2_TOOLS_PATH || getToolsDir());
+    configureToolsPath(readEnv('TOOLS_PATH') || getToolsDir());
   }
   configureWorkspaceToolDiscovery(jean2WorkspaceToolDiscovery);
 }

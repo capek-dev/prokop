@@ -8,7 +8,7 @@ import {
   getWorkspaceGrants,
   matchGrant,
 } from '@/infrastructure/sqlite/permissions';
-import type { Ask, PermissionAsk } from '@jean2/sdk';
+import type { Ask, PermissionAsk } from '@prokopai/sdk';
 
 function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));

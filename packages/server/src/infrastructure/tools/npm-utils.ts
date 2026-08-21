@@ -2,26 +2,36 @@ import { existsSync, rmSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import Arborist, { type ArboristNode } from '@npmcli/arborist';
+import { readEnv } from '@/infrastructure/runtime/env-compat';
+import { LEGACY_JEAN2_DIR_NAME } from '@/infrastructure/runtime/paths';
 
-const JEAN2_OWNED_PACKAGES = ['@jean2/client', '@jean2/sdk'];
+// Canonical prokopai packages plus the legacy jean2 names during the
+// compatibility window (tools were published under @jean2/*).
+const OWNED_PACKAGES = ['@prokopai/client', '@prokopai/sdk', '@jean2/client', '@prokopai/sdk'];
 
 export function getMinAgeHours(): number {
-  const raw = process.env.JEAN2_PACKAGE_MIN_AGE_HOURS;
+  const raw = readEnv('PACKAGE_MIN_AGE_HOURS');
   if (raw === '0' || raw === 'false' || raw === 'off') return 0;
   const parsed = parseInt(raw || '24', 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 24;
 }
 
 export function isJean2OwnedPackage(packageName: string): boolean {
-  return JEAN2_OWNED_PACKAGES.includes(packageName);
+  return OWNED_PACKAGES.includes(packageName);
 }
 
 export function getRegistry(): string {
-  return process.env.JEAN2_NPM_REGISTRY || 'https://registry.npmjs.org';
+  return readEnv('NPM_REGISTRY') || 'https://registry.npmjs.org';
 }
 
 export function getDefaultNpmCacheDir(): string {
-  return process.env.JEAN2_NPM_CACHE_DIR || join(homedir(), '.jean2', 'npm-cache');
+  const canonical = readEnv('NPM_CACHE_DIR');
+  if (canonical) {
+    return canonical;
+  }
+  // Cache lives under the resolved data dir root's legacy default for now;
+  // PROKOPAI_NPM_CACHE_DIR is the canonical override.
+  return join(homedir(), LEGACY_JEAN2_DIR_NAME, 'npm-cache');
 }
 
 export function resetInstallState(dir: string): void {

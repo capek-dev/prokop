@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { Agent, Preconfig } from '@jean2/sdk';
+import type { Agent, Preconfig } from '@prokopai/sdk';
 import {
   configureJean2AgentSource,
   configureJean2PreconfigSource,

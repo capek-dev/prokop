@@ -1,7 +1,7 @@
 import type { RouterContext } from './router-context';
 import type { ConnectionId } from './connection-id';
 import { createWirePorts, requireWireApplication } from './application';
-import type { SessionCompactMessage, SessionRevertMessage, SessionForkMessage } from '@jean2/sdk';
+import type { SessionCompactMessage, SessionRevertMessage, SessionForkMessage } from '@prokopai/sdk';
 
 /**
  * Compact, revert, and fork wire handlers (S3). Wire presentation only;

@@ -1,4 +1,4 @@
-import type { ClientDescriptor, ClientRegisterMessage, ClientRejectedMessage, ServerMessage } from '@jean2/sdk';
+import type { ClientDescriptor, ClientRegisterMessage, ClientRejectedMessage, ServerMessage } from '@prokopai/sdk';
 import { createConnectionId, type ConnectionId } from './connection-id';
 
 // Types

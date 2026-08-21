@@ -2,7 +2,7 @@ import { readdir, readFile, writeFile, unlink, mkdir, rename } from 'fs/promises
 import { join } from 'path';
 import { existsSync } from 'fs';
 import matter from 'gray-matter';
-import type { Preconfig, PreconfigMode } from '@jean2/sdk';
+import type { Preconfig, PreconfigMode } from '@prokopai/sdk';
 import { getPreconfigsDir as getPreconfigsDirPath } from '@/infrastructure/runtime/paths';
 import { knownSubagentIds, sanitizeCanSpawnSubagentsIds } from '@/domains/agents';
 import { DEFAULT_PREAMBLES } from './defaults';

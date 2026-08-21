@@ -1,4 +1,4 @@
-import type { Ask, AskAuthority } from '@jean2/sdk';
+import type { Ask, AskAuthority } from '@prokopai/sdk';
 import type { SessionWirePorts } from '../ports/delivery';
 import type { SessionExecutionPort } from '../ports/execution';
 import type {

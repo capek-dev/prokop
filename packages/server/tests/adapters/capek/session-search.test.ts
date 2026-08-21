@@ -15,7 +15,7 @@ import {
   createTestUserMessage,
 } from '#tests/factories';
 import { seedSession, seedWorkspace } from '#tests/seed';
-import type { Session, Workspace } from '@jean2/sdk';
+import type { Session, Workspace } from '@prokopai/sdk';
 import type {
   SessionSearchMessageResult,
   SessionSearchOptions,

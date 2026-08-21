@@ -1,4 +1,4 @@
-import type { ProviderCredentialStatus } from '@jean2/sdk';
+import type { ProviderCredentialStatus } from '@prokopai/sdk';
 
 /**
  * Provider-accounts domain: provider credential policy.
@@ -7,20 +7,34 @@ import type { ProviderCredentialStatus } from '@jean2/sdk';
  * the credential input validation rules, and the environment-file line
  * merge policy. The environment file I/O and env reload stay in
  * `configuration/provider-credentials.ts`; it consumes these rules.
+ *
+ * Env keys are canonical PROKOPAI_*. The legacy JEAN2_* twin is derived via
+ * legacyEnvKeyFor and must be cleared on deletion so a stale fallback value
+ * cannot resurrect a removed credential.
  */
+
+export const PROKOPAI_ENV_PREFIX = 'PROKOPAI_';
+export const JEAN2_ENV_PREFIX = 'JEAN2_';
 
 export interface ProviderCredentialDefinition {
   provider: string;
   envKey: string;
 }
 
+export function legacyEnvKeyFor(envKey: string): string | undefined {
+  if (!envKey.startsWith(PROKOPAI_ENV_PREFIX)) {
+    return undefined;
+  }
+  return `${JEAN2_ENV_PREFIX}${envKey.slice(PROKOPAI_ENV_PREFIX.length)}`;
+}
+
 export const PROVIDER_CREDENTIALS: readonly ProviderCredentialDefinition[] = [
-  { provider: 'minimax', envKey: 'JEAN2_LLM_MINIMAX_API_KEY' },
-  { provider: 'openai', envKey: 'JEAN2_LLM_OPENAI_API_KEY' },
-  { provider: 'openrouter', envKey: 'JEAN2_LLM_OPENROUTER_API_KEY' },
-  { provider: 'zhipu', envKey: 'JEAN2_LLM_ZHIPU_API_KEY' },
-  { provider: 'zhipu-coding', envKey: 'JEAN2_LLM_ZHIPU_CODING_API_KEY' },
-  { provider: 'deepseek', envKey: 'JEAN2_LLM_DEEPSEEK_API_KEY' },
+  { provider: 'minimax', envKey: 'PROKOPAI_LLM_MINIMAX_API_KEY' },
+  { provider: 'openai', envKey: 'PROKOPAI_LLM_OPENAI_API_KEY' },
+  { provider: 'openrouter', envKey: 'PROKOPAI_LLM_OPENROUTER_API_KEY' },
+  { provider: 'zhipu', envKey: 'PROKOPAI_LLM_ZHIPU_API_KEY' },
+  { provider: 'zhipu-coding', envKey: 'PROKOPAI_LLM_ZHIPU_CODING_API_KEY' },
+  { provider: 'deepseek', envKey: 'PROKOPAI_LLM_DEEPSEEK_API_KEY' },
 ];
 
 export function getSupportedProviderCredential(

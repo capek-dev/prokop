@@ -5,7 +5,7 @@ import type {
   ScheduleKind,
   ScheduledJob,
   ScheduledJobState,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import type { ScheduledJobRepositoryPort } from '@/application/ports/scheduling';
 import {
   decideNextRunAfterAdvance,

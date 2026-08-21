@@ -1,4 +1,4 @@
-import type { ServerMessage } from '@jean2/sdk';
+import type { ServerMessage } from '@prokopai/sdk';
 
 /**
  * Create a mock ServerWebSocket for integration tests.

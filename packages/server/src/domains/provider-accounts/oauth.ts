@@ -3,7 +3,7 @@ import type {
   GmailProviderConfig,
   OAuthProviderConfig,
   ProviderStatus,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 /**
  * Provider-accounts domain: OAuth 2.0 + PKCE flow policy.

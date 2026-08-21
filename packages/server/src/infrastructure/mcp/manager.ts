@@ -8,7 +8,7 @@ import type {
   McpLocalServerConfig,
   McpRemoteServerConfig,
   McpStatus,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import type { CapabilityTool as Tool } from '@/adapters/capek/contracts';
 import { convertMcpTool } from './converter';
 import { McpOAuthProvider } from './oauth-provider';

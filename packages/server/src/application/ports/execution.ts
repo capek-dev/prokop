@@ -1,4 +1,4 @@
-import type { Session } from '@jean2/sdk';
+import type { Session } from '@prokopai/sdk';
 import type { SessionWirePorts } from './delivery';
 
 /**

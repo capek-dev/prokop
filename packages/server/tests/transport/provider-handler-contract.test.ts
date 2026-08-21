@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import type { ServerMessage } from '@jean2/sdk';
+import type { ServerMessage } from '@prokopai/sdk';
 import { installWireApplication, type WireApplication } from '@/transport/websocket/application';
 import {
   handleProviderConnect,

@@ -17,11 +17,13 @@ import {
 } from '@/infrastructure/daemon';
 
 import { initJean2, type InitOptions } from '@/cli/init';
+import { runProkopaiRenameMigration, type RenameMigrationResult } from '@/cli/rename-migrate';
 import { runMigrations, getDatabase } from '@/infrastructure/sqlite/database';
 import { runToolsCommand, type ToolsCommandArgs } from '@/cli/tools-cli';
 import { performUpdate, type UpdateOptions } from '@/cli/update';
 import { syncModels, type SyncResult } from '@/config/models-sync';
 import { cleanupOrphanedData, vacuumDatabase, formatBytes } from '@/infrastructure/sqlite/cleanup';
+import { readEnv, readEnvInt } from '@/infrastructure/runtime/env-compat';
 import { VERSION } from '@/version';
 
 import '@/cli/clack-utils';
@@ -73,14 +75,14 @@ function parseServerArgs(args: string[]): ParsedServerArgs {
 }
 
 function printVersion(): void {
-  console.log(`jean2 version ${VERSION}`);
+  console.log(`prokopai version ${VERSION}`);
 }
 
 function printHelp(): void {
   console.log(`
-Jean2 - AI Agent Server
+Prokopai - AI Agent Server
 
-Usage: jean2 <command> [options]
+Usage: prokopai <command> [options]
 
 Commands:
   start               Start server as background daemon
@@ -105,7 +107,7 @@ Commands:
 
   auth                 Show authentication configuration
 
-  init                 Initialize Jean2 (required before first use)
+  init                 Initialize Prokopai (required before first use)
     --db-path <path>   Custom database path
     --tools-path <path>  Custom tools path
     --run-migrations   Run schema migrations (default)
@@ -144,7 +146,7 @@ Commands:
     sync                Sync models from upstream registry
       --override         Replace local models.json with upstream
 
-  update               Update jean2 to latest version
+  update               Update prokopai to latest version
     --version <ver>    Update to a specific version
     --force            Reinstall even if already on latest
     --dry-run          Check for updates without installing
@@ -154,37 +156,37 @@ Commands:
   help                 Show this help
 
 Examples:
-  jean2 db stats                  Check database size and reclaimable space
-  jean2 db vacuum                 Reclaim disk space (run during low activity)
-  jean2 db cleanup                Remove orphaned rows only
-  jean2 start                     Start server as daemon
-  jean2 stop                      Stop the daemon
-  jean2 status                    Check if daemon is running
-  jean2 restart                   Restart the daemon
-  jean2 server                    Run in foreground (for systemd)
-  jean2 logs                      Follow server logs
-  jean2 auth                       Show auth configuration
-  jean2 init                      Initialize Jean2
-  jean2 tools install             Interactive tool install
-  jean2 tools list                List available tools
-  jean2 tools list --extensions  Show extension details
-  jean2 tools update              Update installed tools
-  jean2 tools outdated            Check for updates
-  jean2 migrate                   Run database migrations
-  jean2 models sync               Sync models from upstream registry
-  jean2 models sync --override    Replace local models with upstream
-  jean2 update                     Update to latest version
-  jean2 update --dry-run           Check for updates only
-  jean2 update --version 0.9.0     Update to specific version
+  prokopai db stats                  Check database size and reclaimable space
+  prokopai db vacuum                 Reclaim disk space (run during low activity)
+  prokopai db cleanup                Remove orphaned rows only
+  prokopai start                     Start server as daemon
+  prokopai stop                      Stop the daemon
+  prokopai status                    Check if daemon is running
+  prokopai restart                   Restart the daemon
+  prokopai server                    Run in foreground (for systemd)
+  prokopai logs                      Follow server logs
+  prokopai auth                       Show auth configuration
+  prokopai init                      Initialize Prokopai
+  prokopai tools install             Interactive tool install
+  prokopai tools list                List available tools
+  prokopai tools list --extensions  Show extension details
+  prokopai tools update              Update installed tools
+  prokopai tools outdated            Check for updates
+  prokopai migrate                   Run database migrations
+  prokopai models sync               Sync models from upstream registry
+  prokopai models sync --override    Replace local models with upstream
+  prokopai update                     Update to latest version
+  prokopai update --dry-run           Check for updates only
+  prokopai update --version 0.9.0     Update to specific version
 
 Environment:
-  API keys and config can be set in ~/.jean2/.env
+  API keys and config can be set in ~/.prokopai/.env
   System environment variables take precedence.
 
 Configuration:
-  Config dir: ~/.jean2/
-  PID file:   ~/.jean2/server.pid
-  Log file:   ~/.jean2/server.log
+  Config dir: ~/.prokopai/
+  PID file:   ~/.prokopai/server.pid
+  Log file:   ~/.prokopai/server.log
 `);
 }
 
@@ -193,7 +195,7 @@ async function main(): Promise<void> {
     case 'server': {
       // Check if initialized (skip if JEAN2_DATABASE_PATH is set - backward compat)
       if (!getDatabasePath() && !isInitialized()) {
-        console.error('Error: Jean2 is not initialized. Run `jean2 init` first.');
+        console.error('Error: Prokopai is not initialized. Run `prokopai init` first.');
         process.exit(1);
       }
 
@@ -210,7 +212,7 @@ async function main(): Promise<void> {
     case 'start': {
       // Check if initialized (skip if JEAN2_DATABASE_PATH is set - backward compat)
       if (!getDatabasePath() && !isInitialized()) {
-        console.error('Error: Jean2 is not initialized. Run `jean2 init` first.');
+        console.error('Error: Prokopai is not initialized. Run `prokopai init` first.');
         process.exit(1);
       }
 
@@ -273,18 +275,18 @@ async function main(): Promise<void> {
     }
 
     case 'auth': {
-      const token = process.env.JEAN2_AUTH_TOKEN;
+      const token = readEnv('AUTH_TOKEN');
       if (token) {
         const masked = token.length > 8
           ? `${token.slice(0, 4)}...${token.slice(-4)}`
           : '****';
         console.log(`\nAuthentication: enabled`);
         console.log(`Token:          ${masked}`);
-        console.log(`\nSet via JEAN2_AUTH_TOKEN environment variable.`);
-        console.log(`Change it in ~/.jean2/.env or your shell environment.\n`);
+        console.log(`\nSet via PROKOPAI_AUTH_TOKEN environment variable.`);
+        console.log(`Change it in ~/.prokopai/.env or your shell environment.\n`);
       } else {
         console.log(`\nAuthentication: disabled`);
-        console.log(`\nSet JEAN2_AUTH_TOKEN in ~/.jean2/.env or your shell environment to enable.\n`);
+        console.log(`\nSet PROKOPAI_AUTH_TOKEN in ~/.prokopai/.env or your shell environment to enable.\n`);
       }
       break;
     }
@@ -315,7 +317,7 @@ async function main(): Promise<void> {
       try {
         const result = await initJean2(initOptions);
         if (result.success) {
-          console.log('\nJean2 initialized successfully!');
+          console.log('\nProkopai initialized successfully!');
           console.log(`  Config:   ${result.configPath}`);
           console.log(`  Database: ${result.databasePath}`);
           console.log(`  Tools:    ${result.toolsPath}`);
@@ -351,7 +353,7 @@ async function main(): Promise<void> {
 
     case 'migrate': {
       if (!isInitialized()) {
-        console.error('Error: Jean2 is not initialized. Run `jean2 init` first.');
+        console.error('Error: Prokopai is not initialized. Run `prokopai init` first.');
         process.exit(1);
       }
 
@@ -361,6 +363,25 @@ async function main(): Promise<void> {
         const message = err instanceof Error ? err.message : String(err);
         console.error('Migration failed:', message);
         process.exit(1);
+      }
+
+      // Rename migration (jean2 → prokopai): runs after schema migrations so
+      // the db shape is current before workspace paths are rewritten.
+      try {
+        const renameResult: RenameMigrationResult = runProkopaiRenameMigration();
+        for (const step of renameResult.steps) {
+          if (step.status === 'done') {
+            console.log(`  ${step.step}: ${step.detail ?? 'done'}`);
+          } else if (step.status === 'failed') {
+            console.error(`  ${step.step}: FAILED — ${step.detail ?? 'unknown error'}`);
+          }
+        }
+        if (!renameResult.success) {
+          console.error('Rename migration completed with failures:', renameResult.error);
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('Rename migration failed:', message);
       }
       break;
     }
@@ -380,9 +401,9 @@ async function main(): Promise<void> {
           updateOptions.noRestart = true;
         } else if (updateArgs[i] === '--help' || updateArgs[i] === '-h') {
           console.log(`
-jean2 update - Update jean2 to latest version
+prokopai update - Update prokopai to latest version
 
-Usage: jean2 update [options]
+Usage: prokopai update [options]
 
 Options:
   --version <ver>    Update to a specific version (default: latest)
@@ -392,9 +413,9 @@ Options:
   --help             Show this help message
 
 Examples:
-  jean2 update                     Update to latest version
-  jean2 update --dry-run           Check for updates only
-  jean2 update --version 0.9.0     Update to specific version
+  prokopai update                     Update to latest version
+  prokopai update --dry-run           Check for updates only
+  prokopai update --version 0.9.0     Update to specific version
 `);
           process.exit(0);
         }
@@ -417,8 +438,8 @@ Examples:
     }
 
     case 'open': {
-      const openPort = parseInt(process.env.JEAN2_CLIENT_PORT || '3774', 10);
-      const openProtocol = process.env.JEAN2_TLS_ENABLED === 'true' ? 'https' : 'http';
+      const openPort = readEnvInt('CLIENT_PORT', 3774);
+      const openProtocol = readEnv('TLS_ENABLED') === 'true' ? 'https' : 'http';
       const clientUrl = `${openProtocol}://localhost:${openPort}`;
       console.log(`Opening ${clientUrl} ...`);
       try {
@@ -471,7 +492,7 @@ Examples:
 
     default: {
       console.error(`Unknown command: ${command}`);
-      console.error('Run "jean2 help" for usage information');
+      console.error('Run "prokopai help" for usage information');
       process.exit(1);
     }
   }
@@ -541,7 +562,7 @@ async function runToolsCommandFromCLI(args: string[]): Promise<void> {
 
 async function runDbCommand(dbArgs: string[]): Promise<void> {
   if (!isInitialized()) {
-    console.error('Error: Jean2 is not initialized. Run `jean2 init` first.');
+    console.error('Error: Prokopai is not initialized. Run `prokopai init` first.');
     process.exit(1);
   }
 
@@ -549,9 +570,9 @@ async function runDbCommand(dbArgs: string[]): Promise<void> {
 
   if (subCommand === '--help' || subCommand === '-h') {
     console.log(`
-jean2 db - Database maintenance
+prokopai db - Database maintenance
 
-Usage: jean2 db <command>
+Usage: prokopai db <command>
 
 Commands:
   stats       Show database size and reclaimable space
@@ -561,9 +582,9 @@ Commands:
   cleanup     Remove orphaned data only (no VACUUM)
 
 Examples:
-  jean2 db stats       Check how much space can be reclaimed
-  jean2 db vacuum      Reclaim disk space
-  jean2 db cleanup     Remove orphaned rows only
+  prokopai db stats       Check how much space can be reclaimed
+  prokopai db vacuum      Reclaim disk space
+  prokopai db cleanup     Remove orphaned rows only
 `);
     return;
   }
@@ -583,7 +604,7 @@ Examples:
       console.log('');
 
       if (result.reclaimedBytes > 0) {
-        console.log('  Run `jean2 db vacuum` to reclaim this space.');
+        console.log('  Run `prokopai db vacuum` to reclaim this space.');
       } else {
         console.log('  Database is well-compacted. Nothing to reclaim.');
       }
@@ -622,11 +643,11 @@ Examples:
         console.log('Cleanup complete: no orphaned data found');
       }
       console.log('');
-      console.log('Note: Run `jean2 db vacuum` to reclaim the freed disk space.');
+      console.log('Note: Run `prokopai db vacuum` to reclaim the freed disk space.');
       console.log('');
     } else {
       console.error(`Unknown db command: ${subCommand || '(none)'}`);
-      console.error('Run "jean2 db --help" for usage information');
+      console.error('Run "prokopai db --help" for usage information');
       process.exit(1);
     }
   } catch (err: unknown) {
@@ -646,17 +667,17 @@ async function runModelsCommand(modelsArgs: string[]): Promise<void> {
         override = true;
       } else if (arg === '--help' || arg === '-h') {
         console.log(`
-jean2 models sync - Sync models from upstream registry
+prokopai models sync - Sync models from upstream registry
 
-Usage: jean2 models sync [options]
+Usage: prokopai models sync [options]
 
 Options:
   --override    Replace local models.json with upstream (default: merge)
   --help        Show this help message
 
 Examples:
-  jean2 models sync              Add new models, keep existing
-  jean2 models sync --override   Replace with upstream models
+  prokopai models sync              Add new models, keep existing
+  prokopai models sync --override   Replace with upstream models
 `);
         process.exit(0);
       } else {
@@ -682,23 +703,23 @@ Examples:
 
   if (subCommand === '--help' || subCommand === '-h') {
     console.log(`
-jean2 models - Model registry management
+prokopai models - Model registry management
 
-Usage: jean2 models <command> [options]
+Usage: prokopai models <command> [options]
 
 Commands:
   sync            Sync models from upstream registry
     --override     Replace local models.json with upstream
 
 Examples:
-  jean2 models sync              Add new models, keep existing
-  jean2 models sync --override   Replace with upstream models
+  prokopai models sync              Add new models, keep existing
+  prokopai models sync --override   Replace with upstream models
 `);
     return;
   }
 
   console.error(`Unknown models command: ${subCommand || '(none)'}`);
-  console.error('Run "jean2 models --help" for usage information');
+  console.error('Run "prokopai models --help" for usage information');
   process.exit(1);
 }
 

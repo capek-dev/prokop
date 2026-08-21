@@ -1,5 +1,7 @@
 export interface EnvPreset {
   key: string;
+  /** Legacy pre-rename key, still readable for compatibility. */
+  legacyKey?: string;
   description: string;
   category: string;
   sensitive: boolean;
@@ -14,7 +16,8 @@ export interface EnvPreset {
 export const ENV_PRESETS: EnvPreset[] = [
   // --- Gmail OAuth ---
   {
-    key: 'JEAN2_GMAIL_CLIENT_ID',
+    key: 'PROKOPAI_GMAIL_CLIENT_ID',
+    legacyKey: 'JEAN2_GMAIL_CLIENT_ID',
     description: 'Google OAuth Client ID for Gmail integration',
     category: 'Gmail OAuth',
     sensitive: false,
@@ -25,7 +28,8 @@ export const ENV_PRESETS: EnvPreset[] = [
     },
   },
   {
-    key: 'JEAN2_GMAIL_CLIENT_SECRET',
+    key: 'PROKOPAI_GMAIL_CLIENT_SECRET',
+    legacyKey: 'JEAN2_GMAIL_CLIENT_SECRET',
     description: 'Google OAuth Client Secret for Gmail integration',
     category: 'Gmail OAuth',
     sensitive: true,
@@ -37,10 +41,12 @@ export const ENV_PRESETS: EnvPreset[] = [
   },
 ];
 
-const presetKeySet = new Set(ENV_PRESETS.map(p => p.key));
+const presetKeySet = new Set(
+  ENV_PRESETS.flatMap((p) => [p.key, ...(p.legacyKey ? [p.legacyKey] : [])]),
+);
 
 export function getPreset(key: string): EnvPreset | undefined {
-  return ENV_PRESETS.find(p => p.key === key);
+  return ENV_PRESETS.find((p) => p.key === key || p.legacyKey === key);
 }
 
 export function isPresetKey(key: string): boolean {

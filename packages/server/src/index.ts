@@ -24,10 +24,11 @@ import {
 import { scanTools } from '@/adapters/capek/contracts';
 import { closeDatabase, getDatabase } from '@/infrastructure/sqlite/database';
 import { backfillFts } from '@/infrastructure/session-search/fts';
-import type { ServerMessage, AskAuthority } from '@jean2/sdk';
+import type { ServerMessage, AskAuthority } from '@prokopai/sdk';
 import { getTerminalManager, getTerminalEventManager } from '@/transport/terminal';
 import { cleanupRunningSessionsOnStartup } from '@/infrastructure/sqlite/terminal-session-store';
 import { reconcileAllSessionsCompaction } from '@/adapters/capek/compaction-recovery';
+import { readEnv } from '@/infrastructure/runtime/env-compat';
 import {
   disposeJean2ExecutionScope,
   initializeJean2ExecutionScope,
@@ -154,7 +155,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
 
   const app = createApp(application);
 
-  if (process.env.JEAN2_SANDBOX === 'true') {
+  if (readEnv('SANDBOX') === 'true') {
     activateSandbox((event) => {
       transport.delivery.broadcast(event as unknown as ServerMessage);
     });

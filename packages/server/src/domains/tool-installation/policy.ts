@@ -21,7 +21,7 @@ export const TOOL_RUNTIME = 'bun';
 
 /** The SDK package whose resolved version and integrity are recorded in the
  * install manifest. */
-export const PROTECTED_SDK_PACKAGE = '@jean2/sdk';
+export const PROTECTED_SDK_PACKAGE = '@prokopai/sdk';
 
 export type InstallStage = 'npm-install' | 'validate' | 'finalize';
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
-import type { TerminalSessionInfo } from '@jean2/sdk';
+import type { TerminalSessionInfo } from '@prokopai/sdk';
 import { createBunWebSocketAdapter, type WsData } from '@/transport/websocket/bun-adapter';
 import { decodeFrame, encodeFrame, OPCODES } from '@/transport/terminal';
 

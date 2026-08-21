@@ -2,7 +2,7 @@
  * Codex (ChatGPT) OAuth provider.
  * Uses the generalized OAuth manager for PKCE + authorization code flow.
  */
-import type { CodexProviderConfig, ProviderStatus } from '@jean2/sdk';
+import type { CodexProviderConfig, ProviderStatus } from '@prokopai/sdk';
 import {
   createOpenAiResponsesModel,
   registerProvider,

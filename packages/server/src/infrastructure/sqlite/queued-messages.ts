@@ -1,6 +1,6 @@
 import { getDatabase } from './database';
 import { getAttachment } from './attachments';
-import type { QueuedMessage } from '@jean2/sdk';
+import type { QueuedMessage } from '@prokopai/sdk';
 
 interface QueuedMessageRow {
   id: string;

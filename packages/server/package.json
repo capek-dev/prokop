@@ -1,12 +1,12 @@
 {
-  "name": "@jean2/server",
+  "name": "@prokopai/server",
   "version": "1.4.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "jean2": "./dist/bin/jean2"
+    "prokopai": "./dist/bin/prokopai"
   },
   "scripts": {
     "dev": "bun --watch src/index.ts",
@@ -16,10 +16,10 @@
     "auth:token": "bun run src/auth/cli.ts show",
     "auth:regenerate": "bun run src/auth/cli.ts regenerate",
     "auth:path": "bun run src/auth/cli.ts path",
-    "build:bin": "VERSION=$(bun -e \"console.log(require('./package.json').version)\") && bun build --compile --define=JEAN2_VERSION=\"'${VERSION}'\" --outfile=dist/bin/jean2 src/cli.ts",
-    "build:bin:macos": "VERSION=$(bun -e \"console.log(require('./package.json').version)\") && bun build --compile --define=JEAN2_VERSION=\"'${VERSION}'\" --outfile=dist/bin/jean2-macos-arm64 src/cli.ts",
-    "build:bin:linux": "VERSION=$(bun -e \"console.log(require('./package.json').version)\") && bun build --compile --define=JEAN2_VERSION=\"'${VERSION}'\" --outfile=dist/bin/jean2-linux-x64 src/cli.ts",
-    "build:bin:windows": "VERSION=$(bun -e \"console.log(require('./package.json').version)\") && bun build --compile --define=JEAN2_VERSION=\"'${VERSION}'\" --outfile=dist/bin/jean2-windows-x64.exe src/cli.ts",
+    "build:bin": "VERSION=$(bun -e \"console.log(require('./package.json').version)\") && bun build --compile --define=PROKOPAI_VERSION=\"'${VERSION}'\" --outfile=dist/bin/prokopai src/cli.ts",
+    "build:bin:macos": "VERSION=$(bun -e \"console.log(require('./package.json').version)\") && bun build --compile --define=PROKOPAI_VERSION=\"'${VERSION}'\" --outfile=dist/bin/prokopai-macos-arm64 src/cli.ts",
+    "build:bin:linux": "VERSION=$(bun -e \"console.log(require('./package.json').version)\") && bun build --compile --define=PROKOPAI_VERSION=\"'${VERSION}'\" --outfile=dist/bin/prokopai-linux-x64 src/cli.ts",
+    "build:bin:windows": "VERSION=$(bun -e \"console.log(require('./package.json').version)\") && bun build --compile --define=PROKOPAI_VERSION=\"'${VERSION}'\" --outfile=dist/bin/prokopai-windows-x64.exe src/cli.ts",
     "build:all": "bun run build && bun run build:bin",
     "test": "bun test",
     "test:watch": "bun test --watch",
@@ -31,7 +31,7 @@
     "@capekai/types": "workspace:*",
     "@clack/prompts": "^0.10.0",
     "@hono/zod-validator": "^0.8.0",
-    "@jean2/sdk": "workspace:*",
+    "@prokopai/sdk": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@npmcli/arborist": "^9.4.3",
     "@zip.js/zip.js": "^2.7.60",

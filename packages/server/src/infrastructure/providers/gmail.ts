@@ -8,7 +8,8 @@
  * A background timer proactively refreshes the access token before it expires,
  * so tools never need to handle token refresh logic.
  */
-import type { GmailProviderConfig, ProviderStatus } from '@jean2/sdk';
+import type { GmailProviderConfig, ProviderStatus } from '@prokopai/sdk';
+import { readEnv } from '@/infrastructure/runtime/env-compat';
 import { broadcastEvent } from '@/transport/websocket/broadcast';
 import { registerProvider, type ConnectableProvider, type TokenResponse } from '@/adapters/capek/contracts';
 import { loadProviderConfig, saveProviderConfig, deleteProviderConfig } from '@/infrastructure/providers/provider-config-files';
@@ -42,11 +43,11 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let isRefreshing = false;
 
 function getClientId(): string {
-  return process.env.JEAN2_GMAIL_CLIENT_ID || '';
+  return readEnv('GMAIL_CLIENT_ID') || '';
 }
 
 function getClientSecret(): string {
-  return process.env.JEAN2_GMAIL_CLIENT_SECRET || '';
+  return readEnv('GMAIL_CLIENT_SECRET') || '';
 }
 
 // Register Gmail OAuth config. Credentials come from env vars.

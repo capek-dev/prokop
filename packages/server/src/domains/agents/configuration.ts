@@ -1,4 +1,4 @@
-import type { Preconfig, PreconfigMode } from '@jean2/sdk';
+import type { Preconfig, PreconfigMode } from '@prokopai/sdk';
 
 /**
  * Agents domain: subagent configuration rules.

@@ -13,7 +13,7 @@ import type {
   EditableFileResponse,
   FileRevisionConflictDetails,
   SaveFileResponse,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import {
   FILE_PREVIEW_MAX_BYTES,
   isBinaryBuffer,

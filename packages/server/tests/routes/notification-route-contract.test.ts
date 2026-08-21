@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { registerNotificationRoutes } from '@/transport/http/routes/notifications';
 import { HttpError } from '@/application/http-errors';
 import type { NotificationsApplication } from '@/application/notifications';
-import type { PushSubscriptionRecord } from '@jean2/sdk';
+import type { PushSubscriptionRecord } from '@prokopai/sdk';
 
 function makeRecord(overrides: Partial<PushSubscriptionRecord> = {}): PushSubscriptionRecord {
   return {

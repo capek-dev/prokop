@@ -1,4 +1,4 @@
-import type { ScheduledJob, Session } from '@jean2/sdk';
+import type { ScheduledJob, Session } from '@prokopai/sdk';
 
 /**
  * Scheduling domain: scheduled-run notification policy.

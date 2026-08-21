@@ -4,7 +4,7 @@ import type {
   SessionControlStatus,
   SessionControlUpdateReason,
   TakeoverDecision,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 /**
  * Controller domain: the controller claim/release/takeover state machine

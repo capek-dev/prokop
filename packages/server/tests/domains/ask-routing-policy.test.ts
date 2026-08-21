@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { AskAuthority } from '@jean2/sdk';
+import type { AskAuthority } from '@prokopai/sdk';
 import {
   carrierHasCapabilities,
   checkAskResponseEligibility,

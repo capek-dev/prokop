@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { registerWorkspaceRoutes } from '@/transport/http/routes/workspaces';
 import { HttpError } from '@/application/http-errors';
 import type { WorkspaceApplication } from '@/application/workspaces';
-import type { PinnedMessage, Session, Workspace } from '@jean2/sdk';
+import type { PinnedMessage, Session, Workspace } from '@prokopai/sdk';
 
 function makeWorkspace(overrides: Partial<Workspace> = {}): Workspace {
   return {

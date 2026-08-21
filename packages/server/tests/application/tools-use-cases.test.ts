@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { LoadedTool, ToolDefinition, ToolEnvVarStatus } from '@jean2/sdk';
+import type { LoadedTool, ToolDefinition, ToolEnvVarStatus } from '@prokopai/sdk';
 import {
   createToolsHttpApplication,
   type ToolsHttpApplication,

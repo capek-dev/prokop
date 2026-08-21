@@ -12,7 +12,7 @@ import { homedir } from 'os';
 import type { FilesApplication } from '@/application/files';
 import { validate } from './validate';
 import { saveFileSchema } from './schemas';
-import type { SaveFileRequest } from '@jean2/sdk';
+import type { SaveFileRequest } from '@prokopai/sdk';
 
 import { BadRequestError, ForbiddenError, HttpError, NotFoundError } from '@/application/http-errors';
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import type { AssistantMessage, PushSubscriptionRecord, Session } from '@jean2/sdk';
+import type { AssistantMessage, PushSubscriptionRecord, Session } from '@prokopai/sdk';
 import {
   createNotificationsApplication,
   type NotificationsApplication,

@@ -1,4 +1,4 @@
-import type { InterruptReason } from '@jean2/sdk';
+import type { InterruptReason } from '@prokopai/sdk';
 import {
   executeCompaction as executeCapekCompaction,
   forkSession as forkCapekSession,

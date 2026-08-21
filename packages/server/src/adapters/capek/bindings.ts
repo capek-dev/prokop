@@ -12,6 +12,7 @@ import {
   setDefaultContextAssembler,
   type RuntimeHost,
 } from '@capekai/core/hosts';
+import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';
 import { jean2DeliveryBindings } from './delivery';
 import { jean2InteractionBindings } from './interaction';
 import { jean2SandboxBindings } from './sandbox';
@@ -27,7 +28,7 @@ export const jean2CompatibilityBindings = {
   workspace: jean2WorkspaceBindings,
   sandbox: jean2SandboxBindings,
   layout: {
-    workspaceMemoryDir: (workspacePath: string) => join(workspacePath, '.jean2'),
+    workspaceMemoryDir: (workspacePath: string) => resolveWorkspaceMemoryDir(workspacePath),
     workspaceSkillsDir: (workspacePath: string) => join(workspacePath, '.agents', 'skills'),
     agentSkillsDir: (agentDir: string) => join(agentDir, 'skills'),
     toolOutputTempRoot: () => join(tmpdir(), 'jean2'),

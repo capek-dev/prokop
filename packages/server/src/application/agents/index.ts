@@ -1,4 +1,4 @@
-import type { Agent, Preconfig } from '@jean2/sdk';
+import type { Agent, Preconfig } from '@prokopai/sdk';
 import type {
   AgentDirectoryPort,
   AgentPreconfigPort,

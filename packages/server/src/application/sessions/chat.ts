@@ -1,4 +1,4 @@
-import type { ServerMessage } from '@jean2/sdk';
+import type { ServerMessage } from '@prokopai/sdk';
 import type { SessionWirePorts } from '../ports/delivery';
 import type { SessionExecutionPort } from '../ports/execution';
 import type { ControllerGatePort, ControllerGateRejection } from '../ports/control';

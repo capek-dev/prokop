@@ -7,7 +7,7 @@ import {
   createOutsideWorkspaceAsk,
   createWorkspaceModificationAsk,
   type PermissionIntent,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 // =============================================================================
 // Test Suite A — Permission Intent Analysis

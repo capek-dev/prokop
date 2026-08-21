@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import { isTextPart, isToolPart, isImagePart, isFilePart, parseToolInput, createStepPart } from '@capekai/core/execution';
-import type { Part } from '@jean2/sdk';
+import type { Part } from '@prokopai/sdk';
 
 describe('type guards', () => {
   test('isTextPart returns true for text parts', () => {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import type { Preconfig } from '@jean2/sdk';
+import type { Preconfig } from '@prokopai/sdk';
 import { createRuntime } from '@/bootstrap/create-runtime';
 import { buildSystemMessage } from '@capekai/core/execution';
 

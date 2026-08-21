@@ -1,4 +1,4 @@
-import type { ScheduleConfig } from '@jean2/sdk';
+import type { ScheduleConfig } from '@prokopai/sdk';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 

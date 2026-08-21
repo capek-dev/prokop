@@ -2,7 +2,7 @@ import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { Hono } from 'hono';
 import type { ConfigurationApplication } from '@/application/config';
 import type { ProvidersApplication } from '@/application/providers';
-import type { ProviderDescriptor } from '@jean2/sdk';
+import type { ProviderDescriptor } from '@prokopai/sdk';
 
 mock.module('@/config/models', () => ({
   getModelsConfigWithStatus: () => ({ providers: [], defaultModel: '', defaultProvider: '' }),

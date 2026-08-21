@@ -1,5 +1,5 @@
 import type { Hono } from 'hono';
-import type { CreateScheduledJobInput, UpdateScheduledJobInput } from '@jean2/sdk';
+import type { CreateScheduledJobInput, UpdateScheduledJobInput } from '@prokopai/sdk';
 import type { SchedulingHttpApplication } from '@/application/scheduling';
 import { validate } from './validate';
 import { NotFoundError } from '@/application/http-errors';

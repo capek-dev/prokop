@@ -4,7 +4,7 @@ import type {
   SessionStatus,
   Workspace,
   WorkspaceSettings,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import type {
   WorkspaceCleanupPort,
   WorkspaceDirectoryPort,

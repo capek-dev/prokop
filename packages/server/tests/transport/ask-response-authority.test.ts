@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import type { AskAuthority, AskResponse, ServerMessage } from '@jean2/sdk';
-import type { ClientMessage } from '@jean2/sdk';
+import type { AskAuthority, AskResponse, ServerMessage } from '@prokopai/sdk';
+import type { ClientMessage } from '@prokopai/sdk';
 import {
   handleAskResponseWithDependencies,
   handleNotificationAcknowledge,

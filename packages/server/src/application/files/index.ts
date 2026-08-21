@@ -17,7 +17,7 @@ import type {
   GitFileDiffResponse,
   SaveFileResponse,
   Workspace,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import type {
   FilesApplicationPort,
   GitStatusResult,

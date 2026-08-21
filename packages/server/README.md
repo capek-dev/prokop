@@ -15,17 +15,17 @@ Provides multi-provider LLM streaming, tool execution with security policies, su
 - **Skills** — discoverable `SKILL.md` files in `.agents/skills/` directories
 - **Preconfigs** — agent personality presets (Reader, Coder, Writer, Explore, General)
 - **Session management** — compaction, revert, fork, message queueing, and interrupt with cascade
-- **Auth off by default** — no tokens are generated. Set `JEAN2_AUTH_TOKEN` env var to enable authentication.
+- **Auth off by default** — no tokens are generated. Set `PROKOPAI_AUTH_TOKEN` env var to enable authentication.
 - **SQLite storage** — sessions, messages, parts, permissions, queued messages, tool approvals
 - **Daemon mode** — background server with PID file management and log tailing
-- **Instructions** — global (`~/.jean2/AGENTS.md`) and project-level instructions injected into system prompts
+- **Instructions** — global (`~/.prokopai/AGENTS.md`) and project-level instructions injected into system prompts
 - **Remote terminal** — PTY sessions with WebSocket binary frame protocol, multi-tab support, session reconnection, and idle cleanup
 
 ## Quick Start
 
 ```bash
-# Initialize (creates ~/.jean2/ with config, database, tools dir)
-jean2 init
+# Initialize (creates ~/.prokopai/ with config, database, tools dir)
+prokopai init
 
 # Start as background daemon
 jean2 start
@@ -81,8 +81,8 @@ Commands:
 ### Directory Layout
 
 ```
-~/.jean2/
-  config.json           # Server configuration (created by `jean2 init`)
+~/.prokopai/
+  config.json           # Server configuration (created by `prokopai init`)
   models.json           # LLM model definitions and defaults
   .env                  # Environment variables (API keys, settings)
   AGENTS.md             # Global instructions (applied to all sessions)
@@ -99,51 +99,51 @@ Commands:
 
 ### Environment Variables
 
-All settings can be placed in `~/.jean2/.env`. Process environment variables take precedence over values in `~/.jean2/.env`.
+All settings can be placed in `~/.prokopai/.env`. Process environment variables take precedence over values in `~/.prokopai/.env`.
 
 #### Server
 
 | Variable | Default | Description |
 |---|---|---|
-| `JEAN2_PORT` | `8742` | Server listen port |
-| `JEAN2_HOST` | `0.0.0.0` | Server bind host |
-| `JEAN2_AUTH_TOKEN` | — | API token for authentication. Not set = auth disabled. |
-| `JEAN2_DATABASE_PATH` | — | SQLite database path (defaults to `~/.jean2/data/agent.db`) |
-| `JEAN2_TOOLS_PATH` | `~/.jean2/tools` | Tools directory path |
-| `JEAN2_PRECONFIGS_PATH` | `~/.jean2/preconfigs` | Preconfigs directory path |
-| `JEAN2_MODELS_PATH` | — | Models config file path (defaults to `~/.jean2/models.json`) |
+| `PROKOPAI_PORT` | `8742` | Server listen port |
+| `PROKOPAI_HOST` | `0.0.0.0` | Server bind host |
+| `PROKOPAI_AUTH_TOKEN` | — | API token for authentication. Not set = auth disabled. |
+| `PROKOPAI_DATABASE_PATH` | — | SQLite database path (defaults to `~/.prokopai/data/agent.db`) |
+| `PROKOPAI_TOOLS_PATH` | `~/.prokopai/tools` | Tools directory path |
+| `PROKOPAI_PRECONFIGS_PATH` | `~/.prokopai/preconfigs` | Preconfigs directory path |
+| `PROKOPAI_MODELS_PATH` | — | Models config file path (defaults to `~/.prokopai/models.json`) |
 
 #### LLM
 
 | Variable | Default | Description |
 |---|---|---|
-| `JEAN2_LLM_TEMPERATURE` | `0.7` | Default LLM temperature |
-| `JEAN2_LLM_MAX_TOKENS` | `32000` | Max output token cap |
-| `JEAN2_LLM_MAX_STEPS` | `10` | Max agent loop steps (main agent) |
-| `JEAN2_LLM_SUBAGENT_MAX_STEPS` | `50` | Max agent loop steps (subagent) |
-| `JEAN2_LLM_BASE_URL` | — | Custom OpenAI-compatible base URL |
-| `JEAN2_LLM_OPENAI_API_KEY` | — | OpenAI API key |
-| `JEAN2_LLM_ANTHROPIC_API_KEY` | — | Anthropic API key |
-| `JEAN2_LLM_GOOGLE_API_KEY` | — | Google API key |
-| `JEAN2_LLM_OPENROUTER_API_KEY` | — | OpenRouter API key |
-| `JEAN2_LLM_MINIMAX_API_KEY` | — | MiniMax API key |
-| `JEAN2_LLM_ZHIPU_API_KEY` | — | Zhipu API key (open.bigmodel.cn) |
-| `JEAN2_LLM_ZHIPU_CODING_API_KEY` | — | Zhipu Coding API key (api.z.ai) |
+| `PROKOPAI_LLM_TEMPERATURE` | `0.7` | Default LLM temperature |
+| `PROKOPAI_LLM_MAX_TOKENS` | `32000` | Max output token cap |
+| `PROKOPAI_LLM_MAX_STEPS` | `10` | Max agent loop steps (main agent) |
+| `PROKOPAI_LLM_SUBAGENT_MAX_STEPS` | `50` | Max agent loop steps (subagent) |
+| `PROKOPAI_LLM_BASE_URL` | — | Custom OpenAI-compatible base URL |
+| `PROKOPAI_LLM_OPENAI_API_KEY` | — | OpenAI API key |
+| `PROKOPAI_LLM_ANTHROPIC_API_KEY` | — | Anthropic API key |
+| `PROKOPAI_LLM_GOOGLE_API_KEY` | — | Google API key |
+| `PROKOPAI_LLM_OPENROUTER_API_KEY` | — | OpenRouter API key |
+| `PROKOPAI_LLM_MINIMAX_API_KEY` | — | MiniMax API key |
+| `PROKOPAI_LLM_ZHIPU_API_KEY` | — | Zhipu API key (open.bigmodel.cn) |
+| `PROKOPAI_LLM_ZHIPU_CODING_API_KEY` | — | Zhipu Coding API key (api.z.ai) |
 
 #### Compaction
 
 | Variable | Default | Description |
 |---|---|---|
-| `JEAN2_COMPACTION_MODEL` | — | Model ID for summarization (defaults to session model) |
-| `JEAN2_COMPACTION_PROVIDER` | — | Provider for summarization (defaults to session provider) |
-| `JEAN2_COMPACTION_MAX_TOKENS` | `2000` | Max output tokens for summary |
-| `JEAN2_COMPACTION_AUTO_THRESHOLD_RATIO` | `0.75` | Ratio for hybrid auto-compaction threshold |
-| `JEAN2_COMPACTION_AUTO_RESERVE_CAP_TOKENS` | `32000` | Cap token reserve for auto-compaction formula |
-| `JEAN2_COMPACTION_AUTO_SAFETY_MARGIN_TOKENS` | `20000` | Safety margin tokens for auto-compaction |
-| `JEAN2_COMPACTION_PRESERVE_RECENT_TOOL_COUNT` | `3` | Recent completed tool outputs to preserve |
-| `JEAN2_COMPACTION_PRESERVE_SMALL_TOOL_CHARS` | `200` | Small tool output size threshold (chars) |
-| `JEAN2_COMPACTION_TOOL_CLEAR_CHARS_THRESHOLD` | `1000` | Minimum size for clearing tool outputs |
-| `JEAN2_COMPACTION_MAX_PRUNED_TOOL_COUNT` | `50` | Max tools to prune per compaction |
+| `PROKOPAI_COMPACTION_MODEL` | — | Model ID for summarization (defaults to session model) |
+| `PROKOPAI_COMPACTION_PROVIDER` | — | Provider for summarization (defaults to session provider) |
+| `PROKOPAI_COMPACTION_MAX_TOKENS` | `2000` | Max output tokens for summary |
+| `PROKOPAI_COMPACTION_AUTO_THRESHOLD_RATIO` | `0.75` | Ratio for hybrid auto-compaction threshold |
+| `PROKOPAI_COMPACTION_AUTO_RESERVE_CAP_TOKENS` | `32000` | Cap token reserve for auto-compaction formula |
+| `PROKOPAI_COMPACTION_AUTO_SAFETY_MARGIN_TOKENS` | `20000` | Safety margin tokens for auto-compaction |
+| `PROKOPAI_COMPACTION_PRESERVE_RECENT_TOOL_COUNT` | `3` | Recent completed tool outputs to preserve |
+| `PROKOPAI_COMPACTION_PRESERVE_SMALL_TOOL_CHARS` | `200` | Small tool output size threshold (chars) |
+| `PROKOPAI_COMPACTION_TOOL_CLEAR_CHARS_THRESHOLD` | `1000` | Minimum size for clearing tool outputs |
+| `PROKOPAI_COMPACTION_MAX_PRUNED_TOOL_COUNT` | `50` | Max tools to prune per compaction |
 
 ### Compaction Configuration
 
@@ -153,7 +153,7 @@ Manual (`session.compact`) and automatic compaction share the same policy surfac
 2. Generate an assistant summary message with `mode: 'compaction'`
 3. Mark eligible tool outputs as compacted
 
-**Model selection**: `JEAN2_COMPACTION_MODEL` / `JEAN2_COMPACTION_PROVIDER` override the session's model/provider for summarization. When unset, compaction uses the session's current model.
+**Model selection**: `PROKOPAI_COMPACTION_MODEL` / `PROKOPAI_COMPACTION_PROVIDER` override the session's model/provider for summarization. When unset, compaction uses the session's current model.
 
 **Auto-compaction**: Uses a hybrid threshold formula (`autoThresholdRatio`, `autoReserveCapTokens`, `autoSafetyMarginTokens`) to trigger before the context window is exhausted.
 
@@ -163,23 +163,23 @@ Example `.env` tuning:
 
 ```bash
 # Use a cheaper model for summarization
-JEAN2_COMPACTION_MODEL=gpt-5.1-codex-mini
-JEAN2_COMPACTION_PROVIDER=openai
-JEAN2_COMPACTION_MAX_TOKENS=1500
+PROKOPAI_COMPACTION_MODEL=gpt-5.1-codex-mini
+PROKOPAI_COMPACTION_PROVIDER=openai
+PROKOPAI_COMPACTION_MAX_TOKENS=1500
 
 # Tune auto-compaction aggressiveness (lower ratio = earlier trigger)
-JEAN2_COMPACTION_AUTO_THRESHOLD_RATIO=0.70
-JEAN2_COMPACTION_AUTO_RESERVE_CAP_TOKENS=32000
-JEAN2_COMPACTION_AUTO_SAFETY_MARGIN_TOKENS=15000
+PROKOPAI_COMPACTION_AUTO_THRESHOLD_RATIO=0.70
+PROKOPAI_COMPACTION_AUTO_RESERVE_CAP_TOKENS=32000
+PROKOPAI_COMPACTION_AUTO_SAFETY_MARGIN_TOKENS=15000
 
 # Tune tool pruning (preserve more recent tools, raise clear threshold)
-JEAN2_COMPACTION_PRESERVE_RECENT_TOOL_COUNT=5
-JEAN2_COMPACTION_TOOL_CLEAR_CHARS_THRESHOLD=2000
+PROKOPAI_COMPACTION_PRESERVE_RECENT_TOOL_COUNT=5
+PROKOPAI_COMPACTION_TOOL_CLEAR_CHARS_THRESHOLD=2000
 ```
 
 ### Models Configuration
 
-Models are defined in `~/.jean2/models.json`. The file declares providers, their available models with context window sizes and max output tokens, and the default model/provider pair.
+Models are defined in `~/.prokopai/models.json`. The file declares providers, their available models with context window sizes and max output tokens, and the default model/provider pair.
 
 ```json
 {
@@ -203,11 +203,11 @@ Model tiers: `budget`, `standard`, `premium`.
 
 Authentication is **disabled by default**. No tokens are generated or stored on disk.
 
-To enable authentication, set the `JEAN2_AUTH_TOKEN` environment variable:
+To enable authentication, set the `PROKOPAI_AUTH_TOKEN` environment variable:
 
 ```bash
-# In ~/.jean2/.env or your shell environment
-JEAN2_AUTH_TOKEN=your-secret-token
+# In ~/.prokopai/.env or your shell environment
+PROKOPAI_AUTH_TOKEN=your-secret-token
 ```
 
 When set:
@@ -217,7 +217,7 @@ When set:
 
 When not set, all requests pass through without authentication.
 
-Check auth status with `jean2 auth` — it shows whether auth is enabled and displays the masked token if set.
+Check auth status with `prokopai auth` — it shows whether auth is enabled and displays the masked token if set.
 
 ## API
 
@@ -360,7 +360,7 @@ src/
   app.ts                # Hono app — REST API routes, middleware
   cli.ts                # CLI binary — all jean2 commands
   init.ts               # First-run initialization wizard
-  env.ts                # Environment variable loading (~/.jean2/.env)
+  env.ts                # Environment variable loading (~/.prokopai/.env)
   
   core/
     agent.ts            # LLM streaming, tool binding, AI SDK integration
@@ -401,7 +401,7 @@ src/
   
   mcp/
     manager.ts          # MCP client lifecycle (connect/disconnect/list tools)
-    config.ts           # .jean2/mcp.json loader
+    config.ts           # .prokopai/mcp.json loader
     converter.ts        # MCP tool → AI SDK Tool adapter
     auth.ts             # MCP auth token storage
     oauth-provider.ts   # OAuth redirect flow for remote MCP
@@ -409,7 +409,7 @@ src/
   providers/
     codex.ts            # Codex OAuth provider (ChatGPT subscription)
     registry.ts         # Provider registration and model factory
-    storage.ts          # OAuth token persistence (~/.jean2/providers/)
+    storage.ts          # OAuth token persistence (~/.prokopai/providers/)
   
   skills/
     registry.ts         # SKILL.md discovery from .agents/skills/
@@ -429,7 +429,7 @@ src/
     index.ts            # Background daemon start/stop/status/logs
   
   prompts/
-    registry.ts         # Prompt template discovery (~/.jean2/prompts/*.md)
+    registry.ts         # Prompt template discovery (~/.prokopai/prompts/*.md)
   
   utils/
     strip-visualization.ts  # Strip _visualization from tool output for LLM context
@@ -441,7 +441,7 @@ src/
 
 ## Tools
 
-Tools are language-agnostic modules installed under `~/.jean2/tools/`. Each tool is a directory containing:
+Tools are language-agnostic modules installed under `~/.prokopai/tools/`. Each tool is a directory containing:
 
 ```
 tools/
@@ -469,7 +469,7 @@ jean2 tools install --all
 jean2 tools install --name read-file
 
 # During init
-jean2 init --install-tools
+prokopai init --install-tools
 ```
 
 ### Tool Module Interface
@@ -608,7 +608,7 @@ Ask requests time out after **5 minutes** by default. Timed-out asks are automat
 
 ## MCP (Model Context Protocol)
 
-MCP servers are configured per-workspace in `.jean2/mcp.json`:
+MCP servers are configured per-workspace in `.prokopai/mcp.json`:
 
 ```json
 {
@@ -697,7 +697,7 @@ Preconfigs define agent personalities with system prompts, tool sets, model pref
 
 Preconfigs have a `mode` field: `primary` (user-facing), `subagent` (Task tool only), or `both`.
 
-Custom preconfigs can be created via the REST API or by placing JSON files in `~/.jean2/preconfigs/`.
+Custom preconfigs can be created via the REST API or by placing JSON files in `~/.prokopai/preconfigs/`.
 
 ## Session Features
 
@@ -755,4 +755,4 @@ bun run build:bin:macos      # macOS ARM64
 bun run build:bin:linux      # Linux x64
 ```
 
-The resulting binary is self-contained and includes the Bun runtime. The CLI (`jean2 init`, `jean2 server`, etc.) works without a separate Bun installation. npm dependency installation for tools is handled by `@npmcli/arborist` bundled within the binary — no external Node.js or npm required.
+The resulting binary is self-contained and includes the Bun runtime. The CLI (`prokopai init`, `prokopai server`, etc.) works without a separate Bun installation. npm dependency installation for tools is handled by `@npmcli/arborist` bundled within the binary — no external Node.js or npm required.

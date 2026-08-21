@@ -1,4 +1,4 @@
-import type { PermissionGrant } from '@jean2/sdk';
+import type { PermissionGrant } from '@prokopai/sdk';
 import type { PermissionGrantRepositoryPort } from '../ports/permissions';
 
 export interface PermissionsApplication {

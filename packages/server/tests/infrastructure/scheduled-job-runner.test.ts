@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from 'bun:test';
-import type { Preconfig, ScheduledJob } from '@jean2/sdk';
+import type { Preconfig, ScheduledJob } from '@prokopai/sdk';
 import type {
   ScheduledRunSessionPort,
   ScheduledRunWorkspacePort,

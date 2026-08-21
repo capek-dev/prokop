@@ -2,7 +2,7 @@ import type {
   CreateScheduledJobInput,
   ScheduledJob,
   UpdateScheduledJobInput,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import type { ScheduledJobRepositoryPort } from '@/application/ports/scheduling';
 import { createScheduledJobRepository } from './scheduled-job-repository';
 import { getDatabase } from './database';

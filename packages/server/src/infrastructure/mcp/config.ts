@@ -1,16 +1,15 @@
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import { resolveWorkspaceDir } from '@/infrastructure/runtime/workspace-dirs';
 import type {
   McpConfig,
   McpServerConfig,
   McpLocalServerConfig,
   McpRemoteServerConfig,
-} from '@jean2/sdk';
-
-const MCP_CONFIG_PATH = '.jean2/mcp.json';
+} from '@prokopai/sdk';
 
 export async function loadMcpConfig(workspacePath: string): Promise<McpConfig> {
-  const configPath = join(workspacePath, MCP_CONFIG_PATH);
+  const configPath = join(resolveWorkspaceDir(workspacePath), 'mcp.json');
 
   try {
     const content = await readFile(configPath, 'utf-8');

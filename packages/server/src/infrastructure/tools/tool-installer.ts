@@ -105,8 +105,8 @@ export async function installTool(
 
   try {
     const installResult = await installDependencies({ toolDir: sourcePath });
-    sdkVersion = installResult.protectedVersions?.['@jean2/sdk']?.version;
-    sdkIntegrity = installResult.protectedVersions?.['@jean2/sdk']?.integrity ?? undefined;
+    sdkVersion = installResult.protectedVersions?.['@prokopai/sdk']?.version;
+    sdkIntegrity = installResult.protectedVersions?.['@prokopai/sdk']?.integrity ?? undefined;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return {
@@ -241,8 +241,8 @@ export async function installToolFromUrl(
 
     try {
       const installResult = await installDependencies({ toolDir: extractedRoot });
-      sdkVersionFromUrl = installResult.protectedVersions?.['@jean2/sdk']?.version;
-      sdkIntegrityFromUrl = installResult.protectedVersions?.['@jean2/sdk']?.integrity ?? undefined;
+      sdkVersionFromUrl = installResult.protectedVersions?.['@prokopai/sdk']?.version;
+      sdkIntegrityFromUrl = installResult.protectedVersions?.['@prokopai/sdk']?.integrity ?? undefined;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       return {

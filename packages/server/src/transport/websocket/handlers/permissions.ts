@@ -1,7 +1,7 @@
 import type { RouterContext } from '../router-context';
 import type { ConnectionId } from '../connection-id';
 import { requireWireApplication } from '../application';
-import type { PermissionListRequestMessage, PermissionRevokeMessage, PermissionRevokeAllMessage } from '@jean2/sdk';
+import type { PermissionListRequestMessage, PermissionRevokeMessage, PermissionRevokeAllMessage } from '@prokopai/sdk';
 
 export function handlePermissionList(
   ctx: RouterContext<ConnectionId>,

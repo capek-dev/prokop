@@ -1,11 +1,11 @@
 import type {
   AssistantMessage,
-  Jean2PushPayloadV1,
+  ProkopaiPushPayloadV1,
   NotificationEventType,
   NotificationPreferences,
   PushSubscriptionRecord,
   WebPushSubscriptionInput,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import {
   buildPushPayloadV1,
   buildRetryPushPayloadV1,
@@ -87,7 +87,7 @@ export function createNotificationsApplication(
     eventId: string,
     eventType: NotificationEventType,
     sessionId: string,
-  ): Jean2PushPayloadV1 {
+  ): ProkopaiPushPayloadV1 {
     return buildPushPayloadV1(subscription, eventId, eventType, sessionId, Date.now());
   }
 

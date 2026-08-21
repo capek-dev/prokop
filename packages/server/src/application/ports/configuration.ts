@@ -10,7 +10,7 @@ import type {
   UpdateModelRequest,
   UpdatePromptRequest,
   UpdateProviderRequest,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 export interface ModelsConfigurationPort {
   getModelsConfigWithStatus(): ModelsConfigResponse;

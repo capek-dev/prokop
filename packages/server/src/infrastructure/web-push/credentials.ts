@@ -3,6 +3,7 @@ import { dirname, join } from 'path';
 import { randomUUID } from 'crypto';
 import { mkdirSync } from 'fs';
 import { getWebPushCredentialsPath } from '@/infrastructure/runtime/paths';
+import { readEnv } from '@/infrastructure/runtime/env-compat';
 import webpush from 'web-push';
 import type { PushSubscription } from 'web-push';
 
@@ -22,7 +23,7 @@ const DEFAULT_VAPID_SUBJECT = 'https://github.com/jean2ai/jean2';
 const LEGACY_VAPID_SUBJECT = 'mailto:noreply@jean2.local';
 
 function getSubject(): string {
-  return process.env.JEAN2_WEB_PUSH_SUBJECT || DEFAULT_VAPID_SUBJECT;
+  return readEnv('WEB_PUSH_SUBJECT') || DEFAULT_VAPID_SUBJECT;
 }
 
 function normalizeSubject(subject: string | undefined): string {

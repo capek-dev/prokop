@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { MockLanguageModelV3, convertArrayToReadableStream } from 'ai/test';
-import type { AssistantMessage, ToolPart } from '@jean2/sdk';
+import type { AssistantMessage, ToolPart } from '@prokopai/sdk';
 import { withProviderOverrides } from '@capekai/core/providers';
 import { getRuntimeConfiguration, withRuntimeConfiguration } from '@capekai/core/configuration';
 import { getRuntimeHost as getJean2CompatibilityBindings, withRuntimeHost as withJean2CompatibilityBindings } from '@capekai/core/hosts';

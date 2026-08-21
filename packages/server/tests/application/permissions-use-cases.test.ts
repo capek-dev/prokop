@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { PermissionGrant } from '@jean2/sdk';
+import type { PermissionGrant } from '@prokopai/sdk';
 import {
   createPermissionsApplication,
   type PermissionsApplication,

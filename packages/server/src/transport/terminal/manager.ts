@@ -1,4 +1,5 @@
 import { existsSync, statSync } from 'fs';
+import { readEnvInt } from '@/infrastructure/runtime/env-compat';
 import type { ServerWebSocket } from 'bun';
 
 type TerminalSocket = ServerWebSocket<unknown>;
@@ -6,7 +7,7 @@ import type { IPty, IExitEvent } from 'bun-pty';
 import { spawn } from 'bun-pty';
 import { encodeFrame, OPCODES } from './frames';
 import type { TerminalSessionStorePort } from '@/application/ports/terminal';
-import type { TerminalSessionInfo } from '@jean2/sdk';
+import type { TerminalSessionInfo } from '@prokopai/sdk';
 import type { TerminalEventManager } from './event-manager';
 
 interface OutputChunk {
@@ -54,8 +55,8 @@ export class TerminalManager {
 
   constructor(store?: TerminalSessionStorePort) {
     this._store = store ?? null;
-    this.maxSessionsPerWorkspace = parseInt(process.env.JEAN2_TERMINAL_MAX_SESSIONS || '10', 10);
-    this.maxBufferBytes = parseInt(process.env.JEAN2_TERMINAL_BUFFER_BYTES || String(5 * 1024 * 1024), 10);
+    this.maxSessionsPerWorkspace = readEnvInt('TERMINAL_MAX_SESSIONS', 10);
+    this.maxBufferBytes = readEnvInt('TERMINAL_BUFFER_BYTES', 5 * 1024 * 1024);
     this.startExitedSessionCleanup();
   }
 

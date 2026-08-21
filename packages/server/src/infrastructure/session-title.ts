@@ -1,4 +1,4 @@
-import type { MessageWithParts } from '@jean2/sdk';
+import type { MessageWithParts } from '@prokopai/sdk';
 import { runTextModel } from '@/adapters/capek/contracts';
 import { getModelsConfig, findModel } from '@/config';
 

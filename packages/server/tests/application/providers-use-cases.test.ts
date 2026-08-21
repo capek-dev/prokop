@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ProviderDescriptor, ProviderStatus } from '@jean2/sdk';
+import type { ProviderDescriptor, ProviderStatus } from '@prokopai/sdk';
 import {
   createProvidersApplication,
   type ProvidersApplication,

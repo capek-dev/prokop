@@ -4,7 +4,7 @@ import type {
   ProviderCredentialsResponse,
   ProviderDescriptor,
   ProviderStatus,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 /**
  * Inward-facing provider-account ports (S4/S5). The provider account and

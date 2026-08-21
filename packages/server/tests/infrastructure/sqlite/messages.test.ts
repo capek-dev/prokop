@@ -37,7 +37,7 @@ import { createSession } from '@/infrastructure/sqlite/session-store';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { revertToStep, forkSession } from '@capekai/core/execution';
 import { createTestSession } from '#tests/factories';
-import type { AssistantMessage, Part, ToolPart } from '@jean2/sdk';
+import type { AssistantMessage, Part, ToolPart } from '@prokopai/sdk';
 
 function makeSession(overrides: { id: string; workspaceId: string; title: string; status: 'active' | 'closed' }) {
   const { createdAt: _c, updatedAt: _u, ...defaults } = createTestSession(overrides);

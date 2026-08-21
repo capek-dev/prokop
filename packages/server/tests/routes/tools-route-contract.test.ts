@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { registerToolRoutes } from '@/transport/http/routes/tools';
 import { HttpError } from '@/application/http-errors';
 import type { ToolsHttpApplication } from '@/application/tools';
-import type { LoadedTool, ToolDefinition } from '@jean2/sdk';
+import type { LoadedTool, ToolDefinition } from '@prokopai/sdk';
 
 function makeDefinition(overrides: Partial<ToolDefinition> = {}): ToolDefinition {
   return {

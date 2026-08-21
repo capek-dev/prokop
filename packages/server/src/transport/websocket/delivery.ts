@@ -1,4 +1,4 @@
-import type { AskAuthority, ServerMessage } from '@jean2/sdk';
+import type { AskAuthority, ServerMessage } from '@prokopai/sdk';
 import { getControllerConnections, getParticipantConnections } from './control-registry';
 import type { ConnectionId } from './connection-id';
 

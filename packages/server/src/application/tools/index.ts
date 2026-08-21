@@ -1,4 +1,4 @@
-import type { LoadedTool, ToolDefinition, ToolEnvVarStatus } from '@jean2/sdk';
+import type { LoadedTool, ToolDefinition, ToolEnvVarStatus } from '@prokopai/sdk';
 import type {
   ToolCatalogPort,
   ToolEnvironmentPort,

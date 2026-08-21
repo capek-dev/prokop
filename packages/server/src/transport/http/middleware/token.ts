@@ -1,17 +1,18 @@
 // Transport HTTP auth token validation (env-var based)
+import { readEnv } from '@/infrastructure/runtime/env-compat';
 
 /**
  * Auth token management — env-var only.
  *
- * Set JEAN2_AUTH_TOKEN to enable authentication.
- * When set, all /api/* routes (except public ones) require this token
- * via Authorization: Bearer <token> or ?token=<token>.
+ * Set PROKOPAI_AUTH_TOKEN (or legacy JEAN2_AUTH_TOKEN) to enable
+ * authentication. When set, all /api/* routes (except public ones) require
+ * this token via Authorization: Bearer <token> or ?token=<token>.
  *
  * When not set, auth is disabled (all requests pass through).
  */
 
 export function isAuthEnabled(): boolean {
-  return !!process.env.JEAN2_AUTH_TOKEN;
+  return !!readEnv('AUTH_TOKEN');
 }
 
 export function validateToken(providedToken: string | null | undefined): boolean {
@@ -19,7 +20,7 @@ export function validateToken(providedToken: string | null | undefined): boolean
     return false;
   }
 
-  const expected = process.env.JEAN2_AUTH_TOKEN;
+  const expected = readEnv('AUTH_TOKEN');
   if (!expected) {
     return false;
   }

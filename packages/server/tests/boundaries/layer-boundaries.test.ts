@@ -66,9 +66,13 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
   'packages/server/src/adapters/capek/titles.ts': ['@/infrastructure/session-title'],
   'packages/server/src/adapters/capek/tool-source.ts': [
     '@/config', '@/infrastructure/mcp', '@/infrastructure/runtime/paths',
+    '@/infrastructure/runtime/env-compat',
   ],
   'packages/server/src/adapters/capek/workspace.ts': [
     '@/infrastructure/sqlite/workspaces', '@/infrastructure/runtime/environment', '@/infrastructure/runtime/paths',
+  ],
+  'packages/server/src/adapters/capek/bindings.ts': [
+    '@/infrastructure/runtime/workspace-dirs',
   ],
   'packages/server/src/adapters/jean2/session-repository.ts': [
     '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/queued-messages', '@/infrastructure/sqlite/tool-output-artifacts', '@/infrastructure/sqlite/attachments', '@/infrastructure/sqlite/pending-asks', '@/infrastructure/sqlite/workspaces', '@/adapters/capek/compaction-recovery', '@/infrastructure/session-title',
@@ -134,6 +138,23 @@ const aiSdkExceptions: Record<string, string[]> = {};
 // control, chat, and session handler entries; S4 retired the misc handler's
 // capability-router import. S9 moved permission persistence behind the wired
 // permission application.
+// Rename compat (jean2 → prokopai): transport reads env through the runtime
+// env-compat helper (PROKOPAI_ ?? JEAN2_ resolution) and the terminal
+// manager through the same helper. Recorded until transport gets its own
+// env-access port. Distinct from layerTransportLegacyExceptions, which stays
+// pinned empty by the S4 ask-response gate.
+const layerTransportRenameCompatExceptions: Record<string, string[]> = {
+  'packages/server/src/transport/websocket/bun-adapter.ts': [
+    '@/infrastructure/runtime/env-compat',
+  ],
+  'packages/server/src/transport/terminal/manager.ts': [
+    '@/infrastructure/runtime/env-compat',
+  ],
+  'packages/server/src/transport/http/middleware/token.ts': [
+    '@/infrastructure/runtime/env-compat',
+  ],
+};
+
 const layerTransportLegacyExceptions: Record<string, string[]> = {};
 
 // The HTTP app composition file needs three composition-root reads that the
@@ -145,6 +166,7 @@ const layerTransportAppExceptions: Record<string, string[]> = {
   'packages/server/src/transport/http/app.ts': [
     '@/version',
     '@/infrastructure/runtime/environment',
+    '@/infrastructure/runtime/env-compat',
     '@/bootstrap/application',
   ],
 };
@@ -271,6 +293,7 @@ const layerRules: DependencyRule[] = [
     allowedResolvedDirs: [transportDir, applicationDir, adaptersCapekDir],
     exceptions: {
       ...layerTransportLegacyExceptions,
+      ...layerTransportRenameCompatExceptions,
       ...layerTransportAppExceptions,
     },
   },
@@ -719,7 +742,7 @@ describe('server layer boundaries', () => {
       '../application',
       '../connection-id',
       '../router-context',
-      '@jean2/sdk',
+      '@prokopai/sdk',
     ].sort());
     expect(imports.some((imp) => imp.specifier === '@/store/permissions')).toBe(false);
     expect(file!.sourceText).toContain('requireWireApplication().permissions.list');
@@ -752,7 +775,7 @@ describe('server layer boundaries', () => {
 
     const allowedSpecifiers = [
       '@capekai/core/hosts',
-      '@jean2/sdk',
+      '@prokopai/sdk',
       '@/application/ports/session-search',
     ];
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
@@ -797,7 +820,7 @@ describe('server layer boundaries', () => {
 
     const allowedSpecifiers = [
       'hono',
-      '@jean2/sdk',
+      '@prokopai/sdk',
       '@/application/scheduling',
       './validate',
       './schemas',
@@ -881,7 +904,7 @@ describe('server layer boundaries', () => {
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@jean2/sdk',
+      '@prokopai/sdk',
       '@/application/ports/scheduling',
       './database',
       './scheduled-job-repository',
@@ -896,7 +919,7 @@ describe('server layer boundaries', () => {
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@jean2/sdk',
+      '@prokopai/sdk',
       '@/application/ports/scheduling',
       '@/domains/scheduling/job-lifecycle',
       '@/domains/scheduling/schedule',
@@ -1096,7 +1119,7 @@ describe('server layer boundaries', () => {
 
   test('S4 gate: the controller domain imports only SDK types and sibling modules', () => {
     const allowedSpecifiers = [
-      '@jean2/sdk',
+      '@prokopai/sdk',
       './policy',
       './ask-routing',
       './index',
@@ -1132,7 +1155,7 @@ describe('server layer boundaries', () => {
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@jean2/sdk',
+      '@prokopai/sdk',
       '@/domains/controllers',
     ].sort());
     const domainImport = imports.find((imp) => imp.specifier === '@/domains/controllers');
@@ -1192,7 +1215,7 @@ describe('server layer boundaries', () => {
         [
           '@/application/ports/session-message',
           '@/infrastructure/session-search/fts',
-          '@jean2/sdk',
+          '@prokopai/sdk',
           './attachments',
           './database',
           './session-repository',
@@ -1209,7 +1232,7 @@ describe('server layer boundaries', () => {
         [
           '@/application/ports/session-message',
           '@/infrastructure/session-search/fts-projector',
-          '@jean2/sdk',
+          '@prokopai/sdk',
           './database',
           './message-repository',
           './session-store',
@@ -1244,7 +1267,7 @@ describe('server layer boundaries', () => {
       } else {
         expect(specifiers).toEqual([
           '@/application/ports/session-message',
-          '@jean2/sdk',
+          '@prokopai/sdk',
           'bun:sqlite',
         ]);
         // The Database import is type-only; no runtime SQLite API leaks
@@ -1270,7 +1293,7 @@ describe('server layer boundaries', () => {
 
     const allowedSpecifiers = [
       'hono',
-      '@jean2/sdk',
+      '@prokopai/sdk',
       '@/application/workspaces',
       './validate',
       './schemas',
@@ -1329,7 +1352,7 @@ describe('server layer boundaries', () => {
 
   test('S4 gate: the workspace domain imports only SDK types and sibling modules', () => {
     const allowedSpecifiers = [
-      '@jean2/sdk',
+      '@prokopai/sdk',
       './record',
       './index',
     ];
@@ -1414,7 +1437,7 @@ describe('server layer boundaries', () => {
       'fs',
       'os',
       'path',
-      '@jean2/sdk',
+      '@prokopai/sdk',
       '@/application/files',
       '@/application/http-errors',
       './schemas',
@@ -1474,7 +1497,7 @@ describe('server layer boundaries', () => {
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@jean2/sdk',
+      '@prokopai/sdk',
       '../ports/files',
       'path',
     ].sort());
@@ -1485,17 +1508,17 @@ describe('server layer boundaries', () => {
   test('S5 gate: the filesystem infrastructure modules import only utilities, binaries, and their siblings', () => {
     const expectedImports: Record<string, string[]> = {
       'packages/server/src/infrastructure/filesystem/workspace-files.ts': [
-        '@jean2/sdk', 'fast-glob', 'fs', 'fs/promises', 'ignore', 'path',
+        '@prokopai/sdk', 'fast-glob', 'fs', 'fs/promises', 'ignore', 'path',
       ],
       'packages/server/src/infrastructure/filesystem/file-preview.ts': [
-        '@jean2/sdk', './binary-detection', 'fs/promises', 'path',
+        '@prokopai/sdk', './binary-detection', 'fs/promises', 'path',
       ],
       'packages/server/src/infrastructure/filesystem/file-mutations.ts': [
-        '@jean2/sdk', './binary-detection', '@/application/http-errors',
+        '@prokopai/sdk', './binary-detection', '@/application/http-errors',
         './file-preview', 'crypto', 'fs/promises', 'path',
       ],
       'packages/server/src/infrastructure/filesystem/git-status.ts': [
-        '@jean2/sdk', './binary-detection', './file-preview', 'fs/promises', 'path',
+        '@prokopai/sdk', './binary-detection', './file-preview', 'fs/promises', 'path',
       ],
     };
 
@@ -1662,7 +1685,7 @@ describe('server layer boundaries', () => {
 
   test('S4/S5 gate: the tool-installation domain imports only SDK types, path, and sibling modules', () => {
     const allowedSpecifiers = [
-      '@jean2/sdk',
+      '@prokopai/sdk',
       '@capekai/tool',
       'path',
       './policy',
@@ -1778,7 +1801,7 @@ describe('server layer boundaries', () => {
     expect(parseImports(runner!.sourceText, runner!.path).map((imp) => imp.specifier).sort()).toEqual([
       '@/adapters/capek/contracts',
       '@/application/ports/scheduling',
-      '@jean2/sdk',
+      '@prokopai/sdk',
       'crypto',
     ].sort());
 
@@ -1794,7 +1817,7 @@ describe('server layer boundaries', () => {
       '@/infrastructure/sqlite/scheduled-job-store',
       '@/infrastructure/sqlite/session-store',
       '@/infrastructure/sqlite/workspaces',
-      '@jean2/sdk',
+      '@prokopai/sdk',
     ].sort());
     expect(adapter!.sourceText).not.toContain('@/scheduler/runner');
   });
@@ -1995,7 +2018,7 @@ describe('server layer boundaries', () => {
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@jean2/sdk',
+      '@prokopai/sdk',
       '../application',
       '../connection-id',
       '../router-context',
@@ -2057,7 +2080,7 @@ describe('server layer boundaries', () => {
 
   test('S4 gate: the provider-accounts domain imports only SDK types and sibling modules', () => {
     const allowedSpecifiers = [
-      '@jean2/sdk',
+      '@prokopai/sdk',
       './oauth',
       './credentials',
       './index',
@@ -2207,7 +2230,7 @@ describe('server layer boundaries', () => {
 
   test('S4 gate: the notification domain imports only SDK types and sibling modules', () => {
     const allowedSpecifiers = [
-      '@jean2/sdk',
+      '@prokopai/sdk',
       './policy',
       './index',
     ];

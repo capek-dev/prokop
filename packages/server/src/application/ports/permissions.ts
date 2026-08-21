@@ -1,4 +1,4 @@
-import type { PermissionGrant } from '@jean2/sdk';
+import type { PermissionGrant } from '@prokopai/sdk';
 
 export interface PermissionGrantRepositoryPort {
   list(workspaceId: string, options?: { includeRevoked?: boolean }): PermissionGrant[];

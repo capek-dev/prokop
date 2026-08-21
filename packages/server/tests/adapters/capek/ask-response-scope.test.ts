@@ -7,7 +7,7 @@ import {
   configureStorage,
   createInMemoryStorageBundle,
 } from '@capekai/core/storage';
-import type { AskRequestMessage, AskTimedOutMessage, PermissionAsk } from '@jean2/sdk';
+import type { AskRequestMessage, AskTimedOutMessage, PermissionAsk } from '@prokopai/sdk';
 import { resolveAsk, getAuthorityForPendingAsk } from '@/adapters/capek/contracts';
 import { configureJean2Bindings } from '@/adapters/capek/bindings';
 import { configureJean2RuntimeConfiguration } from '@/adapters/capek/runtime-configuration';

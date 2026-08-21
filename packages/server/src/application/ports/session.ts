@@ -9,7 +9,7 @@ import type {
   QueuedMessage,
   Session,
   SessionStatus,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 /** Structural copies of storage result shapes. The Jean2 repository
  * adapter maps store and Capek storage results onto these contracts. */

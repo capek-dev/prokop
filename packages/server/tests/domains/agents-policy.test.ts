@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { Preconfig } from '@jean2/sdk';
+import type { Preconfig } from '@prokopai/sdk';
 import {
   AGENT_MEMORY_MEMORY_FILENAME,
   AGENT_MEMORY_USER_FILENAME,
@@ -43,7 +43,7 @@ describe('agents domain: home directory semantics', () => {
     expect(agentDirectoryPath('/data', 'coder')).toBe('/data/agents/coder');
     expect(agentSkillsDirectoryPath('/data', 'coder')).toBe('/data/agents/coder/skills');
     expect(agentHomeDirectoryPath('/data', 'coder')).toBe('/data/agents/coder/home');
-    expect(agentHomeDotJean2DirectoryPath('/data', 'coder')).toBe('/data/agents/coder/home/.jean2');
+    expect(agentHomeDotJean2DirectoryPath('/data', 'coder')).toBe('/data/agents/coder/home/.prokopai');
   });
 
   test('derives the home workspace id, memory filenames, and the exact home workspace template', () => {

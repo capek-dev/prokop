@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { CodexProviderConfig, GmailProviderConfig } from '@jean2/sdk';
+import type { CodexProviderConfig, GmailProviderConfig } from '@prokopai/sdk';
 import {
   applyCodexRefresh,
   applyGmailRefresh,
@@ -197,7 +197,7 @@ describe('provider-accounts domain: credential policy', () => {
     expect(PROVIDER_CREDENTIALS).toHaveLength(6);
     expect(getSupportedProviderCredential('openai')).toEqual({
       provider: 'openai',
-      envKey: 'JEAN2_LLM_OPENAI_API_KEY',
+      envKey: 'PROKOPAI_LLM_OPENAI_API_KEY',
     });
     expect(getSupportedProviderCredential('ghost')).toBeUndefined();
   });

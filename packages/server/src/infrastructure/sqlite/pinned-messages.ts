@@ -1,5 +1,5 @@
 import { getDatabase } from './database';
-import type { PinnedMessage } from '@jean2/sdk';
+import type { PinnedMessage } from '@prokopai/sdk';
 import { HttpError } from '@/application/http-errors';
 
 // =============================================================================

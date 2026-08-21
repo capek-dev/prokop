@@ -1,5 +1,5 @@
 import type { Hono } from 'hono';
-import type { SessionStatus } from '@jean2/sdk';
+import type { SessionStatus } from '@prokopai/sdk';
 import { validate } from './validate';
 import { createSessionSchema, updateSessionSchema } from './schemas';
 import {

@@ -12,7 +12,7 @@ import type { NotificationsApplication } from '@/application/notifications';
 import type { PermissionsApplication } from '@/application/permissions';
 import type { ProvidersApplication } from '@/application/providers';
 import type { SessionApplication, SessionControlApplication } from '@/application';
-import type { NotificationAcknowledgeMessage } from '@jean2/sdk';
+import type { NotificationAcknowledgeMessage } from '@prokopai/sdk';
 
 interface AckSpy {
   acks: Array<{ eventId: string; sessionId: string; clientId: string }>;

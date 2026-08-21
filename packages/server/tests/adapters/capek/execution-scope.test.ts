@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import type { ScheduledJob } from '@jean2/sdk';
+import type { ScheduledJob } from '@prokopai/sdk';
 import type {
   executeCompaction as CapekExecuteCompaction,
   forkSession as CapekForkSession,

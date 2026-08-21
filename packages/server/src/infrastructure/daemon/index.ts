@@ -113,6 +113,23 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonResult
   const port = options?.port ?? getPort();
   const host = options?.host ?? getHost();
 
+  // Child env passes both canonical PROKOPAI_* keys and legacy JEAN2_* twins
+  // so the spawned server (possibly a different version during update)
+  // resolves them under either prefix.
+  const childEnv = (): NodeJS.ProcessEnv => ({
+    ...getToolEnv(),
+    PROKOPAI_PORT: String(port),
+    PROKOPAI_HOST: host,
+    JEAN2_PORT: String(port),
+    JEAN2_HOST: host,
+    ...(getTlsEnabled() && {
+      PROKOPAI_TLS_ENABLED: 'true',
+      JEAN2_TLS_ENABLED: 'true',
+      ...(getTlsCertFile() && { PROKOPAI_TLS_CERT_FILE: getTlsCertFile(), JEAN2_TLS_CERT_FILE: getTlsCertFile() }),
+      ...(getTlsKeyFile() && { PROKOPAI_TLS_KEY_FILE: getTlsKeyFile(), JEAN2_TLS_KEY_FILE: getTlsKeyFile() }),
+    }),
+  });
+
   ensureConfigDir();
 
   const logFilePath = getLogFilePath();
@@ -129,16 +146,7 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonResult
       {
         detached: true,
         stdio: ['ignore', logFd, logFd],
-        env: {
-          ...getToolEnv(),
-          JEAN2_PORT: String(port),
-          JEAN2_HOST: host,
-          ...(getTlsEnabled() && {
-            JEAN2_TLS_ENABLED: 'true',
-            ...(getTlsCertFile() && { JEAN2_TLS_CERT_FILE: getTlsCertFile() }),
-            ...(getTlsKeyFile() && { JEAN2_TLS_KEY_FILE: getTlsKeyFile() }),
-          }),
-        },
+        env: childEnv(),
       }
     );
   } else {
@@ -148,16 +156,7 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonResult
       {
         detached: true,
         stdio: ['ignore', logFd, logFd],
-        env: {
-          ...getToolEnv(),
-          JEAN2_PORT: String(port),
-          JEAN2_HOST: host,
-          ...(getTlsEnabled() && {
-            JEAN2_TLS_ENABLED: 'true',
-            ...(getTlsCertFile() && { JEAN2_TLS_CERT_FILE: getTlsCertFile() }),
-            ...(getTlsKeyFile() && { JEAN2_TLS_KEY_FILE: getTlsKeyFile() }),
-          }),
-        },
+        env: childEnv(),
       }
     );
   }

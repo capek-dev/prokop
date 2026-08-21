@@ -1,4 +1,4 @@
-import type { AutoApproveSeverity, Workspace, WorkspaceSettings } from '@jean2/sdk';
+import type { AutoApproveSeverity, Workspace, WorkspaceSettings } from '@prokopai/sdk';
 
 /**
  * Workspace domain: workspace record policy.

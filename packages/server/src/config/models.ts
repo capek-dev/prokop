@@ -13,7 +13,7 @@ import type {
   UpdateModelRequest,
   SetDefaultsRequest,
   ModelWithStatus,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 const KNOWN_PROVIDERS = new Set([
   'openai', 'openrouter', 'minimax', 'zhipu', 'zhipu-coding',
@@ -21,12 +21,12 @@ const KNOWN_PROVIDERS = new Set([
 ]);
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
-  openai: 'JEAN2_LLM_OPENAI_API_KEY',
-  openrouter: 'JEAN2_LLM_OPENROUTER_API_KEY',
-  minimax: 'JEAN2_LLM_MINIMAX_API_KEY',
-  zhipu: 'JEAN2_LLM_ZHIPU_API_KEY',
-  'zhipu-coding': 'JEAN2_LLM_ZHIPU_CODING_API_KEY',
-  'deepseek': 'JEAN2_LLM_DEEPSEEK_API_KEY',
+  openai: 'PROKOPAI_LLM_OPENAI_API_KEY',
+  openrouter: 'PROKOPAI_LLM_OPENROUTER_API_KEY',
+  minimax: 'PROKOPAI_LLM_MINIMAX_API_KEY',
+  zhipu: 'PROKOPAI_LLM_ZHIPU_API_KEY',
+  'zhipu-coding': 'PROKOPAI_LLM_ZHIPU_CODING_API_KEY',
+  'deepseek': 'PROKOPAI_LLM_DEEPSEEK_API_KEY',
 };
 
 export function getModelsDocument(): ModelsConfig {

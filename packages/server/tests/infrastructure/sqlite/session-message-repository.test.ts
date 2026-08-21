@@ -9,7 +9,7 @@ import {
 import { createSessionRepository } from '@/infrastructure/sqlite/session-repository';
 import { createMessageRepository } from '@/infrastructure/sqlite/message-repository';
 import type { SessionMessageRepositoryHooks } from '@/application/ports/session-message';
-import type { AssistantMessage, ToolPart } from '@jean2/sdk';
+import type { AssistantMessage, ToolPart } from '@prokopai/sdk';
 
 function makeHooks(): SessionMessageRepositoryHooks & { calls: string[] } {
   const calls: string[] = [];

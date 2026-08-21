@@ -1,4 +1,4 @@
-import type { Preconfig, PreconfigMode } from '@jean2/sdk';
+import type { Preconfig, PreconfigMode } from '@prokopai/sdk';
 import {
   listPreconfigs,
   getPreconfig,

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
-import type { ClientMessage, ServerMessage } from '@jean2/sdk';
+import type { ClientMessage, ServerMessage } from '@prokopai/sdk';
 import { handleClientMessage } from '@/transport/websocket/message-router';
 import type { ClientEntry, RouterContext } from '@/transport/websocket/router-context';
 import {

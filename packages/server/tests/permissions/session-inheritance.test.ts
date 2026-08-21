@@ -10,7 +10,7 @@ import { requestPermission, resolvePermission } from '@capekai/core/ask-authorit
 import {
   getWorkspaceGrants,
 } from '@/infrastructure/sqlite/permissions';
-import type { PermissionAsk } from '@jean2/sdk';
+import type { PermissionAsk } from '@prokopai/sdk';
 
 // =============================================================================
 // Session Permission Inheritance Tests (Bugfix Spec 03)

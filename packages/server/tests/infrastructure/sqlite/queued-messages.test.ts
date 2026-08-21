@@ -12,7 +12,7 @@ import {
   getQueuedMessageCount,
   addMessageToQueue,
 } from '@/infrastructure/sqlite/queued-messages';
-import type { QueuedMessage } from '@jean2/sdk';
+import type { QueuedMessage } from '@prokopai/sdk';
 
 describe('queued-messages store', () => {
   let sessionId: string;

@@ -1,4 +1,4 @@
-import type { ClientMessage } from '@jean2/sdk';
+import type { ClientMessage } from '@prokopai/sdk';
 import type { ConnectionId } from './connection-id';
 import type { RouterContext } from './router-context';
 import { handleChat, handleSessionEditMessage } from './chat-handler';

@@ -1,7 +1,7 @@
 import { getDatabase } from './database';
 import { mkdirSync, writeFileSync, unlinkSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
-import type { AttachmentKind } from '@jean2/sdk';
+import type { AttachmentKind } from '@prokopai/sdk';
 import { getAttachmentDir } from '@/infrastructure/runtime/paths';
 
 const MAX_ATTACHMENT_SIZE = 20 * 1024 * 1024;

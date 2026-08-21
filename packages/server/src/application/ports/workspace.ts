@@ -5,7 +5,7 @@ import type {
   SessionStatus,
   Workspace,
   WorkspaceSettings,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 /**
  * Inward-facing workspace ports (S4). The workspace record policy and the

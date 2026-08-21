@@ -4,7 +4,7 @@ import { HttpError } from '@/application/http-errors';
 import { registerSessionRoutes } from '@/transport/http/routes/sessions';
 import { createSessionHttpApplication, type SessionHttpApplication } from '@/application/sessions/http';
 import type { SessionRepositoryPort } from '@/application/ports/session';
-import type { Session } from '@jean2/sdk';
+import type { Session } from '@prokopai/sdk';
 
 function makeSession(overrides: Partial<Session> = {}): Session {
   return {

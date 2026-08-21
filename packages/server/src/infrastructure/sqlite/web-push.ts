@@ -4,7 +4,7 @@ import type {
   PushSubscriptionRecord,
   NotificationPreferences,
   WebPushSubscriptionInput,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 export interface PushSubscriptionRow {
   id: string;

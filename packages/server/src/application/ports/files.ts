@@ -14,8 +14,8 @@ import type {
   GitDiffSummary,
   GitFileDiffResponse,
   Workspace,
-} from '@jean2/sdk';
-import type { EditableFileResponse, SaveFileResponse } from '@jean2/sdk';
+} from '@prokopai/sdk';
+import type { EditableFileResponse, SaveFileResponse } from '@prokopai/sdk';
 
 export interface EditableFileWorkspaceLike {
   path: string;

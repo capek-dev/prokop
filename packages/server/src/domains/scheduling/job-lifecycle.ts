@@ -1,4 +1,4 @@
-import type { ScheduledJob, UpdateScheduledJobInput } from '@jean2/sdk';
+import type { ScheduledJob, UpdateScheduledJobInput } from '@prokopai/sdk';
 import { computeNextRun } from './schedule';
 
 /**

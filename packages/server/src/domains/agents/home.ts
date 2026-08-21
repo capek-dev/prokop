@@ -1,11 +1,12 @@
+import { existsSync } from 'fs';
 import { join } from 'path';
-import type { WorkspaceSettings } from '@jean2/sdk';
+import type { WorkspaceSettings } from '@prokopai/sdk';
 
 /**
  * Agents domain: agent home directory semantics.
  *
  * Owns the layout rules that make a preconfig an agent on disk: the agent
- * directory under `<dataDir>/agents`, the `skills` and `home/.jean2`
+ * directory under `<dataDir>/agents`, the `skills` and `home/.prokopai`
  * subdirectories, the `USER.md`/`MEMORY.md` memory files, and the virtual
  * home workspace (`<agentId>-home`) with its fixed settings. These rules
  * were inline in `agents/storage.ts` before S4.
@@ -32,8 +33,25 @@ export function agentHomeDirectoryPath(dataDir: string, agentId: string): string
   return join(agentDirectoryPath(dataDir, agentId), 'home');
 }
 
+export function agentHomeDotDirectoryPath(dataDir: string, agentId: string): string {
+  return join(agentHomeDirectoryPath(dataDir, agentId), '.prokopai');
+}
+
+/**
+ * Legacy alias kept for compatibility (name predates the prokopai rename).
+ * Same resolution: the `.prokopai` dir inside the agent home, falling back
+ * to `.jean2` when only the legacy dir exists on disk.
+ */
 export function agentHomeDotJean2DirectoryPath(dataDir: string, agentId: string): string {
-  return join(agentHomeDirectoryPath(dataDir, agentId), '.jean2');
+  const canonical = agentHomeDotDirectoryPath(dataDir, agentId);
+  if (existsSync(canonical)) {
+    return canonical;
+  }
+  const legacy = join(agentHomeDirectoryPath(dataDir, agentId), '.jean2');
+  if (existsSync(legacy)) {
+    return legacy;
+  }
+  return canonical;
 }
 
 /** The virtual home workspace id derived from the agent id. */

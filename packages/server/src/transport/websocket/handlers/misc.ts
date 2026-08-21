@@ -11,7 +11,7 @@ import type {
   AskAuthority,
   NotificationAcknowledgeMessage,
   PongMessage,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 export function handleClientRegister(
   ctx: RouterContext<ConnectionId>,

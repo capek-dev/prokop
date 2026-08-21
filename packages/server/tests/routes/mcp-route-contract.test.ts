@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { registerMcpRoutes } from '@/transport/http/routes/mcp';
 import { HttpError } from '@/application/http-errors';
 import type { McpHttpApplication } from '@/application/mcp';
-import type { McpStatus } from '@jean2/sdk';
+import type { McpStatus } from '@prokopai/sdk';
 
 const connected: McpStatus = { status: 'connected' };
 

@@ -27,7 +27,7 @@ import {
   vacuumDatabase,
 } from '@/infrastructure/sqlite/cleanup';
 import { getDatabase } from '@/infrastructure/sqlite/database';
-import type { PermissionAsk } from '@jean2/sdk';
+import type { PermissionAsk } from '@prokopai/sdk';
 
 function makeSession(overrides: { id: string; workspaceId: string; title: string; status: 'active' | 'closed' }) {
   const { createdAt: _c, updatedAt: _u, ...defaults } = createTestSession(overrides);

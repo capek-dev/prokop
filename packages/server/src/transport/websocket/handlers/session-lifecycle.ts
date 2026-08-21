@@ -12,7 +12,7 @@ import type {
   SessionRenameMessage,
   SessionGenerateTitleMessage,
   SessionInterruptMessage,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 /**
  * Session lifecycle wire handlers (S3). These handlers own wire

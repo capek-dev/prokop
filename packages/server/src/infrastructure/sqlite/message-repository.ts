@@ -15,7 +15,7 @@ import type {
   SystemMessage,
   ToolPart,
   UserMessage,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import type {
   CompactionBoundary,
   MessageStorePort,

@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import { _internal, attachGitStatusToEntries } from '@/infrastructure/filesystem/git-status';
-import type { FileEntry, GitDiffSummary, GitAvailability } from '@jean2/sdk';
+import type { FileEntry, GitDiffSummary, GitAvailability } from '@prokopai/sdk';
 
 const { parsePorcelainStatus, parseNumstat, aggregateDirectoryStatus, mapStatus, parseUnifiedDiff } = _internal;
 

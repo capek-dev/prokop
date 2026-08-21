@@ -1,5 +1,5 @@
 import { getDatabase } from './database';
-import type { Ask } from '@jean2/sdk';
+import type { Ask } from '@prokopai/sdk';
 
 // =============================================================================
 // Permission Request Lifecycle Status

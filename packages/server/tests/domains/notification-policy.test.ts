@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { AssistantMessage, Session } from '@jean2/sdk';
+import type { AssistantMessage, Session } from '@prokopai/sdk';
 import {
   buildPushPayloadV1,
   buildRetryPushPayloadV1,

@@ -1,10 +1,10 @@
 import type {
   AssistantMessage,
-  Jean2PushPayloadV1,
+  ProkopaiPushPayloadV1,
   NotificationEventType,
   Session,
-} from '@jean2/sdk';
-import { getTerminalNotificationEventId } from '@jean2/sdk';
+} from '@prokopai/sdk';
+import { getTerminalNotificationEventId } from '@prokopai/sdk';
 
 /**
  * Notification domain: web-push reservation and delivery policy.
@@ -46,7 +46,7 @@ export function buildPushPayloadV1(
   eventType: NotificationEventType,
   sessionId: string,
   now: number,
-): Jean2PushPayloadV1 {
+): ProkopaiPushPayloadV1 {
   const route = `/server/${subscription.client_server_id}/workspace/session/${sessionId}`;
   return {
     version: 1,
@@ -72,7 +72,7 @@ export interface RetryDeliveryLike {
 export function buildRetryPushPayloadV1(
   delivery: RetryDeliveryLike,
   subscription: PushPayloadSubscription,
-): Jean2PushPayloadV1 {
+): ProkopaiPushPayloadV1 {
   const route = `/server/${subscription.client_server_id}/workspace/session/${
     delivery.event_id.includes('permission:') ? '' : delivery.event_id
   }`;

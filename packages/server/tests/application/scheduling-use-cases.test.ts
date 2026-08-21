@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ScheduledJob, Workspace } from '@jean2/sdk';
+import type { ScheduledJob, Workspace } from '@prokopai/sdk';
 import {
   createSchedulingHttpApplication,
   type SchedulingHttpApplication,

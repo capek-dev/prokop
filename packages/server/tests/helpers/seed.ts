@@ -19,8 +19,8 @@ export function seedWorkspace(
 
 export function seedSession(
   workspaceId: string = 'ws1',
-  overrides: Partial<Omit<import('@jean2/sdk').Session, 'createdAt' | 'updatedAt'>> = {},
-): import('@jean2/sdk').Session {
+  overrides: Partial<Omit<import('@prokopai/sdk').Session, 'createdAt' | 'updatedAt'>> = {},
+): import('@prokopai/sdk').Session {
   const defaults = createTestSession({ workspaceId });
   const { createdAt: _c, updatedAt: _u, ...sessionInput } = defaults;
   return createSession({
@@ -31,7 +31,7 @@ export function seedSession(
 
 export function seedWorkspaceWithSession(
   wsOverrides: Partial<CreateWorkspaceInput> = {},
-  sessionOverrides: Partial<Omit<import('@jean2/sdk').Session, 'createdAt' | 'updatedAt'>> = {},
+  sessionOverrides: Partial<Omit<import('@prokopai/sdk').Session, 'createdAt' | 'updatedAt'>> = {},
 ): { workspaceId: string; sessionId: string } {
   const ws = seedWorkspace(wsOverrides);
   const session = seedSession(ws.id, sessionOverrides);

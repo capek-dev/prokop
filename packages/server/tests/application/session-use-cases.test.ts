@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ServerMessage, Session } from '@jean2/sdk';
+import type { ServerMessage, Session } from '@prokopai/sdk';
 import {
   createSessionApplication,
   type SessionApplicationDeps,

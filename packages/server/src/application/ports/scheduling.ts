@@ -6,7 +6,7 @@ import type {
   Session,
   UpdateScheduledJobInput,
   Workspace,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 /**
  * Repository port for scheduled-job persistence. Structural copy of the

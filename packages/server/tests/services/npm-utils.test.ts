@@ -63,8 +63,8 @@ describe('npm-utils', () => {
       expect(isJean2OwnedPackage('@jean2/client')).toBe(true);
     });
 
-    test('returns true for @jean2/sdk', () => {
-      expect(isJean2OwnedPackage('@jean2/sdk')).toBe(true);
+    test('returns true for @prokopai/sdk', () => {
+      expect(isJean2OwnedPackage('@prokopai/sdk')).toBe(true);
     });
 
     test('returns false for unknown packages', () => {
@@ -153,39 +153,39 @@ describe('npm-utils', () => {
     test('extracts integrity from tree node', () => {
       const tree = {
         path: '/project',
-        children: new Map([['@jean2/sdk', {
-          path: '/project/node_modules/@jean2/sdk',
+        children: new Map([['@prokopai/sdk', {
+          path: '/project/node_modules/@prokopai/sdk',
           package: { dist: { integrity: 'sha512-abc123' } },
           children: new Map(),
         }]]),
       } as ArboristNode;
 
-      expect(extractIntegrity(tree, '@jean2/sdk')).toBe('sha512-abc123');
+      expect(extractIntegrity(tree, '@prokopai/sdk')).toBe('sha512-abc123');
     });
 
     test('returns null when package not in tree', () => {
       const tree = { path: '/project', children: new Map() } as ArboristNode;
-      expect(extractIntegrity(tree, '@jean2/sdk')).toBe(null);
+      expect(extractIntegrity(tree, '@prokopai/sdk')).toBe(null);
     });
 
     test('returns null when tree is null', () => {
-      expect(extractIntegrity(null, '@jean2/sdk')).toBe(null);
+      expect(extractIntegrity(null, '@prokopai/sdk')).toBe(null);
     });
 
     test('returns null when tree is undefined', () => {
-      expect(extractIntegrity(undefined, '@jean2/sdk')).toBe(null);
+      expect(extractIntegrity(undefined, '@prokopai/sdk')).toBe(null);
     });
 
     test('returns null when dist.integrity is missing', () => {
       const tree = {
         path: '/project',
-        children: new Map([['@jean2/sdk', {
-          path: '/project/node_modules/@jean2/sdk',
+        children: new Map([['@prokopai/sdk', {
+          path: '/project/node_modules/@prokopai/sdk',
           package: { dist: {} },
           children: new Map(),
         }]]),
       } as ArboristNode;
-      expect(extractIntegrity(tree, '@jean2/sdk')).toBe(null);
+      expect(extractIntegrity(tree, '@prokopai/sdk')).toBe(null);
     });
   });
 

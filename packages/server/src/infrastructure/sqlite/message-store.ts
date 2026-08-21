@@ -7,7 +7,7 @@
 import { getDatabase } from './database';
 import { getSession } from './session-store';
 import { createFtsProjector } from '@/infrastructure/session-search/fts-projector';
-import type { Message, MessageWithParts, Part, ToolPart } from '@jean2/sdk';
+import type { Message, MessageWithParts, Part, ToolPart } from '@prokopai/sdk';
 import {
   createMessageRepository,
   type MessageDatabaseAccessor,

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { Preconfig, ScheduledJob, Session } from '@jean2/sdk';
+import type { Preconfig, ScheduledJob, Session } from '@prokopai/sdk';
 import { executeChildSession, findProviderFromModel } from '@/adapters/capek/contracts';
 import type {
   ScheduledJobRepositoryPort,

@@ -13,7 +13,7 @@ import { configureJean2Bindings } from '@/adapters/capek/bindings';
 import { jean2CompatibilityBindings, jean2StorageBundle } from '@/adapters/capek';
 import { buildAiSdkTools, type BuildToolsOptions } from '@capekai/core/execution';
 import { clearCache, scanTools } from '@capekai/core/tools';
-import type { Preconfig, Session, Workspace } from '@jean2/sdk';
+import type { Preconfig, Session, Workspace } from '@prokopai/sdk';
 
 interface BindingOverrides {
   sessions?: Record<string, Partial<Session>>;

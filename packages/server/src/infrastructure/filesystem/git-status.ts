@@ -10,7 +10,7 @@
 
 import { relative, normalize, sep, resolve, join, extname } from 'path';
 import { stat, readFile } from 'fs/promises';
-import type { FileEntry, GitAvailability, GitDiffSummary, GitFileStatus, GitFileDiffResponse, GitDiffHunk, GitDiffChange, GitFileDiffUnavailableReason } from '@jean2/sdk';
+import type { FileEntry, GitAvailability, GitDiffSummary, GitFileStatus, GitFileDiffResponse, GitDiffHunk, GitDiffChange, GitFileDiffUnavailableReason } from '@prokopai/sdk';
 import { isBinaryExtension, isBinaryFile, FILE_PREVIEW_MAX_BYTES } from './binary-detection';
 import { getLanguageForPath } from './file-preview';
 

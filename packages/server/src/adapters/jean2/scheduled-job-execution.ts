@@ -1,6 +1,6 @@
 import { withJean2ExecutionScope } from '@/adapters/capek/execution-scope';
 import { getModelsConfig } from '@/config';
-import type { ScheduledJob } from '@jean2/sdk';
+import type { ScheduledJob } from '@prokopai/sdk';
 import { getDefaultPreconfig, getPreconfig } from '@/infrastructure/config/preconfig';
 import { createScheduledJobRunner } from '@/infrastructure/scheduling/scheduled-job-runner';
 import { createSession, getSession } from '@/infrastructure/sqlite/session-store';

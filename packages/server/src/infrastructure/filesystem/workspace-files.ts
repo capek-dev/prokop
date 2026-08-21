@@ -11,7 +11,7 @@ import { readFileSync, existsSync } from 'fs';
 import { extname, join } from 'path';
 import fg from 'fast-glob';
 import ignore from 'ignore';
-import type { FileEntry } from '@jean2/sdk';
+import type { FileEntry } from '@prokopai/sdk';
 
 const IGNORE_PATTERNS = [
   'node_modules/**',

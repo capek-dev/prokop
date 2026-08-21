@@ -4,7 +4,7 @@ import { seedWorkspaceWithSession } from '#tests/seed';
 import { getDefaultCompactionPolicy, resolveCompactionPolicy, createCompactionTrigger, processCompactionTask, persistCompactionFailure } from '@capekai/core/execution';
 import { type GenerateSummaryFn } from '@capekai/core/execution';
 import { createMessage, createPart, getPartsBySession, listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
-import type { AssistantMessage, CompactionPart, ToolPart } from '@jean2/sdk';
+import type { AssistantMessage, CompactionPart, ToolPart } from '@prokopai/sdk';
 import { type RuntimeEvent } from '@capekai/core';
 
 function createFakeGenerateSummary(overrides: {

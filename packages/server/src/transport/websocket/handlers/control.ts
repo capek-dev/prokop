@@ -6,7 +6,7 @@ import type {
   SessionControlReleaseMessage,
   SessionControlRequestTakeoverMessage,
   SessionControlRespondTakeoverMessage,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 /**
  * Controller wire handlers (S3). The claim, release, and takeover state

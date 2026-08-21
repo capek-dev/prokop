@@ -11,7 +11,7 @@ import {
   removeSessionFromFts,
   type FtsDatabase,
 } from './fts';
-import type { Message, Session } from '@jean2/sdk';
+import type { Message, Session } from '@prokopai/sdk';
 
 export function createFtsProjector(dependencies: {
   getDatabase(): FtsDatabase;

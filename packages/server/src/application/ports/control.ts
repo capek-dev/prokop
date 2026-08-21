@@ -3,7 +3,7 @@ import type {
   ServerMessage,
   SessionControlUpdateReason,
   TakeoverDecision,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 /**
  * Inward-facing controller ports (S4). The claim/release/takeover policy,

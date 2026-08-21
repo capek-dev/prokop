@@ -12,7 +12,7 @@ import {
   matchGrant,
   createGrantFromOptions,
 } from '@/infrastructure/sqlite/permissions';
-import type { PermissionAsk } from '@jean2/sdk';
+import type { PermissionAsk } from '@prokopai/sdk';
 
 // =============================================================================
 // Session Scope Isolation Tests (Bugfix Spec 02)

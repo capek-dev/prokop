@@ -4,7 +4,7 @@ import type {
   SessionControlState,
   SessionControlUpdateReason,
   TakeoverDecision,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import {
   applyAutoClaim,
   applyClaim,

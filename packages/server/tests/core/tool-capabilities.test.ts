@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import type { Session } from '@jean2/sdk';
+import type { Session } from '@prokopai/sdk';
 
 type SessionLookup = (id: string) => Session | null;
 

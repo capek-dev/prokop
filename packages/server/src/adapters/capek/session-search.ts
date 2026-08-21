@@ -2,7 +2,7 @@ import {
   configureSessionSearchHost,
   type SessionSearchHost,
 } from '@capekai/core/hosts';
-import type { Session, Workspace } from '@jean2/sdk';
+import type { Session, Workspace } from '@prokopai/sdk';
 import type { SessionSearchQueryPort } from '@/application/ports/session-search';
 
 /** S5 Capek session-search adapter: translates `SessionSearchHost` calls

@@ -1,5 +1,5 @@
 import type { RuntimeDelivery, RuntimeEvent, RuntimeEventContext } from '@capekai/core';
-import type { AskAuthority, ServerMessage } from '@jean2/sdk';
+import type { AskAuthority, ServerMessage } from '@prokopai/sdk';
 import type { NotificationsApplication } from '@/application/notifications';
 import {
   broadcastEvent,

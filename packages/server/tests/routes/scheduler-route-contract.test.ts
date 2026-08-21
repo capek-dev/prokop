@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { registerSchedulerRoutes } from '@/transport/http/routes/scheduler';
 import { HttpError } from '@/application/http-errors';
 import type { SchedulingHttpApplication } from '@/application/scheduling';
-import type { ScheduledJob } from '@jean2/sdk';
+import type { ScheduledJob } from '@prokopai/sdk';
 
 function makeJob(overrides: Partial<ScheduledJob> = {}): ScheduledJob {
   return {

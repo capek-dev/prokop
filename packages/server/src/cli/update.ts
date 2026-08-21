@@ -43,8 +43,17 @@ export function detectPlatform(): 'darwin' | 'linux' | 'windows' {
   }
 }
 
+/** Whether the given release version still used legacy jean2-* asset names. */
+export function usesLegacyAssetName(version: string): boolean {
+  // Assets switched to prokopai-* with the rename, first release after v1.4.x.
+  const [major, minor] = version.split('.').map(Number);
+  return major === 1 && minor <= 4;
+}
+
 export function getDownloadUrl(version: string, platform: string): string {
-  const assetName = platform === 'windows' ? 'jean2-windows.exe' : `jean2-${platform}`;
+  const assetName = usesLegacyAssetName(version)
+    ? (platform === 'windows' ? 'jean2-windows.exe' : `jean2-${platform}`)
+    : (platform === 'windows' ? 'prokopai-windows.exe' : `prokopai-${platform}`);
   return `https://github.com/${REPO}/releases/download/server%2Fv${version}/${assetName}`;
 }
 
@@ -55,7 +64,7 @@ export function isCompiledBinary(): boolean {
 export async function fetchLatestVersion(): Promise<string> {
   const response = await fetch(VERSION_FILE_URL, {
     headers: {
-      'User-Agent': 'jean2-updater',
+      'User-Agent': 'prokopai-updater',
     },
   });
 
@@ -101,7 +110,7 @@ export async function downloadBinary(url: string, destPath: string): Promise<voi
 
   const response = await fetch(url, {
     headers: {
-      'User-Agent': 'jean2-updater',
+      'User-Agent': 'prokopai-updater',
     },
   });
 

@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
-import type { PromptInfo } from '@jean2/sdk';
+import type { PromptInfo } from '@prokopai/sdk';
 import { getPromptsDir as getPromptsDirFromPaths } from '@/infrastructure/runtime/paths';
 
 let promptsCache: PromptInfo[] | null = null;

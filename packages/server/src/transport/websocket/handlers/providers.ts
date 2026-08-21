@@ -1,7 +1,7 @@
 import type { RouterContext } from '../router-context';
 import type { ConnectionId } from '../connection-id';
 import { requireWireApplication } from '../application';
-import type { ProviderConnectMessage, ProviderDisconnectMessage } from '@jean2/sdk';
+import type { ProviderConnectMessage, ProviderDisconnectMessage } from '@prokopai/sdk';
 
 /**
  * Provider wire handlers (S4). The provider account and OAuth use cases

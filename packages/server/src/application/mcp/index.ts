@@ -1,4 +1,4 @@
-import type { McpStatus } from '@jean2/sdk';
+import type { McpStatus } from '@prokopai/sdk';
 import type { McpLifecyclePort, McpWorkspacePort } from '../ports/mcp';
 
 /**

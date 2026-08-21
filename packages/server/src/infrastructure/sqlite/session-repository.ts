@@ -9,7 +9,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import type { Session, SessionStatus, SubagentStatus } from '@jean2/sdk';
+import type { Session, SessionStatus, SubagentStatus } from '@prokopai/sdk';
 import type {
   ListSessionPageOptions,
   SessionCreateInput,
