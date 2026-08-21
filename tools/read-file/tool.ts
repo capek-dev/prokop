@@ -1,6 +1,6 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
-import type { NoneVisualization } from '@jean2/sdk';
-import { createFilePermissionAsk, SENSITIVE_FILE_PATTERNS } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { NoneVisualization } from '@prokopai/sdk';
+import { createFilePermissionAsk, SENSITIVE_FILE_PATTERNS } from '@prokopai/sdk';
 import { createHash } from 'node:crypto';
 
 const DEFAULT_READ_LIMIT = 2000;

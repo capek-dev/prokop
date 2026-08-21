@@ -1,5 +1,5 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
-import type { DiffsVisualization, DiffVisualization } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { DiffsVisualization, DiffVisualization } from '@prokopai/sdk';
 
 // ---------------------------------------------------------------------------
 // Local safe matching engine

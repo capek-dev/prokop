@@ -1,6 +1,6 @@
 import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
 import { definition, execute } from './tool';
-import type { ToolContext } from '@jean2/sdk';
+import type { ToolContext } from '@prokopai/sdk';
 import { Database } from 'bun:sqlite';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';

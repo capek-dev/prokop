@@ -1,5 +1,5 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
-import type { ShellOutputVisualization } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { ShellOutputVisualization } from '@prokopai/sdk';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import {
@@ -11,7 +11,7 @@ import {
   createWorkspaceModificationAsk,
   getEffectiveShellCommandIdentity,
   type ShellRiskCategory,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 
 interface Input {
   command: string;

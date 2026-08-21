@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 
 const DISCORD_API_BASE = 'https://discord.com/api/v10';
 

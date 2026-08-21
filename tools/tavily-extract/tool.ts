@@ -1,5 +1,5 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
-import type { MarkdownVisualization } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { MarkdownVisualization } from '@prokopai/sdk';
 import { tavily } from '@tavily/core';
 
 interface Input {

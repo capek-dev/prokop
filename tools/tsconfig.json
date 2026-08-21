@@ -15,7 +15,7 @@
     "sourceMap": false,
     "baseUrl": ".",
     "paths": {
-      "@jean2/sdk": ["../packages/sdk/src"]
+      "@prokopai/sdk": ["../packages/sdk/src"]
     }
   },
   "include": ["./**/*.ts", "./**/*.d.ts"],

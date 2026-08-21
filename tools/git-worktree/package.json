@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@jean2/sdk": "^1.0.10"
+    "@prokopai/sdk": "^1.4.0"
   }
 }

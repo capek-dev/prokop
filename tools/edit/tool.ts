@@ -1,6 +1,6 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
-import type { DiffVisualization } from '@jean2/sdk';
-import { createFilePermissionAsk } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { DiffVisualization } from '@prokopai/sdk';
+import { createFilePermissionAsk } from '@prokopai/sdk';
 
 // ---------------------------------------------------------------------------
 // Local safe matching engine

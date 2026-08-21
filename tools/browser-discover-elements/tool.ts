@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 
 export const definition: ToolDefinition = {
   name: 'browser_discover_elements',

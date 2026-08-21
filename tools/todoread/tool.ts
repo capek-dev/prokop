@@ -1,5 +1,5 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
-import type { TodoListVisualization, TodoListItem } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { TodoListVisualization, TodoListItem } from '@prokopai/sdk';
 import { Database } from 'bun:sqlite';
 import { existsSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';

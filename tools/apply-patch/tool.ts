@@ -1,10 +1,10 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 import type {
   FileListVisualization,
   DiffHunk,
   DiffChange,
-} from '@jean2/sdk';
-import { createFilePermissionAsk } from '@jean2/sdk';
+} from '@prokopai/sdk';
+import { createFilePermissionAsk } from '@prokopai/sdk';
 
 // ---------------------------------------------------------------------------
 // Public types

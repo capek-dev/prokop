@@ -1,7 +1,7 @@
 import { describe, test, expect, mock } from 'bun:test';
 import { definition, execute } from './tool';
 import { createMockContext, VirtualFS } from '../test-utils';
-import type { ToolContext } from '@jean2/sdk';
+import type { ToolContext } from '@prokopai/sdk';
 
 interface CapturedRequest {
   url: string;

@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 import { tavily } from '@tavily/core';
 
 interface SearchInput {

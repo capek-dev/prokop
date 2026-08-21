@@ -1,5 +1,5 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
-import type { NoneVisualization } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { NoneVisualization } from '@prokopai/sdk';
 import picomatch from 'picomatch';
 import { scan as scanGlob } from 'picomatch';
 

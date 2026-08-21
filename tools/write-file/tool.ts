@@ -1,6 +1,6 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
-import type { CodeVisualization } from '@jean2/sdk';
-import { createFilePermissionAsk, SENSITIVE_FILE_PATTERNS } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { CodeVisualization } from '@prokopai/sdk';
+import { createFilePermissionAsk, SENSITIVE_FILE_PATTERNS } from '@prokopai/sdk';
 
 interface Input {
   path: string;

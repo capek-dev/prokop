@@ -1,7 +1,7 @@
 // MIT License — https://github.com/jojomondag/FileToMarkdown
 // Adapted from jojomondag/FileToMarkdown (MIT) — converted per-converter logic ported to TypeScript + Jean2 wrapper
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
-import type { NoneVisualization } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { NoneVisualization } from '@prokopai/sdk';
 import { dirname, join } from 'path';
 
 

@@ -1,6 +1,6 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
-import type { NoneVisualization } from '@jean2/sdk';
-import { createWebfetchPermissionAsk } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { NoneVisualization } from '@prokopai/sdk';
+import { createWebfetchPermissionAsk } from '@prokopai/sdk';
 import TurndownService from 'turndown';
 
 interface Input {

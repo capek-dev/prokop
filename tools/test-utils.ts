@@ -5,7 +5,7 @@
  * network, or local processes.
  */
 import { mock } from 'bun:test';
-import type { ToolContext, PermissionAsk } from '@jean2/sdk';
+import type { ToolContext, PermissionAsk } from '@prokopai/sdk';
 
 export const WORKSPACE = '/workspace/project';
 

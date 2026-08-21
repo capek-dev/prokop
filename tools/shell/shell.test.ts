@@ -1,5 +1,5 @@
 import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
-import type { ToolContext, PermissionAsk } from '@jean2/sdk';
+import type { ToolContext, PermissionAsk } from '@prokopai/sdk';
 import { definition, execute } from './tool';
 
 // ── Mock Bun.spawn so NO real processes ever execute ─────────

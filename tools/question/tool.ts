@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolContext, ToolResult, AskFormResponse } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult, AskFormResponse } from '@prokopai/sdk';
 
 interface QuestionInput {
   title: string;

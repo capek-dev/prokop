@@ -1,5 +1,5 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
-import type { ShellOutputVisualization } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { ShellOutputVisualization } from '@prokopai/sdk';
 import { resolve, join } from 'path';
 import { homedir } from 'os';
 

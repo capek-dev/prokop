@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
-import type { DiffVisualization, DiffChange } from '@jean2/sdk';
-import { createFilePermissionAsk } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { DiffVisualization, DiffChange } from '@prokopai/sdk';
+import { createFilePermissionAsk } from '@prokopai/sdk';
 
 const REVISION_RE = /^sha256:[0-9a-f]{64}$/;
 
