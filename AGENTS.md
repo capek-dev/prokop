@@ -128,7 +128,7 @@ import './styles.css';
 - **Components**: PascalCase (`ChatView`, `SessionList`)
 - **Types/Interfaces**: PascalCase (`Session`, `ToolDefinition`)
 - **Type aliases**: PascalCase (`SessionStatus`, `ToolRuntime`)
-- **Constants**: SCREAMING_SNAKE_CASE for env-derived (`JEAN2_LLM_MAX_TOKENS`), camelCase otherwise
+- **Constants**: SCREAMING_SNAKE_CASE for env-derived (`PROKOPAI_LLM_MAX_TOKENS`), camelCase otherwise
 - **Files**: camelCase for modules (`agent.ts`), PascalCase for components (`ChatView.tsx`)
 
 ### TypeScript
@@ -209,12 +209,12 @@ try {
 
 ### Environment Variables
 
-- Prefix with `JEAN2_` for server application settings, `VITE_` for client build-time settings
+- Prefix with `PROKOPAI_` for server application settings, `VITE_` for client build-time settings
 - Access via `process.env.VAR_NAME` (server) or `import.meta.env.VITE_VAR_NAME` (client)
 - Provide defaults with `||` or `??`
 
 ```typescript
-const JEAN2_LLM_MAX_TOKENS = parseInt(process.env.JEAN2_LLM_MAX_TOKENS || '4096', 10);
+const PROKOPAI_LLM_MAX_TOKENS = parseInt(process.env.PROKOPAI_LLM_MAX_TOKENS || '4096', 10);
 ```
 
 ### AI SDK (Server)
@@ -370,8 +370,8 @@ changelogs/              # Version changelogs
     cleanup-releases.yml # Weekly cleanup of old releases
 
 install/                 # Installation scripts and documentation
-  install-jean2.sh       # Unix installer
-  install-jean2.ps1      # Windows installer
+  install-prokopai.sh       # Unix installer
+  install-prokopai.ps1      # Windows installer
 ```
 
 ## Before Committing

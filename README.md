@@ -44,7 +44,7 @@ irm https://jean2.ai/install.ps1 | iex
 
 **Run:**
 ```bash
-jean2 init
+prokopai init
 jean2 start
 jean2 open
 ```
@@ -112,8 +112,8 @@ Everything else is a surface you choose to connect.
 │   Ask Protocol (Permissions, Questions, Forms)            │
 │   SQLite Store · Compaction Engine                        │
 │                                                           │
-│   ~/.jean2/                    (data, tools, preconfigs)   │
-│   ~/.jean2/agents/<name>/      (agent home: memory,        │
+│   ~/.prokopai/                    (data, tools, preconfigs)   │
+│   ~/.prokopai/agents/<name>/      (agent home: memory,        │
 │                                 skills, sessions)          │
 │   <workspace>/.jean2/          (memory, mcp.json)          │
 │   <workspace>/.agents/skills/  (SKILL.md files)            │
