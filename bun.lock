@@ -19,10 +19,10 @@
       },
     },
     "packages/browser": {
-      "name": "@jean2/browser",
+      "name": "@prokopai/browser",
       "version": "0.5.0",
       "dependencies": {
-        "@jean2/sdk": "workspace:*",
+        "@prokopai/sdk": "workspace:*",
       },
       "devDependencies": {
         "@types/chrome": "^0.0.287",
@@ -31,7 +31,7 @@
     },
     "packages/capek": {
       "name": "@capekai/core",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@ai-sdk/deepseek": "^2.0.35",
         "@ai-sdk/openai": "^3.0.84",
@@ -57,7 +57,7 @@
     },
     "packages/capek-tool": {
       "name": "@capekai/tool",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@capekai/types": "workspace:*",
       },
@@ -70,7 +70,7 @@
     },
     "packages/capek-types": {
       "name": "@capekai/types",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@capekai/tool": "workspace:*",
       },
@@ -82,7 +82,7 @@
       },
     },
     "packages/client": {
-      "name": "@jean2/client",
+      "name": "@prokopai/client",
       "version": "1.4.0",
       "bin": {
         "j2": "./dist/cli.mjs",
@@ -109,9 +109,9 @@
         "@dnd-kit/sortable": "^10.0.0",
         "@dnd-kit/utilities": "^3.2.2",
         "@fontsource-variable/geist": "^5.2.8",
-        "@jean2/sdk": "workspace:*",
         "@legendapp/list": "^3.0.0",
         "@lezer/highlight": "^1.2.3",
+        "@prokopai/sdk": "workspace:*",
         "@tanstack/react-query": "^5.100.10",
         "@tanstack/react-router": "^1.114.0",
         "@xterm/addon-fit": "^0.10.0",
@@ -160,7 +160,7 @@
       },
     },
     "packages/client-electron": {
-      "name": "@jean2/client-electron",
+      "name": "@prokopai/client-electron",
       "version": "1.4.0",
       "dependencies": {
         "electron-log": "^5.4.3",
@@ -179,7 +179,7 @@
       },
     },
     "packages/sandbox-cli": {
-      "name": "@jean2/sandbox-cli",
+      "name": "@prokopai/sandbox-cli",
       "version": "0.1.0",
       "devDependencies": {
         "bun-types": "^1.3.9",
@@ -187,7 +187,7 @@
       },
     },
     "packages/sdk": {
-      "name": "@jean2/sdk",
+      "name": "@prokopai/sdk",
       "version": "1.4.0",
       "dependencies": {
         "@capekai/tool": "workspace:*",
@@ -195,10 +195,10 @@
       },
     },
     "packages/server": {
-      "name": "@jean2/server",
+      "name": "@prokopai/server",
       "version": "1.4.0",
       "bin": {
-        "jean2": "./dist/bin/jean2",
+        "prokopai": "./dist/bin/prokopai",
       },
       "dependencies": {
         "@capekai/core": "workspace:*",
@@ -206,9 +206,9 @@
         "@capekai/types": "workspace:*",
         "@clack/prompts": "^0.10.0",
         "@hono/zod-validator": "^0.8.0",
-        "@jean2/sdk": "workspace:*",
         "@modelcontextprotocol/sdk": "^1.27.1",
         "@npmcli/arborist": "^9.4.3",
+        "@prokopai/sdk": "workspace:*",
         "@zip.js/zip.js": "^2.7.60",
         "bun-pty": "^0.4.8",
         "cross-spawn": "^7.0.6",
@@ -244,7 +244,7 @@
       "name": "@jean2/tools",
       "version": "1.0.0",
       "dependencies": {
-        "@jean2/sdk": "workspace:*",
+        "@prokopai/sdk": "workspace:*",
         "@tavily/core": "^0.7.2",
         "adm-zip": "^0.5.16",
         "ignore": "^7.0.3",
@@ -704,18 +704,6 @@
 
     "@isaacs/string-locale-compare": ["@isaacs/string-locale-compare@1.1.0", "", {}, "sha512-SQ7Kzhh9+D+ZW9MA0zkYv3VXhIDNx+LzM6EJ+/65I3QY+enU6Itte7E5XX7EWrqLW2FN4n06GWzBnPoC3th2aQ=="],
 
-    "@jean2/browser": ["@jean2/browser@workspace:packages/browser"],
-
-    "@jean2/client": ["@jean2/client@workspace:packages/client"],
-
-    "@jean2/client-electron": ["@jean2/client-electron@workspace:packages/client-electron"],
-
-    "@jean2/sandbox-cli": ["@jean2/sandbox-cli@workspace:packages/sandbox-cli"],
-
-    "@jean2/sdk": ["@jean2/sdk@workspace:packages/sdk"],
-
-    "@jean2/server": ["@jean2/server@workspace:packages/server"],
-
     "@jean2/tools": ["@jean2/tools@workspace:tools"],
 
     "@joshwooding/vite-plugin-react-docgen-typescript": ["@joshwooding/vite-plugin-react-docgen-typescript@0.7.0", "", { "dependencies": { "glob": "^13.0.1", "react-docgen-typescript": "^2.2.2" }, "peerDependencies": { "typescript": ">= 4.3.x", "vite": "^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0" }, "optionalPeers": ["typescript"] }, "sha512-qvsTEwEFefhdirGOPnu9Wp6ChfIwy2dBCRuETU3uE+4cC+PFoxMSiiEhxk4lOluA34eARHA0OxqsEUYDqRMgeQ=="],
@@ -853,6 +841,18 @@
     "@pkgjs/parseargs": ["@pkgjs/parseargs@0.11.0", "", {}, "sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg=="],
 
     "@polka/url": ["@polka/url@1.0.0-next.29", "", {}, "sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww=="],
+
+    "@prokopai/browser": ["@prokopai/browser@workspace:packages/browser"],
+
+    "@prokopai/client": ["@prokopai/client@workspace:packages/client"],
+
+    "@prokopai/client-electron": ["@prokopai/client-electron@workspace:packages/client-electron"],
+
+    "@prokopai/sandbox-cli": ["@prokopai/sandbox-cli@workspace:packages/sandbox-cli"],
+
+    "@prokopai/sdk": ["@prokopai/sdk@workspace:packages/sdk"],
+
+    "@prokopai/server": ["@prokopai/server@workspace:packages/server"],
 
     "@radix-ui/number": ["@radix-ui/number@1.1.1", "", {}, "sha512-MkKCwxlXTgz6CFoJx3pCwn07GKp36+aZyu/u2Ln2VrA5DcdyCZkASEDBTd8x5whTQQL5CiYf4prXKLcgQdv29g=="],
 

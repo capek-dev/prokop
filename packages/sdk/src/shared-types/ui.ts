@@ -21,8 +21,8 @@ export function clampPanelWidth(width: number): number {
  * Storage keys for panel state persistence
  */
 export const PANEL_STORAGE_KEYS = {
-  SESSIONS: 'jean2_sessions_panel_width',
-  FILES: 'jean2_files_panel_width',
+  SESSIONS: 'prokopai_sessions_panel_width',
+  FILES: 'prokopai_files_panel_width',
 } as const;
 
 /**
@@ -32,7 +32,7 @@ export interface SavedPanelWidth {
   width: number;
 }
 
-export const DRAFT_KEY_PREFIX = 'jean2_draft_';
+export const DRAFT_KEY_PREFIX = 'prokopai_draft_';
 export const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface SavedDraft {

@@ -1,25 +1,25 @@
-export class Jean2Error extends Error {
+export class ProkopaiError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = 'Jean2Error';
+    this.name = 'ProkopaiError';
   }
 }
 
-export class ConnectionError extends Jean2Error {
+export class ConnectionError extends ProkopaiError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = 'ConnectionError';
   }
 }
 
-export class AuthError extends Jean2Error {
+export class AuthError extends ProkopaiError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = 'AuthError';
   }
 }
 
-export class RateLimitError extends Jean2Error {
+export class RateLimitError extends ProkopaiError {
   readonly retryAfterMs?: number;
 
   constructor(message: string, retryAfterMs?: number, options?: ErrorOptions) {
@@ -29,14 +29,14 @@ export class RateLimitError extends Jean2Error {
   }
 }
 
-export class TimeoutError extends Jean2Error {
+export class TimeoutError extends ProkopaiError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = 'TimeoutError';
   }
 }
 
-export class ServerError extends Jean2Error {
+export class ServerError extends ProkopaiError {
   readonly statusCode: number;
 
   constructor(message: string, statusCode: number, options?: ErrorOptions) {
@@ -46,7 +46,7 @@ export class ServerError extends Jean2Error {
   }
 }
 
-export class ValidationError extends Jean2Error {
+export class ValidationError extends ProkopaiError {
   readonly statusCode: number;
 
   constructor(message: string, statusCode: number = 400, options?: ErrorOptions) {
@@ -56,7 +56,7 @@ export class ValidationError extends Jean2Error {
   }
 }
 
-export class ApiError extends Jean2Error {
+export class ApiError extends ProkopaiError {
   readonly statusCode: number;
   readonly code: string;
   readonly details?: unknown;

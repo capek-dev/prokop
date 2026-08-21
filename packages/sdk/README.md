@@ -915,7 +915,7 @@ import { Jean2Client } from '@jean2/sdk';
 
 const client = new Jean2Client({
   url: 'http://localhost:3000',
-  token: process.env.JEAN2_TOKEN,
+  token: process.env.PROKOPAI_TOKEN,
   clientDescriptor: {
     clientId: 'bot',
     clientType: 'sdk',

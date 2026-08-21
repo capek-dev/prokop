@@ -68,7 +68,7 @@ export interface PushSubscriptionRecord {
  * The service worker parses this and derives user-visible copy from `type`.
  * It must never trust arbitrary server-provided titles or HTML.
  */
-export interface Jean2PushPayloadV1 {
+export interface ProkopaiPushPayloadV1 {
   version: 1;
   eventId: string;
   type: NotificationEventType;

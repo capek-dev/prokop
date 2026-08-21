@@ -15,7 +15,7 @@ import { TerminalNamespace } from './namespaces/terminal';
 import { NotificationsNamespace } from './namespaces/notifications';
 import { HttpNamespace } from './rest/http-namespace';
 
-export class Jean2Client extends TypedEventEmitter<SdkEventMap> {
+export class ProkopaiClient extends TypedEventEmitter<SdkEventMap> {
   private config: ClientConfig;
   private transport: WebSocketTransport;
   private _httpClient: HttpClient;

@@ -1,6 +1,6 @@
 /**
  * MCP Server Configuration Types
- * Used for configuring MCP servers in workspace .jean2/mcp.json
+ * Used for configuring MCP servers in workspace .prokopai/mcp.json (legacy: .jean2)
  */
 
 export type McpServerType = 'local' | 'remote';

@@ -1,12 +1,12 @@
 // Re-export everything from shared
 export * from './shared';
 
-export { Jean2Client } from './client';
+export { ProkopaiClient } from './client';
 export { TypedEventEmitter } from './emitter';
 export type { EventMap } from './emitter';
 
 export {
-  Jean2Error,
+  ProkopaiError,
   ConnectionError,
   AuthError,
   RateLimitError,

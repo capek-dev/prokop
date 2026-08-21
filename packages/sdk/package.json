@@ -1,5 +1,5 @@
 {
-  "name": "@jean2/sdk",
+  "name": "@prokopai/sdk",
   "version": "1.4.0",
   "type": "module",
   "main": "./src/index.ts",
