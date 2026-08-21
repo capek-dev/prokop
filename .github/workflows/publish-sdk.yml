@@ -74,7 +74,7 @@ jobs:
         id: check
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          if npm view "@jean2/sdk@$VERSION" version >/dev/null 2>&1; then
+          if npm view "@prokopai/sdk@$VERSION" version >/dev/null 2>&1; then
             echo "Version $VERSION already exists on npm, skipping publish"
             echo "skip=true" >> $GITHUB_OUTPUT
           else

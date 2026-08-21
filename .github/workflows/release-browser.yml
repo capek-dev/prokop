@@ -132,10 +132,10 @@ jobs:
         run: |
           V="${{ needs.prepare-browser-release.outputs.version }}"
           cd dist
-          zip -r "../jean2-browser-v${V}.zip" .
+          zip -r "../prokopai-browser-v${V}.zip" .
           cd ..
-          SHA256=$(shasum -a 256 "jean2-browser-v${V}.zip" | cut -d' ' -f1)
-          echo "$SHA256" > "jean2-browser-v${V}.zip.sha256"
+          SHA256=$(shasum -a 256 "prokopai-browser-v${V}.zip" | cut -d' ' -f1)
+          echo "$SHA256" > "prokopai-browser-v${V}.zip.sha256"
           echo "SHA-256: $SHA256"
 
       - name: Upload artifacts
@@ -145,8 +145,8 @@ jobs:
         run: |
           cd packages/browser
           gh release upload "$TAG" \
-            "jean2-browser-v${V}.zip" \
-            "jean2-browser-v${V}.zip.sha256" \
+            "prokopai-browser-v${V}.zip" \
+            "prokopai-browser-v${V}.zip.sha256" \
             --clobber
 
   publish-release:

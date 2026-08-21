@@ -128,7 +128,7 @@ jobs:
           V: ${{ needs.prepare-server-release.outputs.version }}
         run: |
           mkdir -p packages/server/dist
-          bun build --compile --target=bun-darwin-arm64 --define=JEAN2_VERSION="'${V}'" --outfile=packages/server/dist/jean2-darwin packages/server/src/cli.ts
+          bun build --compile --target=bun-darwin-arm64 --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokopai-darwin packages/server/src/cli.ts
 
       - name: Import Apple Certificate
         env:
@@ -146,7 +146,7 @@ jobs:
           rm -f "$CERT_PATH"
 
       - name: Remove existing signature
-        run: codesign --remove-signature packages/server/dist/jean2-darwin || true
+        run: codesign --remove-signature packages/server/dist/prokopai-darwin || true
 
       - name: Code Sign
         run: |
@@ -155,10 +155,10 @@ jobs:
           codesign --force --options runtime \
             --entitlements packages/server/build/entitlements.mac.plist \
             --sign "$IDENTITY" \
-            packages/server/dist/jean2-darwin
+            packages/server/dist/prokopai-darwin
 
       - name: Verify Signature
-        run: codesign --verify --deep --strict --verbose=2 packages/server/dist/jean2-darwin
+        run: codesign --verify --deep --strict --verbose=2 packages/server/dist/prokopai-darwin
 
       - name: Notarize
         env:
@@ -167,21 +167,21 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           cd packages/server/dist
-          zip -y jean2-darwin.zip jean2-darwin
-          xcrun notarytool submit jean2-darwin.zip \
+          zip -y prokopai-darwin.zip prokopai-darwin
+          xcrun notarytool submit prokopai-darwin.zip \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait
-          rm jean2-darwin.zip
+          rm prokopai-darwin.zip
 
       - name: Staple Notarization Ticket
-        run: xcrun stapler staple packages/server/dist/jean2-darwin || echo "Stapling skipped (expected for bare binaries)"
+        run: xcrun stapler staple packages/server/dist/prokopai-darwin || echo "Stapling skipped (expected for bare binaries)"
 
       - name: Upload macOS Binary
         env:
           TAG: ${{ needs.prepare-server-release.outputs.tag }}
-        run: gh release upload "$TAG" packages/server/dist/jean2-darwin --clobber
+        run: gh release upload "$TAG" packages/server/dist/prokopai-darwin --clobber
 
       - name: Cleanup Keychain
         if: always()
@@ -207,13 +207,13 @@ jobs:
           V: ${{ needs.prepare-server-release.outputs.version }}
         run: |
           mkdir -p packages/server/dist
-          bun build --compile --target=bun-linux-x64 --define=JEAN2_VERSION="'${V}'" --outfile=packages/server/dist/jean2-linux packages/server/src/cli.ts
-          bun build --compile --target=bun-windows-x64-baseline --define=JEAN2_VERSION="'${V}'" --outfile=packages/server/dist/jean2-windows.exe packages/server/src/cli.ts
+          bun build --compile --target=bun-linux-x64 --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokopai-linux packages/server/src/cli.ts
+          bun build --compile --target=bun-windows-x64-baseline --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokopai-windows.exe packages/server/src/cli.ts
 
       - name: Upload Linux and Windows binaries
         env:
           TAG: ${{ needs.prepare-server-release.outputs.tag }}
-        run: gh release upload "$TAG" packages/server/dist/jean2-linux packages/server/dist/jean2-windows.exe --clobber
+        run: gh release upload "$TAG" packages/server/dist/prokopai-linux packages/server/dist/prokopai-windows.exe --clobber
 
   announce-server:
     needs: [prepare-server-release, release-server-macos, release-server-linux-windows]

@@ -74,8 +74,8 @@ jobs:
           echo "prerelease=$PRE" >> "$GITHUB_OUTPUT"
 
           NOTES_FLAG=""
-          if [ -s "changelogs/client/v${V}.md" ]; then
-            NOTES_FLAG="--notes-file changelogs/client/v${V}.md"
+          if [ -s "changelogs@prokopai/client/v${V}.md" ]; then
+            NOTES_FLAG="--notes-file changelogs@prokopai/client/v${V}.md"
           fi
           PRE_FLAG=""
           if [ "$PRE" = "true" ]; then
@@ -150,7 +150,7 @@ jobs:
       - name: Install
         run: bun install
 
-      - name: Verify client/client-electron versions match (build identity from package.json)
+      - name: Verify client@prokopai/client-electron versions match (build identity from package.json)
         run: |
           CLIENT_V=$(node -p "require('./packages/client/package.json').version")
           ELECTRON_V=$(node -p "require('./packages/client-electron/package.json').version")
@@ -209,7 +209,7 @@ jobs:
       - name: Install
         run: bun install
 
-      - name: Verify client/client-electron versions match (build identity from package.json)
+      - name: Verify client@prokopai/client-electron versions match (build identity from package.json)
         shell: bash
         run: |
           CLIENT_V=$(node -p "require('./packages/client/package.json').version")
@@ -237,7 +237,7 @@ jobs:
             fi
           done
 
-  # Publish @jean2/client to NPM only after both desktop builds succeed.
+  # Publish @prokopai/client to NPM only after both desktop builds succeed.
   # This is the (formerly independent) reusable workflow, now invoked only here so
   # desktop and NPM can never release separately.
   publish-npm:
@@ -265,8 +265,8 @@ jobs:
         run: |
           set -euo pipefail
           NOTES_FLAG=""
-          if [ -s "changelogs/client/v${V}.md" ]; then
-            NOTES_FLAG="--notes-file changelogs/client/v${V}.md"
+          if [ -s "changelogs@prokopai/client/v${V}.md" ]; then
+            NOTES_FLAG="--notes-file changelogs@prokopai/client/v${V}.md"
           fi
           # Idempotent: flip draft off. If the release was already published
           # (retry path), this is a harmless no-op that re-applies release notes.
