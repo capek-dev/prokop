@@ -102,7 +102,7 @@ async function initJean2Internal(options: InitOptions = {}): Promise<InitResult>
   if (isInitialized() && !force) {
     return {
       success: false,
-      error: 'Jean2 is already initialized. Use --force to re-initialize.',
+      error: 'Prokopai is already initialized. Use --force to re-initialize.',
       configPath: getConfigPath(),
       databasePath: databasePath || getDefaultDatabasePath(),
       toolsPath: toolsPath || getDefaultToolsPath(),
@@ -156,7 +156,7 @@ async function initJean2Internal(options: InitOptions = {}): Promise<InitResult>
   // Create empty .env file
   const envPath = getEnvFilePath();
   if (!existsSync(envPath)) {
-    writeFileSync(envPath, `# Jean2 Environment Variables
+    writeFileSync(envPath, `# Prokopai Environment Variables
 # Add your API keys and configuration here
 
 # LLM API Keys
@@ -173,7 +173,7 @@ PROKOPAI_LLM_SUBAGENT_MAX_STEPS=500
   // Create empty AGENTS.md file
   const agentsPath = getGlobalAgentsPath();
   if (!existsSync(agentsPath)) {
-    writeFileSync(agentsPath, `# Jean2 Global Instructions
+    writeFileSync(agentsPath, `# Prokopai Global Instructions
 #
 # This file contains instructions that apply to all projects on this machine.
 # They will be loaded before project-specific instructions.
@@ -188,7 +188,7 @@ PROKOPAI_LLM_SUBAGENT_MAX_STEPS=500
   const modelsPath = getModelsConfigPath();
   if (!existsSync(modelsPath)) {
     writeFileSync(modelsPath, JSON.stringify(defaultModelsJson, null, 2));
-    console.log('Created default models.json at ~/.jean2/models.json');
+    console.log('Created default models.json at ~/.prokopai/models.json');
   }
 
   // Save config
@@ -227,7 +227,7 @@ PROKOPAI_LLM_SUBAGENT_MAX_STEPS=500
     }
   }
 
-  console.log('\nDone! Jean2 is ready.');
+  console.log('\nDone! Prokopai is ready.');
 
   return {
     success: true,
