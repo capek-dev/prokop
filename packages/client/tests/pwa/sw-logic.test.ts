@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   NOTIFICATION_COPY,
   parsePushData,
-  isJean2PushPayload,
+  isProkopaiPushPayload,
   isSameOriginRoute,
   normalizeRoute,
   hasVisibleFocusedClient,
@@ -26,14 +26,14 @@ function makeValidPayload(overrides?: Partial<ProkopaiPushPayloadV1>): ProkopaiP
 
 describe('sw-logic: notification copy', () => {
   it('produces generic copy for each event type', () => {
-    expect(NOTIFICATION_COPY.session_completed.body).toBe('Jean2 finished a session');
-    expect(NOTIFICATION_COPY.session_failed.body).toBe('Jean2 session failed');
-    expect(NOTIFICATION_COPY.permission_required.body).toBe('Jean2 needs your approval');
+    expect(NOTIFICATION_COPY.session_completed.body).toBe('Prokopai finished a session');
+    expect(NOTIFICATION_COPY.session_failed.body).toBe('Prokopai session failed');
+    expect(NOTIFICATION_COPY.permission_required.body).toBe('Prokopai needs your approval');
   });
 
-  it('uses Jean2 as the title for all types', () => {
+  it('uses Prokopai as the title for all types', () => {
     for (const copy of Object.values(NOTIFICATION_COPY)) {
-      expect(copy.title).toBe('Jean2');
+      expect(copy.title).toBe('Prokopai');
     }
   });
 });
@@ -41,22 +41,22 @@ describe('sw-logic: notification copy', () => {
 describe('sw-logic: payload validation', () => {
   it('accepts a valid V1 payload', () => {
     const payload = makeValidPayload();
-    expect(isJean2PushPayload(payload)).toBe(true);
+    expect(isProkopaiPushPayload(payload)).toBe(true);
   });
 
   it('rejects unsupported version', () => {
-    expect(isJean2PushPayload({ ...makeValidPayload(), version: 2 })).toBe(false);
+    expect(isProkopaiPushPayload({ ...makeValidPayload(), version: 2 })).toBe(false);
   });
 
   it('rejects unknown event type', () => {
-    expect(isJean2PushPayload({ ...makeValidPayload(), type: 'unknown_event' })).toBe(false);
+    expect(isProkopaiPushPayload({ ...makeValidPayload(), type: 'unknown_event' })).toBe(false);
   });
 
   it('rejects missing fields', () => {
-    expect(isJean2PushPayload(null)).toBe(false);
-    expect(isJean2PushPayload({ version: 1 })).toBe(false);
-    expect(isJean2PushPayload({ ...makeValidPayload(), eventId: undefined })).toBe(false);
-    expect(isJean2PushPayload({ ...makeValidPayload(), route: undefined })).toBe(false);
+    expect(isProkopaiPushPayload(null)).toBe(false);
+    expect(isProkopaiPushPayload({ version: 1 })).toBe(false);
+    expect(isProkopaiPushPayload({ ...makeValidPayload(), eventId: undefined })).toBe(false);
+    expect(isProkopaiPushPayload({ ...makeValidPayload(), route: undefined })).toBe(false);
   });
 });
 

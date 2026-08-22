@@ -684,7 +684,7 @@ export function useServerSessionManager({
 
   const handleCreateVirtualWorkspace = async () => {
     const name = `Workspace ${workspaces.length + 1}`;
-    const path = `~/.jean2/workspaces/${crypto.randomUUID()}`;
+    const path = `~/.prokopai/workspaces/${crypto.randomUUID()}`;
     setIsCreatingWorkspace(true);
     try {
       await createWorkspace(name, path, true);

@@ -12,7 +12,7 @@ const SUPPORT_MESSAGES: Record<NotificationSupport, string> = {
   unsupported: 'System notifications are not supported in this browser.',
   'insecure-context': 'System notifications require HTTPS.',
   'ios-install-required':
-    'Add Jean2 to your Home Screen, then enable notifications from the installed app.',
+    'Add Prokopai to your Home Screen, then enable notifications from the installed app.',
 };
 
 function ToggleSwitch({ enabled, onClick, disabled }: {

@@ -44,7 +44,7 @@ export default function TokenPrompt({ onSubmit, error, defaultServerUrl = 'local
         <div className="bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
           {/* Header */}
           <div className="px-6 pt-6 pb-4 text-center border-b border-border">
-            <h1 className="text-2xl font-bold text-foreground">Jean2</h1>
+            <h1 className="text-2xl font-bold text-foreground">Prokopai</h1>
             <p className="text-muted-foreground mt-1">Connect to your AI Agent Server</p>
           </div>
           

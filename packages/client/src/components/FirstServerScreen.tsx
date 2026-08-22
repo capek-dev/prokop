@@ -92,7 +92,7 @@ export default function FirstServerScreen({ error }: FirstServerScreenProps) {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <h1 className="text-2xl font-bold text-foreground">Add Server</h1>
-            <p className="text-muted-foreground mt-1">Connect to a Jean2 server</p>
+            <p className="text-muted-foreground mt-1">Connect to a Prokopai server</p>
           </div>
 
           {/* Form */}

@@ -55,7 +55,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private handleReset = (): void => {
     const confirmed = window.confirm(
-      'Reset Jean2 downloaded app files? Your drafts, settings, and server data will be kept.',
+      'Reset Prokopai downloaded app files? Your drafts, settings, and server data will be kept.',
     );
     if (!confirmed) return;
 
@@ -99,7 +99,7 @@ export class ErrorBoundary extends Component<Props, State> {
               }}
             >
               {isStaleBuildError
-                ? 'Jean2 could not load the downloaded app files. Reload to use a consistent version.'
+                ? 'Prokopai could not load the downloaded app files. Reload to use a consistent version.'
                 : err.message || 'Unknown error'}
             </p>
             <pre
@@ -143,7 +143,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 }}
               >
                 {isStaleBuildError
-                  ? (this.state.isRecovering ? 'Reloading...' : 'Reload Jean2')
+                  ? (this.state.isRecovering ? 'Reloading...' : 'Reload Prokopai')
                   : 'Try Again'}
               </button>
               {isStaleBuildError && (

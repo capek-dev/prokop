@@ -14,12 +14,12 @@ export interface ProkopaiPushPayloadV1 {
 }
 
 export const NOTIFICATION_COPY: Record<PushEventType, { title: string; body: string }> = {
-  session_completed: { title: 'Jean2', body: 'Jean2 finished a session' },
-  session_failed: { title: 'Jean2', body: 'Jean2 session failed' },
-  permission_required: { title: 'Jean2', body: 'Jean2 needs your approval' },
+  session_completed: { title: 'Prokopai', body: 'Prokopai finished a session' },
+  session_failed: { title: 'Prokopai', body: 'Prokopai session failed' },
+  permission_required: { title: 'Prokopai', body: 'Prokopai needs your approval' },
 };
 
-export function isJean2PushPayload(data: unknown): data is ProkopaiPushPayloadV1 {
+export function isProkopaiPushPayload(data: unknown): data is ProkopaiPushPayloadV1 {
   if (typeof data !== 'object' || data === null) return false;
   const obj = data as Record<string, unknown>;
   return obj.version === 1
@@ -31,13 +31,13 @@ export function isJean2PushPayload(data: unknown): data is ProkopaiPushPayloadV1
 
 /**
  * Parse a push event's JSON payload. Returns null if the data is missing,
- * malformed, or not a valid Jean2 push payload.
+ * malformed, or not a valid Prokopai push payload.
  */
 export function parsePushData(rawData: unknown): ProkopaiPushPayloadV1 | null {
   if (!rawData) return null;
   try {
     const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
-    if (!isJean2PushPayload(data)) return null;
+    if (!isProkopaiPushPayload(data)) return null;
     return data;
   } catch {
     return null;

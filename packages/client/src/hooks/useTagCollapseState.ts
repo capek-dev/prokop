@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-const STORAGE_KEY = 'jean2_collapsed_tags';
+const STORAGE_KEY = 'prokopai_collapsed_tags';
 
 function loadCollapsedTags(): Set<string> {
   try {

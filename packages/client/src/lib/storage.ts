@@ -90,6 +90,8 @@ const LEGACY_STORAGE_KEYS: Record<string, string> = {
   jean2_files_panel_width: 'prokopai_files_panel_width',
   jean2_overview_groups: STORAGE_KEYS.OVERVIEW_GROUPS,
   jean2_editor_width_pct: 'prokopai_editor_width_pct',
+  jean2_collapsed_tags: 'prokopai_collapsed_tags',
+  jean2_collapsed_workspaces: 'prokopai_collapsed_workspaces',
   jean2_notify_completion: 'prokopai_notify_completion',
   jean2_notify_permission: 'prokopai_notify_permission',
   jean2_sound_chat_finish_enabled: 'prokopai_sound_chat_finish_enabled',

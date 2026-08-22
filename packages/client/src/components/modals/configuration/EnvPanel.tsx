@@ -187,7 +187,7 @@ export function EnvPanel({ sdkClient }: PanelProps) {
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">
           Manage environment variables for integrations. Values are stored in{' '}
-          <code className="text-xs bg-muted px-1 py-0.5 rounded">~/.jean2/.env</code> and applied at runtime.
+          <code className="text-xs bg-muted px-1 py-0.5 rounded">~/.prokopai/.env</code> and applied at runtime.
         </p>
         {envVars.length > 0 && (
           <p className="text-xs text-muted-foreground">

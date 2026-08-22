@@ -17,7 +17,7 @@ describe('ErrorBoundary recovery', () => {
   it('offers PWA recovery for stale chunk failures', () => {
     renderBoundary(new Error('Failed to fetch dynamically imported module'));
 
-    expect(screen.getByRole('button', { name: 'Reload Jean2' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reload Prokopai' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reset downloaded app files' })).toBeInTheDocument();
   });
 
@@ -25,6 +25,6 @@ describe('ErrorBoundary recovery', () => {
     renderBoundary(new Error('Normal render failure'));
 
     expect(screen.getByRole('button', { name: 'Try Again' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Reload Jean2' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reload Prokopai' })).not.toBeInTheDocument();
   });
 });

@@ -1,8 +1,10 @@
 // packages/client/src/config/auth.ts
 
-const TOKEN_KEY = 'jean2_api_token';
-const TOKEN_EXPIRY_KEY = 'jean2_token_expiry';
-const SERVER_URL_KEY = 'jean2_server_url';
+import { STORAGE_KEYS } from '@/lib/storage';
+
+const TOKEN_KEY = STORAGE_KEYS.API_TOKEN;
+const TOKEN_EXPIRY_KEY = STORAGE_KEYS.TOKEN_EXPIRY;
+const SERVER_URL_KEY = STORAGE_KEYS.SERVER_URL;
 
 /**
  * Get stored API token from localStorage

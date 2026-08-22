@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-const STORAGE_KEY = 'jean2_collapsed_workspaces';
+const STORAGE_KEY = 'prokopai_collapsed_workspaces';
 
 function loadCollapsedWorkspaces(): Set<string> {
   try {
