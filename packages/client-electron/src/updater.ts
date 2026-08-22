@@ -7,8 +7,8 @@ const log = electronLog.default || electronLog;
 type UpdateInfo = import('electron-updater').UpdateInfo;
 
 const UPDATE_CHECK_INTERVAL = 4 * 60 * 60 * 1000;
-const GITHUB_OWNER = 'rabbyte-tech';
-const GITHUB_REPO = 'jean2';
+const GITHUB_OWNER = 'capek-dev';
+const GITHUB_REPO = 'prokop';
 
 async function resolveLatestClientReleaseTag(): Promise<string | null> {
   try {

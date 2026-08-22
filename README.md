@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jean2ai/jean2/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/jean2ai/jean2?color=6366f1"></a>
+  <a href="https://github.com/capek-dev/prokop/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/capek-dev/prokop?color=6366f1"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-6366f1"></a>
   <a href="https://bun.sh"><img alt="Bun" src="https://img.shields.io/badge/runtime-Bun-6366f1?logo=bun"></a>
   <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.7-6366f1?logo=typescript"></a>

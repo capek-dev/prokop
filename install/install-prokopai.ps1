@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
 
-$VERSION_FILE_URL = "https://raw.githubusercontent.com/jean2ai/jean2/refs/heads/main/packages/server/VERSION"
-$REPO = "jean2ai/jean2"
+$VERSION_FILE_URL = "https://raw.githubusercontent.com/capek-dev/prokop/refs/heads/main/packages/server/VERSION"
+$REPO = "capek-dev/prokop"
 $INSTALL_DIR = "$HOME.prokopai\bin"
 $BINARY_NAME = "prokopai.exe"
 $BINARY_PATH = ""

@@ -17,13 +17,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jean2ai/jean2",
+    "url": "git+https://github.com/capek-dev/prokop",
     "directory": "packages/sdk"
   },
   "bugs": {
-    "url": "https://github.com/jean2ai/jean2/issues"
+    "url": "https://github.com/capek-dev/prokop/issues"
   },
-  "homepage": "https://github.com/jean2ai/jean2#readme",
+  "homepage": "https://github.com/capek-dev/prokop#readme",
   "license": "MIT",
   "publishConfig": {
     "access": "public"

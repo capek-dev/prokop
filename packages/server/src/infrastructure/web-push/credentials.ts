@@ -19,7 +19,7 @@ export interface VapidCredentials {
 
 let configured = false;
 
-const DEFAULT_VAPID_SUBJECT = 'https://github.com/jean2ai/jean2';
+const DEFAULT_VAPID_SUBJECT = 'https://github.com/capek-dev/prokop';
 const LEGACY_VAPID_SUBJECT = 'mailto:noreply@jean2.local';
 
 function getSubject(): string {

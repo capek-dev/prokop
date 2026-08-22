@@ -22,7 +22,7 @@ export {
 } from '@/domains/tool-installation';
 
 const DEFAULT_REGISTRY_URL =
-  'https://raw.githubusercontent.com/jean2ai/jean2/main/tools/repositoryv3.json';
+  'https://raw.githubusercontent.com/capek-dev/prokop/main/tools/repositoryv3.json';
 const REPOSITORY_TIMEOUT = 10000;
 
 function getRegistryUrl(): string {

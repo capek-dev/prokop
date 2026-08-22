@@ -53,8 +53,8 @@ msi:
 
 publish:
   provider: github
-  owner: rabbyte-tech
-  repo: jean2
+  owner: capek-dev
+  repo: prokop
 
 asar: true
 compression: normal

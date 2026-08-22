@@ -27,8 +27,8 @@ export interface UpdateResult {
   newVersion?: string;
 }
 
-const VERSION_FILE_URL = 'https://raw.githubusercontent.com/jean2ai/jean2/refs/heads/main/packages/server/VERSION';
-const REPO = 'jean2ai/jean2';
+const VERSION_FILE_URL = 'https://raw.githubusercontent.com/capek-dev/prokop/refs/heads/main/packages/server/VERSION';
+const REPO = 'capek-dev/prokop';
 
 export function detectPlatform(): 'darwin' | 'linux' | 'windows' {
   switch (process.platform) {

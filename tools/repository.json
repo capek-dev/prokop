@@ -2,9 +2,9 @@
   "version": 1,
 
   "registry": {
-    "baseUrl": "https://github.com/jean2ai/jean2/releases/download",
+    "baseUrl": "https://github.com/capek-dev/prokop/releases/download",
     "urlTemplate": "{baseUrl}/tool-{name}-bun%2Fv{version}/{name}-bun.tar.gz",
-    "versionUrlTemplate": "https://raw.githubusercontent.com/jean2ai/jean2/main/tools/{name}-bun/VERSION"
+    "versionUrlTemplate": "https://raw.githubusercontent.com/capek-dev/prokop/main/tools/{name}-bun/VERSION"
   },
 
   "tools": {

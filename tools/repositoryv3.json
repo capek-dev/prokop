@@ -2,9 +2,9 @@
   "version": 3,
   "format": "source",
   "registry": {
-    "baseUrl": "https://github.com/jean2ai/jean2/releases/download",
+    "baseUrl": "https://github.com/capek-dev/prokop/releases/download",
     "urlTemplate": "{baseUrl}/tool-{name}%2Fv{version}/{name}.tar.gz",
-    "versionUrlTemplate": "https://raw.githubusercontent.com/jean2ai/jean2/main/tools/{name}/VERSION"
+    "versionUrlTemplate": "https://raw.githubusercontent.com/capek-dev/prokop/main/tools/{name}/VERSION"
   },
   "metadata": {
     "categories": {

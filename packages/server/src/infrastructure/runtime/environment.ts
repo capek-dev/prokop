@@ -96,7 +96,7 @@ export function getModelsPath(): string | undefined {
 export function getModelsRegistryUrl(): string {
   return (
     readEnv('MODELS_REGISTRY_URL') ||
-    'https://raw.githubusercontent.com/jean2ai/jean2/main/packages/server/src/config/models.json'
+    'https://raw.githubusercontent.com/capek-dev/prokop/main/packages/server/src/config/models.json'
   );
 }
 

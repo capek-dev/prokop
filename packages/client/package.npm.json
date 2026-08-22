@@ -10,13 +10,13 @@
   "files": ["dist"],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jean2ai/jean2",
+    "url": "git+https://github.com/capek-dev/prokop",
     "directory": "packages/client"
   },
   "bugs": {
-    "url": "https://github.com/jean2ai/jean2/issues"
+    "url": "https://github.com/capek-dev/prokop/issues"
   },
-  "homepage": "https://github.com/jean2ai/jean2#readme",
+  "homepage": "https://github.com/capek-dev/prokop#readme",
   "license": "MIT",
   "dependencies": {
     "open": "^10.1.0"
