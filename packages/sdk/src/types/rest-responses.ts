@@ -121,9 +121,12 @@ export interface ListWorkspaceSessionsResponse {
 
 /**
  * GET /api/tools
+ *
+ * Each entry carries `source`: 'builtin' (shipped with the server
+ * binary) or 'installed' (resolved from the tools directory).
  */
 export interface ListToolsResponse {
-  tools: ToolDefinition[];
+  tools: Array<ToolDefinition & { source: 'builtin' | 'installed' }>;
 }
 
 /**

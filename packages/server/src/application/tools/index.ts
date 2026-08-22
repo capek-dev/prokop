@@ -1,5 +1,6 @@
-import type { LoadedTool, ToolDefinition, ToolEnvVarStatus } from '@prokopai/sdk';
+import type { LoadedTool, ToolEnvVarStatus } from '@prokopai/sdk';
 import type {
+  ToolCatalogEntry,
   ToolCatalogPort,
   ToolEnvironmentPort,
   ToolEnvStatus,
@@ -17,7 +18,7 @@ export interface ToolsApplicationDeps {
   environment: ToolEnvironmentPort;
 }
 
-export type ToolListResult = { kind: 'ok'; tools: ToolDefinition[] };
+export type ToolListResult = { kind: 'ok'; tools: ToolCatalogEntry[] };
 export type ToolGetResult = { kind: 'ok'; tool: LoadedTool } | { kind: 'missing' };
 export type ToolEnvListResult =
   | { kind: 'ok'; status: ToolEnvStatus }

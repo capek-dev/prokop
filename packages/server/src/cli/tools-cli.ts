@@ -590,40 +590,6 @@ export async function toolsRemove(options: RemoveOptions): Promise<ToolsCliResul
   return { success: failedCount === 0 };
 }
 
-export interface InstallRecommendedToolsResult {
-  success: boolean;
-  toolsInstalled: boolean;
-  error?: string;
-}
-
-export async function installRecommendedTools(): Promise<InstallRecommendedToolsResult> {
-  try {
-    const result = await toolsInstall({
-      recommended: true,
-    });
-
-    if (!result.success) {
-      return {
-        success: false,
-        toolsInstalled: false,
-        error: `${result.error}\nRun 'jean2 tools install --recommended' to try again.`,
-      };
-    }
-
-    return {
-      success: true,
-      toolsInstalled: true,
-    };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    return {
-      success: false,
-      toolsInstalled: false,
-      error: message,
-    };
-  }
-}
-
 export interface OutdatedOptions {
   names?: string[];
 }

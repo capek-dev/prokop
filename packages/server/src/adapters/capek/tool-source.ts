@@ -6,6 +6,7 @@ import {
   type WorkspaceToolDiscovery,
 } from '@capekai/core/tools';
 import { resolveToolsPath } from '@/config';
+import type { ToolCatalogEntry } from '@/application/ports/tool-distribution';
 import { getTools, initializeWorkspace } from '@/infrastructure/mcp';
 import { getToolsDir } from '@/infrastructure/runtime/paths';
 import { readEnv } from '@/infrastructure/runtime/env-compat';
@@ -24,14 +25,15 @@ export const jean2WorkspaceToolDiscovery: WorkspaceToolDiscovery = {
  * built-ins win on name collision (the scoped resolver enforces the
  * same precedence at execution time). */
 export const jean2ToolCatalog = {
-  listTools: async () => {
+  listTools: async (): Promise<ToolCatalogEntry[]> => {
     const installed = await capekListTools();
     const builtinNames = new Set(builtinTools.map((tool) => tool.definition.name));
-    const definitions = [
-      ...builtinTools.map((tool) => tool.definition),
-      ...installed.filter((definition) => !builtinNames.has(definition.name)),
-    ];
-    return definitions.sort((a, b) => a.name.localeCompare(b.name));
+    return [
+      ...builtinTools.map((tool) => ({ ...tool.definition, source: 'builtin' as const })),
+      ...installed
+        .filter((definition) => !builtinNames.has(definition.name))
+        .map((definition) => ({ ...definition, source: 'installed' as const })),
+    ].sort((a, b) => a.name.localeCompare(b.name));
   },
   getTool: async (name: string) => {
     const builtin = builtinTools.find((tool) => tool.definition.name === name);

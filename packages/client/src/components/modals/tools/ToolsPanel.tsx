@@ -1,5 +1,5 @@
 import type { ProkopaiClient, ToolDefinition } from '@prokopai/sdk';
-import { Check, Loader2, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Check, Cpu, Loader2, Package, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useToolsQuery, useToolEnvVarsQuery } from '@/hooks/queries';
 
@@ -7,15 +7,17 @@ interface PanelProps {
   sdkClient: ProkopaiClient | null;
 }
 
+type ToolsListEntry = ToolDefinition & { source?: 'builtin' | 'installed' };
+
 export function ToolsPanel({ sdkClient }: PanelProps) {
   const { data: toolsData, isLoading: toolsLoading, error: toolsError } = useToolsQuery(sdkClient);
   const { data: envData, isLoading: envLoading } = useToolEnvVarsQuery(sdkClient);
 
-  const tools: ToolDefinition[] = toolsData?.tools ?? [];
+  const tools: ToolsListEntry[] = toolsData?.tools ?? [];
   const loading = toolsLoading || envLoading;
   const error = toolsError?.message ?? null;
 
-  const getToolEnvStatus = (tool: ToolDefinition) => {
+  const getToolEnvStatus = (tool: ToolsListEntry) => {
     const requiredEnvs = tool.env || [];
     if (requiredEnvs.length === 0) return { total: 0, missing: 0 };
     const missing = requiredEnvs.filter((key) => {
@@ -46,9 +48,12 @@ export function ToolsPanel({ sdkClient }: PanelProps) {
       )}
 
       <div className="space-y-1">
-        <p className="text-sm text-muted-foreground">
-          {tools.length} tool{tools.length !== 1 ? 's' : ''} loaded. Configure their environment variables in the{' '}
-          <span className="font-medium text-foreground">Environment</span> tab.
+        <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+          <Package className="size-3.5 shrink-0" />
+          <span>
+            {tools.length} tool{tools.length !== 1 ? 's' : ''} loaded ({tools.filter((t) => t.source === 'builtin').length} built-in). Configure their environment variables in the{' '}
+            <span className="font-medium text-foreground">Environment</span> tab.
+          </span>
         </p>
       </div>
 
@@ -61,7 +66,15 @@ export function ToolsPanel({ sdkClient }: PanelProps) {
               className="flex items-start justify-between gap-2 p-2.5 rounded-lg border"
             >
               <div className="flex-1 min-w-0">
-                <span className="text-sm font-medium break-words">{tool.name}</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-sm font-medium break-words">{tool.name}</span>
+                  {tool.source === 'builtin' && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 gap-1 shrink-0">
+                      <Cpu className="size-2.5" />
+                      built-in
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words">
                   {tool.description}
                 </p>

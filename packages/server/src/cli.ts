@@ -114,8 +114,6 @@ Commands:
     --no-migrations    Skip schema migrations
     --install-preconfigs   Install default preconfigs (default)
     --no-preconfigs        Skip preconfig installation
-    --install-tools     Install recommended tools non-interactively
-    --no-tools          Skip tool installation entirely
     --force            Force re-initialization
 
   tools                Tool management
@@ -307,10 +305,6 @@ async function main(): Promise<void> {
           initOptions.installPreconfigs = initArgs[i] === '--install-preconfigs';
         } else if (initArgs[i] === '--force' || initArgs[i] === '-f') {
           initOptions.force = true;
-        } else if (initArgs[i] === '--install-tools') {
-          initOptions.installTools = true;
-        } else if (initArgs[i] === '--no-tools') {
-          initOptions.skipTools = true;
         }
       }
 
@@ -321,9 +315,6 @@ async function main(): Promise<void> {
           console.log(`  Config:   ${result.configPath}`);
           console.log(`  Database: ${result.databasePath}`);
           console.log(`  Tools:    ${result.toolsPath}`);
-          if (result.toolsInstalled) {
-            console.log('  Tools installed: yes');
-          }
         } else {
           console.error('Initialization failed:', result.error);
           process.exit(1);

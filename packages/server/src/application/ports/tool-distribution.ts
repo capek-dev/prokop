@@ -58,9 +58,16 @@ export interface ToolRepositoryPort {
   getToolByName(toolName: string): Promise<RepositoryTool | null>;
 }
 
+/** Catalog entry exposed to the tools route: the tool definition plus
+ * where it resolves from. Built-ins win over same-named installed
+ * tools, so a name appears at most once. */
+export type ToolCatalogEntry = ToolDefinition & {
+  source: 'builtin' | 'installed';
+};
+
 /** Catalog of installed tools exposed to the tools route. */
 export interface ToolCatalogPort {
-  listTools(): Promise<ToolDefinition[]>;
+  listTools(): Promise<ToolCatalogEntry[]>;
   getTool(name: string): Promise<LoadedTool | null>;
 }
 
