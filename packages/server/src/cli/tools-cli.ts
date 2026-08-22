@@ -18,13 +18,11 @@ const INTERACTIVE_INSTALL_VISIBLE_ITEMS = 10;
 
 import {
   excludeInstalledTools,
-  selectRecommendedTools,
   validateInstallOptions,
 } from '@/domains/tool-installation';
 
 export {
   excludeInstalledTools,
-  selectRecommendedTools,
   validateInstallOptions,
 };
 
@@ -118,7 +116,6 @@ export async function toolsList(options: ListOptions): Promise<ToolsCliResult> {
 export interface CliInstallOptions {
   names?: string[];
   all?: boolean;
-  recommended?: boolean;
   force?: boolean;
 }
 
@@ -136,7 +133,7 @@ export async function toolsInstall(options: CliInstallOptions): Promise<ToolsCli
   }
 
   const toolArgs = options.names || [];
-  const isInteractive = toolArgs.length === 0 && !options.all && !options.recommended;
+  const isInteractive = toolArgs.length === 0 && !options.all;
 
   let tools: RepositoryTool[];
 
@@ -157,13 +154,6 @@ export async function toolsInstall(options: CliInstallOptions): Promise<ToolsCli
 
   if (options.all) {
     selected = tools;
-  } else if (options.recommended) {
-    selected = selectRecommendedTools(tools);
-    if (selected.length === 0) {
-      const error = 'The tool registry does not define any recommended tools.';
-      log.error(error);
-      return { success: false, error, exitCode: 1 };
-    }
   } else if (isInteractive) {
     const installedTools = await getInstalledTools(toolsDir);
     const availableTools = excludeInstalledTools(
@@ -677,7 +667,6 @@ export function toolsHelp(): void {
 
     install [names...]    Install tools (interactive if no args)
       --all                 Install all available tools
-      --recommended         Install recommended tools only
       --force               Reinstall even if already installed
 
     update [names...]     Update installed tools to latest
@@ -695,7 +684,6 @@ export function toolsHelp(): void {
 
   Examples:
     jean2 tools install                Interactive selection
-    jean2 tools install --recommended  Install recommended tools
     jean2 tools install --all           Install all tools
     jean2 tools install grep glob      Install specific tools
     jean2 tools update                 Update all installed tools
@@ -711,7 +699,6 @@ export interface ToolsCommandArgs {
     installed?: boolean;
     json?: boolean;
     all?: boolean;
-    recommended?: boolean;
     force?: boolean;
     dryRun?: boolean;
   };
@@ -735,7 +722,6 @@ export async function runToolsCommand(args: ToolsCommandArgs): Promise<ToolsCliR
       return toolsInstall({
         names: names ?? [],
         all: flags.all,
-        recommended: flags.recommended,
         force: flags.force,
       });
     }

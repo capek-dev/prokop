@@ -14,25 +14,17 @@ export function excludeInstalledTools(
   return tools.filter((tool) => !installedSet.has(tool.name));
 }
 
-export function selectRecommendedTools(tools: RepositoryTool[]): RepositoryTool[] {
-  return tools.filter((tool) => tool.recommended === true);
-}
-
 export interface ToolInstallCliOptions {
   names?: string[];
   all?: boolean;
-  recommended?: boolean;
   force?: boolean;
 }
 
 export function validateInstallOptions(options: ToolInstallCliOptions): string | null {
   const hasNames = (options.names?.length ?? 0) > 0;
 
-  if (options.all && options.recommended) {
-    return 'Cannot combine --all with --recommended.';
-  }
-  if (hasNames && (options.all || options.recommended)) {
-    return 'Cannot combine tool names with --all or --recommended.';
+  if (hasNames && options.all) {
+    return 'Cannot combine tool names with --all.';
   }
 
   return null;

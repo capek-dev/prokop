@@ -124,7 +124,6 @@ Commands:
       --json              JSON output
     install [names...]  Install tools (interactive if no args)
       --all               Install all tools
-      --recommended       Install recommended tools only
       --force             Reinstall even if installed
       --skip-runtime-check  Skip runtime check
     update [names...]   Update installed tools to latest
@@ -520,9 +519,6 @@ async function runToolsCommandFromCLI(args: string[]): Promise<void> {
         break;
       case '--all':
         toolsArgs.flags.all = true;
-        break;
-      case '--recommended':
-        toolsArgs.flags.recommended = true;
         break;
       case '--force':
       case '-f':

@@ -17,7 +17,6 @@ import {
 } from '@/domains/tool-installation';
 import {
   excludeInstalledTools,
-  selectRecommendedTools,
   validateInstallOptions,
 } from '@/domains/tool-installation';
 import {
@@ -138,7 +137,7 @@ describe('tool-installation domain: install manifest policy', () => {
 
 describe('tool-installation domain: selection policy', () => {
   const tools = [
-    { name: 'a', description: '', version: '1', artifactUrl: 'u', recommended: true },
+    { name: 'a', description: '', version: '1', artifactUrl: 'u' },
     { name: 'b', description: '', version: '1', artifactUrl: 'u' },
   ] as RepositoryTool[];
 
@@ -147,24 +146,12 @@ describe('tool-installation domain: selection policy', () => {
     expect(excludeInstalledTools(tools, ['a', 'b'])).toEqual([]);
   });
 
-  test('selects only recommended tools without falling back', () => {
-    expect(selectRecommendedTools(tools).map((tool) => tool.name)).toEqual(['a']);
-    expect(selectRecommendedTools([tools[1]])).toEqual([]);
-  });
-
   test('validates install option combinations with the exact messages', () => {
     expect(validateInstallOptions({ names: ['a'] })).toBeNull();
     expect(validateInstallOptions({ all: true })).toBeNull();
-    expect(validateInstallOptions({ recommended: true })).toBeNull();
     expect(validateInstallOptions({})).toBeNull();
-    expect(validateInstallOptions({ all: true, recommended: true })).toBe(
-      'Cannot combine --all with --recommended.',
-    );
     expect(validateInstallOptions({ names: ['a'], all: true })).toBe(
-      'Cannot combine tool names with --all or --recommended.',
-    );
-    expect(validateInstallOptions({ names: ['a'], recommended: true })).toBe(
-      'Cannot combine tool names with --all or --recommended.',
+      'Cannot combine tool names with --all.',
     );
   });
 });
@@ -179,7 +166,7 @@ describe('tool-installation domain: repository schema and release URL policy', (
       versionUrlTemplate: '{baseUrl}/tools/{name}/VERSION',
     },
     tools: [
-      { name: 'demo', description: 'Demo', recommended: true, envVars: [{ name: 'DEMO_KEY', required: true }] },
+      { name: 'demo', description: 'Demo', envVars: [{ name: 'DEMO_KEY', required: true }] },
     ],
   };
 

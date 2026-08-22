@@ -3,16 +3,18 @@ import { Hono } from 'hono';
 import { registerToolRoutes } from '@/transport/http/routes/tools';
 import { HttpError } from '@/application/http-errors';
 import type { ToolsHttpApplication } from '@/application/tools';
-import type { LoadedTool, ToolDefinition } from '@prokopai/sdk';
+import type { ToolCatalogEntry } from '@/application/ports/tool-distribution';
+import type { LoadedTool } from '@prokopai/sdk';
 
-function makeDefinition(overrides: Partial<ToolDefinition> = {}): ToolDefinition {
+function makeDefinition(overrides: Partial<ToolCatalogEntry> = {}): ToolCatalogEntry {
   return {
     name: 'demo',
     description: 'Demo tool',
     inputSchema: { type: 'object', properties: {} },
     timeout: 30000,
+    source: 'installed',
     ...overrides,
-  } as ToolDefinition;
+  } as ToolCatalogEntry;
 }
 
 function makeFakeApplication(overrides: Partial<ToolsHttpApplication> = {}): ToolsHttpApplication {

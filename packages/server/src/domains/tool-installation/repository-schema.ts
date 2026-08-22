@@ -41,7 +41,6 @@ export interface ToolCatalogEntry {
   description: string;
   category?: string;
   capabilities?: string[];
-  recommended?: boolean;
   envVars?: ToolEnvVar[];
   hasSecurity?: boolean;
 }
@@ -53,7 +52,6 @@ export interface RepositoryTool {
   artifactUrl: string;
   category?: string;
   capabilities?: string[];
-  recommended?: boolean;
   envVars?: ToolEnvVar[];
   hasSecurity?: boolean;
 }
@@ -275,9 +273,6 @@ export function validateToolRepositoryShape(data: unknown): ToolRepository {
     }
     if (tool.hasSecurity !== undefined && typeof tool.hasSecurity !== 'boolean') {
       throw new RepositorySchemaError(`${idx}.hasSecurity must be a boolean`);
-    }
-    if (tool.recommended !== undefined && typeof tool.recommended !== 'boolean') {
-      throw new RepositorySchemaError(`${idx}.recommended must be a boolean`);
     }
 
     validateToolEnvVars(tool, idx);

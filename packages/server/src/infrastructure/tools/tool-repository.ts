@@ -86,7 +86,6 @@ export async function fetchRepositoryWithVersions(): Promise<RepositoryTool[]> {
         artifactUrl,
         category: tool.category,
         capabilities: tool.capabilities,
-        recommended: tool.recommended,
         envVars: tool.envVars,
         hasSecurity: tool.hasSecurity,
       } satisfies RepositoryTool;

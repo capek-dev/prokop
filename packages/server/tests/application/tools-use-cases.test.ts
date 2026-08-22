@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { LoadedTool, ToolDefinition, ToolEnvVarStatus } from '@prokopai/sdk';
+import type { LoadedTool, ToolEnvVarStatus } from '@prokopai/sdk';
 import {
   createToolsHttpApplication,
   type ToolsHttpApplication,
@@ -7,16 +7,18 @@ import {
 import type {
   ToolCatalogPort,
   ToolEnvironmentPort,
+  ToolCatalogEntry,
 } from '@/application/ports/tool-distribution';
 
-function makeDefinition(overrides: Partial<ToolDefinition> = {}): ToolDefinition {
+function makeDefinition(overrides: Partial<ToolCatalogEntry> = {}): ToolCatalogEntry {
   return {
     name: 'demo',
     description: 'Demo tool',
     inputSchema: { type: 'object', properties: {} },
     timeout: 30000,
+    source: 'installed',
     ...overrides,
-  } as ToolDefinition;
+  } as ToolCatalogEntry;
 }
 
 function makeEnvVar(overrides: Partial<ToolEnvVarStatus> = {}): ToolEnvVarStatus {
@@ -31,7 +33,7 @@ function makeEnvVar(overrides: Partial<ToolEnvVarStatus> = {}): ToolEnvVarStatus
 }
 
 interface FakeState {
-  tools: ToolDefinition[];
+  tools: ToolCatalogEntry[];
   envVars: ToolEnvVarStatus[];
   listFails: boolean;
   envFails: boolean;
