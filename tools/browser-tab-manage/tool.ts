@@ -5,7 +5,7 @@ export const definition: ToolDefinition = {
   description:
     'Manage browser tabs: list all tabs, create a new tab, close a tab, or switch to a tab. ' +
     'Use this alongside browser_navigate and browser_dom_action to work across multiple tabs. ' +
-    'Requires a connected Jean2Browser extension.',
+    'Requires a connected ProkopaiBrowser extension.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -113,7 +113,7 @@ export async function execute(
       return {
         success: false,
         error:
-          'Tab action timed out. Ensure the Jean2Browser extension is installed and connected.',
+          'Tab action timed out. Ensure the ProkopaiBrowser extension is installed and connected.',
       };
     }
 

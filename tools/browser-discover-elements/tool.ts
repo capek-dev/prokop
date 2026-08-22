@@ -8,7 +8,7 @@ export const definition: ToolDefinition = {
     'bounding rectangles (x, y, width, height, top, right, bottom, left), ' +
     'visibility flags (isVisible, isInViewport), and viewport dimensions. ' +
     'Use this before browser_dom_action to find the correct selectors and understand element layout. ' +
-    'Requires a connected Jean2Browser extension.',
+    'Requires a connected ProkopaiBrowser extension.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -72,7 +72,7 @@ export async function execute(
       return {
         success: false,
         error:
-          'Element discovery timed out. Ensure the Jean2Browser extension is installed and connected.',
+          'Element discovery timed out. Ensure the ProkopaiBrowser extension is installed and connected.',
       };
     }
 

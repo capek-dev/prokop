@@ -5,7 +5,7 @@ export const definition: ToolDefinition = {
   description:
     'Capture a screenshot of the active browser tab. Returns a base64-encoded PNG image. ' +
     'Use this to visually verify the current state of a page after performing actions. ' +
-    'Requires a connected Jean2Browser extension.',
+    'Requires a connected ProkopaiBrowser extension.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -67,7 +67,7 @@ export async function execute(
       return {
         success: false,
         error:
-          'Screenshot timed out. Ensure the Jean2Browser extension is installed and connected.',
+          'Screenshot timed out. Ensure the ProkopaiBrowser extension is installed and connected.',
       };
     }
 

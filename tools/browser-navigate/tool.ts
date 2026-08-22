@@ -4,7 +4,7 @@ export const definition: ToolDefinition = {
   name: 'browser_navigate',
   description:
     'Navigate the active browser tab to a URL. Waits for the page to finish loading before returning the new URL and title. ' +
-    'Requires a connected Jean2Browser extension.',
+    'Requires a connected ProkopaiBrowser extension.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -99,7 +99,7 @@ export async function execute(
       return {
         success: false,
         error:
-          'Navigation timed out. Ensure the Jean2Browser extension is installed and connected.',
+          'Navigation timed out. Ensure the ProkopaiBrowser extension is installed and connected.',
       };
     }
 

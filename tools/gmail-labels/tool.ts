@@ -19,12 +19,25 @@ export const definition: ToolDefinition = {
 };
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
-const TOKEN_FILE_PATH = '~/.jean2/providers/gmail.json';
+// Canonical prokopai path first; legacy jean2 fallback while installs migrate.
+const TOKEN_FILE_PATHS = ['~/.prokopai/providers/gmail.json', '~/.jean2/providers/gmail.json'];
+
+async function readTokenFromCandidates(ctx: ToolContext): Promise<string> {
+  let lastError: unknown = new Error('no token file candidates');
+  for (const candidate of TOKEN_FILE_PATHS) {
+    try {
+      return await ctx.fs.readFile(candidate, 'utf-8');
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
 
 async function readGmailToken(ctx: ToolContext): Promise<string> {
   let tokenData: string;
   try {
-    tokenData = await ctx.fs.readFile(TOKEN_FILE_PATH, 'utf-8');
+    tokenData = await readTokenFromCandidates(ctx);
   } catch {
     throw new Error('Gmail is not connected. Connect your Gmail account in Settings > OAuth Providers.');
   }

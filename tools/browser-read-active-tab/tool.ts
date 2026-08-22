@@ -10,7 +10,7 @@ export const definition: ToolDefinition = {
   name: 'browser_read_active_tab',
   description:
     'Read the active browser tab. Returns the page title, URL, and visible text content. ' +
-    'Requires a connected Jean2Browser extension.',
+    'Requires a connected ProkopaiBrowser extension.',
   inputSchema: {
     type: 'object',
     properties: {},
@@ -74,7 +74,7 @@ export async function execute(
       return {
         success: false,
         error:
-          'Browser read timed out. Ensure the Jean2Browser extension is installed, connected, and the active tab is accessible.',
+          'Browser read timed out. Ensure the ProkopaiBrowser extension is installed, connected, and the active tab is accessible.',
       };
     }
 

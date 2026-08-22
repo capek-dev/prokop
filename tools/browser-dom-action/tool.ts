@@ -14,7 +14,7 @@ export const definition: ToolDefinition = {
   name: 'browser_dom_action',
   description:
     'Perform a DOM interaction on the active browser tab. Supports: click (by selector or text), type into inputs, select dropdown options, clear inputs, scroll, hover, press Enter, check/uncheck checkboxes. ' +
-    'Requires a connected Jean2Browser extension. ' +
+    'Requires a connected ProkopaiBrowser extension. ' +
     'Use browser_read_active_tab first to understand the page, then use browser_dom_action to interact with it. ' +
     'All actions return scrollX, scrollY, viewportWidth, and viewportHeight for orientation context. ' +
     'Clicks dispatch with real element coordinates (clientX/clientY) for compatibility with position-aware handlers.',
@@ -150,7 +150,7 @@ export async function execute(
       return {
         success: false,
         error:
-          'Browser action timed out. Ensure the Jean2Browser extension is installed, connected, and the active tab is accessible.',
+          'Browser action timed out. Ensure the ProkopaiBrowser extension is installed, connected, and the active tab is accessible.',
       };
     }
 
