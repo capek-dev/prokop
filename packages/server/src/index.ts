@@ -27,6 +27,7 @@ import { backfillFts } from '@/infrastructure/session-search/fts';
 import type { ServerMessage, AskAuthority } from '@prokopai/sdk';
 import { getTerminalManager, getTerminalEventManager } from '@/transport/terminal';
 import { cleanupRunningSessionsOnStartup } from '@/infrastructure/sqlite/terminal-session-store';
+import { reconcileStuckRunningSessions } from '@/infrastructure/sqlite/session-store';
 import { reconcileAllSessionsCompaction } from '@/adapters/capek/compaction-recovery';
 import { readEnv } from '@/infrastructure/runtime/env-compat';
 import {
@@ -105,6 +106,10 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   const application = createWiredApplication(agents);
   installWireApplication({ session: application.session, control: application.control, providers: application.providers, notifications: application.notifications, permissions: application.permissions });
   cleanupRunningSessionsOnStartup();
+  const stuckRunningSessions = reconcileStuckRunningSessions();
+  if (stuckRunningSessions > 0) {
+    console.log(`[startup] Reconciled ${stuckRunningSessions} session(s) stuck in running state`);
+  }
   await reconcileAllSessionsCompaction();
   reconcileAllOrphanedToolCalls();
   cleanupAllPendingAsks();

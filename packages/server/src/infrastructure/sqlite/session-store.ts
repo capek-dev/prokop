@@ -171,5 +171,30 @@ export function listSessionPageGrouped(
   return repo().listSessionPageGrouped(workspaceIds, options);
 }
 
+/**
+ * Startup reconciliation for chat sessions stuck in "running". A previous
+ * process may have died mid-execution (crash, SIGKILL) leaving running_at
+ * set with no live execution to clear it. The client treats running_at as
+ * streaming, so such sessions could never accept a new prompt again.
+ * Returns the number of sessions reconciled.
+ */
+export function reconcileStuckRunningSessions(): number {
+  const sessions = listSessions();
+  let reconciled = 0;
+  for (const session of sessions) {
+    const isStuckRunning = (session.runningAt !== null && session.runningAt !== undefined)
+      || session.subagentStatus === 'running';
+    if (!isStuckRunning) continue;
+    const updates: Partial<Pick<Session, 'runningAt' | 'subagentStatus'>> = { runningAt: null };
+    if (session.subagentStatus === 'running') {
+      updates.subagentStatus = 'interrupted';
+    }
+    if (repo().updateSession(session.id, updates)) {
+      reconciled++;
+    }
+  }
+  return reconciled;
+}
+
 export { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from './session-repository';
 export { cleanupSessionOutputDir };

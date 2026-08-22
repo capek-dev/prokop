@@ -150,6 +150,15 @@ export function createSessionLifecycleApplication<Origin>(
       await deps.repository.reconcileCompaction(session.id);
       if (!isRunning) {
         deps.repository.reconcileOrphanedToolCalls(session.id);
+        // No live execution can hold the running flag: clear any stale
+        // running_at/subagent_status left by a crashed or wedged run so the
+        // session cannot stay bricked in "running" forever.
+        if (session.runningAt || session.subagentStatus === 'running') {
+          deps.repository.updateSession(session.id, {
+            runningAt: null,
+            ...(session.subagentStatus === 'running' ? { subagentStatus: 'interrupted' } : {}),
+          });
+        }
       }
 
       const reconciledSession = deps.repository.getSession(sessionId);

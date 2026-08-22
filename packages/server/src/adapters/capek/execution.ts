@@ -17,7 +17,7 @@ import type {
 } from '@/application/ports/execution';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import { createJean2RuntimeContext } from './events';
-import { withJean2ExecutionScope } from './execution-scope';
+import { withJean2ComposedScopeSync, withJean2ExecutionScope } from './execution-scope';
 
 export interface Jean2SessionExecutionDependencies {
   handleChat?: typeof handleCapekChat;
@@ -107,7 +107,15 @@ export function createJean2SessionExecution(
     },
 
     async interruptSession(sessionId: string, reason?: string): Promise<InterruptExecutionResult> {
-      return interruptManager.interruptSession(sessionId, (reason ?? 'user_request') as InterruptReason);
+      // Wire-side interrupt arrives outside any execution context, but the
+      // interrupt path rejects pending asks, and the live ask waiters live in
+      // the composed permission runtime that execution entered. Running the
+      // interrupt unscoped hit the process-default runtime's empty waiter
+      // map: the question tool's ctx.ask() never settled and the session
+      // stayed registered (bricked in "running"). Route through the composed
+      // scope exactly like the other wire-side ask seams.
+      return withJean2ComposedScopeSync(() =>
+        interruptManager.interruptSession(sessionId, (reason ?? 'user_request') as InterruptReason));
     },
 
     isSessionActive(sessionId: string): boolean {

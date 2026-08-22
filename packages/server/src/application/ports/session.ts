@@ -78,6 +78,8 @@ export type SessionUpdateInput = Partial<
     | 'selectedVariant'
     | 'parentId'
     | 'agentName'
+    | 'subagentStatus'
+    | 'runningAt'
     | 'tags'
     | 'autoApproveSeverity'
     | 'agentId'
