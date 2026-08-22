@@ -25,7 +25,7 @@ export class WebviewManager {
     const id = `webview-${++this.idCounter}`;
 
     // Create a unique URL for this view that we can identify later
-    const managedUrl = `${url}#jean2-view-id=${id}`;
+    const managedUrl = `${url}#prokopai-view-id=${id}`;
 
     const view = new WebContentsView({
       webPreferences: {

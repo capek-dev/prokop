@@ -15,7 +15,7 @@ async function resolveLatestClientReleaseTag(): Promise<string | null> {
     const response = await fetch(
       `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases`,
       {
-        headers: { 'User-Agent': 'jean2-updater' },
+        headers: { 'User-Agent': 'prokopai-updater' },
       },
     );
     if (!response.ok) return null;
