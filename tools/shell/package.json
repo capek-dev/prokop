@@ -1,9 +1,0 @@
-{
-  "name": "@jean2/tool-shell",
-  "version": "1.0.10",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@prokopai/sdk": "^1.4.0"
-  }
-}

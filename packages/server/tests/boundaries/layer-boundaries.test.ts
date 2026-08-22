@@ -24,6 +24,7 @@ const routesDir = resolve(serverSourceRoot, 'transport/http/routes');
 const utilsDir = resolve(serverSourceRoot, 'utils');
 const layerDirs = [bootstrapDir, transportDir, applicationDir, domainsDir, infrastructureDir, adaptersDir];
 const infrastructureSqliteDir = resolve(infrastructureDir, 'sqlite');
+const builtinToolsDir = resolve(serverSourceRoot, 'tools', 'builtin');
 
 const capekInternalPrefix = '@capekai/core/' + 'internal/';
 
@@ -236,10 +237,10 @@ const globalBaselineRules: DependencyRule[] = [
   },
   {
     name: 'sqlite-infrastructure-only',
-    rationale: 'SQLite is infrastructure-only. No store exceptions remain; new consumers fail.',
+    rationale: 'SQLite is infrastructure-only (built-in tools ship their own standalone databases). New consumers fail.',
     appliesTo: [serverSourceRoot],
     forbiddenSpecifiers: [{ exact: 'bun:sqlite' }],
-    allowedInDirs: [infrastructureSqliteDir],
+    allowedInDirs: [infrastructureSqliteDir, builtinToolsDir],
     exceptions: sqliteExceptions,
   },
   {

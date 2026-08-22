@@ -270,27 +270,14 @@ describe('tool-repository', () => {
   });
 
   describe('checked-in repository recommendations', () => {
-    test('marks the bundled preconfig baseline as recommended', () => {
+    test('external catalog marks nothing recommended; the baseline ships built-in', () => {
       const repositoryPath = join(import.meta.dir, '../../../../tools/repositoryv3.json');
       const repository = JSON.parse(readFileSync(repositoryPath, 'utf8')) as ToolRepository;
       const recommended = repository.tools
         .filter((tool) => tool.recommended === true)
         .map((tool) => tool.name);
 
-      expect(recommended).toEqual([
-        'apply-patch',
-        'edit',
-        'glob',
-        'grep',
-        'ls',
-        'multiedit',
-        'read-file',
-        'shell',
-        'todoread',
-        'todowrite',
-        'webfetch',
-        'write-file',
-      ]);
+      expect(recommended).toEqual([]);
     });
   });
 

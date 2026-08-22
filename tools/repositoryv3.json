@@ -53,12 +53,6 @@
   },
   "tools": [
     {
-      "name": "apply-patch",
-      "description": "Apply unified diff patches to files atomically.",
-      "category": "filesystem",
-      "recommended": true
-    },
-    {
       "name": "browser-discover-elements",
       "description": "Discover all interactive elements (buttons, links, inputs, selects, etc.) on the active browser tab. Returns a list of elements with their CSS selectors, text content, and attributes.",
       "category": "browser"
@@ -104,31 +98,9 @@
       "category": "communication"
     },
     {
-      "name": "edit",
-      "description": "Performs string replacements in files with fuzzy matching support.",
-      "category": "filesystem",
-      "recommended": true
-    },
-    {
-      "name": "edit-range",
-      "description": "Performs revision-aware range edits using line numbers.",
-      "category": "filesystem"
-    },
-    {
       "name": "file-to-markdown",
       "description": "Converts files to Markdown format. Supports PDF, Microsoft Office (.docx, .xlsx, .pptx), LibreOffice (.odt, .ods, .odp), and ZIP archives. Does not support .7z archives.",
       "category": "filesystem"
-    },
-    {
-      "name": "git-worktree",
-      "description": "Manage git worktrees for parallel development across multiple sessions. Create, list, check status, or remove worktrees.",
-      "category": "development"
-    },
-    {
-      "name": "glob",
-      "description": "Find files matching a glob pattern. Returns matching file paths sorted by modification time.",
-      "category": "filesystem",
-      "recommended": true
     },
     {
       "name": "gmail-draft",
@@ -164,42 +136,6 @@
       "name": "gmail-send",
       "description": "Send an email from the connected Gmail account immediately. Supports recipients, CC, BCC, and reply threading.",
       "category": "communication"
-    },
-    {
-      "name": "grep",
-      "description": "Search for text patterns in files using regular expressions.",
-      "category": "filesystem",
-      "recommended": true
-    },
-    {
-      "name": "ls",
-      "description": "List directory contents with tree formatting.",
-      "category": "filesystem",
-      "recommended": true
-    },
-    {
-      "name": "multiedit",
-      "description": "Performs multiple string replacements in a single file atomically.",
-      "category": "filesystem",
-      "recommended": true
-    },
-    {
-      "name": "question",
-      "description": "Ask the user structured questions and get typed answers back as tool results.",
-      "category": "workflow",
-      "capabilities": ["interactive-user-input"]
-    },
-    {
-      "name": "read-file",
-      "description": "Read a file or directory from the filesystem.",
-      "category": "filesystem",
-      "recommended": true
-    },
-    {
-      "name": "shell",
-      "description": "Execute a shell command in a persistent session.",
-      "category": "system",
-      "recommended": true
     },
     {
       "name": "tavily-crawl",
@@ -248,45 +184,6 @@
           "sensitive": true
         }
       ]
-    },
-    {
-      "name": "todoread",
-      "description": "Read the current task list for the session from SQLite database.",
-      "category": "workflow",
-      "recommended": true,
-      "hasSecurity": false,
-      "envVars": [
-        {
-          "name": "TODOS_DB_PATH",
-          "required": false,
-          "sensitive": false
-        }
-      ]
-    },
-    {
-      "name": "todowrite",
-      "description": "Update the task list for the current session in SQLite database.",
-      "category": "workflow",
-      "recommended": true,
-      "envVars": [
-        {
-          "name": "TODOS_DB_PATH",
-          "required": false,
-          "sensitive": false
-        }
-      ]
-    },
-    {
-      "name": "webfetch",
-      "description": "Fetch content from a URL and convert to readable format.",
-      "category": "web",
-      "recommended": true
-    },
-    {
-      "name": "write-file",
-      "description": "Write content to a file, creating it if it doesn't exist or overwriting if it does.",
-      "category": "filesystem",
-      "recommended": true
     }
   ],
   "envConfig": {
@@ -296,7 +193,12 @@
       "required": true,
       "configFile": "~/.jean2/.env",
       "example": "TAVILY_API_KEY=tvly-xxxxxxxxxxxxxxxx",
-      "usedBy": ["tavily-search", "tavily-crawl", "tavily-map", "tavily-extract"]
+      "usedBy": [
+        "tavily-search",
+        "tavily-crawl",
+        "tavily-map",
+        "tavily-extract"
+      ]
     },
     "TODOS_DB_PATH": {
       "description": "Custom path for the todos SQLite database. Must be an absolute path.",
@@ -305,7 +207,10 @@
       "default": "~/.jean2/data/todos.db",
       "configFile": "~/.jean2/.env",
       "example": "TODOS_DB_PATH=~/.jean2/data/todos.db",
-      "usedBy": ["todoread", "todowrite"]
+      "usedBy": [
+        "todoread",
+        "todowrite"
+      ]
     }
   }
 }
