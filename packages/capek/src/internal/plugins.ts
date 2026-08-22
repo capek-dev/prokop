@@ -58,6 +58,7 @@ export {
   type FacadeScopeValues,
 } from '../plugins/facade-plugins';
 export { loadedToolsPlugin } from '../plugins/loaded-tools';
+export { createContributedToolResolver } from '../plugins/tool-catalog';
 export {
   getContextSources,
 } from '../context/sources';

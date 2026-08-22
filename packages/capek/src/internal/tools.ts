@@ -11,11 +11,16 @@
 export {
   clearCache,
   configureToolsPath,
+  getInstalledTool,
   getTool,
+  hasUnscannedToolCache,
+  listInstalledTools,
   listTools,
   loadToolModule,
   scanTools,
 } from '../tools/registry';
+export type { ToolRegistryResolver } from '../tools/registry';
+export { RETRIEVE_TOOL_OUTPUT_NAME } from '../tool-output/policy';
 export {
   configureWorkspaceToolDiscovery,
   getWorkspaceToolDiscovery,

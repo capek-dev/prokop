@@ -115,6 +115,7 @@ describe('Čapek composition root', () => {
       '@/adapters/capek/session-search',
       '@/adapters/capek/scheduler',
       '@/adapters/capek/composition',
+      '@/adapters/capek/tool-resolver',
       '@/bootstrap/application',
       '@/application/agents',
       '@/adapters/jean2/session-repository',
@@ -288,16 +289,17 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
       ['capek.workflow-domain', 'agent', 'current.workflow-domain', 'agent'],
       ['capek.workspace-policy', 'agent', 'current.workspace-policy', 'agent'],
       ['capek.workspace-tool-discovery', 'agent', 'current.workspace-tool-discovery', 'agent'],
+      ['capek.tool-resolver', 'agent', 'prokopai.tool-resolver', 'agent'],
       ['capek.installed-tool-registry', 'process', 'current.installed-tool-registry', 'process'],
       ['capek.provider-registry', 'process', 'current.provider-registry', 'process'],
       ['capek.scheduler-host', 'process', 'current.scheduler-host', 'process'],
       ['capek.session-search-host', 'process', 'current.session-search-host', 'process'],
     ]);
 
-    // The current agent composition intentionally omits the optional tool
-    // resolver so installed-tool cache resolution runs unchanged.
-    expect(agentScope.optional(capekToolResolverKey)).toBeUndefined();
-    expect(agentServices.some((entry) => entry[0] === 'capek.tool-resolver')).toBe(false);
+    // The built-in tools resolver is provided: built-ins plus installed
+    // tools resolve through the merged scoped resolver.
+    expect(agentScope.optional(capekToolResolverKey)).toBeDefined();
+    expect(agentServices.some((entry) => entry[0] === 'capek.tool-resolver')).toBe(true);
 
     // Diagnostics expose metadata only: no service values, functions, or
     // credential-bearing strings survive serialization.
@@ -328,6 +330,25 @@ describe('C4 coding bundle in the Jean2 composition', () => {
   const STANDARD_CODING_TOOL_NAMES = [
     'retrieve-tool-output',
   ];
+  void STANDARD_CODING_TOOL_NAMES;
+
+  const BUILTIN_BASELINE_TOOL_NAMES = [
+    'apply-patch',
+    'edit',
+    'edit-range',
+    'git-worktree',
+    'glob',
+    'grep',
+    'ls',
+    'multiedit',
+    'question',
+    'read-file',
+    'shell',
+    'todoread',
+    'todowrite',
+    'webfetch',
+    'write-file',
+  ];
 
   afterEach(async () => {
     if (agentScope !== null) {
@@ -340,7 +361,7 @@ describe('C4 coding bundle in the Jean2 composition', () => {
     }
   });
 
-  test('exposes the exact standard contributed coding inventory without a scoped resolver', async () => {
+  test('exposes the exact standard contributed coding inventory through the scoped resolver', async () => {
     createRuntime();
 
     const composition = await createJean2RuntimeComposition();
@@ -349,7 +370,7 @@ describe('C4 coding bundle in the Jean2 composition', () => {
 
     const tools = agentScope.listTools();
     expect(tools.map((tool) => tool.definition.name)).toEqual([
-      ...STANDARD_CODING_TOOL_NAMES,
+      'retrieve-tool-output',
       'task',
       'skill',
       'memory',
@@ -359,11 +380,13 @@ describe('C4 coding bundle in the Jean2 composition', () => {
       'scheduler',
       'agent_memory',
       'agent_skill_manage',
+      ...BUILTIN_BASELINE_TOOL_NAMES,
     ]);
     for (const tool of tools) {
       expect(tool.visible).toBe(true);
       expect(
-        tool.pluginId === 'current.tool-output-policy'
+        tool.pluginId === 'prokopai.builtin-tools'
+        || tool.pluginId === 'current.tool-output-policy'
         || tool.pluginId === 'current.session-search-domain'
         || tool.pluginId === 'current.scheduler-domain'
         || tool.pluginId === 'current.subagent-domain'
@@ -373,9 +396,9 @@ describe('C4 coding bundle in the Jean2 composition', () => {
       ).toBe(true);
     }
 
-    // The Jean2 representation keeps the installed-tool registry fallback:
-    // no scoped tool resolver replaces installed external tool resolution.
-    expect(agentScope.optional(capekToolResolverKey)).toBeUndefined();
+    // The merged scoped resolver is provided: built-ins plus installed
+    // external tools resolve through it.
+    expect(agentScope.optional(capekToolResolverKey)).toBeDefined();
   });
 });
 

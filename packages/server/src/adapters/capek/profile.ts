@@ -1,6 +1,7 @@
 /** The Jean2 server composition profile and its exact plugin inventory. */
 
 import type { CapekPlugin } from '@capekai/core/composition';
+import { builtinToolsAgentPlugins } from './tool-resolver';
 import {
   compactionPolicyPlugin,
   contextSourcesValuePlugin,
@@ -53,6 +54,8 @@ export const JEAN2_PROCESS_PLUGIN_IDS = [
 ] as const;
 
 export const JEAN2_AGENT_PLUGIN_IDS = [
+  'prokopai.builtin-tools',
+  'prokopai.tool-resolver',
   'current.storage',
   'current.runtime-configuration',
   'current.runtime-host',
@@ -88,6 +91,7 @@ export function jean2ProcessPlugins(): readonly CapekPlugin<unknown>[] {
 
 export function jean2AgentPlugins(): readonly CapekPlugin<unknown>[] {
   return [
+    ...builtinToolsAgentPlugins(),
     storageValuePlugin('current.storage', getStorage()),
     runtimeConfigurationValuePlugin('current.runtime-configuration', getRuntimeConfiguration()),
     runtimeHostValuePlugin('current.runtime-host', getRuntimeHost()),

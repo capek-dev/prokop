@@ -323,16 +323,16 @@ const layerRules: DependencyRule[] = [
   },
   {
     name: 'layer-infrastructure',
-    rationale: 'Infrastructure implements ports. It may import domains and application ports but not transport route handlers.',
+    rationale: 'Infrastructure implements ports. It may import domains and application ports but not transport route handlers. The built-in tools catalog is a server-internal asset leaf (installer collision guard).',
     appliesTo: [infrastructureDir],
-    allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir, adaptersCapekDir],
+    allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir, adaptersCapekDir, builtinToolsDir],
     exceptions: layerInfrastructureExceptions,
   },
   {
     name: 'layer-adapters',
-    rationale: 'Adapters translate Capek contracts and Jean2 ports. Transport-owned implementation exceptions are explicit and documented; new unrelated imports fail.',
+    rationale: 'Adapters translate Capek contracts and Jean2 ports. Transport-owned implementation exceptions are explicit and documented; the built-in tools catalog is a server-internal asset leaf (resolver and catalog seam).',
     appliesTo: [adaptersDir],
-    allowedResolvedDirs: [adaptersDir, applicationDir, domainsDir],
+    allowedResolvedDirs: [adaptersDir, applicationDir, domainsDir, builtinToolsDir],
     exceptions: layerAdaptersLegacyExceptions,
   },
   {

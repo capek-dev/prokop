@@ -8,12 +8,6 @@ import {
   jean2PreconfigSource,
 } from '@/adapters/capek/context-sources';
 import type { AgentsApplication } from '@/application/agents';
-import {
-  getDefaultPreconfig,
-  getPreconfig,
-  listPreconfigs,
-  listSubagentPreconfigs,
-} from '@/infrastructure/config/preconfig';
 import { getGlobalAgentsPath } from '@/infrastructure/runtime/paths';
 
 function makeAgentsApplication(calls: string[]): AgentsApplication {
@@ -77,13 +71,14 @@ describe('Čapek context source adapters', () => {
     expect(Object.keys(jean2PreconfigSource).sort()).toEqual(
       ['get', 'getDefault', 'getForAgent', 'list', 'listSubagents'].sort(),
     );
-    expect(jean2PreconfigSource.get).toBe(getPreconfig);
-    expect(jean2PreconfigSource.getDefault).toBe(getDefaultPreconfig);
-    expect(jean2PreconfigSource.list).toBe(listPreconfigs);
-    expect(jean2PreconfigSource.listSubagents).toBe(listSubagentPreconfigs);
+    // Infrastructure operations stay delegated (no agents calls yet); the
+    // retrieval-tool append (facade semantics for the scoped resolver)
+    // applies to the agent-lookup path this test controls.
     expect(calls).toEqual([]);
 
-    expect(await jean2PreconfigSource.getForAgent('coder')).toMatchObject({ id: 'coder', systemPrompt: 'PROMPT' });
+    const preconfig = await jean2PreconfigSource.getForAgent('coder');
+    expect(preconfig).toMatchObject({ id: 'coder', systemPrompt: 'PROMPT' });
+    expect(preconfig?.tools).toContain('retrieve-tool-output');
     expect(calls).toEqual(['preconfig:coder']);
   });
 

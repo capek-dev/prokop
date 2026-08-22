@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, r
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { resolveToolsPath, getDefaultToolsPath } from '@/config';
+import { isBuiltinToolName } from '@/tools/builtin';
 import { clearCache as clearToolsCache, downloadArtifact, verifyChecksum, extractArtifact, validateArtifactStructure, ArtifactError, readInstallManifest, writeInstallManifest, loadToolModule } from '@/adapters/capek/contracts';
 import {
   buildSourceInstallManifest,
@@ -128,6 +129,15 @@ export async function installTool(
       success: false,
       toolName: '',
       error: message,
+      stage: 'validate',
+    };
+  }
+
+  if (isBuiltinToolName(toolName)) {
+    return {
+      success: false,
+      toolName,
+      error: `"${toolName}" is a built-in tool. Built-ins always win; an installed copy of the same name would be shadowed. Pick a different tool name.`,
       stage: 'validate',
     };
   }
@@ -276,6 +286,15 @@ export async function installToolFromUrl(
         success: false,
         toolName,
         error: err instanceof Error ? err.message : String(err),
+        stage: 'validate',
+      };
+    }
+
+    if (isBuiltinToolName(resolvedToolName)) {
+      return {
+        success: false,
+        toolName: resolvedToolName,
+        error: `"${resolvedToolName}" is a built-in tool. Built-ins always win; an installed copy of the same name would be shadowed. Pick a different tool name.`,
         stage: 'validate',
       };
     }

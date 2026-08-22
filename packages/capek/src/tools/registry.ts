@@ -152,8 +152,16 @@ export async function scanTools(toolsPath: string | null = getDefaultToolsPath()
   return tools;
 }
 
-async function ensureScanned(): Promise<void> {
-  if (Date.now() - lastScanTime >= CACHE_TTL) await scanTools();
+let ensureScannedPromise: Promise<void> | null = null;
+
+function ensureScanned(): Promise<void> {
+  if (Date.now() - lastScanTime < CACHE_TTL) return Promise.resolve();
+  if (ensureScannedPromise === null) {
+    ensureScannedPromise = scanTools().then(() => undefined).finally(() => {
+      ensureScannedPromise = null;
+    });
+  }
+  return ensureScannedPromise;
 }
 
 export async function getTool(name: string): Promise<LoadedTool | null> {
@@ -168,6 +176,28 @@ export async function listTools(): Promise<ToolDefinition[]> {
   if (resolver) return resolver.list().map((loaded) => loaded.definition);
   await ensureScanned();
   return [...toolsCache.values()].map((loaded) => loaded.definition);
+}
+
+/** Synchronous cache read of one installed tool. Ignores any ambient
+ * scoped resolver: this is the dir-scan branch of `getTool`, for
+ * resolver implementations that layer installed tools beneath their
+ * own contributions. Returns null when the cache has not been scanned
+ * (or the name is unknown); callers own ensuring a scan happened. */
+export function getInstalledTool(name: string): LoadedTool | null {
+  return toolsCache.get(name) ?? null;
+}
+
+/** Synchronous snapshot of the installed-tools cache. Ignores any
+ * ambient scoped resolver, like `getInstalledTool`. Empty when the
+ * cache has not been scanned. */
+export function listInstalledTools(): LoadedTool[] {
+  return [...toolsCache.values()];
+}
+
+/** True when the installed-tools cache is empty because no scan has
+ * run yet (as opposed to a genuinely empty tools directory). */
+export function hasUnscannedToolCache(): boolean {
+  return lastScanTime === 0;
 }
 
 export function clearCache(): void {
