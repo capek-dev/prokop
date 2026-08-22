@@ -218,8 +218,24 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
     }, timeout);
   });
 
+  // Abort must settle the race even when the tool ignores its abort signal
+  // (for example a tool blocked on ctx.ask()). Promise.race keeps handlers
+  // on every promise, so a late rejection after settlement cannot surface as
+  // an unhandled rejection.
+  const abortPromise = abortSignal
+    ? new Promise<never>((_, reject) => {
+        if (abortSignal.aborted) {
+          reject(new Error('Tool execution interrupted'));
+          return;
+        }
+        abortSignal.addEventListener('abort', () => reject(new Error('Tool execution interrupted')), { once: true });
+      })
+    : null;
+
   try {
-    const result = await Promise.race([executePromise, timeoutPromise]);
+    const result = await Promise.race(
+      abortPromise ? [executePromise, timeoutPromise, abortPromise] : [executePromise, timeoutPromise],
+    );
     return result;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
