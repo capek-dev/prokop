@@ -1,6 +1,6 @@
 appId: com.prokopai.app
-productName: Prokopai
-copyright: Copyright © 2026 Jean2
+productName: Prokop
+copyright: Copyright © 2026 Prokop
 
 directories:
   output: release
@@ -26,9 +26,9 @@ mac:
   gatekeeperAssess: false
   type: distribution
   extendInfo:
-    NSCameraUsageDescription: Prokopai needs camera access for video calls
-    NSMicrophoneUsageDescription: Prokopai needs microphone access for audio calls
-    NSUserNotificationsUsageDescription: Prokopai needs notification access for alerts
+    NSCameraUsageDescription: Prokop needs camera access for video calls
+    NSMicrophoneUsageDescription: Prokop needs microphone access for audio calls
+    NSUserNotificationsUsageDescription: Prokop needs notification access for alerts
 
 win:
   target:
@@ -43,13 +43,13 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Prokopai
+  shortcutName: Prokop
 
 msi:
   oneClick: false
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Prokopai
+  shortcutName: Prokop
 
 publish:
   provider: github

@@ -20,16 +20,16 @@ describe('PWAUpdateBanner', () => {
     const user = userEvent.setup();
     render(<PWAUpdateBanner />);
 
-    expect(screen.queryByText('Prokopai update ready')).not.toBeInTheDocument();
+    expect(screen.queryByText('Prokop update ready')).not.toBeInTheDocument();
 
     act(() => usePWAUpdateStore.getState().markNeedRefresh());
-    expect(screen.getByText('Prokopai update ready')).toBeInTheDocument();
+    expect(screen.getByText('Prokop update ready')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Later' }));
-    expect(screen.queryByText('Prokopai update ready')).not.toBeInTheDocument();
+    expect(screen.queryByText('Prokop update ready')).not.toBeInTheDocument();
 
     act(() => usePWAUpdateStore.getState().showOnForeground());
-    expect(screen.getByText('Prokopai update ready')).toBeInTheDocument();
+    expect(screen.getByText('Prokop update ready')).toBeInTheDocument();
   });
 
   it('restarts once and disables actions while activation is in progress', async () => {

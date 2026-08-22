@@ -19,8 +19,8 @@ export function PWAUpdateBanner() {
       <Alert className="pointer-events-auto mx-auto max-w-2xl">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <AlertTitle>Prokopai update ready</AlertTitle>
-            <AlertDescription>Restart Prokopai to use the latest version.</AlertDescription>
+            <AlertTitle>Prokop update ready</AlertTitle>
+            <AlertDescription>Restart Prokop to use the latest version.</AlertDescription>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Button variant="ghost" size="sm" onClick={dismiss} disabled={isUpdating}>

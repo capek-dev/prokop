@@ -95,7 +95,7 @@ export function setupUpdater(mainWindow: BrowserWindow): void {
       .showMessageBox(mainWindow, {
         type: 'info',
         title: 'Update Ready',
-        message: `Prokopai  has been downloaded.`,
+        message: `Prokop ${info.version} has been downloaded.`,
         detail: 'The update will be installed when you restart the application.',
         buttons: ['Restart Now', 'Later'],
         defaultId: 0,
