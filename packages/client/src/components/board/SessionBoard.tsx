@@ -65,8 +65,11 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
 
   useBoardSessionLoader(sdkClient, connected);
 
-  // Track container width with proper cleanup
-  const [containerWidth, setContainerWidth] = useState(0);
+  // Track only the derived column budget: during animated panel transitions the
+  // raw width changes every frame, but floor(width/MIN_PANE_WIDTH) almost never
+  // does, so storing the derived integer lets React bail out instead of
+  // re-rendering the whole board per animation frame.
+  const [maxColumns, setMaxColumns] = useState(1);
   const observerRef = useRef<ResizeObserver | null>(null);
   const containerRef = useCallback((node: HTMLDivElement | null) => {
     if (observerRef.current) {
@@ -74,10 +77,11 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
       observerRef.current = null;
     }
     if (node) {
-      setContainerWidth(node.clientWidth);
+      setMaxColumns(Math.max(1, Math.floor(node.clientWidth / MIN_PANE_WIDTH)) || 1);
       observerRef.current = new ResizeObserver((entries) => {
         for (const entry of entries) {
-          setContainerWidth(entry.contentRect.width);
+          const next = Math.max(1, Math.floor(entry.contentRect.width / MIN_PANE_WIDTH)) || 1;
+          setMaxColumns(prev => (prev === next ? prev : next));
         }
       });
       observerRef.current.observe(node);
@@ -94,7 +98,6 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
   const showPaneChrome = visiblePaneCount > 1;
   const gridColumnCount = Math.min(visiblePaneCount, MAX_GRID_COLUMNS);
   const gridRowCount = Math.ceil(visiblePaneCount / MAX_GRID_COLUMNS);
-  const maxColumns = containerWidth > 0 ? Math.max(1, Math.floor(containerWidth / MIN_PANE_WIDTH)) : 1;
 
   // Render all panes when the columns required by the two-row layout fit.
   // Otherwise retain every open session and show only the focused pane.
@@ -151,41 +154,24 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
     );
   }
 
-  const renderPane = (sessionId: string, sortable: boolean) => {
-    const pane = (
-      <SessionPane
-        key={sessionId}
-        sessionId={sessionId}
-        sdkClient={sdkClient}
-        serverUrl={serverUrl}
-        isFocused={sessionId === focusedSessionId}
-        isCompact={!showGrid && visiblePaneCount > 1}
-        showPaneChrome={showPaneChrome}
-        onRemoveFromBoard={handleRemoveFromBoard}
-      />
-    );
-
-    if (!sortable) return pane;
-
-    return (
-      <SortableSessionPane key={sessionId} sessionId={sessionId}>
-        {(dragAttributes, dragListeners, setDragActivatorNode) => (
-          <SessionPane
-            sessionId={sessionId}
-            sdkClient={sdkClient}
-            serverUrl={serverUrl}
-            isFocused={sessionId === focusedSessionId}
-            isCompact={false}
-            showPaneChrome={showPaneChrome}
-            onRemoveFromBoard={handleRemoveFromBoard}
-            dragAttributes={dragAttributes}
-            dragListeners={dragListeners}
-            setDragActivatorNode={setDragActivatorNode}
-          />
-        )}
-      </SortableSessionPane>
-    );
-  };
+  const renderPane = (sessionId: string, isCompact: boolean) => (
+    <SortableSessionPane key={sessionId} sessionId={sessionId}>
+      {(dragAttributes, dragListeners, setDragActivatorNode) => (
+        <SessionPane
+          sessionId={sessionId}
+          sdkClient={sdkClient}
+          serverUrl={serverUrl}
+          isFocused={sessionId === focusedSessionId}
+          isCompact={isCompact}
+          showPaneChrome={showPaneChrome}
+          onRemoveFromBoard={handleRemoveFromBoard}
+          dragAttributes={dragAttributes}
+          dragListeners={dragListeners}
+          setDragActivatorNode={setDragActivatorNode}
+        />
+      )}
+    </SortableSessionPane>
+  );
 
   // Grid mode: all panes fit
   if (showGrid) {
@@ -204,7 +190,7 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
               gridTemplateRows: `repeat(${gridRowCount}, minmax(0, 1fr))`,
             }}
           >
-            {openSessionIds.map(sessionId => renderPane(sessionId, true))}
+            {openSessionIds.map(sessionId => renderPane(sessionId, false))}
           </div>
         </SortableContext>
       </DndContext>
@@ -229,7 +215,7 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
               focusedSessionId={focusId}
             />
           )}
-          {renderPane(focusId, false)}
+          {renderPane(focusId, true)}
         </div>
       </SortableContext>
     </DndContext>

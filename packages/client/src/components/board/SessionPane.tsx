@@ -8,8 +8,8 @@ import { ChatLoadingState } from '@/components/shared/LoadingSkeleton';
 import { Button } from '@/components/ui/button';
 import { useSessionStore, type SessionNavigationIntent } from '@/stores/sessionStore';
 import { useAskStore } from '@/stores/askStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useSessionCommands } from '@/contexts/SessionCommandsContext';
-import { useSessionManager } from '@/contexts/SessionManagerContext';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useBoardFocus } from '@/hooks/useBoardFocus';
@@ -52,7 +52,6 @@ export function SessionPane({
   dragListeners,
   setDragActivatorNode,
 }: SessionPaneProps) {
-  const sessionManager = useSessionManager();
   const commands = useSessionCommands();
 
   const session = useSessionStore(s => s.sessions.find(sess => sess.id === sessionId));
@@ -62,14 +61,12 @@ export function SessionPane({
   const compactionSuccess = useSessionStore(s => s.compactionSuccessBySessionId[sessionId] ?? false);
   const navigationIntent = useSessionStore(s => s.navigationIntentBySessionId[sessionId] ?? DEFAULT_NAV_INTENT);
   const queuedMessages = useSessionStore(s => s.queuedMessages[sessionId] ?? EMPTY_QUEUE);
-  const modelBySessionId = useSessionStore(s => s.modelBySessionId);
-  const allPendingRequests = useAskStore(s => s.pendingRequests);
+  const sessionModel = useSessionStore(s => s.modelBySessionId[sessionId] ?? s.sessions.find(sess => sess.id === sessionId)?.selectedModel ?? '');
+  const pendingAskRequests = useAskStore(
+    useShallow(s => s.pendingRequests.filter(r => r.sessionId === sessionId || r.originSessionId === sessionId)),
+  );
   const prompts = useServerDataStore(s => s.prompts);
   const models = useServerDataStore(s => s.models);
-  const pendingAskRequests = useMemo(
-    () => allPendingRequests.filter(r => r.sessionId === sessionId || r.originSessionId === sessionId),
-    [allPendingRequests, sessionId],
-  );
 
   // Pane-scoped pinned messages: resolve the session's workspaceId and
   // query pin state for that workspace. Each pane builds its own pin set,
@@ -156,9 +153,7 @@ export function SessionPane({
   }, [commands, sessionId]);
 
   const isCompacting = session?.compacting ?? false;
-  const streamingSessionIds = useConnectionStore(s => s.streamingSessionIds);
-  const isStreaming = streamingSessionIds.has(sessionId) || !!session?.runningAt;
-  const sessionModel = modelBySessionId[sessionId] ?? session?.selectedModel ?? '';
+  const isStreaming = useConnectionStore(s => s.streamingSessionIds.has(sessionId)) || !!session?.runningAt;
   const sessionModelInfo = models.find(m => m.id === sessionModel);
   const modelSupportsImage = sessionModelInfo?.capabilities?.input?.image ?? false;
   const targetMessageId = navigationIntent.mode === 'target-message' ? navigationIntent.messageId : null;
@@ -186,7 +181,7 @@ export function SessionPane({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => sessionManager.resumeSession(sessionId)}
+            onClick={() => commands.resumeSession(sessionId)}
           >
             <RefreshCw className="size-3" />
             Retry
@@ -205,7 +200,7 @@ export function SessionPane({
           onRemoveFromQueue={commands.removeFromQueue}
           pendingAskRequests={pendingAskRequests}
           onAskResponse={commands.handleAskResponse}
-          onNavigateToSubagent={sessionManager.resumeSession}
+          onNavigateToSubagent={commands.resumeSession}
           isStreaming={isStreaming}
           onInterrupt={handleInterrupt}
           onRevert={commands.revertSession}

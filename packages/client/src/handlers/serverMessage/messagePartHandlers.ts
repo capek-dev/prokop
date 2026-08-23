@@ -9,6 +9,8 @@ import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useChatRetryStore } from '@/stores/chatRetryStore';
 
+export const STREAM_FLUSH_INTERVAL_MS = 75;
+
 const FILE_MUTATING_TOOLS = new Set([
   'edit', 'multiedit', 'write-file', 'apply-patch', 'shell',
 ]);
@@ -257,6 +259,8 @@ export function handlePartAppend(
     addStreamingSession,
     pendingPartAppendsRef,
     partAppendRafRef,
+    partAppendTimeoutRef,
+    lastPartAppendFlushAtRef,
     interruptedSessions,
     flushPendingPartAppends,
     clearCompletion,
@@ -275,11 +279,21 @@ export function handlePartAppend(
     const existing = pendingPartAppendsRef.current.get(partId);
     pendingPartAppendsRef.current.set(partId, (existing || '') + delta);
 
-    // Flush on next animation frame — no throttle batching.
-    if (partAppendRafRef.current === null) {
-      partAppendRafRef.current = requestAnimationFrame(() => {
-        flushPendingPartAppends();
-      });
+    // Throttle store flushes: leading flush when the interval elapsed, then a
+    // single trailing timer. Keeps streaming markdown re-parses off the 60fps
+    // frame budget; message completion paths still flush immediately.
+    if (partAppendRafRef.current === null && partAppendTimeoutRef.current === null) {
+      const elapsed = Date.now() - lastPartAppendFlushAtRef.current;
+      if (elapsed >= STREAM_FLUSH_INTERVAL_MS) {
+        partAppendRafRef.current = requestAnimationFrame(() => {
+          flushPendingPartAppends();
+        });
+      } else {
+        partAppendTimeoutRef.current = window.setTimeout(() => {
+          partAppendTimeoutRef.current = null;
+          flushPendingPartAppends();
+        }, STREAM_FLUSH_INTERVAL_MS - elapsed);
+      }
     }
   }
 }

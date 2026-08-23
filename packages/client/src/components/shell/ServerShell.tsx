@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { useParams, useRouter, Outlet } from '@tanstack/react-router';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -6,7 +6,7 @@ import { useServerContext } from '@/contexts/ServerContext';
 import { ViewRefsContext } from '@/contexts/ViewRefsContext';
 import { SessionManagerContext } from '@/contexts/SessionManagerContext';
 import { ServerClientProvider, useServerClientMemo } from '@/contexts/ServerClientContext';
-import { SessionCommandsProvider } from '@/contexts/SessionCommandsContext';
+import { SessionCommandsProvider, type SessionCommandsValue } from '@/contexts/SessionCommandsContext';
 import {
   SessionPaneRegistryContext,
   type SessionPaneHandle,
@@ -71,14 +71,14 @@ export default function ServerShell() {
     sessionsPanelWidth: s.sessionsPanelWidth,
   })));
 
-  const viewRefs = {
+  const viewRefs = useMemo(() => ({
     sidebarRef,
     chatInputRef,
     terminalPanelRef,
     filesPanelRef,
     scrollToBottomRef,
     autoFollowToggleRef,
-  };
+  }), []);
 
   const serverClientValue = useServerClientMemo(
     sessionManager.sdkClient,
@@ -86,6 +86,62 @@ export default function ServerShell() {
     sessionManager.apiToken,
     sessionManager.connected,
   );
+
+  // Commands context holds action functions only. The manager object and its
+  // functions get new identities on every store change; delegating through a ref
+  // keeps the context value stable so command consumers (SessionPane, headers,
+  // inputs) never re-render from reactive session state changes.
+  const sessionManagerRef = useRef(sessionManager);
+  useEffect(() => {
+    sessionManagerRef.current = sessionManager;
+  });
+  const commandsValue = useMemo(() => {
+    const manager = () => sessionManagerRef.current;
+    return {
+      createSession: (...args: Parameters<SessionCommandsValue['createSession']>) => manager().createSession(...args),
+      resumeSession: (...args: Parameters<SessionCommandsValue['resumeSession']>) => manager().resumeSession(...args),
+      openAlongside: (...args: Parameters<SessionCommandsValue['openAlongside']>) => manager().openAlongside(...args),
+      closeSession: (...args: Parameters<SessionCommandsValue['closeSession']>) => manager().closeSession(...args),
+      reopenSession: (...args: Parameters<SessionCommandsValue['reopenSession']>) => manager().reopenSession(...args),
+      permanentlyDeleteSession: (...args: Parameters<SessionCommandsValue['permanentlyDeleteSession']>) => manager().permanentlyDeleteSession(...args),
+      handleRenameSession: (...args: Parameters<SessionCommandsValue['handleRenameSession']>) => manager().handleRenameSession(...args),
+      regenerateSessionTitle: (...args: Parameters<SessionCommandsValue['regenerateSessionTitle']>) => manager().regenerateSessionTitle(...args),
+      revertSession: (...args: Parameters<SessionCommandsValue['revertSession']>) => manager().revertSession(...args),
+      forkSession: (...args: Parameters<SessionCommandsValue['forkSession']>) => manager().forkSession(...args),
+      editMessage: (...args: Parameters<SessionCommandsValue['editMessage']>) => manager().editMessage(...args),
+      compactSession: (...args: Parameters<SessionCommandsValue['compactSession']>) => manager().compactSession(...args),
+      removeFromQueue: (...args: Parameters<SessionCommandsValue['removeFromQueue']>) => manager().removeFromQueue(...args),
+      sendChatMessage: (...args: Parameters<SessionCommandsValue['sendChatMessage']>) => manager().sendChatMessage(...args),
+      sendChatMessageForSession: (...args: Parameters<SessionCommandsValue['sendChatMessageForSession']>) => manager().sendChatMessageForSession(...args),
+      handleAskResponse: (...args: Parameters<SessionCommandsValue['handleAskResponse']>) => manager().handleAskResponse(...args),
+      handleInterruptSession: (...args: Parameters<SessionCommandsValue['handleInterruptSession']>) => manager().handleInterruptSession(...args),
+      handleInterruptSessionById: (...args: Parameters<SessionCommandsValue['handleInterruptSessionById']>) => manager().handleInterruptSessionById(...args),
+      updateSessionPreconfig: (...args: Parameters<SessionCommandsValue['updateSessionPreconfig']>) => manager().updateSessionPreconfig(...args),
+      updateSessionPreconfigForSession: (...args: Parameters<SessionCommandsValue['updateSessionPreconfigForSession']>) => manager().updateSessionPreconfigForSession(...args),
+      updateSessionModel: (...args: Parameters<SessionCommandsValue['updateSessionModel']>) => manager().updateSessionModel(...args),
+      updateSessionModelForSession: (...args: Parameters<SessionCommandsValue['updateSessionModelForSession']>) => manager().updateSessionModelForSession(...args),
+      updateSessionVariant: (...args: Parameters<SessionCommandsValue['updateSessionVariant']>) => manager().updateSessionVariant(...args),
+      updateSessionVariantForSession: (...args: Parameters<SessionCommandsValue['updateSessionVariantForSession']>) => manager().updateSessionVariantForSession(...args),
+      handleNavigateBack: () => manager().handleNavigateBack(),
+      selectWorkspace: (...args: Parameters<SessionCommandsValue['selectWorkspace']>) => manager().selectWorkspace(...args),
+      renameWorkspace: (...args: Parameters<SessionCommandsValue['renameWorkspace']>) => manager().renameWorkspace(...args),
+      updateWorkspacePaths: (...args: Parameters<SessionCommandsValue['updateWorkspacePaths']>) => manager().updateWorkspacePaths(...args),
+      updateWorkspaceSettings: (...args: Parameters<SessionCommandsValue['updateWorkspaceSettings']>) => manager().updateWorkspaceSettings(...args),
+      handleCreateVirtualWorkspace: () => manager().handleCreateVirtualWorkspace(),
+      handleCreatePhysicalWorkspace: (...args: Parameters<SessionCommandsValue['handleCreatePhysicalWorkspace']>) => manager().handleCreatePhysicalWorkspace(...args),
+      deleteWorkspace: (...args: Parameters<SessionCommandsValue['deleteWorkspace']>) => manager().deleteWorkspace(...args),
+      createSessionInWorkspace: (...args: Parameters<SessionCommandsValue['createSessionInWorkspace']>) => manager().createSessionInWorkspace(...args),
+      claimControl: (...args: Parameters<SessionCommandsValue['claimControl']>) => manager().claimControl(...args),
+      releaseControl: (...args: Parameters<SessionCommandsValue['releaseControl']>) => manager().releaseControl(...args),
+      requestTakeover: (...args: Parameters<SessionCommandsValue['requestTakeover']>) => manager().requestTakeover(...args),
+      respondTakeover: (...args: Parameters<SessionCommandsValue['respondTakeover']>) => manager().respondTakeover(...args),
+      handleLogout: () => manager().handleLogout(),
+      handleRetry: () => manager().handleRetry(),
+      refreshPermissions: () => manager().refreshPermissions(),
+      revokePermission: (...args: Parameters<SessionCommandsValue['revokePermission']>) => manager().revokePermission(...args),
+      revokeAllPermissions: (...args: Parameters<SessionCommandsValue['revokeAllPermissions']>) => manager().revokeAllPermissions(...args),
+    } satisfies SessionCommandsValue;
+  }, []);
 
   return (
     <SessionPaneRegistryContext.Provider value={paneRegistry}>
@@ -97,7 +153,7 @@ export default function ServerShell() {
 
           <div className="flex flex-1 min-h-0">
             <SessionManagerContext.Provider value={sessionManager}>
-              <SessionCommandsProvider value={sessionManager}>
+              <SessionCommandsProvider value={commandsValue}>
                 <ViewRefsContext.Provider value={viewRefs}>
                   <Outlet />
                 </ViewRefsContext.Provider>

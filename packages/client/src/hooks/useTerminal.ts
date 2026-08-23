@@ -133,6 +133,7 @@ export function useTerminalConnection(
   const statusRef = useRef<TerminalStatus>('disconnected');
   const disposedRef = useRef(false);
   const connectionGenerationRef = useRef(0);
+  const lastSentDimsRef = useRef<{ cols: number; rows: number } | null>(null);
 
   const onOutputRef = useRef(options.onOutput);
   const onStatusChangeRef = useRef(options.onStatusChange);
@@ -195,6 +196,7 @@ export function useTerminalConnection(
       }
 
       connectionRef.current = connection;
+      lastSentDimsRef.current = null;
 
       let isRestoringReplay = connection.isReconnect;
       let replayFallback: ReturnType<typeof setTimeout> | null = null;
@@ -294,6 +296,16 @@ export function useTerminalConnection(
         setStatus('connected');
       }
 
+      // Send authoritative client dimensions (fixes resizes dropped while connect was in flight)
+      const terminalNow = terminalRef.current;
+      if (terminalNow && terminalNow.cols > 1 && terminalNow.rows > 1) {
+        const session = connection.session;
+        if (terminalNow.cols !== session.cols || terminalNow.rows !== session.rows) {
+          connection.resize(terminalNow.cols, terminalNow.rows);
+        }
+        lastSentDimsRef.current = { cols: terminalNow.cols, rows: terminalNow.rows };
+      }
+
       // Call onSessionInit with session data
       const session = connection.session;
       onSessionInitRef.current?.({
@@ -331,6 +343,9 @@ export function useTerminalConnection(
     const onResizeDisposable = terminal.onResize(({ cols, rows }: { cols: number; rows: number }) => {
       const connection = connectionRef.current;
       if (!connection || connection.closed) return;
+      const last = lastSentDimsRef.current;
+      if (last && last.cols === cols && last.rows === rows) return;
+      lastSentDimsRef.current = { cols, rows };
       connection.resize(cols, rows);
     });
 
@@ -338,6 +353,7 @@ export function useTerminalConnection(
       onDataDisposable.dispose();
       onResizeDisposable.dispose();
       disposedRef.current = true;
+      lastSentDimsRef.current = null;
       const connection = connectionRef.current;
       if (connection) {
         connection.removeAllListeners();

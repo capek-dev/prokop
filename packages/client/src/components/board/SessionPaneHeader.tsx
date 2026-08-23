@@ -46,12 +46,11 @@ export function SessionPaneHeader({
   const commands = useSessionCommands();
 
   const session = useSessionStore(s => s.sessions.find(sess => sess.id === sessionId) as Session | undefined);
-  const usageBySessionId = useSessionStore(s => s.usageBySessionId);
-  const modelBySessionId = useSessionStore(s => s.modelBySessionId);
-  const variantBySessionId = useSessionStore(s => s.variantBySessionId);
+  const sessionUsage = useSessionStore(s => s.usageBySessionId[sessionId]);
+  const currentModel = useSessionStore(s => s.modelBySessionId[sessionId]);
+  const selectedVariant = useSessionStore(s => s.variantBySessionId[sessionId]);
   const sessionMessages = useSessionStore(s => s.messagesBySession[sessionId]);
-  const streamingSessionIds = useConnectionStore(s => s.streamingSessionIds);
-
+  const isStreaming = useConnectionStore(s => s.streamingSessionIds.has(sessionId));
   const allPreconfigs = useServerDataStore(s => s.preconfigs);
   const models = useServerDataStore(s => s.models) as Model[];
   const defaultModel = useServerDataStore(s => s.defaultModel);
@@ -74,7 +73,9 @@ export function SessionPaneHeader({
 
   if (!session) return null;
 
-  const sessionUsage = usageBySessionId[sessionId] ?? {
+  const headerStreaming = isStreaming || !!session.runningAt;
+
+  const usage = sessionUsage ?? {
     promptTokens: 0,
     completionTokens: 0,
     totalTokens: 0,
@@ -82,8 +83,6 @@ export function SessionPaneHeader({
     cacheWriteTokens: 0,
     noCacheTokens: 0,
   };
-  const currentModel = modelBySessionId[sessionId] ?? '';
-  const selectedVariant = variantBySessionId[sessionId] ?? null;
   const currentModelInfo = models.find(m => m.id === currentModel);
   const compactableMessageCount = (sessionMessages ?? []).filter(m => m.role !== 'system').length;
   const isCompacting = session.compacting ?? false;
@@ -110,7 +109,7 @@ export function SessionPaneHeader({
         preconfigs={preconfigs}
         models={models}
         defaultModel={defaultModel}
-        usage={sessionUsage}
+        usage={usage}
         modelName={currentModel}
         onChangePreconfig={(preconfigId) => commands.updateSessionPreconfigForSession(sessionId, preconfigId)}
         onChangeModel={(modelId, providerId) => commands.updateSessionModelForSession(sessionId, modelId, providerId)}
@@ -121,11 +120,11 @@ export function SessionPaneHeader({
             ? () => commands.resumeSession(session.parentId!)
             : undefined
         }
-        isStreaming={streamingSessionIds.has(sessionId) || !!session.runningAt}
+        isStreaming={headerStreaming}
         onCompact={compactableMessageCount >= 2 ? () => commands.compactSession(sessionId) : undefined}
         isCompacting={isCompacting}
         canCompact={compactableMessageCount >= 2}
-        selectedVariant={selectedVariant}
+        selectedVariant={selectedVariant ?? null}
         variants={currentModelInfo?.variants}
         onClaimControl={commands.claimControl}
         onReleaseControl={commands.releaseControl}

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import type { CachedTerminal } from '@/hooks/useTerminal';
 
+const FIT_DEBOUNCE_MS = 120;
+
 interface TerminalViewProps {
   cachedTerminal: CachedTerminal;
 }
@@ -44,19 +46,31 @@ export function TerminalView({ cachedTerminal }: TerminalViewProps) {
 
     terminal.focus();
 
-    const observer = new ResizeObserver(() => {
-      requestAnimationFrame(() => {
-        try {
-          fitAddon.fit();
-        } catch {
-          // Container might not be visible
-        }
-      });
-    });
+    let fitDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const runDebouncedFit = () => {
+      if (fitDebounceTimer !== null) clearTimeout(fitDebounceTimer);
+      fitDebounceTimer = setTimeout(() => {
+        fitDebounceTimer = null;
+        requestAnimationFrame(() => {
+          try {
+            fitAddon.fit();
+          } catch {
+            // Container might not be visible
+          }
+        });
+      }, FIT_DEBOUNCE_MS);
+    };
+
+    const observer = new ResizeObserver(runDebouncedFit);
     observer.observe(container);
 
     return () => {
       observer.disconnect();
+      if (fitDebounceTimer !== null) {
+        clearTimeout(fitDebounceTimer);
+        fitDebounceTimer = null;
+      }
       if (terminal.element && terminal.element.parentElement) {
         terminal.element.parentElement.removeChild(terminal.element);
       }

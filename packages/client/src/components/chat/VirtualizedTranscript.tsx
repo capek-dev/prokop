@@ -24,6 +24,9 @@ import { cn } from '@/lib/utils';
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 import { StructuredResponse } from '@/components/visualizations';
 import type { PendingAskRequest } from '@/stores/askStore';
+import { splitStreamingText } from './streamingText';
+
+const USER_SCROLL_INPUT_WINDOW_MS = 200;
 
 export interface DisplayItem {
   message: Message;
@@ -172,6 +175,103 @@ function CompactionDivider({ part }: { part: CompactionPart }) {
   );
 }
 
+// Parts that have streamed in this app session keep the streaming render path
+// after completion, so the finished message never remounts into a different
+// tree (which would pop the already-visible text).
+const STREAMED_PART_IDS = new Set<string>();
+
+const MIN_REVEAL_CPS = 12;
+const ACTIVE_CATCHUP_S = 0.45;
+const DONE_CATCHUP_S = 0.25;
+
+const StreamBlock = memo(function StreamBlock({ block }: { block: string }) {
+  return <MarkdownRenderer>{block}</MarkdownRenderer>;
+});
+
+/**
+ * Reveals `text` at a steady character rate via rAF instead of jumping per
+ * network flush. Mounts snapped to the current text (no replay); afterwards
+ * new arrivals drain within a small catch-up window so the visible text never
+ * lags far behind. Same renderer for tail and blocks, so a block graduating
+ * from tail to stable is pixel-identical (no typography pop).
+ */
+function useRevealedLength(text: string, active: boolean): number {
+  const [revealed, setRevealed] = useState(() => text.length);
+  const revealedRef = useRef(revealed);
+  const targetRef = useRef(text.length);
+  const activeRef = useRef(active);
+
+  useEffect(() => {
+    targetRef.current = text.length;
+    activeRef.current = active;
+
+    if (targetRef.current < revealedRef.current) {
+      // Text replaced wholesale (edit/revert): snap to it.
+      revealedRef.current = targetRef.current;
+      setRevealed(targetRef.current);
+      return;
+    }
+    if (targetRef.current === revealedRef.current) return;
+
+    let raf = 0;
+    let last = performance.now();
+    const step = (now: number) => {
+      const dt = Math.max(0, (now - last) / 1000);
+      last = now;
+      const backlog = targetRef.current - revealedRef.current;
+      if (backlog <= 0) return;
+      const catchUpS = activeRef.current ? ACTIVE_CATCHUP_S : DONE_CATCHUP_S;
+      const rate = Math.max(MIN_REVEAL_CPS, backlog / catchUpS);
+      const next = Math.min(
+        targetRef.current,
+        revealedRef.current + Math.max(1, Math.round(rate * dt)),
+      );
+      revealedRef.current = next;
+      setRevealed(next);
+      if (next < targetRef.current) {
+        raf = requestAnimationFrame(step);
+      }
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [text, active]);
+
+  return Math.min(revealed, text.length);
+}
+
+function StreamingText({ text, active }: { text: string; active: boolean }) {
+  const revealed = useRevealedLength(text, active);
+  // Frozen first-render flag: a fresh mount of already-complete text skips the
+  // block split and renders once (identical visuals, single parse).
+  const [mountedInactive] = useState(!active);
+
+  if (!active && mountedInactive && revealed >= text.length) {
+    return <MarkdownRenderer>{text}</MarkdownRenderer>;
+  }
+
+  const visible = text.slice(0, revealed);
+  const { blocks, tail } = splitStreamingText(visible);
+
+  return (
+    <div className="min-w-0">
+      {blocks.map((block, index) => (
+        <StreamBlock key={`${index}:${block.length}`} block={block} />
+      ))}
+      {tail && <MarkdownRenderer>{tail}</MarkdownRenderer>}
+    </div>
+  );
+}
+
+/**
+ * Reasoning streams through the same reveal cadence as text. It renders as a
+ * plain text node (no markdown), so the reveal is the only thing needed to
+ * avoid word-chunk jumps between 75ms store flushes.
+ */
+function StreamingReasoning({ text, active }: { text: string; active: boolean }) {
+  const revealed = useRevealedLength(text, active);
+  return <>{text.slice(0, revealed)}</>;
+}
+
 const MessageParts = memo(function MessageParts({
   sessionId,
   parts,
@@ -179,6 +279,7 @@ const MessageParts = memo(function MessageParts({
   onAskResponse,
   onNavigateToSubagent,
   inverted = false,
+  isStreaming = false,
   serverUrl,
 }: {
   sessionId: string;
@@ -187,6 +288,7 @@ const MessageParts = memo(function MessageParts({
   onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   onNavigateToSubagent?: (sessionId: string) => void;
   inverted?: boolean;
+  isStreaming?: boolean;
   serverUrl?: string;
 }) {
   return (
@@ -197,9 +299,15 @@ const MessageParts = memo(function MessageParts({
             const text = inverted && part.text
               ? formatInvertedText(part.text)
               : (part.text || '...');
+            if (isStreaming && !inverted) STREAMED_PART_IDS.add(part.id);
+            const streamingPath = !inverted && (isStreaming || STREAMED_PART_IDS.has(part.id));
             return (
               <div key={part.id} className="min-w-0">
-                <MarkdownRenderer inverted={inverted}>{text}</MarkdownRenderer>
+                {streamingPath ? (
+                  <StreamingText text={text} active={isStreaming} />
+                ) : (
+                  <MarkdownRenderer inverted={inverted}>{text}</MarkdownRenderer>
+                )}
               </div>
             );
           }
@@ -210,7 +318,7 @@ const MessageParts = memo(function MessageParts({
                 key={part.id}
                 className="visualization-container text-muted-foreground text-sm italic border-l-2 border-muted-foreground/30 pl-3 my-2 wrap-break-word"
               >
-                {part.text}
+                <StreamingReasoning text={part.text} active={isStreaming} />
               </div>
             );
 
@@ -288,6 +396,7 @@ const MessageParts = memo(function MessageParts({
   if (prev.sessionId !== next.sessionId) return false;
   if (prev.parts !== next.parts) return false;
   if (prev.inverted !== next.inverted) return false;
+  if (prev.isStreaming !== next.isStreaming) return false;
   if (prev.onNavigateToSubagent !== next.onNavigateToSubagent) return false;
   if (prev.serverUrl !== next.serverUrl) return false;
 
@@ -480,6 +589,7 @@ const MessageRow = memo(function MessageRow({
             onAskResponse={onAskResponse}
             onNavigateToSubagent={onNavigateToSubagent}
             inverted={item.message.role === 'user' && !item.isQueued}
+            isStreaming={isAssistantMessage(item.message) && item.message.status === 'streaming'}
             serverUrl={serverUrl}
           />
         )}
@@ -567,6 +677,7 @@ export function VirtualizedTranscript({
   const followScrollRafRef = useRef<number | null>(null);
   const followScrollTimeoutRef = useRef<number | null>(null);
   const targetMessageIdRef = useRef(targetMessageId);
+  const lastUserScrollAtRef = useRef(0);
 
   const [maintainAutoFollow, setMaintainAutoFollow] = useState(autoFollow);
   const onAutoScrollChangeRef = useRef(onAutoScrollChange);
@@ -690,32 +801,61 @@ export function VirtualizedTranscript({
     if (!scrollEl) return;
 
     let touchStartY = 0;
+    let scrollbarDragging = false;
+
+    const markUserScrollInput = () => {
+      lastUserScrollAtRef.current = Date.now();
+    };
 
     const onWheel = (event: WheelEvent) => {
+      markUserScrollInput();
       if (event.deltaY < 0) {
         disableAutoFollowForUserIntent();
       }
     };
 
     const onTouchStart = (event: TouchEvent) => {
+      markUserScrollInput();
       touchStartY = event.touches[0]?.clientY ?? 0;
     };
 
     const onTouchMove = (event: TouchEvent) => {
+      markUserScrollInput();
       const currentY = event.touches[0]?.clientY ?? 0;
       if (currentY > touchStartY + 5) {
         disableAutoFollowForUserIntent();
       }
     };
 
+    const onMouseDown = (_event: MouseEvent) => {
+      markUserScrollInput();
+      scrollbarDragging = true;
+    };
+
+    const onMouseMove = () => {
+      if (scrollbarDragging) {
+        markUserScrollInput();
+      }
+    };
+
+    const onMouseUp = () => {
+      scrollbarDragging = false;
+    };
+
     scrollEl.addEventListener('wheel', onWheel, { passive: true });
     scrollEl.addEventListener('touchstart', onTouchStart, { passive: true });
     scrollEl.addEventListener('touchmove', onTouchMove, { passive: true });
+    scrollEl.addEventListener('mousedown', onMouseDown, { passive: true });
+    window.addEventListener('mousemove', onMouseMove, { passive: true });
+    window.addEventListener('mouseup', onMouseUp, { passive: true });
 
     return () => {
       scrollEl.removeEventListener('wheel', onWheel);
       scrollEl.removeEventListener('touchstart', onTouchStart);
       scrollEl.removeEventListener('touchmove', onTouchMove);
+      scrollEl.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
     };
   }, [disableAutoFollowForUserIntent]);
 
@@ -758,7 +898,11 @@ export function VirtualizedTranscript({
     }
 
     if (state.isAtEnd || state.isWithinMaintainScrollAtEndThreshold) {
-      if (!autoScrollRef.current) {
+      // Re-enable follow only on user-driven scrolls (wheel, touch, scrollbar drag).
+      // LegendList's internal MVCP corrections use el.scrollBy, which also emits scroll
+      // events; treating those as user intent silently re-enables follow on panel toggles.
+      const isUserDriven = Date.now() - lastUserScrollAtRef.current < USER_SCROLL_INPUT_WINDOW_MS;
+      if (!autoScrollRef.current && isUserDriven) {
         autoScrollRef.current = true;
         setMaintainAutoFollow(true);
         onAutoScrollChangeRef.current?.(true);
