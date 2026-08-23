@@ -1,6 +1,5 @@
 {
   "tools": [
-    "apply-patch",
     "browser-discover-elements",
     "browser-dom-action",
     "browser-navigate",
@@ -11,11 +10,7 @@
     "discord-list-guilds",
     "discord-read-messages",
     "discord-send-message",
-    "edit",
-    "edit-range",
     "file-to-markdown",
-    "glob",
-    "git-worktree",
     "gmail-draft",
     "gmail-labels",
     "gmail-labels-manage",
@@ -23,19 +18,9 @@
     "gmail-read",
     "gmail-search",
     "gmail-send",
-    "grep",
-    "ls",
-    "multiedit",
-    "question",
-    "read-file",
-    "shell",
     "tavily-crawl",
     "tavily-extract",
     "tavily-map",
-    "tavily-search",
-    "todoread",
-    "todowrite",
-    "webfetch",
-    "write-file"
+    "tavily-search"
   ]
 }

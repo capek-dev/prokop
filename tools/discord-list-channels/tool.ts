@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 
 interface ListChannelsInput {
   guildId?: string;

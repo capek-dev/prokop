@@ -349,7 +349,7 @@ tools/                   # External tool modules (independent from main project)
   #   VERSION              # Semantic version
   #   *.test.ts            # Tests (optional, using bun:test + VirtualFS)
   # Tools are separately versioned and distributed via GitHub Releases
-  # Tools use @jean2/sdk ToolModule interface with ctx.ask() for the Ask protocol
+  # Tools use the @capekai/tool ToolModule interface with ctx.ask() for the Ask protocol
 
 changelogs/              # Version changelogs
   client/                # Client release notes
@@ -365,8 +365,6 @@ changelogs/              # Version changelogs
     release.yml          # Server + tools release (cross-platform binaries)
     release-electron.yml # Electron desktop release (macOS + Windows)
     release-browser.yml  # Browser extension release
-    publish-client.yml   # NPM publish for @jean2/client
-    publish-sdk.yml      # NPM publish for @jean2/sdk
     cleanup-releases.yml # Weekly cleanup of old releases
 
 install/                 # Installation scripts and documentation

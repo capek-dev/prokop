@@ -15,7 +15,7 @@
     "sourceMap": false,
     "baseUrl": ".",
     "paths": {
-      "@prokopai/sdk": ["../packages/sdk/src"]
+      "@capekai/tool": ["../packages/capek-tool/src"]
     }
   },
   "include": ["./**/*.ts", "./**/*.d.ts"],

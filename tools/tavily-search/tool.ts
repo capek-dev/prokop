@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 import { tavily } from '@tavily/core';
 
 interface SearchInput {

@@ -1,10 +1,10 @@
 {
   "name": "@jean2/tool-tavily-crawl",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@prokopai/sdk": "^1.4.0",
+    "@capekai/tool": "^1.0.0",
     "@tavily/core": "^0.7.2"
   }
 }

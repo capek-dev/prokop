@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 
 export const definition: ToolDefinition = {
   name: 'browser_navigate',

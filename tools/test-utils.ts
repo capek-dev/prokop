@@ -5,7 +5,7 @@
  * network, or local processes.
  */
 import { mock } from 'bun:test';
-import type { ToolContext, PermissionAsk } from '@prokopai/sdk';
+import type { ToolContext, PermissionAsk } from '@capekai/tool';
 
 export const WORKSPACE = '/workspace/project';
 

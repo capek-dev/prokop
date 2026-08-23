@@ -1,5 +1,4 @@
-import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
-import type { MarkdownVisualization } from '@prokopai/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 import { tavily } from '@tavily/core';
 
 interface Input {
@@ -146,7 +145,7 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
     const _totalResults = results.length + failedResults.length;
     const content = results.map(r => `## ${r.url}\n\n${r.rawContent}`).join('\n\n');
 
-    const visualization: MarkdownVisualization = {
+    const visualization: NonNullable<ToolResult['visualization']> = {
       type: 'markdown',
       content: content || `Extracted content from ${results.length} URL(s). ${failedResults.length} failed.`,
     };

@@ -1,9 +1,9 @@
 {
   "name": "@jean2/tool-browser-navigate",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@prokopai/sdk": "^1.4.0"
+    "@capekai/tool": "^1.0.0"
   }
 }

@@ -199,18 +199,6 @@
         "tavily-map",
         "tavily-extract"
       ]
-    },
-    "TODOS_DB_PATH": {
-      "description": "Custom path for the todos SQLite database. Must be an absolute path.",
-      "sensitive": false,
-      "required": false,
-      "default": "~/.jean2/data/todos.db",
-      "configFile": "~/.jean2/.env",
-      "example": "TODOS_DB_PATH=~/.jean2/data/todos.db",
-      "usedBy": [
-        "todoread",
-        "todowrite"
-      ]
     }
   }
 }

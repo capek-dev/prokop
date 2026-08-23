@@ -1,7 +1,6 @@
 // MIT License — https://github.com/jojomondag/FileToMarkdown
 // Adapted from jojomondag/FileToMarkdown (MIT) — converted per-converter logic ported to TypeScript + Jean2 wrapper
-import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
-import type { NoneVisualization } from '@prokopai/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 import { dirname, join } from 'path';
 
 
@@ -649,7 +648,7 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
     const cacheInfo = fromCache ? ' (from cache)' : '';
 
-    const visualization: NoneVisualization = {
+    const visualization: NonNullable<ToolResult['visualization']> = {
       type: 'none',
       message: `Converted to markdown: ${resolvedPath}${cacheInfo}`,
     };

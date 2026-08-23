@@ -10,7 +10,7 @@
     "test:watch": "bun test --watch"
   },
   "dependencies": {
-    "@prokopai/sdk": "workspace:*",
+    "@capekai/tool": "workspace:*",
     "@tavily/core": "^0.7.2",
     "adm-zip": "^0.5.16",
     "mammoth": "^1.8.0",

@@ -1,9 +1,9 @@
 {
   "name": "@jean2/tool-browser-dom-action",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@prokopai/sdk": "^1.4.0"
+    "@capekai/tool": "^1.0.0"
   }
 }

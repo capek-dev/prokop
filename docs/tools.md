@@ -174,7 +174,7 @@ my-tool/
 ### `tool.ts`
 
 ```typescript
-import type { ToolDefinition, ToolContext, ToolResult } from '@jean2/sdk';
+import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 
 interface Input {
   message: string;
@@ -217,7 +217,9 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 {
   "name": "my-tool",
   "version": "1.0.0",
-  "dependencies": {}
+  "dependencies": {
+    "@capekai/tool": "^1.0.0"
+  }
 }
 ```
 
