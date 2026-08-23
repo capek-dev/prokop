@@ -10,6 +10,7 @@ interface Input {
 export const definition: ToolDefinition = {
   name: 'write-file',
   description: 'Write content to a file, creating it if it doesn\'t exist or overwriting if it does.\n\nIMPORTANT: Always prefer using the edit tool to modify existing files.\n\n## Permission Model\n\nThis tool requires explicit permission for:\n- Files outside the workspace\n- Sensitive files (.env, .pem, .key, credentials, etc.)',
+  display: { summary: '{path}' },
   inputSchema: {
     type: 'object',
     properties: {

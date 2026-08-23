@@ -62,7 +62,7 @@ export interface ToolRepositoryPort {
  * where it resolves from. Built-ins win over same-named installed
  * tools, so a name appears at most once. */
 export type ToolCatalogEntry = ToolDefinition & {
-  source: 'builtin' | 'installed';
+  source: 'builtin' | 'installed' | 'domain';
 };
 
 /** Catalog of installed tools exposed to the tools route. */

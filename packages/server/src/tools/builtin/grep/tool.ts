@@ -1,5 +1,5 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
-import type { NoneVisualization } from '@prokopai/sdk';
+import type { FileListVisualization } from '@prokopai/sdk';
 import ignore from 'ignore';
 import picomatch from 'picomatch';
 
@@ -54,6 +54,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 export const definition: ToolDefinition = {
   name: 'grep',
   description: 'Search for text patterns in files using regular expressions.\n\nWhen to use:\n- Finding code containing specific patterns\n- Searching for function/class definitions\n- Locating usage of variables or imports\n\nWhen NOT to use:\n- Finding files by name: Use glob tool instead\n- Simple file reading: Use read-file tool instead\n\nPattern examples:\n- `function\\s+\\w+` - Function declarations\n- `import.*from` - Import statements\n- `TODO|FIXME` - Todo comments\n- `class \\w+` - Class declarations\n\nUsage:\n- pattern (required): Regex pattern to search for\n- path (required): File or directory to search in. Supports relative paths from workspace, absolute paths, or home paths.\n- include (optional): File pattern to filter (e.g., `*.ts`, `*.{ts,tsx}`). Supports brace expansion, character classes, and extglob via picomatch.\n- ignore (optional): Glob patterns to exclude from results (e.g., `[\\"*.test.ts\\", \\"**/fixtures/**\\"]`).\n\nReturns file paths and line numbers with matching content.',
+  display: { summary: '{pattern}' },
   inputSchema: {
     type: 'object',
     properties: {
@@ -269,13 +270,16 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
     }
 
     const truncated = matches.length >= MAX_MATCHES;
-    const message = truncated
-      ? `Grep: "${input.pattern}" (${matches.length} matches, truncated to ${MAX_MATCHES})`
-      : `Grep: "${input.pattern}" (${matches.length} matches)`;
 
-    const visualization: NoneVisualization = {
-      type: 'none',
-      message,
+    const visualization: FileListVisualization = {
+      type: 'file-list',
+      collapsed: true,
+      badge: truncated
+        ? `${matches.length}+ matches`
+        : `${matches.length} match${matches.length === 1 ? '' : 'es'}`,
+      title: input.pattern,
+      files: matches.slice(0, 50).map((m) => ({ path: m.file, line: m.line })),
+      total: matches.length,
     };
 
     return {

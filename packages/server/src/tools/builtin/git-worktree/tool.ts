@@ -41,6 +41,7 @@ When creating a worktree, the new path is automatically added to the workspace's
 
 - **create**, **list**, **status**: Auto-approved (read/local operations)
 - **remove**: Requires explicit user approval via ctx.ask()`,
+  display: { summary: '{action} {branch}' },
   inputSchema: {
     type: 'object',
     properties: {

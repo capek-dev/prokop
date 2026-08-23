@@ -1,5 +1,5 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
-import type { NoneVisualization } from '@prokopai/sdk';
+import type { FileListVisualization } from '@prokopai/sdk';
 
 interface Input {
   path?: string;
@@ -49,6 +49,7 @@ const IGNORED_NAMES = new Set([
 export const definition: ToolDefinition = {
   name: 'ls',
   description: 'List directory contents with tree formatting.\n\nWhen to use:\n- Exploring project structure for the first time\n- Understanding directory layout\n- Viewing file organization\n\nWhen NOT to use:\n- Finding specific files: Use glob tool instead\n- Searching file contents: Use grep tool instead\n\nParameters:\n- path (optional): Directory to list. Defaults to workspace root.\n- ignore (optional): Additional directory/file names to ignore.\n- showHidden (optional): Show hidden files (dotfiles). Default false.\n\nNote: Output is limited to 100 entries. Common directories (node_modules, .git, dist, build, target, vendor, .venv, coverage, etc.) are automatically hidden.',
+  display: { summary: '{path}' },
   inputSchema: {
     type: 'object',
     properties: {
@@ -216,9 +217,11 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
       content += `\n\n(Showing 100 of ${files.length} entries. Use grep or glob for targeted searching.)`;
     }
 
-    const visualization: NoneVisualization = {
-      type: 'none',
-      message: `Ls: ${input.path || 'workspace'}`,
+    const visualization: FileListVisualization = {
+      type: 'file-list',
+      badge: truncated ? `${files.length}+ entries` : `${files.length} entries`,
+      files: files.slice(0, 50).map((f) => ({ path: f })),
+      total: files.length,
     };
 
     return {

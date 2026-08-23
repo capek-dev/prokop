@@ -52,6 +52,7 @@ This tool requires explicit permission for:
 - Filesystem modifications (mv, cp, mkdir, etc.)
 - Commands outside the workspace
 - Commands with shell operators (|, >, &&, etc.)`,
+  display: { summary: '{command}' },
   inputSchema: {
     type: 'object',
     properties: {

@@ -167,6 +167,7 @@ Returns lists of added, modified, deleted, and moved files, plus the match mode 
 ## Permission model
 
 Every source and destination path is checked before any write. This tool requires explicit permission for paths outside the workspace, sensitive files, and any deletion or move. Editing system directories is blocked entirely.`,
+  display: { summary: '{path}' },
   inputSchema: {
     type: 'object',
     properties: {

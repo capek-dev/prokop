@@ -1,5 +1,5 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
-import type { NoneVisualization } from '@prokopai/sdk';
+import type { NoneVisualization, MarkdownVisualization } from '@prokopai/sdk';
 import { createWebfetchPermissionAsk } from '@prokopai/sdk';
 import TurndownService from 'turndown';
 
@@ -16,6 +16,7 @@ const MAX_TIMEOUT = 120;
 export const definition: ToolDefinition = {
   name: 'webfetch',
   description: 'Fetch content from a URL and convert to readable format.\n\n## Permission Model\n\nThis tool requires explicit permission for:\n- HTTP URLs (unencrypted)\n- Private/localhost IPs (blocked)',
+  display: { summary: '{url}' },
   inputSchema: {
     type: 'object',
     properties: {
@@ -183,10 +184,25 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
       const displayUrl = input.url.length > 80 ? input.url.substring(0, 77) + '...' : input.url;
 
-      const visualization: NoneVisualization = {
-        type: 'none',
-        message: `Fetched: ${displayUrl}`,
-      };
+      const contentIsRenderable =
+        (outputContent.length <= 20_000) &&
+        (contentType.includes('markdown') ||
+          contentType.includes('text/plain') ||
+          (input.format === 'markdown' && contentType.includes('text/html')));
+
+      const visualization = contentIsRenderable
+        ? ({
+            type: 'markdown',
+            badge: `${(outputContent.length / 1024).toFixed(1)} KB`,
+            collapsed: true,
+            content: outputContent.slice(0, 20_000),
+            sourceUrl: input.url,
+          } as MarkdownVisualization)
+        : ({
+            type: 'none',
+            badge: `${(outputContent.length / 1024).toFixed(1)} KB`,
+            message: `Fetched: ${displayUrl}`,
+          } as NoneVisualization);
 
       return {
         success: true,

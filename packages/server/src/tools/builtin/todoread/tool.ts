@@ -8,6 +8,7 @@ import { getDataDir } from '@/infrastructure/runtime/paths';
 export const definition: ToolDefinition = {
   name: 'todoread',
   description: 'Read the current task list for the session from SQLite database.\n\nUsage:\n- Use when starting a new task or when asked to check current progress\n- Useful for tracking multi-step tasks throughout a session\n\nNotes:\n- Returns tasks sorted by priority (high → medium → low), then by creation time\n- Each task has: content, status (pending/in_progress/completed/cancelled), priority (high/medium/low)\n- Use todowrite to update the list',
+  display: { summary: 'todos' },
   inputSchema: {
     type: 'object',
     properties: {},

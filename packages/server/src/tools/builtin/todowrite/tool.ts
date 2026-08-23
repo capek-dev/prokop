@@ -22,6 +22,7 @@ const VALID_PRIORITIES = ['high', 'medium', 'low'];
 export const definition: ToolDefinition = {
   name: 'todowrite',
   description: 'Update the task list for the current session in SQLite database.\n\nUsage:\n- Call with complete new list (replaces existing)\n- Set status to \'in_progress\' for the task currently being worked on\n- Set status to \'completed\' when a task is done\n- Set status to \'cancelled\' for abandoned tasks\n\nParameters:\n- todos (required): Array of { content, status, priority? }\n- content: Brief description of the task\n- status: pending | in_progress | completed | cancelled\n- priority: high | medium (default) | low\n\nWhen to use:\n- Track complex multi-step tasks\n- Show progress to user\n- Mark current work item\n\nWhen NOT to use:\n- Simple single tasks that don\'t need tracking\n- Replace the list unnecessarily',
+  display: { summary: '{todos.length} todos' },
   inputSchema: {
     type: 'object',
     properties: {

@@ -23,6 +23,7 @@ interface Input {
 export const definition: ToolDefinition = {
   name: 'read-file',
   description: 'Read a file or directory from the filesystem.\n\nUsage:\n- The path parameter should be an absolute path.\n- By default, returns up to 2000 lines from the start of the file.\n- The offset parameter is the line number to start from (1-indexed).\n- To read later sections, use a larger offset.\n\n## Revision metadata\n\nRegular-file results include a `revision` (SHA-256 of the complete file content) plus `totalLines`, `offset`, `linesReturned`, and `truncated`. The revision is computed from the untruncated bytes, including line endings and trailing newline state, so it is identical across paginated reads of an unchanged file. Pass the revision to `edit-range` to prove the file has not changed since it was read. Directory reads do not include a revision.\n\n## Permission Model\n\nThis tool requires explicit permission for:\n- Files outside the workspace\n- Sensitive files (.env, .pem, .key, credentials, etc.)',
+  display: { summary: '{path}' },
   inputSchema: {
     type: 'object',
     properties: {
@@ -198,6 +199,7 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
     const visualization: NoneVisualization = {
       type: 'none',
+      badge: `${totalLines} lines`,
       message: `Read: ${resolvedPath}`,
     };
 

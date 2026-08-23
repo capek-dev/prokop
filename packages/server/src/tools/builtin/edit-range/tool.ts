@@ -126,6 +126,7 @@ This tool requires explicit permission for:
 - Files outside the workspace
 - Sensitive files (.env, .pem, .key, credentials, etc.)
 - Editing system directories is blocked entirely`,
+  display: { summary: '{path}' },
   inputSchema: {
     type: 'object',
     properties: {

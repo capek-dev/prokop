@@ -597,6 +597,7 @@ This tool requires explicit permission for:
 - Sensitive files (.env, .pem, .key, credentials, etc.)
 - More than ${MAX_EDITS_WITHOUT_APPROVAL} edits at once
 - Editing system directories is blocked entirely`,
+  display: { summary: '{path}' },
   inputSchema: {
     type: 'object',
     properties: {

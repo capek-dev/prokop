@@ -1,5 +1,5 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
-import type { NoneVisualization } from '@prokopai/sdk';
+import type { FileListVisualization } from '@prokopai/sdk';
 import picomatch from 'picomatch';
 import { scan as scanGlob } from 'picomatch';
 
@@ -43,6 +43,7 @@ const SKIP_DIRS = new Set([
 export const definition: ToolDefinition = {
   name: 'glob',
   description: 'Find files matching a glob pattern. Returns matching file paths sorted by modification time.\n\nWhen to use:\n- Finding files by name patterns (e.g., all TypeScript files)\n- Locating specific file types in a project\n- When you know the directory structure pattern\n\nWhen NOT to use:\n- Searching file contents: Use grep tool instead\n- Exploring unknown structure: Use ls tool instead\n\nPattern examples:\n- `**/*.ts` - All TypeScript files recursively\n- `src/**/*.tsx` - All TSX files in src directory\n- `*.{js,ts}` - All JS and TS files in current directory (brace expansion)\n- `[abc]*.ts` - TS files starting with a, b, or c (character class)\n- `package.json` - Specific file\n- `!(README)*` - Files NOT matching README (extglob)\n\nSupports full Bash-compliant glob features via picomatch:\n- Brace expansion: `*.{js,ts}`, `src/{lib,test}/**`\n- Character classes: `[a-z]`, `[!.]`\n- Extglob: `!(pattern)`, `+(pattern)`, `?(pattern)`, `@(pattern)`\n- Globstar: `**` for recursive directory matching\n- Ignore patterns: exclude matched files from results',
+  display: { summary: '{pattern}' },
   inputSchema: {
     type: 'object',
     properties: {
@@ -163,14 +164,26 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
           return {
             success: true,
             result: { files: [input.pattern] },
-            visualization: { type: 'none', message: `Glob: "${input.pattern}" (1 file)` } as NoneVisualization,
+            visualization: {
+              type: 'file-list',
+              collapsed: true,
+              badge: '1 file',
+              files: [{ path: input.pattern }],
+              total: 1,
+            } as FileListVisualization,
           };
         }
       } catch { /* empty */ }
       return {
         success: true,
         result: { files: [] },
-        visualization: { type: 'none', message: `Glob: "${input.pattern}" (0 files)` } as NoneVisualization,
+        visualization: {
+          type: 'file-list',
+          collapsed: true,
+          badge: '0 files',
+          files: [],
+          total: 0,
+        } as FileListVisualization,
       };
     }
 
@@ -184,9 +197,13 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
     const files = matched.map(f => f.relativePath);
 
-    const visualization: NoneVisualization = {
-      type: 'none',
-      message: `Glob: "${input.pattern}" (${files.length} files)`,
+    const visualization: FileListVisualization = {
+      type: 'file-list',
+      collapsed: true,
+      badge: `${files.length} file${files.length === 1 ? '' : 's'}`,
+      title: input.pattern,
+      files: files.slice(0, 50).map((f) => ({ path: f })),
+      total: files.length,
     };
 
     return {

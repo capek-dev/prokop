@@ -53,6 +53,7 @@ export const definition: ToolDefinition = {
     '- CRITICAL: Each option within a single_select/multi_select MUST have a unique `value` field. ' +
     'Do NOT use empty strings or duplicate values across options — use distinct machine-readable slugs ' +
     '(e.g., "auth", "database", "api") that differ from each other.',
+  display: { summary: '{title}' },
   inputSchema: {
     type: 'object',
     properties: {
