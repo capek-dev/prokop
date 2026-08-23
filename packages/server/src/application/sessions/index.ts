@@ -1,6 +1,7 @@
 import type { SessionExecutionPort } from '../ports/execution';
 import type { ControllerGatePort, SessionControlPort } from '../ports/control';
 import type { AskAuthorityPort, PendingAskPort, SessionRepositoryPort } from '../ports/session';
+import type { ToolCatalogPort } from '../ports/tool-distribution';
 import {
   createSessionChatApplication,
   type SessionChatApplication,
@@ -27,6 +28,7 @@ export interface SessionApplicationDeps<Origin> {
   control: SessionControlPort<Origin>;
   pendingAsks: PendingAskPort;
   askAuthority: AskAuthorityPort;
+  toolCatalog?: Pick<ToolCatalogPort, 'listTools'>;
 }
 
 /**

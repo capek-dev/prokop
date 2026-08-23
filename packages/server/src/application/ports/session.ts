@@ -9,6 +9,7 @@ import type {
   QueuedMessage,
   Session,
   SessionStatus,
+  ToolPart,
 } from '@prokopai/sdk';
 
 /** Structural copies of storage result shapes. The Jean2 repository
@@ -163,6 +164,7 @@ export interface SessionRepositoryPort {
     beforeSequence: number,
     limit: number,
   ): TranscriptPage;
+  getToolPart(sessionId: string, partId: string): ToolPart | null;
   reconcileCompaction(sessionId: string): Promise<number>;
   reconcileOrphanedToolCalls(sessionId: string): number;
 

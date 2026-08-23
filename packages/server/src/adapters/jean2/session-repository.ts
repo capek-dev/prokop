@@ -11,6 +11,8 @@ import {
   updateSession,
 } from '@/infrastructure/sqlite/session-store';
 import {
+  getMessage,
+  getPart,
   listMessages,
   listLatestMessagesWithPartsPage,
   listMessagesWithPartsBeforeSequence,
@@ -61,6 +63,7 @@ import type {
   QueuedMessage,
   Session,
   SessionStatus,
+  ToolPart,
 } from '@prokopai/sdk';
 import type { Preconfig } from '@prokopai/sdk';
 import type { SessionPageInfo, ToolOutputArtifactPage as SessionToolOutputArtifactPage } from '@/application/ports/session';
@@ -193,6 +196,13 @@ export function createJean2SessionRepository(
       limit: number,
     ): TranscriptPage {
       return toTranscriptPage(listMessagesWithPartsBeforeSequence(sessionId, beforeSequence, limit));
+    },
+
+    getToolPart(sessionId: string, partId: string): ToolPart | null {
+      const part = getPart(partId);
+      if (!part || part.type !== 'tool') return null;
+      const message = getMessage(part.messageId);
+      return message?.sessionId === sessionId ? part : null;
     },
 
     async reconcileCompaction(sessionId: string): Promise<number> {

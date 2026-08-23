@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { Session } from '@prokopai/sdk';
+import type { Session, ToolPart } from '@prokopai/sdk';
 import { createSessionHttpApplication } from '@/application/sessions/http';
 import type { SessionRepositoryPort, TranscriptPage } from '@/application/ports/session';
 
@@ -32,6 +32,7 @@ function makeRepository(overrides: Partial<SessionRepositoryPort> = {}): Session
     listMessages: () => [],
     listLatestMessagesWithPartsPage: () => ({ messages: [], pagination: { hasOlder: false, oldestSequence: null, newestSequence: null, limit: 50 } }),
     listMessagesWithPartsBeforeSequence: () => ({ messages: [], pagination: { hasOlder: false, oldestSequence: null, newestSequence: null, limit: 50 } }),
+    getToolPart: () => null,
     reconcileCompaction: async () => 0,
     reconcileOrphanedToolCalls: () => 0,
     listQueuedMessages: () => [],
@@ -138,7 +139,7 @@ describe('session HTTP application', () => {
     expect(missingApp.createAttachment({ sessionId: 'missing', filename: 'f', mimeType: 'text/plain', sizeBytes: 1, data: new ArrayBuffer(0) })).toBeNull();
   });
 
-  test('transcript reads delegate to the repository paging functions', () => {
+  test('transcript reads delegate to the repository paging functions', async () => {
     const latest: TranscriptPage = { messages: [], pagination: { hasOlder: false, oldestSequence: null, newestSequence: null, limit: 50 } };
     const before: TranscriptPage = { messages: [], pagination: { hasOlder: true, oldestSequence: 5, newestSequence: 10, limit: 10 } };
     const repository = makeRepository({
@@ -147,8 +148,32 @@ describe('session HTTP application', () => {
     });
     const app = createSessionHttpApplication(repository);
 
-    expect(app.latestTranscript('sess-1', 50)).toEqual(latest);
-    expect(app.transcriptBefore('sess-1', 10, 10)).toEqual(before);
+    expect(await app.latestTranscript('sess-1', 50)).toEqual(latest);
+    expect(await app.transcriptBefore('sess-1', 10, 10)).toEqual(before);
+  });
+
+  test('tool debug returns only the raw debug fields', () => {
+    const part: ToolPart = {
+      id: 'part-1',
+      messageId: 'message-1',
+      createdAt: 1,
+      type: 'tool',
+      callId: 'call-1',
+      name: 'shell',
+      state: {
+        status: 'completed',
+        input: { command: 'pwd' },
+        output: { success: true },
+        startedAt: 1,
+        completedAt: 2,
+      },
+    };
+    const app = createSessionHttpApplication(makeRepository({ getToolPart: () => part }));
+
+    expect(app.getToolDebug('sess-1', 'part-1')).toEqual({
+      input: { command: 'pwd' },
+      output: { success: true },
+    });
   });
 
   test('tool output limits and validation come from the repository port', () => {

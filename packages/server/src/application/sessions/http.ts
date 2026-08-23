@@ -11,6 +11,12 @@ import type {
   ToolOutputArtifactPage,
   TranscriptPage,
 } from '../ports/session';
+import type { ToolCatalogPort } from '../ports/tool-distribution';
+import {
+  getToolDebugData,
+  projectMessagesForClient,
+  type ToolDebugData,
+} from './tool-debug';
 
 export interface SessionHttpCreateInput {
   id?: string;
@@ -54,8 +60,9 @@ export interface SessionHttpApplication {
   deleteSession(id: string): boolean;
 
   listMessages(sessionId: string): Message[];
-  latestTranscript(sessionId: string, limit: number): TranscriptPage;
-  transcriptBefore(sessionId: string, beforeSequence: number, limit: number): TranscriptPage;
+  latestTranscript(sessionId: string, limit: number): Promise<TranscriptPage>;
+  transcriptBefore(sessionId: string, beforeSequence: number, limit: number): Promise<TranscriptPage>;
+  getToolDebug(sessionId: string, partId: string): ToolDebugData | null;
   getToolOutputArtifactPage(
     sessionId: string,
     artifactId: string,
@@ -77,7 +84,10 @@ export interface SessionHttpApplication {
   };
 }
 
-export function createSessionHttpApplication(repository: SessionRepositoryPort): SessionHttpApplication {
+export function createSessionHttpApplication(
+  repository: SessionRepositoryPort,
+  toolCatalog?: Pick<ToolCatalogPort, 'listTools'>,
+): SessionHttpApplication {
   return {
     listSessions(status) {
       return repository.listSessions(status);
@@ -133,12 +143,25 @@ export function createSessionHttpApplication(repository: SessionRepositoryPort):
       return repository.listMessages(sessionId);
     },
 
-    latestTranscript(sessionId, limit) {
-      return repository.listLatestMessagesWithPartsPage(sessionId, limit);
+    async latestTranscript(sessionId, limit) {
+      const page = repository.listLatestMessagesWithPartsPage(sessionId, limit);
+      return {
+        ...page,
+        messages: await projectMessagesForClient(page.messages, toolCatalog),
+      };
     },
 
-    transcriptBefore(sessionId, beforeSequence, limit) {
-      return repository.listMessagesWithPartsBeforeSequence(sessionId, beforeSequence, limit);
+    async transcriptBefore(sessionId, beforeSequence, limit) {
+      const page = repository.listMessagesWithPartsBeforeSequence(sessionId, beforeSequence, limit);
+      return {
+        ...page,
+        messages: await projectMessagesForClient(page.messages, toolCatalog),
+      };
+    },
+
+    getToolDebug(sessionId, partId) {
+      const part = repository.getToolPart(sessionId, partId);
+      return part ? getToolDebugData(part) : null;
     },
 
     getToolOutputArtifactPage(sessionId, artifactId, offset, limit) {

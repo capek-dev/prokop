@@ -11,7 +11,9 @@ import type {
   PendingAskRecord,
   SessionRepositoryPort,
 } from '../ports/session';
+import type { ToolCatalogPort } from '../ports/tool-distribution';
 import { sendGateRejection } from './chat';
+import { projectMessagesForClient } from './tool-debug';
 
 export interface SessionLifecycleDeps<Origin> {
   repository: SessionRepositoryPort;
@@ -20,6 +22,7 @@ export interface SessionLifecycleDeps<Origin> {
   control: SessionControlPort<Origin>;
   pendingAsks: PendingAskPort;
   askAuthority: AskAuthorityPort;
+  toolCatalog?: Pick<ToolCatalogPort, 'listTools'>;
 }
 
 export interface SessionCreateInput {
@@ -163,13 +166,14 @@ export function createSessionLifecycleApplication<Origin>(
 
       const reconciledSession = deps.repository.getSession(sessionId);
       const transcriptPage = deps.repository.listLatestMessagesWithPartsPage(session.id, 50);
+      const clientMessages = await projectMessagesForClient(transcriptPage.messages, deps.toolCatalog);
 
       wire.delivery.send(origin, {
         type: 'session.resumed',
         session: reconciledSession!,
-        messages: transcriptPage.messages,
+        messages: clientMessages,
         transcript: {
-          messages: transcriptPage.messages,
+          messages: clientMessages,
           pagination: transcriptPage.pagination,
         },
         usage: reconciledSession!.totalTokens ? {

@@ -123,6 +123,7 @@ function makeRepository(overrides: Partial<SessionRepositoryPort> = {}): Session
     listMessages: () => [],
     listLatestMessagesWithPartsPage: () => ({ messages: [], pagination: { hasOlder: false, oldestSequence: null, newestSequence: null, limit: 50 } }),
     listMessagesWithPartsBeforeSequence: () => ({ messages: [], pagination: { hasOlder: false, oldestSequence: null, newestSequence: null, limit: 50 } }),
+    getToolPart: () => null,
     reconcileCompaction: async () => 0,
     reconcileOrphanedToolCalls: () => 0,
     listQueuedMessages: () => [],

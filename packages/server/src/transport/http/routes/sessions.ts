@@ -149,18 +149,26 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
       if (isNaN(beforeSequence) || beforeSequence < 1) {
         throw new BadRequestError('before must be a positive integer');
       }
-      const result = application.transcriptBefore(sessionId, beforeSequence, limit);
+      const result = await application.transcriptBefore(sessionId, beforeSequence, limit);
       return c.json({
         messages: result.messages,
         pagination: result.pagination,
       });
     }
 
-    const result = application.latestTranscript(sessionId, limit);
+    const result = await application.latestTranscript(sessionId, limit);
     return c.json({
       messages: result.messages,
       pagination: result.pagination,
     });
+  });
+
+  app.get('/api/sessions/:id/tool-parts/:partId/debug', async (c) => {
+    const sessionId = c.req.param('id');
+    if (!application.getSession(sessionId)) throw new NotFoundError('Session not found');
+    const debug = application.getToolDebug(sessionId, c.req.param('partId'));
+    if (!debug) throw new NotFoundError('Tool part not found');
+    return c.json(debug);
   });
 
   app.get('/api/sessions/:id/tool-output-artifacts/:artifactId', async (c) => {

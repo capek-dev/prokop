@@ -4,7 +4,7 @@ import { HttpError } from '@/application/http-errors';
 import { registerSessionRoutes } from '@/transport/http/routes/sessions';
 import { createSessionHttpApplication, type SessionHttpApplication } from '@/application/sessions/http';
 import type { SessionRepositoryPort } from '@/application/ports/session';
-import type { Session } from '@prokopai/sdk';
+import type { Session, ToolPart } from '@prokopai/sdk';
 
 function makeSession(overrides: Partial<Session> = {}): Session {
   return {
@@ -35,6 +35,7 @@ function makeRepository(overrides: Partial<SessionRepositoryPort> = {}): Session
     listMessages: () => [],
     listLatestMessagesWithPartsPage: () => ({ messages: [], pagination: { hasOlder: false, oldestSequence: null, newestSequence: null, limit: 50 } }),
     listMessagesWithPartsBeforeSequence: () => ({ messages: [], pagination: { hasOlder: false, oldestSequence: null, newestSequence: null, limit: 50 } }),
+    getToolPart: () => null,
     reconcileCompaction: async () => 0,
     reconcileOrphanedToolCalls: () => 0,
     listQueuedMessages: () => [],
@@ -204,6 +205,39 @@ describe('HTTP session route contract', () => {
     const ok = await app.request('/api/sessions/sess-1/transcript');
     expect(ok.status).toBe(200);
     expect(await json(ok)).toEqual({ messages: [], pagination: { hasOlder: false, oldestSequence: null, newestSequence: null, limit: 50 } });
+  });
+
+  test('GET tool debug returns raw fields only for a part in the requested session', async () => {
+    const part: ToolPart = {
+      id: 'part-1',
+      messageId: 'message-1',
+      createdAt: 1,
+      type: 'tool',
+      callId: 'call-1',
+      name: 'shell',
+      state: {
+        status: 'completed',
+        input: { command: 'pwd' },
+        output: { success: true },
+        startedAt: 1,
+        completedAt: 2,
+      },
+    };
+    const { app } = makeApp({
+      getToolPart: (sessionId, partId) =>
+        sessionId === 'sess-1' && partId === 'part-1' ? part : null,
+    });
+
+    const ok = await app.request('/api/sessions/sess-1/tool-parts/part-1/debug');
+    expect(ok.status).toBe(200);
+    expect(await json(ok)).toEqual({
+      input: { command: 'pwd' },
+      output: { success: true },
+    });
+
+    const crossSession = await app.request('/api/sessions/other/tool-parts/part-1/debug');
+    expect(crossSession.status).toBe(404);
+    expect(await json(crossSession)).toEqual({ error: 'not_found', message: 'Tool part not found' });
   });
 
   test('GET tool output artifacts validates the artifact id and the page limits', async () => {

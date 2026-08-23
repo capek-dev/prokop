@@ -2,12 +2,15 @@ import type { SessionWirePorts } from '../ports/delivery';
 import type { SessionExecutionPort } from '../ports/execution';
 import type { ControllerGatePort } from '../ports/control';
 import type { SessionRepositoryPort } from '../ports/session';
+import type { ToolCatalogPort } from '../ports/tool-distribution';
 import { sendGateRejection } from './chat';
+import { projectMessagesForClient } from './tool-debug';
 
 export interface SessionTranscriptDeps<Origin> {
   repository: SessionRepositoryPort;
   execution: SessionExecutionPort;
   gate: ControllerGatePort<Origin>;
+  toolCatalog?: Pick<ToolCatalogPort, 'listTools'>;
 }
 
 export interface SessionTranscriptApplication<Origin> {
@@ -77,10 +80,11 @@ export function createSessionTranscriptApplication<Origin>(
         });
 
         const currentState = deps.repository.listLatestMessagesWithPartsPage(sessionId, 50);
+        const clientMessages = await projectMessagesForClient(currentState.messages, deps.toolCatalog);
         wire.delivery.broadcastToSession(sessionId, {
           type: 'session.state',
           sessionId,
-          messages: currentState.messages,
+          messages: clientMessages,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Revert failed';
@@ -104,11 +108,12 @@ export function createSessionTranscriptApplication<Origin>(
         });
 
         const forkedPage = deps.repository.listLatestMessagesWithPartsPage(result.forkedSession.id, 50);
+        const clientMessages = await projectMessagesForClient(forkedPage.messages, deps.toolCatalog);
         wire.delivery.broadcastToSession(sessionId, {
           type: 'session.forked',
           originalSessionId: sessionId,
           forkedSession: result.forkedSession,
-          messages: forkedPage.messages,
+          messages: clientMessages,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Fork failed';

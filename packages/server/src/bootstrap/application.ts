@@ -135,6 +135,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   const askAuthority = createJean2AskAuthorityPort();
   const pendingAsks = createJean2PendingAskPort();
   const transportControl = createTransportControllerPorts();
+  const toolCatalog = createJean2ToolCatalogPort();
 
   const session = createSessionApplication<ConnectionId>({
     repository,
@@ -143,6 +144,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     control: transportControl.control,
     pendingAsks,
     askAuthority,
+    toolCatalog,
   });
 
   const control = createSessionControlApplication<ConnectionId>({
@@ -150,7 +152,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     autoApproveTakeover: getAutoApproveTakeover,
   });
 
-  const http = createSessionHttpApplication(repository);
+  const http = createSessionHttpApplication(repository, toolCatalog);
 
   const schedulingRepository = createJean2ScheduledJobRepository();
   const schedulingExecution = createJean2ScheduledJobExecution();
@@ -179,7 +181,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   });
 
   const tools = createToolsHttpApplication({
-    catalog: createJean2ToolCatalogPort(),
+    catalog: toolCatalog,
     environment: createJean2ToolEnvironmentPort(),
   });
 
