@@ -54,6 +54,10 @@ import {
   getTlsKeyFile,
   getClientEnabled,
   getLLMDeepseekApiKey,
+  getLocalHttpEnabled,
+  getLocalHost,
+  listenersOverlap,
+  resolveTlsPort,
 } from '@/infrastructure/runtime/environment';
 import { activateSandbox } from '@/infrastructure/sandbox';
 import { getEmbeddedClientAssetsRoot } from '@/infrastructure/runtime/client-assets';
@@ -70,6 +74,7 @@ export interface ServerOptions {
 
 export interface ServerInstance {
   server: ReturnType<typeof Bun.serve>;
+  localServer?: ReturnType<typeof Bun.serve>;
   cleanup: () => Promise<void>;
 }
 
@@ -179,9 +184,25 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   }
   const protocol = tls ? 'https' : 'http';
 
-  console.log(`Server starting on ${protocol}://${host}:${port}`);
+  let localHttpEnabled = getLocalHttpEnabled();
+  const localHost = getLocalHost();
+  const tlsPort = tls ? resolveTlsPort(host, port, localHttpEnabled) : undefined;
+
+  if (readEnv('LOCAL_HTTP') === 'true' && !tls) {
+    console.warn('WARNING: PROKOPAI_LOCAL_HTTP=true has no effect when TLS is disabled; the main listener is already plain HTTP.');
+  }
+
+  console.log(`Server starting on ${protocol}://${host}:${tlsPort ?? port}`);
+
+  if (localHttpEnabled && tlsPort === port && listenersOverlap(host, localHost)) {
+    console.error(`ERROR: TLS listener (${host}:${tlsPort}) overlaps the local HTTP listener (${localHost}:${port}); set PROKOPAI_TLS_PORT, bind PROKOPAI_HOST to a specific address, or disable the local listener with PROKOPAI_LOCAL_HTTP=false.`);
+    localHttpEnabled = false;
+  } else if (localHttpEnabled) {
+    console.log(`[local] HTTP listener on http://${localHost}:${port}`);
+  }
 
   let server: ReturnType<typeof Bun.serve> | undefined;
+  let localServer: ReturnType<typeof Bun.serve> | undefined;
   let cleanupPromise: Promise<void> | null = null;
   let onSigterm: (() => void) | undefined;
   let onSigint: (() => void) | undefined;
@@ -204,6 +225,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
       attempt(() => stopPushRetryScheduler());
       attempt(() => stopProviderAccountLifecycle());
       attempt(() => server?.stop());
+      attempt(() => localServer?.stop());
       attempt(() => getTerminalManager().destroyAllSessions());
       try {
         await disposeJean2ExecutionScope();
@@ -224,7 +246,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   try {
     await initializeJean2ExecutionScope();
     server = Bun.serve({
-      port,
+      port: tlsPort ?? port,
       hostname: host,
       ...(tls && { tls }),
 
@@ -240,6 +262,24 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
       websocket: transport.websocket,
     });
 
+    if (localHttpEnabled) {
+      localServer = Bun.serve({
+        port,
+        hostname: localHost,
+
+        async fetch(req: Request): Promise<Response | undefined> {
+          const upgrade = transport.handleUpgrade(req, (data: WsData) => localServer!.upgrade(req, { data }));
+          if (upgrade.handled) {
+            return upgrade.response;
+          }
+
+          return app.fetch(req);
+        },
+
+        websocket: transport.websocket,
+      });
+    }
+
     transport.startTimers();
 
     // Start the scheduler tick loop (catches jobs that became due while offline)
@@ -250,14 +290,17 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     const clientAssetsRoot = getEmbeddedClientAssetsRoot();
     if (clientAssetsRoot !== null) {
       const clientHost = host === '0.0.0.0' ? 'localhost' : host;
-      console.log(`[client] Running at ${protocol}://${clientHost}:${port}`);
+      console.log(`[client] Running at ${protocol}://${clientHost}:${tlsPort ?? port}`);
+      if (localServer) {
+        console.log(`[client] Running locally at http://${localHost}:${port}`);
+      }
     } else if (getClientEnabled()) {
       console.log('[client] Embedded client assets unavailable in source development');
     } else {
       console.log('[client] Built-in client disabled (PROKOPAI_CLIENT_ENABLED=false)');
     }
 
-    console.log(`AI Agent Server running at ${protocol}://${host}:${port}`);
+    console.log(`AI Agent Server running at ${protocol}://${host}:${tlsPort ?? port}`);
 
     const onShutdown = async (signal: string): Promise<void> => {
       console.log(`Received ${signal}, shutting down...`);
@@ -275,7 +318,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     process.on('SIGTERM', onSigterm);
     process.on('SIGINT', onSigint);
 
-    return { server, cleanup };
+    return { server, cleanup, localServer };
   } catch (error: unknown) {
     try {
       await cleanup();

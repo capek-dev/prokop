@@ -18,6 +18,8 @@ describe('API Routes', () => {
 
   beforeEach(() => {
     delete process.env.JEAN2_AUTH_TOKEN;
+    delete process.env.JEAN2_CLIENT_ENABLED;
+    delete process.env.PROKOPAI_CLIENT_ENABLED;
     setupTestDataDir();
     setupTestDatabase();
     app = createApp();
@@ -27,6 +29,8 @@ describe('API Routes', () => {
     resetTestDatabase();
     resetTestDataDir();
     delete process.env.JEAN2_AUTH_TOKEN;
+    delete process.env.JEAN2_CLIENT_ENABLED;
+    delete process.env.PROKOPAI_CLIENT_ENABLED;
   });
 
   // ── Health & Info ──────────────────────────────────────────────

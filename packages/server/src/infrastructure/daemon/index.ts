@@ -14,7 +14,8 @@ import {
 import { getPidFilePath as getPidFilePathFromPaths, getLogFilePath as getLogFilePathFromPaths, getDataDir } from '@/infrastructure/runtime/paths';
 
 import { getPort, getHost } from '@/config';
-import { getToolEnv, getTlsEnabled, getTlsCertFile, getTlsKeyFile, getClientEnabled } from '@/infrastructure/runtime/environment';
+import { getToolEnv, getTlsEnabled, getTlsCertFile, getTlsKeyFile, getClientEnabled, getLocalHttpEnabled, getLocalHost, resolveTlsPort } from '@/infrastructure/runtime/environment';
+import { readEnv } from '@/infrastructure/runtime/env-compat';
 
 export interface DaemonStatus {
   running: boolean;
@@ -112,6 +113,9 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonResult
 
   const port = options?.port ?? getPort();
   const host = options?.host ?? getHost();
+  const localHttp = readEnv('LOCAL_HTTP');
+  const localHost = readEnv('LOCAL_HOST');
+  const tlsPortEnv = readEnv('TLS_PORT');
 
   // Child env passes both canonical PROKOPAI_* keys and legacy JEAN2_* twins
   // so the spawned server (possibly a different version during update)
@@ -128,6 +132,9 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonResult
       ...(getTlsCertFile() && { PROKOPAI_TLS_CERT_FILE: getTlsCertFile(), JEAN2_TLS_CERT_FILE: getTlsCertFile() }),
       ...(getTlsKeyFile() && { PROKOPAI_TLS_KEY_FILE: getTlsKeyFile(), JEAN2_TLS_KEY_FILE: getTlsKeyFile() }),
     }),
+    ...(localHttp !== undefined && { PROKOPAI_LOCAL_HTTP: localHttp, JEAN2_LOCAL_HTTP: localHttp }),
+    ...(localHost !== undefined && { PROKOPAI_LOCAL_HOST: localHost, JEAN2_LOCAL_HOST: localHost }),
+    ...(tlsPortEnv !== undefined && { PROKOPAI_TLS_PORT: tlsPortEnv, JEAN2_TLS_PORT: tlsPortEnv }),
   });
 
   ensureConfigDir();
@@ -177,12 +184,16 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonResult
 
   const tls = getTlsEnabled() ? { cert: getTlsCertFile(), key: getTlsKeyFile() } : undefined;
   const protocol = tls ? 'https' : 'http';
+  const effectivePort = tls ? resolveTlsPort(host, port, getLocalHttpEnabled()) : port;
 
   console.log(`Daemon started with PID ${pid}`);
-  console.log(`Server running at ${protocol}://${host}:${port}`);
+  console.log(`Server running at ${protocol}://${host}:${effectivePort}`);
+  if (getLocalHttpEnabled()) {
+    console.log(`Local HTTP listener on http://${getLocalHost()}:${port}`);
+  }
   if (getClientEnabled()) {
     const clientHost = host === '0.0.0.0' ? 'localhost' : host;
-    console.log(`Client available at ${protocol}://${clientHost}:${port}`);
+    console.log(`Client available at ${protocol}://${clientHost}:${effectivePort}`);
   }
   console.log(`Logs: ${logFilePath}`);
 

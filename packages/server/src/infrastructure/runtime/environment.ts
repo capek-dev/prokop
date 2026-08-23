@@ -313,6 +313,39 @@ export function getTlsKeyFile(): string | undefined {
   return readEnv('TLS_KEY_FILE');
 }
 
+export function getLocalHttpEnabled(): boolean {
+  return getTlsEnabled() && readEnv('LOCAL_HTTP') !== 'false';
+}
+
+export function getLocalHost(): string {
+  return readEnv('LOCAL_HOST') || '127.0.0.1';
+}
+
+export function isWildcardHost(host: string): boolean {
+  return host === '0.0.0.0' || host === '::' || host === '[::]';
+}
+
+export function isLoopbackHost(host: string): boolean {
+  return host === 'localhost' || host === '::1' || host === '[::1]' || host.startsWith('127.');
+}
+
+export function listenersOverlap(host: string, localHost: string): boolean {
+  if (isWildcardHost(host)) return true;
+  if (host === localHost) return true;
+  return isLoopbackHost(host) && isLoopbackHost(localHost);
+}
+
+export function resolveTlsPort(host: string, port: number, localHttpEnabled: boolean): number {
+  const configured = readEnvInt('TLS_PORT', -1);
+  if (configured > 0) {
+    return configured;
+  }
+  if (!localHttpEnabled) {
+    return port;
+  }
+  return listenersOverlap(host, getLocalHost()) ? port + 1 : port;
+}
+
 export function getAutoApproveTakeover(): boolean {
   return readEnv('AUTO_APPROVE_TAKEOVER') !== 'false';
 }

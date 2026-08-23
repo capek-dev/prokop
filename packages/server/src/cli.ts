@@ -429,7 +429,10 @@ Examples:
     case 'open': {
       const openPort = readEnvInt('PORT', 8742);
       const openProtocol = readEnv('TLS_ENABLED') === 'true' ? 'https' : 'http';
-      const clientUrl = `${openProtocol}://localhost:${openPort}`;
+      const localEnabled = readEnv('TLS_ENABLED') === 'true' && readEnv('LOCAL_HTTP') !== 'false';
+      const clientUrl = localEnabled
+        ? `http://${readEnv('LOCAL_HOST') || '127.0.0.1'}:${openPort}`
+        : `${openProtocol}://localhost:${openPort}`;
       console.log(`Opening ${clientUrl} ...`);
       try {
         const cmd = process.platform === 'darwin' ? 'open'

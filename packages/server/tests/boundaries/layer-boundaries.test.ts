@@ -168,6 +168,7 @@ const layerTransportAppExceptions: Record<string, string[]> = {
     '@/version',
     '@/infrastructure/runtime/environment',
     '@/infrastructure/runtime/env-compat',
+    '@/infrastructure/runtime/client-assets',
     '@/bootstrap/application',
   ],
 };
