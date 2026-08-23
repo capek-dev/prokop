@@ -126,7 +126,7 @@ export interface ListWorkspaceSessionsResponse {
  * binary) or 'installed' (resolved from the tools directory).
  */
 export interface ListToolsResponse {
-  tools: Array<ToolDefinition & { source: 'builtin' | 'installed' }>;
+  tools: Array<ToolDefinition & { source: 'builtin' | 'installed' | 'domain' }>;
 }
 
 /**
