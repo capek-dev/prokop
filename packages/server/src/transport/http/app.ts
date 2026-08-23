@@ -14,6 +14,11 @@ import { ZodError } from 'zod';
 
 import { requireAuth, isPublicRoute } from '@/transport/http/middleware/auth';
 import { isAuthEnabled } from '@/transport/http/middleware/token';
+import {
+  createClientAssetResponse,
+  getEmbeddedClientAssetsRoot,
+  hasClientAssets,
+} from '@/infrastructure/runtime/client-assets';
 import { getClientEnabled } from '@/infrastructure/runtime/environment';
 import { readEnv } from '@/infrastructure/runtime/env-compat';
 import { VERSION } from '@/version';
@@ -34,8 +39,18 @@ import { registerAgentRoutes } from '@/transport/http/routes/agents';
 import { registerMaintenanceRoutes } from '@/transport/http/routes/maintenance';
 import { registerNotificationRoutes } from '@/transport/http/routes/notifications';
 
-export function createApp(application?: WiredApplication) {
+export interface CreateAppOptions {
+  clientAssetsRoot?: string | null;
+}
+
+export function createApp(application?: WiredApplication, options?: CreateAppOptions) {
   const wired = application ?? createWiredApplication();
+  const configuredClientAssetsRoot = options?.clientAssetsRoot === undefined
+    ? getEmbeddedClientAssetsRoot()
+    : options.clientAssetsRoot;
+  const clientAssetsRoot = getClientEnabled() && hasClientAssets(configuredClientAssetsRoot)
+    ? configuredClientAssetsRoot
+    : null;
 
   const app = new Hono();
 
@@ -59,7 +74,12 @@ export function createApp(application?: WiredApplication) {
   // Root and Health Endpoints
   // ============================================================================
 
-  app.get('/', (c) => {
+  app.get('/', async (c) => {
+    if (clientAssetsRoot !== null) {
+      const response = await createClientAssetResponse(c.req.raw, clientAssetsRoot);
+      if (response !== null) return response;
+    }
+
     return c.json({
       status: 'ok',
       message: 'AI Agent Server is running',
@@ -84,7 +104,7 @@ export function createApp(application?: WiredApplication) {
         preconfigs: true,
         tools: true,
         authentication: isAuthEnabled(),
-        client: getClientEnabled(),
+        client: clientAssetsRoot !== null,
       },
       timestamp: new Date().toISOString()
     });
@@ -143,6 +163,28 @@ export function createApp(application?: WiredApplication) {
       sessionId
     });
   });
+
+  // ============================================================================
+  // Embedded Client
+  // ============================================================================
+
+  if (clientAssetsRoot !== null) {
+    const handleClientRequest = async (request: Request): Promise<Response | null> => {
+      const pathname = new URL(request.url).pathname;
+      if (pathname === '/api' || pathname.startsWith('/api/')) return null;
+      if (pathname === '/ws' || pathname.startsWith('/ws/')) return null;
+      return createClientAssetResponse(request, clientAssetsRoot);
+    };
+
+    app.get('*', async (c) => {
+      const response = await handleClientRequest(c.req.raw);
+      return response ?? c.notFound();
+    });
+    app.on('HEAD', '*', async (c) => {
+      const response = await handleClientRequest(c.req.raw);
+      return response ?? c.notFound();
+    });
+  }
 
   // ============================================================================
   // 404 and Error Handlers

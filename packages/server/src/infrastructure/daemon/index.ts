@@ -14,7 +14,7 @@ import {
 import { getPidFilePath as getPidFilePathFromPaths, getLogFilePath as getLogFilePathFromPaths, getDataDir } from '@/infrastructure/runtime/paths';
 
 import { getPort, getHost } from '@/config';
-import { getToolEnv, getTlsEnabled, getTlsCertFile, getTlsKeyFile, getClientEnabled, getClientPort } from '@/infrastructure/runtime/environment';
+import { getToolEnv, getTlsEnabled, getTlsCertFile, getTlsKeyFile, getClientEnabled } from '@/infrastructure/runtime/environment';
 
 export interface DaemonStatus {
   running: boolean;
@@ -181,7 +181,8 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonResult
   console.log(`Daemon started with PID ${pid}`);
   console.log(`Server running at ${protocol}://${host}:${port}`);
   if (getClientEnabled()) {
-    console.log(`Client running at http://localhost:${getClientPort()}`);
+    const clientHost = host === '0.0.0.0' ? 'localhost' : host;
+    console.log(`Client available at ${protocol}://${clientHost}:${port}`);
   }
   console.log(`Logs: ${logFilePath}`);
 

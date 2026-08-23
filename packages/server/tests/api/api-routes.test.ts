@@ -1,4 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { createApp } from '@/transport/http/app';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
@@ -37,6 +40,40 @@ describe('API Routes', () => {
       expect(body.status).toBe('ok');
       expect(body.version).toBeDefined();
       expect(body.timestamp).toBeDefined();
+    });
+
+    test('serves embedded client routes without shadowing API routes', async () => {
+      const clientRoot = mkdtempSync(join(tmpdir(), 'prokop-client-app-'));
+      writeFileSync(join(clientRoot, 'index.html'), '<html>Prokop</html>');
+      const clientApp = createApp(undefined, { clientAssetsRoot: clientRoot });
+
+      try {
+        const rootResponse = await clientApp.request('/');
+        const routeResponse = await clientApp.request('/sessions/example', {
+          headers: { Accept: 'text/html' },
+        });
+        const headResponse = await clientApp.request('/', { method: 'HEAD' });
+        const missingAssetResponse = await clientApp.request('/assets/missing.js');
+        const apiResponse = await clientApp.request('/api/info', {
+          headers: { Accept: 'text/html' },
+        });
+        const missingApiResponse = await clientApp.request('/api/missing', {
+          headers: { Accept: 'text/html' },
+        });
+
+        expect(rootResponse.headers.get('content-type')).toBe('text/html');
+        expect(await rootResponse.text()).toBe('<html>Prokop</html>');
+        expect(await routeResponse.text()).toBe('<html>Prokop</html>');
+        expect(headResponse.status).toBe(200);
+        expect(await headResponse.text()).toBe('');
+        expect(missingAssetResponse.status).toBe(404);
+        expect(apiResponse.headers.get('content-type')).toContain('application/json');
+        expect((await json(apiResponse)).runtime).toBe('bun');
+        expect(missingApiResponse.status).toBe(404);
+        expect(missingApiResponse.headers.get('content-type')).toContain('application/json');
+      } finally {
+        rmSync(clientRoot, { recursive: true, force: true });
+      }
     });
 
     test('GET /api/health returns healthy', async () => {

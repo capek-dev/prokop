@@ -4,7 +4,6 @@
 import '@/infrastructure/runtime/environment';  // This loads .env automatically
 
 import { startServer, type ServerOptions } from '@/index';
-import { runClientCommand } from '@/infrastructure/runtime/client-launcher';
 import { isInitialized } from '@/config';
 import { getDatabasePath } from '@/infrastructure/runtime/environment';
 import {
@@ -428,7 +427,7 @@ Examples:
     }
 
     case 'open': {
-      const openPort = readEnvInt('CLIENT_PORT', 3774);
+      const openPort = readEnvInt('PORT', 8742);
       const openProtocol = readEnv('TLS_ENABLED') === 'true' ? 'https' : 'http';
       const clientUrl = `${openProtocol}://localhost:${openPort}`;
       console.log(`Opening ${clientUrl} ...`);
@@ -458,25 +457,6 @@ Examples:
     case '--help':
     case undefined: {
       printHelp();
-      break;
-    }
-
-    case '_client': {
-      const clientArgs = args.slice(1);
-      let cliPath = '';
-      let clientPort = 3774;
-      for (let i = 0; i < clientArgs.length; i++) {
-        if (clientArgs[i] === '--cli-path' && clientArgs[i + 1]) {
-          cliPath = clientArgs[++i];
-        } else if ((clientArgs[i] === '--port' || clientArgs[i] === '-p') && clientArgs[i + 1]) {
-          clientPort = parseInt(clientArgs[++i], 10);
-        }
-      }
-      if (!cliPath) {
-        console.error('[client] --cli-path is required');
-        process.exit(1);
-      }
-      await runClientCommand(cliPath, clientPort);
       break;
     }
 
@@ -730,7 +710,7 @@ function printSyncResult(result: SyncResult): void {
   console.log(`info: Total: ${result.totalProviders} providers, ${result.totalModels} models`);
 }
 
-const longRunningCommands = new Set(['server', 'logs', '_client']);
+const longRunningCommands = new Set(['server', 'logs']);
 
 main().then(() => {
   if (!longRunningCommands.has(command ?? '')) {

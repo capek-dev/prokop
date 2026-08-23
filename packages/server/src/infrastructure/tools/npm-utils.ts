@@ -7,7 +7,7 @@ import { LEGACY_JEAN2_DIR_NAME } from '@/infrastructure/runtime/paths';
 
 // Canonical prokopai packages plus the legacy jean2 names during the
 // compatibility window (tools were published under @jean2/*).
-const OWNED_PACKAGES = ['@prokopai/client', '@prokopai/sdk', '@jean2/client', '@prokopai/sdk'];
+const OWNED_PACKAGES = ['@prokopai/sdk', '@jean2/sdk'];
 
 export function getMinAgeHours(): number {
   const raw = readEnv('PACKAGE_MIN_AGE_HOURS');

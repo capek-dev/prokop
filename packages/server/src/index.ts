@@ -53,15 +53,10 @@ import {
   getTlsCertFile,
   getTlsKeyFile,
   getClientEnabled,
-  getClientPort,
   getLLMDeepseekApiKey,
 } from '@/infrastructure/runtime/environment';
 import { activateSandbox } from '@/infrastructure/sandbox';
-import {
-  createClientLauncher,
-  prepareAndLaunchClient,
-  type ClientLauncher,
-} from '@/infrastructure/runtime/client-launcher';
+import { getEmbeddedClientAssetsRoot } from '@/infrastructure/runtime/client-assets';
 import { startPushRetryScheduler, stopPushRetryScheduler, cleanupPushData } from '@/infrastructure/web-push/retry-scheduler';
 import {
   startProviderAccountLifecycle,
@@ -187,7 +182,6 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   console.log(`Server starting on ${protocol}://${host}:${port}`);
 
   let server: ReturnType<typeof Bun.serve> | undefined;
-  let clientLauncher: ClientLauncher | undefined;
   let cleanupPromise: Promise<void> | null = null;
   let onSigterm: (() => void) | undefined;
   let onSigint: (() => void) | undefined;
@@ -209,7 +203,6 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
       attempt(() => application.schedulerTicker.stop());
       attempt(() => stopPushRetryScheduler());
       attempt(() => stopProviderAccountLifecycle());
-      attempt(() => clientLauncher?.stop());
       attempt(() => server?.stop());
       attempt(() => getTerminalManager().destroyAllSessions());
       try {
@@ -254,22 +247,14 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     startPushRetryScheduler();
     startProviderAccountLifecycle();
 
-    if (getClientEnabled()) {
-      clientLauncher = createClientLauncher();
-      const { version, launchResult } = await prepareAndLaunchClient(
-        clientLauncher,
-        getClientPort(),
-        port,
-        host,
-      );
-
-      if (launchResult?.success) {
-        console.log(`[client] @jean2/client@${version} running at ${launchResult.url}`);
-      } else if (launchResult) {
-        console.warn(`[client] Failed to launch: ${launchResult.error}`);
-      }
+    const clientAssetsRoot = getEmbeddedClientAssetsRoot();
+    if (clientAssetsRoot !== null) {
+      const clientHost = host === '0.0.0.0' ? 'localhost' : host;
+      console.log(`[client] Running at ${protocol}://${clientHost}:${port}`);
+    } else if (getClientEnabled()) {
+      console.log('[client] Embedded client assets unavailable in source development');
     } else {
-      console.log('[client] Built-in client disabled (JEAN2_CLIENT_ENABLED=false)');
+      console.log('[client] Built-in client disabled (PROKOPAI_CLIENT_ENABLED=false)');
     }
 
     console.log(`AI Agent Server running at ${protocol}://${host}:${port}`);

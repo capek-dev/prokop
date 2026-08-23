@@ -301,10 +301,6 @@ export function getClientEnabled(): boolean {
   return readEnv('CLIENT_ENABLED') !== 'false';
 }
 
-export function getClientPort(): number {
-  return readEnvInt('CLIENT_PORT', 3774);
-}
-
 export function getTlsEnabled(): boolean {
   return readEnv('TLS_ENABLED') === 'true';
 }

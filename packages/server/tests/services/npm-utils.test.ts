@@ -59,8 +59,9 @@ describe('npm-utils', () => {
   });
 
   describe('isJean2OwnedPackage', () => {
-    test('returns true for @jean2/client', () => {
-      expect(isJean2OwnedPackage('@jean2/client')).toBe(true);
+    test('returns false for retired client packages', () => {
+      expect(isJean2OwnedPackage('@jean2/client')).toBe(false);
+      expect(isJean2OwnedPackage('@prokopai/client')).toBe(false);
     });
 
     test('returns true for @prokopai/sdk', () => {
