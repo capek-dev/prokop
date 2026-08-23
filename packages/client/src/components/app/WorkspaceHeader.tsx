@@ -122,9 +122,6 @@ export function WorkspaceHeader() {
               selectedVariant={selectedVariant}
               variants={currentModelInfo?.variants}
               onClaimControl={sessionManager.claimControl}
-              onReleaseControl={sessionManager.releaseControl}
-              onRequestTakeover={sessionManager.requestTakeover}
-              onRespondTakeover={sessionManager.respondTakeover}
               lockPreconfig={lockPreconfig}
             />
           )}

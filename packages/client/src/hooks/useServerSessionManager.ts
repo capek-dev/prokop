@@ -112,9 +112,6 @@ export interface UseServerSessionManagerReturn {
   revokeAllPermissions: (workspaceId: string) => void;
 
   claimControl: (sessionId: string) => void;
-  releaseControl: (sessionId: string) => void;
-  requestTakeover: (sessionId: string) => void;
-  respondTakeover: (sessionId: string, requesterClientId: string, decision: 'approve' | 'deny') => void;
 
   selectWorkspace: (workspace: Workspace) => void;
   renameWorkspace: (id: string, name: string) => void;
@@ -866,9 +863,6 @@ export function useServerSessionManager({
     revokePermission,
     revokeAllPermissions,
     claimControl,
-    releaseControl,
-    requestTakeover,
-    respondTakeover,
   } = useSessionCommands({
     clientRef: sdkClientRef,
     currentSession,
@@ -968,9 +962,6 @@ export function useServerSessionManager({
     revokeAllPermissions,
 
     claimControl,
-    releaseControl,
-    requestTakeover,
-    respondTakeover,
 
     selectWorkspace,
     renameWorkspace,

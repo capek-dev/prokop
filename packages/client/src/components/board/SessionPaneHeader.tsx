@@ -127,9 +127,6 @@ export function SessionPaneHeader({
         selectedVariant={selectedVariant ?? null}
         variants={currentModelInfo?.variants}
         onClaimControl={commands.claimControl}
-        onReleaseControl={commands.releaseControl}
-        onRequestTakeover={commands.requestTakeover}
-        onRespondTakeover={commands.respondTakeover}
         lockPreconfig={lockPreconfig}
       />
       <Button

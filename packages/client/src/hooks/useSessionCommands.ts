@@ -68,9 +68,6 @@ interface UseSessionCommandsReturn {
   revokePermission: (permissionId: string) => void;
   revokeAllPermissions: (workspaceId: string) => void;
   claimControl: (sessionId: string) => void;
-  releaseControl: (sessionId: string) => void;
-  requestTakeover: (sessionId: string) => void;
-  respondTakeover: (sessionId: string, requesterClientId: string, decision: 'approve' | 'deny') => void;
 }
 
 export function useSessionCommands({
@@ -448,27 +445,6 @@ export function useSessionCommands({
     }
   }, [clientRef]);
 
-  const releaseControl = useCallback((sessionId: string) => {
-    const client = clientRef.current;
-    if (client && client.connected) {
-      client.control.release(sessionId);
-    }
-  }, [clientRef]);
-
-  const requestTakeover = useCallback((sessionId: string) => {
-    const client = clientRef.current;
-    if (client && client.connected) {
-      client.control.requestTakeover(sessionId);
-    }
-  }, [clientRef]);
-
-  const respondTakeover = useCallback((sessionId: string, requesterClientId: string, decision: 'approve' | 'deny') => {
-    const client = clientRef.current;
-    if (client && client.connected) {
-      client.control.respondTakeover(sessionId, requesterClientId, decision);
-    }
-  }, [clientRef]);
-
   return {
     createSession,
     resumeSession,
@@ -501,8 +477,5 @@ export function useSessionCommands({
     revokePermission,
     revokeAllPermissions,
     claimControl,
-    releaseControl,
-    requestTakeover,
-    respondTakeover,
   };
 }

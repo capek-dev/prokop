@@ -60,9 +60,6 @@ export interface SessionCommandsValue {
   createSessionInWorkspace: (workspaceId: string) => void;
 
   claimControl: (sessionId: string) => void;
-  releaseControl: (sessionId: string) => void;
-  requestTakeover: (sessionId: string) => void;
-  respondTakeover: (sessionId: string, requesterClientId: string, decision: 'approve' | 'deny') => void;
 
   handleLogout: () => void;
   handleRetry: () => void;

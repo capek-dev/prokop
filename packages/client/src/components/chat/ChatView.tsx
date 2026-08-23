@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
-import { Lock, Eye, ArrowDown, ShieldOff, Wifi } from 'lucide-react';
+import { Lock, Eye, ArrowDown, ShieldOff } from 'lucide-react';
 import type { ProkopaiClient, Message } from '@prokopai/sdk';
 import type { Session, MessageWithParts, QueuedMessage, AttachmentKind, AskResponse } from '@prokopai/sdk';
 import { MessageInput } from './MessageInput';
@@ -163,8 +163,7 @@ export function ChatView({
   const controlState = useSessionControlStore((s) => s.controlBySessionId[session.id]);
   const myClientId = useClientIdentityStore((s) => s.clientId);
   const isObserver = controlState?.status === 'controlled' && controlState.controllerClientId !== myClientId;
-  const isInGrace = controlState?.status === 'grace';
-  const isInputDisabled = isObserver || isInGrace;
+  const isInputDisabled = isObserver;
 
   const [rejectionNotice, setRejectionNotice] = useState<string | null>(null);
   const rejectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -319,13 +318,6 @@ export function ChatView({
         <div className="px-4 py-2 border-t border-border bg-muted/30 text-center flex items-center justify-center gap-2 text-xs text-muted-foreground">
           <ShieldOff className="size-3.5" />
           You are observing this session. Input is disabled.
-        </div>
-      )}
-
-      {isInGrace && (
-        <div className="px-4 py-2 border-t border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/30 text-center flex items-center justify-center gap-2 text-xs text-yellow-600 dark:text-yellow-400">
-          <Wifi className="size-3.5" />
-          Reconnecting to session… waiting for control to be restored.
         </div>
       )}
 

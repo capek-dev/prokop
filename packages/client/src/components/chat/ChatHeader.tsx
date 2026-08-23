@@ -41,9 +41,6 @@ interface ChatHeaderProps {
   selectedVariant: string | null;
   variants?: Record<string, { providerOptions: Record<string, unknown> }>;
   onClaimControl?: (sessionId: string) => void;
-  onReleaseControl?: (sessionId: string) => void;
-  onRequestTakeover?: (sessionId: string) => void;
-  onRespondTakeover?: (sessionId: string, requesterClientId: string, decision: 'approve' | 'deny') => void;
   /** When true, locks the preconfig selector (e.g. agent-home workspaces). */
   lockPreconfig?: boolean;
 }
@@ -51,20 +48,13 @@ interface ChatHeaderProps {
 type ControlUiState =
   | 'uncontrolled'
   | 'controller'
-  | 'observer'
-  | 'takeover_controller'
-  | 'takeover_requester'
-  | 'grace';
+  | 'observer';
 
 function deriveControlUiState(
   controlStatus: string | undefined,
   isController: boolean,
 ): ControlUiState {
   if (!controlStatus || controlStatus === 'uncontrolled') return 'uncontrolled';
-  if (controlStatus === 'grace') return 'grace';
-  if (controlStatus === 'takeover_requested') {
-    return isController ? 'takeover_controller' : 'takeover_requester';
-  }
   if (controlStatus === 'controlled') {
     return isController ? 'controller' : 'observer';
   }
@@ -89,9 +79,6 @@ export function ChatHeader({
   selectedVariant,
   variants,
   onClaimControl,
-  onReleaseControl,
-  onRequestTakeover,
-  onRespondTakeover,
   lockPreconfig,
 }: ChatHeaderProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -103,7 +90,7 @@ export function ChatHeader({
   const controlState = useSessionControlStore((s) => s.controlBySessionId[session.id]);
   const myClientId = useClientIdentityStore((s) => s.clientId);
 
-  const isActiveControlled = controlState?.status === 'controlled' || controlState?.status === 'takeover_requested';
+  const isActiveControlled = controlState?.status === 'controlled';
   const isController = isActiveControlled && controlState.controllerClientId === myClientId;
   const isObserver = isActiveControlled && controlState.controllerClientId !== myClientId;
 
@@ -227,11 +214,7 @@ export function ChatHeader({
               <SessionControlButton
                 uiState={controlUiState}
                 sessionId={session.id}
-                pendingRequesterClientId={controlState?.pendingTakeover?.requestedByClientId}
                 onClaimControl={onClaimControl}
-                onReleaseControl={onReleaseControl}
-                onRequestTakeover={onRequestTakeover}
-                onRespondTakeover={onRespondTakeover}
               />
             )}
 
