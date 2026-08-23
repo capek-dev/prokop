@@ -1,4 +1,4 @@
-export { useToolsQuery, useToolEnvVarsQuery, useToolSetEnvVar, useToolClearEnvVar } from './useToolsQueries';
+export { useToolsQuery, useToolDisplayCatalog, useToolEnvVarsQuery, useToolSetEnvVar, useToolClearEnvVar } from './useToolsQueries';
 export { useAgentsQuery, usePromoteAgent, useDemoteAgent } from './useAgentsQueries';
 export { useModelsConfigQuery, useCreateProvider, useUpdateProvider, useDeleteProvider, useCreateModel, useUpdateModel, useDeleteModel, useSetModelDefaults, useSyncModels } from './useModelsQueries';
 export { usePreconfigsQuery, useCreatePreconfig, useUpdatePreconfig, useDeletePreconfig } from './usePreconfigsQueries';

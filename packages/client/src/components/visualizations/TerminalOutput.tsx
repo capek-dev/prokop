@@ -1,12 +1,23 @@
 interface TerminalOutputProps {
-  command: string;
+  command?: string;
   stdout?: string;
   stderr?: string;
-  exitCode: number;
+  exitCode?: number;
 }
 
 export function TerminalOutput({ command, stdout, stderr, exitCode }: TerminalOutputProps) {
-  const isSuccess = exitCode === 0;
+  const hasHeader = command !== undefined || exitCode !== undefined;
+  const isSuccess = (exitCode ?? 0) === 0;
+
+  if (!hasHeader) {
+    if (!stdout && !stderr) return null;
+    return (
+      <div className="visualization-container bg-black rounded-md px-3 py-2 font-mono text-xs overflow-x-auto">
+        {stdout && <pre className="text-gray-300 whitespace-pre-wrap">{stdout}</pre>}
+        {stderr && <pre className="text-red-400 whitespace-pre-wrap mt-1">{stderr}</pre>}
+      </div>
+    );
+  }
 
   return (
     <div className="visualization-container border border-border rounded-md overflow-hidden">

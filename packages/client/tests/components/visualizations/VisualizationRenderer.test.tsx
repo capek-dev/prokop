@@ -58,7 +58,7 @@ describe('VisualizationRenderer', () => {
       content: '# Hello World',
     };
     render(<VisualizationRenderer visualization={viz} />);
-    expect(screen.getByText('# Hello World')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Hello World' })).toBeInTheDocument();
   });
 
   it('renders JSON for "table" type', () => {

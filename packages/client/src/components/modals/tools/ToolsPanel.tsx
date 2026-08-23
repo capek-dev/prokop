@@ -7,7 +7,7 @@ interface PanelProps {
   sdkClient: ProkopaiClient | null;
 }
 
-type ToolsListEntry = ToolDefinition & { source?: 'builtin' | 'installed' };
+type ToolsListEntry = ToolDefinition & { source?: 'builtin' | 'installed' | 'domain' };
 
 export function ToolsPanel({ sdkClient }: PanelProps) {
   const { data: toolsData, isLoading: toolsLoading, error: toolsError } = useToolsQuery(sdkClient);
@@ -51,7 +51,7 @@ export function ToolsPanel({ sdkClient }: PanelProps) {
         <p className="text-sm text-muted-foreground flex items-center gap-1.5">
           <Package className="size-3.5 shrink-0" />
           <span>
-            {tools.length} tool{tools.length !== 1 ? 's' : ''} loaded ({tools.filter((t) => t.source === 'builtin').length} built-in). Configure their environment variables in the{' '}
+            {tools.length} tool{tools.length !== 1 ? 's' : ''} loaded ({tools.filter((t) => t.source === 'builtin' || t.source === 'domain').length} built-in). Configure their environment variables in the{' '}
             <span className="font-medium text-foreground">Environment</span> tab.
           </span>
         </p>
@@ -68,7 +68,7 @@ export function ToolsPanel({ sdkClient }: PanelProps) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-sm font-medium break-words">{tool.name}</span>
-                  {tool.source === 'builtin' && (
+                  {(tool.source === 'builtin' || tool.source === 'domain') && (
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 gap-1 shrink-0">
                       <Cpu className="size-2.5" />
                       built-in

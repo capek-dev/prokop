@@ -7,6 +7,7 @@ import { SuccessIndicator } from './SuccessIndicator';
 import { TerminalOutput } from './TerminalOutput';
 import { TodoList } from './TodoList';
 import { StructuredResponse } from './StructuredResponse';
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 
 interface VisualizationRendererProps {
   visualization?: AnyVisualization;
@@ -77,8 +78,8 @@ export const VisualizationRenderer = memo(function VisualizationRenderer({ visua
 
     case 'markdown':
       return (
-        <div className="prose prose-sm dark:prose-invert">
-          {visualization.content}
+        <div className="prose prose-sm dark:prose-invert max-w-full">
+          <MarkdownRenderer>{visualization.content}</MarkdownRenderer>
         </div>
       );
 

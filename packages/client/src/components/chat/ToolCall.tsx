@@ -1,13 +1,18 @@
 import { memo, useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, ExternalLink, Copy, Check, Wrench, Loader2, CheckCircle, XCircle, Clock, Pause } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Copy, Check, Loader2, CheckCircle, XCircle, Clock, Pause } from 'lucide-react';
 import type { ToolPart, AnyVisualization, AskResponse, Session } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { VisualizationRenderer } from '@/components/visualizations';
+import { TerminalOutput } from '@/components/visualizations/TerminalOutput';
 import { AskQuestion } from './AskQuestion';
 import type { PendingAskRequest } from '@/stores/askStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { RENDER_BUDGETS } from '@/lib/renderBudgets';
+import { getToolRowInfo } from '@/lib/toolSummaries';
+import type { ToolRowChip } from '@/lib/toolSummaries';
+import { useSdkClient } from '@/contexts/ServerClientContext';
+import { useToolDisplayCatalog } from '@/hooks/queries';
 
 interface LazyOutputProps {
   content: string;
@@ -110,6 +115,12 @@ function getDescendantSessionIds(parentId: string, sessions: Session[]): Set<str
   return descendants;
 }
 
+const chipToneClass: Record<ToolRowChip['tone'], string> = {
+  neutral: 'bg-muted text-muted-foreground',
+  success: 'bg-success/15 text-success',
+  error: 'bg-red-500/15 text-red-400',
+};
+
 const areToolCallPropsEqual = (
   prev: ToolCallProps,
   next: ToolCallProps
@@ -151,31 +162,30 @@ export const ToolCall = memo(function ToolCall({
       : JSON.stringify(state.output, null, 2);
   }, [status, state, isOpen]);
 
-  // Extract visualization at component level to render outside collapsible
   const visualization = status === 'completed' && 'output' in state
     ? extractVisualization(state.output)
     : undefined;
 
-  // Extract taskSessionId first so it's available for ask matching
   const taskSessionId = extractTaskSessionId(part);
 
-  // Get sessions from store for descendant matching
   const sessions = useSessionStore((s) => s.sessions);
 
-  // Collect all relevant pending asks for this tool call
+  const sdkClient = useSdkClient();
+  const catalog = useToolDisplayCatalog(sdkClient);
+
+  const { summary, chips } = useMemo(() => getToolRowInfo(part, catalog), [part, catalog]);
+
   const allPendingAsks: PendingAskRequest[] = [];
 
   if (status === 'pending' || status === 'running') {
-    // Direct ask for this tool call
     const directAsk = pendingAskRequests.find((r) => r.toolCallId === part.callId);
     if (directAsk) {
       allPendingAsks.push(directAsk);
     }
 
-    // For task tools, also surface asks from the child session and its descendants
     if (taskSessionId) {
       const descendantIds = getDescendantSessionIds(taskSessionId, sessions);
-      descendantIds.add(taskSessionId); // Include the child session itself
+      descendantIds.add(taskSessionId);
       const childAsks = pendingAskRequests.filter(
         (r) => {
           const isChildOrDescendant = r.originSessionId && descendantIds.has(r.originSessionId);
@@ -198,15 +208,6 @@ export const ToolCall = memo(function ToolCall({
     }
   };
 
-  const truncatedArgs = (() => {
-    try {
-      const args = JSON.stringify(state.input);
-      return args.length > 50 ? args.slice(0, 47) + '...' : args;
-    } catch {
-      return String(state.input);
-    }
-  })();
-
   return (
     <div className="my-1">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -222,14 +223,24 @@ export const ToolCall = memo(function ToolCall({
               <ChevronRight className="size-4 text-muted-foreground" />
             )}
 
-            <Wrench className="size-3" />
-            <span className="text-xs truncate max-w-[120px] sm:max-w-none">{part.name}</span>
+            <span className="flex min-w-0 flex-1 items-baseline">
+              <span className="text-xs truncate max-w-[120px] sm:max-w-none">{part.name}</span>
 
-            {!isOpen && (
-              <span className="text-xs text-muted-foreground font-mono truncate flex-1 min-w-0 hidden sm:block">
-                {truncatedArgs}
+              {summary && (
+                <span className="text-xs text-muted-foreground font-mono truncate min-w-0 flex-1 hidden sm:inline">
+                  {`: ${summary}`}
+                </span>
+              )}
+            </span>
+
+            {chips.map((chip) => (
+              <span
+                key={chip.label}
+                className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 hidden sm:inline ${chipToneClass[chip.tone]}`}
+              >
+                {chip.label}
               </span>
-            )}
+            ))}
 
             {taskSessionId && onNavigateToSubagent && (
               <Button
@@ -251,6 +262,14 @@ export const ToolCall = memo(function ToolCall({
 
         {isOpen && <CollapsibleContent>
           <div className="pl-5 pb-2 flex flex-col gap-2">
+            {/* Pretty body for collapsed visualizations (chip-only while collapsed) */}
+            {visualization && visualization.collapsed && visualization.type !== 'none' && (
+              <div>
+                <div className="text-xs uppercase text-muted-foreground mb-1">Result</div>
+                <VisualizationRenderer visualization={visualization} />
+              </div>
+            )}
+
             {/* Input */}
             <div>
               <div className="text-xs uppercase text-muted-foreground mb-1">Input</div>
@@ -273,7 +292,7 @@ export const ToolCall = memo(function ToolCall({
               </Button>
             )}
 
-            {/* Output - always show raw (visualization shown separately below) */}
+            {/* Output - raw debug JSON */}
             {status === 'completed' && serializedOutput !== null && (
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -324,10 +343,16 @@ export const ToolCall = memo(function ToolCall({
         </div>
       )}
 
-      {/* Visualization - outside Collapsible, always visible at bottom */}
-      {status === 'completed' && visualization && (
-        <div className="mt-2">
-          <VisualizationRenderer visualization={visualization} />
+      {/* Content below the row (no click needed): tool-declared visualizations.
+          `collapsed: true` means the tool says the row + chip suffices;
+          `none` visualizations carry no body. Expand is debug-only. */}
+      {status === 'completed' && visualization && !visualization.collapsed && visualization.type !== 'none' && (
+        <div className="mt-1">
+          {visualization.type === 'shell-output' ? (
+            <TerminalOutput stdout={visualization.stdout} stderr={visualization.stderr} />
+          ) : (
+            <VisualizationRenderer visualization={visualization} />
+          )}
         </div>
       )}
     </div>
