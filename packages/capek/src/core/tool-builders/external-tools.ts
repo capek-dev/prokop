@@ -14,6 +14,7 @@ import { interruptManager } from '../interrupt';
 import {
   getContributedDomainToolPayloads,
   getDomainToolFallback,
+  mergeDomainToolVisualization,
   type DomainToolPayload,
 } from '../../runtime/domain-tool-source';
 import { isToolAllowedInContext, type ToolExecutionScope } from '../tool-capabilities';
@@ -165,7 +166,7 @@ export async function buildExternalTools(options: ExternalToolsOptions): Promise
               },
               allowedSubagentIds,
               broadcast,
-            });
+            }).then((result) => mergeDomainToolVisualization(taskPayload, args, result));
           } finally {
             interruptManager.unregisterToolExecution(sessionId, toolCallId);
           }

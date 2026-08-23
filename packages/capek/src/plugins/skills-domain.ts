@@ -57,6 +57,25 @@ export function createSkillToolPayload(): DomainToolPayload {
     name: 'skill',
     description: 'Load a specialized skill that provides domain-specific instructions and workflows.',
     inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
+    display: { summary: '{name}' },
+    visualize: (input, result) => {
+      const output = (result as { output?: unknown }).output;
+      const content = typeof output === 'string' ? output : undefined;
+      const title = (result as { title?: unknown }).title;
+      if (content && content.length <= 20_000) {
+        return {
+          type: 'markdown',
+          collapsed: true,
+          badge: `${(content.length / 1024).toFixed(1)} KB`,
+          content: content.slice(0, 20_000),
+          title: typeof title === 'string' ? title : String(input.name ?? 'Skill'),
+        };
+      }
+      return {
+        type: 'none',
+        message: typeof title === 'string' ? title : `Loaded skill: ${String(input.name ?? '')}`,
+      };
+    },
     resolveDefinition: async (sessionId, options) => {
       const definition = await buildSkillToolDefinition(
         options?.workspacePath as string,
@@ -84,6 +103,23 @@ export function createSkillManageToolPayload(): DomainToolPayload {
     name: 'skill_manage',
     description: skillManageToolDefinition.description,
     inputSchema: skillManageToolDefinition.inputSchema,
+    display: { summary: '{action} {name}' },
+    visualize: (_input, result) => {
+      const skills = Array.isArray(result.skills) ? result.skills : undefined;
+      if (skills) {
+        return {
+          type: 'file-list',
+          collapsed: true,
+          badge: `${skills.length} skill${skills.length === 1 ? '' : 's'}`,
+          files: skills.slice(0, 20).map((s) => ({
+            path: String((s as { name?: string }).name ?? ''),
+            content: (s as { description?: string }).description,
+          })),
+          total: skills.length,
+        };
+      }
+      return { type: 'none', message: String(result.title ?? 'Skill updated') };
+    },
     resolveDefinition: async (_sessionId, options) => {
       const description = await buildSkillManageToolDescription(
         getHostLayout().workspaceSkillsDir(options?.workspacePath as string),
@@ -119,6 +155,23 @@ export function createAgentSkillManageToolPayload(): DomainToolPayload {
     name: 'agent_skill_manage',
     description: skillManageToolDefinition.description,
     inputSchema: skillManageToolDefinition.inputSchema,
+    display: { summary: '{action} {name}' },
+    visualize: (_input, result) => {
+      const skills = Array.isArray(result.skills) ? result.skills : undefined;
+      if (skills) {
+        return {
+          type: 'file-list',
+          collapsed: true,
+          badge: `${skills.length} skill${skills.length === 1 ? '' : 's'}`,
+          files: skills.slice(0, 20).map((s) => ({
+            path: String((s as { name?: string }).name ?? ''),
+            content: (s as { description?: string }).description,
+          })),
+          total: skills.length,
+        };
+      }
+      return { type: 'none', message: String(result.title ?? 'Skill updated') };
+    },
     resolveDefinition: async (_sessionId, options) => {
       const description = await buildSkillManageToolDescription(
         getHostLayout().agentSkillsDir(options?.agentDir as string),

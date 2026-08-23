@@ -43,3 +43,6 @@ export {
   stripVisualization,
   extractVisualization,
 } from '../utils/strip-visualization';
+export {
+  listDomainToolFallbackDefinitions,
+} from '../runtime/domain-tool-source';

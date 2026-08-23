@@ -270,6 +270,7 @@ describe('package boundary', () => {
       'getTool',
       'getWorkspaceToolDiscovery',
       'hasUnscannedToolCache',
+      'listDomainToolFallbackDefinitions',
       'listInstalledTools',
       'listTools',
       'loadToolModule',

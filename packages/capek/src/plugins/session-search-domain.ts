@@ -92,7 +92,44 @@ function sessionSearchPayload(deps: SessionSearchPayloadDeps): DomainToolPayload
     name: sessionSearchToolDefinition.name,
     description: sessionSearchToolDefinition.description,
     inputSchema: sessionSearchToolDefinition.inputSchema as Readonly<Record<string, unknown>>,
+    display: { summary: '{action} {query}' },
     isEnabled: deps.isEnabled,
+    visualize: (_input, result) => {
+      const results = Array.isArray(result.results) ? result.results : undefined;
+      if (results) {
+        return {
+          type: 'file-list',
+          collapsed: true,
+          badge: `${results.length} result${results.length === 1 ? '' : 's'}`,
+          title: String(result.query ?? String(result.title ?? 'Search')),
+          files: results.slice(0, 20).map((r) => ({
+            path: String((r as { sessionTitle?: string }).sessionTitle ?? (r as { sessionId?: string }).sessionId ?? ''),
+          })),
+          total: results.length,
+        };
+      }
+      const sessions = Array.isArray(result.sessions) ? result.sessions : undefined;
+      if (sessions) {
+        return {
+          type: 'file-list',
+          collapsed: true,
+          badge: `${sessions.length} session${sessions.length === 1 ? '' : 's'}`,
+          files: sessions.slice(0, 20).map((s) => ({
+            path: String((s as { title?: string }).title ?? (s as { id?: string }).id ?? ''),
+          })),
+          total: sessions.length,
+        };
+      }
+      const messages = Array.isArray(result.messages) ? result.messages : undefined;
+      if (messages) {
+        return {
+          type: 'none',
+          badge: `${messages.length} message${messages.length === 1 ? '' : 's'}`,
+          message: String(result.sessionTitle ?? 'Session context'),
+        };
+      }
+      return { type: 'none', message: String(result.title ?? 'Session search completed') };
+    },
     execute: async (input, context) => {
       // workspace-tools captures permissionRisk and includeToolResults at
       // build time exactly like pre-C5 and passes them through the execution

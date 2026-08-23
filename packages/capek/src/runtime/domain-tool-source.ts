@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { Ask } from '@capekai/tool';
+import type { Ask, ToolDisplayConfig } from '@capekai/tool';
+import type { AnyVisualization } from '@capekai/types';
 
 /**
  * Internal contributed-domain-tool payload context (C5).
@@ -35,6 +36,18 @@ export interface DomainToolPayload {
   readonly name: string;
   readonly description: string;
   readonly inputSchema: Readonly<Record<string, unknown>>;
+  /** Client display hints declared by the domain (collapsed-row summary
+   * template). Travels through tool catalogs to clients; not consumed by
+   * the runtime. Mirrors ToolDefinition.display. */
+  readonly display?: ToolDisplayConfig;
+  /** Optional result visualization: called with the tool input and the
+   * domain's execute result after success. The builders merge the returned
+   * visualization into the tool output as `_visualization` (stripped again
+   * before LLM consumption). */
+  readonly visualize?: (
+    input: Record<string, unknown>,
+    result: Record<string, unknown>,
+  ) => AnyVisualization | undefined;
   /** The domain's availability predicate (workspace settings gate). The
    * owning domain uses the same predicate for its context contribution. */
   readonly isEnabled?: (workspaceId: string, sessionId?: string) => boolean | Promise<boolean>;
@@ -66,6 +79,21 @@ export function isDomainToolPayload(value: unknown): value is DomainToolPayload 
     && typeof candidate.execute === 'function';
 }
 
+/** Merges a payload's `visualize` result into the execute output as
+ * `_visualization`, mirroring the external-tool builder's merge. Only a
+ * successful object-shaped output can carry a visualization. */
+export function mergeDomainToolVisualization(
+  payload: DomainToolPayload,
+  input: Record<string, unknown>,
+  result: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!payload.visualize) return result;
+  if (typeof result.error === 'string' && result.error.length > 0) return result;
+  const visualization = payload.visualize(input, result);
+  if (!visualization) return result;
+  return { ...result, _visualization: visualization };
+}
+
 const scopedPayloads = new AsyncLocalStorage<ReadonlyMap<string, DomainToolPayload>>();
 
 export function withContributedDomainToolPayloads<T>(
@@ -89,6 +117,23 @@ export function registerDomainToolFallback(name: string, payload: DomainToolPayl
 
 export function getDomainToolFallback(name: string): DomainToolPayload | null {
   return fallbacks.get(name) ?? null;
+}
+
+/** Registered domain-tool fallback definitions for tool catalogs: name,
+ * description, schema, and display hints. Introspects the fallback registry
+ * the server installs at bootstrap. */
+export function listDomainToolFallbackDefinitions(): Array<{
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  display?: ToolDisplayConfig;
+}> {
+  return [...fallbacks.values()].map((payload) => ({
+    name: payload.name,
+    description: payload.description,
+    inputSchema: payload.inputSchema as Record<string, unknown>,
+    ...(payload.display ? { display: payload.display } : {}),
+  }));
 }
 
 function isTestExecution(): boolean {

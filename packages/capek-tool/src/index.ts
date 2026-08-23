@@ -46,6 +46,16 @@ export type BufferEncoding = 'utf-8' | 'ascii' | 'utf-16le' | 'ucs2' | 'base64' 
 // Tool Definition (new module format)
 // ===========================================
 
+export interface ToolDisplayConfig {
+  /**
+   * Template for the collapsed tool-call row summary, resolved against
+   * input args with `{field}` placeholders (e.g. `'{command}'`, `'{path}'`).
+   * Missing fields resolve to an empty string. When absent, the client
+   * falls back to truncated input JSON.
+   */
+  summary?: string;
+}
+
 export interface ToolDefinition {
   name: string;
   description: string;
@@ -54,6 +64,12 @@ export interface ToolDefinition {
   timeout?: number;
   env?: string[];
   capabilities?: string[];
+  /**
+   * Client display hints declared by the tool itself. Not consumed by
+   * the server runtime; travels verbatim through the tool catalog to
+   * clients that choose to use it.
+   */
+  display?: ToolDisplayConfig;
 }
 
 // ===========================================

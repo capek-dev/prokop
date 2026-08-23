@@ -54,6 +54,20 @@ export function createMemoryToolPayload(): DomainToolPayload {
     name: memoryToolDefinition.name,
     description: memoryToolDefinition.description,
     inputSchema: memoryToolDefinition.inputSchema,
+    display: { summary: '{action} {target}' },
+    visualize: (_input, result) => {
+      const r = result as { action?: string; target?: string; usage?: { chars?: number; limit?: number }; entries?: string[] };
+      if (r.action === 'list') {
+        const count = Array.isArray(r.entries) ? r.entries.length : 0;
+        const usage = r.usage ? `${r.usage.chars ?? 0}/${r.usage.limit ?? 0} chars` : '';
+        return {
+          type: 'none',
+          badge: [`${count} entr${count === 1 ? 'y' : 'ies'}`, usage].filter(Boolean).join(' · '),
+          message: `Memory (${r.target ?? 'memory'})`,
+        };
+      }
+      return { type: 'none', message: String(result.title ?? 'Memory updated') };
+    },
     execute: async (input, context) => {
       const workspacePath = context.workspacePath as string;
       const risk = (context.permissionRisk ?? 'none') as PermissionRiskLevel;
@@ -99,6 +113,19 @@ Actions:
 
 Character limits: user=1500, memory=2500. Keep entries compact.`,
     inputSchema: memoryToolDefinition.inputSchema,
+    display: { summary: '{action} {target}' },
+    visualize: (_input, result) => {
+      const r = result as { action?: string; target?: string; entries?: string[] };
+      if (r.action === 'list') {
+        const count = Array.isArray(r.entries) ? r.entries.length : 0;
+        return {
+          type: 'none',
+          badge: `${count} entr${count === 1 ? 'y' : 'ies'}`,
+          message: `Agent memory (${r.target ?? 'memory'})`,
+        };
+      }
+      return { type: 'none', message: String(result.title ?? 'Agent memory updated') };
+    },
     execute: async (input, context) => {
       const result = await executeMemoryTool(input, context.agentDir as string, 'none');
       if (!result.success) {

@@ -295,6 +295,10 @@ describe('C5 scheduler composed execution', () => {
           action: 'create',
           title: 'Scheduled job "Daily task" created',
           job: scheduledJob(),
+          _visualization: {
+            type: 'none',
+            message: 'Scheduled job "Daily task" created',
+          },
         });
         expect(created).toBe(true);
 
@@ -306,6 +310,10 @@ describe('C5 scheduler composed execution', () => {
           action: 'trigger',
           title: 'Job "Daily task" triggered',
           jobId: 'job-1',
+          _visualization: {
+            type: 'none',
+            message: 'Job "Daily task" triggered',
+          },
         });
         expect(triggered).toBe(true);
       });
@@ -361,6 +369,11 @@ describe('C5 scheduler composed execution', () => {
           action: 'list',
           title: '1 scheduled job',
           jobs: [scheduledJob()],
+          _visualization: {
+            type: 'none',
+            badge: '1 job',
+            message: '1 scheduled job',
+          },
         });
       });
     } finally {
@@ -411,6 +424,10 @@ describe('C5 scheduler composed execution', () => {
           action: 'create',
           title: 'Scheduled job "Daily task" created',
           job: scheduledJob(),
+          _visualization: {
+            type: 'none',
+            message: 'Scheduled job "Daily task" created',
+          },
         });
       });
     } finally {
@@ -482,6 +499,10 @@ describe('C5 scheduler composed execution', () => {
           action: 'create',
           title: 'Scheduled job "Daily task" created',
           job: scheduledJob(),
+          _visualization: {
+            type: 'none',
+            message: 'Scheduled job "Daily task" created',
+          },
         });
       });
     } finally {
@@ -816,6 +837,10 @@ describe('unscoped compatibility fallback', () => {
       action: 'create',
       title: 'Scheduled job "Daily task" created',
       job: scheduledJob(),
+      _visualization: {
+        type: 'none',
+        message: 'Scheduled job "Daily task" created',
+      },
     });
   });
 
@@ -882,6 +907,10 @@ describe('unscoped compatibility fallback', () => {
       action: 'create',
       title: 'Scheduled job "Daily task" created',
       job: scheduledJob(),
+      _visualization: {
+        type: 'none',
+        message: 'Scheduled job "Daily task" created',
+      },
     });
   });
 });

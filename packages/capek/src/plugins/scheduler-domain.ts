@@ -88,7 +88,22 @@ function schedulerPayload(deps: SchedulerPayloadDeps): DomainToolPayload {
     name: schedulerToolDefinition.name,
     description: schedulerToolDefinition.description,
     inputSchema: schedulerToolDefinition.inputSchema as Readonly<Record<string, unknown>>,
+    display: { summary: '{action} {name}' },
     isEnabled: deps.isEnabled,
+    visualize: (_input, result) => {
+      const jobs = Array.isArray(result.jobs) ? result.jobs.length : undefined;
+      if (jobs !== undefined) {
+        return {
+          type: 'none',
+          badge: `${jobs} job${jobs === 1 ? '' : 's'}`,
+          message: String(result.title ?? ''),
+        };
+      }
+      return {
+        type: 'none',
+        message: String(result.title ?? 'Scheduler action completed'),
+      };
+    },
     execute: async (input, context) => {
       // workspace-tools captures the settings at build time exactly like
       // pre-C5 and passes the value through the execution context; the

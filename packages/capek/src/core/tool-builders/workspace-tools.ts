@@ -2,6 +2,7 @@ import { tool, jsonSchema } from 'ai';
 import {
   getContributedDomainToolPayloads,
   getDomainToolFallback,
+  mergeDomainToolVisualization,
   type DomainToolPayload,
 } from '../../runtime/domain-tool-source';
 import { getWorkspace } from '../../storage/runtime';
@@ -83,7 +84,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
             workspacePath,
             allowedSkills,
             agentSkillsDir,
-          }),
+          }).then((result) => mergeDomainToolVisualization(skillPayload, args, result)),
       });
     }
   }
@@ -100,7 +101,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
         const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
         try {
           const askApi = createAskApiOrThrow(sessionId, toolCallId, 'memory', broadcastFn, workspaceId, rootSessionId);
-          return await memoryPayload.execute(args, {
+          const result = await memoryPayload.execute(args, {
             workspaceId,
             sessionId,
             ask: (ask: import('@capekai/tool').Ask) => askApi(ask),
@@ -108,6 +109,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
             workspacePath,
             permissionRisk,
           });
+          return mergeDomainToolVisualization(memoryPayload, args, result);
         } finally {
           interruptManager.unregisterToolExecution(sessionId, toolCallId);
           await rejectPendingAsksByToolCallId(toolCallId);
@@ -183,15 +185,16 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
         execute: async (args: Record<string, unknown>, { toolCallId }: { toolCallId: string }) => {
           const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
           try {
-            const askApi = createAskApiOrThrow(sessionId, toolCallId, 'skill_manage', broadcastFn, workspaceId, rootSessionId);
-            return await skillManagePayload.execute(args, {
-              workspaceId,
-              sessionId,
-              ask: (ask: import('@capekai/tool').Ask) => askApi(ask),
-              agentId,
-              workspacePath,
-              permissionRisk,
-            });
+          const askApi = createAskApiOrThrow(sessionId, toolCallId, 'skill_manage', broadcastFn, workspaceId, rootSessionId);
+          const result = await skillManagePayload.execute(args, {
+            workspaceId,
+            sessionId,
+            ask: (ask: import('@capekai/tool').Ask) => askApi(ask),
+            agentId,
+            workspacePath,
+            permissionRisk,
+          });
+          return mergeDomainToolVisualization(skillManagePayload, args, result);
           } finally {
             interruptManager.unregisterToolExecution(sessionId, toolCallId);
             await rejectPendingAsksByToolCallId(toolCallId);
@@ -215,7 +218,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
         const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
         try {
           const askApi = createAskApiOrThrow(sessionId, toolCallId, sessionSearchPayload.name, broadcastFn, workspaceId, rootSessionId);
-          return await sessionSearchPayload.execute(
+          const result = await sessionSearchPayload.execute(
             args,
             {
               workspaceId,
@@ -226,6 +229,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
               includeToolResults: searchSettings?.includeToolResults === true,
             },
           );
+          return mergeDomainToolVisualization(sessionSearchPayload, args, result);
         } finally {
           interruptManager.unregisterToolExecution(sessionId, toolCallId);
           await rejectPendingAsksByToolCallId(toolCallId);
@@ -250,7 +254,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
         const _toolAbortController = interruptManager.registerToolExecution(sessionId, toolCallId);
         try {
           const askApi = createAskApiOrThrow(sessionId, toolCallId, schedulerPayload.name, broadcastFn, workspaceId, rootSessionId);
-          return await schedulerPayload.execute(
+          const result = await schedulerPayload.execute(
             args,
             {
               workspaceId,
@@ -260,6 +264,7 @@ export async function buildWorkspaceTools(options: WorkspaceToolsOptions): Promi
               permissionRisk: schedulingRisk,
             },
           );
+          return mergeDomainToolVisualization(schedulerPayload, args, result);
         } finally {
           interruptManager.unregisterToolExecution(sessionId, toolCallId);
           await rejectPendingAsksByToolCallId(toolCallId);

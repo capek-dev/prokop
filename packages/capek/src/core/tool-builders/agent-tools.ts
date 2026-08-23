@@ -2,6 +2,7 @@ import { tool, jsonSchema } from 'ai';
 import {
   getContributedDomainToolPayloads,
   getDomainToolFallback,
+  mergeDomainToolVisualization,
   type DomainToolPayload,
 } from '../../runtime/domain-tool-source';
 import type { ToolMap } from './types';
@@ -42,7 +43,7 @@ export async function buildAgentTools(options: AgentToolsOptions): Promise<ToolM
             throw new Error('Cannot ask user: no broadcast channel available');
           },
           agentDir,
-        }),
+        }).then((result) => mergeDomainToolVisualization(agentMemoryPayload, args, result)),
     });
   }
 
@@ -62,7 +63,7 @@ export async function buildAgentTools(options: AgentToolsOptions): Promise<ToolM
             throw new Error('Cannot ask user: no broadcast channel available');
           },
           agentDir,
-        }),
+        }).then((result) => mergeDomainToolVisualization(agentSkillManagePayload, args, result)),
     });
   }
 

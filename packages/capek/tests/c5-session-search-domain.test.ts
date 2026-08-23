@@ -277,6 +277,14 @@ const foundShape = {
     messagesBefore: 3,
     messagesAfter: 4,
   }],
+  _visualization: {
+    type: 'file-list',
+    collapsed: true,
+    badge: '1 result',
+    title: 'needle',
+    files: [{ path: 'S1' }],
+    total: 1,
+  },
 };
 
 function searchHostWithFound(): SessionSearchHost {
@@ -348,6 +356,14 @@ describe('C5 session-search composed execution', () => {
           query: 'needle',
           scope: 'workspace',
           results: [],
+          _visualization: {
+            type: 'file-list',
+            collapsed: true,
+            badge: '0 results',
+            title: 'needle',
+            files: [],
+            total: 0,
+          },
         });
       });
     } finally {

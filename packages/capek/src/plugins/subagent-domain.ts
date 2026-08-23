@@ -118,6 +118,17 @@ function taskPayload(deps: TaskPayloadDeps): DomainToolPayload {
     name: placeholder.name,
     description: placeholder.description,
     inputSchema: placeholder.inputSchema,
+    display: { summary: '{description}' },
+    visualize: (_input, result) => {
+      const taskId = typeof result.task_id === 'string' ? result.task_id : '';
+      const text = typeof result.result === 'string' ? result.result : '';
+      return {
+        type: 'none',
+        badge: taskId ? 'session ready' : undefined,
+        message: text.split('\n').filter((line) => line && !line.startsWith('task_id:'))
+          .join('\n').replace(/<\/?task_result>/g, '').replace(/<\/?structured_result>/g, '').trim().slice(0, 200) || 'Subagent completed',
+      };
+    },
     isEnabled: async (workspaceId, sessionId) =>
       typeof sessionId === 'string' && await deps.canSpawn(sessionId),
     resolveDefinition: async (sessionId, options) => {

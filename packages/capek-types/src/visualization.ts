@@ -10,6 +10,8 @@ export interface ToolVisualization {
   type: VisualizationType;
   title?: string;
   collapsed?: boolean;
+  /** Optional compact badge text for the collapsed row (e.g. `120 lines`). */
+  badge?: string;
 }
 
 /**
