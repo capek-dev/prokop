@@ -1,9 +1,9 @@
 {
-  "name": "jean2",
+  "name": "prokop",
   "type": "module",
   "version": "0.1.0",
   "private": true,
-  "description": "Jean2 - AI Agent Monorepo",
+  "description": "Prokop - AI Agent Monorepo",
   "workspaces": [
     "packages/*",
     "tools"

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "ai-agent-server",
+      "name": "prokop",
       "dependencies": {
         "diff": "^8.0.3",
       },
