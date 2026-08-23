@@ -1,6 +1,8 @@
 # @capekai/core
 
-Agent framework contracts and runtime implementations for composition, execution, hosts, providers, tools, sandbox, and storage.
+Bun-native agent framework contracts and runtime implementations for composition, execution, hosts, providers, tools, sandbox, and storage.
+
+Requires Bun 1.3 or newer.
 
 ## Install
 

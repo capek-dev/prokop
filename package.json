@@ -29,6 +29,9 @@
     "build:bin:windows": "cd packages/server && bun run build:bin:windows",
     "build:all": "cd packages/server && bun run build:all",
     "build:tools": "bun run tools/build.ts",
+    "capek:release:check": "bun run --filter '@capekai/types' typecheck && bun run --filter '@capekai/tool' typecheck && bun run --filter '@capekai/core' typecheck && bun test packages/capek-types/tests packages/capek-tool/tests packages/capek/tests/package-boundary.test.ts packages/capek/tests/tool-entrypoint.test.ts",
+    "capek:release:pack": "(cd packages/capek-types && npm publish --dry-run --access public) && (cd packages/capek-tool && npm publish --dry-run --access public) && (cd packages/capek && npm publish --dry-run --access public)",
+    "capek:release:validate": "bun run capek:release:check && bun run capek:release:pack",
 
     "dev:electron": "cd packages/client-electron && bun run electron:dev",
     "electron:build": "cd packages/client-electron && bun run electron:build",

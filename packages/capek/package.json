@@ -1,8 +1,15 @@
 {
   "name": "@capekai/core",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.0",
+  "description": "Bun-native composable agent runtime and framework for Capek.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/capek-dev/prokop.git",
+    "directory": "packages/capek"
+  },
   "type": "module",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -57,11 +64,21 @@
       "default": "./src/storage.ts"
     }
   },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.35",
     "@ai-sdk/openai": "^3.0.84",
-    "@capekai/tool": "workspace:*",
-    "@capekai/types": "workspace:*",
+    "@capekai/tool": "^1.0.0",
+    "@capekai/types": "^1.0.0",
     "@openrouter/ai-sdk-provider": "^2.3.3",
     "@zip.js/zip.js": "^2.7.60",
     "ai": "^6.0.116",
@@ -72,7 +89,7 @@
     "zhipu-ai-provider": "^0.2.2"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && bun scripts/add-js-extensions.ts",
+    "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests",
     "test": "bun test tests"
