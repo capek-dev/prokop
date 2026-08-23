@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/promo_v1.1.0.webp" alt="Jean2 desktop client - chat interface, workspace selector, and tool execution" width="800">
+  <img src="docs/promo_v1.1.0.webp" alt="Prokop desktop client - chat interface, workspace selector, and tool execution" width="800">
 </p>
 
 <p align="center">
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  Jean is the server. Everything else (the LLM, the tools, the browser, the personality)<br>
+  Prokop is the server. Everything else (the LLM, the tools, the browser, the personality)<br>
   is something you connect <strong>to</strong> it. No default system prompt, no default tools,<br>
   no fixed personality. You opt in to each layer. Memory, skills, workflows, agents. Your call.
 </p>
@@ -21,9 +21,8 @@
 </p>
 
 <p align="center">
-  <a href="https://jean2.ai/docs/get-started/installation">Get Started</a> ·
-  <a href="https://jean2.ai/docs">Docs</a> ·
-  <a href="https://jean2.ai">Website</a> ·
+  <a href="docs/getting-started.md">Get Started</a> ·
+  <a href="docs/index.md">Docs</a> ·
   <a href="https://chromewebstore.google.com/detail/jean2browser/jpahdfmmfmmnacapmkchljmcijoedcpj">Chrome Extension</a> ·
   <a href="https://discord.com/invite/38sUKnUNPQ">Discord</a>
 </p>
@@ -34,28 +33,28 @@
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://jean2.ai/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/capek-dev/prokop/main/install/install-prokopai.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://jean2.ai/install.ps1 | iex
+irm https://raw.githubusercontent.com/capek-dev/prokop/main/install/install-prokopai.ps1 | iex
 ```
 
 **Run:**
 ```bash
 prokopai init
-jean2 start
-jean2 open
+prokopai start
+prokopai open
 ```
 
-The server binary includes the client and serves it at `http://localhost:8742`. Desktop app (macOS Electron) and PWA (any device) are also available. See the [Getting Started guide](https://jean2.ai/docs/get-started/installation).
+The server binary includes the client and serves it at `http://localhost:8742`. Desktop app (macOS Electron) and PWA (any device) are also available. See the [Getting Started guide](docs/getting-started.md).
 
 ---
 
 ## Features
 
-By default, Jean2 is as bare as Codex or OpenCode. A blank prompt. No memory. No skills. No session search. You opt in to each layer in **workspace settings**.
+By default, Prokop is as bare as Codex or OpenCode. A blank prompt. No memory. No skills. No session search. You opt in to each layer in **workspace settings**.
 
 | | |
 |---|---|
@@ -67,7 +66,7 @@ By default, Jean2 is as bare as Codex or OpenCode. A blank prompt. No memory. No
 | **Parallel Workflows** | Decompose, fan out 5 concurrent subagents, synthesize one answer. Only the final result lands in the main context window. |
 | **Scheduled Tasks** | Cron jobs that run as agent sessions. Daily code review, nightly dependency check, weekly changelog. No human in the loop. |
 | **Structured Responses** | Define a JSON schema, apply it to the next message. A yes/no question produces a yes/no answer. |
-| **Browser Automation** | Jean2Browser gives the agent real hands on Chrome: read, click, fill, navigate. Same interface as files and shell. |
+| **Browser Automation** | ProkopaiBrowser gives the agent real hands on Chrome: read, click, fill, navigate. Same interface as files and shell. |
 | **Bring Your Own Model** | OpenAI, DeepSeek, OpenRouter, MiniMax, Zhipu. Use API keys or your ChatGPT subscription via Codex. |
 | **MCP Integration** | Connect any MCP server. Full OAuth handled server-side. Tools appear alongside built-in tools. |
 | **Server-First** | Persistent 24/7 server. PWA on any device. Close your laptop. Open your phone. The agent never stops. |
@@ -75,14 +74,14 @@ By default, Jean2 is as bare as Codex or OpenCode. A blank prompt. No memory. No
 
 ---
 
-## Why Jean2?
+## Why Prokop?
 
-Jean connects **to** things. The browser. Your codebase. Any LLM. Jean2 is the hub.
+Prokop connects **to** things. The browser. Your codebase. Any LLM. Prokop is the hub.
 Everything else is a surface you choose to connect.
 
-- **No baked-in behavior.** Every AI coding agent ships with hidden system prompts you can't change. Claude Code has a long system prompt buried in the npm package. Cursor has behavior rules that override your preferences. Jean2 ships with none of that. The system prompt is composed from files you control. Every layer is visible and replaceable.
+- **No baked-in behavior.** Every AI coding agent ships with hidden system prompts you can't change. Claude Code has a long system prompt buried in the npm package. Cursor has behavior rules that override your preferences. Prokop ships with none of that. The system prompt is composed from files you control. Every layer is visible and replaceable.
 
-- **Everything is opt-in.** By default, Jean2 is a blank slate. You build the agent you want, layer by layer. Turn on memory. Turn on skills. Turn on session search. Or don't. Your call.
+- **Everything is opt-in.** By default, Prokop is a blank slate. You build the agent you want, layer by layer. Turn on memory. Turn on skills. Turn on session search. Or don't. Your call.
 
 - **You bring the keys, you keep the data.** Runs on your machine. No telemetry, no vendor lock-in, no subscription to a single AI company.
 
@@ -102,7 +101,7 @@ Everything else is a surface you choose to connect.
 └──────────────────────────┬────────────────────────────────┘
                            │
 ┌──────────────────────────┴────────────────────────────────┐
-│                   Server (@jean2/server)                  │
+│                   Server (@prokopai/server)               │
 │                                                           │
 │   Agent Loop (AI SDK v6) · Tool Executor                  │
 │   Goal Loop + Evaluator · Workflow Orchestrator           │
@@ -115,7 +114,7 @@ Everything else is a surface you choose to connect.
 │   ~/.prokopai/                    (data, tools, preconfigs)   │
 │   ~/.prokopai/agents/<name>/      (agent home: memory,        │
 │                                 skills, sessions)          │
-│   <workspace>/.jean2/          (memory, mcp.json)          │
+│   <workspace>/.prokopai/          (memory, mcp.json)          │
 │   <workspace>/.agents/skills/  (SKILL.md files)            │
 └───────────────────────────────────────────────────────────┘
                            │
@@ -127,15 +126,15 @@ Everything else is a surface you choose to connect.
 
 ## Documentation
 
-Full documentation site: [jean2.ai/docs](https://jean2.ai/docs/get-started/installation)
+Documentation lives in this repository: [docs/index.md](docs/index.md)
 
 | | |
 |---|---|
-| [Getting Started](https://jean2.ai/docs/get-started/installation) | Install, initialize, first session |
-| [Workspaces & Sessions](https://jean2.ai/docs/workspaces/overview) | Capabilities, Goal Mode, MCP, Skills, Memory, Workflows |
-| [Configuration](https://jean2.ai/docs/configuration/overview) | API keys, models, env vars, MCP config |
-| [Tools](https://jean2.ai/docs/reference/writing-tools) | Installed tools, capability tools, writing your own |
-| [Security & Auth](https://jean2.ai/docs/guides/auth) | Auth tokens, TLS, permissions |
+| [Getting Started](docs/getting-started.md) | Install, initialize, first session |
+| [Workspaces & Sessions](docs/workspaces.md) | Capabilities, Goal Mode, MCP, Skills, Memory, Workflows |
+| [Configuration](docs/configuration.md) | API keys, models, env vars, MCP config |
+| [Tools](docs/tools.md) | Installed tools, capability tools, writing your own |
+| [Security & Auth](docs/auth.md) | Auth tokens, TLS, permissions |
 
 ---
 
@@ -148,3 +147,7 @@ Full documentation site: [jean2.ai/docs](https://jean2.ai/docs/get-started/insta
 ## License
 
 [Apache 2.0](LICENSE)
+
+## Legacy Compatibility
+
+Prokop still accepts legacy `JEAN2_*` environment variables and falls back to `~/.jean2` data and workspace paths when the canonical `PROKOPAI_*` variables or `~/.prokopai` paths are absent. New setups should use the Prokop names. Run `prokopai migrate` to move an existing `~/.jean2` setup to `~/.prokopai` and rewrite legacy environment keys.

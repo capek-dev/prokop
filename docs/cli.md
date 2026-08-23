@@ -1,19 +1,19 @@
 # CLI Reference
 
-The Jean2 CLI (`jean2`) manages the server daemon, tools, models, and updates.
+The Prokop CLI (`prokopai`) manages the server daemon, tools, models, and updates.
 
 ```
-jean2 <command> [options]
+prokopai <command> [options]
 ```
 
 ## Daemon Management
 
-### `jean2 start`
+### `prokopai start`
 
 Start the server as a background daemon.
 
 ```
-jean2 start [-p|--port <port>] [-h|--host <host>]
+prokopai start [-p|--port <port>] [-h|--host <host>]
 ```
 
 | Flag | Default | Description |
@@ -21,38 +21,38 @@ jean2 start [-p|--port <port>] [-h|--host <host>]
 | `-p`, `--port` | `8742` | Port to listen on |
 | `-h`, `--host` | `0.0.0.0` | Host to bind to |
 
-### `jean2 stop`
+### `prokopai stop`
 
 Stop the running daemon.
 
-### `jean2 restart`
+### `prokopai restart`
 
 Restart the daemon. Accepts the same flags as `start`.
 
-### `jean2 status`
+### `prokopai status`
 
 Show daemon status (PID, port, host, uptime).
 
-### `jean2 logs`
+### `prokopai logs`
 
-Tail the server log file (`~/.jean2/server.log`).
+Tail the server log file (`~/.prokopai/server.log`).
 
-### `jean2 server`
+### `prokopai server`
 
 Start the server in the foreground (for systemd or debugging).
 
 ```
-jean2 server [-p|--port <port>] [-h|--host <host>]
+prokopai server [-p|--port <port>] [-h|--host <host>]
 ```
 
 ## Initialization
 
-### `jean2 init`
+### `prokopai init`
 
-Interactive first-time setup. Creates `~/.jean2/` with all necessary files.
+Interactive first-time setup. Creates `~/.prokopai/` with all necessary files.
 
 ```
-jean2 init [options]
+prokopai init [options]
 ```
 
 | Flag | Description |
@@ -69,12 +69,12 @@ jean2 init [options]
 
 ## Tools
 
-### `jean2 tools list`
+### `prokopai tools list`
 
 List available and installed tools.
 
 ```
-jean2 tools list [options]
+prokopai tools list [options]
 ```
 
 | Flag | Description |
@@ -84,12 +84,12 @@ jean2 tools list [options]
 | `--tag <tag>` | Filter by tag |
 | `--json` | JSON output |
 
-### `jean2 tools install`
+### `prokopai tools install`
 
 Install tools. Interactive if no names provided.
 
 ```
-jean2 tools install [names...] [options]
+prokopai tools install [names...] [options]
 ```
 
 | Flag | Description |
@@ -99,34 +99,34 @@ jean2 tools install [names...] [options]
 | `--force` | Reinstall even if already installed |
 | `--skip-runtime-check` | Skip runtime compatibility check |
 
-### `jean2 tools update`
+### `prokopai tools update`
 
 Update installed tools to the latest version.
 
 ```
-jean2 tools update [names...] [--dry-run]
+prokopai tools update [names...] [--dry-run]
 ```
 
-### `jean2 tools remove`
+### `prokopai tools remove`
 
 Remove installed tools.
 
 ```
-jean2 tools remove [names...] [--all]
+prokopai tools remove [names...] [--all]
 ```
 
-### `jean2 tools outdated`
+### `prokopai tools outdated`
 
 Check for available updates.
 
 ## Models
 
-### `jean2 models sync`
+### `prokopai models sync`
 
 Sync models from the upstream registry.
 
 ```
-jean2 models sync [--override]
+prokopai models sync [--override]
 ```
 
 | Flag | Description |
@@ -135,18 +135,18 @@ jean2 models sync [--override]
 
 ## Database
 
-### `jean2 migrate`
+### `prokopai migrate`
 
 Run pending database migrations.
 
 ## Updates
 
-### `jean2 update`
+### `prokopai update`
 
-Update the Jean2 binary to the latest version.
+Update the Prokop binary to the latest version.
 
 ```
-jean2 update [options]
+prokopai update [options]
 ```
 
 | Flag | Description |
@@ -158,19 +158,19 @@ jean2 update [options]
 
 ## Utility
 
-### `jean2 open`
+### `prokopai open`
 
 Open the built-in client in your browser.
 
-### `jean2 auth`
+### `prokopai auth`
 
 Show authentication status and masked token.
 
-### `jean2 version`
+### `prokopai version`
 
 Print the current version.
 
-### `jean2 help`
+### `prokopai help`
 
 Print the full help text.
 
@@ -178,7 +178,7 @@ Print the full help text.
 
 All server behavior is configured via environment variables. See [Configuration](./configuration.md) for the complete reference.
 
-- `~/.jean2/.env`: Server reads this automatically on startup
+- `~/.prokopai/.env`: Server reads this automatically on startup
 - System environment variables take precedence over `.env`
 - Changes to `.env` require a server restart
 
@@ -186,9 +186,9 @@ All server behavior is configured via environment variables. See [Configuration]
 
 | File | Purpose |
 |------|---------|
-| `~/.jean2/config.json` | Server configuration (port, host, paths) |
-| `~/.jean2/models.json` | Model registry (providers and models) |
-| `~/.jean2/.env` | Environment variables and API keys |
-| `~/.jean2/AGENTS.md` | Global agent instructions |
-| `~/.jean2/server.pid` | Daemon PID file |
-| `~/.jean2/server.log` | Server log file |
+| `~/.prokopai/config.json` | Server configuration (port, host, paths) |
+| `~/.prokopai/models.json` | Model registry (providers and models) |
+| `~/.prokopai/.env` | Environment variables and API keys |
+| `~/.prokopai/AGENTS.md` | Global agent instructions |
+| `~/.prokopai/server.pid` | Daemon PID file |
+| `~/.prokopai/server.log` | Server log file |

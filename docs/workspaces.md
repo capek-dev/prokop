@@ -5,7 +5,7 @@
 A workspace is a directory the agent operates within. There are two types:
 
 - **Physical workspace** - A real directory you choose on your machine. The agent can read and write files directly.
-- **Virtual workspace** - An isolated empty directory auto-generated in `~/.jean2/workspaces/<uuid>/`. Good for sandboxed experiments or when you don't want the agent touching real files.
+- **Virtual workspace** - An isolated empty directory auto-generated in `~/.prokopai/workspaces/<uuid>/`. Good for sandboxed experiments or when you don't want the agent touching real files.
 
 ### Creating a workspace
 
@@ -29,7 +29,7 @@ The agent loads this automatically when you switch to the workspace.
 
 ### Global instructions
 
-The file `~/.jean2/AGENTS.md` contains instructions that apply to **all** workspaces. These are loaded first, then workspace-specific ones are appended.
+The file `~/.prokopai/AGENTS.md` contains instructions that apply to **all** workspaces. These are loaded first, then workspace-specific ones are appended.
 
 ### Permissions
 
@@ -53,12 +53,12 @@ Each capability that lets the agent write files has a **permission risk level** 
 
 Lets the agent persist facts, decisions, and preferences across sessions. Two files store this:
 
-- **`.jean2/USER.md`** - User preferences and communication expectations (limit: 1500 chars)
-- **`.jean2/MEMORY.md`** - Workspace facts, conventions, commands, non-obvious fixes (limit: 2500 chars)
+- **`.prokopai/USER.md`** - User preferences and communication expectations (limit: 1500 chars)
+- **`.prokopai/MEMORY.md`** - Workspace facts, conventions, commands, non-obvious fixes (limit: 2500 chars)
 
 The agent decides what's worth remembering and saves entries automatically. Both files are injected into the system prompt at the start of every session. Tell it "we use pnpm" once. Two weeks later, in a new session, it already knows.
 
-To review or edit manually, open the files in `<workspace>/.jean2/`.
+To review or edit manually, open the files in `<workspace>/.prokopai/`.
 
 ### Skills
 
@@ -201,7 +201,7 @@ Cancel a running generation. Interrupts cascade to subagents: if a subagent is r
 
 ### Compact
 
-When a conversation approaches the model's context window limit, Jean2 automatically compacts (summarizes) older messages while preserving recent context and tool results. This is transparent. You don't need to do anything. See [Configuration](./configuration.md#compaction) for tuning options.
+When a conversation approaches the model's context window limit, Prokop automatically compacts (summarizes) older messages while preserving recent context and tool results. This is transparent. You don't need to do anything. See [Configuration](./configuration.md#compaction) for tuning options.
 
 ### Queue
 
@@ -235,11 +235,11 @@ The workflow tool automatically decomposes the task, runs subagents in parallel,
 
 ## MCP Integration
 
-MCP (Model Context Protocol) is an open standard for connecting AI tools to external services. Jean2 connects to any MCP server, giving the agent access to third-party APIs, databases, and services.
+MCP (Model Context Protocol) is an open standard for connecting AI tools to external services. Prokop connects to any MCP server, giving the agent access to third-party APIs, databases, and services.
 
 ### Configuration
 
-MCP servers are configured per-workspace in `.jean2/mcp.json`:
+MCP servers are configured per-workspace in `.prokopai/mcp.json`:
 
 ```json
 {
@@ -266,7 +266,7 @@ MCP servers are configured per-workspace in `.jean2/mcp.json`:
 
 ### OAuth
 
-For remote servers requiring authentication, Jean2 handles the full OAuth flow: opens a browser tab for login and approval, stores the token server-side. If client registration is needed first, Jean2 handles that automatically.
+For remote servers requiring authentication, Prokop handles the full OAuth flow: opens a browser tab for login and approval, stores the token server-side. If client registration is needed first, Prokop handles that automatically.
 
 ### Status badges
 
@@ -292,6 +292,6 @@ The client provides full PTY terminal sessions. The agent can also run commands 
 
 ## Data Storage
 
-Sessions, messages, and permissions are stored in SQLite at `~/.jean2/data/agent.db` (or your custom `JEAN2_DATABASE_PATH`). Workspace data (files, project structure) remains in the workspace directory.
+Sessions, messages, and permissions are stored in SQLite at `~/.prokopai/data/agent.db` (or your custom `PROKOPAI_DATABASE_PATH`). Workspace data (files, project structure) remains in the workspace directory.
 
-Memory files live in `<workspace>/.jean2/USER.md` and `<workspace>/.jean2/MEMORY.md`. Skill files live in `<workspace>/.agents/skills/`. MCP configuration lives in `<workspace>/.jean2/mcp.json`.
+Memory files live in `<workspace>/.prokopai/USER.md` and `<workspace>/.prokopai/MEMORY.md`. Skill files live in `<workspace>/.agents/skills/`. MCP configuration lives in `<workspace>/.prokopai/mcp.json`.

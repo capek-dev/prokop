@@ -4,7 +4,7 @@ Tools give the agent the ability to interact with your filesystem, run commands,
 
 ## Installed Tools
 
-Jean2 ships with 24 installable tools. Tools are **not managed by npm** - they download from a GitHub releases registry. Install them with `jean2 tools install`.
+Prokop ships with 24 installable tools. Tools are **not managed by npm** - they download from a GitHub releases registry. Install them with `prokopai tools install`.
 
 ### File Tools
 
@@ -36,7 +36,7 @@ The shell tool enforces safety: dangerous commands (`rm`, `sudo`, `curl`), files
 
 ### Browser
 
-Requires the **Jean2Browser** extension. Install it from the [Chrome Web Store](https://chromewebstore.google.com/detail/jean2browser/jpahdfmmfmmnacapmkchljmcijoedcpj), then connect it to your Jean2 server:
+Requires the **ProkopaiBrowser** extension. Install it from the [Chrome Web Store](https://chromewebstore.google.com/detail/jean2browser/jpahdfmmfmmnacapmkchljmcijoedcpj), then connect it to your Prokop server:
 
 | Tool | Description |
 |------|-------------|
@@ -68,11 +68,11 @@ Requires a Tavily API key:
 
 ## Capability Tools
 
-These tools are built into the server and appear only when their corresponding workspace capability is enabled. They are not installed via `jean2 tools install`.
+These tools are built into the server and appear only when their corresponding workspace capability is enabled. They are not installed via `prokopai tools install`.
 
 | Tool | Capability | Description |
 |------|------------|-------------|
-| **memory** | Memory | Save and manage persistent facts across sessions in `.jean2/USER.md` and `.jean2/MEMORY.md` |
+| **memory** | Memory | Save and manage persistent facts across sessions in `.prokopai/USER.md` and `.prokopai/MEMORY.md` |
 | **session_search** | Session Search | Search past sessions by text, list recent sessions, or read context around a specific message |
 | **workflow** | Workflow | Decompose a task into parallel subtasks, fan out concurrent subagents (max 5), and synthesize results |
 | **skill_manage** | Skills | Create, update, patch, and delete SKILL.md files. Lets the agent program its own workflows |
@@ -84,47 +84,47 @@ See [Workspaces & Sessions](./workspaces.md#workspace-capabilities) for how to e
 
 When you connect an MCP server to a workspace, its tools appear alongside built-in and installed tools. The agent calls them identically. No adapters, no wrappers.
 
-MCP tools are configured per-workspace in `<workspace>/.jean2/mcp.json`. See [Configuration](./configuration.md#mcp-configuration) for the config format.
+MCP tools are configured per-workspace in `<workspace>/.prokopai/mcp.json`. See [Configuration](./configuration.md#mcp-configuration) for the config format.
 
 ## Installing Tools
 
 ```bash
 # Interactive: browse and pick tools
-jean2 tools install
+prokopai tools install
 
 # Install specific tools
-jean2 tools install shell grep read-file
+prokopai tools install shell grep read-file
 
 # Install all tools
-jean2 tools install --all
+prokopai tools install --all
 
 # Install only recommended tools
-jean2 tools install --recommended
+prokopai tools install --recommended
 
 # Force reinstall even if already installed
-jean2 tools install shell --force
+prokopai tools install shell --force
 ```
 
 The recommended set provides the tools used by the bundled preconfigs: file reading and editing, file search, shell execution, task tracking, and web fetching. Use `--all` only when every catalog tool is required.
 
 ```bash
 # List available tools
-jean2 tools list
+prokopai tools list
 
 # List only installed tools
-jean2 tools list --installed
+prokopai tools list --installed
 
 # Check for updates
-jean2 tools outdated
+prokopai tools outdated
 
 # Update installed tools
-jean2 tools update
+prokopai tools update
 
 # Remove tools
-jean2 tools remove shell grep
+prokopai tools remove shell grep
 ```
 
-Tools are stored in `~/.jean2/tools/` (or your custom `JEAN2_TOOLS_PATH`).
+Tools are stored in `~/.prokopai/tools/` (or your custom `PROKOPAI_TOOLS_PATH`).
 
 ## The Ask Protocol
 
@@ -225,7 +225,7 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
 ### Installing custom tools
 
-Place the tool directory in `~/.jean2/tools/` and restart the server. Tools are discovered automatically by scanning for `tool.ts` files.
+Place the tool directory in `~/.prokopai/tools/` and restart the server. Tools are discovered automatically by scanning for `tool.ts` files.
 
 ### Testing tools
 
