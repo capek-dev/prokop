@@ -1,19 +1,15 @@
-# @jean2/sdk
+# @prokopai/sdk
 
-The official TypeScript SDK for Jean2. Provides a typed client for connecting to a Jean2 server over WebSocket and REST — with zero production dependencies.
+The private TypeScript client package used inside the Prokop monorepo.
 
 ## Install
 
-```bash
-bun add @jean2/sdk
-# or
-npm install @jean2/sdk
-```
+This package is not published to npm. Consume it as a workspace dependency. Use `@capekai/tool` when building external tools.
 
 ## Quick Start
 
 ```typescript
-import { Jean2Client } from '@jean2/sdk';
+import { Jean2Client } from '@prokopai/sdk';
 
 const client = new Jean2Client({
   url: 'http://localhost:3000',
@@ -754,7 +750,7 @@ interface McpRemoteServerConfig {
 The SDK exports a hierarchy of error classes:
 
 ```typescript
-import { Jean2Error, ConnectionError, AuthError, RateLimitError, TimeoutError, ServerError, ValidationError } from '@jean2/sdk';
+import { Jean2Error, ConnectionError, AuthError, RateLimitError, TimeoutError, ServerError, ValidationError } from '@prokopai/sdk';
 
 try {
   await client.connect();
@@ -821,7 +817,7 @@ client.ws;  // WebSocket | null
 ### Type Guards
 
 ```typescript
-import { isTextPart, isToolPart, isReasoningPart, isStepPart, isImagePart, isFilePart, isCompactionPart, isAssistantMessage, isUserMessage } from '@jean2/sdk';
+import { isTextPart, isToolPart, isReasoningPart, isStepPart, isImagePart, isFilePart, isCompactionPart, isAssistantMessage, isUserMessage } from '@prokopai/sdk';
 
 if (isToolPart(part)) {
   console.log(part.callId, part.name, part.state);
@@ -838,7 +834,7 @@ import {
   splitShellCommandSegments,
   createShellPermissionAskStructured,
   analyzeShellCommandEffects,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 ```
 
 ---
@@ -911,7 +907,7 @@ conn.close();
 ## Full Example: Headless Chat Bot
 
 ```typescript
-import { Jean2Client } from '@jean2/sdk';
+import { Jean2Client } from '@prokopai/sdk';
 
 const client = new Jean2Client({
   url: 'http://localhost:3000',
