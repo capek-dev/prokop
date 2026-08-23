@@ -13,6 +13,8 @@ export const queryKeys = {
     groupedBounded: (workspaceIds: string[], status: string | undefined, limitPerWorkspace: number) =>
       ['sessions', 'grouped', 'bounded', { workspaceIds: [...workspaceIds].sort(), status, limitPerWorkspace }] as const,
     tags: (workspaceId: string) => ['sessions', 'tags', workspaceId] as const,
+    toolDebug: (sessionId: string, partId: string) =>
+      ['sessions', sessionId, 'tool-debug', partId] as const,
   },
   tools: {
     all: ['tools'] as const,

@@ -173,6 +173,7 @@ function CompactionDivider({ part }: { part: CompactionPart }) {
 }
 
 const MessageParts = memo(function MessageParts({
+  sessionId,
   parts,
   pendingAskRequests,
   onAskResponse,
@@ -180,6 +181,7 @@ const MessageParts = memo(function MessageParts({
   inverted = false,
   serverUrl,
 }: {
+  sessionId: string;
   parts: Part[];
   pendingAskRequests: PendingAskRequest[];
   onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
@@ -216,6 +218,7 @@ const MessageParts = memo(function MessageParts({
             return (
               <ToolCall
                 key={part.id}
+                sessionId={sessionId}
                 part={part}
                 pendingAskRequests={pendingAskRequests}
                 onAskResponse={onAskResponse}
@@ -282,6 +285,7 @@ const MessageParts = memo(function MessageParts({
     </>
   );
 }, (prev, next) => {
+  if (prev.sessionId !== next.sessionId) return false;
   if (prev.parts !== next.parts) return false;
   if (prev.inverted !== next.inverted) return false;
   if (prev.onNavigateToSubagent !== next.onNavigateToSubagent) return false;
@@ -293,6 +297,7 @@ const MessageParts = memo(function MessageParts({
 });
 
 const StructuredOutputMessage = memo(function StructuredOutputMessage({
+  sessionId,
   parts,
   structuredOutput,
   pendingAskRequests,
@@ -300,6 +305,7 @@ const StructuredOutputMessage = memo(function StructuredOutputMessage({
   onNavigateToSubagent,
   serverUrl,
 }: {
+  sessionId: string;
   parts: Part[];
   structuredOutput: StructuredOutputData;
   pendingAskRequests: PendingAskRequest[];
@@ -332,6 +338,7 @@ const StructuredOutputMessage = memo(function StructuredOutputMessage({
           <CollapsibleContent>
             <div className="pb-2">
               <MessageParts
+                sessionId={sessionId}
                 parts={parts}
                 pendingAskRequests={pendingAskRequests}
                 onAskResponse={onAskResponse}
@@ -457,6 +464,7 @@ const MessageRow = memo(function MessageRow({
           <span className="opacity-50">...</span>
         ) : isAssistantMessage(item.message) && item.message.structuredOutput ? (
           <StructuredOutputMessage
+            sessionId={sessionId}
             parts={item.parts}
             structuredOutput={item.message.structuredOutput}
             pendingAskRequests={pendingAskRequests}
@@ -466,6 +474,7 @@ const MessageRow = memo(function MessageRow({
           />
         ) : (
           <MessageParts
+            sessionId={sessionId}
             parts={item.parts}
             pendingAskRequests={pendingAskRequests}
             onAskResponse={onAskResponse}

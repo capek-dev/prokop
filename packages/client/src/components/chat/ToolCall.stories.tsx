@@ -86,6 +86,7 @@ const meta = {
   },
   decorators: [withSessionStore()],
   args: {
+    sessionId: 'session-1',
     pendingAskRequests: [],
     onAskResponse: fn(),
     onNavigateToSubagent: fn(),

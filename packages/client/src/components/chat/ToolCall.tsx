@@ -12,7 +12,7 @@ import { RENDER_BUDGETS } from '@/lib/renderBudgets';
 import { getToolRowInfo } from '@/lib/toolSummaries';
 import type { ToolRowChip } from '@/lib/toolSummaries';
 import { useSdkClient } from '@/contexts/ServerClientContext';
-import { useToolDisplayCatalog } from '@/hooks/queries';
+import { useToolDebugQuery, useToolDisplayCatalog } from '@/hooks/queries';
 
 interface LazyOutputProps {
   content: string;
@@ -50,6 +50,7 @@ const LazyOutput = memo(function LazyOutput({ content, className }: LazyOutputPr
 });
 
 interface ToolCallProps {
+  sessionId: string;
   part: ToolPart;
   pendingAskRequests: PendingAskRequest[];
   onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
@@ -125,6 +126,7 @@ const areToolCallPropsEqual = (
   prev: ToolCallProps,
   next: ToolCallProps
 ): boolean => {
+  if (prev.sessionId !== next.sessionId) return false;
   if (prev.part !== next.part) return false;
   if (prev.onNavigateToSubagent !== next.onNavigateToSubagent) return false;
   if (prev.onAskResponse !== next.onAskResponse) return false;
@@ -134,6 +136,7 @@ const areToolCallPropsEqual = (
 };
 
 export const ToolCall = memo(function ToolCall({
+  sessionId,
   part,
   pendingAskRequests,
   onAskResponse,
@@ -144,33 +147,46 @@ export const ToolCall = memo(function ToolCall({
 
   const state = part.state;
   const status = state.status;
+  const sdkClient = useSdkClient();
+  const shouldLoadDebug = part.presentation?.debugAvailable === true;
+  const debugQuery = useToolDebugQuery(
+    sdkClient,
+    sessionId,
+    part.id,
+    isOpen && shouldLoadDebug,
+  );
+  const rawInput = shouldLoadDebug ? debugQuery.data?.input : state.input;
+  const rawOutput = shouldLoadDebug
+    ? debugQuery.data?.output
+    : status === 'completed' && 'output' in state
+      ? state.output
+      : undefined;
+  const debugReady = !shouldLoadDebug || debugQuery.data !== undefined;
 
   const serializedInput = useMemo((): string => {
-    if (!isOpen) return '';
+    if (!isOpen || rawInput === undefined) return '';
     try {
-      return JSON.stringify(state.input, null, 2);
+      return JSON.stringify(rawInput, null, 2);
     } catch {
-      return String(state.input);
+      return String(rawInput);
     }
-  }, [state.input, isOpen]);
+  }, [rawInput, isOpen]);
 
   const serializedOutput = useMemo((): string | null => {
-    if (!isOpen) return null;
-    if (status !== 'completed' || !('output' in state)) return null;
-    return typeof state.output === 'string'
-      ? state.output
-      : JSON.stringify(state.output, null, 2);
-  }, [status, state, isOpen]);
+    if (!isOpen || rawOutput === undefined) return null;
+    return typeof rawOutput === 'string'
+      ? rawOutput
+      : JSON.stringify(rawOutput, null, 2);
+  }, [rawOutput, isOpen]);
 
-  const visualization = status === 'completed' && 'output' in state
-    ? extractVisualization(state.output)
-    : undefined;
+  const visualization = part.presentation?.visualization
+    ?? (status === 'completed' && 'output' in state
+      ? extractVisualization(state.output)
+      : undefined);
 
   const taskSessionId = extractTaskSessionId(part);
 
   const sessions = useSessionStore((s) => s.sessions);
-
-  const sdkClient = useSdkClient();
   const catalog = useToolDisplayCatalog(sdkClient);
 
   const { summary, chips } = useMemo(() => getToolRowInfo(part, catalog), [part, catalog]);
@@ -198,10 +214,10 @@ export const ToolCall = memo(function ToolCall({
   }
 
   const handleCopyOutput = async () => {
-    if ('output' in state) {
-      const output = typeof state.output === 'string'
-        ? state.output
-        : JSON.stringify(state.output, null, 2);
+    if (rawOutput !== undefined) {
+      const output = typeof rawOutput === 'string'
+        ? rawOutput
+        : JSON.stringify(rawOutput, null, 2);
       await navigator.clipboard.writeText(output);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -270,14 +286,36 @@ export const ToolCall = memo(function ToolCall({
               </div>
             )}
 
-            {/* Input */}
-            <div>
-              <div className="text-xs uppercase text-muted-foreground mb-1">Input</div>
-              <LazyOutput
-                content={serializedInput}
-                className="text-xs bg-background border rounded-md p-2 overflow-x-auto whitespace-pre-wrap break-words"
-              />
-            </div>
+            {shouldLoadDebug && debugQuery.isFetching && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                <Loader2 className="size-3 animate-spin" />
+                Loading debug data...
+              </div>
+            )}
+
+            {shouldLoadDebug && debugQuery.isError && (
+              <div className="flex items-center justify-between gap-2 rounded-md border border-destructive/20 bg-destructive/10 p-2 text-xs text-destructive">
+                <span>Debug data could not be loaded.</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6"
+                  onClick={() => void debugQuery.refetch()}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+
+            {debugReady && (
+              <div>
+                <div className="text-xs uppercase text-muted-foreground mb-1">Input</div>
+                <LazyOutput
+                  content={serializedInput}
+                  className="text-xs bg-background border rounded-md p-2 overflow-x-auto whitespace-pre-wrap break-words"
+                />
+              </div>
+            )}
 
             {/* Subagent Navigation */}
             {(status === 'running' || status === 'completed' || status === 'interrupted') && taskSessionId && onNavigateToSubagent && (
@@ -293,7 +331,7 @@ export const ToolCall = memo(function ToolCall({
             )}
 
             {/* Output - raw debug JSON */}
-            {status === 'completed' && serializedOutput !== null && (
+            {debugReady && status === 'completed' && serializedOutput !== null && (
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-xs uppercase text-muted-foreground">Output</div>

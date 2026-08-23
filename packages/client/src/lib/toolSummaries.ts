@@ -1,4 +1,9 @@
-import type { AnyVisualization, ToolPart } from '@prokopai/sdk';
+import {
+  resolveToolSummary,
+  resolveToolSummaryTemplate,
+  type AnyVisualization,
+  type ToolPart,
+} from '@prokopai/sdk';
 
 export type ToolRowChipTone = 'neutral' | 'success' | 'error';
 
@@ -20,51 +25,13 @@ export interface ToolDisplayCatalogEntry {
 
 export type ToolDisplayCatalog = Record<string, ToolDisplayCatalogEntry>;
 
-function truncate(s: string, max: number): string {
-  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
-}
-
 function formatBytes(n: number): string {
   if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
   if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${n} B`;
 }
 
-function toDisplayString(value: unknown): string | undefined {
-  if (typeof value === 'string' && value.length > 0) return value;
-  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-  return undefined;
-}
-
-/**
- * Resolve a tool-declared `{field}` summary template against input args.
- * Supports dotted paths (`{todos.length}`). Missing fields resolve to
- * an empty string; a fully-empty result means "no summary".
- */
-export function resolveSummaryTemplate(
-  template: string,
-  input: Record<string, unknown>,
-): string {
-  const resolved = template.replace(/\{([\w.]+)\}/g, (_match, path: string) => {
-    let value: unknown = input;
-    for (const key of path.split('.')) {
-      if (value === null || typeof value !== 'object') return '';
-      value = (value as Record<string, unknown>)[key];
-    }
-    return toDisplayString(value) ?? '';
-  });
-  return resolved.replace(/\s+/g, ' ').trim();
-}
-
-function fallbackSummary(input: Record<string, unknown>): string {
-  try {
-    const json = JSON.stringify(input);
-    if (json === '{}') return '';
-    return json.length > 50 ? `${json.slice(0, 47)}...` : json;
-  } catch {
-    return truncate(String(input), 50);
-  }
-}
+export const resolveSummaryTemplate = resolveToolSummaryTemplate;
 
 /**
  * Structural chips derived only from typed visualization fields, plus
@@ -149,30 +116,25 @@ export function getToolRowInfo(
       ? (state.input as Record<string, unknown>)
       : undefined;
 
-  let summary = '';
-  if (input) {
-    const template = catalog[part.name]?.display?.summary;
-    if (template) {
-      summary = truncate(resolveSummaryTemplate(template, input), 120);
-    } else {
-      summary = fallbackSummary(input);
-    }
-  }
+  const summary = part.presentation?.summary ?? (input
+    ? resolveToolSummary(input, catalog[part.name]?.display?.summary)
+    : '');
 
   const chips: ToolRowChip[] = [];
-  if (state.status === 'completed' && 'output' in state) {
+  let visualization = part.presentation?.visualization;
+  if (!visualization && state.status === 'completed' && 'output' in state) {
     const output = state.output;
     if (output && typeof output === 'object') {
-      const viz =
+      visualization =
         '_visualization' in output &&
         output._visualization &&
         typeof output._visualization === 'object'
           ? (output._visualization as AnyVisualization)
           : undefined;
-      if (viz) {
-        chips.push(...chipsFromVisualization(viz));
-      }
     }
+  }
+  if (visualization) {
+    chips.push(...chipsFromVisualization(visualization));
   }
 
   return { summary, chips };
