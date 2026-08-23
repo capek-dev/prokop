@@ -263,20 +263,6 @@ export interface SessionControlReleaseMessage {
   sessionId: string;
 }
 
-export interface SessionControlRequestTakeoverMessage {
-  type: 'session.control.request_takeover';
-  sessionId: string;
-}
-
-export type TakeoverDecision = 'approve' | 'deny';
-
-export interface SessionControlRespondTakeoverMessage {
-  type: 'session.control.respond_takeover';
-  sessionId: string;
-  requesterClientId: string;
-  decision: TakeoverDecision;
-}
-
 // =============================================================================
 // Notification Messages
 // =============================================================================
@@ -323,7 +309,5 @@ export type ClientMessage =
   | SandboxRespondMessage
   | SessionControlClaimMessage
   | SessionControlReleaseMessage
-  | SessionControlRequestTakeoverMessage
-  | SessionControlRespondTakeoverMessage
   | NotificationAcknowledgeMessage
   | PongMessage;
