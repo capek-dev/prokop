@@ -8,6 +8,7 @@ import { TokenMeter } from './TokenMeter';
 import { ModelVariantConfigSelector } from './ModelVariantConfigSelector';
 import { SessionControlButton } from './SessionControlButton';
 import { useSessionControlStore } from '@/stores/sessionControlStore';
+import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import type { SessionUsage } from '@/stores/sessionStore';
 
 import { useClientIdentityStore } from '@/stores/clientIdentityStore';
@@ -86,6 +87,8 @@ export function ChatHeader({
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
   const isCompact = useIsCompact();
+  const hasMultipleOpenSessions = useSessionBoardStore((s) => s.openSessionIds.length > 1);
+  const showFullModelSelector = isMobile || hasMultipleOpenSessions;
 
   const controlState = useSessionControlStore((s) => s.controlBySessionId[session.id]);
   const myClientId = useClientIdentityStore((s) => s.clientId);
@@ -206,7 +209,7 @@ export function ChatHeader({
               onChangePreconfig={onChangePreconfig}
               disabled={session.status === 'closed' || !!session.parentId || isObserver}
               lockPreconfig={lockPreconfig}
-              iconOnly={isMobile}
+              iconOnly={showFullModelSelector}
               compact={isCompact}
             />
 
