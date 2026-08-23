@@ -73,6 +73,8 @@ PROKOPAI_TLS_CERT_FILE=/path/to/cert.pem
 PROKOPAI_TLS_KEY_FILE=/path/to/key.pem
 ```
 
+When TLS is enabled, the main port keeps serving plain HTTP on loopback only (`http://127.0.0.1:8742` by default) for clients on the same machine, and the TLS listener moves to its own port: the same port when the server binds a specific non-loopback address, or one higher otherwise. For a Tailscale setup where HTTPS keeps port 8742, set `PROKOPAI_HOST` to the machine's Tailscale IP. Disable the local listener with `PROKOPAI_LOCAL_HTTP=false`; override the TLS port with `PROKOPAI_TLS_PORT`.
+
 ## Public Routes
 
 These routes are always accessible without authentication:

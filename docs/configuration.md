@@ -66,6 +66,9 @@ When conversations grow too large for the context window, Prokop automatically c
 | `PROKOPAI_TLS_ENABLED` | `false` | Enable HTTPS |
 | `PROKOPAI_TLS_CERT_FILE` | (none) | Path to TLS certificate |
 | `PROKOPAI_TLS_KEY_FILE` | (none) | Path to TLS private key |
+| `PROKOPAI_LOCAL_HTTP` | follows TLS | When TLS is enabled, keep serving plain HTTP on the main port bound to loopback for local clients. Set to `false` for a TLS-only server |
+| `PROKOPAI_LOCAL_HOST` | `127.0.0.1` | Bind address for the local plain HTTP listener (loopback only) |
+| `PROKOPAI_TLS_PORT` | auto | Port for the TLS listener: same as `PROKOPAI_PORT` when bound to a specific non-loopback address (e.g. a Tailscale IP), otherwise `PROKOPAI_PORT + 1` |
 
 ### Auth
 
