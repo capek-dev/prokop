@@ -4,14 +4,14 @@ The Jean2 server exposes a REST API and WebSocket endpoint. Any client that spea
 
 ## Built-in Client
 
-The server automatically downloads and serves the latest client from npm on port **3774** (configurable via `JEAN2_CLIENT_PORT`) when running. This is the recommended way to connect:
+The server binary contains the production client and serves it from the same origin as the API and WebSocket endpoint. This is the recommended way to connect:
 
 ```bash
 jean2 start
 jean2 open
 ```
 
-Then visit `http://localhost:3774` in your browser.
+Then visit `http://localhost:8742` in your browser. Changing the server port changes the client URL too.
 
 ## PWA (any device)
 

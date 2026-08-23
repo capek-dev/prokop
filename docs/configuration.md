@@ -57,8 +57,7 @@ When conversations grow too large for the context window, Jean2 automatically co
 | `JEAN2_TOOLS_PATH` | `~/.jean2/tools` | Tool modules directory |
 | `JEAN2_PRECONFIGS_PATH` | `~/.jean2/preconfigs` | Preconfigs directory |
 | `JEAN2_MODELS_PATH` | (none) | Custom models.json path |
-| `JEAN2_CLIENT_ENABLED` | `true` | Set to `false` to disable the built-in client |
-| `JEAN2_CLIENT_PORT` | `3774` | Built-in client dev server port |
+| `JEAN2_CLIENT_ENABLED` | `true` | Set to `false` to disable the client embedded in the server binary |
 
 ### TLS (HTTPS)
 

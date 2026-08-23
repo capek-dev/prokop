@@ -70,7 +70,7 @@ jean2 init --force                # Re-initialize (overwrites config)
 
 You can set API keys directly in the client while the server is running: no need to edit config files manually.
 
-1. Open the client (`http://localhost:3774`)
+1. Open the client (`http://localhost:8742`)
 2. Click the **three dots (top right) → Configuration → Credentials** to set API keys, or **OAuth** to connect your ChatGPT subscription plan
 
 If you prefer to set them in a file, edit `~/.jean2/.env`:
@@ -112,10 +112,10 @@ jean2 restart
 
 ### Built-in client (automatic)
 
-When you run `jean2 start`, the server automatically downloads the latest client from npm and serves it on port **3774**. Just open your browser:
+When you run `jean2 start`, the server serves the client embedded in its binary on port **8742**. Just open your browser:
 
 ```
-http://localhost:3774
+http://localhost:8742
 ```
 
 If the client is already running:
@@ -123,16 +123,6 @@ If the client is already running:
 ```bash
 jean2 open
 ```
-
-### npx
-
-Run the client directly without the server:
-
-```bash
-npx @jean2/client
-```
-
-Opens a local web UI connecting to `http://localhost:8742`.
 
 ### Desktop app (macOS)
 

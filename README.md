@@ -49,7 +49,7 @@ jean2 start
 jean2 open
 ```
 
-The server serves the client at `http://localhost:3774`. Desktop app (macOS Electron) and PWA (any device) also available. See the [Getting Started guide](https://jean2.ai/docs/get-started/installation).
+The server binary includes the client and serves it at `http://localhost:8742`. Desktop app (macOS Electron) and PWA (any device) are also available. See the [Getting Started guide](https://jean2.ai/docs/get-started/installation).
 
 ---
 
