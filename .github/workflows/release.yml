@@ -118,17 +118,20 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.0
 
       - name: Install
         run: bun install
+
+      - name: Build embedded client
+        run: cd packages/client && VITE_BASE=/ bun run build
 
       - name: Build macOS binary
         env:
           V: ${{ needs.prepare-server-release.outputs.version }}
         run: |
           mkdir -p packages/server/dist
-          bun build --compile --target=bun-darwin-arm64 --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokopai-darwin packages/server/src/cli.ts
+          bun build --compile --target=bun-darwin-arm64 --asset packages/client/dist --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokopai-darwin packages/server/src/cli.ts
 
       - name: Import Apple Certificate
         env:
@@ -197,18 +200,21 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.0
 
       - name: Install
         run: bun install
+
+      - name: Build embedded client
+        run: cd packages/client && VITE_BASE=/ bun run build
 
       - name: Build Linux and Windows binaries
         env:
           V: ${{ needs.prepare-server-release.outputs.version }}
         run: |
           mkdir -p packages/server/dist
-          bun build --compile --target=bun-linux-x64 --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokopai-linux packages/server/src/cli.ts
-          bun build --compile --target=bun-windows-x64-baseline --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokopai-windows.exe packages/server/src/cli.ts
+          bun build --compile --target=bun-linux-x64 --asset packages/client/dist --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokopai-linux packages/server/src/cli.ts
+          bun build --compile --target=bun-windows-x64-baseline --asset packages/client/dist --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokopai-windows.exe packages/server/src/cli.ts
 
       - name: Upload Linux and Windows binaries
         env:

@@ -21,8 +21,8 @@ permissions:
 
 concurrency:
   group: release-client-${{ github.workflow }}-${{ github.ref }}
-  # Never cancel an in-flight release; an interrupted publish could leave NPM
-  # or the GitHub release in an inconsistent state.
+  # Never cancel an in-flight release; an interrupted publish could leave the
+  # GitHub release in an inconsistent state.
   cancel-in-progress: false
 
 env:
@@ -109,8 +109,8 @@ jobs:
 
           # ---- Normal (non-force) path ----
           # A fully published release means this version already shipped: skip the
-          # expensive desktop builds. Downstream NPM/publicity/announce jobs still
-          # run and are idempotent, so a previously-failed VERSION announcement can
+          # expensive desktop builds. Downstream publication and announcement jobs
+          # still run and are idempotent, so a previously failed VERSION announcement can
           # be retried without rebuilding release identity from VERSION.
           if [ "$RELEASE_STATE" = "published" ]; then
             echo "should_skip=true" >> "$GITHUB_OUTPUT"
@@ -237,23 +237,11 @@ jobs:
             fi
           done
 
-  # Publish @prokopai/client to NPM only after both desktop builds succeed.
-  # This is the (formerly independent) reusable workflow, now invoked only here so
-  # desktop and NPM can never release separately.
-  publish-npm:
-    needs: [prepare-client-release, release-client-macos, release-client-windows]
-    # Runs when builds succeeded OR were skipped (already-published retry path).
-    # Never runs if the prepare step or a desktop build failed, or the run was cancelled.
-    if: ${{ always() && !cancelled() && needs.prepare-client-release.result == 'success' && (needs.prepare-client-release.outputs.should_skip == 'true' || (needs.release-client-macos.result == 'success' && needs.release-client-windows.result == 'success')) }}
-    uses: ./.github/workflows/publish-client.yml
-    with:
-      version: ${{ needs.prepare-client-release.outputs.version }}
-    secrets: inherit
-
-  # Make the draft release public only after desktop artifacts + NPM are published,
+  # Make the draft release public only after both desktop artifact builds succeed,
   # so the updater never sees an incomplete release.
   publish-release:
-    needs: [publish-npm, prepare-client-release]
+    needs: [prepare-client-release, release-client-macos, release-client-windows]
+    if: ${{ always() && !cancelled() && needs.prepare-client-release.result == 'success' && (needs.prepare-client-release.outputs.should_skip == 'true' || (needs.release-client-macos.result == 'success' && needs.release-client-windows.result == 'success')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -273,9 +261,9 @@ jobs:
           gh release edit "$TAG" --draft=false $NOTES_FLAG
           echo "Release $TAG is now public."
 
-  # Final announcement: open a VERSION update pull request only after both
-  # distribution channels are public. VERSION never sources a build/tag/package
-  # version; it only records the latest successfully published version.
+  # Final announcement: open a VERSION update pull request only after the
+  # desktop release is public. VERSION never sources a build or tag version;
+  # it only records the latest successfully published version.
   announce-version:
     needs: [publish-release, prepare-client-release]
     runs-on: ubuntu-latest
@@ -312,7 +300,7 @@ jobs:
               --base "$DEFAULT_BRANCH" \
               --head "$BRANCH" \
               --title "release(client): announce v$V" \
-              --body "Announces client $V after the desktop release and NPM package were published successfully."
+              --body "Announces client $V after the desktop release was published successfully."
           else
             echo "Announcement pull request already exists for $BRANCH"
           fi
