@@ -22,6 +22,7 @@
     "./server": { "types": "./src/server.ts", "default": "./src/server.ts" },
     "./provider": { "types": "./src/provider.ts", "default": "./src/provider.ts" },
     "./visualization": { "types": "./src/visualization.ts", "default": "./src/visualization.ts" },
+    "./tool-display": { "types": "./src/tool-display.ts", "default": "./src/tool-display.ts" },
     "./wire": { "types": "./src/wire.ts", "default": "./src/wire.ts" }
   },
   "dependencies": {

@@ -8,6 +8,7 @@ import type {
   DeleteSessionResponse,
   ListMessagesResponse,
   TranscriptPageResponse,
+  GetToolDebugResponse,
 } from '../types/rest-responses';
 import type { SessionStatus } from '../types';
 
@@ -92,6 +93,17 @@ export class SessionsRestNamespace {
       params,
       signal: options?.signal,
     });
+  }
+
+  async getToolDebug(
+    id: string,
+    partId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<GetToolDebugResponse> {
+    return this.http.get(
+      `/sessions/${encodeURIComponent(id)}/tool-parts/${encodeURIComponent(partId)}/debug`,
+      { signal: options?.signal },
+    );
   }
 
   async listGrouped(options: ListGroupedOptions): Promise<ListSessionsGroupedResponse> {

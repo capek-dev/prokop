@@ -1,3 +1,5 @@
+import type { AnyVisualization } from './visualization';
+
 // ===========================================
 // Tool State Types
 // ===========================================
@@ -71,11 +73,18 @@ export interface ReasoningPart extends PartBase {
   text: string;
 }
 
+export interface ToolPartPresentation {
+  summary: string;
+  visualization?: AnyVisualization;
+  debugAvailable: boolean;
+}
+
 export interface ToolPart extends PartBase {
   type: 'tool';
   callId: string; // Maps to AI SDK's toolCallId
   name: string; // Tool name (e.g., 'bash', 'read', 'write')
   state: ToolState;
+  presentation?: ToolPartPresentation;
 }
 
 export interface FilePart extends PartBase {

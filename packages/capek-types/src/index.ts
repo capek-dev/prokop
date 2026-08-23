@@ -15,4 +15,5 @@ export * from './scheduled-job';
 export * from './server';
 export * from './provider';
 export * from './visualization';
+export * from './tool-display';
 export * from './wire';

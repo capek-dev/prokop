@@ -72,3 +72,4 @@ export { HttpNamespace } from './rest/http-namespace';
 export type { LoadAllResult, CriticalServerData, SecondaryServerData } from './rest/http-namespace';
 
 export type { ClientConfig, ConnectionState, SdkEvent } from './types';
+export type { GetToolDebugResponse } from './types/rest-responses';

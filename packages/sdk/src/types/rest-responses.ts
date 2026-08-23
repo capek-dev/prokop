@@ -76,6 +76,11 @@ export interface TranscriptPageResponse {
   pagination: TranscriptPageInfo;
 }
 
+export interface GetToolDebugResponse {
+  input: Record<string, unknown>;
+  output?: unknown;
+}
+
 /**
  * GET /api/workspaces
  */

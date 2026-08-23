@@ -283,6 +283,7 @@ export type {
   UpdateSessionResponse,
   DeleteSessionResponse,
   ListMessagesResponse,
+  GetToolDebugResponse,
   ListWorkspacesResponse,
   CreateWorkspaceResponse,
   GetWorkspaceResponse,
