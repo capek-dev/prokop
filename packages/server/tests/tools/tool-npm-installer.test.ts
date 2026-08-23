@@ -113,6 +113,44 @@ describe('tool-npm-installer', () => {
       expect(existsSync(join(toolDir, 'node_modules', 'emoji-regex'))).toBe(true);
     });
 
+    test('records protected dependency version and integrity for @capekai/tool', async () => {
+      const toolDir = join(tempDir, 'protected-dep');
+      mkdirSync(toolDir, { recursive: true });
+      writeFileSync(join(toolDir, 'package.json'), JSON.stringify({
+        name: 'test-tool-with-protected-dep',
+        version: '1.0.0',
+        type: 'module',
+        dependencies: {
+          '@capekai/tool': '^1.0.0',
+        },
+      }));
+
+      const cacheDir = join(tempDir, 'npm-cache-protected');
+      mkdirSync(cacheDir, { recursive: true });
+
+      const previousMinAge = process.env.PROKOPAI_PACKAGE_MIN_AGE_HOURS;
+      process.env.PROKOPAI_PACKAGE_MIN_AGE_HOURS = '0';
+
+      try {
+        const result = await installDependencies({
+          toolDir,
+          cacheDir,
+        });
+
+        expect(result.success).toBe(true);
+        const protectedEntry = result.protectedVersions?.['@capekai/tool'];
+        expect(protectedEntry).toBeDefined();
+        expect(protectedEntry!.version).toBe('1.0.0');
+        expect(protectedEntry!.integrity).toBeTruthy();
+      } finally {
+        if (previousMinAge === undefined) {
+          delete process.env.PROKOPAI_PACKAGE_MIN_AGE_HOURS;
+        } else {
+          process.env.PROKOPAI_PACKAGE_MIN_AGE_HOURS = previousMinAge;
+        }
+      }
+    });
+
     test('respects custom registry option', async () => {
       const toolDir = join(tempDir, 'custom-registry');
       mkdirSync(toolDir, { recursive: true });

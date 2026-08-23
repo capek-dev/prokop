@@ -16,6 +16,7 @@ declare module '@npmcli/arborist' {
       };
     };
     children: Map<string, ArboristNode>;
+    inventory?: Map<string, ArboristNode>;
   }
 
   class Arborist {

@@ -10,6 +10,7 @@ import {
   defaultEntry,
   isPreviousEntry,
   isStagingEntry,
+  PROTECTED_SDK_PACKAGE,
   readVersionValue,
   requireArtifactPackageJson,
   toolInstallDir,
@@ -106,8 +107,8 @@ export async function installTool(
 
   try {
     const installResult = await installDependencies({ toolDir: sourcePath });
-    sdkVersion = installResult.protectedVersions?.['@prokopai/sdk']?.version;
-    sdkIntegrity = installResult.protectedVersions?.['@prokopai/sdk']?.integrity ?? undefined;
+    sdkVersion = installResult.protectedVersions?.[PROTECTED_SDK_PACKAGE]?.version;
+    sdkIntegrity = installResult.protectedVersions?.[PROTECTED_SDK_PACKAGE]?.integrity ?? undefined;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return {
@@ -251,8 +252,8 @@ export async function installToolFromUrl(
 
     try {
       const installResult = await installDependencies({ toolDir: extractedRoot });
-      sdkVersionFromUrl = installResult.protectedVersions?.['@prokopai/sdk']?.version;
-      sdkIntegrityFromUrl = installResult.protectedVersions?.['@prokopai/sdk']?.integrity ?? undefined;
+      sdkVersionFromUrl = installResult.protectedVersions?.[PROTECTED_SDK_PACKAGE]?.version;
+      sdkIntegrityFromUrl = installResult.protectedVersions?.[PROTECTED_SDK_PACKAGE]?.integrity ?? undefined;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       return {

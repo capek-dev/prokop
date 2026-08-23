@@ -19,9 +19,9 @@ export const INSTALL_STRATEGY_SOURCE_NPM = 'source+npm';
 export const INSTALL_STRATEGY_SOURCE_NPM_BUNDLE = 'source+npm+bundle';
 export const TOOL_RUNTIME = 'bun';
 
-/** The SDK package whose resolved version and integrity are recorded in the
- * install manifest. */
-export const PROTECTED_SDK_PACKAGE = '@prokopai/sdk';
+/** The tool-authoring package whose resolved version and integrity are recorded
+ * in the install manifest as sdkVersion and sdkIntegrity. */
+export const PROTECTED_SDK_PACKAGE = '@capekai/tool';
 
 export type InstallStage = 'npm-install' | 'validate' | 'finalize';
 

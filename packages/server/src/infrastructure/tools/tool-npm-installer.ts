@@ -6,6 +6,7 @@ import {
   checkVersionAge,
   resolveMaxSatisfying,
   extractIntegrity,
+  findInstalledPackageNode,
 } from './npm-utils';
 import { PROTECTED_SDK_PACKAGE } from '@/domains/tool-installation';
 
@@ -95,12 +96,12 @@ export async function installDependencies(
     });
 
     const tree = await arb.reify();
-    const installedCount = tree?.children?.size || 0;
+    const installedCount = tree?.inventory?.size ?? tree?.children?.size ?? 0;
 
     const protectedVersions: Record<string, { version: string; integrity: string | null }> = {};
     for (const dep of PROTECTED_DEPENDENCIES) {
       if (pkgJson.dependencies![dep]) {
-        const child = tree?.children?.get(dep);
+        const child = findInstalledPackageNode(tree, dep);
         if (child) {
           const version = (child as unknown as { package?: { version?: string } }).package?.version;
           const integrity = extractIntegrity(tree, dep);

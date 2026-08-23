@@ -5,9 +5,7 @@ import Arborist, { type ArboristNode } from '@npmcli/arborist';
 import { readEnv } from '@/infrastructure/runtime/env-compat';
 import { LEGACY_JEAN2_DIR_NAME } from '@/infrastructure/runtime/paths';
 
-// Canonical prokopai packages plus the legacy jean2 names during the
-// compatibility window (tools were published under @jean2/*).
-const OWNED_PACKAGES = ['@prokopai/sdk', '@jean2/sdk'];
+const OWNED_PACKAGES = ['@capekai/tool', '@capekai/types'];
 
 export function getMinAgeHours(): number {
   const raw = readEnv('PACKAGE_MIN_AGE_HOURS');
@@ -190,11 +188,18 @@ export interface VersionLock {
   integrity: string;
 }
 
+export function findInstalledPackageNode(
+  tree: ArboristNode | null | undefined,
+  packageName: string,
+): ArboristNode | null {
+  return tree?.inventory?.get(`node_modules/${packageName}`)
+    ?? tree?.children?.get(packageName)
+    ?? null;
+}
+
 export function extractIntegrity(
   tree: ArboristNode | null | undefined,
   packageName: string,
 ): string | null {
-  const child = tree?.children?.get(packageName);
-  if (!child) return null;
-  return child.package?.dist?.integrity ?? null;
+  return findInstalledPackageNode(tree, packageName)?.package?.dist?.integrity ?? null;
 }

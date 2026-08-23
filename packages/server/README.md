@@ -474,10 +474,10 @@ prokopai init --install-tools
 
 ### Tool Module Interface
 
-Tools implement the `ToolModule` interface from `@jean2/sdk`:
+Tools implement the `ToolModule` interface from `@capekai/tool`:
 
 ```typescript
-import type { ToolModule, ToolContext, ToolResult } from '@jean2/sdk';
+import type { ToolModule, ToolContext, ToolResult } from '@capekai/tool';
 
 const tool: ToolModule = {
   definition: {

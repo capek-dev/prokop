@@ -8,6 +8,7 @@ import {
   INSTALL_STRATEGY_SOURCE_NPM_BUNDLE,
   isPreviousEntry,
   isStagingEntry,
+  PROTECTED_SDK_PACKAGE,
   readVersionValue,
   requireArtifactPackageJson,
   toolInstallDir,
@@ -30,6 +31,10 @@ import {
 } from '@/domains/tool-installation';
 
 describe('tool-installation domain: layout and version policy', () => {
+  test('tracks the published tool-authoring package', () => {
+    expect(PROTECTED_SDK_PACKAGE).toBe('@capekai/tool');
+  });
+
   test('pins the layout and staging naming rules', () => {
     expect(VERSION_FILE).toBe('VERSION');
     expect(toolInstallDir('/tools', 'demo')).toBe(join('/tools', 'demo'));

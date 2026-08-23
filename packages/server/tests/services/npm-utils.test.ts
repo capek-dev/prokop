@@ -59,13 +59,16 @@ describe('npm-utils', () => {
   });
 
   describe('isJean2OwnedPackage', () => {
-    test('returns false for retired client packages', () => {
-      expect(isJean2OwnedPackage('@jean2/client')).toBe(false);
-      expect(isJean2OwnedPackage('@prokopai/client')).toBe(false);
+    test('returns true for published Capek packages', () => {
+      expect(isJean2OwnedPackage('@capekai/tool')).toBe(true);
+      expect(isJean2OwnedPackage('@capekai/types')).toBe(true);
     });
 
-    test('returns true for @prokopai/sdk', () => {
-      expect(isJean2OwnedPackage('@prokopai/sdk')).toBe(true);
+    test('returns false for retired and private packages', () => {
+      expect(isJean2OwnedPackage('@jean2/client')).toBe(false);
+      expect(isJean2OwnedPackage('@prokopai/client')).toBe(false);
+      expect(isJean2OwnedPackage('@jean2/sdk')).toBe(false);
+      expect(isJean2OwnedPackage('@prokopai/sdk')).toBe(false);
     });
 
     test('returns false for unknown packages', () => {
@@ -154,39 +157,39 @@ describe('npm-utils', () => {
     test('extracts integrity from tree node', () => {
       const tree = {
         path: '/project',
-        children: new Map([['@prokopai/sdk', {
-          path: '/project/node_modules/@prokopai/sdk',
+        children: new Map([['@capekai/tool', {
+          path: '/project/node_modules/@capekai/tool',
           package: { dist: { integrity: 'sha512-abc123' } },
           children: new Map(),
         }]]),
       } as ArboristNode;
 
-      expect(extractIntegrity(tree, '@prokopai/sdk')).toBe('sha512-abc123');
+      expect(extractIntegrity(tree, '@capekai/tool')).toBe('sha512-abc123');
     });
 
     test('returns null when package not in tree', () => {
       const tree = { path: '/project', children: new Map() } as ArboristNode;
-      expect(extractIntegrity(tree, '@prokopai/sdk')).toBe(null);
+      expect(extractIntegrity(tree, '@capekai/tool')).toBe(null);
     });
 
     test('returns null when tree is null', () => {
-      expect(extractIntegrity(null, '@prokopai/sdk')).toBe(null);
+      expect(extractIntegrity(null, '@capekai/tool')).toBe(null);
     });
 
     test('returns null when tree is undefined', () => {
-      expect(extractIntegrity(undefined, '@prokopai/sdk')).toBe(null);
+      expect(extractIntegrity(undefined, '@capekai/tool')).toBe(null);
     });
 
     test('returns null when dist.integrity is missing', () => {
       const tree = {
         path: '/project',
-        children: new Map([['@prokopai/sdk', {
-          path: '/project/node_modules/@prokopai/sdk',
+        children: new Map([['@capekai/tool', {
+          path: '/project/node_modules/@capekai/tool',
           package: { dist: {} },
           children: new Map(),
         }]]),
       } as ArboristNode;
-      expect(extractIntegrity(tree, '@prokopai/sdk')).toBe(null);
+      expect(extractIntegrity(tree, '@capekai/tool')).toBe(null);
     });
   });
 

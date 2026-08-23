@@ -2,6 +2,3 @@
 # Only install package versions published at least 3 days ago (259200 seconds)
 # This acts as a cooldown period to avoid supply-chain attacks or broken releases
 minimumReleaseAge = 259200
-
-# Packages excluded from the minimum release age requirement
-minimumReleaseAgeExcludes = ["@jean2/sdk"]
