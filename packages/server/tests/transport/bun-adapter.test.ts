@@ -4,7 +4,6 @@ import type { TerminalSessionInfo } from '@prokopai/sdk';
 import {
   createBunWebSocketAdapter,
   MAX_MISSED_PINGS,
-  runGraceSweepTick,
   runHeartbeatTick,
   type WsData,
 } from '@/transport/websocket/bun-adapter';
@@ -194,29 +193,6 @@ describe('bun websocket adapter', () => {
     adapter.websocket.close!(socket as unknown as ServerWebSocket<WsData>, 0, '');
 
     expect(getConnectionBySocket(socket)).toBeUndefined();
-  });
-
-  test('grace sweep tick broadcasts grace expiry and stale takeover reasons in order', () => {
-    const events: Array<{ sessionId: string; reason: string }> = [];
-    runGraceSweepTick({
-      sweepExpiredGrace: () => ['session-grace'],
-      clearStaleTakeoverRequests: () => [
-        { sessionId: 'session-takeover', reason: 'takeover_auto_approved' },
-      ],
-      broadcastToSession: (sessionId, message) => {
-        events.push({ sessionId, reason: (message as { reason: string }).reason });
-      },
-      buildControlUpdatedMessage: (sessionId, reason) => ({
-        type: 'session.control.updated',
-        sessionId,
-        reason,
-      } as never),
-    });
-
-    expect(events).toEqual([
-      { sessionId: 'session-grace', reason: 'grace_expired' },
-      { sessionId: 'session-takeover', reason: 'takeover_auto_approved' },
-    ]);
   });
 
   test('handleUpgrade preserves auth, parameter, and upgrade behavior for each path', () => {

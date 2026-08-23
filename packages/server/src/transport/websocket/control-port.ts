@@ -5,14 +5,12 @@ import type {
   SessionControlActionResult,
   SessionResumeControlResult,
 } from '@/application/ports/control';
-import type { ServerMessage, SessionControlUpdateReason, TakeoverDecision } from '@prokopai/sdk';
+import type { ServerMessage, SessionControlUpdateReason } from '@prokopai/sdk';
 import {
   buildControlUpdatedMessage,
   checkControllerGate,
   handleClaim,
   handleRelease,
-  handleRequestTakeover,
-  handleRespondTakeover,
   handleSessionResume,
 } from './control-registry';
 import type { ConnectionId } from './connection-id';
@@ -41,9 +39,9 @@ export interface TransportControllerPorts {
 }
 
 /**
- * Transport control port adapter (S3, S4 policy ownership).
+ * Transport control port adapter.
  *
- * The controller gate and claim/release/takeover policy live in the named
+ * The controller gate and claim/release policy live in the named
  * controller domain (`@/domains/controllers`) and are applied by the
  * transport control registry. This module exposes the registry functions
  * through the application port contracts; use cases never import the
@@ -62,12 +60,6 @@ export function createTransportControllerPorts(): TransportControllerPorts {
     },
     release(sessionId, origin) {
       return toActionResult(handleRelease(sessionId, origin));
-    },
-    requestTakeover(sessionId, origin, autoApprove) {
-      return toActionResult(handleRequestTakeover(sessionId, origin, autoApprove));
-    },
-    respondTakeover(sessionId, origin, requesterClientId, decision: TakeoverDecision) {
-      return toActionResult(handleRespondTakeover(sessionId, origin, requesterClientId, decision));
     },
     resumeControl(sessionId, origin) {
       return toResumeResult(handleSessionResume(sessionId, origin));

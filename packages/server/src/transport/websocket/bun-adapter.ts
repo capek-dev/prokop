@@ -1,14 +1,8 @@
 import type { ServerWebSocket, WebSocketHandler } from 'bun';
-import type { AskAuthority, ClientMessage, ServerMessage, SessionControlUpdateReason } from '@prokopai/sdk';
+import type { AskAuthority, ClientMessage, ServerMessage } from '@prokopai/sdk';
 import type { ConnectionId } from './connection-id';
 import { registerConnection, unregisterConnection, touchConnection, getConnectionBySocket } from './connection-registry';
-import {
-  handleConnectionDisconnect,
-  sweepExpiredGrace,
-  clearStaleTakeoverRequests,
-  buildControlUpdatedMessage,
-  type StaleTakeoverResult,
-} from './control-registry';
+import { handleConnectionDisconnect } from './control-registry';
 import { createDeliveryPort, participantConnectionIdsFor, controllerConnectionIdsFor, type DeliveryPort } from './delivery';
 import type { ClientEntry, RouterContext } from './router-context';
 import { handleClientMessage } from './message-router';
@@ -26,7 +20,6 @@ export type BunWebSocketConfig = WebSocketHandler<WsData>;
 
 export const HEARTBEAT_INTERVAL_MS = 30_000;
 export const MAX_MISSED_PINGS = 3;
-export const GRACE_SWEEP_INTERVAL_MS = 5_000;
 
 export interface BunWebSocketAdapterDeps {
   auth: {
@@ -51,7 +44,6 @@ export interface BunWebSocketAdapter {
   startTimers(): void;
   stopTimers(): void;
   heartbeatTick(): void;
-  graceSweepTick(): void;
 }
 
 // Lifecycle ticks (exported separately so tests can drive them deterministically)
@@ -76,25 +68,6 @@ export function runHeartbeatTick(deps: HeartbeatTickDeps): void {
         deps.touchConnection(socket);
       }
     }
-  }
-}
-
-export interface GraceSweepTickDeps {
-  sweepExpiredGrace(): string[];
-  clearStaleTakeoverRequests(): StaleTakeoverResult[];
-  broadcastToSession(sessionId: string, message: ServerMessage): void;
-  buildControlUpdatedMessage(sessionId: string, reason: SessionControlUpdateReason): ServerMessage;
-}
-
-export function runGraceSweepTick(deps: GraceSweepTickDeps): void {
-  const expiredSessionIds = deps.sweepExpiredGrace();
-  for (const sessionId of expiredSessionIds) {
-    deps.broadcastToSession(sessionId, deps.buildControlUpdatedMessage(sessionId, 'grace_expired'));
-  }
-
-  const staleTakeoverResults = deps.clearStaleTakeoverRequests();
-  for (const { sessionId, reason } of staleTakeoverResults) {
-    deps.broadcastToSession(sessionId, deps.buildControlUpdatedMessage(sessionId, reason));
   }
 }
 
@@ -381,10 +354,7 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
       if (!conn) return;
       clients.delete(conn.connectionId);
       sockets.delete(conn.connectionId);
-      const disconnectTransitions = handleConnectionDisconnect(conn.connectionId);
-      for (const { sessionId, reason } of disconnectTransitions) {
-        delivery.broadcastToSession(sessionId, buildControlUpdatedMessage(sessionId, reason));
-      }
+      handleConnectionDisconnect(conn.connectionId);
       unregisterConnection(ws);
     },
 
@@ -409,7 +379,6 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
   };
 
   let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
-  let sweepInterval: ReturnType<typeof setInterval> | undefined;
 
   const heartbeatTick = () => {
     runHeartbeatTick({
@@ -423,15 +392,6 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
     });
   };
 
-  const graceSweepTick = () => {
-    runGraceSweepTick({
-      sweepExpiredGrace,
-      clearStaleTakeoverRequests,
-      broadcastToSession: delivery.broadcastToSession,
-      buildControlUpdatedMessage,
-    });
-  };
-
   return {
     websocket,
     delivery,
@@ -440,21 +400,13 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
       if (!heartbeatInterval) {
         heartbeatInterval = setInterval(heartbeatTick, HEARTBEAT_INTERVAL_MS);
       }
-      if (!sweepInterval) {
-        sweepInterval = setInterval(graceSweepTick, GRACE_SWEEP_INTERVAL_MS);
-      }
     },
     stopTimers() {
       if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
         heartbeatInterval = undefined;
       }
-      if (sweepInterval) {
-        clearInterval(sweepInterval);
-        sweepInterval = undefined;
-      }
     },
     heartbeatTick,
-    graceSweepTick,
   };
 }

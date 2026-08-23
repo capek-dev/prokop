@@ -3,24 +3,13 @@ import type {
   ServerMessage,
   SessionControlState,
   SessionControlUpdateReason,
-  TakeoverDecision,
 } from '@prokopai/sdk';
 import {
-  applyAutoClaim,
   applyClaim,
-  applyGraceEntry,
-  applyGraceExpiry,
-  applyGraceReattach,
   applyRelease,
-  applyRequestTakeover,
-  applyRespondTakeover,
   applyResume,
-  applyTakeoverAutoApprove,
   decideControllerGate,
-  decideDisconnectTransition,
-  decideStaleTakeover,
   isAutoClaimEligible,
-  isGraceExpired,
   makeUncontrolledRecord,
   recordToState,
   type ControllerGateRejection,
@@ -32,10 +21,10 @@ import { getConnectionById, getClientIdForConnection, getClientByClientId, getCo
 import type { ConnectionId } from './connection-id';
 
 /**
- * Transport controller registry (S4). The controller and participant
- * registries, connection lookups, console logs, and sweep scheduling stay
- * here; every claim/release/takeover/gate/grace decision is delegated to
- * the named controller domain through the application port layer.
+ * Transport controller registry. The controller and participant
+ * registries, connection lookups, and console logs stay here; every
+ * claim/release/gate decision is delegated to the named controller
+ * domain through the application port layer.
  */
 
 // Types
@@ -154,72 +143,12 @@ export function checkControllerGate(
   return decideControllerGate(record, clientId, sessionId, action);
 }
 
-// Auto-claim
+// Auto-claim eligibility
 
 export function isEligibleForAutoClaim(clientId: string): boolean {
   const client = getClientByClientId(clientId);
   if (!client) return false;
   return isAutoClaimEligible(client.interactionMode);
-}
-
-export function tryAutoClaim(
-  sessionId: string,
-  clientId: string,
-  connectionId: ConnectionId,
-): SessionControlState {
-  const record = ensureControlRecord(sessionId);
-  const eligible = isEligibleForAutoClaim(clientId);
-  const previousStatus = record.status;
-
-  const state = applyAutoClaim(record, clientId, connectionId, Date.now(), eligible);
-
-  if (record.status !== previousStatus) {
-    console.log(
-      `[control] Auto-claim: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
-    );
-  }
-
-  return state;
-}
-
-// Grace management
-
-export function enterGrace(sessionId: string): void {
-  const record = controlBySessionId.get(sessionId);
-  const now = Date.now();
-  const entered = applyGraceEntry(record, now);
-  if (!entered || !record) return;
-
-  console.log(
-    `[control] Grace entered: sessionId=${sessionId} controllerClientId=${record.controllerClientId} expiresAt=${record.leaseExpiresAt}`,
-  );
-}
-
-export function tryReattachDuringGrace(
-  sessionId: string,
-  clientId: string,
-  connectionId: ConnectionId,
-): boolean {
-  const record = controlBySessionId.get(sessionId);
-  const reattached = applyGraceReattach(record, clientId, connectionId, Date.now());
-  if (!reattached || !record) return false;
-
-  console.log(
-    `[control] Grace reattach: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
-  );
-
-  return true;
-}
-
-export function expireGrace(sessionId: string): void {
-  const record = controlBySessionId.get(sessionId);
-  if (!record) return;
-
-  console.log(
-    `[control] Grace expired: sessionId=${sessionId} previousController=${record.controllerClientId}`,
-  );
-
-  applyGraceExpiry(record);
 }
 
 // Control action handlers
@@ -230,22 +159,15 @@ export function handleClaim(
 ): ControlActionResult {
   const conn = getConnectionById(connectionId);
   const clientId = conn?.clientId ?? null;
-  const eligible = clientId ? isEligibleForAutoClaim(clientId) : false;
   const record = clientId ? ensureControlRecord(sessionId) : controlBySessionId.get(sessionId);
-  const wasUncontrolled = record?.status === 'uncontrolled';
+  const previousController = record?.controllerClientId ?? null;
 
-  const result = applyClaim(record, sessionId, clientId, connectionId, Date.now(), eligible);
+  const result = applyClaim(record, sessionId, clientId, connectionId, Date.now());
 
   if (result.success) {
-    if (result.transitionReason === 'claimed' && wasUncontrolled) {
-      console.log(
-        `[control] Auto-claim: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
-      );
-    } else if (result.transitionReason === 'grace_reattached') {
-      console.log(
-        `[control] Grace reattach: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
-      );
-    }
+    console.log(
+      `[control] Claim: clientId=${clientId} previousController=${previousController} sessionId=${sessionId} connectionId=${connectionId}`,
+    );
   }
 
   return result;
@@ -270,113 +192,6 @@ export function handleRelease(
   return result;
 }
 
-export function handleRequestTakeover(
-  sessionId: string,
-  connectionId: ConnectionId,
-  autoApprove = false,
-): ControlActionResult {
-  const conn = getConnectionById(connectionId);
-  const clientId = conn?.clientId ?? null;
-  const record = controlBySessionId.get(sessionId);
-  const previousController = record?.controllerClientId ?? null;
-
-  const result = applyRequestTakeover(record, sessionId, clientId, Date.now(), autoApprove);
-
-  if (result.success && result.transitionReason === 'takeover_auto_approved') {
-    console.log(
-      `[control] Takeover auto-approved (env): newController=${clientId} previousController=${previousController} sessionId=${sessionId}`,
-    );
-  } else if (result.success && result.transitionReason === 'takeover_requested') {
-    console.log(
-      `[control] Takeover requested: requesterClientId=${clientId} sessionId=${sessionId} controllerClientId=${previousController}`,
-    );
-  }
-
-  return result;
-}
-
-export function handleRespondTakeover(
-  sessionId: string,
-  connectionId: ConnectionId,
-  requesterClientId: string,
-  decision: TakeoverDecision,
-): ControlActionResult {
-  const conn = getConnectionById(connectionId);
-  const clientId = conn?.clientId ?? null;
-  const record = controlBySessionId.get(sessionId);
-
-  const result = applyRespondTakeover(record, sessionId, clientId, requesterClientId, decision, Date.now());
-
-  if (result.success && result.transitionReason === 'takeover_approved') {
-    console.log(
-      `[control] Takeover approved: newController=${requesterClientId} previousController=${clientId} sessionId=${sessionId}`,
-    );
-  } else if (result.success && result.transitionReason === 'takeover_denied') {
-    console.log(
-      `[control] Takeover denied: requesterClientId=${requesterClientId} controllerClientId=${clientId} sessionId=${sessionId}`,
-    );
-  }
-
-  return result;
-}
-
-// Stale takeover cleanup
-
-export interface StaleTakeoverResult {
-  sessionId: string;
-  reason: SessionControlUpdateReason;
-}
-
-export function clearStaleTakeoverRequests(): StaleTakeoverResult[] {
-  const now = Date.now();
-  const results: StaleTakeoverResult[] = [];
-
-  controlBySessionId.forEach((record, sessionId) => {
-    const controllerAlive = clientHasActiveConnections(record.controllerClientId ?? '');
-    const decision = decideStaleTakeover(record, now, controllerAlive);
-    if (decision === null) return;
-
-    const requester = record.pendingTakeover?.requestedByClientId;
-    if (decision === 'clear_denied') {
-      console.log(
-        `[control] Stale takeover cleared (controller alive): sessionId=${sessionId} requester=${requester}`,
-      );
-      record.status = 'controlled';
-      record.pendingTakeover = null;
-      results.push({ sessionId, reason: 'takeover_denied' });
-    } else {
-      console.log(
-        `[control] Stale takeover cleared (controller gone): sessionId=${sessionId} requester=${requester}`,
-      );
-      const previousController = record.controllerClientId;
-      applyTakeoverAutoApprove(record, now);
-      console.log(
-        `[control] Takeover auto-approved: newController=${record.controllerClientId} previousController=${previousController} sessionId=${sessionId}`,
-      );
-      results.push({ sessionId, reason: 'takeover_auto_approved' });
-    }
-  });
-
-  return results;
-}
-
-// Auto-approve takeover
-
-function autoApproveTakeover(sessionId: string): void {
-  const record = controlBySessionId.get(sessionId);
-  if (!record?.pendingTakeover) return;
-
-  const now = Date.now();
-  const newControllerClientId = record.pendingTakeover.requestedByClientId;
-  const previousController = record.controllerClientId;
-
-  applyTakeoverAutoApprove(record, now);
-
-  console.log(
-    `[control] Takeover auto-approved: newController=${newControllerClientId} previousController=${previousController} sessionId=${sessionId}`,
-  );
-}
-
 // Session resume integration
 
 export function handleSessionResume(
@@ -395,11 +210,7 @@ export function handleSessionResume(
   const eligible = clientId ? isEligibleForAutoClaim(clientId) : false;
   const result = applyResume(record, clientId, connectionId, Date.now(), eligible);
 
-  if (result.transitionReason === 'grace_reattached') {
-    console.log(
-      `[control] Grace reattach: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
-    );
-  } else if (result.transitionReason === 'auto_claimed') {
+  if (result.transitionReason === 'auto_claimed') {
     console.log(
       `[control] Auto-claim: clientId=${clientId} sessionId=${sessionId} connectionId=${connectionId}`,
     );
@@ -408,69 +219,28 @@ export function handleSessionResume(
   return result;
 }
 
-// Disconnect cleanup
+// Disconnect cleanup: control never changes on disconnect, only
+// participant bookkeeping is updated.
 
-export interface DisconnectTransition {
-  sessionId: string;
-  reason: SessionControlUpdateReason;
-}
-
-function clientHasActiveConnections(clientId: string): boolean {
-  return getConnectionsForClient(clientId).length > 0;
-}
-
-export function handleConnectionDisconnect(connectionId: ConnectionId): DisconnectTransition[] {
+export function handleConnectionDisconnect(connectionId: ConnectionId): void {
   const conn = getConnectionById(connectionId);
-  if (!conn) return [];
+  if (!conn) return;
 
   const { clientId, activeSessionIds } = conn;
-  const transitions: DisconnectTransition[] = [];
 
-  for (const activeSessionId of activeSessionIds) {
-    if (clientId) {
+  if (clientId) {
+    for (const activeSessionId of activeSessionIds) {
       removeParticipant(activeSessionId, connectionId, clientId);
+    }
 
-      const participants = participantsBySessionId.get(activeSessionId);
-      const clientEntry = participants?.get(clientId);
-      if (!clientEntry || clientEntry.connectionIds.size === 0) {
-        const record = controlBySessionId.get(activeSessionId);
-        const decision = decideDisconnectTransition(record, clientId);
-        if (decision === 'grace') {
-          enterGrace(activeSessionId);
-          transitions.push({ sessionId: activeSessionId, reason: 'grace_entered' });
-        } else if (decision === 'takeover_auto_approved') {
-          autoApproveTakeover(activeSessionId);
-          transitions.push({ sessionId: activeSessionId, reason: 'takeover_auto_approved' });
-        }
+    // Secondary cleanup: remove participant entries from ALL sessions
+    // (covers any sessions that might not be in activeSessionIds)
+    controlBySessionId.forEach((_record, sessionId) => {
+      if (!activeSessionIds.has(sessionId)) {
+        removeParticipant(sessionId, connectionId, clientId);
       }
-    }
+    });
   }
-
-  // Secondary cleanup: remove participant entries from ALL sessions
-  // (covers any sessions that might not be in activeSessionIds)
-  controlBySessionId.forEach((_record, sessionId) => {
-    if (!activeSessionIds.has(sessionId) && clientId) {
-      removeParticipant(sessionId, connectionId, clientId);
-    }
-  });
-
-  return transitions;
-}
-
-// Periodic grace expiry sweep
-
-export function sweepExpiredGrace(): string[] {
-  const now = Date.now();
-  const expired: string[] = [];
-
-  controlBySessionId.forEach((record, sessionId) => {
-    if (isGraceExpired(record, now)) {
-      expireGrace(sessionId);
-      expired.push(sessionId);
-    }
-  });
-
-  return expired;
 }
 
 // Session cleanup

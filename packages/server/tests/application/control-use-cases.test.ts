@@ -16,10 +16,7 @@ function makeControlState(sessionId: string) {
     controllerClientId: null,
     controllerConnectionId: null,
     acquiredAt: null,
-    lastHeartbeatAt: null,
-    leaseExpiresAt: null,
     status: 'uncontrolled' as const,
-    pendingTakeover: null,
   };
 }
 
@@ -27,10 +24,8 @@ function makeControl(overrides: Partial<SessionControlPort<Origin>> = {}): Sessi
   return {
     claim: () => ({ success: false, error: 'no', code: 'already_controlled', controlState: makeControlState('sess-1') }),
     release: () => ({ success: false, error: 'no', code: 'already_controlled', controlState: makeControlState('sess-1') }),
-    requestTakeover: () => ({ success: false, error: 'no', code: 'already_controlled', controlState: makeControlState('sess-1') }),
-    respondTakeover: () => ({ success: false, error: 'no', code: 'already_controlled', controlState: makeControlState('sess-1') }),
     resumeControl: () => ({ controlState: makeControlState('sess-1'), transitionReason: null }),
-    buildControlUpdatedMessage: (sessionId) => ({ type: 'session.control.updated', control: makeControlState(sessionId), reason: 'claimed' }),
+    buildControlUpdatedMessage: () => ({ type: 'session.control.updated', control: makeControlState('sess-1'), reason: 'claimed' }),
     ...overrides,
   };
 }
@@ -53,8 +48,8 @@ function makeDelivery(spy: DeliverySpy): ApplicationDeliveryPort<Origin> {
   };
 }
 
-function makeApp(control: SessionControlPort<Origin>, autoApprove: () => boolean = () => true): SessionControlApplication<Origin> {
-  return createSessionControlApplication({ control, autoApproveTakeover: autoApprove });
+function makeApp(control: SessionControlPort<Origin>): SessionControlApplication<Origin> {
+  return createSessionControlApplication({ control });
 }
 
 describe('application control use cases', () => {
@@ -100,7 +95,7 @@ describe('application control use cases', () => {
     expect(spy.broadcastToSession).toEqual([]);
   });
 
-  test('release delegates to the port and broadcasts the transition', () => {
+  test('release success broadcasts and failure sends the error', () => {
     const calls: string[] = [];
     const control = makeControl({
       release: (sessionId) => {
@@ -116,43 +111,5 @@ describe('application control use cases', () => {
 
     expect(calls).toEqual(['sess-1']);
     expect(spy.broadcastToSession[0].message).toMatchObject({ type: 'session.control.updated', reason: 'released' });
-  });
-
-  test('requestTakeover passes the injected auto-approve configuration', () => {
-    const takeoverCalls: unknown[] = [];
-    const control = makeControl({
-      requestTakeover: (sessionId, o, autoApprove) => {
-        takeoverCalls.push([sessionId, o, autoApprove]);
-        return { success: false, error: 'no', code: 'already_controlled', controlState: makeControlState(sessionId) };
-      },
-    });
-    const spy: DeliverySpy = { sent: [], broadcastToSession: [] };
-    const delivery = makeDelivery(spy);
-
-    makeApp(control, () => false).requestTakeover(delivery, origin, 'sess-1');
-    makeApp(control, () => true).requestTakeover(delivery, origin, 'sess-1');
-
-    expect(takeoverCalls).toEqual([
-      ['sess-1', origin, false],
-      ['sess-1', origin, true],
-    ]);
-  });
-
-  test('respondTakeover passes the requester and decision through', () => {
-    const respondCalls: unknown[] = [];
-    const control = makeControl({
-      respondTakeover: (sessionId, o, requesterClientId, decision) => {
-        respondCalls.push([sessionId, o, requesterClientId, decision]);
-        return { success: true, controlState: makeControlState(sessionId), transitionReason: 'takeover_approved' };
-      },
-      buildControlUpdatedMessage: (sessionId) => ({ type: 'session.control.updated', control: makeControlState(sessionId), reason: 'takeover_approved' }),
-    });
-    const spy: DeliverySpy = { sent: [], broadcastToSession: [] };
-    const delivery = makeDelivery(spy);
-
-    makeApp(control).respondTakeover(delivery, origin, 'sess-1', 'requester-1', 'approve');
-
-    expect(respondCalls).toEqual([['sess-1', origin, 'requester-1', 'approve']]);
-    expect(spy.broadcastToSession).toHaveLength(1);
   });
 });

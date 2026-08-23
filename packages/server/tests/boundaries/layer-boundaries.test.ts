@@ -117,6 +117,7 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
   'packages/server/src/adapters/jean2/notifications.ts': [
     '@/infrastructure/sqlite/notification-repository', '@/infrastructure/web-push/sender',
     '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/scheduled-job-store', '@/infrastructure/sqlite/pending-asks', '@/infrastructure/runtime/environment',
+    '@/transport/websocket/control-registry',
   ],
   'packages/server/src/adapters/jean2/permissions.ts': ['@/infrastructure/sqlite/permissions'],
   'packages/server/src/adapters/jean2/tool-distribution.ts': [
@@ -1109,7 +1110,6 @@ describe('server layer boundaries', () => {
         && imp.names.includes('applyClaim')
         && imp.names.includes('decideControllerGate')
         && imp.names.includes('applyResume')
-        && imp.names.includes('decideDisconnectTransition')
       ),
     ).toBe(true);
     // Dependency direction: transport reaches the policy only through the
@@ -2227,6 +2227,7 @@ describe('server layer boundaries', () => {
       '@/infrastructure/sqlite/scheduled-job-store',
       '@/infrastructure/sqlite/session-store',
       '@/infrastructure/web-push/sender',
+      '@/transport/websocket/control-registry',
     ].sort());
   });
 

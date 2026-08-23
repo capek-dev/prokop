@@ -346,10 +346,6 @@ export function resolveTlsPort(host: string, port: number, localHttpEnabled: boo
   return listenersOverlap(host, getLocalHost()) ? port + 1 : port;
 }
 
-export function getAutoApproveTakeover(): boolean {
-  return readEnv('AUTO_APPROVE_TAKEOVER') !== 'false';
-}
-
 export function getBaseUrl(): string | undefined {
   return readEnv('BASE_URL');
 }

@@ -151,6 +151,7 @@ function makeDeps(state: FakeState, overrides: Partial<NotificationsApplicationD
     canNotifyForSession: () => true,
     getPendingAsk: (requestId) => (requestId === 'pending-req' ? { status: 'pending' } : { status: 'resolved' }),
     permissionTimeoutMs: () => 1_800_000,
+    getControllerClientId: () => null,
     ...overrides,
   };
 }
@@ -261,6 +262,52 @@ describe('notifications application use cases', () => {
     expect(state.sent).toHaveLength(1);
   });
 
+  test('dispatch delivers only to the controller client subscriptions', async () => {
+    state.subscriptions = [
+      makeSubRow({ id: 'sub-desktop', client_id: 'client-desktop' }),
+      makeSubRow({ id: 'sub-phone', client_id: 'client-phone', endpoint: 'https://push.example.com/phone' }),
+    ];
+    const application = makeApplication(state, makeDeps(state, {
+      getControllerClientId: (sessionId) => (sessionId === 'sess-1' ? 'client-desktop' : null),
+    }));
+
+    await application.dispatch({ eventId: 'e-ctrl', eventType: 'session_completed', sessionId: 'sess-1' });
+
+    expect(state.sent).toHaveLength(1);
+    expect(state.sent[0].endpoint).toBe('https://push.example.com/endpoint');
+    expect(state.log).toContain('delivered:e-ctrl:sub-desktop');
+    expect(state.log.some((entry) => entry.includes('sub-phone'))).toBe(false);
+  });
+
+  test('dispatch fans out to all subscriptions when the session is uncontrolled', async () => {
+    state.subscriptions = [
+      makeSubRow({ id: 'sub-desktop', client_id: 'client-desktop' }),
+      makeSubRow({ id: 'sub-phone', client_id: 'client-phone', endpoint: 'https://push.example.com/phone' }),
+    ];
+    const application = makeApplication(state, makeDeps(state, {
+      getControllerClientId: () => null,
+    }));
+
+    await application.dispatch({ eventId: 'e-free', eventType: 'session_completed', sessionId: 'sess-1' });
+
+    expect(state.sent).toHaveLength(2);
+    expect(state.log).toContain('delivered:e-free:sub-desktop');
+    expect(state.log).toContain('delivered:e-free:sub-phone');
+  });
+
+  test('dispatch skips when the controller has no enabled subscriptions', async () => {
+    state.subscriptions = [
+      makeSubRow({ id: 'sub-phone', client_id: 'client-phone' }),
+    ];
+    const application = makeApplication(state, makeDeps(state, {
+      getControllerClientId: () => 'client-desktop',
+    }));
+
+    await application.dispatch({ eventId: 'e-none', eventType: 'session_completed', sessionId: 'sess-1' });
+
+    expect(state.sent).toHaveLength(0);
+  });
+
   test('dispatch deletes stale subscriptions and marks transient and permanent failures', async () => {
     state.sendResult = { success: false, statusCode: 404 };
     const application = makeApplication(state);
@@ -294,6 +341,25 @@ describe('notifications application use cases', () => {
       // Wrong session or missing event is not acknowledged.
       expect(application.acknowledgePendingNotification('message:msg-1:completed', 'other', 'client-1')).toBe(false);
       expect(application.acknowledgePendingNotification('missing', 'sess-1', 'client-1')).toBe(false);
+    } finally {
+      timers.restore();
+    }
+  });
+
+  test('observer acks do not suppress the controller notification', () => {
+    const timers = patchTimers();
+    try {
+      const application = makeApplication(state, makeDeps(state, {
+        getControllerClientId: (sessionId) => (sessionId === 'sess-1' ? 'client-phone' : null),
+      }));
+      application.notifyTerminalMessage(makeMessage(), 'sess-1');
+
+      expect(timers.timeouts).toHaveLength(1);
+      expect(application.acknowledgePendingNotification('message:msg-1:completed', 'sess-1', 'client-desktop')).toBe(false);
+      expect(timers.cleared).toBe(0);
+
+      expect(application.acknowledgePendingNotification('message:msg-1:completed', 'sess-1', 'client-phone')).toBe(true);
+      expect(timers.cleared).toBe(1);
     } finally {
       timers.restore();
     }

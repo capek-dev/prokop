@@ -69,7 +69,6 @@ import {
 import { installTerminalSessionStore } from '@/transport/terminal';
 import { createJean2TerminalSessionPort } from '@/adapters/jean2/terminal';
 import { createTransportControllerPorts } from '@/transport/websocket/control-port';
-import { getAutoApproveTakeover } from '@/infrastructure/runtime/environment';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
 import { getDataDir } from '@/infrastructure/runtime/paths';
@@ -149,7 +148,6 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
 
   const control = createSessionControlApplication<ConnectionId>({
     control: transportControl.control,
-    autoApproveTakeover: getAutoApproveTakeover,
   });
 
   const http = createSessionHttpApplication(repository, toolCatalog);

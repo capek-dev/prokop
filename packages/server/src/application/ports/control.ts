@@ -2,15 +2,14 @@ import type {
   ControllerGatedAction,
   ServerMessage,
   SessionControlUpdateReason,
-  TakeoverDecision,
 } from '@prokopai/sdk';
 
 /**
- * Inward-facing controller ports (S4). The claim/release/takeover policy,
- * the controller gate decision, and the ask routing policy now live in the
- * named controller domain (`@/domains/controllers`). This module re-exports
- * the domain contracts so transport implementors depend on the application
- * layer only, and keeps the port interfaces the use cases consume.
+ * Inward-facing controller ports. The claim/release policy and the
+ * controller gate decision live in the named controller domain
+ * (`@/domains/controllers`). This module re-exports the domain contracts
+ * so transport implementors depend on the application layer only, and
+ * keeps the port interfaces the use cases consume.
  */
 export * from '@/domains/controllers';
 
@@ -33,17 +32,6 @@ export interface SessionControlPort<Origin> {
   release(
     sessionId: string,
     origin: Origin,
-  ): import('@/domains/controllers').ControlActionResult;
-  requestTakeover(
-    sessionId: string,
-    origin: Origin,
-    autoApprove: boolean,
-  ): import('@/domains/controllers').ControlActionResult;
-  respondTakeover(
-    sessionId: string,
-    origin: Origin,
-    requesterClientId: string,
-    decision: TakeoverDecision,
   ): import('@/domains/controllers').ControlActionResult;
   resumeControl(
     sessionId: string,

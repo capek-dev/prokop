@@ -104,8 +104,23 @@ export function createNotificationsApplication(
       return;
     }
 
+    // Single-user control model: push only the controlling client's
+    // devices. Uncontrolled sessions (scheduled runs) fan out to everyone.
+    const controllerClientId = deps.getControllerClientId(sessionId);
+    const recipients = controllerClientId
+      ? subscriptions.filter((sub) => sub.client_id === controllerClientId)
+      : subscriptions;
+    if (recipients.length === 0) {
+      console.info(`[web-push] Controller has no enabled subscriptions, skipping`, {
+        eventId,
+        eventType,
+        controllerClientId,
+      });
+      return;
+    }
+
     await Promise.allSettled(
-      subscriptions.map(async (sub) => {
+      recipients.map(async (sub) => {
         const isNew = deps.store.reserveDelivery({
           eventId,
           subscriptionId: sub.id,
@@ -307,6 +322,20 @@ export function createNotificationsApplication(
     acknowledgePendingNotification(eventId, sessionId, clientId) {
       const pending = pendingTerminalDispatches.get(eventId);
       if (!pending || pending.sessionId !== sessionId) {
+        return false;
+      }
+
+      // Suppression mirrors delivery: only the controller's ack cancels a
+      // push (an observing client watching live must not silence the
+      // controller's device). Uncontrolled sessions accept any ack.
+      const controllerClientId = deps.getControllerClientId(sessionId);
+      if (controllerClientId && controllerClientId !== clientId) {
+        console.info('[web-push] Ack ignored: client is not the controller', {
+          eventId,
+          sessionId,
+          clientId,
+          controllerClientId,
+        });
         return false;
       }
 

@@ -5,6 +5,7 @@ import { getPermissionRequestByRequestId } from '@/infrastructure/sqlite/pending
 import { createNotificationRepository } from '@/infrastructure/sqlite/notification-repository';
 import { createWebPushSender } from '@/infrastructure/web-push/sender';
 import { canNotifyForSession as scheduledSessionCanNotify } from '@/domains/scheduling/notifications';
+import { getControlState } from '@/transport/websocket/control-registry';
 import {
   createNotificationsApplication,
   type NotificationsApplication,
@@ -36,6 +37,7 @@ export function getJean2NotificationsApplication(): NotificationsApplication {
     canNotifyForSession: (session) => scheduledSessionCanNotify(session, (id) => getScheduledJob(id)),
     getPendingAsk: getPermissionRequestByRequestId,
     permissionTimeoutMs: getPermissionTimeoutMs,
+    getControllerClientId: (sessionId) => getControlState(sessionId).controllerClientId,
   });
 
   return singleton;

@@ -111,4 +111,8 @@ export interface NotificationsApplicationDeps {
   canNotifyForSession(session: Session): boolean;
   getPendingAsk(requestId: string): PendingAskLookup | null | undefined;
   permissionTimeoutMs(): number;
+  /** Current controller client for a session, or null when uncontrolled.
+   * Push deliveries go only to the controller's subscriptions; an
+   * uncontrolled session (e.g. a scheduled headless run) fans out to all. */
+  getControllerClientId(sessionId: string): string | null;
 }

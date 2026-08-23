@@ -4,7 +4,7 @@ import type { RouterContext } from './router-context';
 import { handleChat, handleSessionEditMessage } from './chat-handler';
 import { handleSessionCompact, handleSessionRevert, handleSessionFork } from './session-handler';
 
-import { handleClaimMessage, handleReleaseMessage, handleRequestTakeoverMessage, handleRespondTakeoverMessage } from './handlers/control';
+import { handleClaimMessage, handleReleaseMessage } from './handlers/control';
 import {
   handleCreateSession,
   handleResumeSession,
@@ -61,8 +61,6 @@ const handlers: Record<string, Handler> = {
   'client.register': cast(handleClientRegister),
   'session.control.claim': cast(handleClaimMessage),
   'session.control.release': cast(handleReleaseMessage),
-  'session.control.request_takeover': cast(handleRequestTakeoverMessage),
-  'session.control.respond_takeover': cast(handleRespondTakeoverMessage),
   'session.create': cast(handleCreateSession),
   'session.resume': cast(handleResumeSession),
   'session.update': cast(handleUpdateSession),

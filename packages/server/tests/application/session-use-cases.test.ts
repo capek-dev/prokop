@@ -166,13 +166,12 @@ function makeAskAuthority(): AskAuthorityPort {
 }
 
 function makeControl(): SessionControlPort<Origin> {
+  const uncontrolled = { sessionId: 'sess-1', controllerClientId: null, controllerConnectionId: null, acquiredAt: null, status: 'uncontrolled' as const };
   return {
-    claim: () => ({ success: false, error: 'nope', code: 'already_controlled', controlState: { sessionId: 'sess-1', controllerClientId: null, controllerConnectionId: null, acquiredAt: null, lastHeartbeatAt: null, leaseExpiresAt: null, status: 'uncontrolled', pendingTakeover: null } }),
-    release: () => ({ success: false, error: 'nope', code: 'already_controlled', controlState: { sessionId: 'sess-1', controllerClientId: null, controllerConnectionId: null, acquiredAt: null, lastHeartbeatAt: null, leaseExpiresAt: null, status: 'uncontrolled', pendingTakeover: null } }),
-    requestTakeover: () => ({ success: false, error: 'nope', code: 'already_controlled', controlState: { sessionId: 'sess-1', controllerClientId: null, controllerConnectionId: null, acquiredAt: null, lastHeartbeatAt: null, leaseExpiresAt: null, status: 'uncontrolled', pendingTakeover: null } }),
-    respondTakeover: () => ({ success: false, error: 'nope', code: 'already_controlled', controlState: { sessionId: 'sess-1', controllerClientId: null, controllerConnectionId: null, acquiredAt: null, lastHeartbeatAt: null, leaseExpiresAt: null, status: 'uncontrolled', pendingTakeover: null } }),
-    resumeControl: () => ({ controlState: { sessionId: 'sess-1', controllerClientId: null, controllerConnectionId: null, acquiredAt: null, lastHeartbeatAt: null, leaseExpiresAt: null, status: 'uncontrolled', pendingTakeover: null }, transitionReason: null }),
-    buildControlUpdatedMessage: () => ({ type: 'session.control.updated', control: { sessionId: 'sess-1', controllerClientId: null, controllerConnectionId: null, acquiredAt: null, lastHeartbeatAt: null, leaseExpiresAt: null, status: 'uncontrolled', pendingTakeover: null }, reason: 'claimed' }),
+    claim: () => ({ success: false, error: 'nope', code: 'already_controlled', controlState: uncontrolled }),
+    release: () => ({ success: false, error: 'nope', code: 'already_controlled', controlState: uncontrolled }),
+    resumeControl: () => ({ controlState: uncontrolled, transitionReason: null }),
+    buildControlUpdatedMessage: () => ({ type: 'session.control.updated', control: uncontrolled, reason: 'claimed' }),
   };
 }
 
