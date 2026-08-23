@@ -84,9 +84,6 @@
     "packages/client": {
       "name": "@prokopai/client",
       "version": "1.4.0",
-      "bin": {
-        "j2": "./dist/cli.mjs",
-      },
       "dependencies": {
         "@codemirror/autocomplete": "^6.20.3",
         "@codemirror/commands": "^6.10.4",

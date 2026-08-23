@@ -15,6 +15,17 @@ export interface LocalhostDiscoverResult {
 const LOCALHOST_CHECK_URL = 'localhost:8742';
 const LOCALHOST_CHECK_TIMEOUT_MS = 2000;
 
+export function getDefaultServerUrl(
+  currentLocation?: Pick<Location, 'origin' | 'protocol'>,
+): string {
+  const location = currentLocation
+    ?? (typeof window === 'undefined' ? undefined : window.location);
+  if (location?.protocol === 'http:' || location?.protocol === 'https:') {
+    return location.origin;
+  }
+  return LOCALHOST_CHECK_URL;
+}
+
 /**
  * Silently check if a localhost server is running without auth.
  * Used for first-time auto-discovery to improve onboarding UX.

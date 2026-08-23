@@ -1,17 +1,11 @@
 {
   "name": "@prokopai/client",
   "version": "1.4.0",
-  "private": false,
+  "private": true,
   "type": "module",
-  "bin": {
-    "j2": "./dist/cli.mjs"
-  },
-  "files": ["dist"],
   "scripts": {
     "dev": "vite",
     "build": "tsr generate && tsc && vite build",
-    "build:npx": "bun run build && esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.mjs --banner:js='#!/usr/bin/env node'",
-    "prepublishOnly": "bun run build:npx",
     "routes:generate": "tsr generate",
     "typecheck": "tsr generate && tsc --noEmit",
     "preview": "vite preview",

@@ -4,7 +4,7 @@ import { useNavigate, useRouter } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
 import { normalizeServerUrl } from '@/config/auth';
 import { useServerContext } from '@/contexts/ServerContext';
-import { validateServerAuth } from '@/lib/validateServerAuth';
+import { getDefaultServerUrl, validateServerAuth } from '@/lib/validateServerAuth';
 
 interface FirstServerScreenProps {
   error?: string;
@@ -15,7 +15,7 @@ export default function FirstServerScreen({ error }: FirstServerScreenProps) {
   const router = useRouter();
   const { addServer, servers } = useServerContext();
   const [name, setName] = useState('');
-  const [url, setUrl] = useState('localhost:8742');
+  const [url, setUrl] = useState(getDefaultServerUrl);
   const [token, setToken] = useState('');
   const [showToken, setShowToken] = useState(false);
   const [useAuthToken, setUseAuthToken] = useState(false);
