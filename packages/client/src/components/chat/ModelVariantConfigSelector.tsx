@@ -16,6 +16,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
@@ -124,6 +132,12 @@ export function ModelVariantConfigSelector({
 
   const selectedPreconfig = preconfigs.find((p) => p.id === selectedPreconfigId);
   const modelDisplayName = selectedModel?.name || fallbackModelName || 'Select model';
+  const variantDisplayName = selectedVariant ? capitalizeVariant(selectedVariant) : null;
+  const fullSelectionLabel = [
+    modelDisplayName,
+    variantDisplayName,
+    selectedPreconfig && !lockPreconfig ? selectedPreconfig.name : null,
+  ].filter(Boolean).join(', ');
 
   const hasVariants = !!variants && Object.keys(variants).length > 0;
   const variantKeys = hasVariants ? Object.keys(variants!) : [];
@@ -150,24 +164,30 @@ export function ModelVariantConfigSelector({
     setOpenSection((prev) => (prev === section ? null : section));
   };
 
-  const renderTriggerLabel = () => (
-    <span className="truncate inline-flex items-center gap-1.5">
-      <span className="truncate font-medium">{modelDisplayName}</span>
-      {selectedVariant && (
-        <span className="text-muted-foreground">
-          {' (' + capitalizeVariant(selectedVariant) + ')'}
-        </span>
-      )}
-      {selectedPreconfig && !lockPreconfig && (
-        <span className={cn(
-          'text-muted-foreground',
-          isAgentPreconfig(selectedPreconfig.id) && 'text-primary font-medium',
-        )}>
-          · {selectedPreconfig.name}
-        </span>
-      )}
-    </span>
-  );
+  const renderTriggerLabel = () => {
+    if (compact) {
+      return <span className="truncate font-medium">{modelDisplayName}</span>;
+    }
+
+    return (
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="min-w-0 flex-1 truncate font-medium">{modelDisplayName}</span>
+        {variantDisplayName && (
+          <span className="shrink-0 text-muted-foreground">
+            {'(' + variantDisplayName + ')'}
+          </span>
+        )}
+        {selectedPreconfig && !lockPreconfig && (
+          <span className={cn(
+            'max-w-[40%] min-w-0 truncate text-muted-foreground',
+            isAgentPreconfig(selectedPreconfig.id) && 'text-primary font-medium',
+          )}>
+            · {selectedPreconfig.name}
+          </span>
+        )}
+      </span>
+    );
+  };
 
   // --- Shared list items ---
 
@@ -290,8 +310,13 @@ export function ModelVariantConfigSelector({
         {icon}
         {label}
       </span>
-      <span className="flex w-full items-center gap-1">
-        <span className={cn('truncate font-medium', isMobile && 'flex-1')}>{value}</span>
+      <span className="flex w-full min-w-0 items-center gap-1">
+        <span className={cn(
+          'min-w-0 font-medium',
+          isMobile ? 'flex-1 whitespace-normal break-words' : 'truncate',
+        )}>
+          {value}
+        </span>
         <ChevronsUpDown className="ml-auto size-3 shrink-0 opacity-40" />
       </span>
     </button>
@@ -344,21 +369,22 @@ export function ModelVariantConfigSelector({
       : []),
   ];
 
-  const popoverContent = (
-    <PopoverContent className={cn('p-0', isMobile ? 'w-[320px]' : 'w-[480px]')}>
-      <div className="flex flex-col">
-        {/* Collapsed header row — horizontal on desktop, vertical on mobile */}
-        <div className={isMobile ? 'flex flex-col' : 'flex flex-row'}>
-          {sections.map((s) => (
-            <div key={s.section} className="contents">
-              {headerBtn(s.icon, s.label, s.value, s.section)}
-              {/* On mobile, inline-expand below the header */}
-              {isMobile && expandedList(s.section)}
-            </div>
-          ))}
+  const pickerSections = (
+    <div className={isMobile ? 'flex flex-col' : 'flex flex-row'}>
+      {sections.map((s) => (
+        <div key={s.section} className="contents">
+          {headerBtn(s.icon, s.label, s.value, s.section)}
+          {isMobile && expandedList(s.section)}
         </div>
-        {/* On desktop, expand full-width below the header row */}
-        {!isMobile && openSection && (
+      ))}
+    </div>
+  );
+
+  const popoverContent = (
+    <PopoverContent className="w-[480px] p-0">
+      <div className="flex flex-col">
+        {pickerSections}
+        {openSection && (
           <div className="border-t border-border">
             {expandedList(openSection)}
           </div>
@@ -366,6 +392,39 @@ export function ModelVariantConfigSelector({
       </div>
     </PopoverContent>
   );
+
+  if (isMobile) {
+    return (
+      <Sheet open={open} onOpenChange={handleOpenChange}>
+        <SheetTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            role="combobox"
+            aria-expanded={open}
+            aria-label={'Model and configuration: ' + fullSelectionLabel}
+            disabled={disabled}
+          >
+            <Cpu />
+          </Button>
+        </SheetTrigger>
+        <SheetContent
+          side="bottom"
+          className="max-h-[85dvh] gap-0 overflow-hidden rounded-t-xl"
+        >
+          <SheetHeader className="shrink-0 border-b border-border pr-12">
+            <SheetTitle>Model and configuration</SheetTitle>
+            <SheetDescription className="break-words">
+              {fullSelectionLabel}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="dialog-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {pickerSections}
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
   if (iconOnly) {
     return (
@@ -376,10 +435,11 @@ export function ModelVariantConfigSelector({
             size="icon"
             role="combobox"
             aria-expanded={open}
-            aria-label="Select model, variant, and config"
+            aria-label={'Model and configuration: ' + fullSelectionLabel}
+            title={fullSelectionLabel}
             disabled={disabled}
           >
-            <Cpu className="size-4" />
+            <Cpu />
           </Button>
         </PopoverTrigger>
         {popoverContent}
@@ -397,11 +457,12 @@ export function ModelVariantConfigSelector({
           size="default"
           role="combobox"
           aria-expanded={open}
-          aria-label="Select model, variant, and config"
-          className="px-2 text-muted-foreground"
+          aria-label={'Model and configuration: ' + fullSelectionLabel}
+          title={fullSelectionLabel}
+          className="min-w-0 px-2 text-muted-foreground"
           disabled={disabled}
         >
-          <span className={cn('truncate', maxWidth)}>
+          <span className={cn('min-w-0 flex-1', maxWidth)}>
             {renderTriggerLabel()}
           </span>
           <ChevronsUpDown className="size-3 shrink-0 opacity-50" />

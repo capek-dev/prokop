@@ -23,6 +23,16 @@ const models = createModelList().map((m) => ({
   providerId: m.providerId,
   providerName: m.providerName,
 }));
+const longLabelModel = {
+  ...models[0],
+  id: 'claude-long-label',
+  name: 'Claude Sonnet Extended Reasoning Preview',
+};
+const longLabelPreconfig = {
+  ...preconfigs[0],
+  id: 'preconfig-long-label',
+  name: 'Senior TypeScript Architecture and Code Review',
+};
 
 const defaultUsage = {
   promptTokens: 2500,
@@ -146,6 +156,23 @@ export const WithVariants: Story = {
       high: { providerOptions: { temperature: 0.9 } },
     },
     selectedVariant: 'medium',
+  },
+};
+
+export const LongPickerLabels: Story = {
+  args: {
+    session: createSession({
+      title: 'Responsive model picker',
+      selectedModel: longLabelModel.id,
+      selectedProvider: longLabelModel.providerId,
+      preconfigId: longLabelPreconfig.id,
+    }),
+    models: [longLabelModel, ...models],
+    preconfigs: [longLabelPreconfig, ...preconfigs],
+    variants: {
+      xhigh: { providerOptions: {} },
+    },
+    selectedVariant: 'xhigh',
   },
 };
 
