@@ -3,7 +3,8 @@ Set-StrictMode -Version Latest
 $VERSION_FILE_URL = "https://raw.githubusercontent.com/capek-dev/prokop/refs/heads/main/packages/server/VERSION"
 $REPO = "capek-dev/prokop"
 $INSTALL_DIR = Join-Path $HOME ".prokopai\bin"
-$BINARY_NAME = "prokopai.exe"
+$BINARY_NAME = "prokop.exe"
+$LEGACY_BINARY_NAME = "jean2.exe"
 $BINARY_PATH = ""
 
 $Force = $false
@@ -47,7 +48,7 @@ try {
 
   function usage {
     @"
-Install or update Jean2 server binary from GitHub Releases.
+Install or update the Prokop server binary from GitHub Releases.
 
 OPTIONS:
   --Version <ver>      Install a specific version (default: latest)
@@ -143,20 +144,20 @@ EXAMPLES:
   }
 
   function stop_prokopai {
-    info "Stopping Jean2 daemon..."
+    info "Stopping Prokop daemon..."
 
     $null = & $BINARY_PATH stop 2>&1
     if ($LASTEXITCODE -ne 0) {
-      error "Failed to stop Jean2 daemon. Update aborted."
+      error "Failed to stop Prokop daemon. Update aborted."
     }
 
     Start-Sleep -Seconds 1
 
     if (is_prokopai_running) {
-      error "Jean2 daemon is still running after stop command. Update aborted."
+      error "Prokop daemon is still running after stop command. Update aborted."
     }
 
-    success "Jean2 daemon stopped"
+    success "Prokop daemon stopped"
   }
 
   function is_initialized {
@@ -180,19 +181,19 @@ EXAMPLES:
   function start_prokopai {
     param([string]$NewBinary)
 
-    info "Starting Jean2 daemon..."
+    info "Starting Prokop daemon..."
 
     $null = & $NewBinary start 2>&1
     if ($LASTEXITCODE -ne 0) {
-      error "Failed to start Jean2 daemon after update."
+      error "Failed to start Prokop daemon after update."
     }
 
     Start-Sleep -Seconds 1
 
     if (is_prokopai_running_with_binary $NewBinary) {
-      success "Jean2 daemon started successfully"
+      success "Prokop daemon started successfully"
     } else {
-      warn "Jean2 daemon may not have started correctly"
+      warn "Prokop daemon may not have started correctly"
     }
   }
 
@@ -205,9 +206,13 @@ EXAMPLES:
   function download_binary {
     param([string]$Version)
 
-    $url = "https://github.com/$REPO/releases/download/server%2Fv$Version/prokopai-windows.exe"
+    $parts = $Version.Split('.')
+    $major = [int]$parts[0]
+    $minor = [int]$parts[1]
+    $assetPrefix = if ($major -lt 1 -or ($major -eq 1 -and $minor -le 4)) { "jean2" } else { "prokop" }
+    $url = "https://github.com/$REPO/releases/download/server%2Fv$Version/$assetPrefix-windows.exe"
 
-    info "Downloading Jean2 for windows..."
+    info "Downloading Prokop for windows..."
     info "URL: $url"
 
     $script:TEMP_FILE = [System.IO.Path]::GetTempFileName()
@@ -255,7 +260,7 @@ EXAMPLES:
     [Environment]::SetEnvironmentVariable('Path', $newPath, 'User')
     $env:Path = "$INSTALL_DIR;$env:Path"
 
-    success "Added Jean2 to PATH"
+    success "Added Prokop to PATH"
   }
 
   function update_existing_install {
@@ -263,8 +268,9 @@ EXAMPLES:
 
     $wasRunning = $false
     $needsMigration = $false
+    $currentBinary = $BINARY_PATH
 
-    info "Jean2 is already installed at $BINARY_PATH"
+    info "Prokop is already installed at $currentBinary"
 
     $currentVersion = check_existing_install
     info "Current version: $currentVersion"
@@ -275,26 +281,30 @@ EXAMPLES:
       exit 0
     }
 
-    info "Checking if Jean2 daemon is running..."
+    info "Checking if Prokop daemon is running..."
     if (is_prokopai_running) {
       $wasRunning = $true
-      info "Jean2 daemon is running"
+      info "Prokop daemon is running"
       stop_prokopai
     } else {
-      info "Jean2 daemon is not running"
+      info "Prokop daemon is not running"
     }
 
-    info "Checking if Jean2 is initialized..."
+    info "Checking if Prokop is initialized..."
     if (is_initialized) {
       $needsMigration = $true
-      info "Jean2 is initialized, will run migrations"
+      info "Prokop is initialized, will run migrations"
     } else {
-      info "Jean2 is not initialized, skipping migrations"
+      info "Prokop is not initialized, skipping migrations"
     }
 
     $tempFile = download_binary $Version
 
+    $script:BINARY_PATH = Join-Path $INSTALL_DIR $BINARY_NAME
     install_binary $tempFile
+    if ($currentBinary -ne $BINARY_PATH) {
+      configure_path
+    }
 
     $newBinary = $BINARY_PATH
 
@@ -305,10 +315,14 @@ EXAMPLES:
     if ($wasRunning) {
       start_prokopai $newBinary
     } else {
-      info "Jean2 was not running before update, not starting"
+      info "Prokop was not running before update, not starting"
     }
 
-    success "Jean2 updated from v$currentVersion to v$Version"
+    if ($currentBinary -ne $newBinary) {
+      Remove-Item $currentBinary -Force -ErrorAction SilentlyContinue
+    }
+
+    success "Prokop updated from v$currentVersion to v$Version"
   }
 
   function main {
@@ -323,8 +337,17 @@ EXAMPLES:
     }
 
     $script:BINARY_PATH = Join-Path $INSTALL_DIR $BINARY_NAME
+    $legacyInstallDir = if ([string]::IsNullOrEmpty($CustomInstallDir)) {
+      Join-Path $HOME ".jean2\bin"
+    } else {
+      $INSTALL_DIR
+    }
+    $legacyBinaryPath = Join-Path $legacyInstallDir $LEGACY_BINARY_NAME
 
     if (Test-Path $BINARY_PATH) {
+      update_existing_install $VERSION
+    } elseif (Test-Path $legacyBinaryPath) {
+      $script:BINARY_PATH = $legacyBinaryPath
       update_existing_install $VERSION
     } else {
       if ($Force) {
@@ -339,7 +362,7 @@ EXAMPLES:
       configure_path
 
       Write-Host ""
-      success "Jean2 v$VERSION installed successfully!"
+      success "Prokop v$VERSION installed successfully!"
       Write-Host ""
       info "Binary location: $BINARY_PATH"
       Write-Host ""
@@ -348,13 +371,13 @@ EXAMPLES:
         @"
   Next steps:
     1. Add to PATH: setx PATH `"$INSTALL_DIR;%PATH%`"
-    2. Set up and open Prokopai: $BINARY_PATH init
+    2. Set up and open Prokop: $BINARY_PATH init
 "@
       } else {
         @"
   Next steps:
     1. Restart your terminal (to apply PATH changes)
-    2. Set up and open Prokopai: $BINARY_PATH init
+    2. Set up and open Prokop: $BINARY_PATH init
 "@
       }
       Write-Host ""

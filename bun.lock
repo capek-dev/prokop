@@ -176,7 +176,7 @@
       "name": "@prokopai/server",
       "version": "1.4.0",
       "bin": {
-        "prokopai": "./dist/bin/prokopai",
+        "prokop": "./dist/bin/prokop",
       },
       "dependencies": {
         "@capekai/core": "workspace:*",

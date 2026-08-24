@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { tmpdir } from 'os';
 import { existsSync, statSync, openSync, renameSync } from 'fs';
 
@@ -45,16 +45,23 @@ export function detectPlatform(): 'darwin' | 'linux' | 'windows' {
 
 /** Whether the given release version still used legacy jean2-* asset names. */
 export function usesLegacyAssetName(version: string): boolean {
-  // Assets switched to prokopai-* with the rename, first release after v1.4.x.
   const [major, minor] = version.split('.').map(Number);
-  return major === 1 && minor <= 4;
+  return major < 1 || (major === 1 && minor <= 4);
 }
 
 export function getDownloadUrl(version: string, platform: string): string {
   const assetName = usesLegacyAssetName(version)
     ? (platform === 'windows' ? 'jean2-windows.exe' : `jean2-${platform}`)
-    : (platform === 'windows' ? 'prokopai-windows.exe' : `prokopai-${platform}`);
+    : (platform === 'windows' ? 'prokop-windows.exe' : `prokop-${platform}`);
   return `https://github.com/${REPO}/releases/download/server%2Fv${version}/${assetName}`;
+}
+
+export function getUpdateBinaryPath(
+  executablePath: string,
+  platform: 'darwin' | 'linux' | 'windows',
+): string {
+  const binaryName = platform === 'windows' ? 'prokop.exe' : 'prokop';
+  return join(dirname(executablePath), binaryName);
 }
 
 export function isCompiledBinary(): boolean {
@@ -64,7 +71,7 @@ export function isCompiledBinary(): boolean {
 export async function fetchLatestVersion(): Promise<string> {
   const response = await fetch(VERSION_FILE_URL, {
     headers: {
-      'User-Agent': 'prokopai-updater',
+      'User-Agent': 'prokop-updater',
     },
   });
 
@@ -106,11 +113,11 @@ export async function checkForUpdate(): Promise<UpdateCheckResult> {
 }
 
 export async function downloadBinary(url: string, destPath: string): Promise<void> {
-  console.log(`info: Downloading jean2 for ${detectPlatform()}...`);
+  console.log(`info: Downloading prokop for ${detectPlatform()}...`);
 
   const response = await fetch(url, {
     headers: {
-      'User-Agent': 'prokopai-updater',
+      'User-Agent': 'prokop-updater',
     },
   });
 
@@ -234,7 +241,7 @@ export async function performUpdate(options: UpdateOptions): Promise<UpdateResul
   const needsMigration = isInitialized();
 
   const tempDir = tmpdir();
-  const tempPath = join(tempDir, `jean2-update-${Date.now()}`);
+  const tempPath = join(tempDir, `prokop-update-${Date.now()}`);
 
   await downloadBinary(downloadUrl, tempPath);
 
@@ -260,10 +267,11 @@ export async function performUpdate(options: UpdateOptions): Promise<UpdateResul
   }
 
   const binaryPath = process.execPath;
+  const targetPath = getUpdateBinaryPath(binaryPath, platform);
 
   if (platform === 'windows') {
     // Windows: rename the running binary (allowed even while running),
-    // then move the new one into the original path — no need to wait for exit.
+    // then move the new one into place without waiting for exit.
     const oldPath = binaryPath + '.old';
 
     try {
@@ -273,11 +281,11 @@ export async function performUpdate(options: UpdateOptions): Promise<UpdateResul
       // Step 1: rename running exe to .old (Windows allows this)
       renameSync(binaryPath, oldPath);
 
-      // Step 2: move new binary into the original path (path is now free)
-      renameSync(tempPath, binaryPath);
+      // Step 2: install the new binary under the canonical command name.
+      renameSync(tempPath, targetPath);
 
       // Step 3: spawn background process for cleanup + restart
-      spawnPostUpdateTasks(binaryPath, oldPath, {
+      spawnPostUpdateTasks(targetPath, oldPath, {
         needsMigration,
         wasDaemonRunning,
       });
@@ -289,17 +297,20 @@ export async function performUpdate(options: UpdateOptions): Promise<UpdateResul
       };
     }
   } else {
-    // Unix: spawn background replacer that waits for exit then moves
+    // Unix: spawn background replacer that waits for exit then moves.
     const oldPath = binaryPath + '.old';
-    let command = `sleep 1 && mv -f '${tempPath}' '${binaryPath}' && chmod +x '${binaryPath}' && rm -f '${oldPath}'`;
+    const cleanupPaths = targetPath === binaryPath
+      ? `'${oldPath}'`
+      : `'${binaryPath}' '${oldPath}'`;
+    let command = `sleep 1 && mv -f '${tempPath}' '${targetPath}' && chmod +x '${targetPath}' && rm -f ${cleanupPaths}`;
 
     if (needsMigration || wasDaemonRunning) {
       const actions: string[] = [];
       if (needsMigration) {
-        actions.push(`'${binaryPath}' migrate`);
+        actions.push(`'${targetPath}' migrate`);
       }
       if (wasDaemonRunning) {
-        actions.push(`'${binaryPath}' start`);
+        actions.push(`'${targetPath}' start`);
       }
       command += ` && ${actions.join(' && ')}`;
     }

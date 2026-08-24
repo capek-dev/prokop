@@ -5,7 +5,8 @@ set -euo pipefail
 VERSION_FILE_URL="https://raw.githubusercontent.com/capek-dev/prokop/refs/heads/main/packages/server/VERSION"
 REPO="capek-dev/prokop"
 INSTALL_DIR="${HOME}/.prokopai/bin"
-BINARY_NAME="prokopai"
+BINARY_NAME="prokop"
+LEGACY_BINARY_NAME="jean2"
 BINARY_PATH=""
 
 FORCE=false
@@ -70,7 +71,7 @@ usage() {
   cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
 
-Install or update Jean2 server binary from GitHub Releases.
+Install or update the Prokop server binary from GitHub Releases.
 
 OPTIONS:
   --version <ver>      Install a specific version (default: latest)
@@ -182,19 +183,19 @@ is_prokopai_running() {
 }
 
 stop_prokopai() {
-  info "Stopping Jean2 daemon..."
+  info "Stopping Prokop daemon..."
   
   if ! "$BINARY_PATH" stop 2>&1; then
-    error "Failed to stop Jean2 daemon. Update aborted."
+    error "Failed to stop Prokop daemon. Update aborted."
   fi
   
   sleep 1
   
   if is_prokopai_running; then
-    error "Jean2 daemon is still running after stop command. Update aborted."
+    error "Prokop daemon is still running after stop command. Update aborted."
   fi
   
-  success "Jean2 daemon stopped"
+  success "Prokop daemon stopped"
 }
 
 is_initialized() {
@@ -222,18 +223,18 @@ run_migrations() {
 start_prokopai() {
   local new_binary="$1"
   
-  info "Starting Jean2 daemon..."
+  info "Starting Prokop daemon..."
   
   if ! "$new_binary" start 2>&1; then
-    error "Failed to start Jean2 daemon after update."
+    error "Failed to start Prokop daemon after update."
   fi
   
   sleep 1
   
   if is_prokopai_running_with_binary "$new_binary"; then
-    success "Jean2 daemon started successfully"
+    success "Prokop daemon started successfully"
   else
-    warn "Jean2 daemon may not have started correctly"
+    warn "Prokop daemon may not have started correctly"
   fi
 }
 
@@ -250,9 +251,16 @@ is_prokopai_running_with_binary() {
 }
 
 download_binary() {
-  local url="https://github.com/${REPO}/releases/download/server%2Fv${VERSION}/prokopai-${OS}"
+  local major minor asset_prefix url
+  IFS='.' read -r major minor _ <<< "$VERSION"
+  if (( major < 1 || (major == 1 && minor <= 4) )); then
+    asset_prefix="jean2"
+  else
+    asset_prefix="prokop"
+  fi
+  url="https://github.com/${REPO}/releases/download/server%2Fv${VERSION}/${asset_prefix}-${OS}"
 
-  info "Downloading Jean2 for $OS..."
+  info "Downloading Prokop for $OS..."
   info "URL: $url"
 
   TEMP_FILE=$(mktemp)
@@ -332,19 +340,20 @@ configure_path() {
     return 0
   fi
 
-  info "Adding Jean2 to PATH in $shell_config..."
+  info "Adding Prokop to PATH in $shell_config..."
 
   {
     echo ""
     echo "$path_line"
-  } >> "$shell_config" && success "Added Jean2 to PATH in $shell_config" || warn "Failed to update $shell_config"
+  } >> "$shell_config" && success "Added Prokop to PATH in $shell_config" || warn "Failed to update $shell_config"
 }
 
 update_existing_install() {
   local was_running=false
   local needs_migration=false
+  local current_binary="$BINARY_PATH"
   
-  info "Jean2 is already installed at $BINARY_PATH"
+  info "Prokop is already installed at $current_binary"
   
   local current_version
   current_version=$(check_existing_install)
@@ -356,27 +365,31 @@ update_existing_install() {
     exit 0
   fi
   
-  info "Checking if Jean2 daemon is running..."
+  info "Checking if Prokop daemon is running..."
   if is_prokopai_running; then
     was_running=true
-    info "Jean2 daemon is running"
+    info "Prokop daemon is running"
     stop_prokopai
   else
-    info "Jean2 daemon is not running"
+    info "Prokop daemon is not running"
   fi
   
-  info "Checking if Jean2 is initialized..."
+  info "Checking if Prokop is initialized..."
   if is_initialized; then
     needs_migration=true
-    info "Jean2 is initialized, will run migrations"
+    info "Prokop is initialized, will run migrations"
   else
-    info "Jean2 is not initialized, skipping migrations"
+    info "Prokop is not initialized, skipping migrations"
   fi
   
   local temp_file
   temp_file=$(download_binary)
-  
+
+  BINARY_PATH="${INSTALL_DIR}/${BINARY_NAME}"
   install_binary "$temp_file"
+  if [[ "$current_binary" != "$BINARY_PATH" ]]; then
+    configure_path
+  fi
   
   local new_binary="$BINARY_PATH"
   
@@ -387,10 +400,14 @@ update_existing_install() {
   if [[ "$was_running" == true ]]; then
     start_prokopai "$new_binary"
   else
-    info "Jean2 was not running before update, not starting"
+    info "Prokop was not running before update, not starting"
+  fi
+
+  if [[ "$current_binary" != "$new_binary" ]]; then
+    rm -f "$current_binary"
   fi
   
-  success "Jean2 updated from v${current_version} to v${VERSION}"
+  success "Prokop updated from v${current_version} to v${VERSION}"
 }
 
 main() {
@@ -407,8 +424,16 @@ main() {
   fi
 
   BINARY_PATH="${INSTALL_DIR}/${BINARY_NAME}"
+  local legacy_install_dir="${HOME}/.jean2/bin"
+  if [[ -n "$CUSTOM_INSTALL_DIR" ]]; then
+    legacy_install_dir="$INSTALL_DIR"
+  fi
+  local legacy_binary_path="${legacy_install_dir}/${LEGACY_BINARY_NAME}"
 
   if [[ -f "$BINARY_PATH" ]]; then
+    update_existing_install
+  elif [[ -f "$legacy_binary_path" ]]; then
+    BINARY_PATH="$legacy_binary_path"
     update_existing_install
   else
     if [[ "$FORCE" == true ]]; then
@@ -424,7 +449,7 @@ main() {
     configure_path
     
     echo ""
-    success "Jean2 v${VERSION} installed successfully!"
+    success "Prokop v${VERSION} installed successfully!"
     echo ""
     info "Binary location: $BINARY_PATH"
     echo ""
@@ -437,11 +462,11 @@ main() {
       else
         echo -e "       export PATH=\"${INSTALL_DIR}:\$PATH\""
       fi
-      echo -e "    2. Set up and open Prokopai: ${CYAN}${BINARY_PATH} init${NC}"
+      echo -e "    2. Set up and open Prokop: ${CYAN}${BINARY_PATH} init${NC}"
     else
       echo "  Next steps:"
       echo "    1. Add to PATH: export PATH=\"$INSTALL_DIR:\$PATH\""
-      echo -e "    2. Set up and open Prokopai: ${CYAN}${BINARY_PATH} init${NC}"
+      echo -e "    2. Set up and open Prokop: ${CYAN}${BINARY_PATH} init${NC}"
     fi
     echo ""
   fi

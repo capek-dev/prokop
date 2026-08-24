@@ -131,7 +131,7 @@ jobs:
           V: ${{ needs.prepare-server-release.outputs.version }}
         run: |
           mkdir -p packages/server/dist
-          bun build --compile --target=bun-darwin-arm64 --asset packages/client/dist --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokopai-darwin packages/server/src/cli.ts
+          bun build --compile --target=bun-darwin-arm64 --asset packages/client/dist --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokop-darwin packages/server/src/cli.ts
 
       - name: Import Apple Certificate
         env:
@@ -149,7 +149,7 @@ jobs:
           rm -f "$CERT_PATH"
 
       - name: Remove existing signature
-        run: codesign --remove-signature packages/server/dist/prokopai-darwin || true
+        run: codesign --remove-signature packages/server/dist/prokop-darwin || true
 
       - name: Code Sign
         run: |
@@ -158,10 +158,10 @@ jobs:
           codesign --force --options runtime \
             --entitlements packages/server/build/entitlements.mac.plist \
             --sign "$IDENTITY" \
-            packages/server/dist/prokopai-darwin
+            packages/server/dist/prokop-darwin
 
       - name: Verify Signature
-        run: codesign --verify --deep --strict --verbose=2 packages/server/dist/prokopai-darwin
+        run: codesign --verify --deep --strict --verbose=2 packages/server/dist/prokop-darwin
 
       - name: Notarize
         env:
@@ -170,21 +170,21 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           cd packages/server/dist
-          zip -y prokopai-darwin.zip prokopai-darwin
-          xcrun notarytool submit prokopai-darwin.zip \
+          zip -y prokop-darwin.zip prokop-darwin
+          xcrun notarytool submit prokop-darwin.zip \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait
-          rm prokopai-darwin.zip
+          rm prokop-darwin.zip
 
       - name: Staple Notarization Ticket
-        run: xcrun stapler staple packages/server/dist/prokopai-darwin || echo "Stapling skipped (expected for bare binaries)"
+        run: xcrun stapler staple packages/server/dist/prokop-darwin || echo "Stapling skipped (expected for bare binaries)"
 
       - name: Upload macOS Binary
         env:
           TAG: ${{ needs.prepare-server-release.outputs.tag }}
-        run: gh release upload "$TAG" packages/server/dist/prokopai-darwin --clobber
+        run: gh release upload "$TAG" packages/server/dist/prokop-darwin --clobber
 
       - name: Cleanup Keychain
         if: always()
@@ -213,13 +213,13 @@ jobs:
           V: ${{ needs.prepare-server-release.outputs.version }}
         run: |
           mkdir -p packages/server/dist
-          bun build --compile --target=bun-linux-x64 --asset packages/client/dist --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokopai-linux packages/server/src/cli.ts
-          bun build --compile --target=bun-windows-x64-baseline --asset packages/client/dist --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokopai-windows.exe packages/server/src/cli.ts
+          bun build --compile --target=bun-linux-x64 --asset packages/client/dist --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokop-linux packages/server/src/cli.ts
+          bun build --compile --target=bun-windows-x64-baseline --asset packages/client/dist --define=PROKOPAI_VERSION="'${V}'" --outfile=packages/server/dist/prokop-windows.exe packages/server/src/cli.ts
 
       - name: Upload Linux and Windows binaries
         env:
           TAG: ${{ needs.prepare-server-release.outputs.tag }}
-        run: gh release upload "$TAG" packages/server/dist/prokopai-linux packages/server/dist/prokopai-windows.exe --clobber
+        run: gh release upload "$TAG" packages/server/dist/prokop-linux packages/server/dist/prokop-windows.exe --clobber
 
   announce-server:
     needs: [prepare-server-release, release-server-macos, release-server-linux-windows]
