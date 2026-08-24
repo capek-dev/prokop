@@ -21,12 +21,12 @@ curl -fsSL https://raw.githubusercontent.com/capek-dev/prokop/main/install/insta
 irm https://raw.githubusercontent.com/capek-dev/prokop/main/install/install-prokopai.ps1 | iex
 ```
 
-The installer downloads the latest binary to `~/.prokopai/bin/prokopai` and adds it to your `PATH`.
+The installer downloads the latest binary to `~/.prokopai/bin/prokop` and adds it to your `PATH`.
 
-## 2. Set up and open Prokopai
+## 2. Set up and open Prokop
 
 ```bash
-prokopai init
+prokop init
 ```
 
 `init` performs the complete first-run setup:
@@ -42,17 +42,17 @@ The baseline tools used by the bundled agents are included in the binary. No too
 Advanced automation can override paths or skip individual setup operations:
 
 ```bash
-prokopai init --db-path <path> --tools-path <path>
-prokopai init --no-migrations
-prokopai init --no-preconfigs
-prokopai init --force
+prokop init --db-path <path> --tools-path <path>
+prokop init --no-migrations
+prokop init --no-preconfigs
+prokop init --force
 ```
 
 ## 3. Connect an LLM provider
 
 In the opened client, select **Configuration**, then use **Credentials** for an API key or **OAuth** for a supported subscription.
 
-If you prefer environment configuration, edit `~/.prokopai/.env`, then run `prokopai restart`:
+If you prefer environment configuration, edit `~/.prokopai/.env`, then run `prokop restart`:
 
 ```bash
 PROKOPAI_LLM_ANTHROPIC_API_KEY=sk-ant-...
@@ -74,12 +74,12 @@ The built-in agents can read and edit files, search the workspace and web, run c
 These are available after setup, but are not part of installation:
 
 ```bash
-prokopai status
-prokopai logs
-prokopai stop
-prokopai start
-prokopai restart
-prokopai open
+prokop status
+prokop logs
+prokop stop
+prokop start
+prokop restart
+prokop open
 ```
 
 ## Next steps

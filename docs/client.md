@@ -7,8 +7,8 @@ The Prokop server exposes a REST API and WebSocket endpoint. Any client that spe
 The server binary contains the production client and serves it from the same origin as the API and WebSocket endpoint. This is the recommended way to connect:
 
 ```bash
-prokopai start
-prokopai open
+prokop start
+prokop open
 ```
 
 Then visit `http://localhost:8742` in your browser. Changing the server port changes the client URL too.

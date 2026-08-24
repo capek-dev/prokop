@@ -22,7 +22,7 @@ PROKOPAI_AUTH_TOKEN=your-secret-token
 Then restart the server:
 
 ```bash
-prokopai restart
+prokop restart
 ```
 
 ### How it works
@@ -53,7 +53,7 @@ Or as a query parameter:
 ### Checking auth status
 
 ```bash
-prokopai auth
+prokop auth
 ```
 
 Shows whether authentication is enabled and displays a masked token preview.

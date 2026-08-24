@@ -41,9 +41,9 @@ curl -fsSL https://raw.githubusercontent.com/capek-dev/prokop/main/install/insta
 irm https://raw.githubusercontent.com/capek-dev/prokop/main/install/install-prokopai.ps1 | iex
 ```
 
-**Set up and open Prokopai:**
+**Set up and open Prokop:**
 ```bash
-prokopai init
+prokop init
 ```
 
 `init` creates the standard configuration, prepares the database and bundled agents, starts the daemon, and opens the client at `http://localhost:8742`. All baseline tools are included in the binary. The client can be installed as a PWA on supported devices. See the [Getting Started guide](docs/getting-started.md).
@@ -148,4 +148,4 @@ Documentation lives in this repository: [docs/index.md](docs/index.md)
 
 ## Legacy Compatibility
 
-Prokop still accepts legacy `JEAN2_*` environment variables and falls back to `~/.jean2` data and workspace paths when the canonical `PROKOPAI_*` variables or `~/.prokopai` paths are absent. New setups should use the Prokop names. Run `prokopai migrate` to move an existing `~/.jean2` setup to `~/.prokopai` and rewrite legacy environment keys.
+Prokop still accepts legacy `JEAN2_*` environment variables and falls back to `~/.jean2` data and workspace paths when the canonical `PROKOPAI_*` variables or `~/.prokopai` paths are absent. New setups should use the Prokop names. Run `prokop migrate-legacy-data` to move an existing `~/.jean2` setup to `~/.prokopai`, rewrite legacy environment keys and paths, rename nested agent home directories, and update stored workspace paths. `prokop migrate` only runs database schema migrations.

@@ -1,19 +1,19 @@
 # CLI Reference
 
-The Prokop CLI (`prokopai`) manages the server daemon, tools, models, and updates.
+The Prokop CLI (`prokop`) manages the server daemon, tools, models, and updates.
 
 ```
-prokopai <command> [options]
+prokop <command> [options]
 ```
 
 ## Daemon Management
 
-### `prokopai start`
+### `prokop start`
 
 Start the server as a background daemon.
 
 ```
-prokopai start [-p|--port <port>] [-h|--host <host>]
+prokop start [-p|--port <port>] [-h|--host <host>]
 ```
 
 | Flag | Default | Description |
@@ -21,38 +21,38 @@ prokopai start [-p|--port <port>] [-h|--host <host>]
 | `-p`, `--port` | `8742` | Port to listen on |
 | `-h`, `--host` | `0.0.0.0` | Host to bind to |
 
-### `prokopai stop`
+### `prokop stop`
 
 Stop the running daemon.
 
-### `prokopai restart`
+### `prokop restart`
 
 Restart the daemon. Accepts the same flags as `start`.
 
-### `prokopai status`
+### `prokop status`
 
 Show daemon status (PID, port, host, uptime).
 
-### `prokopai logs`
+### `prokop logs`
 
 Tail the server log file (`~/.prokopai/server.log`).
 
-### `prokopai server`
+### `prokop server`
 
 Start the server in the foreground (for systemd or debugging).
 
 ```
-prokopai server [-p|--port <port>] [-h|--host <host>]
+prokop server [-p|--port <port>] [-h|--host <host>]
 ```
 
 ## Initialization
 
-### `prokopai init`
+### `prokop init`
 
 Complete first-time setup. Uses standard defaults without prompting, starts the daemon, and opens the client.
 
 ```
-prokopai init [options]
+prokop init [options]
 ```
 
 | Flag | Description |
@@ -69,12 +69,12 @@ prokopai init [options]
 
 The baseline tools used by bundled agents ship in the binary. These commands manage optional integrations only and are not part of installation.
 
-### `prokopai tools list`
+### `prokop tools list`
 
 List available and installed tools.
 
 ```
-prokopai tools list [options]
+prokop tools list [options]
 ```
 
 | Flag | Description |
@@ -83,12 +83,12 @@ prokopai tools list [options]
 | `--extensions` | Show extension and env config details |
 | `--json` | JSON output |
 
-### `prokopai tools install`
+### `prokop tools install`
 
 Install tools. Interactive if no names provided.
 
 ```
-prokopai tools install [names...] [options]
+prokop tools install [names...] [options]
 ```
 
 | Flag | Description |
@@ -96,34 +96,34 @@ prokopai tools install [names...] [options]
 | `--all` | Install all tools |
 | `--force` | Reinstall even if already installed |
 
-### `prokopai tools update`
+### `prokop tools update`
 
 Update installed tools to the latest version.
 
 ```
-prokopai tools update [names...] [--dry-run]
+prokop tools update [names...] [--dry-run]
 ```
 
-### `prokopai tools remove`
+### `prokop tools remove`
 
 Remove installed tools.
 
 ```
-prokopai tools remove [names...] [--all]
+prokop tools remove [names...] [--all]
 ```
 
-### `prokopai tools outdated`
+### `prokop tools outdated`
 
 Check for available updates.
 
 ## Models
 
-### `prokopai models sync`
+### `prokop models sync`
 
 Sync models from the upstream registry.
 
 ```
-prokopai models sync [--override]
+prokop models sync [--override]
 ```
 
 | Flag | Description |
@@ -132,18 +132,22 @@ prokopai models sync [--override]
 
 ## Database
 
-### `prokopai migrate`
+### `prokop migrate`
 
 Run pending database migrations.
 
+### `prokop migrate-legacy-data`
+
+Move legacy `~/.jean2` data to `~/.prokopai`, including nested agent home directories and stored workspace paths.
+
 ## Updates
 
-### `prokopai update`
+### `prokop update`
 
 Update the Prokop binary to the latest version.
 
 ```
-prokopai update [options]
+prokop update [options]
 ```
 
 | Flag | Description |
@@ -155,19 +159,19 @@ prokopai update [options]
 
 ## Utility
 
-### `prokopai open`
+### `prokop open`
 
 Open the built-in client in your browser.
 
-### `prokopai auth`
+### `prokop auth`
 
 Show authentication status and masked token.
 
-### `prokopai version`
+### `prokop version`
 
 Print the current version.
 
-### `prokopai help`
+### `prokop help`
 
 Print the full help text.
 

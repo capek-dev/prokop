@@ -78,7 +78,7 @@ When conversations grow too large for the context window, Prokop automatically c
 
 ## Models
 
-Models are defined in `~/.prokopai/models.json`. Prokop ships with a built-in registry of providers and models that gets written during `prokopai init`.
+Models are defined in `~/.prokopai/models.json`. Prokop ships with a built-in registry of providers and models that gets written during `prokop init`.
 
 ### Sync upstream models
 
@@ -86,10 +86,10 @@ New models are published to the upstream registry. Sync them:
 
 ```bash
 # Merge new models into your local registry (keeps custom models)
-prokopai models sync
+prokop models sync
 
 # Replace your local registry with upstream
-prokopai models sync --override
+prokop models sync --override
 ```
 
 ### Built-in providers
@@ -179,7 +179,7 @@ Preconfigs can be switched mid-session without starting a new conversation. See 
 
 ### Global instructions (`~/.prokopai/AGENTS.md`)
 
-Instructions that apply to **all** workspaces on this machine. Written during `prokopai init`. Edit it to add global rules:
+Instructions that apply to **all** workspaces on this machine. Written during `prokop init`. Edit it to add global rules:
 
 ```markdown
 # Prokop Global Instructions

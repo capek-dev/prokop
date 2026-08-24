@@ -4,7 +4,7 @@ Tools give the agent the ability to interact with your filesystem, run commands,
 
 ## Built-in tools
 
-A fresh `prokopai init` can use the filesystem, shell, web fetch, task, question, and worktree tools immediately. Built-in tools take precedence over optional extensions with the same name.
+A fresh `prokop init` can use the filesystem, shell, web fetch, task, question, and worktree tools immediately. Built-in tools take precedence over optional extensions with the same name.
 
 ### File Tools
 
@@ -68,7 +68,7 @@ Requires a Tavily API key:
 
 ## Capability Tools
 
-These tools are built into the server and appear only when their corresponding workspace capability is enabled. They are not installed via `prokopai tools install`.
+These tools are built into the server and appear only when their corresponding workspace capability is enabled. They are not installed via `prokop tools install`.
 
 | Tool | Capability | Description |
 |------|------------|-------------|
@@ -92,26 +92,26 @@ External tools are only needed for integrations not included in the binary, such
 
 ```bash
 # Browse optional extensions
-prokopai tools list
+prokop tools list
 
 # Install a specific optional integration
-prokopai tools install tavily-search
+prokop tools install tavily-search
 
 # Update optional installed extensions
-prokopai tools update
+prokop tools update
 ```
 
 These commands are not part of first-run setup. Do not install built-in tool names from the external registry.
 
 ```bash
 # List only installed extensions
-prokopai tools list --installed
+prokop tools list --installed
 
 # Check optional extensions for updates
-prokopai tools outdated
+prokop tools outdated
 
 # Remove an optional extension
-prokopai tools remove tavily-search
+prokop tools remove tavily-search
 ```
 
 Optional extensions are stored in `~/.prokopai/tools/` (or your custom `PROKOPAI_TOOLS_PATH`). Built-in tools remain in the binary.
