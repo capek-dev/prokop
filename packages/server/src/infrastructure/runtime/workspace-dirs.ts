@@ -40,7 +40,7 @@ export function resolveWorkspaceDir(workspacePath: string): string {
     if (!warnedWorkspaces.has(workspacePath)) {
       warnedWorkspaces.add(workspacePath);
       console.warn(
-        `[prokopai] Using legacy workspace directory ${legacy}. ` +
+        `[prokop] Using legacy workspace directory ${legacy}. ` +
           'Rename it to .prokopai to migrate; legacy support will be removed in a future release.',
       );
     }

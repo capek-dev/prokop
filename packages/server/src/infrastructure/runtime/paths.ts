@@ -49,8 +49,8 @@ function resolveDefaultDataDir(): string {
   const legacy = getLegacyJean2HomeDir();
   if (existsSync(legacy)) {
     console.warn(
-      `[prokopai] Using legacy data directory ${legacy}. ` +
-        `Run \`prokopai migrate\` to move it to ${prokopai}.`,
+      `[prokop] Using legacy data directory ${legacy}. ` +
+        `Run \`prokop migrate-legacy-data\` to move it to ${prokopai}.`,
     );
     return legacy;
   }
@@ -187,7 +187,7 @@ class PathsSingleton {
   }
 
   getBinaryPath(): string {
-    const binaryName = process.platform === 'win32' ? 'prokopai.exe' : 'prokopai';
+    const binaryName = process.platform === 'win32' ? 'prokop.exe' : 'prokop';
     return join(this.getBinDir(), binaryName);
   }
 }

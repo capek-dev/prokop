@@ -3,6 +3,7 @@ import { getEnvFilePath, getToolsDir, getPreconfigsDir } from './paths';
 import { readEnv, readEnvFloat, readEnvInt, JEAN2_ENV_PREFIX, PROKOPAI_ENV_PREFIX } from './env-compat';
 
 const envOverlay = new Map<string, string>();
+const envFileInjectedKeys = new Set<string>();
 
 function loadEnvFile(): void {
   const envPath = getEnvFilePath();
@@ -35,6 +36,7 @@ function loadEnvFile(): void {
 
     if (process.env[key] === undefined) {
       process.env[key] = cleanValue;
+      envFileInjectedKeys.add(key);
     }
     envOverlay.set(key, cleanValue);
   }
@@ -292,8 +294,13 @@ export function getAllJean2EnvKeys(): string[] {
   return Array.from(envOverlay.keys());
 }
 
+export function wasEnvInjectedFromFile(key: string): boolean {
+  return envFileInjectedKeys.has(key);
+}
+
 export function reloadJean2Env(): void {
   envOverlay.clear();
+  envFileInjectedKeys.clear();
   loadEnvFile();
 }
 

@@ -18,7 +18,11 @@ import {
 import type { InitOptions } from '@/cli/init';
 import { runInitCommand } from '@/cli/init-command';
 import { openClient } from '@/cli/open-client';
-import { runProkopaiRenameMigration, type RenameMigrationResult } from '@/cli/rename-migrate';
+import {
+  isProkopServerReachable,
+  runProkopaiRenameMigration,
+  type RenameMigrationResult,
+} from '@/cli/rename-migrate';
 import { runMigrations, getDatabase } from '@/infrastructure/sqlite/database';
 import { runToolsCommand, type ToolsCommandArgs } from '@/cli/tools-cli';
 import { performUpdate, type UpdateOptions } from '@/cli/update';
@@ -76,14 +80,14 @@ function parseServerArgs(args: string[]): ParsedServerArgs {
 }
 
 function printVersion(): void {
-  console.log(`prokopai version ${VERSION}`);
+  console.log(`prokop version ${VERSION}`);
 }
 
 function printHelp(): void {
   console.log(`
-Prokopai - AI Agent Server
+Prokop - AI Agent Server
 
-Usage: prokopai <command> [options]
+Usage: prokop <command> [options]
 
 Commands:
   start               Start server as background daemon
@@ -108,7 +112,7 @@ Commands:
 
   auth                 Show authentication configuration
 
-  init                 Set up Prokopai, start it, and open the client
+  init                 Set up Prokop, start it, and open the client
     --db-path <path>   Custom database path
     --tools-path <path>  Custom tools path
     --run-migrations   Run schema migrations (default)
@@ -137,12 +141,13 @@ Commands:
     cleanup             Remove orphaned data only (no VACUUM)
 
   migrate              Run database migrations
+  migrate-legacy-data  Move ~/.jean2 data to ~/.prokopai
 
   models               Model registry management
     sync                Sync models from upstream registry
       --override         Replace local models.json with upstream
 
-  update               Update prokopai to latest version
+  update               Update prokop to latest version
     --version <ver>    Update to a specific version
     --force            Reinstall even if already on latest
     --dry-run          Check for updates without installing
@@ -152,25 +157,26 @@ Commands:
   help                 Show this help
 
 Examples:
-  prokopai db stats                  Check database size and reclaimable space
-  prokopai db vacuum                 Reclaim disk space (run during low activity)
-  prokopai db cleanup                Remove orphaned rows only
-  prokopai start                     Start server as daemon
-  prokopai stop                      Stop the daemon
-  prokopai status                    Check if daemon is running
-  prokopai restart                   Restart the daemon
-  prokopai server                    Run in foreground (for systemd)
-  prokopai logs                      Follow server logs
-  prokopai auth                       Show auth configuration
-  prokopai init                      Set up, start, and open Prokopai
-  prokopai tools list                List optional extensions
-  prokopai tools list --extensions  Show extension details
-  prokopai migrate                   Run database migrations
-  prokopai models sync               Sync models from upstream registry
-  prokopai models sync --override    Replace local models with upstream
-  prokopai update                     Update to latest version
-  prokopai update --dry-run           Check for updates only
-  prokopai update --version 0.9.0     Update to specific version
+  prokop db stats                  Check database size and reclaimable space
+  prokop db vacuum                 Reclaim disk space (run during low activity)
+  prokop db cleanup                Remove orphaned rows only
+  prokop start                     Start server as daemon
+  prokop stop                      Stop the daemon
+  prokop status                    Check if daemon is running
+  prokop restart                   Restart the daemon
+  prokop server                    Run in foreground (for systemd)
+  prokop logs                      Follow server logs
+  prokop auth                      Show auth configuration
+  prokop init                      Set up, start, and open Prokop
+  prokop tools list                List optional extensions
+  prokop tools list --extensions  Show extension details
+  prokop migrate                   Run database migrations
+  prokop migrate-legacy-data       Move legacy data to ~/.prokopai
+  prokop models sync               Sync models from upstream registry
+  prokop models sync --override    Replace local models with upstream
+  prokop update                    Update to latest version
+  prokop update --dry-run          Check for updates only
+  prokop update --version 0.9.0    Update to specific version
 
 Environment:
   API keys and config can be set in ~/.prokopai/.env
@@ -188,7 +194,7 @@ async function main(): Promise<void> {
     case 'server': {
       // Check if initialized (skip if JEAN2_DATABASE_PATH is set - backward compat)
       if (!getDatabasePath() && !isInitialized()) {
-        console.error('Error: Prokopai is not initialized. Run `prokopai init` first.');
+        console.error('Error: Prokop is not initialized. Run `prokop init` first.');
         process.exit(1);
       }
 
@@ -205,7 +211,7 @@ async function main(): Promise<void> {
     case 'start': {
       // Check if initialized (skip if JEAN2_DATABASE_PATH is set - backward compat)
       if (!getDatabasePath() && !isInitialized()) {
-        console.error('Error: Prokopai is not initialized. Run `prokopai init` first.');
+        console.error('Error: Prokop is not initialized. Run `prokop init` first.');
         process.exit(1);
       }
 
@@ -310,7 +316,7 @@ async function main(): Promise<void> {
           process.exit(1);
         }
 
-        console.log('\nProkopai is ready.');
+        console.log('\nProkop is ready.');
         console.log(`  Config:   ${result.initialization.configPath}`);
         console.log(`  Database: ${result.initialization.databasePath}`);
       } catch (err: unknown) {
@@ -338,7 +344,7 @@ async function main(): Promise<void> {
 
     case 'migrate': {
       if (!isInitialized()) {
-        console.error('Error: Prokopai is not initialized. Run `prokopai init` first.');
+        console.error('Error: Prokop is not initialized. Run `prokop init` first.');
         process.exit(1);
       }
 
@@ -350,23 +356,45 @@ async function main(): Promise<void> {
         process.exit(1);
       }
 
-      // Rename migration (jean2 → prokopai): runs after schema migrations so
-      // the db shape is current before workspace paths are rewritten.
+      break;
+    }
+
+    case 'migrate-legacy-data': {
+      const daemonStatus = getStatus();
+      if (daemonStatus.running) {
+        console.error('Error: Stop the Prokop daemon before migrating legacy data.');
+        console.error('Run `prokop stop`, then run `prokop migrate-legacy-data` again.');
+        process.exit(1);
+      }
+
+      if (await isProkopServerReachable()) {
+        console.error('Error: A Prokop or Jean2 server is still reachable.');
+        console.error('Stop every foreground and background server before migrating legacy data.');
+        process.exit(1);
+      }
+
+      if (!isInitialized()) {
+        console.error('Error: No Prokop or legacy Jean2 data directory was found.');
+        process.exit(1);
+      }
+
       try {
         const renameResult: RenameMigrationResult = runProkopaiRenameMigration();
         for (const step of renameResult.steps) {
           if (step.status === 'done') {
             console.log(`  ${step.step}: ${step.detail ?? 'done'}`);
           } else if (step.status === 'failed') {
-            console.error(`  ${step.step}: FAILED — ${step.detail ?? 'unknown error'}`);
+            console.error(`  ${step.step}: FAILED: ${step.detail ?? 'unknown error'}`);
           }
         }
         if (!renameResult.success) {
-          console.error('Rename migration completed with failures:', renameResult.error);
+          console.error('Legacy data migration completed with failures:', renameResult.error);
+          process.exit(1);
         }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
-        console.error('Rename migration failed:', message);
+        console.error('Legacy data migration failed:', message);
+        process.exit(1);
       }
       break;
     }
@@ -386,9 +414,9 @@ async function main(): Promise<void> {
           updateOptions.noRestart = true;
         } else if (updateArgs[i] === '--help' || updateArgs[i] === '-h') {
           console.log(`
-prokopai update - Update prokopai to latest version
+prokop update - Update prokop to latest version
 
-Usage: prokopai update [options]
+Usage: prokop update [options]
 
 Options:
   --version <ver>    Update to a specific version (default: latest)
@@ -398,9 +426,9 @@ Options:
   --help             Show this help message
 
 Examples:
-  prokopai update                     Update to latest version
-  prokopai update --dry-run           Check for updates only
-  prokopai update --version 0.9.0     Update to specific version
+  prokop update                     Update to latest version
+  prokop update --dry-run           Check for updates only
+  prokop update --version 0.9.0     Update to specific version
 `);
           process.exit(0);
         }
@@ -444,7 +472,7 @@ Examples:
 
     default: {
       console.error(`Unknown command: ${command}`);
-      console.error('Run "prokopai help" for usage information');
+      console.error('Run "prokop help" for usage information');
       process.exit(1);
     }
   }
@@ -511,7 +539,7 @@ async function runToolsCommandFromCLI(args: string[]): Promise<void> {
 
 async function runDbCommand(dbArgs: string[]): Promise<void> {
   if (!isInitialized()) {
-    console.error('Error: Prokopai is not initialized. Run `prokopai init` first.');
+    console.error('Error: Prokop is not initialized. Run `prokop init` first.');
     process.exit(1);
   }
 
@@ -519,9 +547,9 @@ async function runDbCommand(dbArgs: string[]): Promise<void> {
 
   if (subCommand === '--help' || subCommand === '-h') {
     console.log(`
-prokopai db - Database maintenance
+prokop db - Database maintenance
 
-Usage: prokopai db <command>
+Usage: prokop db <command>
 
 Commands:
   stats       Show database size and reclaimable space
@@ -531,9 +559,9 @@ Commands:
   cleanup     Remove orphaned data only (no VACUUM)
 
 Examples:
-  prokopai db stats       Check how much space can be reclaimed
-  prokopai db vacuum      Reclaim disk space
-  prokopai db cleanup     Remove orphaned rows only
+  prokop db stats       Check how much space can be reclaimed
+  prokop db vacuum      Reclaim disk space
+  prokop db cleanup     Remove orphaned rows only
 `);
     return;
   }
@@ -553,7 +581,7 @@ Examples:
       console.log('');
 
       if (result.reclaimedBytes > 0) {
-        console.log('  Run `prokopai db vacuum` to reclaim this space.');
+        console.log('  Run `prokop db vacuum` to reclaim this space.');
       } else {
         console.log('  Database is well-compacted. Nothing to reclaim.');
       }
@@ -592,11 +620,11 @@ Examples:
         console.log('Cleanup complete: no orphaned data found');
       }
       console.log('');
-      console.log('Note: Run `prokopai db vacuum` to reclaim the freed disk space.');
+      console.log('Note: Run `prokop db vacuum` to reclaim the freed disk space.');
       console.log('');
     } else {
       console.error(`Unknown db command: ${subCommand || '(none)'}`);
-      console.error('Run "prokopai db --help" for usage information');
+      console.error('Run "prokop db --help" for usage information');
       process.exit(1);
     }
   } catch (err: unknown) {
@@ -616,17 +644,17 @@ async function runModelsCommand(modelsArgs: string[]): Promise<void> {
         override = true;
       } else if (arg === '--help' || arg === '-h') {
         console.log(`
-prokopai models sync - Sync models from upstream registry
+prokop models sync - Sync models from upstream registry
 
-Usage: prokopai models sync [options]
+Usage: prokop models sync [options]
 
 Options:
   --override    Replace local models.json with upstream (default: merge)
   --help        Show this help message
 
 Examples:
-  prokopai models sync              Add new models, keep existing
-  prokopai models sync --override   Replace with upstream models
+  prokop models sync              Add new models, keep existing
+  prokop models sync --override   Replace with upstream models
 `);
         process.exit(0);
       } else {
@@ -652,23 +680,23 @@ Examples:
 
   if (subCommand === '--help' || subCommand === '-h') {
     console.log(`
-prokopai models - Model registry management
+prokop models - Model registry management
 
-Usage: prokopai models <command> [options]
+Usage: prokop models <command> [options]
 
 Commands:
   sync            Sync models from upstream registry
     --override     Replace local models.json with upstream
 
 Examples:
-  prokopai models sync              Add new models, keep existing
-  prokopai models sync --override   Replace with upstream models
+  prokop models sync              Add new models, keep existing
+  prokop models sync --override   Replace with upstream models
 `);
     return;
   }
 
   console.error(`Unknown models command: ${subCommand || '(none)'}`);
-  console.error('Run "prokopai models --help" for usage information');
+  console.error('Run "prokop models --help" for usage information');
   process.exit(1);
 }
 

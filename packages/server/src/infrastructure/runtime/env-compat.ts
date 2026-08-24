@@ -37,7 +37,7 @@ function warnLegacy(suffix: string, legacyUsed: boolean): void {
   if (!legacyUsed || warnedKeys.has(suffix)) return;
   warnedKeys.add(suffix);
   console.warn(
-    `[prokopai] JEAN2_${suffix} is deprecated; rename to PROKOPAI_${suffix}. ` +
+    `[prokop] JEAN2_${suffix} is deprecated; rename to PROKOPAI_${suffix}. ` +
       'Legacy support will be removed in a future release.',
   );
 }

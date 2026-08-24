@@ -42,8 +42,8 @@ describe('paths compat resolution', () => {
     expect(Paths.getDataDir()).toBe('/tmp/prokopai-override');
   });
 
-  test('binary name is prokopai', () => {
-    expect(Paths.getBinaryPath().endsWith('prokopai')).toBe(true);
+  test('binary name is prokop', () => {
+    expect(Paths.getBinaryPath().endsWith('prokop')).toBe(true);
   });
 });
 
