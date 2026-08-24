@@ -11,23 +11,27 @@ import {
 import {
   getSavedServers,
   saveServer,
+  getOrCreateServer,
   updateServer as updateServerStorage,
+  renameServer as renameServerStorage,
   deleteServer,
   getQuickConnections,
   addQuickConnection,
   removeQuickConnection,
   removeQuickConnectionForWorkspace,
+  renameQuickConnectionsForServer,
   reorderQuickConnections,
 } from '@/config/servers';
 import type { SavedServer, QuickConnection } from '@prokopai/sdk';
 import { normalizeServerUrl } from '@/config/auth';
-import { checkLocalhostNoAuth } from '@/lib/validateServerAuth';
+import { discoverServerNoAuth } from '@/lib/validateServerAuth';
 import { useOverviewGroupsStore } from '@/stores/overviewGroupsStore';
 
 interface ServerContextValue {
   servers: SavedServer[];
   quickConnections: QuickConnection[];
   isHydrated: boolean;
+  isDiscovering: boolean;
 
   // Server CRUD actions
   addServer: (name: string, url: string, token?: string) => SavedServer;
@@ -35,6 +39,7 @@ interface ServerContextValue {
     id: string,
     updates: { name?: string; url?: string; token?: string },
   ) => void;
+  renameServer: (id: string, name: string) => string | null;
   removeServer: (id: string) => void;
 
   // Quick connection actions
@@ -61,6 +66,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     [],
   );
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isDiscovering, setIsDiscovering] = useState(false);
 
   const discoveryAttempted = useRef(false);
 
@@ -70,6 +76,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
 
     setServers(loadedServers);
     setQuickConnections(loadedQuickConnections);
+    setIsDiscovering(loadedServers.length === 0);
     setIsHydrated(true);
   }, []);
 
@@ -81,22 +88,15 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     }
 
     discoveryAttempted.current = true;
-    const controller = new AbortController();
 
-    checkLocalhostNoAuth(controller.signal).then((result) => {
-      if (result.available) {
-        const newServer: SavedServer = {
-          id: crypto.randomUUID(),
-          name: 'Home',
-          url: normalizeServerUrl(result.url),
-          createdAt: new Date().toISOString(),
-        };
-        saveServer(newServer);
-        setServers(getSavedServers());
-      }
-    });
-
-    return () => controller.abort();
+    void discoverServerNoAuth()
+      .then((result) => {
+        if (result.available) {
+          getOrCreateServer(result.url, { name: 'Home' });
+          setServers(getSavedServers());
+        }
+      })
+      .finally(() => setIsDiscovering(false));
   }, [isHydrated, servers.length]);
 
   const addServer = useCallback((name: string, url: string, token?: string): SavedServer => {
@@ -126,7 +126,20 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     };
 
     updateServerStorage(id, normalizedUpdates);
+    if (updates.name) {
+      renameQuickConnectionsForServer(id, updates.name);
+      setQuickConnections(getQuickConnections());
+    }
     setServers(getSavedServers());
+  }, []);
+
+  const renameServer = useCallback((id: string, name: string): string | null => {
+    const error = renameServerStorage(id, name);
+    if (error) return error;
+
+    setServers(getSavedServers());
+    setQuickConnections(getQuickConnections());
+    return null;
   }, []);
 
   const removeServer = useCallback((id: string): void => {
@@ -172,8 +185,10 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     servers,
     quickConnections,
     isHydrated,
+    isDiscovering,
     addServer,
     editServer,
+    renameServer,
     removeServer,
     addToQuickConnections,
     removeFromQuickConnections,

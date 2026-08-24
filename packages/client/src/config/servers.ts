@@ -6,6 +6,7 @@ import { normalizeServerUrl } from './auth';
 const STORAGE_KEYS = {
   SERVERS: 'prokopai_servers',
   QUICK_CONNECTIONS: 'prokopai_quick_connections',
+  LAST_SERVER_ID: 'prokopai_last_server_id',
 } as const;
 
 /**
@@ -32,6 +33,23 @@ export function getServerById(id: string): SavedServer | null {
   return servers.find((server) => server.id === id) || null;
 }
 
+export function getLastSelectedServerId(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.LAST_SERVER_ID);
+  } catch (error) {
+    console.error('Error reading last selected server from localStorage:', error);
+    return null;
+  }
+}
+
+export function setLastSelectedServerId(id: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.LAST_SERVER_ID, id);
+  } catch (error) {
+    console.error('Error saving last selected server to localStorage:', error);
+  }
+}
+
 /**
  * Find a server by URL using normalized comparison.
  * Returns the existing server if found, null otherwise.
@@ -44,7 +62,7 @@ export function findServerByUrl(url: string): SavedServer | null {
 
 /**
  * Save a new server to localStorage.
- * Does NOT deduplicate — callers should use getOrCreateServer for
+ * Does NOT deduplicate. Callers should use getOrCreateServer for
  * deduplication, or check findServerByUrl first.
  */
 export function saveServer(server: SavedServer): void {
@@ -74,10 +92,11 @@ export function getOrCreateServer(
     return existing;
   }
 
+  const normalizedUrl = normalizeServerUrl(url);
   const server: SavedServer = {
     id: crypto.randomUUID(),
-    name: options.name || url,
-    url,
+    name: options.name || normalizedUrl,
+    url: normalizedUrl,
     ...(options.token ? { token: options.token } : {}),
     createdAt: new Date().toISOString(),
   };
@@ -122,6 +141,26 @@ export function updateServer(
   }
 }
 
+export function renameServer(id: string, name: string): string | null {
+  const trimmedName = name.trim();
+  if (!trimmedName) return 'Server name is required.';
+
+  const servers = getSavedServers();
+  if (!servers.some((server) => server.id === id)) {
+    return 'Server not found.';
+  }
+  if (servers.some(
+    (server) => server.id !== id
+      && server.name.toLowerCase() === trimmedName.toLowerCase(),
+  )) {
+    return `A server named "${trimmedName}" already exists.`;
+  }
+
+  updateServer(id, { name: trimmedName });
+  renameQuickConnectionsForServer(id, trimmedName);
+  return null;
+}
+
 /**
  * Delete a server by ID
  * Also removes related quick connections
@@ -131,6 +170,9 @@ export function deleteServer(id: string): void {
     const servers = getSavedServers();
     const filtered = servers.filter((server) => server.id !== id);
     localStorage.setItem(STORAGE_KEYS.SERVERS, JSON.stringify(filtered));
+    if (getLastSelectedServerId() === id) {
+      localStorage.removeItem(STORAGE_KEYS.LAST_SERVER_ID);
+    }
 
     // Also remove related quick connections
     const quickConnections = getQuickConnections();
@@ -268,6 +310,25 @@ export function updateQuickConnection(
       'Error updating quick connection in localStorage:',
       error,
     );
+  }
+}
+
+export function renameQuickConnectionsForServer(
+  serverId: string,
+  serverName: string,
+): void {
+  try {
+    const connections = getQuickConnections().map((connection) =>
+      connection.serverId === serverId
+        ? { ...connection, serverName }
+        : connection,
+    );
+    localStorage.setItem(
+      STORAGE_KEYS.QUICK_CONNECTIONS,
+      JSON.stringify(connections),
+    );
+  } catch (error) {
+    console.error('Error renaming server quick connections:', error);
   }
 }
 

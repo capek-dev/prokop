@@ -2,6 +2,7 @@ import { createFileRoute, redirect, useRouter } from '@tanstack/react-router';
 import { fetchCriticalServerData, type CriticalServerData } from '@/lib/fetchServerData';
 import { StoreHydrator } from '@/components/providers/StoreHydrator';
 import ServerShell from '@/components/shell/ServerShell';
+import { setLastSelectedServerId } from '@/config/servers';
 import { mark } from '@/lib/perf';
 
 function ServerErrorComponent({
@@ -14,7 +15,7 @@ function ServerErrorComponent({
   const router = useRouter();
 
   const handleGoToServerSelection = () => {
-    router.navigate({ to: '/', replace: true });
+    router.navigate({ to: '/', search: { select: true }, replace: true });
   };
 
   return (
@@ -43,18 +44,29 @@ export const Route = createFileRoute('/server/$serverId')({
   beforeLoad: ({ params, context }) => {
     const server = context.serverRegistry.getServer(params.serverId);
     if (!server) {
-      throw redirect({ to: '/', replace: true, throw: true });
+      throw redirect({
+        to: '/',
+        search: { select: true },
+        replace: true,
+        throw: true,
+      });
     }
     return { server };
   },
   loader: async ({ params, context, abortController }): Promise<CriticalServerData> => {
     const server = context.serverRegistry.getServer(params.serverId);
     if (!server) {
-      throw redirect({ to: '/', replace: true, throw: true });
+      throw redirect({
+        to: '/',
+        search: { select: true },
+        replace: true,
+        throw: true,
+      });
     }
     mark('server-loader:start');
     try {
       const data = await fetchCriticalServerData(server.url, server.token, abortController.signal);
+      setLastSelectedServerId(params.serverId);
       mark('server-loader:all-ready');
       return data;
     } catch (err: unknown) {

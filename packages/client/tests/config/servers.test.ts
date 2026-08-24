@@ -3,14 +3,19 @@ import { mockLocalStorage } from '../helpers';
 import {
   getSavedServers,
   getServerById,
+  getOrCreateServer,
+  getLastSelectedServerId,
+  setLastSelectedServerId,
   saveServer,
   updateServer,
+  renameServer,
   deleteServer,
   getQuickConnections,
   addQuickConnection,
   removeQuickConnection,
   removeQuickConnectionForWorkspace,
   updateQuickConnection,
+  renameQuickConnectionsForServer,
   reorderQuickConnections,
 } from '@/config/servers';
 import type { SavedServer } from '@prokopai/sdk';
@@ -54,6 +59,31 @@ describe('servers', () => {
     });
   });
 
+  describe('getOrCreateServer', () => {
+    test('deduplicates normalized server URLs', () => {
+      const created = getOrCreateServer('http://localhost:8742/', { name: 'Home' });
+      const existing = getOrCreateServer('localhost:8742');
+
+      expect(existing.id).toBe(created.id);
+      expect(getSavedServers()).toHaveLength(1);
+      expect(created.url).toBe('localhost:8742');
+    });
+  });
+
+  describe('last selected server', () => {
+    test('stores and retrieves the server ID', () => {
+      setLastSelectedServerId('s1');
+      expect(getLastSelectedServerId()).toBe('s1');
+    });
+
+    test('is cleared when its server is deleted', () => {
+      saveServer(makeServer('s1'));
+      setLastSelectedServerId('s1');
+      deleteServer('s1');
+      expect(getLastSelectedServerId()).toBeNull();
+    });
+  });
+
   describe('updateServer', () => {
     test('updates server fields', () => {
       saveServer(makeServer('s1'));
@@ -65,6 +95,26 @@ describe('servers', () => {
       saveServer(makeServer('s1'));
       updateServer('nonexistent', { name: 'X' });
       expect(getSavedServers()).toHaveLength(1);
+    });
+  });
+
+  describe('renameServer', () => {
+    test('trims the name and updates quick connection labels', () => {
+      saveServer(makeServer('s1'));
+      addQuickConnection({ serverId: 's1', workspaceId: 'w1', serverName: 'Old' });
+
+      expect(renameServer('s1', '  Home  ')).toBeNull();
+      expect(getServerById('s1')?.name).toBe('Home');
+      expect(getQuickConnections()[0].serverName).toBe('Home');
+    });
+
+    test('rejects empty and duplicate names', () => {
+      saveServer(makeServer('s1', { name: 'Home' }));
+      saveServer(makeServer('s2', { name: 'Work' }));
+
+      expect(renameServer('s1', '   ')).toBe('Server name is required.');
+      expect(renameServer('s1', 'work')).toBe('A server named "work" already exists.');
+      expect(getServerById('s1')?.name).toBe('Home');
     });
   });
 
@@ -123,6 +173,18 @@ describe('servers', () => {
       const conn = addQuickConnection({ serverId: 's1', workspaceId: 'w1', serverName: 'old' });
       updateQuickConnection(conn.id, { serverName: 'New' });
       expect(getQuickConnections()[0].serverName).toBe('New');
+    });
+
+    test('renameQuickConnectionsForServer updates only matching labels', () => {
+      addQuickConnection({ serverId: 's1', workspaceId: 'w1', serverName: 'Old' });
+      addQuickConnection({ serverId: 's2', workspaceId: 'w2', serverName: 'Other' });
+
+      renameQuickConnectionsForServer('s1', 'Home');
+
+      expect(getQuickConnections().map((connection) => connection.serverName)).toEqual([
+        'Home',
+        'Other',
+      ]);
     });
 
     test('reorderQuickConnections updates order', () => {

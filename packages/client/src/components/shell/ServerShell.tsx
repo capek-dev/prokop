@@ -18,6 +18,9 @@ import { platform } from '@/platform';
 import { SidebarProvider } from '@/components/ui/sidebar';
 
 import { AppHeader } from '@/components/app/AppHeader';
+import { ConnectingState } from '@/components/shared/LoadingSkeleton';
+import { OfflineState } from '@/components/shared/OfflineState';
+import { Button } from '@/components/ui/button';
 import { AppKeyboardHandlersMount } from '@/hooks/useAppKeyboardHandlers';
 import { FilesPanel, type FilesPanelHandle } from '@/components/layout/FilesPanel';
 import type { MessageInputHandle } from '@/components/chat/MessageInput';
@@ -46,6 +49,12 @@ export default function ServerShell() {
     removeFromQuickConnectionsByWorkspace,
     quickConnections,
   });
+  const [hasConnectedOnce, setHasConnectedOnce] = useState(
+    sessionManager.connected,
+  );
+  useEffect(() => {
+    if (sessionManager.connected) setHasConnectedOnce(true);
+  }, [sessionManager.connected]);
 
   const chatInputRef = useRef<MessageInputHandle>(null);
   const terminalPanelRef = useRef<TerminalPanelHandle>(null);
@@ -139,6 +148,37 @@ export default function ServerShell() {
       revokeAllPermissions: (...args: Parameters<SessionCommandsValue['revokeAllPermissions']>) => manager().revokeAllPermissions(...args),
     } satisfies SessionCommandsValue;
   }, []);
+
+  if (!hasConnectedOnce) {
+    if (sessionManager.connectionTimedOut) {
+      return (
+        <div className="flex min-h-screen w-full items-center justify-center bg-background">
+          <OfflineState
+            serverUrl={sessionManager.serverUrl ?? ''}
+            authError={sessionManager.authError}
+            retryCount={sessionManager.retryCount}
+            nextRetryIn={sessionManager.nextRetryIn}
+            onRetry={sessionManager.handleRetry}
+            onLogout={sessionManager.handleLogout}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex min-h-screen w-full flex-col items-center justify-center gap-4 bg-background">
+        <ConnectingState />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={sessionManager.handleLogout}
+          className="text-muted-foreground"
+        >
+          Change Server
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <SessionPaneRegistryContext.Provider value={paneRegistry}>

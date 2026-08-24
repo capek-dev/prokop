@@ -73,7 +73,7 @@ export default function FirstServerScreen({ error }: FirstServerScreenProps) {
     if (router.history.length > 1) {
       router.history.back();
     } else {
-      navigate({ to: '/' });
+      navigate({ to: '/', search: { select: true } });
     }
   };
 

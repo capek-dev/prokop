@@ -7,13 +7,14 @@ export interface ServerAuthResult {
   authEnabled?: boolean;
 }
 
-export interface LocalhostDiscoverResult {
+export interface ServerDiscoverResult {
   available: boolean;
   url: string;
+  authRequired?: boolean;
 }
 
 const LOCALHOST_CHECK_URL = 'localhost:8742';
-const LOCALHOST_CHECK_TIMEOUT_MS = 2000;
+const SERVER_CHECK_TIMEOUT_MS = 2000;
 
 export function getDefaultServerUrl(
   currentLocation?: Pick<Location, 'origin' | 'protocol'>,
@@ -26,40 +27,75 @@ export function getDefaultServerUrl(
   return LOCALHOST_CHECK_URL;
 }
 
-/**
- * Silently check if a localhost server is running without auth.
- * Used for first-time auto-discovery to improve onboarding UX.
- */
-export async function checkLocalhostNoAuth(
+async function probeServerNoAuth(
+  rawUrl: string,
   signal?: AbortSignal,
-): Promise<LocalhostDiscoverResult> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), LOCALHOST_CHECK_TIMEOUT_MS);
+): Promise<ServerDiscoverResult> {
+  const url = normalizeServerUrl(rawUrl);
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (signal?.aborted) abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  const timeout = setTimeout(abort, SERVER_CHECK_TIMEOUT_MS);
 
-    const res = await fetch(`http://${LOCALHOST_CHECK_URL}/api/info`, {
-      signal: signal ?? controller.signal,
+  try {
+    const proto = url.startsWith('https://') ? 'https' : 'http';
+    const clean = url.replace(/^https?:\/\//, '');
+    const res = await fetch(`${proto}://${clean}/api/info`, {
+      signal: controller.signal,
     });
-    clearTimeout(timeout);
 
     if (!res.ok) {
-      return { available: false, url: LOCALHOST_CHECK_URL };
+      return { available: false, url };
     }
 
     interface ServerInfo {
       features?: { authentication?: boolean };
     }
     const info = (await res.json()) as ServerInfo;
-    const authEnabled = info.features?.authentication ?? false;
-
-    if (authEnabled) {
-      return { available: false, url: LOCALHOST_CHECK_URL };
-    }
-
-    return { available: true, url: LOCALHOST_CHECK_URL };
+    const authRequired = info.features?.authentication ?? false;
+    return {
+      available: !authRequired,
+      url,
+      ...(authRequired ? { authRequired: true } : {}),
+    };
   } catch {
-    return { available: false, url: LOCALHOST_CHECK_URL };
+    return { available: false, url };
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', abort);
   }
+}
+
+export interface DiscoverServerOptions {
+  signal?: AbortSignal;
+  currentLocation?: Pick<Location, 'origin' | 'protocol'>;
+}
+
+export async function discoverServerNoAuth(
+  options: DiscoverServerOptions = {},
+): Promise<ServerDiscoverResult> {
+  const candidates = [
+    getDefaultServerUrl(options.currentLocation),
+    LOCALHOST_CHECK_URL,
+  ];
+  const uniqueCandidates = Array.from(
+    new Set(candidates.map((candidate) => normalizeServerUrl(candidate))),
+  );
+
+  for (const candidate of uniqueCandidates) {
+    if (options.signal?.aborted) break;
+    const result = await probeServerNoAuth(candidate, options.signal);
+    if (result.available || result.authRequired) return result;
+  }
+
+  return { available: false, url: normalizeServerUrl(candidates[0]) };
+}
+
+export function checkLocalhostNoAuth(
+  signal?: AbortSignal,
+): Promise<ServerDiscoverResult> {
+  return probeServerNoAuth(LOCALHOST_CHECK_URL, signal);
 }
 
 /**
