@@ -307,6 +307,17 @@ describe('application session use cases', () => {
       expect(spy.sent).toEqual([{ type: 'compaction.complete', sessionId: 'sess-1', tokensUsed: { prompt: 10, completion: 20 } }]);
     });
 
+    test('compact delivers the gate rejection and does not execute', async () => {
+      const execution = makeExecution({ compact: async () => { throw new Error('must not run'); } });
+      const app = createSessionTranscriptApplication({ repository: makeRepository(), execution, gate: rejectGate() });
+      const spy = makeSpy();
+      const wire = makeWire(spy);
+
+      await app.compact(wire, origin, 'sess-1');
+
+      expect(spy.sent[0]).toMatchObject({ type: 'session.action_rejected', sessionId: 'sess-1', action: 'session.compact', code: 'not_controller' });
+    });
+
     test('compact maps skipped failures to invalid_session', async () => {
       const execution = makeExecution({ compact: async () => ({ ok: false, error: 'Compaction is only available for main sessions', skipped: true }) });
       const app = createSessionTranscriptApplication({ repository: makeRepository(), execution, gate: noGate() });
@@ -355,6 +366,17 @@ describe('application session use cases', () => {
       expect(spy.broadcastToSession[0].message).toMatchObject({ type: 'session.reverted', revertedTo: { messageId: 'm-2' } });
     });
 
+    test('revert delivers the gate rejection and does not execute', async () => {
+      const execution = makeExecution({ revert: async () => { throw new Error('must not run'); } });
+      const app = createSessionTranscriptApplication({ repository: makeRepository(), execution, gate: rejectGate() });
+      const spy = makeSpy();
+      const wire = makeWire(spy);
+
+      await app.revert(wire, origin, { sessionId: 'sess-1', messageId: 'm-2' });
+
+      expect(spy.sent[0]).toMatchObject({ type: 'session.action_rejected', sessionId: 'sess-1', action: 'session.revert', code: 'not_controller' });
+    });
+
     test('revert maps thrown errors to revert_error', async () => {
       const execution = makeExecution({ revert: async () => { throw new Error('Target message not found'); } });
       const app = createSessionTranscriptApplication({ repository: makeRepository(), execution, gate: noGate() });
@@ -394,6 +416,17 @@ describe('application session use cases', () => {
       await app.fork(wire, origin, { sessionId: 'sess-1', messageId: 'x' });
 
       expect(spy.sent).toEqual([{ type: 'error', code: 'fork_error', message: 'Source session not found', sessionId: 'sess-1' }]);
+    });
+
+    test('fork delivers the gate rejection and does not execute', async () => {
+      const execution = makeExecution({ fork: async () => { throw new Error('must not run'); } });
+      const app = createSessionTranscriptApplication({ repository: makeRepository(), execution, gate: rejectGate() });
+      const spy = makeSpy();
+      const wire = makeWire(spy);
+
+      await app.fork(wire, origin, { sessionId: 'sess-1', messageId: 'm-1' });
+
+      expect(spy.sent[0]).toMatchObject({ type: 'session.action_rejected', sessionId: 'sess-1', action: 'session.fork', code: 'not_controller' });
     });
 
     test('interrupt gates, executes with the reason default, and broadcasts session.interrupted', async () => {

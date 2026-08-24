@@ -36,25 +36,31 @@ export function createSessionTranscriptApplication<Origin>(
   deps: SessionTranscriptDeps<Origin>,
 ): SessionTranscriptApplication<Origin> {
   return {
-    async compact(wire, _origin, sessionId): Promise<void> {
+    async compact(wire, origin, sessionId): Promise<void> {
       const session = deps.repository.getSession(sessionId);
       if (!session) {
-        wire.delivery.send(_origin, { type: 'error', code: 'not_found', message: 'Session not found', sessionId });
+        wire.delivery.send(origin, { type: 'error', code: 'not_found', message: 'Session not found', sessionId });
+        return;
+      }
+
+      const gate = deps.gate.checkControllerGate(sessionId, 'session.compact', origin);
+      if (gate) {
+        sendGateRejection(wire, origin, gate);
         return;
       }
 
       const execResult = await deps.execution.compact(sessionId, 'manual');
 
       if (execResult.ok) {
-        wire.delivery.send(_origin, {
+        wire.delivery.send(origin, {
           type: 'compaction.complete',
           sessionId,
           tokensUsed: execResult.result.tokensUsed,
         });
       } else if (execResult.skipped) {
-        wire.delivery.send(_origin, { type: 'error', code: 'invalid_session', message: execResult.error, sessionId });
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: execResult.error, sessionId });
       } else {
-        wire.delivery.send(_origin, { type: 'error', code: 'compaction_error', message: execResult.error, sessionId });
+        wire.delivery.send(origin, { type: 'error', code: 'compaction_error', message: execResult.error, sessionId });
       }
     },
 
@@ -64,6 +70,12 @@ export function createSessionTranscriptApplication<Origin>(
         const session = deps.repository.getSession(sessionId);
         if (!session) {
           wire.delivery.send(origin, { type: 'error', code: 'not_found', message: 'Session not found', sessionId });
+          return;
+        }
+
+        const gate = deps.gate.checkControllerGate(sessionId, 'session.revert', origin);
+        if (gate) {
+          sendGateRejection(wire, origin, gate);
           return;
         }
 
@@ -98,6 +110,12 @@ export function createSessionTranscriptApplication<Origin>(
         const session = deps.repository.getSession(sessionId);
         if (!session) {
           wire.delivery.send(origin, { type: 'error', code: 'not_found', message: 'Session not found', sessionId });
+          return;
+        }
+
+        const gate = deps.gate.checkControllerGate(sessionId, 'session.fork', origin);
+        if (gate) {
+          sendGateRejection(wire, origin, gate);
           return;
         }
 
