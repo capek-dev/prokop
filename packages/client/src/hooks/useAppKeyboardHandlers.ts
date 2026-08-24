@@ -6,7 +6,6 @@ import {useChatLayoutStore} from '@/stores/chatLayoutStore';
 import {useServerDataStore} from '@/stores/serverDataStore';
 import type {AppSidebarHandle} from '@/components/layout/AppSidebar';
 import type {Preconfig, Workspace} from '@prokopai/sdk';
-import { platform, hasCapability } from '@/platform';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
 import { useBoardFocus } from '@/hooks/useBoardFocus';
 import { useSessionPaneRegistry } from '@/contexts/SessionPaneRegistryContext';
@@ -52,11 +51,6 @@ export function useAppKeyboardHandlers({
   }, [setSidebarOpen, sidebarRef]);
 
   const focusTerminalPanel = useCallback(() => {
-    if (platform.capabilities.terminal && platform.openTerminal) {
-      const activeWorkspace = useServerDataStore.getState().activeWorkspace;
-      void platform.openTerminal(activeWorkspace?.path);
-      return;
-    }
     useChatLayoutStore.getState().setShowTerminalPanel(true);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -76,15 +70,10 @@ export function useAppKeyboardHandlers({
   });
 
   const handleCloseTerminal = useCallback(() => {
-    if (platform.capabilities.terminal) return;
     useChatLayoutStore.getState().setShowTerminalPanel(false);
   }, []);
 
   const focusFilesPanel = useCallback(() => {
-    if (platform.capabilities.explorer && platform.showExplorer) {
-      void platform.showExplorer();
-      return;
-    }
     requestAnimationFrame(() => {
       filesPanelRef.current?.focus();
     });
@@ -116,16 +105,9 @@ export function useAppKeyboardHandlers({
     }
   }, [activeWorkspace, primaryPreconfigs, createSession]);
 
-  const handleNewWindow = useCallback(() => {
-    if (platform.capabilities.windowManagement) {
-      platform.createWindow?.();
-    }
-  }, []);
-
   const router = useRouter();
 
   const handleToggleViewMode = useCallback(() => {
-    if (!hasCapability('multiView')) return;
     const currentPath = router.state.location.pathname;
     if (currentPath.includes('/overview')) {
       router.navigate({ to: '/server/$serverId/workspace', params: { serverId } });
@@ -201,7 +183,6 @@ export function useAppKeyboardHandlers({
     onOpenTerminal: () => focusTerminalPanelRef.current(),
     onOpenFilesPanel: () => focusFilesPanelRef.current(),
     onNewSession: handleNewSession,
-    onNewWindow: handleNewWindow,
     onToggleViewMode: handleToggleViewMode,
     onCloseFocusedPanel: handleCloseFocusedPanel,
     onFocusChatInput: focusChatInput,
@@ -210,18 +191,6 @@ export function useAppKeyboardHandlers({
     onFocusPane: handleFocusPane,
     onCyclePane: handleCyclePane,
   });
-
-  useLayoutEffect(() => {
-    if (platform.capabilities.accelerators) {
-      return platform.onAccelerator?.((action) => {
-        if (action === 'open-sidebar') {
-          focusSidebarSessionPanelRef.current();
-        } else if (action === 'open-terminal') {
-          focusTerminalPanelRef.current();
-        }
-      });
-    }
-  }, []);
 }
 
 export interface AppKeyboardHandlersMountProps {

@@ -36,9 +36,6 @@ describe('notificationSupport: detectNotificationSupport', () => {
   });
 
   function mockWebPlatform() {
-    vi.doMock('@/platform', () => ({
-      platform: { id: 'web' },
-    }));
     // Stub the browser APIs that happy-dom doesn't provide
     Object.defineProperty(window, 'isSecureContext', {
       configurable: true,
@@ -67,14 +64,6 @@ describe('notificationSupport: detectNotificationSupport', () => {
       writable: true,
     });
   }
-
-  it('returns unsupported when platform is electron', async () => {
-    vi.doMock('@/platform', () => ({
-      platform: { id: 'electron' },
-    }));
-    const { detectNotificationSupport } = await import('@/notifications/notificationSupport');
-    expect(detectNotificationSupport()).toBe('unsupported');
-  });
 
   it('returns insecure-context for HTTP without localhost', async () => {
     mockWebPlatform();

@@ -23,10 +23,6 @@ The web client is a Progressive Web App. Open it once in your browser, and it's 
 
 The PWA caches assets locally after the first load. You still need a connection to your Prokop server.
 
-## Desktop App (macOS)
-
-The Electron desktop app provides a native experience with system tray, notifications, and auto-updates. Download from [GitHub Releases](https://github.com/capek-dev/prokop/releases), install, and launch it. It connects to the server on port **8742** (configurable via `PROKOPAI_PORT`).
-
 ## Browser Extension
 
 The [ProkopaiBrowser](https://chromewebstore.google.com/detail/jean2browser/jpahdfmmfmmnacapmkchljmcijoedcpj) extension lets the agent control a Chrome browser: navigate pages, read content, and click elements. Install it from the Chrome Web Store, then connect it to your Prokop server from the extension popup.

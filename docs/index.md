@@ -2,7 +2,7 @@
 
 Prokop is an AI agent server: one binary, any LLM, any device. It runs on your machine, connects to any LLM provider, and lets you chat, code, research, automate, and delegate through a unified interface.
 
-The server handles the agent loop, tool execution, and session management. You connect with a web client, desktop app, browser extension, or any REST/WebSocket client.
+The server handles the agent loop, tool execution, and session management. You connect with the web client, browser extension, or any REST/WebSocket client.
 
 ## Getting Started
 
@@ -10,7 +10,7 @@ New to Prokop? Start here.
 
 - **[Getting Started](./getting-started.md)** - Install, initialize, and run your first session
 - **[Configuration](./configuration.md)** - Set up LLM providers, API keys, models, capabilities, and MCP
-- **[Client Guide](./client.md)** - Connect with the embedded web client, Electron, PWA, or browser extension
+- **[Client Guide](./client.md)** - Connect with the embedded web client, PWA, or browser extension
 - **[CLI Reference](./cli.md)** - All available commands and flags
 
 ## Core Concepts
@@ -36,7 +36,7 @@ New to Prokop? Start here.
 ## Architecture
 
 ```
-You (browser / desktop / PWA / browser extension)
+You (browser / PWA / browser extension)
     |
     +-- WebSocket (real-time: chat, terminal, permissions)
     +-- REST (CRUD: sessions, files, config, tools, workspaces)

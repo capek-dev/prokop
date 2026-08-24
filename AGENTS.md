@@ -11,7 +11,6 @@ Jean2 is an AI Agent monorepo built with TypeScript, Bun, React, and Hono.
 - **Server**: Hono + AI SDK with multi-provider support (packages/server)
 - **Client**: React 19 + Vite 8 + TanStack Router + Zustand + shadcn/ui + Tailwind CSS v4, with PWA support (packages/client)
 - **SDK**: Shared types, protocols, transport layer, WebSocket namespaces, and REST clients (packages/sdk)
-- **Client Electron**: Electron desktop wrapper around the client (packages/client-electron)
 - **Browser Extension**: Chrome extension for browser automation (packages/browser)
 - **External Tools**: TypeScript tool modules, separately versioned and distributed (tools/). Each tool is a directory with `tool.ts`, `package.json`, and `VERSION`.
 - **Sandbox CLI**: Interactive CLI for intercepting and simulating LLM responses in a running server, enabling end-to-end testing without real API calls (packages/sandbox-cli).
@@ -37,9 +36,6 @@ bun run dev:be
 bun run dev:client
 bun run dev:client:https
 
-# Development - Electron desktop
-bun run dev:electron
-
 # Build all packages
 bun run build
 
@@ -63,12 +59,6 @@ bun run build:all
 # Preview production client build
 bun run preview
 bun run preview:https
-
-# Build Electron desktop app
-bun run electron:build
-bun run electron:build:mac:local
-bun run electron:build:mac:release
-bun run electron:build:win
 
 # Start sandbox CLI
 bun run sandbox
@@ -303,16 +293,6 @@ packages/
       shared.ts          # Barrel file re-exporting shared-types, shared-protocol, shared-utils
       version.ts         # Version constant
 
-  client-electron/       # Electron desktop app (@jean2/client-electron)
-    src/
-      main.ts            # Electron main process
-      preload.ts         # Preload script
-      ipc-handlers.ts    # IPC communication handlers
-      server-manager.ts  # Embedded server lifecycle management
-      updater.ts         # Auto-update via electron-updater
-      menu.ts            # Application menu
-      webview-manager.ts # WebView management
-
   browser/               # Browser extension (@jean2/browser)
     src/
       background.ts      # Background service worker
@@ -363,7 +343,6 @@ changelogs/              # Version changelogs
 .github/                 # CI/CD workflows
   workflows/
     release.yml          # Server + tools release (cross-platform binaries)
-    release-electron.yml # Electron desktop release (macOS + Windows)
     release-browser.yml  # Browser extension release
     cleanup-releases.yml # Weekly cleanup of old releases
 

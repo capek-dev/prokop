@@ -1,5 +1,4 @@
 import { useCallback, useRef, useEffect } from 'react';
-import { platform } from '@/platform';
 import chatFinishSound from '@/assets/sounds/chat-finish.mp3';
 import chatPermissionSound from '@/assets/sounds/chat-permission.mp3';
 
@@ -21,7 +20,6 @@ export function useNotificationSound(): UseNotificationSoundReturn {
   const buffersRef = useRef<Partial<Record<SoundKey, AudioBuffer>>>({});
   const unlockedRef = useRef(false);
   const pendingRef = useRef<SoundKey | null>(null);
-  const nativeCooldownRef = useRef<number>(0);
 
   const getOrCreateContext = useCallback(async (): Promise<AudioContext> => {
     let ctx = audioCtxRef.current;
@@ -112,21 +110,6 @@ export function useNotificationSound(): UseNotificationSoundReturn {
   }, [getOrCreateContext, loadBuffer, playBuffer, attachGestureListeners]);
 
   const playSound = useCallback(async (key: SoundKey) => {
-    if (platform.capabilities.sound) {
-      const now = Date.now();
-      if (now > nativeCooldownRef.current) {
-        try {
-          await platform.playSound?.(key);
-          nativeCooldownRef.current = now + 1000;
-          return;
-        } catch (err) {
-          console.warn('[useNotificationSound] Native playback failed, falling back to Web Audio', err);
-        }
-      }
-      await playWebAudio(key);
-      return;
-    }
-
     await playWebAudio(key);
   }, [playWebAudio]);
 

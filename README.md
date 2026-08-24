@@ -46,7 +46,7 @@ irm https://raw.githubusercontent.com/capek-dev/prokop/main/install/install-prok
 prokopai init
 ```
 
-`init` creates the standard configuration, prepares the database and bundled agents, starts the daemon, and opens the client at `http://localhost:8742`. All baseline tools are included in the binary. Desktop app (macOS Electron) and PWA (any device) are also available. See the [Getting Started guide](docs/getting-started.md).
+`init` creates the standard configuration, prepares the database and bundled agents, starts the daemon, and opens the client at `http://localhost:8742`. All baseline tools are included in the binary. The client can be installed as a PWA on supported devices. See the [Getting Started guide](docs/getting-started.md).
 
 ---
 
@@ -94,7 +94,7 @@ Everything else is a surface you choose to connect.
 ```
 ┌───────────────────────────────────────────────────────────┐
 │                      Client Layer                         │
-│   Desktop (Electron) · Web/PWA · Browser Extension        │
+│              Web/PWA · Browser Extension                 │
 │              WebSocket + REST (any network)               │
 └──────────────────────────┬────────────────────────────────┘
                            │

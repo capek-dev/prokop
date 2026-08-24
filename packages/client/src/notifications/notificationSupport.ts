@@ -1,5 +1,3 @@
-import { platform } from '@/platform';
-
 /**
  * Feature support level for Web Push on this browser/platform.
  */
@@ -34,16 +32,10 @@ export interface NotificationRegistrationMeta {
 /**
  * Detect the notification support level for the current environment.
  *
- * Excludes Electron entirely from Web Push.
  * Detects insecure context (HTTP without localhost).
  * Detects iOS Safari tabs that are not installed as Home Screen apps.
  */
 export function detectNotificationSupport(): NotificationSupport {
-  // Exclude Electron: uses native sounds, not browser Web Push
-  if (platform.id === 'electron') {
-    return 'unsupported';
-  }
-
   // Must have service worker and PushManager
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
     return 'unsupported';

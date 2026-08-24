@@ -21,7 +21,6 @@ import { AppPanels } from '@/components/app/AppPanels';
 import { WorkspaceContentArea } from '@/components/app/WorkspaceContentArea';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
-import { hasCapability } from '@/platform';
 import {
   SidebarHeader,
   SidebarMenu,
@@ -142,7 +141,7 @@ export default function WorkspaceView({ switcher, defaultPreconfigId }: Workspac
 
   const sidebarHeader = (
     <SidebarHeader className="p-1">
-      {switcher ?? (hasCapability('multiView') && (
+      {switcher ?? (
         <WorkspaceSwitcher
           workspaces={sidebarData.workspaces}
           activeWorkspace={sidebarData.activeWorkspace}
@@ -157,7 +156,7 @@ export default function WorkspaceView({ switcher, defaultPreconfigId }: Workspac
           deletingWorkspaceId={deletingWorkspaceId}
           isUpdatingWorkspace={isUpdatingWorkspace}
         />
-      ))}
+      )}
       <div className="px-2">
         <SidebarMenu>
           <SidebarMenuItem>
@@ -253,13 +252,10 @@ export default function WorkspaceView({ switcher, defaultPreconfigId }: Workspac
       </AppSidebar>
 
       <main
-        className={hasCapability('multiView') ? 'flex-1 flex flex-col overflow-hidden min-h-0 p-2' : 'flex-1 flex flex-col overflow-hidden min-h-0'}
-        style={hasCapability('multiView') ? {
-          paddingTop: '0.5rem',
-          paddingBottom: '0.5rem',
-        } : undefined}
+        className="flex-1 flex flex-col overflow-hidden min-h-0 p-2"
+        style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem' }}
       >
-        <div className={hasCapability('multiView') ? 'flex flex-1 flex-col overflow-hidden min-h-0 rounded-xl bg-background shadow-sm ring-1 ring-border' : 'flex flex-1 flex-col overflow-hidden min-h-0 bg-background'}>
+        <div className="flex flex-1 flex-col overflow-hidden min-h-0 rounded-xl bg-background shadow-sm ring-1 ring-border">
           {hasMultipleOpenSessions ? <WorkspaceBoardToolbar /> : <WorkspaceHeader />}
           <WorkspaceContentArea
             sdkClient={sdkClient}

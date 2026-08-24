@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { isElectron } from '@/lib/platform';
 
 const DOUBLE_ESCAPE_WINDOW_MS = 400;
 
@@ -8,7 +7,6 @@ export interface KeyboardShortcutsConfig {
   onOpenTerminal: () => void;
   onOpenFilesPanel: () => void;
   onNewSession: () => void;
-  onNewWindow: () => void;
   onToggleViewMode: () => void;
   onCloseFocusedPanel: () => void;
   onFocusChatInput: () => void;
@@ -17,8 +15,6 @@ export interface KeyboardShortcutsConfig {
   onFocusPane: (index: number) => void;
   onCyclePane: (direction: -1 | 1) => void;
 }
-
-const isMac = typeof navigator !== 'undefined' && navigator.platform?.toUpperCase().includes('MAC') === true;
 
 function isModalDialogOpen(): boolean {
   const openDialogSelectors = [
@@ -99,7 +95,6 @@ export function useKeyboardShortcuts(config: KeyboardShortcutsConfig): void {
         onOpenSidebar,
         onOpenTerminal,
         onOpenFilesPanel,
-        onNewWindow,
         onNewSession,
         onToggleViewMode,
         onToggleAutoFollow,
@@ -166,29 +161,21 @@ export function useKeyboardShortcuts(config: KeyboardShortcutsConfig): void {
         return;
       }
 
-      if (!isElectron() || !isMac) {
-        if (modifierPressed && e.code === 'Digit1') {
-          e.preventDefault();
-          onOpenSidebar();
-          return;
-        }
+      if (modifierPressed && e.code === 'Digit1') {
+        e.preventDefault();
+        onOpenSidebar();
+        return;
+      }
 
-        if (modifierPressed && e.code === 'KeyT') {
-          e.preventDefault();
-          onOpenTerminal();
-          return;
-        }
+      if (modifierPressed && e.code === 'KeyT') {
+        e.preventDefault();
+        onOpenTerminal();
+        return;
       }
 
       if (modifierPressed && e.code === 'Digit2') {
         e.preventDefault();
         onOpenFilesPanel();
-        return;
-      }
-
-      if (modifierPressed && e.shiftKey && e.code === 'KeyN') {
-        e.preventDefault();
-        onNewWindow();
         return;
       }
 

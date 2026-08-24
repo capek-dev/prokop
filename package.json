@@ -33,11 +33,6 @@
     "capek:release:pack": "(cd packages/capek-types && npm publish --dry-run --access public) && (cd packages/capek-tool && npm publish --dry-run --access public) && (cd packages/capek && npm publish --dry-run --access public)",
     "capek:release:validate": "bun run capek:release:check && bun run capek:release:pack",
 
-    "dev:electron": "cd packages/client-electron && bun run electron:dev",
-    "electron:build": "cd packages/client-electron && bun run electron:build",
-    "electron:build:mac:local": "cd packages/client-electron && bun run electron:build:mac:local",
-    "electron:build:mac:release": "cd packages/client-electron && bun run electron:build:mac:release",
-    "electron:build:win": "cd packages/client-electron && bun run electron:build:win",
     "test:client": "cd packages/client && bun vitest run",
     "test:server": "bun test packages/server",
     "test:server:coverage": "cd packages/server && bun test --coverage",

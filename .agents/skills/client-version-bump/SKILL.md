@@ -1,22 +1,21 @@
 ---
 name: client-version-bump
-description: How to bump the client version in the jean2 monorepo. Load when releasing or versioning client changes (client, client-electron, changelogs).
+description: How to bump the web client version in the jean2 monorepo. Load when releasing or versioning client changes.
 ---
 
 # Client Version Bump (jean2 monorepo)
 
-Procedural guide for bumping the client version. The client spans two package.json files that must stay in sync. Server and SDK are versioned separately and must NOT be touched.
+Procedural guide for bumping the web client version. Server and SDK are versioned separately and must NOT be touched.
 
-## Files to update (exactly these two)
+## File to update
 
 | File | Format |
 |------|--------|
 | `packages/client/package.json` | `"version": "X.Y.Z"` |
-| `packages/client-electron/package.json` | `"version": "X.Y.Z"` |
 
 ## Do NOT touch these during a manual bump
 
-- `packages/client/VERSION` — NEVER update manually. The GitHub release workflow (`release-electron.yml`) updates it automatically via an announcement PR AFTER the release succeeds. `package.json` is the only build/tag/package version source. VERSION only records the latest *published* version. Manually setting it early causes the announcement step to skip ("VERSION already $V; nothing to announce") and breaks the contract that VERSION reflects a published version.
+- `packages/client/VERSION` - do not update it during a package version change. `package.json` is the build version source.
 - `packages/sdk/package.json` — versioned independently
 - `packages/server/package.json` — versioned independently
 - `packages/sdk/src/version.ts`, `packages/server/src/version.ts` — separate
@@ -24,7 +23,7 @@ Procedural guide for bumping the client version. The client spans two package.js
 ## Procedure
 
 1. Determine the new version number (e.g. `1.1.0` -> `1.1.1` for a patch).
-2. Update both files listed above to the same version string.
+2. Update `packages/client/package.json` to the new version.
 3. Create changelog: `changelogs/client/vX.Y.Z.md`
 4. Run `bun run typecheck` to verify nothing broke.
 
@@ -49,17 +48,11 @@ Example:
 
 ## Verification
 
-After updating, confirm both package.json files match:
+After updating, confirm the client version and verify SDK and server are unchanged:
 
 ```sh
-grep '"version"' packages/client/package.json packages/client-electron/package.json
+grep '"version"' packages/client/package.json packages/sdk/package.json packages/server/package.json
 ```
 
-Both must show the same version. Confirm SDK and server are unchanged:
-
-```sh
-grep '"version"' packages/sdk/package.json packages/server/package.json
-```
-
-Do NOT check or modify `packages/client/VERSION`. It is updated automatically by the release workflow after publishing succeeds.
+Do not modify `packages/client/VERSION` as part of the version change.
 

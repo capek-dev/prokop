@@ -3,7 +3,6 @@ import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { isElectron } from "@/lib/platform"
 import { XIcon } from "lucide-react"
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
@@ -66,14 +65,13 @@ function SheetContent({
           className
         )}
         style={(() => {
-          const electronTop = isElectron() ? "90px" : "0px"
           const safeAreaStyle = side === "left" || side === "right"
             ? {
-                top: `calc(env(safe-area-inset-top, 0px) + ${electronTop})`,
-                height: `calc(100dvh - env(safe-area-inset-top, 0px) - ${electronTop})`,
+                top: "env(safe-area-inset-top, 0px)",
+                height: "calc(100dvh - env(safe-area-inset-top, 0px))",
               }
             : side === "top"
-              ? { top: `calc(env(safe-area-inset-top, 0px) + ${electronTop})` }
+              ? { top: "env(safe-area-inset-top, 0px)" }
               : side === "bottom"
                 ? { bottom: "env(safe-area-inset-bottom, 0px)" }
                 : undefined;

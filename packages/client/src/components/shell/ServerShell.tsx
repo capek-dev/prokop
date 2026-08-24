@@ -14,7 +14,6 @@ import {
 } from '@/contexts/SessionPaneRegistryContext';
 import { useServerSessionManager } from '@/hooks/useServerSessionManager';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
-import { platform } from '@/platform';
 import { SidebarProvider } from '@/components/ui/sidebar';
 
 import { AppHeader } from '@/components/app/AppHeader';
@@ -183,7 +182,7 @@ export default function ServerShell() {
   return (
     <SessionPaneRegistryContext.Provider value={paneRegistry}>
       <ServerClientProvider value={serverClientValue}>
-        <SidebarProvider panelId="sessions" defaultOpen={true} className="flex-col" style={{ '--sidebar-width': `${sessionsPanelWidth}px`, '--header-height': platform.id === 'electron' ? '4.625rem' : '2.75rem' } as React.CSSProperties}>
+        <SidebarProvider panelId="sessions" defaultOpen={true} className="flex-col" style={{ '--sidebar-width': `${sessionsPanelWidth}px`, '--header-height': '2.75rem' } as React.CSSProperties}>
           <div className="bg-background">
             <AppHeader />
           </div>

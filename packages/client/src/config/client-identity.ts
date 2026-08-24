@@ -1,6 +1,5 @@
 import type { ClientDescriptor } from '@prokopai/sdk';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
-import { getPlatform } from '@/lib/platform';
 
 function generateClientId(): string {
   return crypto.randomUUID();
@@ -15,27 +14,8 @@ async function getOrCreateClientId(): Promise<string> {
   return newId;
 }
 
-function clientTypeForPlatform(): ClientDescriptor['clientType'] {
-  const platform = getPlatform();
-  switch (platform) {
-    case 'electron':
-      return 'desktop';
-    case 'web':
-    case 'unknown':
-    default:
-      return 'web';
-  }
-}
-
 export function getDisplayName(): string {
-  const platform = getPlatform();
-  switch (platform) {
-    case 'electron':
-      return 'Prokopai Desktop';
-    case 'web':
-    default:
-      return 'Prokopai Web';
-  }
+  return 'Prokopai Web';
 }
 
 export async function resolveClientDescriptor(): Promise<ClientDescriptor> {
@@ -43,7 +23,7 @@ export async function resolveClientDescriptor(): Promise<ClientDescriptor> {
 
   return {
     clientId,
-    clientType: clientTypeForPlatform(),
+    clientType: 'web',
     displayName: getDisplayName(),
     interactionMode: 'human',
     capabilities: [],

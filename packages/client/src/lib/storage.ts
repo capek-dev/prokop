@@ -1,5 +1,3 @@
-import { platform } from '@/platform';
-
 export interface StorageEntry<T> {
   exists: boolean;
   value: T | null;
@@ -22,44 +20,25 @@ function localStorageGet<T>(key: string): T | null {
 
 export const storage = {
   async get<T>(key: string): Promise<T | null> {
-    if (platform.storage) {
-      return platform.storage.get<T>(key);
-    }
     return localStorageGet<T>(key);
   },
 
   async getEntry<T>(key: string): Promise<StorageEntry<T>> {
-    if (platform.storage) {
-      const value = await platform.storage.get<T>(key);
-      return { exists: value !== null, value };
-    }
     return localStorageGetEntry<T>(key);
   },
 
   async set<T>(key: string, value: T): Promise<void> {
-    if (platform.storage) {
-      return platform.storage.set(key, value);
-    }
     localStorage.setItem(key, JSON.stringify(value));
   },
 
   async remove(key: string): Promise<void> {
-    if (platform.storage) {
-      return platform.storage.remove(key);
-    }
     localStorage.removeItem(key);
   },
 
   async clear(): Promise<void> {
-    if (platform.storage) {
-      return platform.storage.clear();
-    }
     localStorage.clear();
   },
 
-  isNative(): boolean {
-    return platform.capabilities.storage;
-  },
 };
 
 export const STORAGE_KEYS = {

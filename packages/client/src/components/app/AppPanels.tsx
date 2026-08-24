@@ -1,7 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
-import { platform } from '@/platform';
 import type { TerminalPanelHandle } from '@/components/layout/TerminalPanel';
 import type { ProkopaiClient } from '@prokopai/sdk';
 
@@ -33,10 +32,6 @@ export function AppPanels({
   const workspaceId = activeWorkspace?.id;
   const workspacePath = activeWorkspace?.path;
   const workspaceName = activeWorkspace?.name;
-
-  if (platform.capabilities.terminal) {
-    return null;
-  }
 
   return (
     <Suspense fallback={<TerminalLoadingFallback />}>

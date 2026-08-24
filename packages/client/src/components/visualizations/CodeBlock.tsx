@@ -5,8 +5,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { cn } from '@/lib/utils';
-import { isAbsolutePath, pathBasename } from '@/lib/platform';
-import { platform } from '@/platform';
+import { pathBasename } from '@/lib/platform';
 import { RENDER_BUDGETS } from '@/lib/renderBudgets';
 
 const CODE_THEME_DARK = themes.oneDark;
@@ -60,11 +59,6 @@ export const CodeBlock: FC<CodeBlockProps> = memo(({
 
   const handlePathClick = () => {
     if (!activeWorkspace) return;
-    if (platform.capabilities.fileOpen && platform.openFile) {
-      const absPath = isAbsolutePath(path) ? path : (activeWorkspace.path ? `${activeWorkspace.path}/${path}` : path);
-      void platform.openFile(absPath);
-      return;
-    }
     openFilePreview({
       workspaceId: activeWorkspace.id,
       path,

@@ -36,7 +36,6 @@ import { useUIStore, type DefaultFileOpenMode } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useFileEditorStore } from '@/stores/fileEditorStore';
 import { queryClient } from '@/components/providers/QueryProvider';
-import { platform } from '@/platform';
 import { useFileSearchQuery } from '@/hooks/queries';
 import { queryKeys } from '@/lib/queryKeys';
 
@@ -464,12 +463,6 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
             setShowFilesPanel(false);
           }
           return;
-        }
-
-        if (platform.capabilities.fileOpen && platform.openFile) {
-          const rootPath = root ?? activeWorkspace?.path ?? '';
-          const absPath = rootPath ? `${rootPath}/${entry.path}` : entry.path;
-          void platform.openFile(absPath);
         }
       }
     }, [workspaceId, serverId, isMobile, setShowFilesPanel, openFilePreview, defaultFileOpenMode, activeWorkspace?.path]);

@@ -9,7 +9,6 @@ dev-dist/
 client-dist/
 build/
 storybook-static/
-!packages/client-electron/build
 !packages/server/build
 *.tsbuildinfo
 
@@ -77,13 +76,6 @@ certs/
 *.pem
 
 # ==========================================
-# client-electron (Electron)
-# ==========================================
-packages/client-electron/release/
-packages/client-electron/out/
-packages/client-electron/dist/
-
-# ==========================================
 # client-tauri (Tauri / Rust)
 # ==========================================
 packages/client-tauri/target/
@@ -97,8 +89,6 @@ packages/client-tauri/gen/**/xcuserdata/
 packages/client-tauri/gen/android/.gradle/
 packages/client-tauri/gen/android/app/build/
 packages/client-tauri/gen/android/build/
-packages/client-electron/.electron-cache/
-.electron-cache/
 
 .jean2
 

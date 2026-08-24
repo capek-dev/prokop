@@ -1,20 +1,3 @@
-import { platform } from '@/platform';
-
-export type Platform = 'electron' | 'web' | 'unknown';
-
-/**
- * Returns the runtime platform category.
- */
-export function getPlatform(): Platform {
-  if (platform.id === 'electron') return 'electron';
-  if (platform.id === 'web') return 'web';
-  return 'unknown';
-}
-
-export function isElectron(): boolean {
-  return platform.id === 'electron';
-}
-
 export function isWindows(): boolean {
   if (typeof navigator === 'undefined') return false;
   return /Win/i.test(navigator.platform || navigator.userAgent);
