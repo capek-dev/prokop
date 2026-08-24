@@ -126,7 +126,6 @@ export function SessionPaneHeader({
         canCompact={compactableMessageCount >= 2}
         selectedVariant={selectedVariant ?? null}
         variants={currentModelInfo?.variants}
-        onClaimControl={commands.claimControl}
         lockPreconfig={lockPreconfig}
       />
       <Button

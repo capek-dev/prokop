@@ -6,9 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TokenMeter } from './TokenMeter';
 import { ModelVariantConfigSelector } from './ModelVariantConfigSelector';
-import { SessionControlButton } from './SessionControlButton';
-import { useSessionControlStore } from '@/stores/sessionControlStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
+import { useSessionControlStore } from '@/stores/sessionControlStore';
 import type { SessionUsage } from '@/stores/sessionStore';
 
 import { useClientIdentityStore } from '@/stores/clientIdentityStore';
@@ -41,25 +40,8 @@ interface ChatHeaderProps {
   canCompact?: boolean;
   selectedVariant: string | null;
   variants?: Record<string, { providerOptions: Record<string, unknown> }>;
-  onClaimControl?: (sessionId: string) => void;
   /** When true, locks the preconfig selector (e.g. agent-home workspaces). */
   lockPreconfig?: boolean;
-}
-
-type ControlUiState =
-  | 'uncontrolled'
-  | 'controller'
-  | 'observer';
-
-function deriveControlUiState(
-  controlStatus: string | undefined,
-  isController: boolean,
-): ControlUiState {
-  if (!controlStatus || controlStatus === 'uncontrolled') return 'uncontrolled';
-  if (controlStatus === 'controlled') {
-    return isController ? 'controller' : 'observer';
-  }
-  return 'uncontrolled';
 }
 
 export function ChatHeader({
@@ -79,7 +61,6 @@ export function ChatHeader({
   canCompact,
   selectedVariant,
   variants,
-  onClaimControl,
   lockPreconfig,
 }: ChatHeaderProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -93,11 +74,7 @@ export function ChatHeader({
   const controlState = useSessionControlStore((s) => s.controlBySessionId[session.id]);
   const myClientId = useClientIdentityStore((s) => s.clientId);
 
-  const isActiveControlled = controlState?.status === 'controlled';
-  const isController = isActiveControlled && controlState.controllerClientId === myClientId;
-  const isObserver = isActiveControlled && controlState.controllerClientId !== myClientId;
-
-  const controlUiState = deriveControlUiState(controlState?.status, isController);
+  const isObserver = controlState?.status === 'controlled' && controlState.controllerClientId !== myClientId;
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -213,15 +190,7 @@ export function ChatHeader({
               compact={isCompact}
             />
 
-            {myClientId && (
-              <SessionControlButton
-                uiState={controlUiState}
-                sessionId={session.id}
-                onClaimControl={onClaimControl}
-              />
-            )}
-
-            {onCompact && (
+            {onCompact && !isObserver && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

@@ -121,7 +121,6 @@ export function WorkspaceHeader() {
               canCompact={compactableMessageCount >= 2}
               selectedVariant={selectedVariant}
               variants={currentModelInfo?.variants}
-              onClaimControl={sessionManager.claimControl}
               lockPreconfig={lockPreconfig}
             />
           )}

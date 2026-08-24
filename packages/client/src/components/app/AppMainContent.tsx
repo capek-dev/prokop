@@ -10,6 +10,7 @@ import { useConnectionStore } from '@/stores/connectionStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useAskStore, type PendingAskRequest } from '@/stores/askStore';
+import { useSessionCommands } from '@/contexts/SessionCommandsContext';
 import type { ModelInfo } from '@/handlers/serverMessage/types';
 import { ConnectingState } from '@/components/shared/LoadingSkeleton';
 import { OfflineState } from '@/components/shared/OfflineState';
@@ -76,6 +77,7 @@ export function AppMainContent({
   const models = useServerDataStore(s => s.models) as ModelInfo[];
 
   const pendingAskRequests = useAskStore(s => s.pendingRequests) as PendingAskRequest[];
+  const commands = useSessionCommands();
   const navigationIntent = useSessionStore(s => s.navigationIntent);
   const clearTargetMessageIntent = useSessionStore(s => s.clearTargetMessageIntent);
   const targetMessageId = navigationIntent.mode === 'target-message' ? navigationIntent.messageId : null;
@@ -195,6 +197,7 @@ export function AppMainContent({
       targetMessageId={targetMessageId}
       navigationIntent={navigationIntent}
       onTargetMessageHandled={handleTargetMessageHandled}
+      onClaimControl={commands.claimControl}
     />
   );
 }

@@ -220,6 +220,7 @@ export function SessionPane({
           targetMessageId={targetMessageId}
           navigationIntent={navigationIntent}
           onTargetMessageHandled={() => useSessionStore.getState().setNavigationIntentForSession(sessionId, { mode: 'free' })}
+          onClaimControl={commands.claimControl}
         />
       )}
     </div>

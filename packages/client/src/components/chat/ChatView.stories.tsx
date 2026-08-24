@@ -31,6 +31,8 @@ import {
   withServerDataStore,
   withUIStore,
 } from '../../../.storybook/mocks/storeDecorators';
+import { useSessionControlStore } from '@/stores/sessionControlStore';
+import { useClientIdentityStore } from '@/stores/clientIdentityStore';
 
 const preconfigs = createPreconfigList();
 void preconfigs;
@@ -283,3 +285,24 @@ export const WithCompactionDivider: Story = {
 export const HighTokenUsage: Story = {};
 
 export const WithVariants: Story = {};
+
+export const ObservingSession: Story = {
+  args: {
+    onClaimControl: () => {},
+  },
+  decorators: [
+    (Story) => {
+      useClientIdentityStore.setState({ clientId: 'story-me' });
+      useSessionControlStore.setState({
+        controlBySessionId: {
+          [session.id]: {
+            sessionId: session.id,
+            controllerClientId: 'another-device',
+            status: 'controlled',
+          },
+        },
+      });
+      return <Story />;
+    },
+  ],
+};

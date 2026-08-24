@@ -43,7 +43,7 @@ interface VirtualizedTranscriptProps {
   pendingAskRequests: PendingAskRequest[];
   onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   onNavigateToSubagent?: (sessionId: string) => void;
-  onRemoveFromQueue: (queueId: string) => void;
+  onRemoveFromQueue?: (queueId: string) => void;
   onRevert?: (sessionId: string, stepPartId: string) => void;
   onFork?: (sessionId: string, messageId: string) => void;
   onEditMessage?: (sessionId: string, messageId: string, content: string) => void;
@@ -478,7 +478,7 @@ interface MessageRowProps {
   pendingAskRequests: PendingAskRequest[];
   onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   onNavigateToSubagent?: (sessionId: string) => void;
-  onRemoveFromQueue: (queueId: string) => void;
+  onRemoveFromQueue?: (queueId: string) => void;
   onRevert?: (sessionId: string, stepPartId: string) => void;
   onFork?: (sessionId: string, messageId: string) => void;
   isMainActiveSession?: boolean;
@@ -556,9 +556,9 @@ const MessageRow = memo(function MessageRow({
         message={item.message}
         textContent={getTextContent(item.parts)}
         isQueued={item.isQueued}
-        onRemove={item.isQueued ? () => onRemoveFromQueue(item.queueId!) : undefined}
+        onRemove={item.isQueued && onRemoveFromQueue ? () => onRemoveFromQueue(item.queueId!) : undefined}
         canRevert={canRevert && revertMessageId !== null}
-        onRevert={revertMessageId ? () => onRevert?.(sessionId, revertMessageId) : undefined}
+        onRevert={revertMessageId && onRevert ? () => onRevert(sessionId, revertMessageId) : undefined}
         canFork={canFork}
         onFork={canFork && onFork ? () => onFork(sessionId, item.message.id) : undefined}
         canEdit={canRevert && !item.isQueued}
@@ -980,11 +980,28 @@ export function VirtualizedTranscript({
     targetMessageId,
   ]);
 
+  // Mutation callbacks must be part of extraData: LegendList re-renders
+  // mounted rows on extraData identity change only, so a control-state flip
+  // (callbacks withheld/restored) would otherwise leave stale row buttons.
   const listExtraData = useMemo(() => ({
     pendingAskRequests,
     pinnedMessageIds,
     isPinningMessage,
-  }), [pendingAskRequests, pinnedMessageIds, isPinningMessage]);
+    onRemoveFromQueue,
+    onRevert,
+    onFork,
+    onEditMessage,
+    onCompact,
+  }), [
+    pendingAskRequests,
+    pinnedMessageIds,
+    isPinningMessage,
+    onRemoveFromQueue,
+    onRevert,
+    onFork,
+    onEditMessage,
+    onCompact,
+  ]);
 
   const header = (
     <>

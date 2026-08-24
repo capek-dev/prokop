@@ -1,9 +1,10 @@
 import { useMemo, useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
-import { Lock, Eye, ArrowDown, ShieldOff } from 'lucide-react';
+import { Lock, Eye, ArrowDown, ShieldOff, Shield } from 'lucide-react';
 import type { ProkopaiClient, Message } from '@prokopai/sdk';
 import type { Session, MessageWithParts, QueuedMessage, AttachmentKind, AskResponse } from '@prokopai/sdk';
 import { MessageInput } from './MessageInput';
 import type { MessageInputHandle } from './MessageInput';
+import { Button } from '@/components/ui/button';
 import { VirtualizedTranscript } from './VirtualizedTranscript';
 import type { PendingAskRequest } from '@/stores/askStore';
 import { useSessionControlStore, type ActionRejection } from '@/stores/sessionControlStore';
@@ -50,6 +51,7 @@ interface ChatViewProps {
   targetMessageId?: string | null;
   navigationIntent?: SessionNavigationIntent;
   onTargetMessageHandled?: () => void;
+  onClaimControl?: (sessionId: string) => void;
 }
 
 function mergeMessagesWithQueue(
@@ -153,6 +155,7 @@ export function ChatView({
   targetMessageId,
   navigationIntent = { mode: 'follow' },
   onTargetMessageHandled,
+  onClaimControl,
 }: ChatViewProps) {
   const isPrimarySession = !session.parentId;
   const isMainActiveSession = isPrimarySession && session.status === 'active';
@@ -163,7 +166,13 @@ export function ChatView({
   const controlState = useSessionControlStore((s) => s.controlBySessionId[session.id]);
   const myClientId = useClientIdentityStore((s) => s.clientId);
   const isObserver = controlState?.status === 'controlled' && controlState.controllerClientId !== myClientId;
-  const isInputDisabled = isObserver;
+  // Observers see a read-only transcript: mutation callbacks are withheld so
+  // revert/fork/edit/compact/queue-remove affordances never render.
+  const onRevertForMode = isObserver ? undefined : _onRevert;
+  const onForkForMode = isObserver ? undefined : _onFork;
+  const onEditMessageForMode = isObserver ? undefined : _onEditMessage;
+  const onCompactForMode = isObserver ? undefined : onCompact;
+  const onRemoveFromQueueForMode = isObserver ? undefined : onRemoveFromQueue;
 
   const [rejectionNotice, setRejectionNotice] = useState<string | null>(null);
   const rejectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -254,11 +263,11 @@ export function ChatView({
           onClearCompactionSuccess={onClearCompactionSuccess}
           onAskResponse={onAskResponse}
           onNavigateToSubagent={onNavigateToSubagent}
-          onRemoveFromQueue={onRemoveFromQueue}
-          onRevert={_onRevert}
-          onFork={_onFork}
-          onEditMessage={_onEditMessage}
-          onCompact={onCompact}
+          onRemoveFromQueue={onRemoveFromQueueForMode}
+          onRevert={onRevertForMode}
+          onFork={onForkForMode}
+          onEditMessage={onEditMessageForMode}
+          onCompact={onCompactForMode}
           isMainActiveSession={isMainActiveSession}
           autoFollow={autoFollow}
           onAutoScrollChange={setAutoFollow}
@@ -291,11 +300,11 @@ export function ChatView({
 
       {session.status === 'active' && <RetryStatus sessionId={session.id} />}
 
-      {session.status === 'active' && !session.parentId && (
+      {session.status === 'active' && !session.parentId && !isObserver && (
         <MessageInput
           ref={inputRef}
           onSendMessage={onSendMessage}
-          disabled={isCompacting || isInputDisabled}
+          disabled={isCompacting}
           workspaceId={session.workspaceId}
           sdkClient={sdkClient}
           prompts={prompts}
@@ -307,17 +316,30 @@ export function ChatView({
         />
       )}
 
+      {session.status === 'active' && !session.parentId && isObserver && (
+        <div className="border-t border-border bg-muted/30 px-4 py-3 flex items-center justify-center gap-3">
+          <Eye className="size-4 text-muted-foreground shrink-0" />
+          <span className="text-sm text-muted-foreground text-center">
+            You are viewing this session. Another client is in control.
+          </span>
+          {onClaimControl && myClientId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onClaimControl(session.id)}
+              className="shrink-0"
+            >
+              <Shield className="size-4" data-icon="inline-start" />
+              Take control
+            </Button>
+          )}
+        </div>
+      )}
+
       {session.parentId && (
         <div className="p-4 border-t border-border bg-muted/50 text-center flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <Lock className="size-4" />
           This is a subagent session (read-only)
-        </div>
-      )}
-
-      {isObserver && (
-        <div className="px-4 py-2 border-t border-border bg-muted/30 text-center flex items-center justify-center gap-2 text-xs text-muted-foreground">
-          <ShieldOff className="size-3.5" />
-          You are observing this session. Input is disabled.
         </div>
       )}
 
