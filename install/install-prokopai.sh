@@ -437,18 +437,14 @@ main() {
       else
         echo -e "       export PATH=\"${INSTALL_DIR}:\$PATH\""
       fi
-      echo -e "    2. Initialize: ${CYAN}${BINARY_PATH} init${NC}"
-      echo -e "    3. Start:      ${CYAN}${BINARY_PATH} start${NC}"
+      echo -e "    2. Set up and open Prokopai: ${CYAN}${BINARY_PATH} init${NC}"
     else
       echo "  Next steps:"
       echo "    1. Add to PATH: export PATH=\"$INSTALL_DIR:\$PATH\""
-      echo -e "    2. Initialize: ${CYAN}${BINARY_PATH} init${NC}"
-      echo -e "    3. Start:      ${CYAN}${BINARY_PATH} start${NC}"
+      echo -e "    2. Set up and open Prokopai: ${CYAN}${BINARY_PATH} init${NC}"
     fi
     echo ""
   fi
-  
-  configure_path
 }
 
 main "$@"

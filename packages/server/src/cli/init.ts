@@ -1,6 +1,5 @@
 import { dirname } from 'path';
 import { mkdirSync, existsSync, writeFileSync } from 'fs';
-import { createInterface } from 'node:readline';
 import {
   getPromptsDir,
   getEnvFilePath,
@@ -39,53 +38,6 @@ export interface InitResult {
   preconfigsInstalled: boolean;
 }
 
-interface RlInterface {
-  question: (query: string) => Promise<string>;
-  close: () => void;
-}
-
-function createRl(): RlInterface {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return {
-    question: (query: string): Promise<string> => {
-      return new Promise((resolve) => {
-        rl.question(query, (answer) => {
-          resolve(answer);
-        });
-      });
-    },
-    close: () => {
-      rl.close();
-    },
-  };
-}
-
-async function promptDatabasePath(rl: RlInterface, defaultPath: string): Promise<string> {
-  const answer = await rl.question(`Database path [${defaultPath}]: `);
-  return answer.trim() || defaultPath;
-}
-
-async function promptToolsPath(rl: RlInterface, defaultPath: string): Promise<string> {
-  const answer = await rl.question(`Tools path [${defaultPath}]: `);
-  return answer.trim() || defaultPath;
-}
-
-async function promptRunMigrations(rl: RlInterface): Promise<boolean> {
-  const answer = await rl.question('Run database migrations? [Y/n]: ');
-  const trimmed = (answer || '').trim().toLowerCase();
-  return trimmed === '' || trimmed === 'y' || trimmed === 'yes';
-}
-
-async function promptInstallPreconfigs(rl: RlInterface): Promise<boolean> {
-  const answer = await rl.question('Install default preconfigs? [Y/n]: ');
-  const trimmed = (answer || '').trim().toLowerCase();
-  return trimmed === '' || trimmed === 'y' || trimmed === 'yes';
-}
-
 async function initJean2Internal(options: InitOptions = {}): Promise<InitResult> {
   const { databasePath, toolsPath, runMigrations: runMigrationsOption, installPreconfigs: installPreconfigsOption, force } = options;
 
@@ -106,29 +58,10 @@ async function initJean2Internal(options: InitOptions = {}): Promise<InitResult>
     clearModelsCache();
   }
 
-  const defaultDbPath = getDefaultDatabasePath();
-  const defaultToolsPath = getDefaultToolsPath();
-  let shouldRunMigrations = runMigrationsOption ?? true;
-  let shouldInstallPreconfigs = installPreconfigsOption ?? true;
-  let finalDbPath = databasePath || defaultDbPath;
-  let finalToolsPath = toolsPath || defaultToolsPath;
-
-  if (!databasePath || !toolsPath || runMigrationsOption === undefined || installPreconfigsOption === undefined) {
-    const rl = createRl();
-
-    try {
-      finalDbPath = await promptDatabasePath(rl, defaultDbPath);
-      finalToolsPath = await promptToolsPath(rl, defaultToolsPath);
-      shouldRunMigrations = await promptRunMigrations(rl);
-      shouldInstallPreconfigs = await promptInstallPreconfigs(rl);
-      console.log();
-
-      rl.close();
-    } catch (_e) {
-      rl.close();
-      throw _e;
-    }
-  }
+  const shouldRunMigrations = runMigrationsOption ?? true;
+  const shouldInstallPreconfigs = installPreconfigsOption ?? true;
+  const finalDbPath = databasePath || getDefaultDatabasePath();
+  const finalToolsPath = toolsPath || getDefaultToolsPath();
 
   // Create directories
   mkdirSync(dirname(finalDbPath), { recursive: true });
@@ -196,8 +129,7 @@ PROKOPAI_LLM_SUBAGENT_MAX_STEPS=500
     await migrateUuidPreconfigs();
   }
 
-  console.log('\nDone! Prokopai is ready.');
-  console.log('The built-in tool baseline ships with the binary; install extras with `prokopai tools install`.');
+  console.log('\nSetup complete. Starting Prokopai...');
 
   return {
     success: true,
@@ -210,9 +142,5 @@ PROKOPAI_LLM_SUBAGENT_MAX_STEPS=500
 }
 
 export async function initJean2(options: InitOptions = {}): Promise<InitResult> {
-  if (!process.stdin.isTTY) {
-    return initJean2Internal(options);
-  }
-
   return initJean2Internal(options);
 }

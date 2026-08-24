@@ -2,7 +2,7 @@ Set-StrictMode -Version Latest
 
 $VERSION_FILE_URL = "https://raw.githubusercontent.com/capek-dev/prokop/refs/heads/main/packages/server/VERSION"
 $REPO = "capek-dev/prokop"
-$INSTALL_DIR = "$HOME.prokopai\bin"
+$INSTALL_DIR = Join-Path $HOME ".prokopai\bin"
 $BINARY_NAME = "prokopai.exe"
 $BINARY_PATH = ""
 
@@ -348,21 +348,17 @@ EXAMPLES:
         @"
   Next steps:
     1. Add to PATH: setx PATH `"$INSTALL_DIR;%PATH%`"
-    2. Initialize: $BINARY_PATH init
-    3. Start:      $BINARY_PATH start
+    2. Set up and open Prokopai: $BINARY_PATH init
 "@
       } else {
         @"
   Next steps:
     1. Restart your terminal (to apply PATH changes)
-    2. Initialize: $BINARY_PATH init
-    3. Start:      $BINARY_PATH start
+    2. Set up and open Prokopai: $BINARY_PATH init
 "@
       }
       Write-Host ""
     }
-
-    configure_path
   }
 
   main

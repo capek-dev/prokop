@@ -15,14 +15,16 @@ import {
   type DaemonOptions,
 } from '@/infrastructure/daemon';
 
-import { initJean2, type InitOptions } from '@/cli/init';
+import type { InitOptions } from '@/cli/init';
+import { runInitCommand } from '@/cli/init-command';
+import { openClient } from '@/cli/open-client';
 import { runProkopaiRenameMigration, type RenameMigrationResult } from '@/cli/rename-migrate';
 import { runMigrations, getDatabase } from '@/infrastructure/sqlite/database';
 import { runToolsCommand, type ToolsCommandArgs } from '@/cli/tools-cli';
 import { performUpdate, type UpdateOptions } from '@/cli/update';
 import { syncModels, type SyncResult } from '@/config/models-sync';
 import { cleanupOrphanedData, vacuumDatabase, formatBytes } from '@/infrastructure/sqlite/cleanup';
-import { readEnv, readEnvInt } from '@/infrastructure/runtime/env-compat';
+import { readEnv } from '@/infrastructure/runtime/env-compat';
 import { VERSION } from '@/version';
 
 import '@/cli/clack-utils';
@@ -106,7 +108,7 @@ Commands:
 
   auth                 Show authentication configuration
 
-  init                 Initialize Prokopai (required before first use)
+  init                 Set up Prokopai, start it, and open the client
     --db-path <path>   Custom database path
     --tools-path <path>  Custom tools path
     --run-migrations   Run schema migrations (default)
@@ -115,16 +117,14 @@ Commands:
     --no-preconfigs        Skip preconfig installation
     --force            Force re-initialization
 
-  tools                Tool management
-    list                List available and installed tools
+  tools                Optional tool extensions
+    list                List available and installed extensions
       --installed         Only show installed tools
       --extensions        Show extension and env config details
-      --tag <tag>         Filter by tag
       --json              JSON output
-    install [names...]  Install tools (interactive if no args)
-      --all               Install all tools
+    install [names...]  Install optional extensions (interactive if no args)
+      --all               Install all extensions
       --force             Reinstall even if installed
-      --skip-runtime-check  Skip runtime check
     update [names...]   Update installed tools to latest
       --dry-run           Preview without installing
     remove [names...]  Remove installed tools
@@ -162,12 +162,9 @@ Examples:
   prokopai server                    Run in foreground (for systemd)
   prokopai logs                      Follow server logs
   prokopai auth                       Show auth configuration
-  prokopai init                      Initialize Prokopai
-  prokopai tools install             Interactive tool install
-  prokopai tools list                List available tools
+  prokopai init                      Set up, start, and open Prokopai
+  prokopai tools list                List optional extensions
   prokopai tools list --extensions  Show extension details
-  prokopai tools update              Update installed tools
-  prokopai tools outdated            Check for updates
   prokopai migrate                   Run database migrations
   prokopai models sync               Sync models from upstream registry
   prokopai models sync --override    Replace local models with upstream
@@ -307,16 +304,15 @@ async function main(): Promise<void> {
       }
 
       try {
-        const result = await initJean2(initOptions);
-        if (result.success) {
-          console.log('\nProkopai initialized successfully!');
-          console.log(`  Config:   ${result.configPath}`);
-          console.log(`  Database: ${result.databasePath}`);
-          console.log(`  Tools:    ${result.toolsPath}`);
-        } else {
+        const result = await runInitCommand(initOptions);
+        if (!result.success) {
           console.error('Initialization failed:', result.error);
           process.exit(1);
         }
+
+        console.log('\nProkopai is ready.');
+        console.log(`  Config:   ${result.initialization.configPath}`);
+        console.log(`  Database: ${result.initialization.databasePath}`);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         console.error('Error:', message);
@@ -427,24 +423,7 @@ Examples:
     }
 
     case 'open': {
-      const openPort = readEnvInt('PORT', 8742);
-      const openProtocol = readEnv('TLS_ENABLED') === 'true' ? 'https' : 'http';
-      const localEnabled = readEnv('TLS_ENABLED') === 'true' && readEnv('LOCAL_HTTP') !== 'false';
-      const clientUrl = localEnabled
-        ? `http://${readEnv('LOCAL_HOST') || '127.0.0.1'}:${openPort}`
-        : `${openProtocol}://localhost:${openPort}`;
-      console.log(`Opening ${clientUrl} ...`);
-      try {
-        const cmd = process.platform === 'darwin' ? 'open'
-          : process.platform === 'win32' ? 'cmd'
-          : 'xdg-open';
-        const cmdArgs = process.platform === 'win32'
-          ? ['/c', 'start', clientUrl]
-          : [clientUrl];
-        Bun.spawn([cmd, ...cmdArgs], { detached: true });
-      } catch {
-        console.log(`Could not open browser. Open manually: ${clientUrl}`);
-      }
+      openClient();
       break;
     }
 
