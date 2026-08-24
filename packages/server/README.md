@@ -24,25 +24,17 @@ Provides multi-provider LLM streaming, tool execution with security policies, su
 ## Quick Start
 
 ```bash
-# Initialize (creates ~/.prokopai/ with config, database, tools dir)
+# Create the standard configuration, prepare storage, start the daemon,
+# and open the built-in client
 prokopai init
-
-# Start as background daemon
-jean2 start
-
-# Or run in foreground
-jean2 server
-
-# Check status
-jean2 status
 ```
 
-The server listens on `http://0.0.0.0:8742` by default.
+The server listens on `http://0.0.0.0:8742` by default. Baseline tools are included in the binary and require no separate installation.
 
 ## CLI Commands
 
 ```
-jean2 <command> [options]
+prokopai <command> [options]
 
 Commands:
   start                 Start server as background daemon
@@ -59,17 +51,16 @@ Commands:
   auth                  Show authentication status
                         Displays whether auth is enabled and the masked token (if set).
 
-  init                  Initialize Jean2 (required before first use)
+  init                  Set up Prokopai, start it, and open the client
     --db-path <path>    Custom database path
-    --tools-path <path> Custom tools path
-    --install-tools     Install recommended tools non-interactively
-    --no-tools          Skip tool installation
+    --tools-path <path> Custom optional-extension path
+    --no-migrations     Skip schema migrations
+    --no-preconfigs     Skip bundled preconfig installation
     --force             Force re-initialization
 
-  tools                 Tool management
-    install             Install tools from the registry
-      --all             Install all available tools
-      --name <tool>     Install a specific tool
+  tools                 Optional extension management
+    install [names...]  Install optional tools from the registry
+      --all             Install all available extensions
 
   migrate               Run database migrations
   version               Show version

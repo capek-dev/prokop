@@ -41,14 +41,12 @@ curl -fsSL https://raw.githubusercontent.com/capek-dev/prokop/main/install/insta
 irm https://raw.githubusercontent.com/capek-dev/prokop/main/install/install-prokopai.ps1 | iex
 ```
 
-**Run:**
+**Set up and open Prokopai:**
 ```bash
 prokopai init
-prokopai start
-prokopai open
 ```
 
-The server binary includes the client and serves it at `http://localhost:8742`. Desktop app (macOS Electron) and PWA (any device) are also available. See the [Getting Started guide](docs/getting-started.md).
+`init` creates the standard configuration, prepares the database and bundled agents, starts the daemon, and opens the client at `http://localhost:8742`. All baseline tools are included in the binary. Desktop app (macOS Electron) and PWA (any device) are also available. See the [Getting Started guide](docs/getting-started.md).
 
 ---
 

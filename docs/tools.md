@@ -1,10 +1,10 @@
 # Tools
 
-Tools give the agent the ability to interact with your filesystem, run commands, search the web, and more. Some tools are installed TypeScript modules. Others are built into the server and gated by workspace capabilities.
+Tools give the agent the ability to interact with your filesystem, run commands, search the web, and more. The baseline tools used by bundled agents ship inside the server binary and need no installation or updates. Optional integrations can be added separately.
 
-## Installed Tools
+## Built-in tools
 
-Prokop ships with 24 installable tools. Tools are **not managed by npm** - they download from a GitHub releases registry. Install them with `prokopai tools install`.
+A fresh `prokopai init` can use the filesystem, shell, web fetch, task, question, and worktree tools immediately. Built-in tools take precedence over optional extensions with the same name.
 
 ### File Tools
 
@@ -86,45 +86,35 @@ When you connect an MCP server to a workspace, its tools appear alongside built-
 
 MCP tools are configured per-workspace in `<workspace>/.prokopai/mcp.json`. See [Configuration](./configuration.md#mcp-configuration) for the config format.
 
-## Installing Tools
+## Optional tool extensions
+
+External tools are only needed for integrations not included in the binary, such as Tavily, browser automation, Gmail, Discord, or document conversion.
 
 ```bash
-# Interactive: browse and pick tools
-prokopai tools install
-
-# Install specific tools
-prokopai tools install shell grep read-file
-
-# Install all tools
-prokopai tools install --all
-
-# Install only recommended tools
-prokopai tools install --recommended
-
-# Force reinstall even if already installed
-prokopai tools install shell --force
-```
-
-The recommended set provides the tools used by the bundled preconfigs: file reading and editing, file search, shell execution, task tracking, and web fetching. Use `--all` only when every catalog tool is required.
-
-```bash
-# List available tools
+# Browse optional extensions
 prokopai tools list
 
-# List only installed tools
-prokopai tools list --installed
+# Install a specific optional integration
+prokopai tools install tavily-search
 
-# Check for updates
-prokopai tools outdated
-
-# Update installed tools
+# Update optional installed extensions
 prokopai tools update
-
-# Remove tools
-prokopai tools remove shell grep
 ```
 
-Tools are stored in `~/.prokopai/tools/` (or your custom `PROKOPAI_TOOLS_PATH`).
+These commands are not part of first-run setup. Do not install built-in tool names from the external registry.
+
+```bash
+# List only installed extensions
+prokopai tools list --installed
+
+# Check optional extensions for updates
+prokopai tools outdated
+
+# Remove an optional extension
+prokopai tools remove tavily-search
+```
+
+Optional extensions are stored in `~/.prokopai/tools/` (or your custom `PROKOPAI_TOOLS_PATH`). Built-in tools remain in the binary.
 
 ## The Ask Protocol
 

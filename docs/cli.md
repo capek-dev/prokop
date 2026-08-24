@@ -49,7 +49,7 @@ prokopai server [-p|--port <port>] [-h|--host <host>]
 
 ### `prokopai init`
 
-Interactive first-time setup. Creates `~/.prokopai/` with all necessary files.
+Complete first-time setup. Uses standard defaults without prompting, starts the daemon, and opens the client.
 
 ```
 prokopai init [options]
@@ -63,11 +63,11 @@ prokopai init [options]
 | `--no-migrations` | Skip schema migrations |
 | `--install-preconfigs` | Install default preconfigs (default) |
 | `--no-preconfigs` | Skip preconfig installation |
-| `--install-tools` | Install recommended tools non-interactively |
-| `--no-tools` | Skip tool installation entirely |
 | `--force` | Force re-initialization |
 
-## Tools
+## Optional tool extensions
+
+The baseline tools used by bundled agents ship in the binary. These commands manage optional integrations only and are not part of installation.
 
 ### `prokopai tools list`
 
@@ -81,7 +81,6 @@ prokopai tools list [options]
 |------|-------------|
 | `--installed` | Only show installed tools |
 | `--extensions` | Show extension and env config details |
-| `--tag <tag>` | Filter by tag |
 | `--json` | JSON output |
 
 ### `prokopai tools install`
@@ -95,9 +94,7 @@ prokopai tools install [names...] [options]
 | Flag | Description |
 |------|-------------|
 | `--all` | Install all tools |
-| `--recommended` | Install tools marked as recommended in the registry |
 | `--force` | Reinstall even if already installed |
-| `--skip-runtime-check` | Skip runtime compatibility check |
 
 ### `prokopai tools update`
 
