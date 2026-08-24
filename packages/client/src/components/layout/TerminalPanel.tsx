@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/sheet';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { cn } from '@/lib/utils';
+import { useConnectionStore } from '@/stores/connectionStore';
 
 export interface TerminalPanelHandle {
   focus: () => void;
@@ -61,6 +62,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 }, ref) {
   const isMobile = useIsMobile();
   const viewport = useVisualViewport();
+  const connected = useConnectionStore((state) => state.connected);
 
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
   const [activeTabServerId, setActiveTabServerId] = useState<string | null>(null);
@@ -203,17 +205,19 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   }, [handleTerminalEvent]);
 
   useEffect(() => {
-    if (!workspaceId || !isOpen || !sdkClient) {
+    if (!workspaceId || !isOpen) {
       setTabs([]);
       setActiveTabServerId(null);
       autoCreateRef.current = false;
+      terminalCacheRef.current.disposeAll();
+    }
 
+    if (!workspaceId || !isOpen || !sdkClient || !connected) {
       if (activeConnectionRef.current) {
         activeConnectionRef.current.disconnect();
         activeConnectionRef.current = null;
       }
       setConnectionTarget(null);
-      terminalCacheRef.current.disposeAll();
 
       if (eventsConnRef.current) {
         eventsConnRef.current.dispose();
@@ -308,7 +312,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       currentConn = null;
       eventsConnRef.current = null;
     };
-  }, [workspaceId, isOpen, sdkClient]);
+  }, [workspaceId, isOpen, sdkClient, connected]);
 
   const onOutput = useCallback((serverSessionId: string) => (data: string) => {
     const cached = terminalCacheRef.current.get(serverSessionId);
@@ -348,7 +352,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
   const { connect, disconnect, destroy } = useTerminalConnection(
     connectionTarget?.terminal ?? null,
-    connectionTarget && sdkClient && workspaceId && workspacePath && connectionTarget.serverSessionId ? {
+    connectionTarget && connected && sdkClient && workspaceId && workspacePath && connectionTarget.serverSessionId ? {
       terminal: connectionTarget.terminal,
       sdkClient,
       workspaceId,
@@ -369,7 +373,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   );
 
   const attachActiveTerminal = useCallback(() => {
-    if (!activeTabServerId || !sdkClient || !workspacePath) return;
+    if (!connected || !activeTabServerId || !sdkClient || !workspacePath) return;
 
     const cached = terminalCacheRef.current.get(activeTabServerId);
 
@@ -394,7 +398,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     }
 
     setConnectionTarget(terminalEntry);
-  }, [activeTabServerId, sdkClient, workspacePath]);
+  }, [connected, activeTabServerId, sdkClient, workspacePath]);
 
   useEffect(() => {
     if (!isOpen || !activeTabServerId) return;
@@ -420,6 +424,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
   useEffect(() => {
     if (
+      !connected ||
       !isOpen ||
       !activeTabServerId ||
       activeTabStatus !== 'disconnected' ||
@@ -433,19 +438,19 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     }, delay);
 
     return () => clearTimeout(retryTimer);
-  }, [workspaceId, isOpen, activeTabServerId, activeTabStatus, connect]);
+  }, [workspaceId, connected, isOpen, activeTabServerId, activeTabStatus, connect]);
 
   const selectTerminalTab = useCallback((serverSessionId: string) => {
     if (workspaceId) {
       activeTabByWorkspaceRef.current.set(workspaceId, serverSessionId);
     }
-    if (serverSessionId === activeTabServerId && activeTabStatus === 'disconnected') {
+    if (connected && serverSessionId === activeTabServerId && activeTabStatus === 'disconnected') {
       reconnectAttemptRef.current = 0;
       connect(serverSessionId);
       return;
     }
     setActiveTabServerId(serverSessionId);
-  }, [workspaceId, activeTabServerId, activeTabStatus, connect]);
+  }, [workspaceId, connected, activeTabServerId, activeTabStatus, connect]);
 
   const addTab = useCallback(async () => {
     if (!workspaceId || !workspacePath || !sdkClient) return;
@@ -541,7 +546,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   }, [panelHeight]);
 
 
-  if (!workspaceId || !workspacePath || !sdkClient) {
+  if (!workspaceId || !workspacePath) {
     return (
       <div className="flex items-center justify-center h-[300px] border-t border-border bg-background text-muted-foreground text-sm">
         Select a workspace to use the terminal.
