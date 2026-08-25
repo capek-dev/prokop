@@ -21,6 +21,7 @@ import { AppPanels } from '@/components/app/AppPanels';
 import { WorkspaceContentArea } from '@/components/app/WorkspaceContentArea';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
+import { getCreateSessionOptions } from '@/lib/sessionCreate';
 import {
   SidebarHeader,
   SidebarMenu,
@@ -161,7 +162,11 @@ export default function WorkspaceView({ switcher, defaultPreconfigId }: Workspac
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              onClick={() => createSession(newChatPreconfigId)}
+              onClick={(event) => createSession(
+                newChatPreconfigId,
+                undefined,
+                getCreateSessionOptions(event),
+              )}
               disabled={!sidebarData.connected}
               className="w-full"
             >

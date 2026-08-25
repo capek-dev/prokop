@@ -6,6 +6,7 @@ import type {
   AskResponse,
 } from '@prokopai/sdk';
 import type { ResumeSessionOptions } from '@/stores/sessionStore';
+import type { CreateSessionOptions } from '@/lib/sessionCreate';
 
 /**
  * Stable command functions that don't change on data updates.
@@ -13,7 +14,7 @@ import type { ResumeSessionOptions } from '@/stores/sessionStore';
  * so consumers that only need commands don't rerender on streaming/ask/queue changes.
  */
 export interface SessionCommandsValue {
-  createSession: (preconfigId?: string, title?: string) => void;
+  createSession: (preconfigId?: string, title?: string, options?: CreateSessionOptions) => void;
   resumeSession: (sessionId: string, options?: ResumeSessionOptions) => void;
   openAlongside: (sessionId: string) => void;
   closeSession: (sessionId: string) => void;
@@ -57,7 +58,7 @@ export interface SessionCommandsValue {
   handleCreateVirtualWorkspace: () => void;
   handleCreatePhysicalWorkspace: (path: string) => void;
   deleteWorkspace: (id: string) => void;
-  createSessionInWorkspace: (workspaceId: string) => void;
+  createSessionInWorkspace: (workspaceId: string, options?: CreateSessionOptions) => void;
 
   claimControl: (sessionId: string) => void;
 

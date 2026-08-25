@@ -33,6 +33,7 @@ import { queryClient } from '@/components/providers/QueryProvider';
 import { queryKeys } from '@/lib/queryKeys';
 import { useConnectionLifecycle } from '@/hooks/useConnectionLifecycle';
 import { useSessionCommands } from '@/hooks/useSessionCommands';
+import type { CreateSessionOptions } from '@/lib/sessionCreate';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { usePermissionAutoApprove } from '@/hooks/usePermissionAutoApprove';
 
@@ -81,7 +82,7 @@ export interface UseServerSessionManagerReturn {
 
   streamingSessionIds: Set<string>;
 
-  createSession: (preconfigId?: string, title?: string) => void;
+  createSession: (preconfigId?: string, title?: string, options?: CreateSessionOptions) => void;
   resumeSession: (sessionId: string, options?: ResumeSessionOptions) => void;
   openAlongside: (sessionId: string) => void;
   closeSession: (sessionId: string) => void;
@@ -107,7 +108,7 @@ export interface UseServerSessionManagerReturn {
   updateSessionVariantForSession: (sessionId: string, variant: string | null) => void;
   handleNavigateBack: () => void;
   refreshPermissions: () => void;
-  createSessionInWorkspace: (workspaceId: string) => void;
+  createSessionInWorkspace: (workspaceId: string, options?: CreateSessionOptions) => void;
   revokePermission: (permissionId: string) => void;
   revokeAllPermissions: (workspaceId: string) => void;
 

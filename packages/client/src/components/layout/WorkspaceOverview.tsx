@@ -29,6 +29,8 @@ import { useTagCollapseState } from '@/hooks/useTagCollapseState';
 import { useWorkspaceCollapseState } from '@/hooks/useWorkspaceCollapseState';
 import type { OverviewGroup } from '@/config/overviewGroupsTypes';
 import type { StoreActions } from '@/hooks/useOverviewGroups';
+import { getCreateSessionOptions } from '@/lib/sessionCreate';
+import type { CreateSessionOptions } from '@/lib/sessionCreate';
 
 interface WorkspaceOverviewProps {
   sessionsByWorkspace: Record<string, Session[]>;
@@ -54,7 +56,7 @@ interface WorkspaceOverviewProps {
   onDeleteSession: (sessionId: string) => void;
   onRenameSession: (sessionId: string, title: string) => void;
   onRegenerateSessionTitle?: (sessionId: string) => void;
-  onCreateSessionInWorkspace: (workspaceId: string) => void;
+  onCreateSessionInWorkspace: (workspaceId: string, options?: CreateSessionOptions) => void;
   onAddTag?: (sessionId: string, tag: string) => void;
   onRemoveTag?: (sessionId: string, tag: string) => void;
   connected: boolean;
@@ -240,7 +242,10 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
                       <SidebarMenu>
                         <SidebarMenuItem>
                           <SidebarMenuButton
-                            onClick={() => onCreateSessionInWorkspace(workspace.id)}
+                            onClick={(event) => onCreateSessionInWorkspace(
+                              workspace.id,
+                              getCreateSessionOptions(event),
+                            )}
                             disabled={!connected}
                             className="w-full"
                           >

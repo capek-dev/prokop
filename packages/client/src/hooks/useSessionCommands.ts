@@ -13,6 +13,8 @@ import type { PendingSessionCreateIntent } from '@/stores/sessionBoardStore';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import type { ResumeSessionOptions } from '@/stores/sessionStore';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
+import { getSessionCreateBoardAction } from '@/lib/sessionCreate';
+import type { CreateSessionOptions } from '@/lib/sessionCreate';
 
 interface UseSessionCommandsParams {
   clientRef: React.RefObject<ProkopaiClient | null>;
@@ -37,7 +39,7 @@ interface UseSessionCommandsParams {
 }
 
 interface UseSessionCommandsReturn {
-  createSession: (preconfigId?: string, title?: string) => void;
+  createSession: (preconfigId?: string, title?: string, options?: CreateSessionOptions) => void;
   resumeSession: (sessionId: string, options?: ResumeSessionOptions) => void;
   openAlongside: (sessionId: string) => void;
   closeSession: (sessionId: string) => void;
@@ -64,7 +66,7 @@ interface UseSessionCommandsReturn {
   updateSessionVariantForSession: (sessionId: string, variant: string | null) => void;
   handleNavigateBack: () => void;
   refreshPermissions: () => void;
-  createSessionInWorkspace: (workspaceId: string) => void;
+  createSessionInWorkspace: (workspaceId: string, options?: CreateSessionOptions) => void;
   revokePermission: (permissionId: string) => void;
   revokeAllPermissions: (workspaceId: string) => void;
   claimControl: (sessionId: string) => void;
@@ -92,10 +94,13 @@ export function useSessionCommands({
   viewPath,
 }: UseSessionCommandsParams): UseSessionCommandsReturn {
 
-  const createSession = useCallback((preconfigId?: string, title?: string) => {
+  const createSession = useCallback((preconfigId?: string, title?: string, options?: CreateSessionOptions) => {
     const client = clientRef.current;
     pendingSessionCreateRef.current = activeWorkspace
-      ? { workspaceId: activeWorkspace.id, boardAction: 'replace-focused' }
+      ? {
+          workspaceId: activeWorkspace.id,
+          boardAction: getSessionCreateBoardAction(options),
+        }
       : null;
     if (partAppendRafRef.current !== null) {
       cancelAnimationFrame(partAppendRafRef.current);
@@ -403,13 +408,13 @@ export function useSessionCommands({
     }
   }, [clientRef, activeWorkspace]);
 
-  const createSessionInWorkspace = useCallback((workspaceId: string) => {
+  const createSessionInWorkspace = useCallback((workspaceId: string, options?: CreateSessionOptions) => {
     const client = clientRef.current;
     const ws = workspaces.find(w => w.id === workspaceId) || null;
     setActiveWorkspace(ws);
     pendingSessionCreateRef.current = {
       workspaceId,
-      boardAction: 'replace-focused',
+      boardAction: getSessionCreateBoardAction(options),
     };
     if (partAppendRafRef.current !== null) {
       cancelAnimationFrame(partAppendRafRef.current);
