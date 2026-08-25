@@ -71,7 +71,12 @@ export function chipsFromVisualization(viz: AnyVisualization): ToolRowChip[] {
     case 'file-list': {
       const total = viz.total ?? viz.files?.length;
       if (total !== undefined && viz.badge === undefined) {
-        chips.push({ label: `${total} ${total === 1 ? 'file' : 'files'}`, tone: 'neutral' });
+        const singularLabel = viz.singularLabel ?? 'file';
+        const pluralLabel = viz.pluralLabel ?? 'files';
+        chips.push({
+          label: `${total} ${total === 1 ? singularLabel : pluralLabel}`,
+          tone: 'neutral',
+        });
       }
       break;
     }

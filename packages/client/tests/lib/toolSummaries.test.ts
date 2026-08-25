@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import type { ToolPart } from '@prokopai/sdk';
-import { getToolRowInfo, resolveSummaryTemplate } from '@/lib/toolSummaries';
+import {
+  chipsFromVisualization,
+  getToolRowInfo,
+  resolveSummaryTemplate,
+} from '@/lib/toolSummaries';
 
 function makeProjectedPart(): ToolPart {
   const visualization = {
@@ -42,5 +46,15 @@ describe('tool summaries', () => {
 
   test('keeps dotted summary template resolution', () => {
     expect(resolveSummaryTemplate('{todos.length} items', { todos: { length: 3 } })).toBe('3 items');
+  });
+
+  test('uses file-list entity labels for generated chips', () => {
+    expect(chipsFromVisualization({
+      type: 'file-list',
+      files: [{ path: 'Planning' }, { path: 'Review' }],
+      total: 2,
+      singularLabel: 'session',
+      pluralLabel: 'sessions',
+    })).toEqual([{ label: '2 sessions', tone: 'neutral' }]);
   });
 });

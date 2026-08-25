@@ -66,6 +66,8 @@ export const VisualizationRenderer = memo(function VisualizationRenderer({ visua
           groups={visualization.groups}
           files={visualization.files}
           total={visualization.total}
+          singularLabel={visualization.singularLabel}
+          pluralLabel={visualization.pluralLabel}
         />
       );
 

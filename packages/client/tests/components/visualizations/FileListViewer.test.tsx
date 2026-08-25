@@ -59,6 +59,21 @@ describe('FileListViewer', () => {
     expect(screen.getByText('(42 files)')).toBeInTheDocument();
   });
 
+  it('uses custom labels for non-file lists', () => {
+    render(
+      <FileListViewer
+        total={2}
+        files={[{ path: 'Planning' }, { path: 'Review' }]}
+        singularLabel="session"
+        pluralLabel="sessions"
+      />,
+    );
+
+    expect(screen.getByText('Sessions')).toBeInTheDocument();
+    expect(screen.getByTitle('Copy session')).toBeInTheDocument();
+    expect(screen.queryByText('Files')).not.toBeInTheDocument();
+  });
+
   it('shows file count per group', () => {
     render(
       <FileListViewer

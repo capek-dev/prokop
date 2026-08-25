@@ -15,6 +15,8 @@ interface FileListViewerProps {
   groups?: FileListGroup[];
   files?: FileListItem[];
   total?: number;
+  singularLabel?: string;
+  pluralLabel?: string;
 }
 
 const iconMap = {
@@ -24,7 +26,7 @@ const iconMap = {
   search: Search,
 };
 
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -37,7 +39,7 @@ function CopyButton({ text }: { text: string }) {
     <button
       onClick={handleCopy}
       className="text-muted-foreground hover:text-foreground transition-colors"
-      title="Copy path"
+      title={`Copy ${label}`}
     >
       {copied ? (
         <span className="text-success text-xs">Copied!</span>
@@ -48,9 +50,20 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function FileListViewer({ title, groups, files, total }: FileListViewerProps) {
+export function FileListViewer({
+  title,
+  groups,
+  files,
+  total,
+  singularLabel = 'file',
+  pluralLabel = 'files',
+}: FileListViewerProps) {
   const [showAll, setShowAll] = useState(false);
-  const defaultGroup: FileListGroup = { label: 'Files', files: files || [], icon: undefined };
+  const defaultGroup: FileListGroup = {
+    label: pluralLabel.charAt(0).toUpperCase() + pluralLabel.slice(1),
+    files: files || [],
+    icon: undefined,
+  };
   const displayGroups = groups || (files ? [defaultGroup] : []);
 
   const totalItemCount = useMemo(
@@ -80,7 +93,9 @@ export function FileListViewer({ title, groups, files, total }: FileListViewerPr
         <div className="text-sm font-medium text-foreground">
           {title}
           {total !== undefined && (
-            <span className="ml-2 text-muted-foreground">({total} files)</span>
+            <span className="ml-2 text-muted-foreground">
+              ({total} {total === 1 ? singularLabel : pluralLabel})
+            </span>
           )}
         </div>
       )}
@@ -125,7 +140,7 @@ export function FileListViewer({ title, groups, files, total }: FileListViewerPr
                     {file.action}
                   </span>
                 )}
-                <CopyButton text={file.path} />
+                <CopyButton text={file.path} label={singularLabel} />
               </div>
             ))}
           </div>
@@ -138,7 +153,7 @@ export function FileListViewer({ title, groups, files, total }: FileListViewerPr
           className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           onClick={() => setShowAll(true)}
         >
-          Show all {totalItemCount} files
+          Show all {totalItemCount} {totalItemCount === 1 ? singularLabel : pluralLabel}
         </button>
       )}
       {needsTruncation && showAll && (
