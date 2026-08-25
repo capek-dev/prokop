@@ -11,10 +11,11 @@ import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import { toast } from 'sonner';
 import { subscribeToServerEvents } from './subscribeToServerEvents';
 import { resolveClientDescriptor } from '@/config/client-identity';
-
-const CONNECTION_TIMEOUT = 10000;
-const MAX_RETRY_DELAY = 30000;
-const INITIAL_RETRY_DELAY = 1000;
+import {
+  markConnectionAttempt,
+  startConnectionSupervisor,
+  stopConnectionSupervisor,
+} from '@/lib/connectionSupervisor';
 
 export interface ConnectionLifecycleParams {
   apiToken: string | null;
@@ -50,9 +51,6 @@ export function useConnectionLifecycle({
     useConnectionStore.getState().setAuthError(null);
     setReconnectAttempt(n => n + 1);
   }, []);
-
-  const connected = useConnectionStore((s) => s.connected);
-  const connectionTimedOut = useConnectionStore((s) => s.connectionTimedOut);
 
   useEffect(() => {
     if (!serverUrl) return;
@@ -176,16 +174,26 @@ export function useConnectionLifecycle({
 
       createAndConnectClient();
     }).catch(() => {
-      // Network error during pre-flight — fall through to WebSocket attempt.
+      // Network error during pre-flight: fall through to the WebSocket attempt.
       // The server may be reachable via WS but not HTTP (e.g., proxy issues),
-      // or this could be a temporary network hiccup. Let the existing retry
+      // or this could be a temporary network hiccup. Let the supervisor retry
       // logic handle it.
       if (cancelled) return;
       createAndConnectClient();
     });
 
+    // Connection watchdog, backoff, online/visibility listeners, and stale-op
+    // cleanup live in the supervisor module, outside React.
+    startConnectionSupervisor({
+      serverUrl: () => serverUrl,
+      clientRef,
+      requestReconnect: () => setReconnectAttempt(n => n + 1),
+    });
+    markConnectionAttempt();
+
     return () => {
       cancelled = true;
+      stopConnectionSupervisor();
       const client = clientRef.current;
       if (client) {
         client.dispose();
@@ -195,87 +203,6 @@ export function useConnectionLifecycle({
       }
     };
   }, [serverUrl, apiToken, clientDescriptor, reconnectAttempt]);
-
-  useEffect(() => {
-    if (serverUrl && clientDescriptor && !connected && !connectionTimedOut) {
-      const timeoutId = setTimeout(() => {
-        if (!useConnectionStore.getState().connected) {
-          useConnectionStore.getState().setConnectionTimedOut(true);
-        }
-      }, CONNECTION_TIMEOUT);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [serverUrl, apiToken, clientDescriptor, reconnectAttempt, connected, connectionTimedOut]);
-
-  useEffect(() => {
-    if (!connectionTimedOut || connected || !serverUrl) return;
-
-    const retryCount = useConnectionStore.getState().retryCount;
-    const delay = Math.min(
-      INITIAL_RETRY_DELAY * Math.pow(2, retryCount),
-      MAX_RETRY_DELAY,
-    );
-
-    let countdown = Math.floor(delay / 1000);
-    useConnectionStore.getState().setNextRetryIn(countdown);
-
-    const countdownInterval = setInterval(() => {
-      countdown -= 1;
-      useConnectionStore.getState().setNextRetryIn(Math.max(0, countdown));
-    }, 1000);
-
-    const retryTimeout = setTimeout(() => {
-      useConnectionStore.getState().setRetryCount(c => c + 1);
-      setReconnectAttempt(n => n + 1);
-    }, delay);
-
-    return () => {
-      clearInterval(countdownInterval);
-      clearTimeout(retryTimeout);
-    };
-  }, [serverUrl, apiToken, reconnectAttempt, connected, connectionTimedOut]);
-
-  useEffect(() => {
-    const handleOnline = () => {
-      if (!serverUrl) return;
-
-      const client = clientRef.current;
-      if (client && client.connected) return;
-
-      useConnectionStore.getState().setConnected(false);
-      useConnectionStore.getState().setRetryCount(0);
-      useConnectionStore.getState().setConnectionTimedOut(false);
-      setReconnectAttempt(n => n + 1);
-    };
-
-    window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
-  }, [serverUrl]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') return;
-
-      const client = clientRef.current;
-      if (client && client.ws?.readyState === WebSocket.OPEN) return;
-      if (!serverUrl) return;
-
-      useConnectionStore.getState().setRetryCount(0);
-      useConnectionStore.getState().setConnectionTimedOut(false);
-      setReconnectAttempt(n => n + 1);
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [serverUrl]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      usePendingOperationsStore.getState().cleanupStaleOperations();
-    }, 15_000);
-    return () => clearInterval(interval);
-  }, []);
 
   return { clientRef, retry };
 }

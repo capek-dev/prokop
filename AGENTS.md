@@ -154,6 +154,8 @@ export async function getTool(name: string): Promise<DiscoveredTool | null> {
 - Server data via TanStack Query hooks (`packages/client/src/hooks/queries/`)
 - Routing via TanStack Router with file-based code splitting
 - UI components built on shadcn/ui (Radix primitives + Tailwind)
+- `useEffect` is only for syncing with the outside world (DOM APIs, timers, subscriptions to non-reactive APIs). Never use it to copy query cache data into stores or to synchronize stores with each other; that sync belongs in WS handlers (handlers/serverMessage) or lib modules (e.g. lib/sessionCacheSync.ts).
+- Mutation side effects on the query cache (invalidations, setQueryData) must be declared in the mutation or WS handler where the change originates, never in follow-up effects.
 
 ```typescript
 interface Props {

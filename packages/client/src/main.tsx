@@ -7,6 +7,7 @@ import { ThemedToaster } from '@/components/providers/ThemedToaster';
 import { PWAUpdateBanner } from '@/components/app/PWAUpdateBanner';
 import { RouterApp } from './router';
 import { registerJean2ServiceWorker } from '@/pwa/registerServiceWorker';
+import { startSessionCacheSync } from '@/lib/sessionCacheSync';
 import './index.css';
 
 // Global error handlers for debugging uncaught errors
@@ -23,6 +24,9 @@ document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => e.preventDefault());
 
 registerJean2ServiceWorker();
+
+// The query cache owns session-list hydration into the session read-model.
+startSessionCacheSync();
 
 function App() {
   return (

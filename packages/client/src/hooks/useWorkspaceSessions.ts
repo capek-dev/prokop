@@ -1,9 +1,6 @@
-import { useEffect } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { useSessionStore } from '@/stores/sessionStore';
 import { queryKeys } from '@/lib/queryKeys';
-import { dedupeAndSortSessions } from '@/lib/sessionUtils';
 
 const WORKSPACE_PAGE_SIZE = 100;
 
@@ -27,9 +24,6 @@ export function useWorkspaceSessions({
   workspaceId,
   connected,
 }: UseWorkspaceSessionsParams): UseWorkspaceSessionsReturn {
-  const replaceSessionsForWorkspace = useSessionStore(s => s.replaceSessionsForWorkspace);
-  const removeSessionsForWorkspace = useSessionStore(s => s.removeSessionsForWorkspace);
-
   const query = useInfiniteQuery({
     queryKey: queryKeys.sessions.byWorkspaceInfinite({
       workspaceId: workspaceId ?? '',
@@ -51,32 +45,6 @@ export function useWorkspaceSessions({
     enabled: !!sdkClient && connected && !!workspaceId,
     staleTime: 10_000,
   });
-
-  // When workspace is null, clear sessions for it
-  useEffect(() => {
-    if (!workspaceId) {
-      return;
-    }
-  }, [workspaceId]);
-
-  // When workspaceId changes, remove old workspace sessions
-  useEffect(() => {
-    return () => {
-      if (workspaceId) {
-        removeSessionsForWorkspace(workspaceId);
-      }
-    };
-  }, [workspaceId, removeSessionsForWorkspace]);
-
-  // Merge loaded pages into store
-  useEffect(() => {
-    if (!workspaceId) return;
-    if (!query.data?.pages) return;
-
-    const allSessions = query.data.pages.flatMap((page) => page.sessions);
-    const deduped = dedupeAndSortSessions(allSessions);
-    replaceSessionsForWorkspace(workspaceId, deduped);
-  }, [query.data, workspaceId, replaceSessionsForWorkspace]);
 
   const hasNextPage = query.hasNextPage;
   const isFetchingNextPage = query.isFetchingNextPage;
