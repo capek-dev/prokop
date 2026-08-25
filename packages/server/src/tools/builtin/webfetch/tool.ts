@@ -194,7 +194,6 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
         ? ({
             type: 'markdown',
             badge: `${(outputContent.length / 1024).toFixed(1)} KB`,
-            collapsed: true,
             content: outputContent.slice(0, 20_000),
             sourceUrl: input.url,
           } as MarkdownVisualization)

@@ -273,10 +273,11 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
     const visualization: FileListVisualization = {
       type: 'file-list',
-      collapsed: true,
       badge: truncated
         ? `${matches.length}+ matches`
         : `${matches.length} match${matches.length === 1 ? '' : 'es'}`,
+      singularLabel: 'match',
+      pluralLabel: 'matches',
       title: input.pattern,
       files: matches.slice(0, 50).map((m) => ({ path: m.file, line: m.line })),
       total: matches.length,

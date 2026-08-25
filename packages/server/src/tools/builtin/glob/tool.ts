@@ -166,7 +166,6 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
             result: { files: [input.pattern] },
             visualization: {
               type: 'file-list',
-              collapsed: true,
               badge: '1 file',
               files: [{ path: input.pattern }],
               total: 1,
@@ -179,7 +178,6 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
         result: { files: [] },
         visualization: {
           type: 'file-list',
-          collapsed: true,
           badge: '0 files',
           files: [],
           total: 0,
@@ -199,7 +197,6 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
     const visualization: FileListVisualization = {
       type: 'file-list',
-      collapsed: true,
       badge: `${files.length} file${files.length === 1 ? '' : 's'}`,
       title: input.pattern,
       files: files.slice(0, 50).map((f) => ({ path: f })),
