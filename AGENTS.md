@@ -4,358 +4,322 @@ Guidelines for AI coding agents working in this repository.
 
 ## Project Overview
 
-Jean2 is an AI Agent monorepo built with TypeScript, Bun, React, and Hono.
+Prokop is an AI agent monorepo built with TypeScript and Bun.
 
-- **Runtime**: Bun
-- **Monorepo**: Workspace-based with packages in `packages/`
-- **Server**: Hono + AI SDK with multi-provider support (packages/server)
-- **Client**: React 19 + Vite 8 + TanStack Router + Zustand + shadcn/ui + Tailwind CSS v4, with PWA support (packages/client)
-- **SDK**: Shared types, protocols, transport layer, WebSocket namespaces, and REST clients (packages/sdk)
-- **Browser Extension**: Chrome extension for browser automation (packages/browser)
-- **External Tools**: TypeScript tool modules, separately versioned and distributed (tools/). Each tool is a directory with `tool.ts`, `package.json`, and `VERSION`.
-- **Sandbox CLI**: Interactive CLI for intercepting and simulating LLM responses in a running server, enabling end-to-end testing without real API calls (packages/sandbox-cli).
+- **Runtime and package manager**: Bun
+- **Workspaces**: `packages/*` and `tools`
+- **Server**: Hono backend in `packages/server` (`@prokopai/server`), with HTTP, WebSocket, terminal, SQLite, MCP, scheduling, permissions, and product-specific domain logic
+- **Agent runtime**: Composable runtime in `packages/capek` (`@capekai/core`), including execution, plugins, providers, tools, storage, compaction, goals, workflows, memory, skills, and sandbox behavior
+- **Runtime contracts**: Shared neutral contracts in `packages/capek-types` (`@capekai/types`)
+- **Tool authoring contracts**: Tool interfaces and install contracts in `packages/capek-tool` (`@capekai/tool`)
+- **Client**: React 19, Vite 8, TanStack Router, TanStack Query, Zustand, shadcn/ui, Tailwind CSS v4, Storybook, and PWA support in `packages/client` (`@prokopai/client`)
+- **SDK**: Product wire protocol, REST clients, WebSocket namespaces, shared product types, and transports in `packages/sdk` (`@prokopai/sdk`)
+- **Browser extension**: Chrome extension for browser automation in `packages/browser` (`@prokopai/browser`)
+- **Sandbox CLI**: Interactive LLM-call simulator in `packages/sandbox-cli` (`@prokopai/sandbox-cli`)
+- **External tools**: Separately versioned TypeScript tool modules in `tools/`
 
-## Build Commands
+## Architecture Boundaries
+
+Keep changes in the package that owns the behavior.
+
+- `@capekai/core` owns the reusable agent runtime and must remain independent of Prokop product packages.
+- `@capekai/types` and `@capekai/tool` own neutral public contracts shared by the runtime, host, SDK, and external tools.
+- `@prokopai/server` is the Prokop host. It composes Čapek, supplies storage and product adapters, and owns HTTP, WebSocket, CLI, MCP, SQLite, scheduling, notifications, permissions, and workspace behavior.
+- `@prokopai/sdk` owns product-facing REST and WebSocket contracts. Do not move generic Čapek contracts back into the SDK.
+- `@prokopai/client` consumes the SDK. Server-originated cache and store changes belong in mutation handlers or WebSocket handlers, not follow-up synchronization effects.
+- Compatibility forwarding modules are intentional boundaries. Do not remove one without checking its consumers and the relevant boundary tests.
+
+The current extraction and ownership record lives in `.architecture-v2/`. Read the relevant document before changing Čapek composition, server boundaries, compatibility shims, or public exports.
+
+## Commands
+
+### Install and Development
 
 ```bash
-# Install dependencies
 bun install
 
-# Development (runs both server and client)
+# Server and client
 bun run dev
-
-# Development with HTTPS
 bun run dev:https
 
-# Development - server only
+# Server only
 bun run dev:server
-# Alias
 bun run dev:be
 
-# Development - client only
+# Client only
 bun run dev:client
 bun run dev:client:https
 
-# Build all packages
+# Sandbox CLI for simulated LLM responses
+bun run sandbox
+```
+
+Do not start a development server as part of verification unless the task specifically requires it.
+
+### Build and Typecheck
+
+```bash
+# Build all workspaces
 bun run build
 
-# Build tools
-bun run build:tools
-
-# Type check all packages
+# Typecheck all workspaces
 bun run typecheck
 
-# Build server binary (current platform)
+# Build external tools
+bun run build:tools
+
+# Build the server binary for the current platform
 bun run build:bin
 
-# Build server binary for specific platform
+# Platform-specific server binaries
 bun run build:bin:macos
 bun run build:bin:linux
 bun run build:bin:windows
 
-# Build server package + binary
+# Build server package and binary
 bun run build:all
 
-# Preview production client build
+# Build and preview the production client
 bun run preview
 bun run preview:https
-
-# Start sandbox CLI
-bun run sandbox
 ```
 
-## Lint Commands
+### Lint
 
 ```bash
-# Run ESLint
 bun run lint
-
-# Run ESLint with auto-fix
 bun run lint:fix
 ```
 
-ESLint uses flat config (`eslint.config.js`) with `typescript-eslint`, `eslint-plugin-react`, and `eslint-plugin-react-hooks`. The `tools/` directory is linted with its own Bun globals config.
+ESLint uses the flat config in `eslint.config.js`, with TypeScript, React, and React Hooks rules. The external `tools/` tree has its own Bun globals block.
 
-## Test Commands
+### Tests
 
 ```bash
-# Run all tests (server + sdk + tools + client)
+# Root suite: server, SDK, Čapek core, external tools, then client
 bun run test
 
-# Server tests (Bun test runner)
+# Server
 bun run test:server
 bun run test:server:coverage
 
-# Client tests (Vitest)
+# Client, using Vitest
 bun run test:client
 
-# Tool tests (Bun test runner)
+# External tools
 bun run test:tools
+
+# Čapek package boundaries and publish checks
+bun run capek:release:check
+bun run capek:release:validate
 ```
 
-- **Server**: Uses `bun:test` with `describe`/`test`/`expect`/`beforeEach`/`afterEach`. Test helpers in `packages/server/tests/helpers/` with import aliases (`#tests/db`, `#tests/factories`, `#tests/seed`, `#tests/mocks`, `#tests/test-dir`).
-- **Client**: Uses Vitest with `describe`/`test`/`expect`/`beforeEach`. Zustand stores tested via `useStore.getState()` directly.
-- **Tools**: Uses `bun:test` with shared `test-utils.ts` providing `createMockContext`, `VirtualFS`, and `WORKSPACE` for virtual filesystem testing.
+During development, run the smallest relevant test target. Run the full root checks before committing or releasing.
+
+- **Server and Čapek**: Bun test runner with `bun:test`
+- **Client**: Vitest with `happy-dom`; Zustand stores can be tested through `useStore.getState()`
+- **External tools**: Bun test runner with `tools/test-utils.ts`, which provides `createMockContext`, `VirtualFS`, and `WORKSPACE`
+- **Server test aliases**: `#tests/db`, `#tests/factories`, `#tests/mocks`, `#tests/seed`, `#tests/test-dir`, `#tests/mock-ws`, and `#tests/wire-application`
+
+Avoid live provider calls in tests. Use fake credentials, injected seams, or the sandbox provider.
+
+### Client Storybook
+
+```bash
+cd packages/client
+bun run storybook
+bun run storybook:build
+```
 
 ## Code Style
 
 ### Imports
 
-- Use `import type` for type-only imports
-- Group imports: external libraries first, then internal packages (`@jean2/*`), then local (`@/`)
-- Use `@/*` path alias for relative imports within the same package
+- Use `import type` for type-only imports.
+- Group external libraries first, then workspace packages (`@capekai/*`, `@prokopai/*`), then package-local imports.
+- Use the `@/*` alias for package-local imports where that package config defines it.
+- Import from a package's public export when crossing package boundaries. Avoid deep imports into another package's source tree.
 
 ```typescript
-import { useState, useEffect } from 'react';
-import type { Session, Message } from '@jean2/sdk';
-import { fetchMessages } from '@/store';
-import './styles.css';
+import { useEffect, useState } from 'react';
+import type { Message, Session } from '@prokopai/sdk';
+import { useSessionStore } from '@/stores/sessionStore';
 ```
-
-### Naming Conventions
-
-- **Variables/Functions**: camelCase (`getUserById`, `isLoading`)
-- **Components**: PascalCase (`ChatView`, `SessionList`)
-- **Types/Interfaces**: PascalCase (`Session`, `ToolDefinition`)
-- **Type aliases**: PascalCase (`SessionStatus`, `ToolRuntime`)
-- **Constants**: SCREAMING_SNAKE_CASE for env-derived (`PROKOPAI_LLM_MAX_TOKENS`), camelCase otherwise
-- **Files**: camelCase for modules (`agent.ts`), PascalCase for components (`ChatView.tsx`)
 
 ### TypeScript
 
-- Strict mode enabled
-- Prefer `interface` for object shapes, `type` for unions/primitives
-- Use explicit return types for exported functions
-- Avoid `any`; use `unknown` when type is uncertain
-- Use `as const` for literal objects that should be immutable
-- Unused vars prefixed with `_` (e.g., `_e`, `_sessionId`)
+- Strict mode is enabled.
+- Prefer `interface` for object shapes and `type` for unions or primitives.
+- Use explicit return types for exported functions.
+- Avoid `any`; use `unknown` when a value has not been validated.
+- Use `as const` for immutable literal definitions.
+- Prefix intentionally unused variables with `_`.
+- Keep public package types neutral. Product-specific fields belong in `@prokopai/sdk`, not `@capekai/types`.
 
-```typescript
-export interface ChatOptions {
-  sessionId: string;
-  messages: Message[];
-}
+### Naming and Formatting
 
-export type SessionStatus = 'active' | 'closed';
-
-export async function getTool(name: string): Promise<DiscoveredTool | null> {
-  // ...
-}
-```
+- Variables and functions: camelCase
+- React components and TypeScript types: PascalCase
+- Environment-derived constants: SCREAMING_SNAKE_CASE
+- Module files: camelCase; component files: PascalCase
+- Use 2-space indentation, single quotes, and trailing commas in multiline structures.
+- Add comments only when they explain non-obvious constraints or ordering.
 
 ### React
 
-- React 19 with React Compiler (configured in Vite via `babel-plugin-react-compiler`)
-- Functional components with hooks
-- Destructure props in function signature
-- Use `export default` for page/container components
-- Named exports for utility components/hooks
-- State management via Zustand stores (`packages/client/src/stores/`)
-- Server data via TanStack Query hooks (`packages/client/src/hooks/queries/`)
-- Routing via TanStack Router with file-based code splitting
-- UI components built on shadcn/ui (Radix primitives + Tailwind)
-- `useEffect` is only for syncing with the outside world (DOM APIs, timers, subscriptions to non-reactive APIs). Never use it to copy query cache data into stores or to synchronize stores with each other; that sync belongs in WS handlers (handlers/serverMessage) or lib modules (e.g. lib/sessionCacheSync.ts).
-- Mutation side effects on the query cache (invalidations, setQueryData) must be declared in the mutation or WS handler where the change originates, never in follow-up effects.
-
-```typescript
-interface Props {
-  session: Session;
-  onSendMessage: (content: string) => void;
-}
-
-export default function ChatView({ session, onSendMessage }: Props) {
-  const [input, setInput] = useState('');
-  // ...
-}
-```
+- React Compiler is configured in Vite through `@rolldown/plugin-babel` and `reactCompilerPreset({ target: '19' })`.
+- Use functional components and hooks.
+- Use Zustand for client state and TanStack Query for server data.
+- TanStack Router uses generated file-based routes with automatic code splitting.
+- UI primitives live in `packages/client/src/components/ui/` and follow shadcn/ui composition patterns.
+- Use `useEffect` only to synchronize with an external system such as a browser API, timer, or non-reactive subscription.
+- Do not use effects to copy query data into stores or synchronize stores with each other.
+- Put query cache updates and invalidations in the mutation or WebSocket handler where the change originates.
+- Server message handling lives under `packages/client/src/handlers/serverMessage/`.
+- PWA update and recovery logic lives under `packages/client/src/pwa/`, with the service worker entry at `packages/client/src/sw.ts`.
 
 ### Error Handling
 
-- Return error objects with `success` boolean for tool execution
-- Use try/catch for async operations; type catch as `unknown`
-- Log errors with context before returning
+- Catch asynchronous boundary failures and type caught values as `unknown`.
+- Preserve error context in logs without exposing credentials or tokens.
+- Validate external, wire, tool, and provider input before use.
+- Tool execution results use the contract defined by `@capekai/tool`; follow that package rather than introducing local lookalike types.
+- Malformed permission, ask, capability, or authority responses must fail closed.
 
-```typescript
-export interface ToolResult {
-  success: boolean;
-  result?: unknown;
-  error?: string;
-}
+### Environment and Data Paths
 
-try {
-  const result = await executeOperation();
-  return { success: true, result };
-} catch (err: unknown) {
-  const message = err instanceof Error ? err.message : String(err);
-  console.error('Operation failed:', message);
-  return { success: false, error: message };
-}
-```
+- New server settings use the `PROKOPAI_` prefix.
+- Client build-time settings use the `VITE_` prefix.
+- Legacy `JEAN2_*` environment names remain supported where compatibility code explicitly handles them. Do not remove legacy support without a migration plan and compatibility tests.
+- Canonical user data lives under `~/.prokopai`.
+- Canonical workspace data lives under `<workspace>/.prokopai` and skills under `<workspace>/.agents/skills`.
+- Never log provider credentials, auth tokens, OAuth material, or sensitive environment values.
 
-### Formatting
+### AI SDK and Providers
 
-- No comments unless absolutely necessary for complex logic
-- 2-space indentation
-- Single quotes for strings (double quotes only when required)
-- Trailing commas in multiline structures
+- Vercel AI SDK integration lives in `packages/capek`, not `packages/server`.
+- Provider registration and scoped provider overrides live in `packages/capek/src/providers/registry.ts`.
+- Current provider integrations include OpenAI, DeepSeek, OpenRouter, MiniMax, and Zhipu.
+- Prokop-specific provider accounts, credentials, and OAuth wiring live in the server adapters, application services, and provider-account domain.
 
-### Environment Variables
+### Sandbox
 
-- Prefix with `PROKOPAI_` for server application settings, `VITE_` for client build-time settings
-- Access via `process.env.VAR_NAME` (server) or `import.meta.env.VITE_VAR_NAME` (client)
-- Provide defaults with `||` or `??`
+The sandbox CLI in `packages/sandbox-cli` intercepts LLM calls through `/api/sandbox` so end-to-end flows can be tested without live model calls.
 
-```typescript
-const PROKOPAI_LLM_MAX_TOKENS = parseInt(process.env.PROKOPAI_LLM_MAX_TOKENS || '4096', 10);
-```
-
-### AI SDK (Server)
-
-- Server uses Vercel AI SDK (`ai` package) for all LLM interactions
-- Supported providers: OpenAI (`@ai-sdk/openai`), DeepSeek (`@ai-sdk/deepseek`), OpenRouter (`@openrouter/ai-sdk-provider`), MiniMax (`vercel-minimax-ai-provider`), Zhipu (`zhipu-ai-provider`)
-- Provider registry pattern in `packages/server/src/providers/`
-
-### Sandbox CLI
-
-The sandbox CLI (`packages/sandbox-cli`) intercepts all LLM calls in a running server and lets you manually or automatically respond — enabling full end-to-end testing of agent flows without real API calls. Start it with `bun run sandbox`. See `packages/sandbox-cli/src/cli.ts` for CLI usage and `packages/server/src/sandbox/` for server-side implementation.
+- Runtime sandbox behavior: `packages/capek/src/sandbox/`
+- Server composition adapter: `packages/server/src/adapters/capek/sandbox.ts`
+- HTTP routes: `packages/server/src/transport/http/routes/sandbox.ts`
 
 ## Project Structure
 
-```
+```text
 packages/
-  server/                # Hono backend (@jean2/server)
+  capek/                 # @capekai/core reusable agent runtime
     src/
-      auth/              # Authentication middleware (env-var based, off by default)
-      config/            # Model configurations (models.json)
-      configuration/     # Runtime configuration (models, preconfigs, prompts, credentials)
-      core/              # Agent logic, streaming, subagents, compaction, retry, forking
-      daemon/            # Background daemon process
-      mcp/               # Model Context Protocol integration (OAuth, stdio transport)
-      providers/         # AI provider registry and storage
-      prompts/           # Prompt registry
-      routes/            # REST API route handlers (config, files, mcp, sessions, tools, workspaces)
-      sandbox/           # Sandbox provider, model, controller, routes (simulated LLM)
-      services/          # Terminal sessions, file preview, file operations, client launcher
-      skills/            # Skill registry and tool integration
-      store/             # SQLite data layer (sessions, messages, permissions, attachments, etc.)
-      tools/             # Tool execution, registry, installer, bundler, Ask protocol
-      types/             # Third-party type declarations
-      utils/             # Binary detection, error handling, truncation utilities
-      app.ts             # Hono app setup
-      cli.ts             # CLI entry point
-      env.ts             # Environment configuration
-      index.ts           # Server entry point
-      init.ts            # Server initialization
-      paths.ts           # Data directory path resolution
-      version.ts         # Version constant
+      adapters/          # AI SDK and host-facing runtime adapters
+      compaction/        # Compaction contracts, policy, recovery, and execution
+      configuration/     # Runtime configuration contracts and scoped defaults
+      context/           # Context assembly and sources
+      core/              # Turn loop and execution helpers
+      goals/             # Goal evaluation and loop services
+      internal/          # Public subpath facades for composition and hosts
+      kernel/            # Composition kernel and service contracts
+      memory/            # Memory registry and tool
+      permission/        # Permission policy and ask handling
+      plugins/           # Runtime composition plugins and domain plugins
+      providers/         # Provider registry and contracts
+      retry/             # Retry policy and stream retry behavior
+      runtime/           # Runtime host, events, guidance, and drivers
+      sandbox/           # Simulated provider and controller
+      scheduler/         # Scheduler host and tool
+      session-search/    # Session search contracts and tool
+      skills/            # Skill registry and tool
+      storage/           # Storage contracts and adapters
+      subagent/          # Subagent execution and policy
+      tool-output/       # Tool output policy and artifact retrieval
+      tools/             # Tool registry, source, executor, and artifacts
+      workflow/          # Workflow orchestration
+      workspace/         # Workspace contracts and policy
 
-  client/                # React frontend (@jean2/client) — also works as PWA
+  capek-types/           # @capekai/types neutral shared contracts
+  capek-tool/            # @capekai/tool tool authoring contracts
+
+  server/                # @prokopai/server Prokop host
     src/
-      components/
-        app/             # App-level layout (header, main content, panels)
-        chat/            # Chat UI (messages, input, model selector, tool calls)
-        files/           # File tree, file preview, file autocomplete
-        layout/          # Sidebar, terminal, workspace switching, file panels
-        modals/          # Dialogs (settings, configuration, MCP, permissions)
-        providers/       # Store hydration, theme provider, QueryClient
-        shared/          # Shared UI (markdown renderer, loading states)
-        shell/           # Server connection shell
-        ui/              # shadcn/ui primitives (button, dialog, tabs, etc.)
-        views/           # View-level components (Overview, Session, Workspace)
-        visualizations/  # Diff viewer, code block, terminal output, todo list renderers
-      config/            # Auth, server URLs, draft/panel storage, client identity
-      contexts/          # React contexts (server, session manager, view refs)
-      handlers/          # Server message handlers (ask, control, message parts, permissions, providers, sessions)
-      hooks/             # Custom React hooks + TanStack Query hooks (queries/)
-      lib/               # Utility libraries (platform detection, server registry, storage, paths)
-      routes/            # TanStack Router file-based routes
-      stores/            # Zustand stores (session, connection, chat layout, UI state, ask, completion, etc.)
-      types/             # Client-specific type definitions
-      utils/             # Utilities (diff, version)
-      assets/            # Static assets (notification sounds)
-      cli.ts             # Local dev server for npx
-      main.tsx           # React entry point
-      router.tsx         # TanStack Router setup
-      routeTree.gen.ts   # Auto-generated route tree
-      index.css          # Global styles (Tailwind)
+      adapters/          # Čapek and compatibility adapters
+      application/       # Use cases and ports
+      bootstrap/         # Application and runtime composition
+      cli/               # CLI commands and update tooling
+      config/            # Models, credentials, schemas, and tool environment
+      domains/           # Agents, controllers, notifications, providers, scheduling, tools, workspaces
+      infrastructure/    # Daemon, filesystem, MCP, OAuth, providers, runtime, scheduling, and SQLite
+      tools/builtin/     # Built-in file, shell, question, todo, and worktree tools
+      transport/http/    # Hono app, middleware, and REST routes
+      transport/terminal/ # Terminal framing and managers
+      transport/websocket/ # WebSocket routing, delivery, handlers, and registries
+      cli.ts             # Compiled `prokop` CLI entry
+      index.ts           # Server entry
 
-  sdk/                   # Shared SDK (@jean2/sdk)
+  client/                # @prokopai/client React web client and PWA
     src/
-      namespaces/        # WebSocket namespace clients (chat, sessions, terminal, control, permissions, queue, providers)
-      rest/              # REST API clients (attachments, config, files, mcp, models, preconfigs, prompts, providers, sessions, tools, workspaces)
-      shared-protocol/   # Shared protocol definitions (client, server, terminal)
-      shared-types/      # Shared TypeScript types (configuration, control, file, interrupt, mcp, message, model, permission, preconfig, prompt, provider, runtime, server, session, skill, task, tool, ui, visualization, workspace)
-      shared-utils/      # Shared utilities (model context helpers)
-      transport/         # Transport layer (HTTP, WebSocket)
-      types/             # SDK-level types (REST responses, server messages, SDK types)
-      client.ts          # Main SDK client class (Jean2Client)
-      emitter.ts         # Event emitter (TypedEventEmitter)
-      errors.ts          # Error types (Jean2Error, ConnectionError, AuthError, etc.)
-      index.ts           # Public API entry point
-      shared.ts          # Barrel file re-exporting shared-types, shared-protocol, shared-utils
-      version.ts         # Version constant
+      components/        # Agent, app, board, chat, editor, files, layout, modals, views, and UI
+      config/            # Auth, server URLs, identity, and persisted UI settings
+      contexts/          # Server, session, pane, command, and view contexts
+      handlers/serverMessage/ # WebSocket-driven cache and session updates
+      hooks/             # Client hooks and TanStack Query hooks
+      lib/               # Client utilities and cache synchronization
+      notifications/     # Browser notification registration and handling
+      pwa/               # Service worker registration, updates, and recovery
+      routes/            # TanStack Router file routes
+      stores/            # Zustand stores
+      sw.ts              # Service worker entry
 
-  browser/               # Browser extension (@jean2/browser)
+  sdk/                   # @prokopai/sdk product protocol and clients
     src/
-      background.ts      # Background service worker
-      client.ts          # Extension client logic
-      config.ts          # Extension configuration
-      content.ts         # Content script
-      popup.ts           # Popup UI logic
-      storage.ts         # Extension storage
-      types.ts           # Extension type definitions
-    manifest.json        # Browser extension manifest
-    popup.html           # Popup HTML
-    icons/               # Extension icons (16, 32, 48, 128)
+      namespaces/        # WebSocket namespaces
+      rest/              # REST clients
+      shared-protocol/   # Client, server, and terminal wire protocol
+      shared-types/      # Prokop product types
+      shared-utils/      # Model context and tool display helpers
+      transport/         # HTTP and WebSocket transports
 
-  sandbox-cli/           # Sandbox CLI for simulating LLM responses (@jean2/sandbox-cli)
-    src/
-      cli.ts             # CLI entry point, readline interactive loop
-      commands.ts        # Command parsing and dispatch (respond, auto-respond, pending, etc.)
-      api-client.ts      # HTTP + WebSocket client for /api/sandbox/* endpoints
-      display.ts         # Terminal display formatting (colors, tables, call details)
-      types.ts           # CLI-specific type definitions
+  browser/               # @prokopai/browser Chrome extension
+  sandbox-cli/           # @prokopai/sandbox-cli interactive simulator
 
-tools/                   # External tool modules (independent from main project)
-  # File tools: apply-patch, edit, glob, grep, ls, multiedit, read-file, write-file
-  # Shell tool: shell
-  # Web tools: webfetch, file-to-markdown
-  # Browser tools: browser-discover-elements, browser-dom-action, browser-navigate,
-  #   browser-read-active-tab, browser-screenshot, browser-tab-manage
-  # Interaction tools: question, todoread, todowrite
-  # Tavily tools: tavily-crawl, tavily-extract, tavily-map, tavily-search
-  # Testing tools: llm-test
-  # Each tool directory contains:
-  #   tool.ts              # Tool implementation + metadata (TypeScript, compiled at install)
-  #   package.json         # Dependencies
-  #   VERSION              # Semantic version
-  #   *.test.ts            # Tests (optional, using bun:test + VirtualFS)
-  # Tools are separately versioned and distributed via GitHub Releases
-  # Tools use the @capekai/tool ToolModule interface with ctx.ask() for the Ask protocol
+tools/                   # External, separately released tool modules
+  manifest.json          # Release manifest for external tools
+  browser-*/             # Browser automation tools
+  discord-*/             # Discord tools
+  gmail-*/               # Gmail tools
+  tavily-*/              # Tavily web tools
+  file-to-markdown/      # Document conversion tool
 
-changelogs/              # Version changelogs
-  client/                # Client release notes
-  server/                # Server release notes
-  tools/                 # Per-tool release notes
-
-.agents/                 # Agent skill definitions
-  skills/
-    shadcn/              # shadcn/ui skill (SKILL.md, rules, evals, assets, agent configs)
-
-.github/                 # CI/CD workflows
-  workflows/
-    release.yml          # Server + tools release (cross-platform binaries)
-    release-browser.yml  # Browser extension release
-    cleanup-releases.yml # Weekly cleanup of old releases
-
-install/                 # Installation scripts and documentation
-  install-prokopai.sh       # Unix installer
-  install-prokopai.ps1      # Windows installer
+.architecture-v2/        # Current extraction architecture, decisions, and validation
+.agents/skills/          # Repository-specific agent procedures
+changelogs/              # capek, client, SDK, server, and tool release notes
+.github/workflows/       # release.yml and release-browser.yml
+install/                 # install-prokopai.sh and install-prokopai.ps1
 ```
+
+Built-in tools are not released from `tools/`. They live in `packages/server/src/tools/builtin/`. External tool directories contain `tool.ts`, `package.json`, and `VERSION`, implement the `@capekai/tool` contract, and use `ctx.ask()` for permission-sensitive operations.
+
+## Working Practices
+
+1. Read the relevant implementation and tests before describing or changing behavior.
+2. For multi-package changes, identify the owning package and public boundary first.
+3. Update focused tests with behavior changes, including malformed-input and compatibility cases at transport boundaries.
+4. Do not use live LLM calls for verification.
+5. Do not bump versions or edit release metadata unless the task explicitly requests a release change.
 
 ## Before Committing
 
-1. Run `bun run typecheck` - must pass
-2. Run `bun run lint` - must pass
-3. Run `bun run test` - must pass
-4. Run `bun run build` - must succeed
+Run the focused checks while developing. Before committing a completed cross-package change, run:
+
+```bash
+bun run typecheck
+bun run lint
+bun run test
+bun run build
+```
+
+For a narrowly scoped change, use package-level or file-level checks first, then expand only as needed.
