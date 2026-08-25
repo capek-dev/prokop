@@ -18,7 +18,7 @@ import type {
   ToolStateCompleted,
   ToolStateError,
   ToolStateInterrupted,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import { mockId, mockNow, mockSecondsAgo, merge } from './mockHelpers';
 
 // =============================================================================

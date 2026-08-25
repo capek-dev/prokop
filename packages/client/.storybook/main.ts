@@ -46,7 +46,7 @@ const config: StorybookConfig = {
 
     config.optimizeDeps = config.optimizeDeps || {};
     config.optimizeDeps.include = [
-      '@jean2/sdk',
+      '@prokopai/sdk',
     ];
 
     return config;

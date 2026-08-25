@@ -1,4 +1,4 @@
-import type { Session, SessionStatus, SubagentStatus } from '@jean2/sdk';
+import type { Session, SessionStatus, SubagentStatus } from '@prokopai/sdk';
 import { mockId, mockIsoNow, mockIsoMinutesAgo, merge } from './mockHelpers';
 import { createWorkspace } from './mockWorkspace';
 

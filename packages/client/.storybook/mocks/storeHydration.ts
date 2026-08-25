@@ -11,7 +11,7 @@
 import { useSessionStore } from '@/stores/sessionStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useConnectionStore } from '@/stores/connectionStore';
-import type { MessageWithParts } from '@jean2/sdk';
+import type { MessageWithParts } from '@prokopai/sdk';
 import {
   createWorkspace,
   createSession,

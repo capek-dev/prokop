@@ -1,6 +1,6 @@
 import type {
   PermissionAsk,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import { merge } from './mockHelpers';
 
 // =============================================================================

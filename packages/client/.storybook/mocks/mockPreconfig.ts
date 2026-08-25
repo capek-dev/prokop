@@ -1,4 +1,4 @@
-import type { Preconfig } from '@jean2/sdk';
+import type { Preconfig } from '@prokopai/sdk';
 import { mockId, merge } from './mockHelpers';
 
 // =============================================================================

@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolResult } from '@jean2/sdk';
+import type { ToolDefinition, ToolResult } from '@prokopai/sdk';
 import { merge } from './mockHelpers';
 
 // =============================================================================

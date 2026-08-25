@@ -1,4 +1,4 @@
-import type { FileEntry } from '@jean2/sdk';
+import type { FileEntry } from '@prokopai/sdk';
 import { merge } from './mockHelpers';
 
 // =============================================================================

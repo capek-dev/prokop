@@ -2,7 +2,7 @@ import type {
   ProviderStatus,
   ModelWithStatus,
   ProviderDescriptor,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import { mockIsoNow, merge } from './mockHelpers';
 
 // =============================================================================

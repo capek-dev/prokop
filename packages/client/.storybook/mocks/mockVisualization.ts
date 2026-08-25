@@ -8,7 +8,7 @@ import type {
   ShellOutputVisualization,
   NoneVisualization,
   TodoListVisualization,
-} from '@jean2/sdk';
+} from '@prokopai/sdk';
 import { merge } from './mockHelpers';
 
 // =============================================================================
