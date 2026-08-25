@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { describe, test, expect } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, test, expect, vi } from 'vitest';
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 
 describe('MarkdownRenderer', () => {
@@ -109,8 +110,58 @@ describe('MarkdownRenderer', () => {
 
     test('renders code block without language', () => {
       render(<MarkdownRenderer>{'```\nplain code\n```'}</MarkdownRenderer>);
-      const code = document.querySelector('code');
-      expect(code).toBeInTheDocument();
+      const pre = document.querySelector('pre');
+      expect(pre).toBeInTheDocument();
+      expect(pre).toHaveTextContent('plain code');
+    });
+
+    test('shows language label on code block', () => {
+      render(<MarkdownRenderer>{'```bash\necho hi\n```'}</MarkdownRenderer>);
+      expect(screen.getByText('bash')).toBeInTheDocument();
+    });
+
+    test('shows text label on code block without language', () => {
+      render(<MarkdownRenderer>{'```\necho hi\n```'}</MarkdownRenderer>);
+      expect(screen.getByText('text')).toBeInTheDocument();
+    });
+
+    test('copies fenced code block with language to clipboard', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+      render(<MarkdownRenderer>{'```bash\nbun install\n```'}</MarkdownRenderer>);
+      await userEvent.click(screen.getByRole('button', { name: 'Copy code' }));
+
+      expect(writeText).toHaveBeenCalledWith('bun install');
+      vi.unstubAllGlobals();
+    });
+
+    test('copies fenced code block without language to clipboard', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal('navigator', { clipboard: { writeText } });
+
+      render(<MarkdownRenderer>{'```\nplain code\n```'}</MarkdownRenderer>);
+      await userEvent.click(screen.getByRole('button', { name: 'Copy code' }));
+
+      expect(writeText).toHaveBeenCalledWith('plain code');
+      vi.unstubAllGlobals();
+    });
+
+    test('copy button still present after copying', async () => {
+      vi.stubGlobal('navigator', {
+        clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+      });
+
+      render(<MarkdownRenderer>{'```bash\necho hi\n```'}</MarkdownRenderer>);
+      await userEvent.click(screen.getByRole('button', { name: 'Copy code' }));
+
+      expect(screen.getByRole('button', { name: 'Copy code' })).toBeInTheDocument();
+      vi.unstubAllGlobals();
+    });
+
+    test('inline code has no copy button', () => {
+      render(<MarkdownRenderer>{'Use `console.log` for debugging'}</MarkdownRenderer>);
+      expect(screen.queryByRole('button', { name: 'Copy code' })).not.toBeInTheDocument();
     });
   });
 
