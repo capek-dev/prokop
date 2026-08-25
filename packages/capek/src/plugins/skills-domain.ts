@@ -65,7 +65,6 @@ export function createSkillToolPayload(): DomainToolPayload {
       if (content && content.length <= 20_000) {
         return {
           type: 'markdown',
-          collapsed: true,
           badge: `${(content.length / 1024).toFixed(1)} KB`,
           content: content.slice(0, 20_000),
           title: typeof title === 'string' ? title : String(input.name ?? 'Skill'),
@@ -109,8 +108,9 @@ export function createSkillManageToolPayload(): DomainToolPayload {
       if (skills) {
         return {
           type: 'file-list',
-          collapsed: true,
           badge: `${skills.length} skill${skills.length === 1 ? '' : 's'}`,
+          singularLabel: 'skill',
+          pluralLabel: 'skills',
           files: skills.slice(0, 20).map((s) => ({
             path: String((s as { name?: string }).name ?? ''),
             content: (s as { description?: string }).description,
@@ -161,8 +161,9 @@ export function createAgentSkillManageToolPayload(): DomainToolPayload {
       if (skills) {
         return {
           type: 'file-list',
-          collapsed: true,
           badge: `${skills.length} skill${skills.length === 1 ? '' : 's'}`,
+          singularLabel: 'skill',
+          pluralLabel: 'skills',
           files: skills.slice(0, 20).map((s) => ({
             path: String((s as { name?: string }).name ?? ''),
             content: (s as { description?: string }).description,

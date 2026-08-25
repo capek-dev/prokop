@@ -279,8 +279,9 @@ const foundShape = {
   }],
   _visualization: {
     type: 'file-list',
-    collapsed: true,
     badge: '1 result',
+    singularLabel: 'result',
+    pluralLabel: 'results',
     title: 'needle',
     files: [{ path: 'S1' }],
     total: 1,
@@ -358,8 +359,9 @@ describe('C5 session-search composed execution', () => {
           results: [],
           _visualization: {
             type: 'file-list',
-            collapsed: true,
             badge: '0 results',
+            singularLabel: 'result',
+            pluralLabel: 'results',
             title: 'needle',
             files: [],
             total: 0,

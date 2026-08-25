@@ -107,8 +107,12 @@ export interface FileListVisualization extends ToolVisualization {
   }>;
   /** Flat list of files (alternative to groups) */
   files?: FileListItem[];
-  /** Total number of files */
+  /** Total number of listed items */
   total?: number;
+  /** Singular item label, defaults to `file` */
+  singularLabel?: string;
+  /** Plural item label, defaults to `files` */
+  pluralLabel?: string;
 }
 
 /**

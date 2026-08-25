@@ -99,8 +99,9 @@ function sessionSearchPayload(deps: SessionSearchPayloadDeps): DomainToolPayload
       if (results) {
         return {
           type: 'file-list',
-          collapsed: true,
           badge: `${results.length} result${results.length === 1 ? '' : 's'}`,
+          singularLabel: 'result',
+          pluralLabel: 'results',
           title: String(result.query ?? String(result.title ?? 'Search')),
           files: results.slice(0, 20).map((r) => ({
             path: String((r as { sessionTitle?: string }).sessionTitle ?? (r as { sessionId?: string }).sessionId ?? ''),
@@ -112,8 +113,9 @@ function sessionSearchPayload(deps: SessionSearchPayloadDeps): DomainToolPayload
       if (sessions) {
         return {
           type: 'file-list',
-          collapsed: true,
           badge: `${sessions.length} session${sessions.length === 1 ? '' : 's'}`,
+          singularLabel: 'session',
+          pluralLabel: 'sessions',
           files: sessions.slice(0, 20).map((s) => ({
             path: String((s as { title?: string }).title ?? (s as { id?: string }).id ?? ''),
           })),
