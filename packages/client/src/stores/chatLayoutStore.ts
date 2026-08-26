@@ -12,6 +12,8 @@ import {
 
 export type FilesPanelTab = 'project' | 'changes';
 export type GitChangesMode = 'grouped' | 'flat';
+export type WorkbenchSurface = 'explorer' | 'changes' | 'editor';
+export type MobileSurface = 'chat' | 'sessions' | 'files' | 'editor';
 
 interface ChatLayoutState {
   showFilesPanel: boolean;
@@ -21,6 +23,8 @@ interface ChatLayoutState {
   filesPanelTab: FilesPanelTab;
   filesPanelRoot: string | null;
   filesPanelGitMode: GitChangesMode;
+  workbenchSurface: WorkbenchSurface;
+  mobileSurface: MobileSurface;
 }
 
 interface ChatLayoutActions {
@@ -31,6 +35,8 @@ interface ChatLayoutActions {
   setFilesPanelTab: (tab: FilesPanelTab) => void;
   setFilesPanelRoot: (root: string | null) => void;
   setFilesPanelGitMode: (mode: GitChangesMode) => void;
+  setWorkbenchSurface: (surface: WorkbenchSurface) => void;
+  setMobileSurface: (surface: MobileSurface) => void;
 }
 
 type ChatLayoutStore = ChatLayoutState & ChatLayoutActions;
@@ -51,6 +57,8 @@ export const useChatLayoutStore = create<ChatLayoutStore>((set) => ({
   filesPanelTab: 'project',
   filesPanelRoot: null,
   filesPanelGitMode: 'grouped',
+  workbenchSurface: 'explorer',
+  mobileSurface: 'chat',
 
   setShowFilesPanel: (show) => set({ showFilesPanel: show }),
   setShowTerminalPanel: (show) => set({ showTerminalPanel: show }),
@@ -67,4 +75,6 @@ export const useChatLayoutStore = create<ChatLayoutStore>((set) => ({
   setFilesPanelTab: (tab) => set({ filesPanelTab: tab }),
   setFilesPanelRoot: (root) => set({ filesPanelRoot: root }),
   setFilesPanelGitMode: (mode) => set({ filesPanelGitMode: mode }),
+  setWorkbenchSurface: (workbenchSurface) => set({ workbenchSurface }),
+  setMobileSurface: (mobileSurface) => set({ mobileSurface }),
 }));

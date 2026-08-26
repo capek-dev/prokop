@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState, useEffect, useMemo } from 'react';
-import { X, RefreshCw, Search, ChevronDown, ChevronRight, Folder, File, Check } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Search, ChevronDown, ChevronRight, Folder, File, Check } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
 import type { FileEntry, ProkopaiClient } from '@prokopai/sdk';
 import { FileTree, type FileTreeHandle, GitChangesView, type GitChangesViewHandle } from '@/components/files';
@@ -8,12 +8,6 @@ import { FOLDER_ICON_COLOR, fileIconColor } from '@/components/files/fileIcons';
 import { buildFilePathTree, type FilePathDirectoryNode } from '@/components/files/filePathTree';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
@@ -41,6 +35,8 @@ import { queryKeys } from '@/lib/queryKeys';
 
 interface FilesPanelProps {
   sdkClient: ProkopaiClient | null;
+  embedded?: boolean;
+  embeddedWidth?: number;
 }
 
 export interface FilesPanelHandle {
@@ -76,13 +72,13 @@ function PathSwitcher({
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 min-w-0 flex-1 justify-between gap-1 px-2 text-sm font-medium"
+          className="h-8 min-w-0 max-w-full gap-1.5 px-2 font-semibold hover:bg-accent"
         >
-          <span className="flex items-center gap-1.5 min-w-0">
-            <Folder className={cn('size-3.5 shrink-0', FOLDER_ICON_COLOR)} />
+          <span className="flex min-w-0 items-center gap-1.5">
+            <Folder className={cn('size-4 shrink-0', FOLDER_ICON_COLOR)} />
             <span className="truncate">{selectedLabel}</span>
           </span>
-          <ChevronDown className="size-3.5 shrink-0 opacity-60" />
+          <ChevronDown className="size-3 shrink-0 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-[12rem] max-w-[18rem]">
@@ -316,7 +312,7 @@ function SearchResults({
 }
 
 export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
-  ({ sdkClient }, ref) => {
+  ({ sdkClient, embedded = false, embeddedWidth }, ref) => {
     const isMobile = useIsMobile();
     const fileTreeRef = useRef<FileTreeHandle>(null);
     const gitChangesRef = useRef<GitChangesViewHandle>(null);
@@ -329,6 +325,9 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
     const setFilesPanelRoot = useChatLayoutStore((s) => s.setFilesPanelRoot);
     const filesPanelGitMode = useChatLayoutStore((s) => s.filesPanelGitMode);
     const setFilesPanelGitMode = useChatLayoutStore((s) => s.setFilesPanelGitMode);
+    const setWorkbenchSurface = useChatLayoutStore((s) => s.setWorkbenchSurface);
+    const setMobileSurface = useChatLayoutStore((s) => s.setMobileSurface);
+    const contentWidth = isMobile ? undefined : (embeddedWidth ?? filesPanelWidth);
     const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
     const workspaceId = activeWorkspace?.id;
     const routeParams = useParams({ from: '/server/$serverId', strict: false } as unknown as Parameters<typeof useParams>[0]);
@@ -406,17 +405,23 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
     }, [sdkClient, workspaceId]);
 
     const focus = useCallback(() => {
-      setShowFilesPanel(true);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (filesPanelTab === 'changes') {
-            gitChangesRef.current?.focus();
-          } else {
-            fileTreeRef.current?.focus();
-          }
-        });
-      });
-    }, [setShowFilesPanel, filesPanelTab]);
+      const focusActiveView = () => {
+        if (filesPanelTab === 'changes') {
+          gitChangesRef.current?.focus();
+        } else {
+          fileTreeRef.current?.focus();
+        }
+      };
+
+      if (isMobile) {
+        setMobileSurface('files');
+      } else {
+        setWorkbenchSurface(filesPanelTab === 'changes' ? 'changes' : 'explorer');
+        setShowFilesPanel(true);
+      }
+      requestAnimationFrame(() => requestAnimationFrame(focusActiveView));
+      window.setTimeout(focusActiveView, 250);
+    }, [filesPanelTab, isMobile, setMobileSurface, setShowFilesPanel, setWorkbenchSurface]);
 
     useImperativeHandle(ref, () => ({ focus }), [focus]);
 
@@ -443,9 +448,6 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
             name: entry.name,
             root,
           });
-          if (isMobile) {
-            setShowFilesPanel(false);
-          }
           return;
         }
 
@@ -460,12 +462,15 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
             entry.name,
           );
           if (isMobile) {
-            setShowFilesPanel(false);
+            setMobileSurface('editor');
+          } else {
+            setWorkbenchSurface('editor');
+            setShowFilesPanel(true);
           }
           return;
         }
       }
-    }, [workspaceId, serverId, isMobile, setShowFilesPanel, openFilePreview, defaultFileOpenMode, activeWorkspace?.path]);
+    }, [workspaceId, serverId, isMobile, setMobileSurface, setShowFilesPanel, setWorkbenchSurface, openFilePreview, defaultFileOpenMode]);
 
     const handleFileSelect = useCallback((target: FileEntryActionTarget) => {
       openFile(target);
@@ -483,21 +488,31 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
             selectedRoot={selectedRoot}
             onSelect={setFilesPanelRoot}
           />
-          <Button variant="ghost" size="icon-sm" onClick={handleRefresh} disabled={isRefreshing} className="shrink-0">
-            <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="ml-auto shrink-0"
+            aria-label="Refresh files"
+          >
+            <RefreshCw className={cn('size-3.5', isRefreshing && 'animate-spin')} />
           </Button>
-          {isMobile && (
-            <Button variant="ghost" size="icon-sm" onClick={() => setShowFilesPanel(false)} className="shrink-0">
-              <X className="size-4" />
+          {isMobile && !embedded && (
+            <Button variant="ghost" size="sm" onClick={() => setMobileSurface('chat')} className="shrink-0">
+              <ArrowLeft className="size-4" />
+              Chat
             </Button>
           )}
         </div>
-        <Tabs value={filesPanelTab} onValueChange={(v) => setFilesPanelTab(v as 'project' | 'changes')}>
-          <TabsList className="w-full">
-            <TabsTrigger value="project" className="flex-1">Project</TabsTrigger>
-            <TabsTrigger value="changes" className="flex-1">Changes</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {!embedded && (
+          <Tabs value={filesPanelTab} onValueChange={(v) => setFilesPanelTab(v as 'project' | 'changes')}>
+            <TabsList className="w-full">
+              <TabsTrigger value="project" className="flex-1">Project</TabsTrigger>
+              <TabsTrigger value="changes" className="flex-1">Changes</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
         {filesPanelTab === 'project' && (
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
@@ -549,7 +564,7 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
             workspaceId={workspaceId}
             sdkClient={sdkClient}
             showHidden={true}
-            width={filesPanelWidth}
+            width={contentWidth}
             root={isMainRoot ? undefined : selectedRoot}
             onFileSelect={handleFileSelect}
             activePath={activeEditorPath}
@@ -566,7 +581,7 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
           mode={filesPanelGitMode}
           searchQuery={changesSearchQuery}
           onFileSelect={handleFileSelect}
-          width={filesPanelWidth}
+          width={contentWidth}
           contextActions={contextActions}
         />
       )
@@ -576,19 +591,25 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       return null;
     }
 
+    if (embedded) {
+      return (
+        <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar" data-workbench-explorer>
+          {headerContent}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border">
+            {content}
+          </div>
+        </div>
+      );
+    }
+
     if (isMobile) {
       return (
-        <Sheet open={showFilesPanel} onOpenChange={(open) => !open && setShowFilesPanel(false)}>
-          <SheetContent side="right" className="w-72 p-0 bg-sidebar [&>button]:hidden">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Files</SheetTitle>
-            </SheetHeader>
-            {headerContent}
-            <div className="flex flex-1 flex-col min-h-0 overflow-hidden border-t border-border">
-              {content}
-            </div>
-          </SheetContent>
-        </Sheet>
+        <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-sidebar" data-workbench-explorer>
+          {headerContent}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-t border-border">
+            {content}
+          </div>
+        </div>
       );
     }
 

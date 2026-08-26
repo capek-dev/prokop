@@ -1,14 +1,11 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { Bot, Folder, Box, ChevronRight, Plus, Tag, Archive, MoreHorizontal, Layers } from 'lucide-react';
+import { Bot, Folder, Box, ChevronRight, SquarePen, Tag, Archive, MoreHorizontal, Layers } from 'lucide-react';
 import type { Agent, Session, Workspace } from '@prokopai/sdk';
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarSeparator,
 } from '@/components/ui/sidebar';
 import {
   Collapsible,
@@ -16,6 +13,8 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -223,47 +222,43 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
                 className="group/collapsible"
               >
                 <SidebarGroup>
-                  <SidebarGroupLabel asChild>
-                    <CollapsibleTrigger className="flex w-full min-w-0 items-center justify-between">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <ChevronRight className="size-3 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                        {isAgentHomeWorkspace(workspace) ? (
-                          <Bot className="size-3.5 shrink-0" />
-                        ) : workspace.isVirtual ? (
-                          <Box className="size-3.5 shrink-0" />
-                        ) : (
-                          <Folder className="size-3.5 shrink-0" />
-                        )}
-                        <span className={isCurrentSessionWorkspace ? 'truncate text-sidebar-foreground font-medium' : 'truncate'}>
-                          {getWorkspaceDisplayName(workspace, agents)}
-                        </span>
+                  <SidebarGroupLabel className="gap-1">
+                    <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-2">
+                      <ChevronRight className="size-3 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      {isAgentHomeWorkspace(workspace) ? (
+                        <Bot className="size-3.5 shrink-0" />
+                      ) : workspace.isVirtual ? (
+                        <Box className="size-3.5 shrink-0" />
+                      ) : (
+                        <Folder className="size-3.5 shrink-0" />
+                      )}
+                      <span className={isCurrentSessionWorkspace ? 'truncate text-sidebar-foreground font-medium' : 'truncate'}>
+                        {getWorkspaceDisplayName(workspace, agents)}
                       </span>
-                      <Badge
-                        variant="secondary"
-                        aria-label={`${activeSessions.length} sessions`}
-                      >
-                        {activeSessions.length}
-                      </Badge>
                     </CollapsibleTrigger>
-                  </SidebarGroupLabel>
-                  <CollapsibleContent>
-                    <SidebarGroupContent>
-                      <SidebarMenu>
-                        <SidebarMenuItem>
-                          <SidebarMenuButton
+                    <TooltipProvider delayDuration={300}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
                             onClick={(event) => onCreateSessionInWorkspace(
                               workspace.id,
                               getCreateSessionOptions(event),
                             )}
                             disabled={!connected}
-                            className="w-full"
+                            className="ml-auto shrink-0"
+                            aria-label={`New Chat in ${getWorkspaceDisplayName(workspace, agents)}`}
                           >
-                            <Plus className="size-4" data-icon="inline-start" />
-                            <span>New Chat</span>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      </SidebarMenu>
-                      <SidebarSeparator />
+                            <SquarePen className="size-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>New Chat</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </SidebarGroupLabel>
+                  <CollapsibleContent>
+                    <SidebarGroupContent>
                       {isWsOpen && (
                         <>
                           {activeSessions.length === 0 ? (

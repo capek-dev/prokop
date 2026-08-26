@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/popover';
 import { useServerContext } from '@/contexts/ServerContext';
 import { cn } from '@/lib/utils';
+import { useConnectionStore } from '@/stores/connectionStore';
 
 interface ServerSwitcherProps {
   compact?: boolean;
@@ -45,6 +46,7 @@ export function ServerSwitcher({ compact }: ServerSwitcherProps) {
   const [renameTarget, setRenameTarget] = useState<SavedServer | null>(null);
   const navigate = useNavigate();
   const { servers, renameServer } = useServerContext();
+  const connected = useConnectionStore((state) => state.connected);
 
   const params = useParams({ from: '/server/$serverId' });
   const currentServerId = params.serverId ?? null;
@@ -144,11 +146,20 @@ export function ServerSwitcher({ compact }: ServerSwitcherProps) {
           size="sm"
           role="combobox"
           aria-expanded={open}
-          aria-label="Select server"
-          className="h-8 gap-1.5 px-2 font-semibold hover:bg-accent"
+          aria-label={`Select server, ${currentServerName}, ${connected ? 'Connected' : 'Disconnected'}`}
+          className="h-8 gap-1.5 px-2 hover:bg-accent"
         >
-          <Server className="size-4 shrink-0 text-muted-foreground" />
-          <span className="truncate">{currentServerName}</span>
+          <span className="relative shrink-0">
+            <Server className="size-4 text-muted-foreground" />
+            <span
+              aria-hidden="true"
+              data-connection-status={connected ? 'connected' : 'disconnected'}
+              className={cn(
+                'absolute -right-1 -bottom-1 size-2 rounded-full ring-2 ring-background',
+                connected ? 'bg-success' : 'bg-destructive',
+              )}
+            />
+          </span>
           <ChevronsUpDown className="size-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>

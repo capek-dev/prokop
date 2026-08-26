@@ -27,6 +27,7 @@ export type SessionNavigationIntent =
 
 export interface ResumeSessionOptions {
   targetMessageId?: string;
+  skipNavigation?: boolean;
 }
 
 // --- Session Content Lifecycle ---

@@ -817,10 +817,6 @@ function PanelResizeHandle({ side, panelId, className, ...props }: PanelResizeHa
   );
 }
 
-function SessionsResizeHandle({ className, ...props }: React.ComponentProps<"div">) {
-  return <PanelResizeHandle side="left" panelId="sessions" className={className} {...props} />
-}
-
 export {
   Sidebar,
   SidebarContent,
@@ -846,6 +842,5 @@ export {
   SidebarSeparator,
   SidebarTrigger,
   PanelResizeHandle,
-  SessionsResizeHandle,
   useSidebar,
 }

@@ -13,6 +13,7 @@ describe('chatLayoutStore', () => {
       showTerminalPanel: false,
       sessionsPanelWidth: PANEL_DEFAULT_WIDTH,
       filesPanelWidth: PANEL_DEFAULT_WIDTH,
+      mobileSurface: 'chat',
     });
   });
 
@@ -62,6 +63,24 @@ describe('chatLayoutStore', () => {
       useChatLayoutStore.getState().setShowFilesPanel(true);
       useChatLayoutStore.getState().setShowFilesPanel(false);
       expect(useChatLayoutStore.getState().showFilesPanel).toBe(false);
+    });
+  });
+
+  describe('mobileSurface', () => {
+    test('moves between one primary phone surface at a time', () => {
+      expect(useChatLayoutStore.getState().mobileSurface).toBe('chat');
+
+      useChatLayoutStore.getState().setMobileSurface('sessions');
+      expect(useChatLayoutStore.getState().mobileSurface).toBe('sessions');
+
+      useChatLayoutStore.getState().setMobileSurface('files');
+      expect(useChatLayoutStore.getState().mobileSurface).toBe('files');
+
+      useChatLayoutStore.getState().setMobileSurface('editor');
+      expect(useChatLayoutStore.getState().mobileSurface).toBe('editor');
+
+      useChatLayoutStore.getState().setMobileSurface('chat');
+      expect(useChatLayoutStore.getState().mobileSurface).toBe('chat');
     });
   });
 

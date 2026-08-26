@@ -248,9 +248,9 @@ export function ChatView({
   );
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 relative">
+    <div className="relative flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
       {/* Transcript area with floating auto-follow button */}
-      <div className="relative flex flex-col flex-1 min-h-0">
+      <div className="relative flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
         {/* Virtualized transcript - handles scrolling for messages only */}
         <VirtualizedTranscript
           displayItems={displayItems}

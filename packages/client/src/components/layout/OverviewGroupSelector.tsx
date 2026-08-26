@@ -94,20 +94,21 @@ export function OverviewGroupSelector({
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button
-              variant="outline"
+              variant="ghost"
+              size="sm"
               role="combobox"
               aria-expanded={open}
               aria-label="Select overview group"
-              className="h-9 w-full justify-between"
+              className="h-8 min-w-0 max-w-full self-start gap-1.5 px-2 font-semibold hover:bg-accent"
               disabled={!isHydrated}
             >
-              <div className="flex min-w-0 items-center gap-2">
+              <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
                 <Layers className="size-4 shrink-0 text-muted-foreground" />
                 <span className="truncate">
                   {activeGroup?.name ?? (isHydrated ? 'Select group' : 'Loading')}
                 </span>
               </div>
-              <ChevronsUpDown className="ml-auto size-4 shrink-0 opacity-50" />
+              <ChevronsUpDown className="size-3 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="max-h-[80vh] w-[320px] p-0">

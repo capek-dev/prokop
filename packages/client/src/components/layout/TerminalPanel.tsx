@@ -14,6 +14,7 @@ import type { TerminalEvent } from '@prokopai/sdk';
 import type { TerminalEventsConnection } from '@prokopai/sdk';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useVisualViewport } from '@/hooks/useVisualViewport';
+import { usePointerDrag } from '@/hooks/usePointerDrag';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -68,7 +69,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   const [activeTabServerId, setActiveTabServerId] = useState<string | null>(null);
   const [panelHeight, setPanelHeight] = useState(DEFAULT_HEIGHT);
   const [connectionTarget, setConnectionTarget] = useState<CachedTerminal | null>(null);
-  const isDraggingRef = useRef(false);
+  const panelBodyRef = useRef<HTMLDivElement | null>(null);
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
   const reconnectAttemptRef = useRef(0);
@@ -515,35 +516,35 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     return () => clearTimeout(timer);
   }, [isOpen, activeTabServerId, focusActiveTerminal]);
 
-  const handleResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    isDraggingRef.current = true;
-    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-    startYRef.current = clientY;
-    startHeightRef.current = panelHeight;
+  const resizeTerminal = useCallback((event: PointerEvent): number | null => {
+    const panelBody = panelBodyRef.current;
+    if (!panelBody) return null;
 
-    const handleMove = (ev: MouseEvent | TouchEvent) => {
-      if (!isDraggingRef.current) return;
-      const clientY = 'touches' in ev ? ev.touches[0].clientY : (ev as MouseEvent).clientY;
-      const delta = startYRef.current - clientY;
-      const maxH = window.innerHeight * MAX_HEIGHT_RATIO;
-      const newHeight = Math.min(Math.max(startHeightRef.current + delta, MIN_HEIGHT), maxH);
-      setPanelHeight(newHeight);
-    };
+    const delta = startYRef.current - event.clientY;
+    const maxHeight = window.innerHeight * MAX_HEIGHT_RATIO;
+    const nextHeight = Math.min(
+      Math.max(startHeightRef.current + delta, MIN_HEIGHT),
+      maxHeight,
+    );
+    panelBody.style.height = `${nextHeight}px`;
+    return nextHeight;
+  }, []);
 
-    const handleUp = () => {
-      isDraggingRef.current = false;
-      document.removeEventListener('mousemove', handleMove);
-      document.removeEventListener('mouseup', handleUp);
-      document.removeEventListener('touchmove', handleMove);
-      document.removeEventListener('touchend', handleUp);
-    };
+  const commitTerminalHeight = useCallback((nextHeight: number) => {
+    setPanelHeight(nextHeight);
+  }, []);
 
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleUp);
-    document.addEventListener('touchmove', handleMove, { passive: false });
-    document.addEventListener('touchend', handleUp);
-  }, [panelHeight]);
+  const beginTerminalResize = usePointerDrag({
+    cursor: 'ns-resize',
+    onMove: resizeTerminal,
+    onCommit: commitTerminalHeight,
+  });
+
+  const handleResizeStart = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    startYRef.current = event.clientY;
+    startHeightRef.current = panelBodyRef.current?.getBoundingClientRect().height ?? panelHeight;
+    beginTerminalResize(event);
+  }, [beginTerminalResize, panelHeight]);
 
 
   if (!workspaceId || !workspacePath) {
@@ -719,14 +720,14 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       {isOpen && (
         <>
           <div
-            className="w-full cursor-ns-resize flex items-center justify-center border-t border-border bg-background select-none shrink-0"
+            className="w-full touch-none cursor-ns-resize flex items-center justify-center border-t border-border bg-background select-none shrink-0"
             style={{ height: 4 }}
-            onMouseDown={handleResizeStart}
-            onTouchStart={handleResizeStart}
+            onPointerDown={handleResizeStart}
           >
             <div className="w-10 h-0.5 bg-muted-foreground/30 rounded-full" />
           </div>
           <div
+            ref={panelBodyRef}
             className="flex flex-col border-t border-border bg-background overflow-hidden shrink-0"
             style={{ height: panelHeight }}
           >

@@ -10,14 +10,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ServerSwitcher } from '@/components/layout/ServerSwitcher';
-import { useConnectionStore } from '@/stores/connectionStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 
 export function AppHeader() {
   const router = useRouter();
   const params = useParams({ from: '/server/$serverId', strict: false } as unknown as Parameters<typeof useParams>[0]);
-  const connected = useConnectionStore((s) => s.connected);
   const setShowSettings = useUIStore((s) => s.setShowSettings);
   const setShowWorkspaceSettings = useUIStore((s) => s.setShowWorkspaceSettings);
   const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
@@ -26,15 +24,8 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="md:hidden flex items-center justify-between pl-3 pr-5 pt-2 sticky top-0 z-40 shrink-0" style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top, 0px))' }}>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            <ServerSwitcher compact />
-            <button className="flex items-center justify-center size-5 rounded-md hover:bg-accent transition-colors" title={connected ? 'Connected' : 'Disconnected'}>
-                <span className={`size-2 rounded-full ${connected ? 'bg-success' : 'bg-destructive'}`} />
-              </button>
-            </div>
-        </div>
+      <header className="md:hidden sticky top-0 z-40 flex shrink-0 items-center justify-between px-1 pb-2" style={{ paddingTop: 'calc(0.5rem + env(safe-area-inset-top, 0px))' }}>
+        <ServerSwitcher compact />
         <TooltipProvider>
           <div className="flex items-center gap-1">
             <DropdownMenu>
@@ -87,18 +78,8 @@ export function AppHeader() {
         </TooltipProvider>
       </header>
 
-      <header className="hidden md:flex items-center justify-between pl-3 pr-5 pt-2 h-11 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            <ServerSwitcher compact />
-            <button
-              className="flex items-center justify-center size-5 rounded-md hover:bg-accent transition-colors"
-              title={connected ? 'Connected' : 'Disconnected'}
-            >
-              <span className={`size-2 rounded-full ${connected ? 'bg-success' : 'bg-destructive'}`} />
-            </button>
-          </div>
-        </div>
+      <header className="hidden md:flex h-11 shrink-0 items-center justify-between px-1 py-1.5">
+        <ServerSwitcher compact />
         <TooltipProvider>
           <div className="flex items-center gap-2">
               <Tooltip>

@@ -5,6 +5,7 @@ import type { ProkopaiClient, WorkspaceSettings, PermissionGrant } from '@prokop
 import { useUIStore } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useFileEditorStore } from '@/stores/fileEditorStore';
+import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 
 const ConfigurationDialog = lazy(() =>
   import('@/components/modals/ConfigurationDialog').then((m) => ({ default: m.ConfigurationDialog })),
@@ -151,6 +152,13 @@ export function ServerDialogs({
                   },
                   filePreviewTarget.name,
                 );
+                const layout = useChatLayoutStore.getState();
+                if (window.innerWidth < 640) {
+                  layout.setMobileSurface('editor');
+                } else {
+                  layout.setWorkbenchSurface('editor');
+                  layout.setShowFilesPanel(true);
+                }
                 closeFilePreview();
               } : undefined}
             />

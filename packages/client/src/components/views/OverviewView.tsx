@@ -11,12 +11,14 @@ import { useOverviewGroups } from '@/hooks/useOverviewGroups';
 import { useInvalidateWorkspaceTags } from '@/hooks/queries';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
+import { useMobileSessionSelection } from '@/hooks/useMobileSessionSelection';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useBoardRouteSync } from '@/hooks/useBoardRouteSync';
 import { useFocusedSessionWorkspaceContext } from '@/hooks/useFocusedSessionWorkspaceContext';
 import { useOverviewRouteSessionLoader } from '@/hooks/useOverviewRouteSessionLoader';
 import { WorkspaceOverview } from '@/components/layout/WorkspaceOverview';
 import { WorkspaceContentArea } from '@/components/app/WorkspaceContentArea';
+import { WorkspaceDock } from '@/components/app/WorkspaceDock';
 
 export default function OverviewView() {
   const sessionManager = useSessionManager();
@@ -44,7 +46,8 @@ export default function OverviewView() {
   );
 
   const openSessionIds = useSessionBoardStore(s => s.openSessionIds);
-  const hasMultipleOpenSessions = openSessionIds.length > 1;
+  const layoutMode = useSessionBoardStore(s => s.layoutMode);
+  const showBoardToolbar = openSessionIds.length > 1 && layoutMode === 'board';
 
   // Overview scope: sessions from any accessible workspace are valid.
   useBoardRouteSync({ scope: { kind: 'overview' } });
@@ -80,6 +83,7 @@ export default function OverviewView() {
     regenerateSessionTitle,
     createSessionInWorkspace,
   } = sessionManager;
+  const handleResumeSession = useMobileSessionSelection(resumeSession);
 
   const handleAddTag = useCallback(async (sessionId: string, tag: string) => {
     if (!sdkClient) return;
@@ -115,7 +119,7 @@ export default function OverviewView() {
       activeGroup={overviewGroups.activeGroup}
       groupActions={overviewGroups.actions}
       serverId={activeServer?.id ?? ''}
-      onResumeSession={resumeSession}
+      onResumeSession={handleResumeSession}
       onOpenAlongside={openAlongside}
       onCloseSession={closeSession}
       onReopenSession={reopenSession}
@@ -133,42 +137,38 @@ export default function OverviewView() {
   );
 
   return (
-    <>
-      <AppSidebar
-        ref={sidebarRef}
-        currentSessionId={sidebarData.currentSessionId}
-        onEscape={() => {
-          if (sidebarData.currentSessionId) {
-            chatInputRef.current?.focus();
-          }
-        }}
-      >
-        {sidebarContent}
-      </AppSidebar>
-
-      <main
-        className="flex-1 flex flex-col overflow-hidden min-h-0 p-2"
-        style={{
-          paddingTop: '0.5rem',
-          paddingBottom: '0.5rem',
-        }}
-      >
-        <div className="flex flex-1 flex-col overflow-hidden min-h-0 rounded-xl bg-background shadow-sm ring-1 ring-border">
-          {hasMultipleOpenSessions ? (
+    <WorkspaceDock
+      sessions={(
+        <AppSidebar
+          ref={sidebarRef}
+          currentSessionId={sidebarData.currentSessionId}
+          onEscape={() => {
+            if (sidebarData.currentSessionId) {
+              chatInputRef.current?.focus();
+            }
+          }}
+        >
+          {sidebarContent}
+        </AppSidebar>
+      )}
+      content={(
+        <WorkspaceContentArea
+          primaryHeader={showBoardToolbar ? (
             <WorkspaceBoardToolbar showWorkspaceContext />
           ) : (
             <WorkspaceHeader />
           )}
-          <WorkspaceContentArea
-            sdkClient={sessionManager.sdkClient}
-            serverUrl={sessionManager.serverUrl}
-          />
-          <AppPanels
-            sdkClient={sessionManager.sdkClient}
-            terminalPanelRef={terminalPanelRef}
-          />
-        </div>
-      </main>
-    </>
+          sdkClient={sessionManager.sdkClient}
+          serverUrl={sessionManager.serverUrl}
+          sessionsContent={sidebarContent}
+        />
+      )}
+      panels={(
+        <AppPanels
+          sdkClient={sessionManager.sdkClient}
+          terminalPanelRef={terminalPanelRef}
+        />
+      )}
+    />
   );
 }

@@ -42,6 +42,22 @@ export function useAppKeyboardHandlers({
   const focusBoard = useBoardFocus();
 
   const focusSidebarSessionPanel = useCallback(() => {
+    if (window.innerWidth < 640) {
+      useChatLayoutStore.getState().setMobileSurface('sessions');
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const surface = document.querySelector<HTMLElement>(
+            '[data-mobile-surface="sessions"]',
+          );
+          const firstSession = surface?.querySelector<HTMLElement>(
+            '[data-sidebar="menu-button"]',
+          );
+          (firstSession ?? surface)?.focus();
+        });
+      });
+      return;
+    }
+
     setSidebarOpen(true);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -118,10 +134,20 @@ export function useAppKeyboardHandlers({
 
   const handleCloseFocusedPanel = useCallback(() => {
     const activeEl = document.activeElement;
-    if (activeEl?.closest('[data-terminal-panel]')) {
+    if (activeEl?.closest('[data-mobile-surface="sessions"]')) {
+      useChatLayoutStore.getState().setMobileSurface('chat');
+    } else if (activeEl?.closest('[data-terminal-panel]')) {
       handleCloseTerminal();
     } else if (activeEl?.closest('[data-panel-id="files"]')) {
       useChatLayoutStore.getState().setShowFilesPanel(false);
+    } else if (activeEl?.closest('[data-editor-surface]')) {
+      const layout = useChatLayoutStore.getState();
+      if (window.innerWidth < 640) layout.setMobileSurface('files');
+      else layout.setShowFilesPanel(false);
+    } else if (activeEl?.closest('[data-workbench-explorer]')) {
+      const layout = useChatLayoutStore.getState();
+      if (window.innerWidth < 640) layout.setMobileSurface('chat');
+      else layout.setShowFilesPanel(false);
     } else if (activeEl?.closest('[data-sidebar="sidebar"]')) {
       setSidebarOpen(false);
     }

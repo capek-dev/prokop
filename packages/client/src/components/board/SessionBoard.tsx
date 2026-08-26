@@ -50,7 +50,7 @@ function useViewPath(): string {
 }
 
 export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
-  const { openSessionIds, focusedSessionId, removeFromBoard } = useSessionBoardStore();
+  const { openSessionIds, focusedSessionId, layoutMode, removeFromBoard } = useSessionBoardStore();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -93,13 +93,16 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
   }, []);
 
   const visiblePaneCount = openSessionIds.length;
-  const showPaneChrome = visiblePaneCount > 1;
+  const showPaneChrome = visiblePaneCount > 1 && layoutMode === 'board';
   const gridColumnCount = Math.min(visiblePaneCount, MAX_GRID_COLUMNS);
   const gridRowCount = Math.ceil(visiblePaneCount / MAX_GRID_COLUMNS);
 
   // Render all panes when the columns required by the two-row layout fit.
   // Otherwise retain every open session and show only the focused pane.
-  const showGrid = visiblePaneCount > 1 && gridColumnCount <= maxColumns;
+  const showGrid =
+    layoutMode === 'board' &&
+    visiblePaneCount > 1 &&
+    gridColumnCount <= maxColumns;
 
   const handleRemoveFromBoard = useCallback((sessionId: string) => {
     removeFromBoard(sessionId);
@@ -145,7 +148,7 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
 
   if (visiblePaneCount === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground px-6">
+      <div className="flex min-w-0 max-w-full flex-1 flex-col items-center justify-center px-6 text-center text-muted-foreground">
         <h2 className="mb-2">Select or create a session</h2>
         <p>Choose a session from the sidebar or create a new one to start chatting.</p>
       </div>
@@ -182,7 +185,7 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
         <SortableContext items={openSessionIds} strategy={rectSortingStrategy}>
           <div
             ref={containerRef}
-            className="flex-1 min-h-0 grid gap-2"
+            className="grid min-h-0 min-w-0 max-w-full flex-1 overflow-hidden"
             style={{
               gridTemplateColumns: `repeat(${gridColumnCount}, minmax(0, 1fr))`,
               gridTemplateRows: `repeat(${gridRowCount}, minmax(0, 1fr))`,
@@ -206,7 +209,7 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
       onDragEnd={handleDragEnd}
     >
       <SortableContext items={openSessionIds} strategy={horizontalListSortingStrategy}>
-        <div ref={containerRef} className="flex-1 min-h-0 flex flex-col">
+        <div ref={containerRef} className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
           {showSwitcher && (
             <CompactBoardSwitcher
               openSessionIds={openSessionIds}
@@ -243,7 +246,7 @@ function SortableSessionPane({ sessionId, children }: SortableSessionPaneProps) 
   return (
     <div
       ref={setNodeRef}
-      className="h-full min-h-0"
+      className="h-full min-h-0 min-w-0 max-w-full overflow-hidden"
       style={{
         transform: CSS.Transform.toString(transform),
         transition,

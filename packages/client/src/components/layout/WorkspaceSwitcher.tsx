@@ -102,13 +102,14 @@ export function WorkspaceSwitcher({
       <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          variant="outline"
+          variant="ghost"
+          size="sm"
           role="combobox"
           aria-expanded={open}
           aria-label="Select workspace"
-          className="w-full justify-between h-9"
+          className="h-8 min-w-0 max-w-full self-start gap-1.5 px-2 font-semibold hover:bg-accent"
         >
-          <div className="flex items-center gap-2 overflow-hidden">
+          <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
             {isAgentHomeWorkspace(activeWorkspace) ? (
               <Bot className="size-4 flex-shrink-0 text-muted-foreground" />
             ) : activeWorkspace?.isVirtual ? (
@@ -122,7 +123,7 @@ export function WorkspaceSwitcher({
                 : 'Select workspace'}
             </span>
           </div>
-          <ChevronsUpDown className="ml-auto size-4 shrink-0 opacity-50" />
+          <ChevronsUpDown className="size-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="max-h-[min(80vh,var(--radix-popover-content-available-height))] w-[320px] overflow-hidden p-0">

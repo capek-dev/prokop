@@ -1,26 +1,23 @@
 import { useMemo } from 'react';
-import { FolderOpen, PanelLeft } from 'lucide-react';
-import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
-import { useSidebar } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { ChatHeader } from '@/components/chat/ChatHeader';
 import { useSessionCommands } from '@/contexts/SessionCommandsContext';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { getWorkspacePreconfigs } from '@/lib/workspacePreconfigs';
+import {
+  SessionsVisibilityButton,
+  WorkbenchVisibilityButton,
+} from '@/components/app/WorkspaceBar';
 
 export function WorkspaceHeader() {
-  const showFilesPanel = useChatLayoutStore((s) => s.showFilesPanel);
-  const setShowFilesPanel = useChatLayoutStore((s) => s.setShowFilesPanel);
   const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
   const allPreconfigs = useServerDataStore(s => s.preconfigs);
   const models = useServerDataStore(s => s.models);
   const defaultModel = useServerDataStore(s => s.defaultModel);
   const allWorkspaces = useServerDataStore(s => s.workspaces);
-  const { toggleSidebar, state: sidebarState } = useSidebar();
   const sessionManager = useSessionCommands();
 
   const focusedSessionId = useSessionBoardStore(s => s.focusedSessionId);
@@ -75,27 +72,12 @@ export function WorkspaceHeader() {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="h-10 flex items-stretch shrink-0 border-b border-border bg-card">
-        {/* Left: Sidebar toggle section */}
-        <div className={`flex items-center px-1 shrink-0 ${sidebarState === 'expanded' ? 'bg-muted' : ''}`}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleSidebar}
-              >
-                <PanelLeft className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{sidebarState === 'expanded' ? 'Hide Sessions' : 'Show Sessions'}</TooltipContent>
-          </Tooltip>
-        </div>
-
-        <div className="w-px bg-border shrink-0" />
-
-        {/* Center: Merged ChatHeader content — fills space even when empty */}
-        <div className="flex-1 flex items-center min-w-0 px-2">
+      <div
+        data-slot="primary-dock-header"
+        className="flex h-10 shrink-0 items-stretch border-b border-border bg-card"
+      >
+        <SessionsVisibilityButton />
+        <div className="flex min-w-0 flex-1 items-center px-2">
 
           {hasSession && currentSession && (
             <ChatHeader
@@ -125,26 +107,7 @@ export function WorkspaceHeader() {
           )}
         </div>
 
-        {/* Right: Files / Explorer toggle section */}
-        {sessionWorkspace && (
-          <>
-            <div className="w-px bg-border shrink-0" />
-            <div className={`flex items-center px-1 shrink-0 ${showFilesPanel ? 'bg-muted' : ''}`}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setShowFilesPanel(!showFilesPanel)}
-                  >
-                    <FolderOpen className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{showFilesPanel ? 'Hide Files' : 'Show Files'}</TooltipContent>
-              </Tooltip>
-            </div>
-          </>
-        )}
+        <WorkbenchVisibilityButton />
       </div>
     </TooltipProvider>
   );

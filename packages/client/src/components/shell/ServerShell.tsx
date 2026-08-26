@@ -1,7 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { useParams, useRouter, Outlet } from '@tanstack/react-router';
-import { useShallow } from 'zustand/react/shallow';
-
 import { useServerContext } from '@/contexts/ServerContext';
 import { ViewRefsContext } from '@/contexts/ViewRefsContext';
 import { SessionManagerContext } from '@/contexts/SessionManagerContext';
@@ -21,7 +19,7 @@ import { ConnectingState } from '@/components/shared/LoadingSkeleton';
 import { OfflineState } from '@/components/shared/OfflineState';
 import { Button } from '@/components/ui/button';
 import { AppKeyboardHandlersMount } from '@/hooks/useAppKeyboardHandlers';
-import { FilesPanel, type FilesPanelHandle } from '@/components/layout/FilesPanel';
+import type { FilesPanelHandle } from '@/components/layout/FilesPanel';
 import type { MessageInputHandle } from '@/components/chat/MessageInput';
 import type { TerminalPanelHandle } from '@/components/layout/TerminalPanel';
 import type { AppSidebarHandle } from '@/components/layout/AppSidebar';
@@ -69,15 +67,7 @@ export default function ServerShell() {
     getHandle: (sessionId) => paneHandles.get(sessionId),
   }), [paneHandles]);
 
-  const {
-    showFilesPanel,
-    filesPanelWidth,
-    sessionsPanelWidth,
-  } = useChatLayoutStore(useShallow((s) => ({
-    showFilesPanel: s.showFilesPanel,
-    filesPanelWidth: s.filesPanelWidth,
-    sessionsPanelWidth: s.sessionsPanelWidth,
-  })));
+  const sessionsPanelWidth = useChatLayoutStore((state) => state.sessionsPanelWidth);
 
   const viewRefs = useMemo(() => ({
     sidebarRef,
@@ -196,16 +186,6 @@ export default function ServerShell() {
               </SessionCommandsProvider>
             </SessionManagerContext.Provider>
 
-            <FilesPanel
-              ref={filesPanelRef}
-              sdkClient={sessionManager.sdkClient}
-            />
-
-            <div
-              data-panel-gap="files"
-              className={`relative bg-transparent transition-[width] duration-200 ease-linear shrink-0 ${!showFilesPanel ? 'w-0' : ''}`}
-              style={{ width: showFilesPanel ? filesPanelWidth : 0 }}
-            />
           </div>
 
           <AppKeyboardHandlersMount

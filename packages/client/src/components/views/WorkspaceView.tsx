@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { Plus } from 'lucide-react';
+import { SquarePen } from 'lucide-react';
 import { toast } from 'sonner';
 import { useViewRefs } from '@/contexts/ViewRefsContext';
 import { useSessionManager } from '@/contexts/SessionManagerContext';
@@ -19,15 +19,14 @@ import { WorkspaceSessionContent } from '@/components/layout/WorkspaceSessionCon
 import { PinnedMessagesPanel } from '@/components/layout/PinnedMessagesPanel';
 import { AppPanels } from '@/components/app/AppPanels';
 import { WorkspaceContentArea } from '@/components/app/WorkspaceContentArea';
+import { WorkspaceDock } from '@/components/app/WorkspaceDock';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
+import { useMobileSessionSelection } from '@/hooks/useMobileSessionSelection';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
 import { getCreateSessionOptions } from '@/lib/sessionCreate';
-import {
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-} from '@/components/ui/sidebar';
+import { SidebarHeader } from '@/components/ui/sidebar';
 
 export default function WorkspaceView() {
   const sessionManager = useSessionManager();
@@ -38,7 +37,8 @@ export default function WorkspaceView() {
   const allPreconfigs = useServerDataStore(s => s.preconfigs);
 
   const openSessionIds = useSessionBoardStore(s => s.openSessionIds);
-  const hasMultipleOpenSessions = openSessionIds.length > 1;
+  const layoutMode = useSessionBoardStore(s => s.layoutMode);
+  const showBoardToolbar = openSessionIds.length > 1 && layoutMode === 'board';
 
   // Sync board state with URL search params
   useBoardRouteSync({ scope: { kind: 'workspace', workspaceId: activeWorkspace?.id ?? null } });
@@ -64,6 +64,7 @@ export default function WorkspaceView() {
     deletingWorkspaceId,
     isUpdatingWorkspace,
   } = sessionManager;
+  const handleResumeSession = useMobileSessionSelection(resumeSession);
 
   const newChatPreconfigId = getWorkspaceDefaultPreconfigId(activeWorkspace, allPreconfigs)
     ?? primaryPreconfigs[0]?.id;
@@ -135,38 +136,43 @@ export default function WorkspaceView() {
 
   const sidebarHeader = (
     <SidebarHeader className="p-1">
-      <WorkspaceSwitcher
-        workspaces={sidebarData.workspaces}
-        agents={agents}
-        activeWorkspace={sidebarData.activeWorkspace}
-        onSelectWorkspace={selectWorkspace}
-        onCreateVirtualWorkspace={handleCreateVirtualWorkspace}
-        onCreatePhysicalWorkspace={handleCreatePhysicalWorkspace}
-        onDeleteWorkspace={deleteWorkspace}
-        onRenameWorkspace={renameWorkspace}
-        onUpdateWorkspacePaths={updateWorkspacePaths}
-        sdkClient={sdkClient}
-        isCreatingWorkspace={isCreatingWorkspace}
-        deletingWorkspaceId={deletingWorkspaceId}
-        isUpdatingWorkspace={isUpdatingWorkspace}
-      />
-      <div className="px-2">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={(event) => createSession(
-                newChatPreconfigId,
-                undefined,
-                getCreateSessionOptions(event),
-              )}
-              disabled={!sidebarData.connected}
-              className="w-full"
-            >
-              <Plus className="size-4" data-icon="inline-start" />
-              <span>New Chat</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <div className="flex min-w-0 items-center gap-1">
+        <WorkspaceSwitcher
+          workspaces={sidebarData.workspaces}
+          agents={agents}
+          activeWorkspace={sidebarData.activeWorkspace}
+          onSelectWorkspace={selectWorkspace}
+          onCreateVirtualWorkspace={handleCreateVirtualWorkspace}
+          onCreatePhysicalWorkspace={handleCreatePhysicalWorkspace}
+          onDeleteWorkspace={deleteWorkspace}
+          onRenameWorkspace={renameWorkspace}
+          onUpdateWorkspacePaths={updateWorkspacePaths}
+          sdkClient={sdkClient}
+          isCreatingWorkspace={isCreatingWorkspace}
+          deletingWorkspaceId={deletingWorkspaceId}
+          isUpdatingWorkspace={isUpdatingWorkspace}
+        />
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onClick={(event) => createSession(
+                  newChatPreconfigId,
+                  undefined,
+                  getCreateSessionOptions(event),
+                )}
+                disabled={!sidebarData.connected}
+                className="ml-auto shrink-0"
+                aria-label="New Chat"
+              >
+                <SquarePen className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>New Chat</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </SidebarHeader>
   );
@@ -189,7 +195,7 @@ export default function WorkspaceView() {
       childrenMap={sidebarData.childrenMap}
       sessionDerivedValues={sidebarData.sessionDerivedValues}
       currentSessionId={sidebarData.currentSessionId}
-      onResumeSession={resumeSession}
+      onResumeSession={handleResumeSession}
       onOpenAlongside={openAlongside}
       onCloseSession={closeSession}
       onReopenSession={reopenSession}
@@ -223,47 +229,53 @@ export default function WorkspaceView() {
     />
   );
 
-  return (
+  const sessionsPanelContent = (
     <>
-      <AppSidebar
-        ref={sidebarRef}
-        header={sidebarHeader}
-        currentSessionId={sidebarData.currentSessionId}
-        onEscape={() => {
-          if (sidebarData.currentSessionId) {
-            chatInputRef.current?.focus();
-          }
-        }}
-      >
-        {sidebarContent}
-        {sidebarData.activeWorkspace && (
-          <PinnedMessagesPanel
-            sdkClient={sdkClient}
-            workspaceId={sidebarData.activeWorkspace.id}
-            currentSessionId={sidebarData.currentSessionId}
-            onNavigateToPinnedMessage={(sessionId, messageId) => {
-              resumeSession(sessionId, { targetMessageId: messageId });
-            }}
-          />
-        )}
-      </AppSidebar>
-
-      <main
-        className="flex-1 flex flex-col overflow-hidden min-h-0 p-2"
-        style={{ paddingTop: '0.5rem', paddingBottom: '0.5rem' }}
-      >
-        <div className="flex flex-1 flex-col overflow-hidden min-h-0 rounded-xl bg-background shadow-sm ring-1 ring-border">
-          {hasMultipleOpenSessions ? <WorkspaceBoardToolbar /> : <WorkspaceHeader />}
-          <WorkspaceContentArea
-            sdkClient={sdkClient}
-            serverUrl={sessionManager.serverUrl}
-          />
-          <AppPanels
-            sdkClient={sdkClient}
-            terminalPanelRef={terminalPanelRef}
-          />
-        </div>
-      </main>
+      {sidebarContent}
+      {sidebarData.activeWorkspace && (
+        <PinnedMessagesPanel
+          sdkClient={sdkClient}
+          workspaceId={sidebarData.activeWorkspace.id}
+          currentSessionId={sidebarData.currentSessionId}
+          onNavigateToPinnedMessage={(sessionId, messageId) => {
+            handleResumeSession(sessionId, { targetMessageId: messageId });
+          }}
+        />
+      )}
     </>
+  );
+
+  return (
+    <WorkspaceDock
+      sessions={(
+        <AppSidebar
+          ref={sidebarRef}
+          header={sidebarHeader}
+          currentSessionId={sidebarData.currentSessionId}
+          onEscape={() => {
+            if (sidebarData.currentSessionId) {
+              chatInputRef.current?.focus();
+            }
+          }}
+        >
+          {sessionsPanelContent}
+        </AppSidebar>
+      )}
+      content={(
+        <WorkspaceContentArea
+          primaryHeader={showBoardToolbar ? <WorkspaceBoardToolbar /> : <WorkspaceHeader />}
+          sdkClient={sdkClient}
+          serverUrl={sessionManager.serverUrl}
+          sessionsHeader={sidebarHeader}
+          sessionsContent={sessionsPanelContent}
+        />
+      )}
+      panels={(
+        <AppPanels
+          sdkClient={sdkClient}
+          terminalPanelRef={terminalPanelRef}
+        />
+      )}
+    />
   );
 }

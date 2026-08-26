@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export const MAX_PANES = 6;
 
-export type LayoutMode = 'auto' | 'single';
+export type LayoutMode = 'focused' | 'board';
 
 /**
  * Intent recorded when a client-initiated session creation is pending.
@@ -62,13 +62,17 @@ function chooseNextFocus(openIds: string[], removedId: string): string | null {
 export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
   openSessionIds: [],
   focusedSessionId: null,
-  layoutMode: 'auto',
+  layoutMode: 'focused',
 
   hydrateFromRoute: (focusedSessionId, openSessionIds) => {
-    set({
+    set((state) => ({
       openSessionIds,
       focusedSessionId,
-    });
+      layoutMode:
+        state.openSessionIds.length === 0 && openSessionIds.length > 1
+          ? 'board'
+          : state.layoutMode,
+    }));
   },
 
   focusSession: (sessionId) => {
@@ -102,9 +106,9 @@ export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
 
   openAlongside: (sessionId) => {
     const state = get();
-    // If already open, just focus
+    // If already open, focus it and reveal the board.
     if (state.openSessionIds.includes(sessionId)) {
-      set({ focusedSessionId: sessionId });
+      set({ focusedSessionId: sessionId, layoutMode: 'board' });
       return;
     }
     // Respect pane limit
@@ -112,6 +116,7 @@ export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
     set({
       openSessionIds: [...state.openSessionIds, sessionId],
       focusedSessionId: sessionId,
+      layoutMode: 'board',
     });
   },
 
@@ -122,7 +127,11 @@ export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
     if (state.focusedSessionId === sessionId) {
       newFocus = chooseNextFocus(state.openSessionIds, sessionId);
     }
-    set({ openSessionIds: newOpenIds, focusedSessionId: newFocus });
+    set({
+      openSessionIds: newOpenIds,
+      focusedSessionId: newFocus,
+      layoutMode: newOpenIds.length > 1 ? state.layoutMode : 'focused',
+    });
   },
 
   reorderSession: (sessionId, targetIndex) => {
@@ -162,7 +171,7 @@ export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
     });
   },
 
-  clearBoard: () => set({ openSessionIds: [], focusedSessionId: null }),
+  clearBoard: () => set({ openSessionIds: [], focusedSessionId: null, layoutMode: 'focused' }),
 
   setLayoutMode: (layoutMode) => set({ layoutMode }),
 }));

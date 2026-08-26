@@ -159,6 +159,10 @@ export function useSessionCommands({
       board.openInFocusedPane(sessionId);
     }
 
+    if (options?.skipNavigation) {
+      return;
+    }
+
     // Build navigation URL with open param
     const newBoard = useSessionBoardStore.getState();
     const openParam = newBoard.openSessionIds.length > 1

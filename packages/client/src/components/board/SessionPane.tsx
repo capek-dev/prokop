@@ -170,7 +170,7 @@ export function SessionPane({
   const contentStatus = contentMeta?.status ?? 'unloaded';
 
   const content = (
-    <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+    <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
       {contentStatus === 'loading' && (
         <ChatLoadingState />
       )}
@@ -229,7 +229,7 @@ export function SessionPane({
   if (!showPaneChrome) {
     return (
       <div
-        className="flex flex-col h-full min-h-0 overflow-hidden"
+        className="flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden"
         onMouseDown={handleFocusPane}
       >
         {content}
@@ -239,7 +239,7 @@ export function SessionPane({
 
   return (
     <div
-      className={`flex flex-col h-full min-h-0 overflow-hidden border rounded-lg transition-colors ${
+      className={`flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden border transition-colors ${
         isFocused
           ? 'border-primary/40 ring-1 ring-primary/20'
           : 'border-border'

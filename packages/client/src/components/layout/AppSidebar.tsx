@@ -135,7 +135,7 @@ export const AppSidebar = forwardRef<AppSidebarHandle, AppSidebarProps>((props, 
 
   return (
     <ResizablePanel
-      variant="floating"
+      variant="shell"
       header={header}
       contentRef={sessionListRef}
       onContentKeyDown={handleSessionListKeyDown}
