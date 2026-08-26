@@ -85,7 +85,7 @@ export function createTerminalInstance(options?: CreateTerminalOptions): { termi
     scrollback: options?.scrollback ?? 1000,
     allowProposedApi: true,
     theme: options?.theme ?? {
-      background: 'var(--background)',
+      background: 'var(--sidebar)',
       foreground: 'var(--foreground)',
       cursor: 'var(--foreground)',
       selectionBackground: 'var(--accent)',

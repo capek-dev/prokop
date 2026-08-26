@@ -595,7 +595,7 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden bg-sidebar" data-workbench-explorer>
           {headerContent}
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {content}
           </div>
         </div>
@@ -606,7 +606,7 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       return (
         <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-sidebar" data-workbench-explorer>
           {headerContent}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-t border-border">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {content}
           </div>
         </div>
@@ -623,7 +623,7 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
         <Sidebar side="right" isOpen={showFilesPanel} variant="floating">
           <PanelResizeHandle side="right" panelId="files" />
           {headerContent}
-          <SidebarContent className="overflow-hidden border-t border-border">
+          <SidebarContent className="overflow-hidden">
             {content}
           </SidebarContent>
         </Sidebar>

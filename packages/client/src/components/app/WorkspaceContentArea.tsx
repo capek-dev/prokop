@@ -210,7 +210,7 @@ export function WorkspaceContentArea({
         {sessionsContent && (
           <div
             className={cn(
-              'absolute inset-0 z-10 flex min-h-0 min-w-0 flex-col overflow-hidden bg-background',
+              'absolute inset-0 z-10 flex min-h-0 min-w-0 flex-col overflow-hidden bg-card',
               mobileSurface !== 'sessions' && 'invisible pointer-events-none',
             )}
             aria-hidden={mobileSurface !== 'sessions'}
@@ -218,7 +218,7 @@ export function WorkspaceContentArea({
             data-mobile-surface="sessions"
             tabIndex={-1}
           >
-            <div className="flex shrink-0 items-center gap-1 border-b border-border px-1 py-1">
+            <div className="flex shrink-0 items-center gap-1 px-1 py-1">
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -238,7 +238,7 @@ export function WorkspaceContentArea({
         {workspaceId && (
           <div
             className={cn(
-              'absolute inset-0 z-10 flex min-h-0 min-w-0 flex-col overflow-hidden bg-background',
+              'absolute inset-0 z-10 flex min-h-0 min-w-0 flex-col overflow-hidden bg-card',
               mobileSurface !== 'files' && mobileSurface !== 'editor' && 'invisible pointer-events-none',
             )}
             aria-hidden={mobileSurface !== 'files' && mobileSurface !== 'editor'}

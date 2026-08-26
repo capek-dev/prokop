@@ -19,7 +19,8 @@ describe('WorkspaceDock', () => {
     const shell = row?.parentElement;
 
     expect(shell).toHaveAttribute('data-slot', 'workspace-dock');
-    expect(shell).toHaveClass('flex-col', 'overflow-hidden', 'border-t', 'border-border', 'bg-background');
+    expect(shell).toHaveClass('flex-col', 'overflow-hidden', 'bg-background');
+    expect(shell).not.toHaveClass('border-t', 'border-border');
     expect(shell).not.toHaveClass('rounded-xl', 'shadow-sm', 'ring-1');
     expect(shell?.parentElement).not.toHaveClass('p-2');
     expect(row).toHaveAttribute('data-slot', 'workspace-dock-row');

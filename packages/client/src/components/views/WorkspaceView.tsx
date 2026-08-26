@@ -12,7 +12,6 @@ import { useBoardRouteSync } from '@/hooks/useBoardRouteSync';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useUIStore } from '@/stores/uiStore';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { WorkspaceBoardToolbar } from '@/components/app/WorkspaceBoardToolbar';
 import { WorkspaceHeader } from '@/components/app/WorkspaceHeader';
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
 import { WorkspaceSessionContent } from '@/components/layout/WorkspaceSessionContent';
@@ -39,7 +38,6 @@ export default function WorkspaceView() {
   const openSessionIds = useSessionBoardStore(s => s.openSessionIds);
   const layoutMode = useSessionBoardStore(s => s.layoutMode);
   const showBoardToolbar = openSessionIds.length > 1 && layoutMode === 'board';
-
   // Sync board state with URL search params
   useBoardRouteSync({ scope: { kind: 'workspace', workspaceId: activeWorkspace?.id ?? null } });
 
@@ -263,7 +261,7 @@ export default function WorkspaceView() {
       )}
       content={(
         <WorkspaceContentArea
-          primaryHeader={showBoardToolbar ? <WorkspaceBoardToolbar /> : <WorkspaceHeader />}
+          primaryHeader={showBoardToolbar ? null : <WorkspaceHeader />}
           sdkClient={sdkClient}
           serverUrl={sessionManager.serverUrl}
           sessionsHeader={sidebarHeader}

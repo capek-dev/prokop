@@ -117,7 +117,7 @@ export const ResizablePanel = forwardRef<ResizablePanelHandle, ResizablePanelPro
             data-sidebar="sidebar"
             data-state={state}
             data-variant="shell"
-            className="relative hidden h-full shrink-0 overflow-hidden bg-sidebar text-sidebar-foreground md:flex md:flex-col"
+            className="relative hidden h-full shrink-0 overflow-hidden bg-sidebar text-sidebar-foreground md:flex md:flex-col md:rounded-xl md:border md:border-border/50 md:shadow-sm"
             style={{
               width: state === 'expanded' ? 'var(--sidebar-width)' : 0,
               paddingBottom: 'env(safe-area-inset-bottom, 0px)',

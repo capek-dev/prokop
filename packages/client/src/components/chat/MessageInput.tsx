@@ -488,16 +488,16 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        'px-4 pt-2 pb-3 bg-background',
+        'px-4 pt-2 pb-4',
         isDragOver && 'ring-2 ring-primary'
       )}
     >
       <div
         className={cn(
-          'rounded-xl bg-input/30 overflow-hidden',
-          'focus-within:ring-1 focus-within:ring-ring/40',
+          'rounded-2xl bg-background/50 overflow-hidden',
+          'focus-within:ring-1 focus-within:ring-ring/30',
           'transition-shadow',
-          'border border-border',
+          'border border-border/60',
           isDragOver && 'ring-2 ring-primary border-primary'
         )}
       >

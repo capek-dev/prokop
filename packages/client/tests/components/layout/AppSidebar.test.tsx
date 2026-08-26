@@ -46,7 +46,7 @@ describe('AppSidebar', () => {
     const divider = getByRole('separator', { name: 'Resize Sessions' });
     expect(divider).toHaveAttribute('aria-valuenow', '256');
     expect(divider).toHaveAttribute('data-slot', 'desktop-panel-divider');
-    expect(divider).toHaveClass('relative', 'w-1', 'shrink-0', 'bg-border');
+    expect(divider).toHaveClass('relative', 'w-3', 'shrink-0', 'bg-transparent');
     expect(container.querySelector('[data-slot="sidebar"]')).not.toBeInTheDocument();
     expect(container.querySelector('[data-slot="sidebar-container"]')).not.toBeInTheDocument();
     expect(

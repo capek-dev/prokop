@@ -549,7 +549,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
   if (!workspaceId || !workspacePath) {
     return (
-      <div className="flex items-center justify-center h-[300px] border-t border-border bg-background text-muted-foreground text-sm">
+      <div className="flex items-center justify-center h-[300px] bg-sidebar text-muted-foreground text-sm">
         Select a workspace to use the terminal.
       </div>
     );
@@ -577,7 +577,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           className={cn(
             'group flex items-center gap-1.5 px-2 py-1 text-xs cursor-pointer rounded-sm whitespace-nowrap border border-transparent',
             tab.serverSessionId === activeTabServerId
-              ? 'bg-accent text-accent-foreground border-border'
+              ? 'bg-muted text-foreground'
               : 'text-muted-foreground hover:bg-muted'
           )}
           onClick={() => selectTerminalTab(tab.serverSessionId)}
@@ -628,7 +628,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     return (
       <>
         {/* Single header bar — toggles both directions */}
-        <div className="flex items-center gap-2 border-t border-border bg-background px-3 py-1 shrink-0">
+        <div className="flex items-center gap-2 bg-sidebar px-3 py-1 shrink-0">
           <button
             onClick={() => isOpen ? onClose() : onOpen()}
             className="flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
@@ -650,7 +650,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <SheetContent
               side="top"
-              className="p-0 bg-background [&>button]:hidden flex flex-col"
+              className="p-0 bg-sidebar [&>button]:hidden flex flex-col"
               style={{ height: sheetHeight }}
             >
               <SheetHeader className="sr-only">
@@ -666,9 +666,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   }
 
   return (
-    <div data-terminal-panel="">
+    <div data-terminal-panel="" className="md:rounded-xl md:border md:border-border/50 md:overflow-hidden">
       {/* Single header bar — toggles both directions, tabs inline when expanded */}
-      <div className="flex items-center gap-1 border-t border-border bg-background px-2 py-1 shrink-0">
+      <div className="flex items-center gap-1 bg-sidebar px-2 py-1 shrink-0">
         <TerminalIcon className="w-3 h-3 text-muted-foreground flex-shrink-0" />
         {isOpen ? (
           <div className="flex items-center gap-0.5 overflow-x-auto flex-1 min-h-0">
@@ -678,7 +678,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                 className={cn(
                   'group flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer rounded-sm whitespace-nowrap border border-transparent',
                   tab.serverSessionId === activeTabServerId
-                    ? 'bg-accent text-accent-foreground border-border'
+                    ? 'bg-muted text-foreground'
                     : 'text-muted-foreground hover:bg-muted'
                 )}
                 onClick={() => selectTerminalTab(tab.serverSessionId)}
@@ -720,7 +720,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       {isOpen && (
         <>
           <div
-            className="w-full touch-none cursor-ns-resize flex items-center justify-center border-t border-border bg-background select-none shrink-0"
+            className="w-full touch-none cursor-ns-resize flex items-center justify-center bg-sidebar select-none shrink-0"
             style={{ height: 4 }}
             onPointerDown={handleResizeStart}
           >
@@ -728,7 +728,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           </div>
           <div
             ref={panelBodyRef}
-            className="flex flex-col border-t border-border bg-background overflow-hidden shrink-0"
+            className="flex flex-col bg-sidebar overflow-hidden shrink-0"
             style={{ height: panelHeight }}
           >
             {renderTerminalContent()}

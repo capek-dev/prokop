@@ -1,17 +1,17 @@
 import { useMemo } from 'react';
-import { useServerDataStore } from '@/stores/serverDataStore';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ChatHeader } from '@/components/chat/ChatHeader';
 import { useSessionCommands } from '@/contexts/SessionCommandsContext';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useConnectionStore } from '@/stores/connectionStore';
+import { useServerDataStore } from '@/stores/serverDataStore';
 import { getWorkspacePreconfigs } from '@/lib/workspacePreconfigs';
-import {
-  SessionsVisibilityButton,
-  WorkbenchVisibilityButton,
-} from '@/components/app/WorkspaceBar';
 
+/**
+ * Slim per-session header inside the primary card. Shell-level panel toggles
+ * live in the global AppHeader title bar.
+ */
 export function WorkspaceHeader() {
   const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
   const allPreconfigs = useServerDataStore(s => s.preconfigs);
@@ -74,11 +74,9 @@ export function WorkspaceHeader() {
     <TooltipProvider delayDuration={300}>
       <div
         data-slot="primary-dock-header"
-        className="flex h-10 shrink-0 items-stretch border-b border-border bg-card"
+        className="flex h-10 shrink-0 items-stretch"
       >
-        <SessionsVisibilityButton />
         <div className="flex min-w-0 flex-1 items-center px-2">
-
           {hasSession && currentSession && (
             <ChatHeader
               session={currentSession}
@@ -106,8 +104,6 @@ export function WorkspaceHeader() {
             />
           )}
         </div>
-
-        <WorkbenchVisibilityButton />
       </div>
     </TooltipProvider>
   );

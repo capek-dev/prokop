@@ -21,7 +21,7 @@ describe('DesktopPanelDivider', () => {
     expect(divider).toHaveAttribute('aria-valuemin', '220');
     expect(divider).toHaveAttribute('aria-valuemax', '720');
     expect(divider).toHaveAttribute('aria-valuenow', '320');
-    expect(divider).toHaveClass('relative', 'w-px', 'shrink-0', 'touch-none', 'bg-border');
+    expect(divider).toHaveClass('relative', 'w-3', 'shrink-0', 'bg-transparent');
     expect(divider).toHaveClass(
       'after:absolute',
       'after:inset-y-0',

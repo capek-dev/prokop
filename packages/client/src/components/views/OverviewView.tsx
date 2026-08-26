@@ -3,7 +3,6 @@ import { useViewRefs } from '@/contexts/ViewRefsContext';
 import { useSessionManager } from '@/contexts/SessionManagerContext';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { WorkspaceHeader } from '@/components/app/WorkspaceHeader';
-import { WorkspaceBoardToolbar } from '@/components/app/WorkspaceBoardToolbar';
 import { AppPanels } from '@/components/app/AppPanels';
 import { useSidebarData } from '@/hooks/useSidebarData';
 import { useOverviewSessions } from '@/hooks/useOverviewSessions';
@@ -153,11 +152,7 @@ export default function OverviewView() {
       )}
       content={(
         <WorkspaceContentArea
-          primaryHeader={showBoardToolbar ? (
-            <WorkspaceBoardToolbar showWorkspaceContext />
-          ) : (
-            <WorkspaceHeader />
-          )}
+          primaryHeader={showBoardToolbar ? null : <WorkspaceHeader />}
           sdkClient={sessionManager.sdkClient}
           serverUrl={sessionManager.serverUrl}
           sessionsContent={sidebarContent}

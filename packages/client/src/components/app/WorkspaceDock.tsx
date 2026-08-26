@@ -19,7 +19,7 @@ export function WorkspaceDock({
     <main className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
       <div
         data-slot="workspace-dock"
-        className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden border-t border-border bg-background"
+        className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden bg-background md:p-2 md:pt-1.5"
       >
         <div
           data-slot="workspace-dock-row"
@@ -28,7 +28,7 @@ export function WorkspaceDock({
           {sessions}
           <div
             data-slot="workspace-primary-dock"
-            className="flex min-h-0 min-w-0 flex-1 flex-col"
+            className="flex min-h-0 min-w-0 flex-1 flex-col md:gap-2"
           >
             {content}
             {panels}

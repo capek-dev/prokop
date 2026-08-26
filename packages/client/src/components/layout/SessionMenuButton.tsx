@@ -1,10 +1,9 @@
-import { ChevronRight, MoreHorizontal, RotateCcw, Trash2, X, Loader2, CheckCircle, XCircle, Pause, AlertTriangle, Pencil, CheckSquare, Square, Tag, Plus, XIcon, Sparkles, Columns2 } from 'lucide-react';
+import { ChevronRight, MoreHorizontal, RotateCcw, Trash2, X, Loader2, Pencil, CheckSquare, Square, Tag, Plus, XIcon, Sparkles, Columns2 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import React from 'react';
 import type { Session } from '@prokopai/sdk';
 import {
   SidebarMenuItem,
-  SidebarMenuButton,
   SidebarMenuAction,
   SidebarMenuSub,
 } from '@/components/ui/sidebar';
@@ -131,7 +130,7 @@ const SessionActionsDropdown = React.memo(function SessionActionsDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <SidebarMenuAction showOnHover>
+        <SidebarMenuAction showOnHover className="top-1/2 -translate-y-1/2">
           <MoreHorizontal className="size-4" />
           <span className="sr-only">Session actions</span>
         </SidebarMenuAction>
@@ -255,30 +254,38 @@ const SessionActionsDropdown = React.memo(function SessionActionsDropdown({
   );
 });
 
-const SessionStatusIcon = React.memo(function SessionStatusIcon({
-  status,
-  isStreaming,
-  runningAt,
-}: {
-  status?: 'running' | 'completed' | 'error' | 'interrupted' | null;
-  isStreaming?: boolean;
-  runningAt?: string | null;
-}) {
-  const isRunning = isStreaming || status === 'running' || !!runningAt;
-  if (isRunning) {
-    return <Loader2 className="size-3.5 animate-spin shrink-0" />;
-  }
+type SessionDotState = 'running' | 'error' | 'interrupted' | 'warning' | 'idle';
 
-  if (status === 'error') {
-    return <XCircle className="size-3.5 shrink-0" />;
-  }
-
-  if (status === 'interrupted') {
-    return <Pause className="size-3.5 shrink-0" />;
-  }
-
-  return <CheckCircle className="size-3.5 shrink-0" />;
+const SessionStatusDot = React.memo(function SessionStatusDot({ state }: { state: SessionDotState }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'size-1.5 shrink-0 rounded-full',
+        state === 'running' && 'animate-pulse bg-primary',
+        state === 'error' && 'bg-destructive',
+        state === 'interrupted' && 'bg-muted-foreground/50',
+        state === 'warning' && 'animate-pulse bg-warning',
+        state === 'idle' && 'bg-muted-foreground/25',
+      )}
+    />
+  );
 });
+
+function relativeSessionTime(iso?: string | null): string | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (Number.isFinite(then) === false) return null;
+  const diffMs = Date.now() - then;
+  if (diffMs < 60_000) return 'now';
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d`;
+  return `${Math.floor(days / 30)}mo`;
+}
 
 export const SessionMenuButton = React.memo(function SessionMenuButton({
   session,
@@ -423,6 +430,41 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
     }
   };
 
+  const handleRowKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleRowClick();
+    }
+  };
+
+  // A pending permission request blocks the run and needs a decision, so it
+  // outranks the generic running state and bubbles up from subagent children.
+  const needsApproval = derived.hasPendingPermission || hasPendingPermissionInSubtree;
+
+  const statusState: SessionDotState = needsApproval
+    ? 'warning'
+    : derived.isRunning
+      ? 'running'
+      : session.subagentStatus === 'error'
+        ? 'error'
+        : session.subagentStatus === 'interrupted'
+          ? 'interrupted'
+          : 'idle';
+
+  const metaParts: React.ReactNode[] = [];
+  if (needsApproval) metaParts.push(
+    <span key="status" className="rounded-full bg-warning/15 px-1.5 py-0.5 font-medium text-warning">
+      Needs approval
+    </span>
+  );
+  else if (derived.isRunning) metaParts.push(<span key="status" className="text-primary">Running</span>);
+  else if (session.subagentStatus === 'error') metaParts.push(<span key="status" className="text-destructive">Errored</span>);
+  else if (session.subagentStatus === 'interrupted') metaParts.push(<span key="status">Interrupted</span>);
+  for (const tag of session.tags?.slice(0, 2) ?? []) metaParts.push(<span key={`tag-${tag}`}>#{tag}</span>);
+  if (childSessions.length > 0) metaParts.push(<span key="runs">{childSessions.length} {childSessions.length === 1 ? 'run' : 'runs'}</span>);
+  const timeLabel = relativeSessionTime(session.updatedAt ?? session.createdAt);
+  if (timeLabel) metaParts.push(<span key="time" className="tabular-nums opacity-70">{timeLabel}</span>);
+
   const rowClassName = cn(
     selected && selectionMode && 'bg-accent/50',
     selectionMode && 'cursor-pointer',
@@ -433,25 +475,9 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
       <TooltipProvider delayDuration={300}>
         <SidebarMenuItem>
           <div
-            className={cn('flex items-center w-full', rowClassName)}
+            className={cn('flex w-full items-center rounded-md', rowClassName, highlightClass)}
             onClick={selectionMode ? handleRowClick : undefined}
           >
-            {selectionMode ? (
-              <button
-                className="shrink-0 size-7 p-1 flex items-center justify-center hover:bg-accent/70 rounded-md transition-colors"
-                onClick={handleCheckboxClick}
-                aria-label={selected ? 'Deselect session' : 'Select session'}
-              >
-                {selected ? (
-                  <CheckSquare className="size-4 text-primary" />
-                ) : (
-                  <Square className="size-4 text-muted-foreground" />
-                )}
-              </button>
-            ) : (
-              <div className="shrink-0 size-7 p-1" />
-            )}
-
             {isEditing ? (
               <input
                 ref={inputRef}
@@ -465,30 +491,57 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
                 className="flex-1 min-w-0 h-8 px-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
               />
             ) : (
-              <SidebarMenuButton
+              <div
+                role="button"
+                tabIndex={0}
+                data-sidebar="menu-button"
                 data-session-id={session.id}
-                isActive={isActive}
-                onClick={selectionMode ? undefined : handleRowClick}
-                className={cn('flex-1 min-w-0', highlightClass)}
+                data-active={isActive}
+                onClick={handleRowClick}
+                onKeyDown={handleRowKeyDown}
+                className={cn(
+                  'peer/menu-button group/row flex min-w-0 flex-1 cursor-pointer flex-col gap-1 rounded-md px-2 py-1.5 text-left outline-none transition-colors',
+                  'hover:bg-sidebar-accent/60 focus-visible:ring-1 focus-visible:ring-ring',
+                  isActive && 'bg-primary/10 hover:bg-primary/15',
+                )}
               >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="truncate flex items-center gap-2">
-                      <SessionStatusIcon status={session.subagentStatus} isStreaming={isActive ? derived.isStreaming : false} runningAt={session.runningAt} />
-                      {derived.hasPendingPermission && <AlertTriangle className="size-3 text-warning shrink-0 animate-pulse" />}
-                      {session.title || 'Untitled'}
-                      {(session.tags?.length ?? 0) > 0 && (
-                        <span className="text-[10px] px-1.5 py-0 rounded-full bg-primary/10 text-primary shrink-0">
-                          {session.tags![0]}
-                        </span>
+                <div className="flex min-w-0 items-center gap-2">
+                  {selectionMode ? (
+                    <button
+                      type="button"
+                      className="flex size-4 shrink-0 items-center justify-center rounded transition-colors hover:bg-accent/70"
+                      onClick={handleCheckboxClick}
+                      aria-label={selected ? 'Deselect session' : 'Select session'}
+                    >
+                      {selected ? (
+                        <CheckSquare className="size-4 text-primary" />
+                      ) : (
+                        <Square className="size-4 text-muted-foreground" />
                       )}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-xs">
-                    {session.title || 'Untitled'}
-                  </TooltipContent>
-                </Tooltip>
-              </SidebarMenuButton>
+                    </button>
+                  ) : (
+                    <SessionStatusDot state={statusState} />
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        {session.title || 'Untitled'}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                      {session.title || 'Untitled'}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="flex min-w-0 items-center gap-1.5 pl-3.5 text-[10px] leading-none text-muted-foreground/80">
+                  {metaParts.map((part, index) => (
+                    <React.Fragment key={index}>
+                      {index > 0 && <span className="text-muted-foreground/40">·</span>}
+                      {part}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
             )}
 
             <SessionActionsDropdown
@@ -521,32 +574,9 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
       >
         <SidebarMenuItem>
           <div
-            className={cn('flex items-center w-full', rowClassName)}
+            className={cn('flex w-full items-center rounded-md', rowClassName, highlightClass)}
             onClick={selectionMode ? handleRowClick : undefined}
           >
-            {selectionMode ? (
-              <button
-                className="shrink-0 size-7 p-1 flex items-center justify-center hover:bg-accent/70 rounded-md transition-colors"
-                onClick={handleCheckboxClick}
-                aria-label={selected ? 'Deselect session' : 'Select session'}
-              >
-                {selected ? (
-                  <CheckSquare className="size-4 text-primary" />
-                ) : (
-                  <Square className="size-4 text-muted-foreground" />
-                )}
-              </button>
-            ) : (
-              <CollapsibleTrigger asChild>
-                <button
-                  className="flex items-center justify-center rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground shrink-0 size-7 p-1"
-                  aria-label="Toggle child sessions"
-                >
-                  <ChevronRight className="size-4 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
-                </button>
-              </CollapsibleTrigger>
-            )}
-
             {isEditing ? (
               <input
                 ref={inputRef}
@@ -560,30 +590,69 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
                 className="flex-1 min-w-0 h-8 px-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
               />
             ) : (
-              <SidebarMenuButton
+              <div
+                role="button"
+                tabIndex={0}
+                data-sidebar="menu-button"
                 data-session-id={session.id}
-                isActive={isActive}
-                onClick={selectionMode ? undefined : handleRowClick}
-                className={cn('flex-1 min-w-0', highlightClass)}
+                data-active={isActive}
+                onClick={handleRowClick}
+                onKeyDown={handleRowKeyDown}
+                className={cn(
+                  'peer/menu-button group/row relative flex min-w-0 flex-1 cursor-pointer flex-col gap-1 rounded-md px-2 py-1.5 text-left outline-none transition-colors',
+                  'hover:bg-sidebar-accent/60 focus-visible:ring-1 focus-visible:ring-ring',
+                  isActive && 'bg-primary/10 hover:bg-primary/15',
+                )}
               >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="truncate flex items-center gap-2">
-                      <SessionStatusIcon status={session.subagentStatus} isStreaming={isActive ? derived.isStreaming : false} runningAt={session.runningAt} />
-                      {derived.hasPendingPermission && <AlertTriangle className="size-3 text-warning shrink-0 animate-pulse" />}
-                      {session.title || 'Untitled'}
-                      {(session.tags?.length ?? 0) > 0 && (
-                        <span className="text-[10px] px-1.5 py-0 rounded-full bg-primary/10 text-primary shrink-0">
-                          {session.tags![0]}
-                        </span>
+                <div className="flex min-w-0 items-center gap-2 pr-14">
+                  {selectionMode ? (
+                    <button
+                      type="button"
+                      className="flex size-4 shrink-0 items-center justify-center rounded transition-colors hover:bg-accent/70"
+                      onClick={handleCheckboxClick}
+                      aria-label={selected ? 'Deselect session' : 'Select session'}
+                    >
+                      {selected ? (
+                        <CheckSquare className="size-4 text-primary" />
+                      ) : (
+                        <Square className="size-4 text-muted-foreground" />
                       )}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-xs">
-                    {session.title || 'Untitled'}
-                  </TooltipContent>
-                </Tooltip>
-              </SidebarMenuButton>
+                    </button>
+                  ) : (
+                    <SessionStatusDot state={statusState} />
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        {session.title || 'Untitled'}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs">
+                      {session.title || 'Untitled'}
+                    </TooltipContent>
+                  </Tooltip>
+                  {!selectionMode && (
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className="absolute top-1/2 right-7 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        aria-label="Toggle subagent runs"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ChevronRight className="size-3.5 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
+                      </button>
+                    </CollapsibleTrigger>
+                  )}
+                </div>
+                <div className="flex min-w-0 items-center gap-1.5 pl-3.5 text-[10px] leading-none text-muted-foreground/80">
+                  {metaParts.map((part, index) => (
+                    <React.Fragment key={index}>
+                      {index > 0 && <span className="text-muted-foreground/40">·</span>}
+                      {part}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
             )}
 
             <SessionActionsDropdown

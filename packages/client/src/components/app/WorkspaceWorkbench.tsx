@@ -48,11 +48,11 @@ export function WorkspaceWorkbench({
 
   return (
     <section
-      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-background"
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-sidebar md:rounded-xl md:border md:border-border/50"
       aria-label="Workspace workbench"
       data-workspace-workbench
     >
-      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border bg-muted/30 px-1" role="tablist">
+      <div className="flex h-10 shrink-0 items-center gap-1 px-1" role="tablist">
         {mobile && (
           <Button
             type="button"
@@ -64,55 +64,66 @@ export function WorkspaceWorkbench({
             <ArrowLeft className="size-4" />
           </Button>
         )}
-        <Button
-          type="button"
-          role="tab"
-          aria-selected={activeSurface === 'explorer'}
-          variant={activeSurface === 'explorer' ? 'secondary' : 'ghost'}
-          size="sm"
-          className="h-7"
-          onClick={() => {
-            setFilesPanelTab('project');
-            setSurface('explorer');
-            if (mobile) setMobileSurface('files');
-          }}
-        >
-          <FolderTree className="size-3.5" />
-          Explorer
-        </Button>
-        <Button
-          type="button"
-          role="tab"
-          aria-selected={activeSurface === 'changes'}
-          variant={activeSurface === 'changes' ? 'secondary' : 'ghost'}
-          size="sm"
-          className="h-7"
-          onClick={() => {
-            setFilesPanelTab('changes');
-            setSurface('changes');
-            if (mobile) setMobileSurface('files');
-          }}
-        >
-          <GitBranch className="size-3.5" />
-          Changes
-        </Button>
-        {hasEditorDocs && (
-          <Button
+        <div className="flex items-center rounded-lg bg-muted p-0.5">
+          <button
             type="button"
             role="tab"
-            aria-selected={activeSurface === 'editor'}
-            variant={activeSurface === 'editor' ? 'secondary' : 'ghost'}
-            size="sm"
-            className="h-7"
+            aria-selected={activeSurface === 'explorer'}
             onClick={() => {
-              setSurface('editor');
-              if (mobile) setMobileSurface('editor');
+              setFilesPanelTab('project');
+              setSurface('explorer');
+              if (mobile) setMobileSurface('files');
             }}
+            className={cn(
+              'flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',
+              activeSurface === 'explorer'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
           >
-            <Code2 className="size-3.5" />
-            Editor
-          </Button>
-        )}
+            <FolderTree className="size-3.5" />
+            Explorer
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeSurface === 'changes'}
+            onClick={() => {
+              setFilesPanelTab('changes');
+              setSurface('changes');
+              if (mobile) setMobileSurface('files');
+            }}
+            className={cn(
+              'flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',
+              activeSurface === 'changes'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <GitBranch className="size-3.5" />
+            Changes
+          </button>
+          {hasEditorDocs && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeSurface === 'editor'}
+              onClick={() => {
+                setSurface('editor');
+                if (mobile) setMobileSurface('editor');
+              }}
+              className={cn(
+                'flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',
+                activeSurface === 'editor'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Code2 className="size-3.5" />
+              Editor
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">

@@ -931,7 +931,7 @@ export function VirtualizedTranscript({
   const renderItem = useCallback(({ item }: { item: DisplayItem }) => (
     <div
       className={cn(
-        'px-4 py-4',
+        'mx-auto w-full max-w-3xl px-4 py-4',
         item.message.id === targetMessageId && 'rounded-lg ring-2 ring-primary/40 bg-primary/5',
       )}
     >

@@ -317,7 +317,7 @@ export function ChatView({
       )}
 
       {session.status === 'active' && !session.parentId && isObserver && (
-        <div className="border-t border-border bg-muted/30 px-4 py-3 flex items-center justify-center gap-3">
+        <div className="bg-muted/40 px-4 py-3 flex items-center justify-center gap-3">
           <Eye className="size-4 text-muted-foreground shrink-0" />
           <span className="text-sm text-muted-foreground text-center">
             You are viewing this session. Another client is in control.
@@ -337,7 +337,7 @@ export function ChatView({
       )}
 
       {session.parentId && (
-        <div className="p-4 border-t border-border bg-muted/50 text-center flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        <div className="p-4 bg-muted/50 text-center flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <Lock className="size-4" />
           This is a subagent session (read-only)
         </div>

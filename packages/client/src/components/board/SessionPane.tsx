@@ -35,6 +35,8 @@ export interface SessionPaneProps {
   isCompact: boolean;
   showPaneChrome: boolean;
   onRemoveFromBoard?: (sessionId: string) => void;
+  onCloseOthers?: () => void;
+  onCloseAll?: () => void;
   dragAttributes?: DraggableAttributes;
   dragListeners?: DraggableSyntheticListeners;
   setDragActivatorNode?: (element: HTMLButtonElement | null) => void;
@@ -48,6 +50,8 @@ export function SessionPane({
   isCompact: _isCompact,
   showPaneChrome,
   onRemoveFromBoard,
+  onCloseOthers,
+  onCloseAll,
   dragAttributes,
   dragListeners,
   setDragActivatorNode,
@@ -239,16 +243,19 @@ export function SessionPane({
 
   return (
     <div
-      className={`flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden border transition-colors ${
+      className={`flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden md:rounded-lg ${
         isFocused
-          ? 'border-primary/40 ring-1 ring-primary/20'
-          : 'border-border'
+          ? 'bg-card ring-1 ring-primary/50'
+          : 'bg-background/50'
       }`}
       onMouseDown={handleFocusPane}
     >
       <SessionPaneHeader
         sessionId={sessionId}
+        isFocused={isFocused}
         onRemove={handleRemove}
+        onCloseOthers={onCloseOthers}
+        onCloseAll={onCloseAll}
         dragAttributes={dragAttributes}
         dragListeners={dragListeners}
         setDragActivatorNode={setDragActivatorNode}

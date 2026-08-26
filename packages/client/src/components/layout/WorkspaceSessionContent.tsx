@@ -12,7 +12,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -199,19 +198,22 @@ export function WorkspaceSessionContent({
   const hasTags = orderedTagNames.length > 0;
   const ungroupedSessions = tagGroups.get('__ungrouped__') ?? [];
 
+  // Micro-label + muted tabular count instead of badge chips and dividers.
+  const renderCount = (count: number) => (
+    <span className="text-[10px] tabular-nums text-muted-foreground/70">{count}</span>
+  );
+
   const renderActiveSection = () => (
     <Collapsible defaultOpen className="group/collapsible">
       <SidebarGroup>
         <SidebarGroupLabel asChild>
           <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between w-full">
-              <span className="flex items-center gap-2">
-                <ChevronRight className="size-3 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                Active
-              </span>
-              <div className="flex items-center gap-2">
+            <div className="group/head flex w-full items-center gap-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <ChevronRight className="size-3 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+              <span>Active</span>
+              {renderCount(activeSessions.length)}
               {selectionMode && (
-                <span className="text-xs text-muted-foreground">
+                <span className="ml-2 normal-case tracking-normal text-muted-foreground">
                   {selectedIds.size > 0 ? (
                     <button
                       type="button"
@@ -241,33 +243,35 @@ export function WorkspaceSessionContent({
                   )}
                 </span>
               )}
-              <Badge variant="secondary">{activeSessions.length}</Badge>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={e => e.stopPropagation()}
-                    className="p-1 rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
-                    title="Session actions"
-                  >
-                    <MoreHorizontal className="size-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-48">
-                  {selectionMode ? (
-                    <DropdownMenuItem onClick={e => { e.stopPropagation(); handleCancel(); }}>
-                      <X className="size-4" />
-                      Cancel selection
-                    </DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem onClick={e => { e.stopPropagation(); toggleSelectionMode(); }}>
-                      <CheckSquare className="size-4" />
-                      Select to archive
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+              <span className="flex-1" />
+              <span className="flex items-center opacity-0 transition-opacity group-hover/head:opacity-100">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={e => e.stopPropagation()}
+                      className="flex size-5 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      title="Session actions"
+                      aria-label="Session actions"
+                    >
+                      <MoreHorizontal className="size-3.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-48">
+                    {selectionMode ? (
+                      <DropdownMenuItem onClick={e => { e.stopPropagation(); handleCancel(); }}>
+                        <X className="size-4" />
+                        Cancel selection
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem onClick={e => { e.stopPropagation(); toggleSelectionMode(); }}>
+                        <CheckSquare className="size-4" />
+                        Select to archive
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </span>
             </div>
           </CollapsibleTrigger>
         </SidebarGroupLabel>
@@ -279,33 +283,37 @@ export function WorkspaceSessionContent({
                   const sessions = tagGroups.get(tagName) ?? [];
                   return (
                     <Collapsible key={tagName} open={isTagOpen(tagName)} onOpenChange={(open) => toggleTag(tagName, open)} className="group/tag-collapsible">
-                      <div className="flex items-center px-2 py-1 text-xs font-medium text-muted-foreground">
+                      <div className="group/head flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-muted-foreground">
                         <CollapsibleTrigger asChild>
-                          <button className="flex items-center gap-1 hover:text-foreground transition-colors">
+                          <button className="flex items-center gap-1.5 hover:text-foreground transition-colors">
                             <ChevronRight className="size-3 transition-transform group-data-[state=open]/tag-collapsible:rotate-90" />
                             <Tag className="size-3" />
-                            {tagName}
+                            <span className="normal-case tracking-normal">{tagName}</span>
+                            {renderCount(sessions.length)}
                           </button>
                         </CollapsibleTrigger>
-                        <Badge variant="secondary" className="ml-auto text-[10px]">{sessions.length}</Badge>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              type="button"
-                              onClick={e => e.stopPropagation()}
-                              className="p-0.5 rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-opacity opacity-0 group-hover/tag-collapsible:opacity-100"
-                              title="Tag actions"
-                            >
-                              <MoreHorizontal className="size-3.5" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="min-w-48">
-                            <DropdownMenuItem onClick={e => { e.stopPropagation(); setArchiveTagDialog(tagName); }}>
-                              <Archive className="size-4" />
-                              Archive all
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <span className="flex-1" />
+                        <span className="flex items-center opacity-0 transition-opacity group-hover/head:opacity-100">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={e => e.stopPropagation()}
+                                className="flex size-5 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                title="Tag actions"
+                                aria-label="Tag actions"
+                              >
+                                <MoreHorizontal className="size-3.5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="min-w-48">
+                              <DropdownMenuItem onClick={e => { e.stopPropagation(); setArchiveTagDialog(tagName); }}>
+                                <Archive className="size-4" />
+                                Archive all
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </span>
                       </div>
                       <CollapsibleContent>
                         <SidebarMenu>
@@ -369,22 +377,22 @@ export function WorkspaceSessionContent({
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger asChild>
-                <div className="flex items-center justify-between w-full">
-                  <span className="flex items-center gap-2">
-                    <ChevronRight className="size-3 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                    Archived
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{archivedSessions.length}</Badge>
+                <div className="group/head flex w-full items-center gap-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  <ChevronRight className="size-3 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                  <span>Archived</span>
+                  {renderCount(archivedSessions.length)}
+                  <span className="flex-1" />
+                  <span className="flex items-center opacity-0 transition-opacity group-hover/head:opacity-100">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
                           onClick={e => e.stopPropagation()}
-                          className="p-1 rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                          className="flex size-5 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                           title="Archived actions"
+                          aria-label="Archived actions"
                         >
-                          <MoreHorizontal className="size-4" />
+                          <MoreHorizontal className="size-3.5" />
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="min-w-48">
@@ -397,7 +405,7 @@ export function WorkspaceSessionContent({
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  </div>
+                  </span>
                 </div>
               </CollapsibleTrigger>
             </SidebarGroupLabel>
@@ -442,8 +450,8 @@ export function WorkspaceSessionContent({
 
       {/* Bulk Action Bar */}
       {selectionMode && selectedIds.size > 0 && (
-        <div className="sticky bottom-0 bg-sidebar border-t px-2 py-1.5 flex items-center justify-between gap-2">
-          <span className="text-xs text-muted-foreground truncate min-w-0">
+        <div className="sticky bottom-0 z-10 mx-2 mb-2 flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-popover px-2.5 py-1.5 shadow-md">
+          <span className="text-xs text-muted-foreground truncate min-w-0 tabular-nums">
             {selectedIds.size} selected
           </span>
           <div className="flex items-center gap-1 shrink-0">

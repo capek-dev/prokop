@@ -30,7 +30,7 @@ export function DesktopPanelDivider({
       onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
       data-slot="desktop-panel-divider"
-      className="group/divider relative z-10 w-px shrink-0 touch-none cursor-ew-resize bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-3 after:-translate-x-1/2 after:content-['']"
+      className="group/divider relative z-10 w-3 shrink-0 touch-none cursor-ew-resize bg-transparent after:absolute after:inset-y-0 after:left-1/2 after:w-3 after:-translate-x-1/2 after:content-['']"
     >
       <div
         data-slot="desktop-panel-divider-indicator"

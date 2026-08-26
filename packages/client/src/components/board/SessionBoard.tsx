@@ -25,6 +25,7 @@ import { useSessionBoardStore, serializeOpenSessionIds } from '@/stores/sessionB
 import { useSessionStore } from '@/stores/sessionStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { SessionPane } from './SessionPane';
+import { SessionStatusDot } from './SessionStatusDot';
 import { useBoardSessionLoader } from '@/hooks/useBoardSessionLoader';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useBoardFocus } from '@/hooks/useBoardFocus';
@@ -104,6 +105,30 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
     visiblePaneCount > 1 &&
     gridColumnCount <= maxColumns;
 
+  const handleRemoveOthers = useCallback((exceptId: string) => {
+    const board = useSessionBoardStore.getState();
+    for (const id of board.openSessionIds) {
+      if (id !== exceptId) board.removeFromBoard(id);
+    }
+    const state = useSessionBoardStore.getState();
+    if (state.focusedSessionId) {
+      navigate({
+        to: `/server/$serverId${viewPath}/session/$sessionId`,
+        params: { serverId: serverId!, sessionId: state.focusedSessionId },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+    }
+  }, [navigate, serverId, viewPath]);
+
+  const handleCloseAll = useCallback(() => {
+    useSessionBoardStore.getState().clearBoard();
+    navigate({
+      to: `/server/$serverId${viewPath}`,
+      params: { serverId: serverId! },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+  }, [navigate, serverId, viewPath]);
+
   const handleRemoveFromBoard = useCallback((sessionId: string) => {
     removeFromBoard(sessionId);
     const state = useSessionBoardStore.getState();
@@ -155,7 +180,7 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
     );
   }
 
-  const renderPane = (sessionId: string, isCompact: boolean) => (
+  const renderPane = (sessionId: string, isCompact: boolean, withPaneMenu = true) => (
     <SortableSessionPane key={sessionId} sessionId={sessionId}>
       {(dragAttributes, dragListeners, setDragActivatorNode) => (
         <SessionPane
@@ -166,6 +191,8 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
           isCompact={isCompact}
           showPaneChrome={showPaneChrome}
           onRemoveFromBoard={handleRemoveFromBoard}
+          onCloseOthers={withPaneMenu && visiblePaneCount > 2 ? () => handleRemoveOthers(sessionId) : undefined}
+          onCloseAll={withPaneMenu && visiblePaneCount > 1 ? handleCloseAll : undefined}
           dragAttributes={dragAttributes}
           dragListeners={dragListeners}
           setDragActivatorNode={setDragActivatorNode}
@@ -185,7 +212,7 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
         <SortableContext items={openSessionIds} strategy={rectSortingStrategy}>
           <div
             ref={containerRef}
-            className="grid min-h-0 min-w-0 max-w-full flex-1 overflow-hidden"
+            className="grid min-h-0 min-w-0 max-w-full flex-1 gap-1.5 overflow-hidden p-1.5"
             style={{
               gridTemplateColumns: `repeat(${gridColumnCount}, minmax(0, 1fr))`,
               gridTemplateRows: `repeat(${gridRowCount}, minmax(0, 1fr))`,
@@ -216,7 +243,7 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
               focusedSessionId={focusId}
             />
           )}
-          {renderPane(focusId, true)}
+          {renderPane(focusId, true, false)}
         </div>
       </SortableContext>
     </DndContext>
@@ -246,7 +273,7 @@ function SortableSessionPane({ sessionId, children }: SortableSessionPaneProps) 
   return (
     <div
       ref={setNodeRef}
-      className="h-full min-h-0 min-w-0 max-w-full overflow-hidden"
+      className="h-full min-h-0 min-w-0 max-w-full"
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
@@ -284,7 +311,7 @@ function CompactBoardSwitcher({
   }, [agents, workspaces]);
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1 border-b border-border shrink-0 overflow-x-auto">
+    <div className="flex items-center gap-1 px-2 py-1.5 shrink-0 overflow-x-auto">
       {openSessionIds.map((sessionId) => {
         const session = sessions.find(s => s.id === sessionId);
         const isActive = sessionId === focusedSessionId;
@@ -331,10 +358,10 @@ function SortableCompactSession({
     <div
       ref={setNodeRef}
       className={cn(
-        'flex items-center rounded-md transition-colors',
+        'group/compact-tab flex h-7 shrink-0 items-center gap-1.5 rounded-md pl-1 pr-2 text-xs transition-colors',
         isActive
-          ? 'bg-primary/10 text-primary font-medium'
-          : 'text-muted-foreground hover:bg-muted',
+          ? 'bg-muted font-medium text-foreground'
+          : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
       )}
       style={{
         transform: CSS.Transform.toString(transform),
@@ -345,7 +372,7 @@ function SortableCompactSession({
       <button
         ref={setActivatorNodeRef}
         type="button"
-        className="flex size-6 shrink-0 cursor-grab touch-none items-center justify-center active:cursor-grabbing"
+        className="flex size-4 shrink-0 cursor-grab touch-none items-center justify-center opacity-0 transition-opacity group-hover/compact-tab:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
         onMouseDown={(event) => event.stopPropagation()}
         title={`Reorder ${label}`}
         aria-label={`Reorder ${label}`}
@@ -354,10 +381,11 @@ function SortableCompactSession({
       >
         <GripVertical className="size-3" />
       </button>
+      <SessionStatusDot sessionId={sessionId} />
       <button
         type="button"
         onClick={onFocus}
-        className="py-0.5 pr-2 text-xs whitespace-nowrap"
+        className="max-w-56 truncate py-0.5"
         title={label}
       >
         {label}
