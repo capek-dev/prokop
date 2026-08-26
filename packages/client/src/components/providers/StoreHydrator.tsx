@@ -53,15 +53,17 @@ export function StoreHydrator({ children }: StoreHydratorProps) {
 
     const pendingWorkspaceId = localStorage.getItem('activeWorkspaceId');
     const workspaces = data.workspaces;
+    const defaultWorkspace = workspaces.find(workspace => !workspace.settings?.isAgentHome)
+      ?? workspaces[0];
     if (pendingWorkspaceId) {
       const saved = workspaces.find(w => w.id === pendingWorkspaceId);
       if (saved) {
         useServerDataStore.getState().setActiveWorkspace(saved);
-      } else if (workspaces.length > 0) {
-        useServerDataStore.getState().setActiveWorkspace(workspaces[0]);
+      } else if (defaultWorkspace) {
+        useServerDataStore.getState().setActiveWorkspace(defaultWorkspace);
       }
-    } else if (workspaces.length > 0) {
-      useServerDataStore.getState().setActiveWorkspace(workspaces[0]);
+    } else if (defaultWorkspace) {
+      useServerDataStore.getState().setActiveWorkspace(defaultWorkspace);
     }
   }, [data, serverId]);
 

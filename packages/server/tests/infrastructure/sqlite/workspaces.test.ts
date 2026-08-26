@@ -6,6 +6,7 @@ import {
   createWorkspace,
   getWorkspace,
   listWorkspaces,
+  listAgentHomeWorkspaces,
   updateWorkspace,
   deleteWorkspace,
   countSessionsInWorkspace,
@@ -72,6 +73,25 @@ describe('workspaces store', () => {
       // Both created in same ms, so just verify both exist
       const ids = list.map(w => w.id).sort();
       expect(ids).toEqual(['ws1', 'ws2']);
+    });
+
+    test('includes agent homes in the default listing', () => {
+      createWorkspace({ id: 'ws1', name: 'First', path: '/1', isVirtual: false });
+      createWorkspace({
+        id: 'coder-home',
+        name: 'coder-home',
+        path: '/home',
+        isVirtual: true,
+        settings: { isAgentHome: true, agentId: 'coder' },
+      });
+
+      expect(listWorkspaces().map(workspace => workspace.id).sort()).toEqual([
+        'coder-home',
+        'ws1',
+      ]);
+      expect(listAgentHomeWorkspaces().map(workspace => workspace.id)).toEqual([
+        'coder-home',
+      ]);
     });
 
     test('returns empty array when no workspaces', () => {

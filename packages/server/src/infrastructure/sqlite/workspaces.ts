@@ -110,9 +110,7 @@ export function listWorkspaces(): Workspace[] {
   const db = getDatabase();
   const rows = db.query('SELECT * FROM workspaces ORDER BY created_at DESC').all() as WorkspaceRow[];
   const pathMap = batchLoadWorkspacePaths(rows.map(r => r.id));
-  return rows
-    .map(row => mapRowToWorkspace(row, pathMap.get(row.id)))
-    .filter(w => !isAgentHomeWorkspace(w.settings));
+  return rows.map(row => mapRowToWorkspace(row, pathMap.get(row.id)));
 }
 
 export function listAgentHomeWorkspaces(): Workspace[] {

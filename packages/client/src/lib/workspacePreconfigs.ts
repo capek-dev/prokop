@@ -30,6 +30,10 @@ export function getWorkspaceDefaultPreconfigId(workspace: Workspace | null, prec
   const wsDefault = workspace?.settings?.preconfigs?.defaultId;
   if (wsDefault) return wsDefault;
 
+  if (workspace?.settings?.isAgentHome && workspace.settings.agentId) {
+    return workspace.settings.agentId;
+  }
+
   const visible = getWorkspacePreconfigs(workspace, preconfigs);
   if (visible.length > 0) return visible[0].id;
 

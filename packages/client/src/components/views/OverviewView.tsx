@@ -11,6 +11,7 @@ import { useOverviewGroups } from '@/hooks/useOverviewGroups';
 import { useInvalidateWorkspaceTags } from '@/hooks/queries';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
+import { useServerDataStore } from '@/stores/serverDataStore';
 import { useBoardRouteSync } from '@/hooks/useBoardRouteSync';
 import { useFocusedSessionWorkspaceContext } from '@/hooks/useFocusedSessionWorkspaceContext';
 import { useOverviewRouteSessionLoader } from '@/hooks/useOverviewRouteSessionLoader';
@@ -23,6 +24,7 @@ export default function OverviewView() {
   const { sidebarRef, chatInputRef, terminalPanelRef } = useViewRefs();
   const updateSession = useSessionStore(s => s.updateSession);
   const invalidateWorkspaceTags = useInvalidateWorkspaceTags();
+  const agents = useServerDataStore(state => state.agents);
 
   const activeServer = sidebarData.activeServer;
 
@@ -106,6 +108,7 @@ export default function OverviewView() {
       currentSessionId={sidebarData.currentSessionId}
       workspaceIds={overviewWorkspaceIds}
       workspaces={sidebarData.workspaces}
+      agents={agents}
       activeWorkspace={sidebarData.activeWorkspace}
       isHydrated={overviewGroups.isHydrated}
       groups={overviewGroups.groups}

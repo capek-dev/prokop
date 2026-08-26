@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Workspace } from '@prokopai/sdk';
+import type { Agent, Workspace } from '@prokopai/sdk';
 import {
   Check,
   ChevronsUpDown,
@@ -40,6 +40,7 @@ interface OverviewGroupSelectorProps {
   groups: OverviewGroup[];
   activeGroup: OverviewGroup | null;
   workspaces: Workspace[];
+  agents: Agent[];
   isHydrated: boolean;
   actions: {
     selectGroup: (serverId: string, groupId: string) => void;
@@ -55,6 +56,7 @@ export function OverviewGroupSelector({
   groups,
   activeGroup,
   workspaces,
+  agents,
   isHydrated,
   actions,
 }: OverviewGroupSelectorProps) {
@@ -193,6 +195,7 @@ export function OverviewGroupSelector({
           serverId={serverId}
           groups={groups}
           workspaces={workspaces}
+          agents={agents}
           editingGroupId={
             dialogState.mode === 'edit' ? dialogState.groupId : null
           }

@@ -10,6 +10,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { OverviewGroupDialog } from '@/components/modals/OverviewGroupDialog';
 import { useOverviewGroupsStore } from '@/stores/overviewGroupsStore';
+import { useServerDataStore } from '@/stores/serverDataStore';
 import type { Workspace } from '@prokopai/sdk';
 
 interface WorkspaceGroupMembershipMenuProps {
@@ -23,6 +24,7 @@ export function WorkspaceGroupMembershipMenu({
 }: WorkspaceGroupMembershipMenuProps) {
   const document = useOverviewGroupsStore((s) => s.document);
   const actions = useOverviewGroupsStore();
+  const agents = useServerDataStore(state => state.agents);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const serverGroups = document.groups.filter((g) => g.serverId === serverId);
@@ -120,6 +122,7 @@ export function WorkspaceGroupMembershipMenu({
           serverId={serverId}
           groups={serverGroups}
           workspaces={[workspace]}
+          agents={agents}
           preselectedWorkspaceId={workspace.id}
           actions={actions}
         />

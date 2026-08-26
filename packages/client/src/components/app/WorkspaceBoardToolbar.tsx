@@ -4,6 +4,7 @@ import { useServerDataStore } from '@/stores/serverDataStore';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { getWorkspaceDisplayName } from '@/lib/workspaceKind';
 
 export interface WorkspaceBoardToolbarProps {
   /** When true, shows the focused workspace name as an indicator. */
@@ -19,6 +20,7 @@ export function WorkspaceBoardToolbar({ showWorkspaceContext }: WorkspaceBoardTo
   const showFilesPanel = useChatLayoutStore((s) => s.showFilesPanel);
   const setShowFilesPanel = useChatLayoutStore((s) => s.setShowFilesPanel);
   const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
+  const agents = useServerDataStore((s) => s.agents);
   const { toggleSidebar, state: sidebarState } = useSidebar();
 
   return (
@@ -42,8 +44,11 @@ export function WorkspaceBoardToolbar({ showWorkspaceContext }: WorkspaceBoardTo
 
         <div className="flex-1 flex items-center min-w-0 px-2">
           {showWorkspaceContext && activeWorkspace && (
-            <span className="text-xs text-muted-foreground truncate" title={activeWorkspace.name}>
-              {activeWorkspace.name}
+            <span
+              className="text-xs text-muted-foreground truncate"
+              title={getWorkspaceDisplayName(activeWorkspace, agents)}
+            >
+              {getWorkspaceDisplayName(activeWorkspace, agents)}
             </span>
           )}
         </div>

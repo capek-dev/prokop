@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import type { Workspace } from '@prokopai/sdk';
+import type { Agent, Workspace } from '@prokopai/sdk';
 import {
   Dialog,
   DialogContent,
@@ -9,12 +9,18 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { ArrowDown, ArrowUp, Box, Folder, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bot, Box, Folder, Plus, Trash2 } from 'lucide-react';
 import type { OverviewGroup } from '@/config/overviewGroupsTypes';
+import {
+  AGENT_HOME_LABEL,
+  getWorkspaceDisplayName,
+  isAgentHomeWorkspace,
+} from '@/lib/workspaceKind';
 
 interface OverviewGroupDialogProps {
   open: boolean;
@@ -23,6 +29,7 @@ interface OverviewGroupDialogProps {
   serverId: string;
   groups: OverviewGroup[];
   workspaces: Workspace[];
+  agents: Agent[];
   preselectedWorkspaceId?: string | null;
   editingGroupId?: string | null;
   actions: {
@@ -43,6 +50,7 @@ export function OverviewGroupDialog({
   serverId,
   groups,
   workspaces,
+  agents,
   preselectedWorkspaceId,
   editingGroupId,
   actions,
@@ -181,8 +189,8 @@ export function OverviewGroupDialog({
   const title = mode === 'create' ? 'Create group' : 'Manage group';
   const description =
     mode === 'create'
-      ? 'Create a group and choose the order of repositories shown in Overview.'
-      : 'Rename, choose, order, or delete repositories in this group.';
+      ? 'Create a group and choose the workspaces and agent homes shown in Overview.'
+      : 'Rename or change the workspaces and agent homes in this group.';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -213,16 +221,17 @@ export function OverviewGroupDialog({
         <Separator className="shrink-0" />
 
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain dialog-scrollbar">
-          <Label className="mb-2 block">Repositories</Label>
+          <Label className="mb-2 block">Workspaces and agent homes</Label>
           {workspaces.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
-              No workspaces available on this server.
+              No workspaces or agent homes available on this server.
             </p>
           ) : (
             <div className="space-y-1">
               {orderedWorkspaces.map((workspace) => {
                 const isSelected = selectedWorkspaceIds.includes(workspace.id);
                 const selectedIndex = visibleSelectedWorkspaceIds.indexOf(workspace.id);
+                const displayName = getWorkspaceDisplayName(workspace, agents);
                 return (
                   <div
                     key={workspace.id}
@@ -237,12 +246,19 @@ export function OverviewGroupDialog({
                       htmlFor={`overview-group-workspace-${workspace.id}`}
                       className="flex min-w-0 flex-1 cursor-pointer items-center gap-2"
                     >
-                      {workspace.isVirtual ? (
+                      {isAgentHomeWorkspace(workspace) ? (
+                        <Bot className="size-4 text-muted-foreground" />
+                      ) : workspace.isVirtual ? (
                         <Box className="size-4 text-muted-foreground" />
                       ) : (
                         <Folder className="size-4 text-muted-foreground" />
                       )}
-                      <span className="truncate text-sm">{workspace.name}</span>
+                      <span className="truncate text-sm">{displayName}</span>
+                      {isAgentHomeWorkspace(workspace) && (
+                        <Badge variant="secondary" className="shrink-0 text-[10px]">
+                          {AGENT_HOME_LABEL}
+                        </Badge>
+                      )}
                     </label>
                     {isSelected && (
                       <div className="flex shrink-0 items-center gap-1">
@@ -251,7 +267,7 @@ export function OverviewGroupDialog({
                           onClick={() => moveWorkspace(workspace.id, -1)}
                           disabled={selectedIndex === 0}
                           className="rounded p-1 hover:bg-secondary disabled:opacity-30"
-                          aria-label={`Move ${workspace.name} up`}
+                          aria-label={`Move ${displayName} up`}
                           title="Move up"
                         >
                           <ArrowUp className="size-4" />
@@ -261,7 +277,7 @@ export function OverviewGroupDialog({
                           onClick={() => moveWorkspace(workspace.id, 1)}
                           disabled={selectedIndex === visibleSelectedWorkspaceIds.length - 1}
                           className="rounded p-1 hover:bg-secondary disabled:opacity-30"
-                          aria-label={`Move ${workspace.name} down`}
+                          aria-label={`Move ${displayName} down`}
                           title="Move down"
                         >
                           <ArrowDown className="size-4" />

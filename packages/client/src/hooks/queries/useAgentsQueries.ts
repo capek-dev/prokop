@@ -11,10 +11,17 @@ export function useAgentsQuery(sdkClient: ProkopaiClient | null) {
   });
 }
 
-async function syncAgentsToStoreAndCache(sdkClient: ProkopaiClient, queryClient: ReturnType<typeof useQueryClient>) {
-  const data = await sdkClient.http.agents.list();
-  useServerDataStore.getState().updateAgents(data.agents);
-  queryClient.setQueryData(queryKeys.config.agents, data);
+async function syncAgentResourcesToStoreAndCache(
+  sdkClient: ProkopaiClient,
+  queryClient: ReturnType<typeof useQueryClient>,
+): Promise<void> {
+  const [agentsData, workspacesData] = await Promise.all([
+    sdkClient.http.agents.list(),
+    sdkClient.http.workspaces.list(),
+  ]);
+  useServerDataStore.getState().updateAgents(agentsData.agents);
+  useServerDataStore.getState().setWorkspaces(workspacesData.workspaces);
+  queryClient.setQueryData(queryKeys.config.agents, agentsData);
 }
 
 export function usePromoteAgent(sdkClient: ProkopaiClient | null) {
@@ -22,8 +29,8 @@ export function usePromoteAgent(sdkClient: ProkopaiClient | null) {
   return useMutation({
     mutationFn: (id: string) =>
       sdkClient!.http.agents.promote(id),
-    onSuccess: () => {
-      if (sdkClient) syncAgentsToStoreAndCache(sdkClient, queryClient);
+    onSuccess: async () => {
+      if (sdkClient) await syncAgentResourcesToStoreAndCache(sdkClient, queryClient);
     },
   });
 }
@@ -32,8 +39,8 @@ export function useDemoteAgent(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => sdkClient!.http.agents.delete(id),
-    onSuccess: () => {
-      if (sdkClient) syncAgentsToStoreAndCache(sdkClient, queryClient);
+    onSuccess: async () => {
+      if (sdkClient) await syncAgentResourcesToStoreAndCache(sdkClient, queryClient);
     },
   });
 }

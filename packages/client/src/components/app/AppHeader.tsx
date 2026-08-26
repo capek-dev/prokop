@@ -1,4 +1,4 @@
-import { Settings, Settings2, Ellipsis, LayoutGrid, LayoutList, Check, Bot } from 'lucide-react';
+import { Settings, Settings2, Ellipsis, LayoutGrid, LayoutList, Check } from 'lucide-react';
 import { useRouter, useParams, useLocation } from '@tanstack/react-router';
 import { isWindows } from '@/lib/platform';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,6 @@ export function AppHeader() {
   const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
   const location = useLocation();
   const isOverview = location.pathname.includes('/overview');
-  const isAgentView = location.pathname.includes('/agent');
 
   return (
     <>
@@ -52,15 +51,11 @@ export function AppHeader() {
               <DropdownMenuContent align="end" className="w-48 min-w-48">
                 <DropdownMenuItem onClick={() => router.navigate({ to: '/server/$serverId/workspace', params: { serverId: params.serverId } })}>
                   <span className="flex-1">Single workspace</span>
-                  {!isOverview && !isAgentView && <Check className="size-4" />}
+                  {!isOverview && <Check className="size-4" />}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.navigate({ to: '/server/$serverId/overview', params: { serverId: params.serverId } })}>
                   <span className="flex-1">Overview</span>
-                  {isOverview && !isAgentView && <Check className="size-4" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.navigate({ to: '/server/$serverId/agent', params: { serverId: params.serverId } })}>
-                  <span className="flex-1">Agents</span>
-                  {isAgentView && <Check className="size-4" />}
+                  {isOverview && <Check className="size-4" />}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -112,7 +107,7 @@ export function AppHeader() {
                     variant="ghost"
                     size="icon-sm"
                     onClick={() => router.navigate({ to: '/server/$serverId/workspace', params: { serverId: params.serverId } })}
-                    className={!isOverview && !isAgentView ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
+                    className={!isOverview ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
                   >
                     <LayoutList className="h-4 w-4" />
                   </Button>
@@ -124,25 +119,12 @@ export function AppHeader() {
                      variant="ghost"
                      size="icon-sm"
                      onClick={() => router.navigate({ to: '/server/$serverId/overview', params: { serverId: params.serverId } })}
-                    className={isOverview && !isAgentView ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
+                     className={isOverview ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
                    >
                      <LayoutGrid className="h-4 w-4" />
                    </Button>
                  </TooltipTrigger>
                  <TooltipContent side={isWindows() ? 'bottom' : undefined}>Overview</TooltipContent>
-               </Tooltip>
-               <Tooltip>
-                 <TooltipTrigger asChild>
-                   <Button
-                     variant="ghost"
-                     size="icon-sm"
-                     onClick={() => router.navigate({ to: '/server/$serverId/agent', params: { serverId: params.serverId } })}
-                     className={isAgentView ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
-                   >
-                     <Bot className="h-4 w-4" />
-                   </Button>
-                 </TooltipTrigger>
-                 <TooltipContent side={isWindows() ? 'bottom' : undefined}>Agents</TooltipContent>
                </Tooltip>
             <div className="w-px h-5 bg-border mx-1" />
             {activeWorkspace && (

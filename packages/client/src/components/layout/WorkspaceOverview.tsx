@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { Folder, Box, ChevronRight, Plus, Tag, Archive, MoreHorizontal, Layers } from 'lucide-react';
-import type { Session, Workspace } from '@prokopai/sdk';
+import { Bot, Folder, Box, ChevronRight, Plus, Tag, Archive, MoreHorizontal, Layers } from 'lucide-react';
+import type { Agent, Session, Workspace } from '@prokopai/sdk';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -31,6 +31,7 @@ import type { OverviewGroup } from '@/config/overviewGroupsTypes';
 import type { StoreActions } from '@/hooks/useOverviewGroups';
 import { getCreateSessionOptions } from '@/lib/sessionCreate';
 import type { CreateSessionOptions } from '@/lib/sessionCreate';
+import { getWorkspaceDisplayName, isAgentHomeWorkspace } from '@/lib/workspaceKind';
 
 interface WorkspaceOverviewProps {
   sessionsByWorkspace: Record<string, Session[]>;
@@ -43,6 +44,7 @@ interface WorkspaceOverviewProps {
   currentSessionId: string | null;
   workspaceIds: string[];
   workspaces: Workspace[];
+  agents: Agent[];
   activeWorkspace: Workspace | null;
   isHydrated: boolean;
   groups: OverviewGroup[];
@@ -76,6 +78,7 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
   currentSessionId,
   workspaceIds,
   workspaces,
+  agents,
   activeWorkspace,
   isHydrated,
   groups,
@@ -167,6 +170,7 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
               groups={groups}
               activeGroup={activeGroup}
               workspaces={workspaces}
+              agents={agents}
               isHydrated={isHydrated}
               actions={groupActions}
             />
@@ -183,6 +187,7 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
         groups={groups}
         activeGroup={activeGroup}
         workspaces={workspaces}
+        agents={agents}
         isHydrated={isHydrated}
         actions={groupActions}
       />
@@ -222,12 +227,16 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
                     <CollapsibleTrigger className="flex w-full min-w-0 items-center justify-between">
                       <span className="flex min-w-0 items-center gap-2">
                         <ChevronRight className="size-3 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                        {workspace.isVirtual ? (
+                        {isAgentHomeWorkspace(workspace) ? (
+                          <Bot className="size-3.5 shrink-0" />
+                        ) : workspace.isVirtual ? (
                           <Box className="size-3.5 shrink-0" />
                         ) : (
                           <Folder className="size-3.5 shrink-0" />
                         )}
-                        <span className={isCurrentSessionWorkspace ? 'truncate text-sidebar-foreground font-medium' : 'truncate'}>{workspace.name}</span>
+                        <span className={isCurrentSessionWorkspace ? 'truncate text-sidebar-foreground font-medium' : 'truncate'}>
+                          {getWorkspaceDisplayName(workspace, agents)}
+                        </span>
                       </span>
                       <Badge
                         variant="secondary"

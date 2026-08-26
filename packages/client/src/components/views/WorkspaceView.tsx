@@ -29,18 +29,12 @@ import {
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
 
-export interface WorkspaceViewProps {
-  /** Optional override for the sidebar header switcher. Defaults to WorkspaceSwitcher. */
-  switcher?: React.ReactNode;
-  /** Optional override for the default preconfig used by the New Chat button. */
-  defaultPreconfigId?: string;
-}
-
-export default function WorkspaceView({ switcher, defaultPreconfigId }: WorkspaceViewProps = {}) {
+export default function WorkspaceView() {
   const sessionManager = useSessionManager();
   const sidebarData = useSidebarData();
   const { sidebarRef, chatInputRef, terminalPanelRef } = useViewRefs();
   const activeWorkspace = useServerDataStore(s => s.activeWorkspace);
+  const agents = useServerDataStore(s => s.agents);
   const allPreconfigs = useServerDataStore(s => s.preconfigs);
 
   const openSessionIds = useSessionBoardStore(s => s.openSessionIds);
@@ -71,8 +65,7 @@ export default function WorkspaceView({ switcher, defaultPreconfigId }: Workspac
     isUpdatingWorkspace,
   } = sessionManager;
 
-  const newChatPreconfigId = defaultPreconfigId
-    ?? getWorkspaceDefaultPreconfigId(activeWorkspace, allPreconfigs)
+  const newChatPreconfigId = getWorkspaceDefaultPreconfigId(activeWorkspace, allPreconfigs)
     ?? primaryPreconfigs[0]?.id;
 
   const {
@@ -142,22 +135,21 @@ export default function WorkspaceView({ switcher, defaultPreconfigId }: Workspac
 
   const sidebarHeader = (
     <SidebarHeader className="p-1">
-      {switcher ?? (
-        <WorkspaceSwitcher
-          workspaces={sidebarData.workspaces}
-          activeWorkspace={sidebarData.activeWorkspace}
-          onSelectWorkspace={selectWorkspace}
-          onCreateVirtualWorkspace={handleCreateVirtualWorkspace}
-          onCreatePhysicalWorkspace={handleCreatePhysicalWorkspace}
-          onDeleteWorkspace={deleteWorkspace}
-          onRenameWorkspace={renameWorkspace}
-          onUpdateWorkspacePaths={updateWorkspacePaths}
-          sdkClient={sdkClient}
-          isCreatingWorkspace={isCreatingWorkspace}
-          deletingWorkspaceId={deletingWorkspaceId}
-          isUpdatingWorkspace={isUpdatingWorkspace}
-        />
-      )}
+      <WorkspaceSwitcher
+        workspaces={sidebarData.workspaces}
+        agents={agents}
+        activeWorkspace={sidebarData.activeWorkspace}
+        onSelectWorkspace={selectWorkspace}
+        onCreateVirtualWorkspace={handleCreateVirtualWorkspace}
+        onCreatePhysicalWorkspace={handleCreatePhysicalWorkspace}
+        onDeleteWorkspace={deleteWorkspace}
+        onRenameWorkspace={renameWorkspace}
+        onUpdateWorkspacePaths={updateWorkspacePaths}
+        sdkClient={sdkClient}
+        isCreatingWorkspace={isCreatingWorkspace}
+        deletingWorkspaceId={deletingWorkspaceId}
+        isUpdatingWorkspace={isUpdatingWorkspace}
+      />
       <div className="px-2">
         <SidebarMenu>
           <SidebarMenuItem>

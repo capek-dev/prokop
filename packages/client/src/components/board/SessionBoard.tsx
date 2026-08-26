@@ -28,6 +28,7 @@ import { SessionPane } from './SessionPane';
 import { useBoardSessionLoader } from '@/hooks/useBoardSessionLoader';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useBoardFocus } from '@/hooks/useBoardFocus';
+import { getWorkspaceDisplayName } from '@/lib/workspaceKind';
 import { cn } from '@/lib/utils';
 
 export interface SessionBoardProps {
@@ -44,9 +45,6 @@ const MAX_GRID_COLUMNS = 3;
  */
 function useViewPath(): string {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const params = useParams({ from: '/server/$serverId', strict: false } as unknown as Parameters<typeof useParams>[0]);
-  const agentId = params?.agentId as string | undefined;
-  if (agentId) return `/agent/${agentId}`;
   if (pathname.includes('/overview')) return '/overview';
   return '/workspace';
 }
@@ -271,15 +269,16 @@ function CompactBoardSwitcher({
 }) {
   const sessions = useSessionStore(s => s.sessions);
   const workspaces = useServerDataStore(s => s.workspaces);
+  const agents = useServerDataStore(s => s.agents);
   const focusBoard = useBoardFocus();
 
   const workspaceNameById = useMemo(() => {
     const map = new Map<string, string>();
-    for (const ws of workspaces) {
-      map.set(ws.id, ws.name);
+    for (const workspace of workspaces) {
+      map.set(workspace.id, getWorkspaceDisplayName(workspace, agents));
     }
     return map;
-  }, [workspaces]);
+  }, [agents, workspaces]);
 
   return (
     <div className="flex items-center gap-1 px-2 py-1 border-b border-border shrink-0 overflow-x-auto">

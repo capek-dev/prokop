@@ -1,75 +1,62 @@
 ---
 name: package-release-procedure
-description: How to trigger releases in the jean2 monorepo. Covers the 5 workflow files (release.yml for server+tools, release-electron.yml for client, publish-client.yml reusable-only, publish-sdk.yml for SDK, release-browser.yml for browser), trigger order, and the VERSION/package.json contract. Load when releasing server, client, SDK, tools, or browser extension.
+description: How to trigger server, tools, and browser releases in the Jean2 monorepo.
 ---
 
-# Package Release Procedure (jean2 monorepo)
+# Package Release Procedure
 
-How to trigger releases and how the version contract works. Verified against `.github/workflows/` as of 2026-07-20.
+## When to Use
 
-## The VERSION / package.json contract (all packages)
+Use when triggering or reviewing server, tool, or browser releases in the Jean2 monorepo.
 
-- `package.json` is the ONLY build, tag, and package version source. Always.
-- `VERSION` files (`packages/{client,server,sdk}/VERSION`, `tools/*/VERSION`) record the latest **published** version only. They are NEVER updated manually.
-- After a release publishes successfully, a bot opens an **announcement PR** that bumps the VERSION file. Merge that PR so VERSION reflects the published version.
-- Manually editing VERSION early causes the announcement step to skip ("VERSION already $V; nothing to announce").
+## Version Contract
 
-Manual version bumps touch ONLY `package.json` files. See skill `client-version-bump` for the client-specific bump procedure.
+- `package.json` is the only build, tag, and package version source.
+- `VERSION` files record the latest published version and are updated only by announcement pull requests.
+- Manual version bumps touch only the relevant `package.json` files.
+- Never bump a version unless the user explicitly asks.
 
-## The 5 release workflows
+## Release Workflows
 
-| Workflow file | What it releases | Trigger |
+| Workflow | Output | Trigger |
 |---|---|---|
-| `release.yml` (Release) | Server binary + all tools | `workflow_dispatch`: toggle `release_server` and/or `release_all_tools` |
-| `release-electron.yml` (Release Electron) | Client desktop (macOS + Windows) + NPM + VERSION PR | `workflow_dispatch`: toggle `release_client` |
-| `publish-client.yml` (Publish Client to NPM) | `@jean2/client` to NPM | **Reusable only** (`workflow_call`). Called automatically by release-electron.yml. Never triggered directly. |
-| `publish-sdk.yml` (Publish SDK to NPM) | `@jean2/sdk` to NPM + VERSION PR | `release: published` on `sdk/v*` tag, OR `workflow_dispatch` |
-| `release-browser.yml` (Release Browser Extension) | Browser extension + VERSION PR | `workflow_dispatch`: toggle `release_browser` |
+| `release.yml` | Server binaries with embedded web client, plus tools | Manual workflow dispatch |
+| `release-browser.yml` | Browser extension | Manual workflow dispatch |
 
-## Release triggers and order
+The web client is private and embedded in server binaries. There is no separate client npm publishing workflow.
 
-### Client (desktop + NPM)
-1. Trigger **Release Electron** only (branch: `main`, `release_client: true`, `force: false`).
-2. Do NOT trigger **Publish Client to NPM** separately. It is reusable-only and is called automatically by the Electron workflow after both desktop builds succeed.
-3. The workflow: creates a draft `client/v$V` release, builds macOS, builds Windows, calls publish-client (NPM), makes the release public, opens a VERSION announcement PR.
+## Procedure
 
 ### Server
-1. Bump `packages/server/package.json` version.
-2. Trigger **Release** with `release_server: true`, `release_all_tools: false`.
-3. Builds cross-platform binaries, creates `server/v$V` release, opens a VERSION announcement PR.
+
+1. Bump `packages/server/package.json` only when explicitly requested.
+2. Scan the client, including `.storybook/`, for stale workspace package aliases after package renames. Storybook mocks are typechecked by the production client build.
+3. Confirm `packages/client` builds successfully with the release command because its `dist` tree is embedded in every server binary with Bun `--asset`.
+4. Trigger `release.yml` with `release_server: true` and `release_all_tools: false`.
+5. Confirm all platform binaries build, include the client assets, and upload before the announcement job runs.
 
 ### Tools
-1. Bump each changed tool's `package.json` version (and changelog if applicable).
-2. Trigger **Release** with `release_server: false`, `release_all_tools: true`.
-3. The workflow iterates ALL tools in `tools/manifest.json`. Existing releases are skipped (idempotent). Newly bumped tools are packaged and released. One announcement PR updates all tool VERSION files.
-4. Pitfall: the workflow checks every tool in the matrix, not a selected subset. Unchanged tools are skipped but still processed.
 
-### SDK
-1. Bump `packages/sdk/package.json` version.
-2. Tag and push `sdk/v$V`, OR trigger **Publish SDK to NPM** via `workflow_dispatch`.
-3. Publishes `@jean2/sdk@$V` to NPM, syncs `src/version.ts` from package.json during build, opens a VERSION announcement PR.
+1. Bump each changed tool package only when explicitly requested.
+2. Trigger `release.yml` with `release_server: false` and `release_all_tools: true`.
+3. The matrix checks all tools and skips releases that already exist.
 
-### Browser extension
-1. Bump browser extension version (check `packages/browser/manifest.json` and any package.json).
-2. Trigger **Release Browser Extension** with `release_browser: true`.
-3. Creates `browser/v$V` release, opens a VERSION announcement PR.
+### Browser Extension
+
+1. Bump the browser manifest and package version only when explicitly requested.
+2. Trigger `release-browser.yml` with `release_browser: true`.
+3. Confirm the release assets and VERSION announcement pull request.
 
 ## Pitfalls
 
-- Never trigger `publish-client.yml` directly. It has no `workflow_dispatch` trigger on purpose.
-- Never manually edit any VERSION file.
-- `release_client` and `release_all_tools` default to `false` in their respective workflows. Server release defaults to `false` too. You must explicitly enable what you want.
-- Use `force: true` only to intentionally delete and recreate an existing release (e.g., a botched draft). It force-moves the tag.
-- For client releases, `packages/client/package.json` and `packages/client-electron/package.json` must carry the **same** version. The workflow validates this and fails on mismatch.
-- The SDK `src/version.ts` is synced from `package.json` at build time inside the publish workflow, so do not hand-edit it before a release.
+- Never manually edit a `VERSION` file before release.
+- Use `force: true` only to intentionally recreate an existing release and move its tag.
+- Do not publish `@prokopai/client` to npm. The production web client ships inside server binaries.
+- Do not publish or upload before validation passes.
+- Release jobs must build from the release tag commit, not a mutable branch tip.
 
 ## Verification
 
-After triggering, monitor the Actions tab:
-- Server/Tools: watch the **Release** workflow run. Confirm the announcement PR opens.
-- Client: watch **Release Electron**. Confirm macos, windows, publish-npm, publish-release, and announce-version jobs all succeed.
-- SDK: watch **Publish SDK to NPM**. Confirm publish + announce jobs succeed.
-- Browser: watch **Release Browser Extension**. Confirm prepare, build, and announce jobs succeed.
-
-Merge each announcement PR after the release completes so VERSION files stay in sync with published versions.
-
+- Server: verify each binary includes `dist/index.html` and JavaScript assets before upload.
+- Tools and browser: verify expected asset names and announcement jobs.
+- Merge announcement pull requests so `VERSION` files match published releases.

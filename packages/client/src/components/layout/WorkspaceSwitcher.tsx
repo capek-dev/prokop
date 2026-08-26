@@ -1,8 +1,9 @@
-import type { ProkopaiClient } from '@prokopai/sdk';
+import type { Agent, ProkopaiClient } from '@prokopai/sdk';
 import { useState, useEffect, useRef } from 'react';
-import { Check, ChevronsUpDown, Folder, Box, Plus, MoreHorizontal, Trash2, Pencil, FolderSymlink, Loader2 } from 'lucide-react';
+import { Bot, Check, ChevronsUpDown, Folder, Box, Plus, MoreHorizontal, Trash2, Pencil, FolderSymlink, Loader2 } from 'lucide-react';
 import type { Workspace } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
+import { PromoteDialog } from '@/components/agent/PromoteDialog';
 import { FolderPickerDialog } from '@/components/modals/FolderPickerDialog';
 import { WorkspaceAdditionalPathsDialog } from '@/components/modals/WorkspaceAdditionalPathsDialog';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
@@ -19,17 +20,20 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from '@/components/ui/command';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { useDemoteAgent } from '@/hooks/queries';
+import { useServerDataStore } from '@/stores/serverDataStore';
+import { getWorkspaceDisplayName, isAgentHomeWorkspace } from '@/lib/workspaceKind';
 import { cn } from '@/lib/utils';
 
 interface WorkspaceSwitcherProps {
   workspaces: Workspace[];
+  agents: Agent[];
   activeWorkspace: Workspace | null;
   onSelectWorkspace: (workspace: Workspace) => void;
   onCreateVirtualWorkspace: () => void;
@@ -45,6 +49,7 @@ interface WorkspaceSwitcherProps {
 
 export function WorkspaceSwitcher({
   workspaces,
+  agents,
   activeWorkspace,
   onSelectWorkspace,
   onCreateVirtualWorkspace,
@@ -59,11 +64,14 @@ export function WorkspaceSwitcher({
 }: WorkspaceSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const [promoteOpen, setPromoteOpen] = useState(false);
+  const [agentToDemote, setAgentToDemote] = useState<Agent | null>(null);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null);
   const [editingPathsWorkspace, setEditingPathsWorkspace] = useState<Workspace | null>(null);
   const [renamingWorkspaceId, setRenamingWorkspaceId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const demoteAgent = useDemoteAgent(sdkClient);
 
   useEffect(() => {
     if (renamingWorkspaceId && renameInputRef.current) {
@@ -101,25 +109,39 @@ export function WorkspaceSwitcher({
           className="w-full justify-between h-9"
         >
           <div className="flex items-center gap-2 overflow-hidden">
-            {activeWorkspace?.isVirtual ? (
+            {isAgentHomeWorkspace(activeWorkspace) ? (
+              <Bot className="size-4 flex-shrink-0 text-muted-foreground" />
+            ) : activeWorkspace?.isVirtual ? (
               <Box className="size-4 flex-shrink-0 text-muted-foreground" />
             ) : (
               <Folder className="size-4 flex-shrink-0 text-muted-foreground" />
             )}
             <span className="truncate">
-              {activeWorkspace?.name || 'Select workspace'}
+              {activeWorkspace
+                ? getWorkspaceDisplayName(activeWorkspace, agents)
+                : 'Select workspace'}
             </span>
           </div>
           <ChevronsUpDown className="ml-auto size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[320px] p-0 max-h-[80vh]">
-        <Command>
+      <PopoverContent className="max-h-[min(80vh,var(--radix-popover-content-available-height))] w-[320px] overflow-hidden p-0">
+        <Command className="h-auto max-h-[inherit]">
           <CommandInput placeholder="Search workspace..." />
-          <CommandList className="max-h-[50vh] overflow-y-auto">
+          <CommandList className="max-h-[min(50dvh,calc(var(--radix-popover-content-available-height)-11rem))] overflow-y-auto overscroll-contain">
             <CommandEmpty>No workspace found.</CommandEmpty>
-            <CommandGroup heading="Workspaces">
-              {workspaces.map((workspace) => (
+            {[
+              {
+                heading: 'Workspaces',
+                items: workspaces.filter(workspace => !isAgentHomeWorkspace(workspace)),
+              },
+              {
+                heading: 'Agent homes',
+                items: workspaces.filter(workspace => isAgentHomeWorkspace(workspace)),
+              },
+            ].map(group => (
+              <CommandGroup key={group.heading} heading={group.heading}>
+                {group.items.map((workspace) => (
                 <CommandItem
                   key={workspace.id}
                   showCheck={false}
@@ -153,12 +175,16 @@ export function WorkspaceSwitcher({
                       />
                     ) : (
                       <>
-                        {workspace.isVirtual ? (
+                        {isAgentHomeWorkspace(workspace) ? (
+                          <Bot className="size-4 flex-shrink-0 text-muted-foreground" />
+                        ) : workspace.isVirtual ? (
                           <Box className="size-4 flex-shrink-0 text-muted-foreground" />
                         ) : (
                           <Folder className="size-4 flex-shrink-0 text-muted-foreground" />
                         )}
-                        <span className="truncate">{workspace.name}</span>
+                        <span className="truncate">
+                          {getWorkspaceDisplayName(workspace, agents)}
+                        </span>
                       </>
                     )}
                   </div>
@@ -182,6 +208,8 @@ export function WorkspaceSwitcher({
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="min-w-48">
+                        {!isAgentHomeWorkspace(workspace) ? (
+                          <>
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
@@ -211,14 +239,34 @@ export function WorkspaceSwitcher({
                           <Trash2 className="size-4" />
                           Delete
                         </DropdownMenuItem>
+                          </>
+                        ) : (
+                          <DropdownMenuItem
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              const agentId = workspace.settings?.agentId;
+                              const agent = agents.find(candidate => candidate.id === agentId);
+                              if (agent) {
+                                setAgentToDemote(agent);
+                                setOpen(false);
+                              }
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="size-4" />
+                            Demote agent
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
-                    </DropdownMenu>
+                      </DropdownMenu>
                   </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-            <CommandSeparator />
-            <CommandGroup>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
+          </CommandList>
+          <CommandList className="max-h-none shrink-0 overflow-visible border-t">
+            <CommandGroup heading="Workspace actions">
               <CommandItem
                 disabled={isCreatingWorkspace}
                 onSelect={() => {
@@ -242,10 +290,22 @@ export function WorkspaceSwitcher({
                 Add existing folder
               </CommandItem>
             </CommandGroup>
+            <CommandGroup heading="Agent actions">
+              <CommandItem
+                onSelect={() => {
+                  setOpen(false);
+                  setPromoteOpen(true);
+                }}
+              >
+                <Bot className="size-4" data-icon="inline-start" />
+                Promote preconfig to agent
+              </CommandItem>
+            </CommandGroup>
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
+    <PromoteDialog open={promoteOpen} onOpenChange={setPromoteOpen} />
     <FolderPickerDialog
       open={showFolderPicker}
       onOpenChange={setShowFolderPicker}
@@ -264,6 +324,36 @@ export function WorkspaceSwitcher({
       onSave={onUpdateWorkspacePaths}
       sdkClient={sdkClient}
       isSaving={editingPathsWorkspace ? !!isUpdatingWorkspace[editingPathsWorkspace.id] : false}
+    />
+    <ConfirmationDialog
+      open={agentToDemote !== null}
+      onOpenChange={(open) => !open && setAgentToDemote(null)}
+      title={agentToDemote ? `Demote ${agentToDemote.name}?` : 'Demote agent?'}
+      description="This will remove the agent directory and its home workspace. Sessions created in the home workspace will be deleted. The original preconfig is preserved."
+      confirmLabel="Demote"
+      variant="destructive"
+      loading={demoteAgent.isPending}
+      onConfirm={() => {
+        if (!agentToDemote) return;
+        const removedHomeId = `${agentToDemote.id}-home`;
+        demoteAgent.mutate(agentToDemote.id, {
+          onSuccess: () => {
+            const state = useServerDataStore.getState();
+            if (state.activeWorkspace?.id === removedHomeId) {
+              const fallback = state.workspaces.find(workspace => !workspace.settings?.isAgentHome)
+                ?? state.workspaces[0]
+                ?? null;
+              state.setActiveWorkspace(fallback);
+              if (fallback) {
+                localStorage.setItem('activeWorkspaceId', fallback.id);
+              } else {
+                localStorage.removeItem('activeWorkspaceId');
+              }
+            }
+            setAgentToDemote(null);
+          },
+        });
+      }}
     />
     <ConfirmationDialog
       open={workspaceToDelete !== null}

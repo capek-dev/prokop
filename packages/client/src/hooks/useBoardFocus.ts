@@ -9,9 +9,6 @@ import { serializeOpenSessionIds } from '@/stores/sessionBoardStore';
  */
 function useViewPath(): string {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const params = useParams({ from: '/server/$serverId', strict: false } as unknown as Parameters<typeof useParams>[0]);
-  const agentId = params?.agentId as string | undefined;
-  if (agentId) return `/agent/${agentId}`;
   if (pathname.includes('/overview')) return '/overview';
   return '/workspace';
 }
