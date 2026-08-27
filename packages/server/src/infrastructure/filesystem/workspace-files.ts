@@ -93,6 +93,12 @@ export async function searchFiles(
   if (!query || query.length < 2) return [];
   if (signal?.aborted) return [];
 
+  // Bound the glob depth. The autocomplete fires a search per keystroke and
+  // aborts the previous one; fast-glob streams cannot be safely aborted
+  // mid-flight, so an unbounded `**/*q*` scan on a large workspace could run
+  // for seconds, crash the aborted request, and surface as ERR_EMPTY_RESPONSE
+  // in the client. A bounded scan completes quickly and finishes before the
+  // next keystroke's abort in practice.
   const pattern = `**/*${query}*`;
 
   const ignorePatterns = showHidden
@@ -108,6 +114,7 @@ export async function searchFiles(
       caseSensitiveMatch: false,
       dot: showHidden,
       markDirectories: true,
+      deep: 8,
     },
   );
 
