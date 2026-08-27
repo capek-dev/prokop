@@ -525,8 +525,8 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
           </div>
         )}
         {filesPanelTab === 'changes' && (
-          <>
-            <div className="relative">
+          <div className="flex items-center gap-1.5">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
               <Input
                 value={changesSearchQuery}
@@ -535,13 +535,28 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
                 className="h-7 pl-7 pr-2 text-sm"
               />
             </div>
-            <Tabs value={filesPanelGitMode} onValueChange={(v) => setFilesPanelGitMode(v as 'grouped' | 'flat')}>
-              <TabsList variant="line" className="w-full">
-                <TabsTrigger value="grouped" className="flex-1">Grouped</TabsTrigger>
-                <TabsTrigger value="flat" className="flex-1">Flat</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </>
+            <div className="flex shrink-0 items-center rounded-lg bg-muted p-0.5">
+              {([
+                ['grouped', 'Grouped'],
+                ['flat', 'Flat'],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={filesPanelGitMode === value}
+                  onClick={() => setFilesPanelGitMode(value)}
+                  className={cn(
+                    'flex h-6 items-center rounded-md px-2 text-[11px] font-medium transition-colors',
+                    filesPanelGitMode === value
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     ) : null;

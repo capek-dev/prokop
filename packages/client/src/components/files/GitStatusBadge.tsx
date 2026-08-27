@@ -16,14 +16,16 @@ const STATUS_LABELS: Record<GitFileStatus, string> = {
   ignored: 'I',
 };
 
+// Status letters use mode-aware status tokens; diff counts keep their own
+// semantic colors so additions/deletions read independently of file state.
 const STATUS_CLASSES: Record<GitFileStatus, string> = {
-  modified: 'text-yellow-500',
-  added: 'text-green-500',
-  untracked: 'text-green-500/70',
-  deleted: 'text-red-500',
-  renamed: 'text-blue-500',
-  copied: 'text-blue-500',
-  conflicted: 'text-red-600 font-semibold',
+  modified: 'text-warning',
+  added: 'text-success',
+  untracked: 'text-success/70',
+  deleted: 'text-destructive',
+  renamed: 'text-primary',
+  copied: 'text-primary',
+  conflicted: 'text-error font-semibold',
   ignored: 'text-muted-foreground/50',
 };
 
@@ -38,7 +40,8 @@ export function GitStatusBadge({ git }: GitStatusBadgeProps) {
       {label}
       {git.additions !== undefined && git.deletions !== undefined && (
         <span className="ml-1 opacity-70">
-          +{git.additions} -{git.deletions}
+          <span className="text-success/80">+{git.additions}</span>{' '}
+          <span className="text-destructive/70">−{git.deletions}</span>
         </span>
       )}
     </span>

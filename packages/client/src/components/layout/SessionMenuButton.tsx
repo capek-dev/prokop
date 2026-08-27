@@ -505,7 +505,7 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
                   isActive && 'bg-primary/10 hover:bg-primary/15',
                 )}
               >
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2 pr-7">
                   {selectionMode ? (
                     <button
                       type="button"

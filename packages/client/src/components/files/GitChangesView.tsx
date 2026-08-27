@@ -36,6 +36,49 @@ interface GitChangesViewProps {
 
 type ChangedFile = { path: string; git: GitDiffSummary };
 
+/** Summed +/- counts for a set of changed files. */
+function summarizeDiffStats(files: ChangedFile[]): { additions: number; deletions: number; hasCounts: boolean } {
+  let additions = 0;
+  let deletions = 0;
+  let hasCounts = false;
+  for (const f of files) {
+    if (f.git.additions !== undefined || f.git.deletions !== undefined) {
+      hasCounts = true;
+      additions += f.git.additions ?? 0;
+      deletions += f.git.deletions ?? 0;
+    }
+  }
+  return { additions, deletions, hasCounts };
+}
+
+/** Flatten all descendant files of a directory node. */
+function collectFiles(node: ChangedDirectoryNode): ChangedFile[] {
+  const out: ChangedFile[] = [];
+  for (const child of node.directories) {
+    out.push(...child.files, ...collectFiles(child));
+  }
+  return out;
+}
+
+/** Compact summary chip row: n files, +/- totals. */
+function ChangesSummary({ files }: { files: ChangedFile[] }) {
+  const stats = summarizeDiffStats(files);
+  return (
+    <div className="flex items-center gap-2 px-2 py-1 text-[10px] tabular-nums text-muted-foreground/70">
+      <span>
+        {files.length} {files.length === 1 ? 'file' : 'files'}
+      </span>
+      {stats.hasCounts && (
+        <>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="text-success">+{stats.additions}</span>
+          <span className="text-destructive/80">−{stats.deletions}</span>
+        </>
+      )}
+    </div>
+  );
+}
+
 // --- Tree model ---
 
 export type ChangedDirectoryNode = FilePathDirectoryNode<ChangedFile>;
@@ -69,8 +112,10 @@ function ChangedFileRow({
   const lastSlash = path.lastIndexOf('/');
   const fileName = lastSlash === -1 ? path : path.slice(lastSlash + 1);
   const dirPath = lastSlash === -1 ? '' : path.slice(0, lastSlash + 1);
+  const isDeleted = git.status === 'deleted';
 
   const handleClick = () => {
+    if (isDeleted) return;
     const extension = fileName.lastIndexOf('.') !== -1
       ? fileName.slice(fileName.lastIndexOf('.'))
       : undefined;
@@ -94,8 +139,8 @@ function ChangedFileRow({
       style={{ paddingLeft: `${depth * 12 + 8}px` }}
     >
       {showChevronSpacer && <span className="w-3 h-3 shrink-0" aria-hidden />}
-      <File className={fileIconColor(path)} />
-      <span className="truncate flex-1 min-w-0">
+      <File className={cn(fileIconColor(path), isDeleted && 'opacity-40')} />
+      <span className={cn('truncate flex-1 min-w-0', isDeleted && 'line-through opacity-60')}>
         {showDirPrefix && dirPath && <span className="text-muted-foreground">{dirPath}</span>}
         <span>{fileName}</span>
       </span>
@@ -180,6 +225,10 @@ function GroupedDirectoryNode({
   defaultExpanded: boolean;
 }) {
   const [open, setOpen] = useState(defaultExpanded);
+  const stats = useMemo(
+    () => summarizeDiffStats([...node.files, ...collectFiles(node)]),
+    [node],
+  );
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -199,7 +248,13 @@ function GroupedDirectoryNode({
           <ChevronRight className={cn('w-3 h-3 shrink-0 transition-transform', open && 'rotate-90')} />
           <Folder className={FOLDER_ICON_COLOR} />
           <span className="flex-1 min-w-0 truncate">{node.name}</span>
-          <span className="text-xs text-muted-foreground tabular-nums shrink-0">{node.fileCount}</span>
+          {stats.hasCounts && (
+            <span className="text-[11px] tabular-nums shrink-0">
+              <span className="text-success">+{stats.additions}</span>{' '}
+              <span className="text-destructive/80">−{stats.deletions}</span>
+            </span>
+          )}
+          <span className="text-[10px] tabular-nums text-muted-foreground/60 w-6 text-right shrink-0">{node.fileCount}</span>
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
@@ -298,6 +353,7 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
       <div ref={containerRef} className="flex-1 min-h-0 min-w-0 w-full outline-none" tabIndex={-1}>
         <ScrollArea className="h-full">
           <div className="px-2 pb-2 w-full min-w-0" style={width ? { width: `${width - 8}px` } : undefined}>
+            <ChangesSummary files={filteredFiles} />
             {mode === 'grouped' ? (
               <GroupedChangedFiles key={normalizedSearchQuery ? 'search' : 'browse'} files={filteredFiles} onFileSelect={onFileSelect} contextActions={contextActions} root={root} defaultExpanded={normalizedSearchQuery.length > 0} />
             ) : (
