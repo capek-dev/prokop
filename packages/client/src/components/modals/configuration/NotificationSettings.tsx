@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Bell, BellOff, AlertCircle, Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { useServerUrl } from '@/contexts/ServerClientContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { getSavedServers } from '@/config/servers';
@@ -14,29 +15,6 @@ const SUPPORT_MESSAGES: Record<NotificationSupport, string> = {
   'ios-install-required':
     'Add Prokopai to your Home Screen, then enable notifications from the installed app.',
 };
-
-function ToggleSwitch({ enabled, onClick, disabled }: {
-  enabled: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-        enabled ? 'bg-[var(--switch-checked)]' : 'bg-muted'
-      } ${disabled ? 'opacity-50' : ''}`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-          enabled ? 'translate-x-6' : 'translate-x-1'
-        }`}
-      />
-    </button>
-  );
-}
 
 export function NotificationSettings() {
   const serverUrl = useServerUrl();
@@ -157,12 +135,13 @@ export function NotificationSettings() {
                 <Bell className="size-4 text-muted-foreground" />
                 <span className="text-sm">Session completion</span>
               </div>
-              <ToggleSwitch
-                enabled={notifyCompletion}
-                onClick={() => void updatePrefs({
+              <Switch
+                checked={notifyCompletion}
+                onCheckedChange={() => void updatePrefs({
                   completion: !notifyCompletion,
                   permission: notifyPermission,
                 })}
+                aria-label="Session completion notification"
               />
             </div>
             <div className="flex items-center justify-between">
@@ -170,12 +149,13 @@ export function NotificationSettings() {
                 <Bell className="size-4 text-muted-foreground" />
                 <span className="text-sm">Permission requests</span>
               </div>
-              <ToggleSwitch
-                enabled={notifyPermission}
-                onClick={() => void updatePrefs({
+              <Switch
+                checked={notifyPermission}
+                onCheckedChange={() => void updatePrefs({
                   completion: notifyCompletion,
                   permission: !notifyPermission,
                 })}
+                aria-label="Permission request notification"
               />
             </div>
           </>
