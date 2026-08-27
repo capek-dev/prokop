@@ -58,6 +58,49 @@ describe('sessionBoardStore layout modes', () => {
     });
   });
 
+  test('reveals board when progressive hydration grows past one session', () => {
+    // Overview F5: the focused session validates first, other route `open`
+    // IDs join the store one fetch later. The second hydration pass must
+    // still reveal the board instead of keeping the focused tab layout.
+    useSessionBoardStore.getState().hydrateFromRoute(
+      'session-b',
+      ['session-b'],
+    );
+    expect(useSessionBoardStore.getState().layoutMode).toBe('focused');
+
+    useSessionBoardStore.getState().hydrateFromRoute(
+      'session-b',
+      ['session-a', 'session-b', 'session-c'],
+    );
+
+    expect(useSessionBoardStore.getState()).toMatchObject({
+      openSessionIds: ['session-a', 'session-b', 'session-c'],
+      focusedSessionId: 'session-b',
+      layoutMode: 'board',
+    });
+  });
+
+  test('restores the persisted tabs preference on route hydration', () => {
+    localStorage.setItem('prokopai_board_layout_preference', 'tabs');
+    useSessionBoardStore.getState().hydrateFromRoute(
+      'session-b',
+      ['session-a', 'session-b'],
+    );
+
+    expect(useSessionBoardStore.getState().layoutMode).toBe('tabs');
+  });
+
+  test('setLayoutMode persists multi-pane preferences but not focused', () => {
+    useSessionBoardStore.getState().setLayoutMode('tabs');
+    expect(localStorage.getItem('prokopai_board_layout_preference')).toBe('tabs');
+
+    useSessionBoardStore.getState().setLayoutMode('board');
+    expect(localStorage.getItem('prokopai_board_layout_preference')).toBe('board');
+
+    useSessionBoardStore.getState().setLayoutMode('focused');
+    expect(localStorage.getItem('prokopai_board_layout_preference')).toBe('board');
+  });
+
   test('returns to focused layout when only one session remains', () => {
     const store = useSessionBoardStore.getState();
     store.openInFocusedPane('session-a');

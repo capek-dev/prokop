@@ -1,8 +1,12 @@
 import { create } from 'zustand';
+import {
+  getBoardLayoutPreference,
+  saveBoardLayoutPreference,
+} from '@/config/boardLayoutStorage';
 
 export const MAX_PANES = 6;
 
-export type LayoutMode = 'focused' | 'board';
+export type LayoutMode = 'focused' | 'board' | 'tabs';
 
 /**
  * Intent recorded when a client-initiated session creation is pending.
@@ -39,7 +43,7 @@ export interface SessionBoardActions {
   replaceSessionId: (oldId: string, newId: string) => void;
   /** Clear all board state. */
   clearBoard: () => void;
-  /** Set layout mode. */
+  /** Set layout mode. Multi-pane modes persist the preference. */
   setLayoutMode: (mode: LayoutMode) => void;
 }
 
@@ -65,13 +69,15 @@ export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
   layoutMode: 'focused',
 
   hydrateFromRoute: (focusedSessionId, openSessionIds) => {
+    const preference = getBoardLayoutPreference('board');
     set((state) => ({
       openSessionIds,
       focusedSessionId,
-      layoutMode:
-        state.openSessionIds.length === 0 && openSessionIds.length > 1
-          ? 'board'
-          : state.layoutMode,
+      // Route hydration is progressive: the focused session validates first,
+      // remaining `open` IDs join once their data loads (overview F5 does one
+      // fetch per unknown ID). The board must reveal whenever the route ends
+      // up with multiple sessions, not only when hydration started empty.
+      layoutMode: openSessionIds.length > 1 ? preference : state.layoutMode,
     }));
   },
 
@@ -106,9 +112,10 @@ export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
 
   openAlongside: (sessionId) => {
     const state = get();
-    // If already open, focus it and reveal the board.
+    // If already open, focus it and reveal the multi-session layout.
     if (state.openSessionIds.includes(sessionId)) {
-      set({ focusedSessionId: sessionId, layoutMode: 'board' });
+      const preference = getBoardLayoutPreference('board');
+      set({ focusedSessionId: sessionId, layoutMode: preference });
       return;
     }
     // Respect pane limit
@@ -116,7 +123,7 @@ export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
     set({
       openSessionIds: [...state.openSessionIds, sessionId],
       focusedSessionId: sessionId,
-      layoutMode: 'board',
+      layoutMode: getBoardLayoutPreference('board'),
     });
   },
 
@@ -173,7 +180,12 @@ export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
 
   clearBoard: () => set({ openSessionIds: [], focusedSessionId: null, layoutMode: 'focused' }),
 
-  setLayoutMode: (layoutMode) => set({ layoutMode }),
+  setLayoutMode: (layoutMode) => {
+    if (layoutMode === 'board' || layoutMode === 'tabs') {
+      saveBoardLayoutPreference(layoutMode);
+    }
+    set({ layoutMode });
+  },
 }));
 
 // ── URL helpers ──────────────────────────────────────────────
