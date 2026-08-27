@@ -95,3 +95,8 @@ packages/client-tauri/gen/android/build/
 # Private architecture sources of truth
 .architecture-specs/
 .architecture-v2/
+
+# Local planning, study, and design documents
+docs/plans/
+docs/study/
+docs/design/

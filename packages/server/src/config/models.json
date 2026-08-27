@@ -124,6 +124,33 @@
       "name": "Z.AI (Coding Plan)",
       "models": [
         {
+          "id": "glm-5.3-flash",
+          "name": "GLM-5.3 (Flash)",
+          "contextWindow": 1000000,
+          "maxOutputTokens": 131072,
+          "tier": "standard",
+          "variants": {
+            "high": {
+              "providerOptions": {
+                "reasoningEffort": "high"
+              }
+            },
+            "max": {
+              "providerOptions": {
+                "reasoningEffort": "max"
+              }
+            }
+          },
+          "capabilities": {
+            "input": {
+              "text": true
+            },
+            "structuredOutput": {
+              "mode": "prompt"
+            }
+          }
+        },
+        {
           "id": "glm-5.3",
           "name": "GLM-5.3",
           "contextWindow": 1000000,
