@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useFileTreeFullQuery } from '@/hooks/queries/useFileTreeFullQuery';
 import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
 import { fileTreeExpandedPaths, useFileTreeStateStore } from '@/stores/fileTreeStateStore';
+import { activatePierreFileSelection } from './pierreTreeHost';
 
 /**
  * Maps our shadcn palette onto @pierre/trees' shadow-DOM custom properties.
@@ -119,14 +120,12 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       onSelectionChange: ((selectedPaths: readonly string[]) => {
         const first = selectedPaths[0];
         if (!first || !onFileSelect || !sdkClient) return;
-        // Directory rows expand/collapse through the tree itself and must
-        // never open a preview. Dirs carry the find-style trailing slash in
-        // the id; the model's own kind check covers any normalization.
-        if (first.endsWith('/') || model.getItem(first)?.isDirectory() === true) return;
         const name = first.split('/').pop() ?? first;
-        onFileSelect({
-          entry: { name, type: 'file', path: first },
-          root,
+        activatePierreFileSelection(model, first, () => {
+          onFileSelect({
+            entry: { name, type: 'file', path: first },
+            root,
+          });
         });
       }) satisfies FileTreeSelectionChangeListener,
     });

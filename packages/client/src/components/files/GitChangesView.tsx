@@ -11,7 +11,11 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
 import { useFileTreeStateStore } from '@/stores/fileTreeStateStore';
-import { PierreTreeHost, focusFocusedPierreRow } from './pierreTreeHost';
+import {
+  activatePierreFileSelection,
+  PierreTreeHost,
+  focusFocusedPierreRow,
+} from './pierreTreeHost';
 
 export interface GitChangesViewHandle {
   focus: () => void;
@@ -189,7 +193,9 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
         if (!first || !onFileSelect || !sdkClient) return;
         const target = buildSelectionTarget(files, first);
         if (!target) return;
-        onFileSelect({ ...target, root });
+        activatePierreFileSelection(model, first, () => {
+          onFileSelect({ ...target, root });
+        });
       }) satisfies FileTreeSelectionChangeListener,
     });
 

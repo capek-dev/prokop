@@ -65,6 +65,32 @@ export function PierreTreeHost({
   );
 }
 
+interface PierreSelectionItem {
+  deselect: () => void;
+  isDirectory: () => boolean;
+}
+
+interface PierreSelectionModel {
+  getItem: (path: string) => PierreSelectionItem | null;
+}
+
+/**
+ * Treat a file selection as an activation, then clear it. Pierre emits
+ * `onSelectionChange` only when selection state changes, so leaving a file
+ * selected prevents clicking that same row from opening preview again.
+ */
+export function activatePierreFileSelection(
+  model: PierreSelectionModel,
+  path: string,
+  activate: () => void,
+): boolean {
+  const item = model.getItem(path);
+  if (!item || item.isDirectory()) return false;
+  activate();
+  item.deselect();
+  return true;
+}
+
 /**
  * Real keyboard navigation needs document focus on the row element Pierre
  * marks with tabIndex != -1 (every other row gets -1). Rows may live in light
