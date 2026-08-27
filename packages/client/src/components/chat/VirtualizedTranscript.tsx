@@ -1052,7 +1052,7 @@ export function VirtualizedTranscript({
       initialScrollAtEnd={!targetMessageId && autoFollow}
       maintainScrollAtEnd={!targetMessageId && maintainAutoFollow ? { animated: false } : false}
       maintainScrollAtEndThreshold={0.1}
-      maintainVisibleContentPosition={{ data: true, size: true }}
+      maintainVisibleContentPosition={{ data: true, size: false }}
       onScroll={handleScroll}
       className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative chat-transcript-scrollbar"
       style={{ WebkitOverflowScrolling: 'touch' }}

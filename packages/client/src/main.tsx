@@ -8,13 +8,19 @@ import { PWAUpdateBanner } from '@/components/app/PWAUpdateBanner';
 import { RouterApp } from './router';
 import { registerJean2ServiceWorker } from '@/pwa/registerServiceWorker';
 import { startSessionCacheSync } from '@/lib/sessionCacheSync';
+import { isResizeObserverDeliveryWarning } from '@/lib/globalErrorHandling';
 import './index.css';
 
 // Global error handlers for debugging uncaught errors
 window.addEventListener('error', (event) => {
+  if (isResizeObserverDeliveryWarning(event)) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
   console.error('[Global] Uncaught error:', event.error || event.message);
   console.error('[Global] Error stack:', event.error?.stack);
-});
+}, { capture: true });
 window.addEventListener('unhandledrejection', (event) => {
   console.error('[Global] Unhandled rejection:', event.reason);
   console.error('[Global] Rejection stack:', event.reason?.stack);

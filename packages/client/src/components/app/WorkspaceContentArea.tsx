@@ -143,21 +143,29 @@ export function WorkspaceContentArea({
     const container = containerRef.current;
     if (!container) return;
 
+    let resizeFrame: number | null = null;
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return;
       const maximum = Math.min(
         WORKBENCH_MAX_WIDTH,
         Math.max(WORKBENCH_MIN_WIDTH, entry.contentRect.width - SESSION_MIN_WIDTH),
       );
-      setWorkbenchWidth((currentWidth) => {
-        const nextWidth = Math.min(currentWidth, maximum);
-        container.style.setProperty('--workbench-width', `${nextWidth}px`);
-        if (nextWidth !== currentWidth) saveWorkbenchWidth(nextWidth);
-        return nextWidth;
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        setWorkbenchWidth((currentWidth) => {
+          const nextWidth = Math.min(currentWidth, maximum);
+          container.style.setProperty('--workbench-width', `${nextWidth}px`);
+          if (nextWidth !== currentWidth) saveWorkbenchWidth(nextWidth);
+          return nextWidth;
+        });
       });
     });
     observer.observe(container);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
+    };
   }, [isCompact, isMobile]);
 
   const handleDividerKeyDown = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
