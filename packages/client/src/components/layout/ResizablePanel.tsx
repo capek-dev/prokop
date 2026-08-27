@@ -117,7 +117,14 @@ export const ResizablePanel = forwardRef<ResizablePanelHandle, ResizablePanelPro
             data-sidebar="sidebar"
             data-state={state}
             data-variant="shell"
-            className="relative hidden h-full shrink-0 overflow-hidden bg-sidebar text-sidebar-foreground md:flex md:flex-col md:rounded-xl md:border md:border-border/50 md:shadow-sm"
+            className={
+              'relative hidden h-full shrink-0 overflow-hidden bg-sidebar text-sidebar-foreground md:flex md:flex-col md:shadow-sm '
+              // Border only while expanded: at width 0 the 1px sides still
+              // paint as a stray vertical line next to the chat.
+              + (state === 'expanded'
+                ? 'md:rounded-xl md:border md:border-border/50'
+                : 'md:border-0')
+            }
             style={{
               width: state === 'expanded' ? 'var(--sidebar-width)' : 0,
               paddingBottom: 'env(safe-area-inset-bottom, 0px)',
