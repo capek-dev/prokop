@@ -12,9 +12,12 @@ import type {
   EditableFileResponse,
   FileEntry,
   FilePreviewResponse,
+  CreateFileResponse,
+  DeleteFileResponse,
   GitAvailability,
   GitDiffSummary,
   GitFileDiffResponse,
+  RenameFileResponse,
   SaveFileResponse,
   Workspace,
 } from '@prokopai/sdk';
@@ -58,6 +61,22 @@ export interface FilesApplication {
     workspaceId: string,
     input: { path: string; content: string; expectedRevision: string; root?: string; force?: boolean },
   ): Promise<SaveFileResponse>;
+  listTreePaths(
+    workspaceId: string,
+    input: { root?: string; showHidden?: boolean },
+  ): Promise<{ root: string; isMain: boolean; paths: string[]; truncated: boolean }>;
+  createFileEntry(
+    workspaceId: string,
+    input: { path: string; kind?: 'file' | 'directory'; root?: string; createParents?: boolean },
+  ): Promise<CreateFileResponse>;
+  renameFileEntry(
+    workspaceId: string,
+    input: { from: string; to: string; root?: string; overwrite?: boolean },
+  ): Promise<RenameFileResponse>;
+  deleteFileEntry(
+    workspaceId: string,
+    input: { path: string; root?: string; recursive?: boolean },
+  ): Promise<DeleteFileResponse>;
   /** Raw directory listing for the home-browse endpoints. */
   listDirectoryOnly(dirPath: string, showHidden?: boolean): Promise<FileEntry[]>;
   /** Expands a `~`-prefixed input through the C6 workspace path policy. */
@@ -187,6 +206,26 @@ export function createFilesApplication(port: FilesApplicationPort): FilesApplica
     saveFile(workspaceId, input) {
       const workspace = resolveWorkspace(workspaceId);
       return port.saveFile(workspace, input);
+    },
+
+    listTreePaths(workspaceId, input) {
+      const workspace = resolveWorkspace(workspaceId);
+      return port.listTreePaths(workspace, input);
+    },
+
+    createFileEntry(workspaceId, input) {
+      const workspace = resolveWorkspace(workspaceId);
+      return port.createFileEntry(workspace, input);
+    },
+
+    renameFileEntry(workspaceId, input) {
+      const workspace = resolveWorkspace(workspaceId);
+      return port.renameFileEntry(workspace, input);
+    },
+
+    deleteFileEntry(workspaceId, input) {
+      const workspace = resolveWorkspace(workspaceId);
+      return port.deleteFileEntry(workspace, input);
     },
 
     listDirectoryOnly(dirPath, showHidden) {

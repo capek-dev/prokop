@@ -16,6 +16,11 @@ import type {
   Workspace,
 } from '@prokopai/sdk';
 import type { EditableFileResponse, SaveFileResponse } from '@prokopai/sdk';
+import type {
+  CreateFileResponse,
+  DeleteFileResponse,
+  RenameFileResponse,
+} from '@prokopai/sdk';
 
 export interface EditableFileWorkspaceLike {
   path: string;
@@ -83,6 +88,30 @@ export interface FilesApplicationPort {
     workspace: EditableFileWorkspaceLike,
     input: { path: string; content: string; expectedRevision: string; root?: string; force?: boolean },
   ): Promise<SaveFileResponse>;
+
+  /** Full recursive root-relative path listing for one workspace root. */
+  listTreePaths(
+    workspace: EditableFileWorkspaceLike,
+    input: { root?: string; showHidden?: boolean },
+  ): Promise<{ root: string; isMain: boolean; paths: string[]; truncated: boolean }>;
+
+  /** Create an empty file or directory (with parent creation). */
+  createFileEntry(
+    workspace: EditableFileWorkspaceLike,
+    input: { path: string; kind?: 'file' | 'directory'; root?: string; createParents?: boolean },
+  ): Promise<CreateFileResponse>;
+
+  /** Rename or move an entry within the selected root. */
+  renameFileEntry(
+    workspace: EditableFileWorkspaceLike,
+    input: { from: string; to: string; root?: string; overwrite?: boolean },
+  ): Promise<RenameFileResponse>;
+
+  /** Delete a file or directory (recursive flag for non-empty dirs). */
+  deleteFileEntry(
+    workspace: EditableFileWorkspaceLike,
+    input: { path: string; root?: string; recursive?: boolean },
+  ): Promise<DeleteFileResponse>;
 
   /** Git status for a workspace root. */
   gitStatus(workspacePath: string): Promise<GitStatusResult>;

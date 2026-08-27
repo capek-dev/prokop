@@ -22,6 +22,15 @@ function makeFilesApplication(
       files: [],
       root: '/ws',
     }),
+    listTreePaths: async () => ({
+      root: '/ws',
+      isMain: true,
+      paths: ['a.txt', 'src', 'src/b.ts'],
+      truncated: false,
+    }),
+    createFileEntry: async () => ({ path: 'created.txt' }),
+    renameFileEntry: async () => ({ path: 'renamed.txt', from: 'old.txt' }),
+    deleteFileEntry: async () => ({ path: 'gone.txt', recursive: false }),
     gitDiff: async () => ({
       path: 'file.txt',
       diffAvailable: false,
@@ -179,6 +188,98 @@ describe('files route contract (S5 filesystem isolation)', () => {
         error: 'bad_request',
         message: 'Path query parameter is required',
       });
+    }
+  });
+
+  test('the tree endpoint delegates query options and returns paths', async () => {
+    const calls: Array<unknown> = [];
+    const application = makeFilesApplication({
+      listTreePaths: async (workspaceId, input) => {
+        calls.push({ workspaceId, input });
+        return { root: '/ws', isMain: true, paths: ['a.txt'], truncated: true };
+      },
+    });
+
+    const response = await filesApp(application).request(
+      '/api/workspaces/ws-1/files/tree?root=/ws&showHidden=false',
+    );
+    expect(response.status).toBe(200);
+    expect(calls).toEqual([
+      {
+        workspaceId: 'ws-1',
+        input: { root: '/ws', showHidden: false },
+      },
+    ]);
+    expect(await response.json()).toEqual({
+      root: '/ws',
+      isMain: true,
+      paths: ['a.txt'],
+      truncated: true,
+    });
+  });
+
+  test('the mutation endpoints delegate validated bodies verbatim', async () => {
+    const calls: Array<{ op: string; body: unknown }> = [];
+    const application = makeFilesApplication({
+      createFileEntry: async (workspaceId, input) => {
+        calls.push({ op: 'create', body: input });
+        return { path: 'made.txt' };
+      },
+      renameFileEntry: async (workspaceId, input) => {
+        calls.push({ op: 'rename', body: input });
+        return { path: 'to.txt', from: 'from.txt' };
+      },
+      deleteFileEntry: async (workspaceId, input) => {
+        calls.push({ op: 'delete', body: input });
+        return { path: 'gone.txt', recursive: true };
+      },
+    });
+    const app = filesApp(application);
+
+    const created = await app.request('/api/workspaces/ws-1/files/create', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: 'dir/made.txt', kind: 'file' }),
+    });
+    expect(created.status).toBe(200);
+
+    const renamed = await app.request('/api/workspaces/ws-1/files/rename', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ from: 'from.txt', to: 'to.txt' }),
+    });
+    expect(renamed.status).toBe(200);
+
+    const deleted = await app.request('/api/workspaces/ws-1/files/delete', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: 'gone.txt', recursive: true }),
+    });
+    expect(deleted.status).toBe(200);
+
+    expect(calls).toEqual([
+      { op: 'create', body: { path: 'dir/made.txt', kind: 'file' } },
+      { op: 'rename', body: { from: 'from.txt', to: 'to.txt' } },
+      { op: 'delete', body: { path: 'gone.txt', recursive: true } },
+    ]);
+  });
+
+  test('mutation endpoints reject absolute paths at the schema boundary', async () => {
+    const application = makeFilesApplication();
+    const app = filesApp(application);
+
+    for (const [endpoint, body] of [
+      ['/files/create', JSON.stringify({ path: '/abs.txt' })],
+      ['/files/create', JSON.stringify({ path: 'ok/../traversal.txt' })],
+      ['/files/rename', JSON.stringify({ from: 'a.txt', to: '/b.txt' })],
+      ['/files/delete', JSON.stringify({ path: '../escape.txt' })],
+    ] as const) {
+      const response = await app.request(`/api/workspaces/ws-1${endpoint}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+      });
+      expect(response.status, `${endpoint} ${body}`).toBe(400);
     }
   });
 

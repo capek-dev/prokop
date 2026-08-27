@@ -13,7 +13,7 @@ import fg from 'fast-glob';
 import ignore from 'ignore';
 import type { FileEntry } from '@prokopai/sdk';
 
-const IGNORE_PATTERNS = [
+export const IGNORE_PATTERNS = [
   'node_modules/**',
   '.git/**',
   'dist/**',

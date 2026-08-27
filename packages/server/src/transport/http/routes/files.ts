@@ -11,10 +11,16 @@ import { dirname, isAbsolute, join, resolve } from 'path';
 import { homedir } from 'os';
 import type { FilesApplication } from '@/application/files';
 import { validate } from './validate';
-import { saveFileSchema } from './schemas';
-import type { SaveFileRequest } from '@prokopai/sdk';
+import {
+  saveFileSchema,
+  fileTreeQuerySchema,
+  createFileSchema,
+  renameFileSchema,
+  deleteFileSchema,
+} from './schemas';
+import type { SaveFileRequest, CreateFileRequest, RenameFileRequest, DeleteFileRequest } from '@prokopai/sdk';
 
-import { BadRequestError, ForbiddenError, HttpError, NotFoundError } from '@/application/http-errors';
+import { BadRequestError, ConflictError, ForbiddenError, HttpError, NotFoundError } from '@/application/http-errors';
 
 /** Maps the application/infrastructure plain errors and passes everything
  * else through, preserving the exact pre-slice status codes and messages.
@@ -29,6 +35,23 @@ function mapApplicationError(err: unknown): never {
     throw new NotFoundError(message);
   }
   if (message === 'Cannot preview a directory') {
+    throw new BadRequestError(message);
+  }
+  if (message.startsWith('Entry already exists:') || message.startsWith('Destination already exists:')) {
+    throw new ConflictError(message);
+  }
+  if (message === 'Directory not empty (pass recursive to delete)') {
+    throw new ConflictError(message);
+  }
+  if (message === 'Refusing to delete the workspace root') {
+    throw new BadRequestError(message);
+  }
+  if (
+    message.startsWith('Create failed:')
+    || message.startsWith('Rename failed:')
+    || message.startsWith('Delete failed:')
+    || message.startsWith('Invalid file name')
+  ) {
     throw new BadRequestError(message);
   }
   if (message === 'Path outside workspace') {
@@ -65,6 +88,73 @@ export function registerFileRoutes(app: Hono, files: FilesApplication): void {
       mapApplicationError(err);
     }
   });
+
+  app.get(
+    '/api/workspaces/:id/files/tree',
+    validate('query', fileTreeQuerySchema),
+    async (c) => {
+      const workspaceId = c.req.param('id');
+      const query = c.req.valid('query') as { root?: string; showHidden?: 'true' | 'false' };
+
+      try {
+        const result = await files.listTreePaths(workspaceId, {
+          root: query.root,
+          showHidden: query.showHidden ? query.showHidden === 'true' : undefined,
+        });
+        return c.json(result);
+      } catch (err) {
+        mapApplicationError(err);
+      }
+    },
+  );
+
+  app.post(
+    '/api/workspaces/:id/files/create',
+    validate('json', createFileSchema),
+    async (c) => {
+      const workspaceId = c.req.param('id');
+      const body = c.req.valid('json') as CreateFileRequest;
+
+      try {
+        const result = await files.createFileEntry(workspaceId, body);
+        return c.json(result);
+      } catch (err) {
+        mapApplicationError(err);
+      }
+    },
+  );
+
+  app.post(
+    '/api/workspaces/:id/files/rename',
+    validate('json', renameFileSchema),
+    async (c) => {
+      const workspaceId = c.req.param('id');
+      const body = c.req.valid('json') as RenameFileRequest;
+
+      try {
+        const result = await files.renameFileEntry(workspaceId, body);
+        return c.json(result);
+      } catch (err) {
+        mapApplicationError(err);
+      }
+    },
+  );
+
+  app.post(
+    '/api/workspaces/:id/files/delete',
+    validate('json', deleteFileSchema),
+    async (c) => {
+      const workspaceId = c.req.param('id');
+      const body = c.req.valid('json') as DeleteFileRequest;
+
+      try {
+        const result = await files.deleteFileEntry(workspaceId, body);
+        return c.json(result);
+      } catch (err) {
+        mapApplicationError(err);
+      }
+    },
+  );
 
   app.get('/api/workspaces/:id/git/status', async (c) => {
     const workspaceId = c.req.param('id');

@@ -112,6 +112,7 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
     '@/infrastructure/sqlite/workspaces', '@/infrastructure/filesystem/workspace-files',
     '@/infrastructure/filesystem/file-preview',
     '@/infrastructure/filesystem/file-mutations',
+    '@/infrastructure/filesystem/file-tree',
     '@/infrastructure/filesystem/git-status',
   ],
   'packages/server/src/adapters/jean2/notifications.ts': [
@@ -1486,6 +1487,7 @@ describe('server layer boundaries', () => {
       '@/application/ports/files',
       '@/infrastructure/filesystem/file-mutations',
       '@/infrastructure/filesystem/file-preview',
+      '@/infrastructure/filesystem/file-tree',
       '@/infrastructure/filesystem/git-status',
       '@/infrastructure/filesystem/workspace-files',
       '@/infrastructure/sqlite/workspaces',

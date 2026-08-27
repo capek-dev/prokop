@@ -109,6 +109,43 @@ export const saveFileSchema = z.object({
   force: z.boolean().optional(),
 }).loose();
 
+// ── File tree / mutation schemas ──────────────────────
+
+const relativePathSchema = z
+  .string()
+  .min(1, { message: 'path is required' })
+  .refine((value) => !value.startsWith('/'), {
+    message: 'Path must be relative to the workspace root',
+  })
+  .refine(
+    (value) => value.split('/').every((segment) => segment !== '..'),
+    { message: 'Path must not contain .. segments' },
+  );
+
+export const fileTreeQuerySchema = z.object({
+  root: z.string().optional(),
+  showHidden: z.enum(['true', 'false']).optional(),
+}).loose();
+
+export const createFileSchema = z.object({
+  path: relativePathSchema,
+  kind: z.enum(['file', 'directory']).default('file'),
+  root: z.string().optional(),
+  createParents: z.boolean().optional(),
+}).loose();
+
+export const renameFileSchema = z.object({
+  from: relativePathSchema,
+  to: relativePathSchema,
+  root: z.string().optional(),
+  overwrite: z.boolean().optional(),
+}).loose();
+
+export const deleteFileSchema = z.object({
+  path: relativePathSchema,
+  root: z.string().optional(),
+  recursive: z.boolean().optional(),
+}).loose();
 // ── Agent memory schemas ───────────────────────────────────────
 
 export const updateAgentMemorySchema = z.object({

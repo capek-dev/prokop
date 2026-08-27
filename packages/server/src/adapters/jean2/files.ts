@@ -11,12 +11,14 @@ import type { FilesApplicationPort } from '@/application/ports/files';
 import { listDirectory, searchFiles } from '@/infrastructure/filesystem/workspace-files';
 import { createFilePreview } from '@/infrastructure/filesystem/file-preview';
 import { createEditableFileOps } from '@/infrastructure/filesystem/file-mutations';
+import { createFileTreeOps } from '@/infrastructure/filesystem/file-tree';
 import {
   createGitStatus,
 } from '@/infrastructure/filesystem/git-status';
 
 const previewFile = createFilePreview(workspacePathPolicyPort);
 const editableOps = createEditableFileOps(workspacePathPolicyPort);
+const treeOps = createFileTreeOps(workspacePathPolicyPort);
 const gitOps = createGitStatus(workspacePathPolicyPort);
 
 export function createJean2FilesApplicationPort(): FilesApplicationPort {
@@ -43,6 +45,14 @@ export function createJean2FilesApplicationPort(): FilesApplicationPort {
       editableOps.readEditableFile(workspace, inputPath, rootQuery),
 
     saveFile: (workspace, input) => editableOps.saveFile(workspace, input),
+
+    listTreePaths: (workspace, input) => treeOps.listTreePaths(workspace, input),
+
+    createFileEntry: (workspace, input) => treeOps.createFileOrDirectory(workspace, input),
+
+    renameFileEntry: (workspace, input) => treeOps.renameFileEntry(workspace, input),
+
+    deleteFileEntry: (workspace, input) => treeOps.deleteFileEntry(workspace, input),
 
     gitStatus: (workspacePath) => gitOps.getGitStatus(workspacePath),
 
