@@ -245,7 +245,7 @@ export function SessionPane({
     <div
       className={`flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden md:rounded-lg ${
         isFocused
-          ? 'bg-card ring-1 ring-primary/50'
+          ? 'bg-card'
           : 'bg-background/50'
       }`}
       onMouseDown={handleFocusPane}

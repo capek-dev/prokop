@@ -37,7 +37,7 @@ export default function WorkspaceView() {
 
   const openSessionIds = useSessionBoardStore(s => s.openSessionIds);
   const layoutMode = useSessionBoardStore(s => s.layoutMode);
-  const showBoardToolbar = openSessionIds.length > 1 && layoutMode === 'board';
+  const showBoardToolbar = openSessionIds.length > 1 && layoutMode !== 'focused';
   // Sync board state with URL search params
   useBoardRouteSync({ scope: { kind: 'workspace', workspaceId: activeWorkspace?.id ?? null } });
 

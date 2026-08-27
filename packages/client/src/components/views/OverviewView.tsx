@@ -46,7 +46,7 @@ export default function OverviewView() {
 
   const openSessionIds = useSessionBoardStore(s => s.openSessionIds);
   const layoutMode = useSessionBoardStore(s => s.layoutMode);
-  const showBoardToolbar = openSessionIds.length > 1 && layoutMode === 'board';
+  const showBoardToolbar = openSessionIds.length > 1 && layoutMode !== 'focused';
 
   // Overview scope: sessions from any accessible workspace are valid.
   useBoardRouteSync({ scope: { kind: 'overview' } });
