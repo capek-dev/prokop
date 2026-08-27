@@ -45,6 +45,8 @@ export const queryKeys = {
     // Individual query key builders
     browse: (workspaceId: string, path?: string, opts?: { showHidden?: boolean; root?: string }) =>
       ['files', 'browse', workspaceId, path ?? '.', opts] as const,
+    tree: (workspaceId: string, root?: string) => ['files', 'tree', workspaceId, root] as const,
+    treePrefix: ['files', 'tree'] as const,
     search: (workspaceId: string, query: string, root?: string) =>
       ['files', 'search', workspaceId, query, root] as const,
     browseFs: (path: string) => ['files', 'browseFs', path] as const,

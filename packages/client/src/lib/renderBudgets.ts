@@ -45,9 +45,6 @@ export const RENDER_BUDGETS = {
   /** Todo list items above which virtualization or pagination is considered */
   todoListVirtualizeThreshold: 100,
 
-  /** Visible file-tree nodes above which the flat list is virtualized */
-  fileTreeVirtualizeThreshold: 200,
-
   /** Root sessions fetched per favorited workspace on the overview initial page */
   overviewInitialPageSize: 50,
 } as const;

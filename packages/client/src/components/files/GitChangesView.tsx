@@ -1,23 +1,17 @@
-import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Loader2, File, ChevronRight, Folder } from 'lucide-react';
-import type { FileEntry, GitDiffSummary } from '@prokopai/sdk';
-import type { ProkopaiClient } from '@prokopai/sdk';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { cn } from '@/lib/utils';
-import { useGitStatusQuery } from '@/hooks/queries';
-import { GitStatusBadge } from './GitStatusBadge';
-import {
-  FileEntryContextMenu,
-  type FileEntryActionTarget,
-  type FileEntryActions,
-} from './FileEntryContextMenu';
-import { FOLDER_ICON_COLOR, fileIconColor } from './fileIcons';
-import {
-  buildFilePathTree,
-  type FilePathDirectoryNode,
-  type FilePathTree,
-} from './filePathTree';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
+import { Loader2 } from 'lucide-react';
+import type { GitDiffSummary, ProkopaiClient } from '@prokopai/sdk';
+import type {
+  FileTreeSelectionChangeListener,
+  GitStatusEntry,
+} from '@pierre/trees';
+import { FileTree as PierreFileTreeReact, useFileTree } from '@pierre/trees/react';
+import type { FileEntryActionTarget } from './FileEntryContextMenu';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
+import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
+import { useFileTreeStateStore } from '@/stores/fileTreeStateStore';
+import { PierreTreeHost, focusFocusedPierreRow } from './pierreTreeHost';
 
 export interface GitChangesViewHandle {
   focus: () => void;
@@ -27,16 +21,41 @@ interface GitChangesViewProps {
   workspaceId: string;
   sdkClient: ProkopaiClient | null;
   root?: string;
-  mode: 'grouped' | 'flat';
+  /** Substring filter applied to changed paths before the tree builds. */
   searchQuery?: string;
   onFileSelect: (target: FileEntryActionTarget) => void;
-  width?: number;
-  contextActions?: FileEntryActions;
 }
 
 type ChangedFile = { path: string; git: GitDiffSummary };
 
-/** Summed +/- counts for a set of changed files. */
+const REASON_LABELS: Record<string, string> = {
+  git_not_installed: 'Git is not installed',
+  not_a_git_repo: 'Not a git repository',
+  git_error: 'Unable to read git status',
+};
+
+function basename(path: string): string {
+  const idx = path.lastIndexOf('/');
+  return idx === -1 ? path : path.slice(idx + 1);
+}
+
+/** Our wire status -> the tree's decoration statuses (copied over). */
+function toPierreEntries(files: ChangedFile[]): GitStatusEntry[] {
+  const statusMap: Record<string, GitStatusEntry['status']> = {
+    modified: 'modified',
+    added: 'added',
+    deleted: 'deleted',
+    renamed: 'renamed',
+    copied: 'modified',
+    untracked: 'untracked',
+    ignored: 'ignored',
+  };
+  return files.map((f) => ({
+    path: f.path,
+    status: statusMap[f.git.status] ?? 'modified',
+  }));
+}
+
 function summarizeDiffStats(files: ChangedFile[]): { additions: number; deletions: number; hasCounts: boolean } {
   let additions = 0;
   let deletions = 0;
@@ -51,16 +70,6 @@ function summarizeDiffStats(files: ChangedFile[]): { additions: number; deletion
   return { additions, deletions, hasCounts };
 }
 
-/** Flatten all descendant files of a directory node. */
-function collectFiles(node: ChangedDirectoryNode): ChangedFile[] {
-  const out: ChangedFile[] = [];
-  for (const child of node.directories) {
-    out.push(...child.files, ...collectFiles(child));
-  }
-  return out;
-}
-
-/** Compact summary chip row: n files, +/- totals. */
 function ChangesSummary({ files }: { files: ChangedFile[] }) {
   const stats = summarizeDiffStats(files);
   return (
@@ -79,239 +88,159 @@ function ChangesSummary({ files }: { files: ChangedFile[] }) {
   );
 }
 
-// --- Tree model ---
-
-export type ChangedDirectoryNode = FilePathDirectoryNode<ChangedFile>;
-export type ChangedFilesTree = FilePathTree<ChangedFile>;
-
-export function buildChangedFilesTree(files: ChangedFile[]): ChangedFilesTree {
-  return buildFilePathTree(files);
+/**
+ * Maps a tree-selected id onto an opener target, or null when the row must
+ * not open anything: directory ids (trailing slash), paths that are not in
+ * the current changed set, and legacy parity (deleted entries never opened;
+ * their preview lives in the Project tab). The caller injects `root`.
+ */
+export function buildSelectionTarget(
+  files: readonly ChangedFile[],
+  selectedPath: string,
+): Omit<FileEntryActionTarget, 'root'> | null {
+  const changed = files.find((entry) => entry.path === selectedPath);
+  if (!changed || changed.git.status === 'deleted') return null;
+  return {
+    entry: {
+      name: basename(selectedPath),
+      type: 'file',
+      path: selectedPath,
+      extension: selectedPath.includes('.')
+        ? `.${selectedPath.split('.').pop()}`
+        : undefined,
+      git: changed.git,
+    },
+  };
 }
 
-// --- File row ---
-
-function ChangedFileRow({
-  path,
-  git,
-  onFileSelect,
-  depth = 0,
-  showChevronSpacer = false,
-  showDirPrefix = true,
-  contextActions,
-  root,
-}: {
-  path: string;
-  git: GitDiffSummary;
-  onFileSelect: (target: FileEntryActionTarget) => void;
-  depth?: number;
-  showChevronSpacer?: boolean;
-  showDirPrefix?: boolean;
-  contextActions?: FileEntryActions;
-  root?: string;
-}) {
-  const lastSlash = path.lastIndexOf('/');
-  const fileName = lastSlash === -1 ? path : path.slice(lastSlash + 1);
-  const dirPath = lastSlash === -1 ? '' : path.slice(0, lastSlash + 1);
-  const isDeleted = git.status === 'deleted';
-
-  const handleClick = () => {
-    if (isDeleted) return;
-    const extension = fileName.lastIndexOf('.') !== -1
-      ? fileName.slice(fileName.lastIndexOf('.'))
-      : undefined;
-    onFileSelect({
-      entry: { name: fileName, type: 'file', path, extension, git },
-      root,
-    });
-  };
-
-  const button = (
-    <button
-      data-file-node
-      data-file-type="file"
-      onClick={handleClick}
-      className={cn(
-        'flex items-center gap-2 w-full min-w-0 overflow-hidden rounded-md p-2 text-left text-sm',
-        'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-        'focus:ring-1 focus:ring-inset ring-sidebar-ring outline-hidden',
-        '[&_svg]:size-4 [&_svg]:shrink-0',
-      )}
-      style={{ paddingLeft: `${depth * 12 + 8}px` }}
-    >
-      {showChevronSpacer && <span className="w-3 h-3 shrink-0" aria-hidden />}
-      <File className={cn(fileIconColor(path), isDeleted && 'opacity-40')} />
-      <span className={cn('truncate flex-1 min-w-0', isDeleted && 'line-through opacity-60')}>
-        {showDirPrefix && dirPath && <span className="text-muted-foreground">{dirPath}</span>}
-        <span>{fileName}</span>
-      </span>
-      <GitStatusBadge git={git} />
-    </button>
-  );
-
-  const entry: FileEntry = {
-    name: fileName,
-    type: 'file',
-    path,
-    extension: fileName.lastIndexOf('.') !== -1 ? fileName.slice(fileName.lastIndexOf('.')) : undefined,
-    git,
-  };
-
-  if (contextActions) {
-    return (
-      <FileEntryContextMenu
-        target={{ entry, root }}
-        actions={contextActions}
-      >
-        {button}
-      </FileEntryContextMenu>
-    );
+/**
+ * Every ancestor directory of the given leaf paths, with the find-style
+ * trailing slash ("src/" from "src/a.ts"). Feeds flat-mode expansion so the
+ * whole subtree renders at once.
+ */
+export function allAncestorDirectories(paths: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const path of paths) {
+    const segments = path.split('/');
+    segments.pop();
+    let current = '';
+    for (const segment of segments) {
+      current = current.length === 0 ? `${segment}/` : `${current}${segment}/`;
+      out.add(current);
+    }
   }
-
-  return button;
+  return [...out].sort();
 }
 
-// --- Grouped mode ---
-
-function GroupedChangedFiles({
-  files,
-  onFileSelect,
-  contextActions,
-  root,
-  defaultExpanded,
-}: {
-  files: ChangedFile[];
-  onFileSelect: (target: FileEntryActionTarget) => void;
-  contextActions?: FileEntryActions;
-  root?: string;
-  defaultExpanded: boolean;
-}) {
-  const tree = useMemo(() => buildChangedFilesTree(files), [files]);
-
-  return (
-    <div className="space-y-0.5">
-      {tree.directories.map((dir) => (
-        <GroupedDirectoryNode key={dir.path} node={dir} depth={0} onFileSelect={onFileSelect} contextActions={contextActions} root={root} defaultExpanded={defaultExpanded} />
-      ))}
-      {tree.files.map((f) => (
-        <ChangedFileRow
-          key={f.path}
-          path={f.path}
-          git={f.git}
-          depth={0}
-          showChevronSpacer
-          showDirPrefix={false}
-          onFileSelect={onFileSelect}
-          contextActions={contextActions}
-          root={root}
-        />
-      ))}
-    </div>
-  );
-}
-
-function GroupedDirectoryNode({
-  node,
-  depth,
-  onFileSelect,
-  contextActions,
-  root,
-  defaultExpanded,
-}: {
-  node: ChangedDirectoryNode;
-  depth: number;
-  onFileSelect: (target: FileEntryActionTarget) => void;
-  contextActions?: FileEntryActions;
-  root?: string;
-  defaultExpanded: boolean;
-}) {
-  const [open, setOpen] = useState(defaultExpanded);
-  const stats = useMemo(
-    () => summarizeDiffStats([...node.files, ...collectFiles(node)]),
-    [node],
-  );
-
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger asChild>
-        <button
-          data-file-node
-          data-file-type="directory"
-          data-file-is-open={open || undefined}
-          className={cn(
-            'flex items-center gap-2 w-full min-w-0 overflow-hidden rounded-md p-2 text-left text-sm',
-            'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-            'focus:ring-1 focus:ring-inset ring-sidebar-ring outline-hidden',
-            '[&_svg]:size-4 [&_svg]:shrink-0',
-          )}
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
-        >
-          <ChevronRight className={cn('w-3 h-3 shrink-0 transition-transform', open && 'rotate-90')} />
-          <Folder className={FOLDER_ICON_COLOR} />
-          <span className="flex-1 min-w-0 truncate">{node.name}</span>
-          {stats.hasCounts && (
-            <span className="text-[11px] tabular-nums shrink-0">
-              <span className="text-success">+{stats.additions}</span>{' '}
-              <span className="text-destructive/80">−{stats.deletions}</span>
-            </span>
-          )}
-          <span className="text-[10px] tabular-nums text-muted-foreground/60 w-6 text-right shrink-0">{node.fileCount}</span>
-        </button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="space-y-0.5">
-          {node.directories.map((child) => (
-            <GroupedDirectoryNode key={child.path} node={child} depth={depth + 1} onFileSelect={onFileSelect} contextActions={contextActions} root={root} defaultExpanded={defaultExpanded} />
-          ))}
-          {node.files.map((f) => (
-            <ChangedFileRow
-              key={f.path}
-              path={f.path}
-              git={f.git}
-              depth={depth + 1}
-              showChevronSpacer
-              showDirPrefix={false}
-              onFileSelect={onFileSelect}
-              contextActions={contextActions}
-              root={root}
-            />
-          ))}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-// --- Main component ---
-
-const REASON_LABELS: Record<string, string> = {
-  git_not_installed: 'Git is not installed',
-  not_a_git_repo: 'Not a git repository',
-  git_error: 'Unable to read git status',
-};
-
+/**
+ * Changed-files tree on the shared Pierre engine. Always tree-structured;
+ * every branch starts open (VSCode SCM behavior) and user collapses persist
+ * across refreshes and reloads via the shared per-workspace store.
+ */
 export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewProps>(
-  ({ workspaceId, sdkClient, root, mode, searchQuery = '', onFileSelect, width, contextActions }, ref) => {
+  ({ workspaceId, sdkClient, root, searchQuery = '', onFileSelect }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const { data, isLoading, error } = useGitStatusQuery(sdkClient, workspaceId, root);
+    const { data, isLoading, error, refetch } = useGitStatusQuery(sdkClient, workspaceId, root);
 
-    const focus = useCallback(() => {
-      const container = containerRef.current;
-      if (container) {
-        const firstNode = container.querySelector<HTMLButtonElement>('[data-file-node]');
-        if (firstNode) {
-          firstNode.focus();
-        } else {
-          container.focus();
-        }
-      }
-    }, []);
+    // Persisted expansion identity mirrors the Project tree but under a
+    // dedicated namespace so neither view clobbers the other's place.
+    const stateKey = `changes:${workspaceId}:${root ?? ''}`;
+    // null = the user has never collapsed anything here, so branches start
+    // fully open instead of collapsing to an empty persisted set.
+    const persistedExpanded = useFileTreeStateStore((s) => s.byKey[stateKey]) ?? null;
 
-    useImperativeHandle(ref, () => ({ focus }), [focus]);
+    const availability = data?.availability;
+    const allFiles = data?.files ?? [];
 
-    if (isLoading) {
+    // Substring filter owns nothing fancy: same matching as before
+    // (lowercased substring against the full path), applied before build.
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+    const files = useMemo(
+      () =>
+        normalizedSearchQuery.length > 0
+          ? allFiles.filter((file) => file.path.toLowerCase().includes(normalizedSearchQuery))
+          : allFiles,
+      [allFiles, normalizedSearchQuery],
+    );
+
+    // Leaf-file path list. Pure leaf inputs need no trailing-slash markers:
+    // the builder auto-creates implicit intermediate directories, and leaf
+    // names can never collide with an implicit dir unless the repo contains
+    // a real file/directory naming conflict.
+    const paths = useMemo(() => files.map((f) => f.path), [files]);
+    const allAncestors = useMemo(() => allAncestorDirectories(paths), [paths]);
+
+    // Expansion = all branches open unless the user collapsed them. The
+    // persisted store lists dirs that were open at last snapshot; a dir in
+    // allAncestors but absent there was explicitly closed, so it stays shut.
+    const expandedForReset = useMemo(() => {
+      if (persistedExpanded === null) return allAncestors;
+      return allAncestors.filter((dir) => persistedExpanded.includes(dir));
+    }, [allAncestors, persistedExpanded]);
+
+    const { model } = useFileTree({
+      paths,
+      icons: { set: 'standard', colored: true },
+      search: false,
+      dragAndDrop: false,
+      renaming: false,
+      onSelectionChange: ((selectedPaths: readonly string[]) => {
+        const first = selectedPaths[0];
+        if (!first || !onFileSelect || !sdkClient) return;
+        const target = buildSelectionTarget(files, first);
+        if (!target) return;
+        onFileSelect({ ...target, root });
+      }) satisfies FileTreeSelectionChangeListener,
+    });
+
+    // Query refreshes AND mode flips rebuild the store. Mode must be part of
+    // the guard: grouped keeps the persisted expansion, flat expands every
+    // Rebuild on data change only. Branches start fully open (VSCode SCM
+    const prevPathsRef = useRef<string[] | null>(null);
+    useEffect(() => {
+      if (prevPathsRef.current === paths) return;
+      prevPathsRef.current = paths;
+      model.resetPaths(paths, { initialExpandedPaths: expandedForReset });
+    }, [paths, model, expandedForReset]);
+
+    const appliedGitSignature = useRef('');
+    useEffect(() => {
+      const entries = toPierreEntries(files);
+      const signature = JSON.stringify(entries);
+      if (signature === appliedGitSignature.current) return;
+      appliedGitSignature.current = signature;
+      model.setGitStatus(entries);
+    }, [files, model]);
+
+    // Capture collapses (and re-opens) whenever the visible rows change.
+    const expandedSignature = useRef('');
+    useEffect(() => {
+      const capture = () => {
+        const count = model.getVisibleCount();
+        if (count === 0) return;
+        const openDirs = model
+          .getVisibleRows(0, count)
+          .filter((row) => row.kind === 'directory' && row.isExpanded)
+          .map((row) => row.path);
+        const signature = JSON.stringify(openDirs);
+        if (signature === expandedSignature.current) return;
+        expandedSignature.current = signature;
+        useFileTreeStateStore.getState().recordExpanded(stateKey, openDirs);
+      };
+      capture();
+      return model.subscribe(capture);
+    }, [model, stateKey]);
+
+    useImperativeHandle(ref, () => ({
+      focus: () => {
+        focusFocusedPierreRow(containerRef.current);
+      },
+    }), []);
+
+    if (isLoading && allFiles.length === 0) {
       return (
-        <div ref={containerRef} className="flex items-center justify-center h-32 text-muted-foreground" tabIndex={-1}>
-          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+        <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+          <Loader2 className="mr-2 size-4 animate-spin" />
           Loading changes...
         </div>
       );
@@ -319,55 +248,41 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
 
     if (error) {
       return (
-        <div ref={containerRef} className="p-4 text-sm text-destructive" tabIndex={-1}>{error.message}</div>
+        <div className="flex items-center p-4 text-sm text-destructive">
+          {error.message}
+          <Button variant="ghost" size="sm" onClick={() => void refetch()} className="ml-2">
+            <RefreshCw className="size-3" />
+          </Button>
+        </div>
       );
     }
-
-    const availability = data?.availability;
-    const files = data?.files ?? [];
-    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-    const filteredFiles = normalizedSearchQuery
-      ? files.filter((file) => file.path.toLowerCase().includes(normalizedSearchQuery))
-      : files;
 
     if (availability && !availability.available) {
-      const label = availability.reason ? REASON_LABELS[availability.reason] ?? 'Git unavailable' : 'Git unavailable';
-      return (
-        <div ref={containerRef} className="p-4 text-sm text-muted-foreground text-center" tabIndex={-1}>{label}</div>
-      );
+      const label = availability.reason
+        ? REASON_LABELS[availability.reason] ?? 'Git unavailable'
+        : 'Git unavailable';
+      return <div className="p-4 text-sm text-muted-foreground text-center">{label}</div>;
     }
 
-    if (files.length === 0) {
-      return (
-        <div ref={containerRef} className="p-4 text-sm text-muted-foreground text-center" tabIndex={-1}>No changes</div>
-      );
+    if (allFiles.length === 0) {
+      return <div className="p-4 text-sm text-muted-foreground text-center">No changes</div>;
     }
 
-    if (filteredFiles.length === 0) {
-      return (
-        <div ref={containerRef} className="p-4 text-sm text-muted-foreground text-center" tabIndex={-1}>No matching files</div>
-      );
+    if (paths.length === 0) {
+      return <div className="p-4 text-sm text-muted-foreground text-center">No matching files</div>;
     }
 
     return (
-      <div ref={containerRef} className="flex-1 min-h-0 min-w-0 w-full outline-none" tabIndex={-1}>
-        <ScrollArea className="h-full">
-          <div className="px-2 pb-2 w-full min-w-0" style={width ? { width: `${width - 8}px` } : undefined}>
-            <ChangesSummary files={filteredFiles} />
-            {mode === 'grouped' ? (
-              <GroupedChangedFiles key={normalizedSearchQuery ? 'search' : 'browse'} files={filteredFiles} onFileSelect={onFileSelect} contextActions={contextActions} root={root} defaultExpanded={normalizedSearchQuery.length > 0} />
-            ) : (
-              <div className="space-y-0.5">
-                {filteredFiles.map((f) => (
-                  <ChangedFileRow key={f.path} path={f.path} git={f.git} onFileSelect={onFileSelect} contextActions={contextActions} root={root} />
-                ))}
-              </div>
-            )}
-          </div>
-        </ScrollArea>
+      // Flex column so the tree host's flex-1/h-full resolve instead of
+      // collapsing to zero height inside this plain div.
+      <div className="flex flex-1 min-h-0 min-w-0 w-full flex-col outline-none">
+        <ChangesSummary files={files} />
+        <PierreTreeHost hostRef={containerRef}>
+          <PierreFileTreeReact model={model} className="size-full" />
+        </PierreTreeHost>
       </div>
     );
-  }
+  },
 );
 
 GitChangesView.displayName = 'GitChangesView';

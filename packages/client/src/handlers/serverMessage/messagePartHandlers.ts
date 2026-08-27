@@ -19,6 +19,7 @@ const SCHEDULER_TOOLS = new Set(['scheduler']);
 
 function invalidateFileQueries(): void {
   queryClient.invalidateQueries({ queryKey: queryKeys.files.browsePrefix });
+  queryClient.invalidateQueries({ queryKey: queryKeys.files.treePrefix });
   queryClient.invalidateQueries({ queryKey: queryKeys.files.searchPrefix });
   queryClient.invalidateQueries({ queryKey: queryKeys.files.gitStatusPrefix });
 }
