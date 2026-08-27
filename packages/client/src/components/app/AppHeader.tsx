@@ -1,17 +1,16 @@
-import { Check, Ellipsis, FolderOpen, LayoutGrid, LayoutList, PanelLeft, Settings, Settings2, SquareTerminal } from 'lucide-react';
+import { Check, LayoutGrid, LayoutList } from 'lucide-react';
 import { useRouter, useParams, useLocation } from '@tanstack/react-router';
-import { isWindows } from '@/lib/platform';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ServerSwitcher } from '@/components/layout/ServerSwitcher';
+import { HeaderPanelToggles } from '@/components/app/HeaderPanelToggles';
 import { useUIStore } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
@@ -69,6 +68,20 @@ export function AppHeader() {
     }
   };
 
+  const panelToggles = (
+    <HeaderPanelToggles
+      sessionsActive={sessionsActive}
+      onToggleSessions={toggleSessions}
+      filesActive={filesActive}
+      onToggleFiles={toggleFiles}
+      terminalActive={showTerminalPanel}
+      onToggleTerminal={() => setShowTerminalPanel(!showTerminalPanel)}
+      hasWorkspace={Boolean(activeWorkspace)}
+      onOpenWorkspaceSettings={() => setShowWorkspaceSettings(true)}
+      onOpenSettings={() => setShowSettings(true)}
+    />
+  );
+
   return (
     <>
       <header
@@ -82,7 +95,7 @@ export function AppHeader() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon-sm">
+                    <Button variant="ghost" size="icon-sm" aria-label="View">
                       {isOverview ? <LayoutGrid className="w-4 h-4" /> : <LayoutList className="w-4 h-4" />}
                     </Button>
                   </DropdownMenuTrigger>
@@ -100,48 +113,7 @@ export function AppHeader() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon-sm">
-                      <Ellipsis className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent>More</TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="end" className="w-52 min-w-52">
-                <DropdownMenuItem onClick={toggleSessions}>
-                  <PanelLeft className="mr-2 h-4 w-4" />
-                  <span className="flex-1">Sessions</span>
-                  {sessionsActive && <Check className="size-4" />}
-                </DropdownMenuItem>
-                {activeWorkspace && (
-                  <DropdownMenuItem onClick={toggleFiles}>
-                    <FolderOpen className="mr-2 h-4 w-4" />
-                    <span className="flex-1">Files</span>
-                    {filesActive && <Check className="size-4" />}
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => setShowTerminalPanel(!showTerminalPanel)}>
-                  <SquareTerminal className="mr-2 h-4 w-4" />
-                  <span className="flex-1">Terminal</span>
-                  {showTerminalPanel && <Check className="size-4" />}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {activeWorkspace && (
-                  <DropdownMenuItem onClick={() => setShowWorkspaceSettings(true)}>
-                    <Settings2 className="mr-2 h-4 w-4" />
-                    Workspace Settings
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => setShowSettings(true)}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {panelToggles}
           </div>
         </TooltipProvider>
       </header>
@@ -181,85 +153,7 @@ export function AppHeader() {
           </div>
         </div>
 
-        <TooltipProvider delayDuration={300}>
-          <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={toggleSessions}
-                  aria-pressed={sessionsActive}
-                  className={sessionsActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
-                >
-                  <PanelLeft className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side={isWindows() ? 'bottom' : undefined}>
-                {sessionsActive ? 'Hide Sessions' : 'Show Sessions'}
-              </TooltipContent>
-            </Tooltip>
-            {activeWorkspace && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={toggleFiles}
-                    aria-pressed={filesActive}
-                    className={filesActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
-                  >
-                    <FolderOpen className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side={isWindows() ? 'bottom' : undefined}>
-                  {filesActive ? 'Hide Files' : 'Show Files'}
-                </TooltipContent>
-              </Tooltip>
-            )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setShowTerminalPanel(!showTerminalPanel)}
-                  aria-pressed={showTerminalPanel}
-                  className={showTerminalPanel ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
-                >
-                  <SquareTerminal className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side={isWindows() ? 'bottom' : undefined}>
-                {showTerminalPanel ? 'Hide Terminal' : 'Show Terminal'}
-              </TooltipContent>
-            </Tooltip>
-            <div className="w-px h-5 bg-border/60 mx-1" />
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon-sm">
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent side={isWindows() ? 'bottom' : undefined}>Settings</TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="end" className="w-52 min-w-52">
-                {activeWorkspace && (
-                  <DropdownMenuItem onClick={() => setShowWorkspaceSettings(true)}>
-                    <Settings2 className="mr-2 h-4 w-4" />
-                    Workspace Settings
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={() => setShowSettings(true)}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </TooltipProvider>
+        {panelToggles}
       </header>
     </>
   );
