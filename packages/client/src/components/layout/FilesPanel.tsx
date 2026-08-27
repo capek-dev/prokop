@@ -1,12 +1,11 @@
-import { forwardRef, useCallback, useImperativeHandle, useRef, useState, useEffect } from 'react';
-import { ArrowLeft, RefreshCw, Search, ChevronDown, Folder, Check } from 'lucide-react';
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState, useEffect, useMemo } from 'react';
+import { ArrowLeft, RefreshCw, ChevronDown, Folder, Check } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { FileTree, type FileTreeHandle, GitChangesView, type GitChangesViewHandle } from '@/components/files';
 import { type FileEntryActionTarget } from '@/components/files/FileEntryContextMenu';
 import { FOLDER_ICON_COLOR } from '@/components/files/fileIcons';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
@@ -15,6 +14,8 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
+import { summarizeDiffStats } from '@/components/files/GitChangesView';
 import {
   Sidebar,
   SidebarContent,
@@ -110,7 +111,6 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
     const workspaceId = activeWorkspace?.id;
     const routeParams = useParams({ from: '/server/$serverId', strict: false } as unknown as Parameters<typeof useParams>[0]);
     const serverId = routeParams?.serverId as string | undefined;
-    const [changesSearchQuery, setChangesSearchQuery] = useState('');
 
     // Active editor doc (for highlighting the open file in the tree).
     const activeEditorPath = useFileEditorStore((s) => {
@@ -139,13 +139,6 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
         setFilesPanelRoot(null);
       }
     }, [activeWorkspace, filesPanelRoot, setFilesPanelRoot]);
-
-    // Clear the changes filter when the workspace changes. The Project tree's
-    // built-in search session resets with its model (remounted per root).
-    const workspaceIdForReset = activeWorkspace?.id;
-    useEffect(() => {
-      setChangesSearchQuery('');
-    }, [workspaceIdForReset]);
 
     const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -253,6 +246,21 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       openFile(target);
     }, [openFile]);
 
+    // Changes-tab stats in the header row. Reads the same git-status cache
+    // as GitChangesView (shared query key), so no extra request.
+    const isChangesTab = !embedded && filesPanelTab === 'changes';
+    const changesRoot = isMainRoot ? undefined : selectedRoot;
+    const gitStatusQuery = useGitStatusQuery(
+      sdkClient,
+      isChangesTab ? workspaceId : undefined,
+      changesRoot,
+      isChangesTab,
+    );
+    const changesStats = useMemo(
+      () => summarizeDiffStats(gitStatusQuery.data?.files ?? []),
+      [gitStatusQuery.data?.files],
+    );
+
     const headerContent = activeWorkspace ? (
       <div className="flex flex-col gap-2 px-2 pt-2 pb-2">
         <div className="flex items-center gap-1.5">
@@ -271,6 +279,20 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
           >
             <RefreshCw className={cn('size-3.5', isRefreshing && 'animate-spin')} />
           </Button>
+          {isChangesTab && (gitStatusQuery.data || changesStats.fileCount > 0) && (
+            <span
+              className="flex shrink-0 items-center gap-1 text-[10px] tabular-nums text-muted-foreground/70"
+              title={`${changesStats.fileCount} changed ${changesStats.fileCount === 1 ? 'file' : 'files'}${changesStats.hasCounts ? `, +${changesStats.additions} −${changesStats.deletions}` : ''}`}
+            >
+              <span>{changesStats.fileCount}</span>
+              {changesStats.hasCounts && (
+                <>
+                  <span className="text-success">+{changesStats.additions}</span>
+                  <span className="text-destructive/80">−{changesStats.deletions}</span>
+                </>
+              )}
+            </span>
+          )}
           {isMobile && !embedded && (
             <Button variant="ghost" size="sm" onClick={() => setMobileSurface('chat')} className="shrink-0">
               <ArrowLeft className="size-4" />
@@ -285,19 +307,6 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
               <TabsTrigger value="changes" className="flex-1">Changes</TabsTrigger>
             </TabsList>
           </Tabs>
-        )}
-        {filesPanelTab === 'changes' && (
-          <div className="flex items-center gap-1.5">
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-              <Input
-                value={changesSearchQuery}
-                onChange={(e) => setChangesSearchQuery(e.target.value)}
-                placeholder="Search changes..."
-                className="h-7 pl-7 pr-2 text-sm"
-              />
-            </div>
-          </div>
         )}
       </div>
     ) : null;
@@ -320,7 +329,6 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
           workspaceId={workspaceId}
           sdkClient={sdkClient}
           root={isMainRoot ? undefined : selectedRoot}
-          searchQuery={changesSearchQuery}
           onFileSelect={handleFileSelect}
         />
       )

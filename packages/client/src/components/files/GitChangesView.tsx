@@ -25,8 +25,6 @@ interface GitChangesViewProps {
   workspaceId: string;
   sdkClient: ProkopaiClient | null;
   root?: string;
-  /** Substring filter applied to changed paths before the tree builds. */
-  searchQuery?: string;
   onFileSelect: (target: FileEntryActionTarget) => void;
 }
 
@@ -60,7 +58,7 @@ function toPierreEntries(files: ChangedFile[]): GitStatusEntry[] {
   }));
 }
 
-function summarizeDiffStats(files: ChangedFile[]): { additions: number; deletions: number; hasCounts: boolean } {
+export function summarizeDiffStats(files: ChangedFile[]): { additions: number; deletions: number; hasCounts: boolean; fileCount: number } {
   let additions = 0;
   let deletions = 0;
   let hasCounts = false;
@@ -71,25 +69,7 @@ function summarizeDiffStats(files: ChangedFile[]): { additions: number; deletion
       deletions += f.git.deletions ?? 0;
     }
   }
-  return { additions, deletions, hasCounts };
-}
-
-function ChangesSummary({ files }: { files: ChangedFile[] }) {
-  const stats = summarizeDiffStats(files);
-  return (
-    <div className="flex items-center gap-2 px-2 py-1 text-[10px] tabular-nums text-muted-foreground/70">
-      <span>
-        {files.length} {files.length === 1 ? 'file' : 'files'}
-      </span>
-      {stats.hasCounts && (
-        <>
-          <span className="text-muted-foreground/40">·</span>
-          <span className="text-success">+{stats.additions}</span>
-          <span className="text-destructive/80">−{stats.deletions}</span>
-        </>
-      )}
-    </div>
-  );
+  return { additions, deletions, hasCounts, fileCount: files.length };
 }
 
 /**
@@ -142,7 +122,7 @@ export function allAncestorDirectories(paths: readonly string[]): string[] {
  * across refreshes and reloads via the shared per-workspace store.
  */
 export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewProps>(
-  ({ workspaceId, sdkClient, root, searchQuery = '', onFileSelect }, ref) => {
+  ({ workspaceId, sdkClient, root, onFileSelect }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const { data, isLoading, error, refetch } = useGitStatusQuery(sdkClient, workspaceId, root);
 
@@ -156,16 +136,9 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
     const availability = data?.availability;
     const allFiles = data?.files ?? [];
 
-    // Substring filter owns nothing fancy: same matching as before
-    // (lowercased substring against the full path), applied before build.
-    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-    const files = useMemo(
-      () =>
-        normalizedSearchQuery.length > 0
-          ? allFiles.filter((file) => file.path.toLowerCase().includes(normalizedSearchQuery))
-          : allFiles,
-      [allFiles, normalizedSearchQuery],
-    );
+    // Filtering lives in the tree's built-in search (hide-non-matches, same
+    // as the Project tab); the host always receives the full changed set.
+    const files = allFiles;
 
     // Leaf-file path list. Pure leaf inputs need no trailing-slash markers:
     // the builder auto-creates implicit intermediate directories, and leaf
@@ -185,7 +158,8 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
     const { model } = useFileTree({
       paths,
       icons: { set: 'standard', colored: true },
-      search: false,
+      search: true,
+      fileTreeSearchMode: 'hide-non-matches',
       dragAndDrop: false,
       renaming: false,
       onSelectionChange: ((selectedPaths: readonly string[]) => {
@@ -222,6 +196,9 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
     const expandedSignature = useRef('');
     useEffect(() => {
       const capture = () => {
+        // Skipped while the built-in search is active: hide-non-matches
+        // hides unrelated branches and would snapshot garbage.
+        if (model.getSearchValue().length > 0 || model.isSearchOpen()) return;
         const count = model.getVisibleCount();
         if (count === 0) return;
         const openDirs = model
@@ -274,15 +251,10 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
       return <div className="p-4 text-sm text-muted-foreground text-center">No changes</div>;
     }
 
-    if (paths.length === 0) {
-      return <div className="p-4 text-sm text-muted-foreground text-center">No matching files</div>;
-    }
-
     return (
       // Flex column so the tree host's flex-1/h-full resolve instead of
       // collapsing to zero height inside this plain div.
       <div className="flex flex-1 min-h-0 min-w-0 w-full flex-col outline-none">
-        <ChangesSummary files={files} />
         <PierreTreeHost hostRef={containerRef}>
           <PierreFileTreeReact model={model} className="size-full" />
         </PierreTreeHost>

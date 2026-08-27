@@ -12,6 +12,7 @@ import {
   allAncestorDirectories,
   buildSelectionTarget,
   GitChangesView,
+  summarizeDiffStats,
 } from '@/components/files/GitChangesView';
 
 const git: GitDiffSummary = { status: 'modified', staged: false, unstaged: true, additions: 1, deletions: 1 };
@@ -86,24 +87,12 @@ describe('GitChangesView light-DOM states', () => {
     });
   });
 
-  test('summary strip shows count and summed +/- totals', () => {
-    mockUseGitStatusQuery.mockReturnValue({
-      data: {
-        availability: { available: true },
-        files: [
-          makeFile('a.ts', { additions: 3, deletions: 0 }),
-          makeFile('b/c.ts', { additions: 2 }),
-        ],
-        root: '',
-      },
-      isLoading: false,
-      error: null,
-    });
-
-    render(<GitChangesView workspaceId="ws-1" sdkClient={null} onFileSelect={vi.fn()} />);
-    const strip = screen.getByText(/2 files/).closest('div')!;
-    expect(strip.textContent).toContain('+5');
-    expect(strip.textContent).toContain('−1');
+  test('summary stats moved to the FilesPanel header; totals helper is exported', () => {
+    const stats = summarizeDiffStats([
+      makeFile('a.ts', { additions: 3, deletions: 0 }),
+      makeFile('b/c.ts', { additions: 2 }),
+    ]);
+    expect(stats).toEqual({ additions: 5, deletions: 1, hasCounts: true, fileCount: 2 });
   });
 
   test('unavailable git renders its reason label instead of the tree', () => {
@@ -121,31 +110,9 @@ describe('GitChangesView light-DOM states', () => {
     expect(screen.getByText('Not a git repository')).toBeInTheDocument();
   });
 
-  test('no changes and no-matching-filter are distinct messages', () => {
+  test('no changes renders the empty state', () => {
     render(<GitChangesView workspaceId="ws-1" sdkClient={null} onFileSelect={vi.fn()} />);
     expect(screen.getByText('No changes')).toBeInTheDocument();
-
-    mockUseGitStatusQuery.mockReturnValue({
-      data: {
-        availability: { available: true },
-        files: [makeFile('a.ts')],
-        root: '',
-      },
-      isLoading: false,
-      error: null,
-    });
-    cleanupViews();
-
-    render(
-      <GitChangesView
-        workspaceId="ws-1"
-        sdkClient={null}
-        searchQuery="zzz"
-        onFileSelect={vi.fn()}
-      />,
-    );
-    expect(screen.getByText('No matching files')).toBeInTheDocument();
-    expect(screen.queryByText('No changes')).not.toBeInTheDocument();
   });
 
   test('error state renders with a retry affordance', () => {
@@ -159,8 +126,3 @@ describe('GitChangesView light-DOM states', () => {
     expect(screen.getByText(/network down/)).toBeInTheDocument();
   });
 });
-
-/** Unmount current views; testing-library auto-cleanup handles most cases. */
-function cleanupViews() {
-  document.body.textContent = '';
-}
