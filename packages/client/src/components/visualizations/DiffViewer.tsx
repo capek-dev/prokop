@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ExternalLink, FileText } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { memo, useState, useMemo } from 'react';
 import { Highlight, themes } from 'prism-react-renderer';
 
@@ -192,35 +192,36 @@ export const DiffViewer = memo(function DiffViewer({ hunks, path, language: prop
   return (
     <div className="visualization-container max-w-full overflow-x-auto border border-border rounded-md">
       <div>
-        <div className="group/path flex items-center gap-2 px-1 bg-muted/50 text-xs text-muted-foreground">
+        <div className="group/path flex items-center gap-2 px-1 bg-muted/50 text-xs text-muted-foreground whitespace-nowrap">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="px-1 py-1 hover:bg-muted rounded"
+            className="shrink-0 px-1 py-1 hover:bg-muted rounded"
           >
             {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
           </button>
 
-          <FileText className="size-3" />
+          {/* Path truncates from a nested span: text-overflow does not apply
+              to the flex button itself, only to a block/inline child. */}
           {disablePathOpen ? (
             <span
-              className="flex items-center gap-1 font-mono pr-2 px-1 py-0.5 min-w-0 truncate"
+              className="flex items-center gap-1 font-mono min-w-0 flex-1"
               title={path}
             >
-              {path}
+              <span className="truncate">{path}</span>
             </span>
           ) : (
             <button
               type="button"
               onClick={handlePathClick}
-              className="flex items-center gap-1 font-mono pr-2 hover:text-foreground transition-colors cursor-pointer rounded px-1 py-0.5 -mx-1 hover:bg-muted min-w-0 truncate"
+              className="flex items-center gap-1 font-mono hover:text-foreground transition-colors cursor-pointer rounded px-1 py-0.5 -mx-1 hover:bg-muted min-w-0 flex-1 text-left"
               title={path}
             >
-              {path}
-              <ExternalLink className="size-2.5 opacity-0 group-hover/path:opacity-100 transition-opacity" />
+              <span className="truncate">{path}</span>
+              <ExternalLink className="size-2.5 shrink-0 opacity-0 group-hover/path:opacity-100 transition-opacity" />
             </button>
           )}
 
-          <div className="ml-auto mr-2 flex items-center gap-2">
+          <div className="shrink-0 mr-2 flex items-center gap-2">
             {usePlainText && (
               <span className="text-xs text-muted-foreground/70">plain text</span>
             )}

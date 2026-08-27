@@ -1,5 +1,5 @@
 import { type FC, memo, useState, useMemo, useCallback } from 'react';
-import { Check, FileText, AlertCircle, ChevronDown, ChevronRight, ExternalLink, Copy } from 'lucide-react';
+import { Check, AlertCircle, ChevronDown, ChevronRight, ExternalLink, Copy } from 'lucide-react';
 import { Highlight, themes } from 'prism-react-renderer';
 import { useUIStore } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
@@ -87,32 +87,33 @@ export const CodeBlock: FC<CodeBlockProps> = memo(({
   return (
     <div className="visualization-container max-w-full overflow-x-auto border border-border rounded-md">
       <div>
-        <div className="group/path flex items-center gap-2 px-1 bg-muted/50 text-xs text-muted-foreground">
+        <div className="group/path flex items-center gap-2 px-1 bg-muted/50 text-xs text-muted-foreground whitespace-nowrap">
           <button
             onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-2 px-2 py-1 hover:bg-muted"
+            className="shrink-0 flex items-center gap-2 px-2 py-1 hover:bg-muted"
           >
             {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
           </button>
 
-          <FileText className="size-3" />
+          {/* Path truncates from a nested span: text-overflow does not apply
+              to the flex button itself, only to a block/inline child. */}
           <button
             type="button"
             onClick={handlePathClick}
-            className="flex items-center gap-1 font-mono pr-2 hover:text-foreground transition-colors cursor-pointer rounded px-1 py-0.5 -mx-1 hover:bg-muted min-w-0 truncate"
+            className="flex items-center gap-1 font-mono hover:text-foreground transition-colors cursor-pointer rounded px-1 py-0.5 -mx-1 hover:bg-muted min-w-0 flex-1 text-left"
             title={path}
           >
-            {path}
-            <ExternalLink className="size-2.5 opacity-0 group-hover/path:opacity-100 transition-opacity" />
+            <span className="truncate">{path}</span>
+            <ExternalLink className="size-2.5 shrink-0 opacity-0 group-hover/path:opacity-100 transition-opacity" />
           </button>
 
           {!expanded && (
-            <span className="text-xs text-muted-foreground/70">
+            <span className="shrink-0 text-xs text-muted-foreground/70">
               {lineCount} lines
             </span>
           )}
 
-          <div className="ml-auto mr-2 flex items-center gap-2">
+          <div className="shrink-0 ml-auto mr-2 flex items-center gap-2">
             {isLargeCode && expanded && (
               <span className="text-xs text-muted-foreground/70">
                 plain text (large file)
