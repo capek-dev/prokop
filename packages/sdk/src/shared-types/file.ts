@@ -160,3 +160,53 @@ export interface SaveFileResponse {
   size: number;
   modifiedAt: string;
 }
+
+export interface CreateFileRequest {
+  /** Workspace-root-relative target path using forward slashes. */
+  path: string;
+  kind?: 'file' | 'directory';
+  root?: string;
+  /** Create missing parent directories (defaults to true). */
+  createParents?: boolean;
+}
+
+export interface RenameFileRequest {
+  /** Workspace-root-relative source path. */
+  from: string;
+  /** Workspace-root-relative destination path (also covers moves). */
+  to: string;
+  root?: string;
+  /** Replace an existing destination file (directories are never replaced). */
+  overwrite?: boolean;
+}
+
+export interface DeleteFileRequest {
+  path: string;
+  root?: string;
+  /** Required to remove a non-empty directory. */
+  recursive?: boolean;
+}
+
+/**
+ * GET /api/workspaces/:id/files/tree
+ * Full recursive relative-path listing for one workspace root, consumed by
+ * path-first tree renderers. `truncated` reports hitting the entry cap.
+ */
+export interface FileTreeResponse {
+  root: string;
+  isMain: boolean;
+  /** Every visible file and directory path, POSIX separators, presorted. */
+  paths: string[];
+  truncated: boolean;
+}
+
+/** Shared mutation result shape for file create/rename/delete. */
+export interface FileMutationResult {
+  path: string;
+  /** Present when a previous entry was replaced or moved. */
+  from?: string;
+}
+
+export type CreateFileResponse = FileMutationResult;
+export type RenameFileResponse = FileMutationResult;
+export type DeleteFileResponse = { path: string; recursive: boolean };

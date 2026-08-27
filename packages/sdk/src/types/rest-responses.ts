@@ -1,4 +1,4 @@
-import type { Session, Message, Workspace, ToolDefinition, ToolEnvVarStatus, PromptInfo, ModelWithStatus, Preconfig, ProviderStatus, ProviderCredentialStatus, ModelsConfigResponse, ModelsConfig, FileEntry, FilePreviewResponse, TerminalSessionInfo, McpServerConfig, McpStatus, PinnedMessage, GitAvailability, GitDiffSummary, GitFileDiffResponse, EditableFileResponse, SaveFileResponse as SaveFileResultResponse, Agent } from '../shared';
+import type { Session, Message, Workspace, ToolDefinition, ToolEnvVarStatus, PromptInfo, ModelWithStatus, Preconfig, ProviderStatus, ProviderCredentialStatus, ModelsConfigResponse, ModelsConfig, FileEntry, FilePreviewResponse, TerminalSessionInfo, McpServerConfig, McpStatus, PinnedMessage, GitAvailability, GitDiffSummary, GitFileDiffResponse, EditableFileResponse, SaveFileResponse as SaveFileResultResponse, FileTreeResponse as FileTreeResultResponse, CreateFileResponse, RenameFileResponse, DeleteFileResponse, Agent } from '../shared';
 import type { NotificationConfig, PushSubscriptionRecord } from '../shared-types/notification';
 
 /**
@@ -416,6 +416,26 @@ export type ReadEditableFileResponse = EditableFileResponse;
  * PUT /api/workspaces/:id/file
  */
 export type SaveFileResponse = SaveFileResultResponse;
+
+/**
+ * GET /api/workspaces/:id/files/tree
+ */
+export type FileTreeRestResponse = FileTreeResultResponse;
+
+/**
+ * POST /api/workspaces/:id/files/create
+ */
+export type CreateFileRestResponse = CreateFileResponse;
+
+/**
+ * POST /api/workspaces/:id/files/rename
+ */
+export type RenameFileRestResponse = RenameFileResponse;
+
+/**
+ * POST /api/workspaces/:id/files/delete
+ */
+export type DeleteFileRestResponse = DeleteFileResponse;
 
 /**
  * GET /api/workspaces/:id/git/diff

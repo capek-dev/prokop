@@ -10,8 +10,17 @@ import type {
   ListDrivesResponse,
   ReadEditableFileResponse,
   SaveFileResponse,
+  FileTreeRestResponse,
+  CreateFileRestResponse,
+  RenameFileRestResponse,
+  DeleteFileRestResponse,
 } from '../types/rest-responses';
-import type { SaveFileRequest } from '../shared';
+import type {
+  SaveFileRequest,
+  CreateFileRequest,
+  RenameFileRequest,
+  DeleteFileRequest,
+} from '../shared';
 
 interface BrowseOptions {
   path?: string;
@@ -123,6 +132,38 @@ export class FilesRestNamespace {
 
   async save(workspaceId: string, request: SaveFileRequest, options?: SaveOptions): Promise<SaveFileResponse> {
     return this.http.put(`/workspaces/${encodeURIComponent(workspaceId)}/file`, request, {
+      signal: options?.signal,
+    });
+  }
+
+  async tree(
+    workspaceId: string,
+    options?: { root?: string; signal?: AbortSignal },
+  ): Promise<FileTreeRestResponse> {
+    const params: Record<string, string> = {};
+    if (options?.root !== undefined) {
+      params.root = options.root;
+    }
+    return this.http.get(`/workspaces/${encodeURIComponent(workspaceId)}/files/tree`, {
+      params: Object.keys(params).length > 0 ? params : undefined,
+      signal: options?.signal,
+    });
+  }
+
+  async createFile(workspaceId: string, request: CreateFileRequest, options?: SaveOptions): Promise<CreateFileRestResponse> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/files/create`, request, {
+      signal: options?.signal,
+    });
+  }
+
+  async renameFile(workspaceId: string, request: RenameFileRequest, options?: SaveOptions): Promise<RenameFileRestResponse> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/files/rename`, request, {
+      signal: options?.signal,
+    });
+  }
+
+  async deleteFile(workspaceId: string, request: DeleteFileRequest, options?: SaveOptions): Promise<DeleteFileRestResponse> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/files/delete`, request, {
       signal: options?.signal,
     });
   }
