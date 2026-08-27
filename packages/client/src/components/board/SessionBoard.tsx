@@ -78,10 +78,18 @@ export function SessionBoard({ sdkClient, serverUrl }: SessionBoardProps) {
     if (node) {
       setMaxColumns(Math.max(1, Math.floor(node.clientWidth / MIN_PANE_WIDTH)) || 1);
       observerRef.current = new ResizeObserver((entries) => {
+        // Frame-loop guard: deferring the state update out of the observer
+        // callback prevents the layout-feedback loop that throws
+        // "ResizeObserver loop completed with undelivered notifications"
+        // on every frame while panes animate.
+        let next: number | null = null;
         for (const entry of entries) {
-          const next = Math.max(1, Math.floor(entry.contentRect.width / MIN_PANE_WIDTH)) || 1;
-          setMaxColumns(prev => (prev === next ? prev : next));
+          next = Math.max(1, Math.floor(entry.contentRect.width / MIN_PANE_WIDTH)) || 1;
         }
+        if (next === null) return;
+        queueMicrotask(() => {
+          setMaxColumns(prev => (prev === next ? prev : next!));
+        });
       });
       observerRef.current.observe(node);
     }

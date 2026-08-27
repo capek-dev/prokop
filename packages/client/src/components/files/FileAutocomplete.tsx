@@ -42,6 +42,7 @@ export function FileAutocomplete({
 }: FileAutocompleteProps) {
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
   const queryIdRef = useRef(0);
 
@@ -62,6 +63,7 @@ export function FileAutocomplete({
 
     const queryId = ++queryIdRef.current;
     setLoading(true);
+    setError(null);
 
     const controller = new AbortController();
 
@@ -78,6 +80,14 @@ export function FileAutocomplete({
       })
       .catch(err => {
         if (err instanceof Error && err.name !== 'AbortError') {
+          // Transient network failures (e.g. a superseded search aborting a
+          // mid-flight glob on the server) must not wedge the popover. Record
+          // the error so the next keystroke can recover instead of leaving the
+          // component in a loading state with no results and no way forward.
+          if (queryId === queryIdRef.current) {
+            setError(err.message || 'Search failed');
+            setLoading(false);
+          }
           console.error('File search failed:', err);
         }
       })
@@ -101,6 +111,15 @@ export function FileAutocomplete({
       <div className="flex items-center justify-center p-4 text-muted-foreground">
         <Loader2 className="w-4 h-4 animate-spin mr-2" />
         Searching...
+      </div>
+    );
+  }
+
+  if (error && files.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 p-4 text-muted-foreground">
+        <span className="text-xs">Search failed.</span>
+        <span className="text-[11px]">Keep typing to retry.</span>
       </div>
     );
   }
