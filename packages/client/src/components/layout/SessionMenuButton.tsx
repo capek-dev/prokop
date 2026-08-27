@@ -475,7 +475,7 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
       <TooltipProvider delayDuration={300}>
         <SidebarMenuItem>
           <div
-            className={cn('flex w-full items-center rounded-md', rowClassName, highlightClass)}
+            className={cn('relative flex w-full items-center rounded-md', rowClassName, highlightClass)}
             onClick={selectionMode ? handleRowClick : undefined}
           >
             {isEditing ? (
@@ -574,7 +574,7 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
       >
         <SidebarMenuItem>
           <div
-            className={cn('flex w-full items-center rounded-md', rowClassName, highlightClass)}
+            className={cn('relative flex w-full items-center rounded-md', rowClassName, highlightClass)}
             onClick={selectionMode ? handleRowClick : undefined}
           >
             {isEditing ? (
