@@ -13,6 +13,7 @@ import { getToolRowInfo } from '@/lib/toolSummaries';
 import type { ToolRowChip } from '@/lib/toolSummaries';
 import { useSdkClient } from '@/contexts/ServerClientContext';
 import { useToolDebugQuery, useToolDisplayCatalog } from '@/hooks/queries';
+import { cn } from '@/lib/utils';
 
 interface LazyOutputProps {
   content: string;
@@ -119,7 +120,7 @@ function getDescendantSessionIds(parentId: string, sessions: Session[]): Set<str
 const chipToneClass: Record<ToolRowChip['tone'], string> = {
   neutral: 'bg-muted text-muted-foreground',
   success: 'bg-success/15 text-success',
-  error: 'bg-red-500/15 text-red-400',
+  error: 'bg-destructive/10 text-destructive',
 };
 
 const areToolCallPropsEqual = (
@@ -229,7 +230,7 @@ export const ToolCall = memo(function ToolCall({
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
           <div
-            className="flex items-center gap-2 py-1 cursor-pointer hover:text-foreground transition-colors text-muted-foreground"
+            className="group/tool-row flex items-center gap-2 py-1 cursor-pointer hover:text-foreground transition-colors text-muted-foreground"
           >
             {getStatusIcon(status)}
 
@@ -261,16 +262,19 @@ export const ToolCall = memo(function ToolCall({
             {taskSessionId && onNavigateToSubagent && (
               <Button
                 variant="ghost"
-                size="sm"
-                className="ml-auto h-6 w-6 p-0 sm:w-auto sm:px-2"
+                size="icon-xs"
+                className={cn(
+                  'ml-auto shrink-0',
+                  'opacity-0 transition-opacity group-hover/tool-row:opacity-100 focus-visible:opacity-100',
+                )}
                 onClick={(e) => {
                   e.stopPropagation();
                   onNavigateToSubagent(taskSessionId!);
                 }}
                 title="View session"
+                aria-label="View session"
               >
                 <ExternalLink className="size-3" />
-                <span className="hidden sm:inline ml-1">View</span>
               </Button>
             )}
           </div>
@@ -281,7 +285,7 @@ export const ToolCall = memo(function ToolCall({
             {/* Pretty body for collapsed visualizations (chip-only while collapsed) */}
             {visualization && visualization.collapsed && visualization.type !== 'none' && (
               <div>
-                <div className="text-xs uppercase text-muted-foreground mb-1">Result</div>
+                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70 mb-1">Result</div>
                 <VisualizationRenderer visualization={visualization} />
               </div>
             )}
@@ -309,7 +313,7 @@ export const ToolCall = memo(function ToolCall({
 
             {debugReady && (
               <div>
-                <div className="text-xs uppercase text-muted-foreground mb-1">Input</div>
+                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70 mb-1">Input</div>
                 <LazyOutput
                   content={serializedInput}
                   className="text-xs bg-background border rounded-md p-2 overflow-x-auto whitespace-pre-wrap break-words"
@@ -334,7 +338,7 @@ export const ToolCall = memo(function ToolCall({
             {debugReady && status === 'completed' && serializedOutput !== null && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <div className="text-xs uppercase text-muted-foreground">Output</div>
+                  <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Output</div>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -350,7 +354,7 @@ export const ToolCall = memo(function ToolCall({
                 </div>
                 <LazyOutput
                   content={serializedOutput}
-                  className="text-xs bg-success/10 border border-success/20 rounded-md p-2 overflow-x-auto whitespace-pre-wrap break-words"
+                  className="text-xs bg-muted/50 border border-border/60 rounded-md p-2 overflow-x-auto whitespace-pre-wrap break-words"
                 />
               </div>
             )}
@@ -358,7 +362,7 @@ export const ToolCall = memo(function ToolCall({
             {/* Error */}
             {status === 'error' && 'error' in state && (
               <div>
-                <div className="text-xs uppercase text-muted-foreground mb-1">Error</div>
+                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70 mb-1">Error</div>
                 <pre className="text-xs bg-destructive/10 border border-destructive/20 rounded-md p-2 overflow-x-auto whitespace-pre-wrap break-words text-destructive">
                   {state.error as string}
                 </pre>

@@ -17,8 +17,8 @@ describe('TerminalOutput', () => {
   it('shows error styling for non-zero exit code', () => {
     render(<TerminalOutput command="fail" exitCode={1} />);
     const exitBadge = screen.getByText('[1]');
-    expect(exitBadge.className).toContain('bg-red-500/20');
-    expect(exitBadge.className).toContain('text-red-400');
+    expect(exitBadge.className).toContain('bg-destructive/10');
+    expect(exitBadge.className).toContain('text-destructive');
   });
 
   it('shows muted styling for zero exit code', () => {
@@ -35,7 +35,7 @@ describe('TerminalOutput', () => {
   it('renders stderr when provided', () => {
     render(<TerminalOutput command="err" exitCode={1} stderr="error occurred" />);
     const stderrEl = screen.getByText('error occurred');
-    expect(stderrEl.className).toContain('text-red-400');
+    expect(stderrEl.className).toContain('text-destructive');
   });
 
   it('renders both stdout and stderr', () => {
@@ -55,7 +55,7 @@ describe('TerminalOutput', () => {
     const { container } = render(
       <TerminalOutput command="noop" exitCode={0} />,
     );
-    const outputSection = container.querySelector('.bg-black');
+    const outputSection = container.querySelector('pre');
     expect(outputSection).not.toBeInTheDocument();
   });
 

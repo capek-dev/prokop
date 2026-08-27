@@ -151,7 +151,7 @@ export const CodeBlock: FC<CodeBlockProps> = memo(({
                 key={lineKey}
                 className={cn(
                   'flex font-mono text-xs',
-                  highlightSet.has(lineKey + 1) && 'bg-yellow-500/20',
+                  highlightSet.has(lineKey + 1) && 'bg-warning/20',
                 )}
               >
                 <span className={cn('w-10 text-right pr-2 select-none border-r', isDark ? 'text-muted-foreground border-white/10' : 'text-muted-foreground border-border')}>
@@ -174,7 +174,7 @@ export const CodeBlock: FC<CodeBlockProps> = memo(({
                         key={lineKey}
                         className={cn(
                           'flex font-mono text-xs',
-                          highlightSet.has(lineKey + 1) && 'bg-yellow-500/20',
+                          highlightSet.has(lineKey + 1) && 'bg-warning/20',
                         )}
                       >
                         <span className={cn('w-10 text-right pr-2 select-none border-r', isDark ? 'text-muted-foreground border-white/10' : 'text-muted-foreground border-border')}>

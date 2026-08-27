@@ -39,6 +39,9 @@ export const RENDER_BUDGETS = {
   /** File list items to render before requiring expansion */
   fileListMaxItems: 200,
 
+  /** File list items rendered inline before collapsing behind a toggle */
+  fileListInlineMaxItems: 8,
+
   /** Todo list items above which virtualization or pagination is considered */
   todoListVirtualizeThreshold: 100,
 

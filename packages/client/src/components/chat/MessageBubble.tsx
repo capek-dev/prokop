@@ -1,4 +1,4 @@
-import { Copy, Check, User, Bot, X, Clock, Undo2, GitBranch, Pin, PinOff, Pencil, X as XIcon, Loader2 } from 'lucide-react';
+import { Copy, Check, X, Clock, Undo2, GitBranch, Pin, PinOff, Pencil, X as XIcon, Loader2 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { Message } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
@@ -186,76 +186,75 @@ export function MessageBubble({
   return (
     <div
       className={cn(
-        'flex flex-col gap-1 animate-slide-up min-w-0',
+        'group/msg flex flex-col gap-0.5 animate-slide-up min-w-0',
         isUser ? 'items-end' : 'items-stretch'
       )}
     >
       <div
         className={cn(
-          'flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground',
-          isUser ? 'mr-3' : 'ml-3'
+          'flex items-center gap-1 text-[10px] font-medium text-muted-foreground/70',
+          isUser ? 'mr-1' : 'ml-1'
         )}
       >
         {isUser ? (
           <>
-            {!isQueued && (
-              <>
-                {canRevert && onRevert && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setShowRevertConfirm(true)}
-                    className="size-5 text-muted-foreground hover:text-foreground"
-                    title="Revert to this point"
-                  >
-                    <Undo2 className="size-3" />
-                  </Button>
-                )}
-                {canFork && onFork && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setShowForkConfirm(true)}
-                    className="size-5 text-muted-foreground hover:text-foreground"
-                    title="Fork from this point"
-                  >
-                    <GitBranch className="size-3" />
-                  </Button>
-                )}
-                {showEditButton && !isEditing && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleStartEdit}
-                    className="size-5 text-muted-foreground hover:text-foreground"
-                    title="Edit and resubmit"
-                  >
-                    <Pencil className="size-3" />
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleCopy}
-                  className="size-5 text-muted-foreground hover:text-foreground"
-                >
-                  {copied ? (
-                    <Check className="size-3" />
-                  ) : (
-                    <Copy className="size-3" />
+            <span>You</span>
+            <span
+              className={cn(
+                'ml-auto flex items-center gap-0.5',
+                'opacity-0 transition-opacity group-hover/msg:opacity-100 focus-within:opacity-100',
+              )}
+            >
+              {!isQueued && (
+                <>
+                  {canRevert && onRevert && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowRevertConfirm(true)}
+                      className="size-5 text-muted-foreground hover:text-foreground"
+                      title="Revert to this point"
+                    >
+                      <Undo2 className="size-3" />
+                    </Button>
                   )}
-                </Button>
-              </>
-            )}
-            <User className="size-3" />
-            {message.role}
+                  {canFork && onFork && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowForkConfirm(true)}
+                      className="size-5 text-muted-foreground hover:text-foreground"
+                      title="Fork from this point"
+                    >
+                      <GitBranch className="size-3" />
+                    </Button>
+                  )}
+                  {showEditButton && !isEditing && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleStartEdit}
+                      className="size-5 text-muted-foreground hover:text-foreground"
+                      title="Edit and resubmit"
+                    >
+                      <Pencil className="size-3" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCopy}
+                    className="size-5 text-muted-foreground hover:text-foreground"
+                    title="Copy message"
+                  >
+                    {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                  </Button>
+                </>
+              )}
+            </span>
           </>
         ) : (
-          <>
-            <Bot className="size-3" />
-            {message.role}
-            {renderAssistantActions()}
-          </>
+          <span>Assistant</span>
         )}
       </div>
 
@@ -335,8 +334,31 @@ export function MessageBubble({
       )}
 
       {showAssistantFork && (
-        <div className="flex items-center gap-1.5 pt-1">
-          {renderAssistantActions()}
+        <div className="flex items-center gap-0.5 pt-0.5">
+          {showPinButton && isPinned && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onTogglePin}
+              disabled={isPinningMessage}
+              className="size-6 text-primary hover:text-primary/80"
+              title="Unpin message"
+            >
+              {isPinningMessage ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <PinOff className="size-3" />
+              )}
+            </Button>
+          )}
+          <span
+            className={cn(
+              'flex items-center gap-0.5',
+              'opacity-0 transition-opacity group-hover/msg:opacity-100 focus-within:opacity-100',
+            )}
+          >
+            {renderAssistantActions()}
+          </span>
         </div>
       )}
 

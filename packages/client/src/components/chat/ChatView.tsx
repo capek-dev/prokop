@@ -344,7 +344,7 @@ export function ChatView({
       )}
 
       {rejectionNotice && (
-        <div className="px-4 py-2 border-t border-orange-500/30 bg-orange-50 dark:bg-orange-950/30 text-center flex items-center justify-center gap-2 text-xs text-orange-600 dark:text-orange-400">
+        <div className="px-4 py-2 border-t border-warning/25 bg-warning/10 text-center flex items-center justify-center gap-2 text-xs text-warning">
           <ShieldOff className="size-3.5" />
           {rejectionNotice}
         </div>

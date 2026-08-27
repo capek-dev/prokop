@@ -476,7 +476,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const canSend = trimmed || pendingAttachments.length > 0;
   const isDisabled = !canSend || disabled || hasUploadingAttachment || goalActive;
   const effectivePlaceholder = goalActive
-    ? `Goal active: ${goalState?.condition ?? ''} (Turn ${goalState?.currentTurn ?? 0}/${goalState?.maxTurns ?? 0})`
+    ? 'Goal active'
     : sendMode === 'goal'
       ? 'Type the completion condition...'
       : placeholder;
@@ -488,7 +488,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        'px-4 pt-2 pb-4',
+        'mx-auto w-full max-w-3xl px-4 pt-2 pb-4',
         isDragOver && 'ring-2 ring-primary'
       )}
     >
@@ -518,7 +518,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
           </div>
         )}
         {pendingAttachments.length > 0 && modelSupportsImage === false && (
-          <div className="flex items-center gap-1.5 px-3 pt-2 text-xs text-amber-600 dark:text-amber-400">
+          <div className="flex items-center gap-1.5 px-3 pt-2 text-xs text-warning">
             <AlertTriangle className="size-3 shrink-0" />
             <span>This model will not inspect images directly. They will be sent as file paths instead.</span>
           </div>
@@ -533,6 +533,17 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                 onPreview={handleMentionPreview}
               />
             ))}
+          </div>
+        )}
+        {goalActive && (
+          <div className="flex items-center gap-2 px-3 pt-3 text-xs">
+            <Target className="size-3 shrink-0 text-warning" />
+            <span className="min-w-0 truncate text-warning" title={goalState?.condition ?? ''}>
+              {goalState?.condition}
+            </span>
+            <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
+              Turn {goalState?.currentTurn ?? 0}/{goalState?.maxTurns ?? 0}
+            </span>
           </div>
         )}
         <div className="relative">
@@ -636,25 +647,32 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
             )}
           </div>
 
-          <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
-            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">/</kbd>
-            <span>prompts</span>
-            <span className="mx-1">•</span>
-            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">@</kbd>
-            <span>files</span>
-          </div>
+          {!trimmed && (
+            <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">/</kbd>
+              <span>prompts</span>
+              <span className="mx-1">•</span>
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">@</kbd>
+              <span>files</span>
+            </div>
+          )}
 
-          <div className="flex h-8 items-center rounded-full border border-border">
+          <div className="flex h-7 items-center rounded-full border border-border/70">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   disabled={goalActive}
-                  className="flex h-full items-center gap-0.5 rounded-l-full bg-muted pl-2.5 pr-1 text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
-                  aria-label="Send mode"
+                  className={cn(
+                    'flex h-full items-center gap-0.5 rounded-l-full pl-2 pr-1 text-xs font-medium transition-colors disabled:opacity-50',
+                    sendMode === 'goal'
+                      ? 'bg-warning/15 text-warning'
+                      : 'bg-muted text-muted-foreground hover:bg-accent',
+                  )}
+                  aria-label={`Send mode: ${sendMode}`}
                 >
-                  <span className="text-xs font-medium capitalize">{sendMode}</span>
-                  <ChevronDown className="size-3 opacity-60" />
+                  <span className="capitalize">{sendMode}</span>
+                  <ChevronDown className="size-2.5 opacity-60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" side="top" sideOffset={8} className="w-56">
@@ -708,7 +726,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
               <button
                 type="button"
                 onClick={onStopStreaming}
-                className="flex h-full items-center justify-center rounded-r-full border-l border-border bg-muted px-2.5 text-red-600 transition-colors hover:bg-accent dark:text-red-400"
+                className="flex h-full items-center justify-center rounded-r-full border-l border-border/70 bg-muted px-2.5 transition-colors text-destructive hover:bg-accent"
                 aria-label="Stop"
                 title="Stop (double Esc)"
               >
@@ -719,11 +737,11 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                 type="submit"
                 disabled={isDisabled}
                 className={cn(
-                  'flex h-full items-center justify-center rounded-r-full border-l border-border bg-muted px-2.5 transition-colors hover:bg-accent disabled:opacity-50',
+                  'flex h-full items-center justify-center rounded-r-full border-l border-border/70 bg-muted px-2.5 transition-colors hover:bg-accent disabled:opacity-50',
                   isDisabled
                     ? 'text-muted-foreground'
                     : sendMode === 'goal'
-                      ? 'text-amber-600 dark:text-amber-500'
+                      ? 'text-warning'
                       : 'text-primary',
                 )}
                 aria-label={isStreaming ? 'Queue message' : sendMode === 'goal' ? 'Set goal' : 'Send message'}
