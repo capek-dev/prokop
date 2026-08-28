@@ -12,6 +12,10 @@ export interface TerminalSessionInfo {
   lastActivityAt: number;
   activeClientCount: number;
   inAlternateScreen: boolean;
+  /** Who created the session. 'user' terminals come from the terminal
+   * panel; 'agent' terminals were spawned by the terminal tool. Omitted
+   * by older servers, treat as 'user'. */
+  origin?: 'user' | 'agent';
 }
 
 export interface TerminalSessionInit {
