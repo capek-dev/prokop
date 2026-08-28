@@ -222,6 +222,44 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
     [docs, closeDocAction],
   );
 
+  // Single refresh entry point: re-read the doc from disk and invalidate its
+  // Git diff so both reflect external writes (LLM edits, other editors).
+  const invalidateDocDiff = useCallback((docId: string) => {
+    const doc = useFileEditorStore.getState().docs[docId];
+    if (!doc) return;
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.files.gitDiff(
+        doc.identity.workspaceId,
+        normalizePath(doc.identity.path),
+        doc.identity.root || undefined,
+      ),
+    });
+  }, []);
+
+  // Reload from disk: reset the doc to loading so the load effect re-fetches.
+  // Dirty docs require confirmation, since reload discards local edits.
+  const [reloadingDocId, setReloadingDocId] = useState<string | null>(null);
+  const reloadDoc = useFileEditorStore((s) => s.reloadDoc);
+  const reloadFromDisk = useCallback(
+    (docId: string) => {
+      invalidateDocDiff(docId);
+      reloadDoc(docId);
+    },
+    [invalidateDocDiff, reloadDoc],
+  );
+  const requestReload = useCallback(
+    (docId: string) => {
+      const doc = useFileEditorStore.getState().docs[docId];
+      if (!doc) return;
+      if (isDocDirty(doc)) {
+        setReloadingDocId(docId);
+      } else {
+        reloadFromDisk(docId);
+      }
+    },
+    [reloadFromDisk],
+  );
+
   const handleConfirmCloseSave = useCallback(async () => {
     if (!closingDocId) return;
     const docId = closingDocId;
@@ -250,6 +288,12 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
     closeDocAction(closingDocId);
     setClosingDocId(null);
   }, [closingDocId, closeDocAction]);
+
+  const handleConfirmReload = useCallback(() => {
+    if (!reloadingDocId) return;
+    reloadFromDisk(reloadingDocId);
+    setReloadingDocId(null);
+  }, [reloadingDocId, reloadFromDisk]);
 
   // --- Conflict actions ---
   const handleConflictCancel = useCallback(
@@ -381,6 +425,7 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
               onReload={() => handleConflictReload(id)}
               onCancelConflict={() => handleConflictCancel(id)}
               onRetry={() => markLoading(id)}
+              onRequestReload={() => requestReload(id)}
               sdkClient={sdkClient}
             />
           </div>
@@ -410,6 +455,27 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reload discards local edits: confirm when dirty */}
+      <Dialog open={!!reloadingDocId} onOpenChange={(open) => !open && setReloadingDocId(null)}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Refresh from disk</DialogTitle>
+            <DialogDescription>
+              {docs[reloadingDocId ?? '']?.name ?? 'This file'} has unsaved changes. Reloading replaces them with the version on disk.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReloadingDocId(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmReload}>
+              <RotateCcw className="size-4" />
+              Reload
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -425,6 +491,8 @@ interface ActiveFileBodyProps {
   onReload: () => void;
   onCancelConflict: () => void;
   onRetry: () => void;
+  /** Re-fetch the file from disk (dirty-guarded by the surface). */
+  onRequestReload: () => void;
   sdkClient: ProkopaiClient | null;
 }
 
@@ -439,6 +507,7 @@ function ActiveFileBody({
   onReload,
   onCancelConflict,
   onRetry,
+  onRequestReload,
   sdkClient,
 }: ActiveFileBodyProps) {
   const docId = buildDocId(doc.identity);
@@ -468,16 +537,6 @@ function ActiveFileBody({
       deletions: diffData.deletions,
     };
   }, [diffData]);
-
-  const handleRefreshDiff = useCallback(() => {
-    queryClient.invalidateQueries({
-      queryKey: queryKeys.files.gitDiff(
-        doc.identity.workspaceId,
-        normalizedPath,
-        normalizedRoot,
-      ),
-    });
-  }, [doc.identity.workspaceId, normalizedPath, normalizedRoot]);
 
   if (doc.status === 'loading') {
     return (
@@ -551,16 +610,6 @@ function ActiveFileBody({
                   {showGitDiff ? <EyeOff className="size-3" /> : <GitBranch className="size-3" />}
                 </Button>
               )}
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                onClick={handleRefreshDiff}
-                title="Refresh Git diff"
-                disabled={diffFetching}
-                className="shrink-0"
-              >
-                <RefreshCw className={cn('size-3', diffFetching && 'animate-spin')} />
-              </Button>
             </>
           )}
           {isMd && (
@@ -577,6 +626,19 @@ function ActiveFileBody({
               </TabsList>
             </Tabs>
           )}
+          {/* Single refresh: re-reads the file from disk (picks up external
+              changes like LLM writes, other editors) and refreshes its Git
+              diff. The surface dirty-guards this and asks for confirmation. */}
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            onClick={onRequestReload}
+            title="Refresh from disk"
+            disabled={saving}
+            className="shrink-0"
+          >
+            <RotateCcw className="size-3" />
+          </Button>
           {dirty && !doc.conflict && (
             <Button size="xs" onClick={onSave} disabled={saving}>
               {saving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}

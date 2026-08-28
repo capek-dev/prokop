@@ -58,6 +58,11 @@ interface FileEditorActions {
   openDoc: (identity: FileDocIdentity, name: string) => FileDocId;
   /** Mark an existing doc as loading. */
   markLoading: (docId: FileDocId) => void;
+  /**
+   * Reset a doc to the loading state so the load effect re-fetches it from
+   * disk (manual reload). Equivalent to close+reopen, but keeps the tab.
+   */
+  reloadDoc: (docId: FileDocId) => void;
   /** Hydrate a doc after a successful editable read. */
   hydrateSuccess: (docId: FileDocId, data: EditableFileResponse) => void;
   /** Mark a doc as failed to load. */
@@ -176,6 +181,28 @@ export const useFileEditorStore = create<FileEditorStore>((baseSet) => {
           docs: {
             ...state.docs,
             [docId]: { ...doc, status: 'loading', error: undefined },
+          },
+        };
+      });
+    },
+
+    reloadDoc: (docId) => {
+      set((state) => {
+        const doc = state.docs[docId];
+        // A doc already loading or saving must not be reset mid-flight.
+        if (!doc || doc.status === 'loading' || doc.status === 'saving') return {};
+        return {
+          docs: {
+            ...state.docs,
+            [docId]: {
+              ...doc,
+              revision: '',
+              baseContent: '',
+              content: '',
+              status: 'loading',
+              error: undefined,
+              conflict: undefined,
+            },
           },
         };
       });

@@ -106,6 +106,69 @@ describe('FileEditorSurface Git diff query lifecycle', () => {
       '/extra/root',
       true,
     );
+  });
 
+  test('re-fetches a loaded doc after reloadDoc resets it to loading', async () => {
+    const identity: FileDocIdentity = {
+      serverId: 'server-1',
+      workspaceId: 'workspace-1',
+      root: '',
+      path: 'src/refresh.ts',
+    };
+    const docId = openLoadedDoc(identity, 'refresh.ts');
+    expect(useFileEditorStore.getState().docs[docId]?.status).toBe('loaded');
+
+    const readEditable = vi.fn().mockResolvedValue({
+      path: 'src/refresh.ts',
+      name: 'refresh.ts',
+      size: 2,
+      content: 'new content from disk',
+      revision: 'rev-2',
+      readOnly: false,
+      encoding: 'utf-8',
+    });
+    const sdkClient = {
+      http: { files: { readEditable } },
+    } as unknown as ProkopaiClient;
+
+    render(
+      <FileEditorSurface
+        sdkClient={sdkClient}
+        serverId="server-1"
+        workspaceId="workspace-1"
+      />,
+    );
+
+    // Loaded doc: the load effect must not re-fetch on mount.
+    await act(async () => {});
+    expect(readEditable).not.toHaveBeenCalled();
+
+    // Reload resets the doc; the effect re-fetches and hydrates disk content.
+    act(() => {
+      useFileEditorStore.getState().reloadDoc(docId);
+    });
+    await act(async () => {});
+
+    expect(readEditable).toHaveBeenCalledTimes(1);
+    const doc = useFileEditorStore.getState().docs[docId];
+    expect(doc?.status).toBe('loaded');
+    expect(doc?.content).toBe('new content from disk');
+    expect(doc?.revision).toBe('rev-2');
+  });
+
+  test('reloadDoc is a no-op while a doc is loading or saving', () => {
+    const identity: FileDocIdentity = {
+      serverId: 'server-1',
+      workspaceId: 'workspace-1',
+      root: '',
+      path: 'src/midflight.ts',
+    };
+    const docId = openLoadedDoc(identity, 'midflight.ts');
+    const before = useFileEditorStore.getState().docs[docId];
+
+    useFileEditorStore.getState().markSaving(docId);
+    useFileEditorStore.getState().reloadDoc(docId);
+    expect(useFileEditorStore.getState().docs[docId]?.status).toBe('saving');
+    expect(useFileEditorStore.getState().docs[docId]?.content).toBe(before?.content);
   });
 });
