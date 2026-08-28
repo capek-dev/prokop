@@ -27,8 +27,8 @@ describe('question tool definition', () => {
     expect(schema.required).toContain('questions');
   });
 
-  test('has 5 minute timeout', () => {
-    expect(definition.timeout).toBe(300000);
+  test('has no deadline (null timeout)', () => {
+    expect(definition.timeout).toBeNull();
   });
 });
 

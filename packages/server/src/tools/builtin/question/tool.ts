@@ -119,7 +119,7 @@ export const definition: ToolDefinition = {
     },
     required: ['title', 'questions'],
   },
-  timeout: 300000,
+  timeout: null,
 };
 
 export async function execute(input: QuestionInput, ctx: ToolContext): Promise<ToolResult> {
