@@ -96,6 +96,10 @@ function parseNumstat(output: string): Map<string, { additions?: number; deletio
   return result;
 }
 
+function stripTerminalLineEnding(output: string): string {
+  return output.replace(/\r?\n$/, '');
+}
+
 async function execGit(args: string[]): Promise<{ stdout: string; exitCode: number }> {
   try {
     const proc = Bun.spawn(['git', ...args], {
@@ -108,7 +112,8 @@ async function execGit(args: string[]): Promise<{ stdout: string; exitCode: numb
     const stdout = await new Response(proc.stdout).text();
     await new Response(proc.stderr).text();
 
-    return { stdout: stdout.trim(), exitCode };
+    // Preserve Git's single-space representation of an empty context line.
+    return { stdout: stripTerminalLineEnding(stdout), exitCode };
   } catch {
     return { stdout: '', exitCode: 1 };
   }
@@ -561,4 +566,5 @@ export const _internal = {
   aggregateDirectoryStatus,
   mapStatus,
   parseUnifiedDiff,
+  stripTerminalLineEnding,
 };

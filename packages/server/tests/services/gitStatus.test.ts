@@ -2,7 +2,14 @@ import { describe, test, expect } from 'bun:test';
 import { _internal, attachGitStatusToEntries } from '@/infrastructure/filesystem/git-status';
 import type { FileEntry, GitDiffSummary, GitAvailability } from '@prokopai/sdk';
 
-const { parsePorcelainStatus, parseNumstat, aggregateDirectoryStatus, mapStatus, parseUnifiedDiff } = _internal;
+const {
+  parsePorcelainStatus,
+  parseNumstat,
+  aggregateDirectoryStatus,
+  mapStatus,
+  parseUnifiedDiff,
+  stripTerminalLineEnding,
+} = _internal;
 
 describe('gitStatus', () => {
   describe('mapStatus', () => {
@@ -404,6 +411,46 @@ describe('gitStatus', () => {
       expect(result.hunks[0].changes).toHaveLength(3);
       expect(result.additions).toBe(1);
       expect(result.deletions).toBe(1);
+    });
+
+    test('retains a final empty context line after Git output normalization', () => {
+      const stdout = [
+        'diff --git a/file.ts b/file.ts',
+        '--- a/file.ts',
+        '+++ b/file.ts',
+        '@@ -145,7 +145,10 @@',
+        ' ',
+        '  useEffect(() => {',
+        '    if (toolsData?.tools) {',
+        '-      setAvailableTools(toolsData.tools);',
+        '+      // Domain tools (memory, skills, search, workflow, scheduler, task)',
+        '+      // are gated by workspace capability toggles, not preconfig tool',
+        '+      // selection; selecting them here would do nothing.',
+        "+      setAvailableTools(toolsData.tools.filter(tool => tool.source !== 'domain'));",
+        '    }',
+        '  }, [toolsData]);',
+        ' ',
+      ].join('\n') + '\n';
+
+      const normalized = stripTerminalLineEnding(stdout);
+      expect(normalized.endsWith(' ')).toBe(true);
+
+      const result = parseUnifiedDiff(normalized);
+      expect(result.hunks).toHaveLength(1);
+      expect(result.additions).toBe(4);
+      expect(result.deletions).toBe(1);
+
+      const hunk = result.hunks[0];
+      const oldConsumed = hunk.changes.filter((change) => change.type !== 'added').length;
+      const newConsumed = hunk.changes.filter((change) => change.type !== 'removed').length;
+      expect(oldConsumed).toBe(hunk.oldLines);
+      expect(newConsumed).toBe(hunk.newLines);
+      expect(hunk.changes.at(-1)).toEqual({
+        type: 'context',
+        content: '',
+        lineNumber: 151,
+        newLineNumber: 154,
+      });
     });
 
     test('returns empty for whitespace-only input', () => {
