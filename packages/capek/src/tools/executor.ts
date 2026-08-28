@@ -34,7 +34,9 @@ export interface ExecuteToolOptions {
   workspaceId?: string;
   toolCallId?: string;
   abortSignal?: AbortSignal;
-  timeout?: number;
+  /** Milliseconds deadline. Pass `null` (or declare it on the tool
+   * definition) to run without a deadline until interrupted. */
+  timeout?: number | null;
   createLlmApi?: (defaultModel?: string) => LlmApi;
   createAskApi?: (toolCallId: string) => AskApi;
   broadcastFn?: (event: { type: string; [key: string]: unknown }) => void;
@@ -172,7 +174,9 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
     workspace,
     sessionId,
     abortSignal,
-    timeout = tool.definition.timeout ?? 30000,
+    // Definition null is authoritative "no deadline"; only an absent
+    // definition falls back to the 30s default.
+    timeout = tool.definition.timeout === undefined ? 30000 : tool.definition.timeout,
     createLlmApi,
     createAskApi,
   } = options;
@@ -211,12 +215,16 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
   const executePromise = tool.execute(args, ctx);
 
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      toolAbortController.abort(new Error(`Tool execution timed out after ${timeout}ms`));
-      reject(new Error(`Tool execution timed out after ${timeout}ms`));
-    }, timeout);
-  });
+  // `timeout === null` is the tool's explicit "no deadline": the executor
+  // arms no timer and the tool runs until it settles or is interrupted.
+  const timeoutPromise = timeout === null
+    ? null
+    : new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          toolAbortController.abort(new Error(`Tool execution timed out after ${timeout}ms`));
+          reject(new Error(`Tool execution timed out after ${timeout}ms`));
+        }, timeout);
+      });
 
   // Abort must settle the race even when the tool ignores its abort signal
   // (for example a tool blocked on ctx.ask()). Promise.race keeps handlers
@@ -232,10 +240,12 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
       })
     : null;
 
+  const racers = timeoutPromise
+    ? (abortPromise ? [executePromise, timeoutPromise, abortPromise] : [executePromise, timeoutPromise])
+    : (abortPromise ? [executePromise, abortPromise] : [executePromise]);
+
   try {
-    const result = await Promise.race(
-      abortPromise ? [executePromise, timeoutPromise, abortPromise] : [executePromise, timeoutPromise],
-    );
+    const result = await Promise.race(racers);
     return result;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

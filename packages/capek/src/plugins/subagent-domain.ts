@@ -276,7 +276,7 @@ export function subagentDomainPlugin(id: string): CapekPlugin<unknown> {
           name: service.tools[0].name,
           description: service.tools[0].description,
           inputSchema: service.tools[0].inputSchema,
-          timeout: 300000,
+          timeout: null,
           [DOMAIN_TOOL_PAYLOAD_FIELD]: service.tools[0],
         } as KernelToolDefinition,
         requiredCapabilities: [capekSubagentDomainKey],

@@ -11,7 +11,7 @@ import { createWorkspaceCapability } from '../src/workspace/policy';
 // kept the AI SDK step hanging and the session stayed "running".
 // ---------------------------------------------------------------------------
 
-function neverSettlingTool(): LoadedTool {
+function neverSettlingTool(timeout?: number | null): LoadedTool {
   const execute = async (_input: unknown, ctx: ToolContext): Promise<ToolResult> => {
     ctx.abortSignal?.throwIfAborted();
     return await new Promise<ToolResult>(() => {});
@@ -21,7 +21,7 @@ function neverSettlingTool(): LoadedTool {
       name: 'never-settles',
       description: 'Tool that ignores its abort signal',
       inputSchema: { type: 'object', properties: {} },
-      timeout: 10_000,
+      timeout,
     },
     execute,
     path: 'virtual://never-settles',
@@ -66,7 +66,7 @@ describe('executeTool abort race', () => {
     controller.abort();
 
     const result = await executeTool({
-      tool: neverSettlingTool(),
+      tool: neverSettlingTool(10_000),
       args: {},
       workspace,
       sessionId: 'session',
@@ -76,5 +76,64 @@ describe('executeTool abort race', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Tool execution interrupted');
+  });
+
+  test('null timeout arms no deadline and a slow tool still completes', async () => {
+    let resolved = false;
+    const tool: LoadedTool = {
+      definition: {
+        name: 'slow-tool',
+        description: 'Would exceed any short deadline',
+        inputSchema: { type: 'object', properties: {} },
+        timeout: null,
+      },
+      execute: async () => {
+        await Bun.sleep(150);
+        resolved = true;
+        return { success: true, result: { ok: true } };
+      },
+      path: 'virtual://slow-tool',
+    };
+
+    const result = await executeTool({
+      tool,
+      args: {},
+      workspace,
+      sessionId: 'session',
+    });
+
+    expect(result.success).toBe(true);
+    expect(resolved).toBe(true);
+  });
+
+  test('explicit null option timeout does not arm a zero-delay timer', async () => {
+    // Old behavior: `setTimeout(fn, null)` fires immediately, so passing null
+    // timed the tool out on the next tick. null must skip the timer entirely
+    // and let the tool run to completion.
+    let resolved = false;
+    const tool: LoadedTool = {
+      definition: {
+        name: 'slow-tool',
+        description: 'Completes after a delay',
+        inputSchema: { type: 'object', properties: {} },
+      },
+      execute: async () => {
+        await Bun.sleep(150);
+        resolved = true;
+        return { success: true, result: { ok: true } };
+      },
+      path: 'virtual://slow-tool',
+    };
+
+    const result = await executeTool({
+      tool,
+      args: {},
+      workspace,
+      sessionId: 'session',
+      timeout: null,
+    });
+
+    expect(result.success).toBe(true);
+    expect(resolved).toBe(true);
   });
 });

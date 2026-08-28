@@ -133,7 +133,7 @@ When NOT to use it:
 Pattern for aggregation (map-reduce): define one schema, spawn N agents each with that outputSchema, then in your next turn merge the returned JSON objects. This keeps your context clean because you can reason about the data instead of re-parsing prose from each agent.
 
 Note: Subagent depth is limited to 2 levels. You cannot spawn further subagents at the maximum depth.`,
-    timeout: 300000,
+    timeout: null,
     inputSchema: {
       type: 'object',
       properties: {

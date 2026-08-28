@@ -181,7 +181,7 @@ describe('C5 subagent composed scope ownership', () => {
       expect(taskEntry!.order).toBe(SUBAGENT_TOOL_CONTRIBUTION_ORDER);
       expect(taskEntry!.pluginId).toBe(CURRENT_SUBAGENT_DOMAIN_PLUGIN_ID);
       expect(taskEntry!.visible).toBe(true);
-      expect(taskEntry!.definition.timeout).toBe(300000);
+      expect(taskEntry!.definition.timeout).toBeNull();
       expect(agentScope.require(capekSubagentDomainKey).tools.map((tool) => tool.name)).toEqual(['task']);
     } finally {
       await agentScope.dispose();
