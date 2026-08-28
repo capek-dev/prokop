@@ -19,6 +19,31 @@ vi.mock('@prokopai/sdk', () => ({
   },
 }));
 
+// Pierre renders into shadow DOM, so light-DOM text assertions cannot see
+// file content; mock the code views to keep behavioral assertions meaningful.
+vi.mock('@/components/files/FileCodeView', () => ({
+  FileCodeView: ({
+    content,
+    diff,
+  }: {
+    content: string;
+    diff?: { hunks: { changes: { content: string }[] }[] };
+  }) => (
+    <div data-testid="mock-file-code-view">
+      {content.split('\n').map((line, i) => (
+        <div key={`content-${i}`}>{line}</div>
+      ))}
+      {diff?.hunks.flatMap((hunk) => hunk.changes).map((change, i) => (
+        <div key={`change-${i}`}>{change.content}</div>
+      ))}
+    </div>
+  ),
+}));
+
+vi.mock('@/components/files/FilePreviewCodeView', () => ({
+  default: () => <div data-testid="mock-file-preview-code-view" />,
+}));
+
 const mockPreviewFn = vi.fn();
 const mockGitDiffFn = vi.fn();
 

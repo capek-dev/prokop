@@ -15,6 +15,35 @@ vi.mock('@/stores/serverDataStore', () => ({
   ),
 }));
 
+// Pierre renders into shadow DOM, invisible to light-DOM text queries; the
+// mock surfaces file contents and the selection range as attributes so the
+// truncation and highlight mapping stay assertable.
+vi.mock('@pierre/diffs/react', () => ({
+  File: ({
+    file,
+    selectedLines,
+  }: {
+    file: { contents: string };
+    selectedLines: { start: number; end: number } | null;
+  }) => (
+    <div
+      data-testid="pierre-file"
+      data-selected={selectedLines ? `${selectedLines.start}-${selectedLines.end}` : 'none'}
+    >
+      {file.contents}
+    </div>
+  ),
+}));
+
+function makeContent(lines: number): string {
+  return Array.from({ length: lines }, (_, i) => `line ${i + 1}`).join('\n');
+}
+
+async function collapseCurrent() {
+  const expandBtn = screen.getAllByRole('button')[0];
+  await userEvent.click(expandBtn);
+}
+
 describe('CodeBlock', () => {
   it('renders file path in header', () => {
     render(<CodeBlock content="hello" path="src/main.ts" />);
@@ -22,83 +51,106 @@ describe('CodeBlock', () => {
   });
 
   it('renders code content via text match', () => {
-    const { container } = render(
-      <CodeBlock content="console.log" path="src/main.ts" />,
-    );
-    expect(container.textContent).toContain('console.log');
+    render(<CodeBlock content="console.log" path="src/render.ts" />);
+    expect(screen.getByTestId('pierre-file').textContent).toContain('console.log');
   });
 
   it('shows "Created" badge by default', () => {
-    render(<CodeBlock content="hello" path="src/main.ts" />);
+    render(<CodeBlock content="hello" path="src/created.ts" />);
     expect(screen.getByText('Created')).toBeInTheDocument();
   });
 
   it('shows "Overwrote" badge when created is false', () => {
-    render(<CodeBlock content="hello" path="src/main.ts" created={false} />);
+    render(<CodeBlock content="hello" path="src/overwrote.ts" created={false} />);
     expect(screen.getByText('Overwrote')).toBeInTheDocument();
   });
 
-  it('shows line count when collapsed', () => {
-    const content = Array.from({ length: 30 }, (_, i) => `line ${i + 1}`).join('\n');
-    render(<CodeBlock content={content} path="src/main.ts" />);
+  it('is expanded by default and shows full content', () => {
+    const content = makeContent(30);
+    render(<CodeBlock content={content} path="src/default-open.ts" />);
+    expect(screen.queryByText('30 lines')).not.toBeInTheDocument();
+    expect(screen.getByTestId('pierre-file').textContent).toContain('line 30');
+  });
+
+  it('shows line count when collapsed', async () => {
+    const content = makeContent(30);
+    render(<CodeBlock content={content} path="src/collapsed-count.ts" />);
+    await collapseCurrent();
     expect(screen.getByText('30 lines')).toBeInTheDocument();
   });
 
-  it('renders line number column', () => {
-    const { container } = render(
-      <CodeBlock content="a\nb\nc" path="src/main.ts" />,
-    );
-    const lineNums = container.querySelectorAll('[class*="border-r"]');
-    expect(lineNums.length).toBeGreaterThanOrEqual(1);
+  it('truncates the preview to the budget when collapsed', async () => {
+    const content = makeContent(30);
+    render(<CodeBlock content={content} path="src/collapsed-truncate.ts" />);
+    await collapseCurrent();
+    const fileEl = screen.getByTestId('pierre-file');
+    expect(fileEl.textContent).toContain('line 20');
+    expect(fileEl.textContent).not.toContain('line 21');
   });
 
   it('has file path button with title', () => {
-    render(<CodeBlock content="hello" path="src/main.ts" />);
-    const pathButton = screen.getByTitle('src/main.ts');
+    render(<CodeBlock content="hello" path="src/title.ts" />);
+    const pathButton = screen.getByTitle('src/title.ts');
     expect(pathButton).toBeInTheDocument();
   });
 
-  it('expands to show all lines when button clicked', async () => {
-    const content = Array.from({ length: 30 }, (_, i) => `line ${i + 1}`).join('\n');
-    render(<CodeBlock content={content} path="src/main.ts" />);
-
+  it('expands again after collapsing', async () => {
+    const content = makeContent(30);
+    render(<CodeBlock content={content} path="src/toggle.ts" />);
+    await collapseCurrent();
     expect(screen.getByText('30 lines')).toBeInTheDocument();
 
     const expandBtn = screen.getAllByRole('button')[0];
     await userEvent.click(expandBtn);
 
     expect(screen.queryByText('30 lines')).not.toBeInTheDocument();
+    expect(screen.getByTestId('pierre-file').textContent).toContain('line 30');
   });
 
-  it('collapses back when button clicked again', async () => {
-    const content = Array.from({ length: 30 }, (_, i) => `line ${i + 1}`).join('\n');
-    render(<CodeBlock content={content} path="src/main.ts" />);
+  it('keeps expansion state across remounts (virtualizer recycling)', async () => {
+    const content = makeContent(30);
+    const path = 'src/persist.ts';
+    const { unmount } = render(<CodeBlock content={content} path={path} />);
+    await collapseCurrent();
+    unmount();
 
-    const expandBtn = screen.getAllByRole('button')[0];
-    await userEvent.click(expandBtn);
-    await userEvent.click(expandBtn);
-
+    // Remount (fresh component instance): the collapsed choice must hold.
+    render(<CodeBlock content={content} path={path} />);
     expect(screen.getByText('30 lines')).toBeInTheDocument();
   });
 
-  it('renders code with syntax highlighting container', () => {
-    const { container } = render(
-      <CodeBlock content="const x = 1" path="src/utils.ts" />,
-    );
-    const codeArea = container.querySelector('[style*="background-color"]');
-    expect(codeArea).toBeInTheDocument();
+  it('scopes expansion state by vizKey, not path+length', async () => {
+    const content = makeContent(30);
+    const path = 'src/shared.ts';
+
+    // Tool call A (vizKey a): user collapses it.
+    const { unmount } = render(<CodeBlock content={content} path={path} vizKey="part-a" />);
+    await collapseCurrent();
+    expect(screen.getByText('30 lines')).toBeInTheDocument();
+    unmount();
+
+    // Tool call B: same path, same content, different part id → must be open.
+    render(<CodeBlock content={content} path={path} vizKey="part-b" />);
+    expect(screen.queryByText('30 lines')).not.toBeInTheDocument();
+    expect(screen.getByTestId('pierre-file').textContent).toContain('line 30');
   });
 
-  it('highlights specified lines', () => {
-    const { container } = render(
-      <CodeBlock
-        content="line1\nline2\nline3"
-        path="src/main.ts"
-        highlightLines={[2]}
-      />,
+  it('maps highlightLines onto the selection range', () => {
+    render(
+      <CodeBlock content={'line1\nline2\nline3'} path="src/highlight.ts" highlightLines={[2]} />,
     );
-    const codeArea = container.querySelector('[style*="background-color"]');
-    expect(codeArea).toBeInTheDocument();
-    expect(codeArea?.innerHTML).toContain('line2');
+    expect(screen.getByTestId('pierre-file')).toHaveAttribute('data-selected', '2-2');
+  });
+
+  it('clamps the selection to the collapsed preview length', async () => {
+    const content = makeContent(30);
+    render(<CodeBlock content={content} path="src/clamp.ts" highlightLines={[25]} />);
+    await collapseCurrent();
+    expect(screen.getByTestId('pierre-file')).toHaveAttribute('data-selected', '20-20');
+  });
+
+  it('passes no selection when highlightLines is empty', () => {
+    render(<CodeBlock content="hello" path="src/noselect.ts" />);
+    expect(screen.getByTestId('pierre-file')).toHaveAttribute('data-selected', 'none');
   });
 });

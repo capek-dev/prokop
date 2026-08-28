@@ -286,7 +286,7 @@ export const ToolCall = memo(function ToolCall({
             {visualization && visualization.collapsed && visualization.type !== 'none' && (
               <div>
                 <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70 mb-1">Result</div>
-                <VisualizationRenderer visualization={visualization} />
+                <VisualizationRenderer visualization={visualization} persistKey={part.id} />
               </div>
             )}
 
@@ -393,7 +393,7 @@ export const ToolCall = memo(function ToolCall({
           {visualization.type === 'shell-output' ? (
             <TerminalOutput stdout={visualization.stdout} stderr={visualization.stderr} />
           ) : (
-            <VisualizationRenderer visualization={visualization} />
+            <VisualizationRenderer visualization={visualization} persistKey={part.id} />
           )}
         </div>
       )}

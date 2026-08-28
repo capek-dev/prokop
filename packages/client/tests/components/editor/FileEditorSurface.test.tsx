@@ -16,8 +16,8 @@ vi.mock('@/hooks/queries', () => ({
   useEditorGitDiffQuery: (...args: unknown[]) => mockUseEditorGitDiffQuery(...args),
 }));
 
-vi.mock('@/components/editor/CodeMirrorEditor', () => ({
-  CodeMirrorEditor: ({ docId }: { docId: string }) => <div data-testid={docId} />,
+vi.mock('@/components/editor/PierreCodeEditor', () => ({
+  PierreCodeEditor: ({ docId }: { docId: string }) => <div data-testid={docId} />,
 }));
 
 function openLoadedDoc(identity: FileDocIdentity, name: string): string {

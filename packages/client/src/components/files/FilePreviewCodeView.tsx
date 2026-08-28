@@ -1,6 +1,8 @@
-import { Highlight, themes } from 'prism-react-renderer';
-import { cn } from '@/lib/utils';
+import { useMemo } from 'react';
+import { File as PierreFile } from '@pierre/diffs/react';
+import type { FileContents } from '@pierre/diffs/react';
 import { useTheme } from '@/components/providers/ThemeProvider';
+import { pierreDiffsBaseOptions, resolvePierreLang } from '@/lib/pierreDiffsTheme';
 
 export interface FilePreviewCodeViewProps {
   content: string;
@@ -9,45 +11,27 @@ export interface FilePreviewCodeViewProps {
   showLineNumbers?: boolean;
 }
 
-const CODE_THEME_DARK = themes.oneDark;
-const CODE_THEME_LIGHT = themes.oneLight;
-
 export default function FilePreviewCodeView({
   content,
-  path: _path,
+  path,
   language,
   showLineNumbers = true,
 }: FilePreviewCodeViewProps) {
   const { resolvedMode } = useTheme();
-  const isDark = resolvedMode === 'dark';
-  const codeTheme = isDark ? CODE_THEME_DARK : CODE_THEME_LIGHT;
+  const baseOptions = useMemo(() => pierreDiffsBaseOptions(resolvedMode), [resolvedMode]);
+  const options = useMemo(
+    () => ({ ...baseOptions, disableLineNumbers: !showLineNumbers }),
+    [baseOptions, showLineNumbers],
+  );
+  const name = path.split('/').pop() ?? path;
+  const lang = useMemo(() => resolvePierreLang(name, language), [name, language]);
+  const file = useMemo<FileContents>(() => ({ name, contents: content, lang }), [name, content, lang]);
 
+  // Vertical scroll container: Pierre's [data-code] only scrolls x and
+  // expects an overflow-y-auto ancestor for wheel/touch scrolling.
   return (
-    <div className={cn('h-full overflow-auto chat-transcript-scrollbar')} style={{ WebkitOverflowScrolling: 'touch', backgroundColor: codeTheme.plain.backgroundColor || (isDark ? '#282c34' : '#fafafa') }}>
-      <Highlight
-        theme={codeTheme}
-        code={content}
-        language={language || 'plaintext'}
-      >
-        {({ style, tokens, getLineProps, getTokenProps }) => (
-          <pre className="text-sm p-4 min-h-full font-mono" style={style}>
-            {tokens.map((line, i) => (
-              <div key={i} {...getLineProps({ line })} className="table-row">
-                {showLineNumbers && (
-                  <span className="table-cell pr-4 text-right select-none opacity-50 text-xs w-12">
-                    {i + 1}
-                  </span>
-                )}
-                <span className="table-cell">
-                  {line.map((token, key) => (
-                    <span key={key} {...getTokenProps({ token })} />
-                  ))}
-                </span>
-              </div>
-            ))}
-          </pre>
-        )}
-      </Highlight>
+    <div className="h-full w-full overflow-y-auto overflow-x-hidden">
+      <PierreFile file={file} options={options} className="min-h-full w-full" />
     </div>
   );
 }

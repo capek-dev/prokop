@@ -11,9 +11,15 @@ import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 
 interface VisualizationRendererProps {
   visualization?: AnyVisualization;
+  /**
+   * Stable identity (tool-call part id) scoping persisted expansion state.
+   * Without it the components fall back to path+content-shape keys, which
+   * collide when the same file is edited twice in one session.
+   */
+  persistKey?: string;
 }
 
-export const VisualizationRenderer = memo(function VisualizationRenderer({ visualization }: VisualizationRendererProps) {
+export const VisualizationRenderer = memo(function VisualizationRenderer({ visualization, persistKey }: VisualizationRendererProps) {
   if (!visualization) {
     return null;
   }
@@ -28,6 +34,7 @@ export const VisualizationRenderer = memo(function VisualizationRenderer({ visua
           additions={visualization.additions}
           deletions={visualization.deletions}
           matchInfo={visualization.matchInfo}
+          vizKey={persistKey}
         />
       );
 
@@ -43,6 +50,7 @@ export const VisualizationRenderer = memo(function VisualizationRenderer({ visua
               additions={diff.additions}
               deletions={diff.deletions}
               matchInfo={diff.matchInfo}
+              vizKey={persistKey ? `${persistKey}:${index}` : undefined}
             />
           ))}
         </div>
@@ -56,6 +64,7 @@ export const VisualizationRenderer = memo(function VisualizationRenderer({ visua
           language={visualization.language}
           created={visualization.created}
           highlightLines={visualization.highlightLines}
+          vizKey={persistKey}
         />
       );
 

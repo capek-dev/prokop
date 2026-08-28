@@ -111,6 +111,7 @@ export default function FilePreviewOverlay({
           </div>
           <div className="flex-1 min-h-0 overflow-hidden">
             <FileCodeView
+              name={target.name}
               content=""
               diff={{ hunks: diffData.hunks, additions: diffData.additions, deletions: diffData.deletions }}
             />
@@ -147,6 +148,7 @@ export default function FilePreviewOverlay({
           </TabsContent>
           <TabsContent value="source" className="flex-1 min-h-0 mt-0">
             <FileCodeView
+              name={target.name}
               content={data.content}
               language={data.language}
               diff={diffData ? { hunks: diffData.hunks, additions: diffData.additions, deletions: diffData.deletions } : undefined}
@@ -160,6 +162,7 @@ export default function FilePreviewOverlay({
     if (hasContent(data)) {
       return (
         <FileCodeView
+          name={target.name}
           content={data.content}
           language={data.language}
           diff={diffData ? { hunks: diffData.hunks, additions: diffData.additions, deletions: diffData.deletions } : undefined}

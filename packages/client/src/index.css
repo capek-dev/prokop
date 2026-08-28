@@ -170,20 +170,6 @@
   --success: oklch(0.55 0.14 150);
   --warning: oklch(0.68 0.14 75);
   --error: oklch(0.55 0.2 26);
-  /* Editor syntax */
-  --syntax-comment: oklch(0.5 0.02 250);
-  --syntax-keyword: var(--chart-1);
-  --syntax-string: oklch(0.42 0.13 150);
-  --syntax-number: oklch(0.48 0.15 65);
-  --syntax-constant: oklch(0.46 0.14 300);
-  --syntax-function: var(--chart-2);
-  --syntax-type: var(--chart-5);
-  --syntax-property: var(--chart-3);
-  --syntax-operator: color-mix(in oklch, var(--primary) 75%, var(--foreground));
-  --syntax-punctuation: color-mix(in oklch, var(--muted-foreground) 75%, var(--foreground));
-  --syntax-invalid: var(--destructive);
-  --diff-added: oklch(0.48 0.15 145);
-  --diff-removed: oklch(0.55 0.2 25);
   /* File icons */
   --file-icon-ts: oklch(0.48 0.17 255);
   --file-icon-js: oklch(0.68 0.16 85);
@@ -230,20 +216,6 @@
   --success: oklch(0.7 0.15 150);
   --warning: oklch(0.8 0.13 80);
   --error: oklch(0.65 0.19 25);
-  /* Editor syntax */
-  --syntax-comment: oklch(0.66 0.025 250);
-  --syntax-keyword: var(--chart-1);
-  --syntax-string: oklch(0.76 0.12 150);
-  --syntax-number: oklch(0.78 0.13 75);
-  --syntax-constant: oklch(0.76 0.12 305);
-  --syntax-function: var(--chart-2);
-  --syntax-type: var(--chart-5);
-  --syntax-property: var(--chart-3);
-  --syntax-operator: color-mix(in oklch, var(--primary) 80%, var(--foreground));
-  --syntax-punctuation: color-mix(in oklch, var(--muted-foreground) 80%, var(--foreground));
-  --syntax-invalid: var(--destructive);
-  --diff-added: oklch(0.7 0.14 145);
-  --diff-removed: oklch(0.7 0.17 25);
   /* File icons */
   --file-icon-ts: oklch(0.7 0.15 255);
   --file-icon-js: oklch(0.8 0.15 85);
@@ -1006,121 +978,17 @@ main {
   animation: none !important;
 }
 
-/* ==========================================================================
-   CODEMIRROR EDITOR STYLING
-   ========================================================================== */
-
-.cm-editor {
-  height: 100%;
-}
-
-.cm-editor.cm-focused {
-  outline: none;
-}
-
-.cm-editor .cm-scroller {
-  overflow: auto;
-}
-
-/* Thin scrollbar for the CodeMirror scroller, matching the app aesthetic. */
-.cm-editor .cm-scroller::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.cm-editor .cm-scroller::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.cm-editor .cm-scroller::-webkit-scrollbar-thumb {
-  background-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
-  border-radius: 3px;
-  border: none;
-}
-
-.cm-editor .cm-scroller::-webkit-scrollbar-thumb:hover {
-  background-color: color-mix(in oklch, var(--muted-foreground) 55%, transparent);
-}
-
-.cm-editor .cm-scroller {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent) transparent;
-}
-
-/* Fold gutter placeholder styling */
-.cm-editor .cm-foldPlaceholder {
-  background-color: var(--muted);
-  border: none;
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
-  border-radius: 3px;
-  padding: 0 4px;
-}
-
-/*
- * Robust selection styling. With drawSelection(), CodeMirror renders its own
- * selection layer (.cm-selectionBackground) instead of relying on the native
- * ::selection. Using !important ensures our theme color wins over the
- * CodeMirror-generated styles and built-in defaults across all browsers.
- */
-.cm-editor .cm-selectionBackground {
-  background-color: color-mix(in oklch, var(--primary) 25%, transparent) !important;
-}
-
-.cm-editor.cm-focused .cm-selectionBackground {
-  background-color: color-mix(in oklch, var(--primary) 30%, transparent) !important;
-}
-
-.cm-editor .cm-cursor {
-  border-left-color: var(--primary) !important;
-}
-
-/* ==========================================================================
-   CODEMIRROR GIT DIFF DECORATIONS
-   ========================================================================== */
-
-/* Added line background */
-.cm-editor .cm-git-added-line {
-  background-color: color-mix(in oklch, var(--diff-added, green) 12%, transparent);
-}
-
-/* Modified line background (replace+add hunk) */
-.cm-editor .cm-git-modified-line {
-  background-color: color-mix(in oklch, var(--diff-added, green) 10%, transparent);
-}
-
-/* Git diff gutter markers */
-.cm-editor .cm-git-diff-gutter {
-  width: 4px;
-}
-
-.cm-editor .cm-git-added-gutter {
-  background-color: color-mix(in oklch, var(--diff-added, green) 50%, transparent);
-}
-
-.cm-editor .cm-git-modified-gutter {
-  background-color: color-mix(in oklch, var(--diff-added, green) 50%, transparent);
-}
-
-.cm-editor .cm-git-deleted-gutter {
-  background-color: color-mix(in oklch, var(--diff-removed, red) 50%, transparent);
-}
-
-/* Removed line block widgets */
-.cm-editor .cm-git-removed-widget {
-  margin: 0;
-  padding: 0;
-  background-color: color-mix(in oklch, var(--diff-removed, red) 10%, transparent);
-  border-left: 2px solid color-mix(in oklch, var(--diff-removed, red) 40%, transparent);
-}
-
-.cm-editor .cm-git-removed-line {
-  padding: 0 8px;
+/* Pierre diffs host: font is inherited into the shadow-DOM renderer. */
+.pierre-diffs-host {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
-  line-height: 1.5;
-  color: color-mix(in oklch, var(--diff-removed, red) 70%, var(--foreground));
-  white-space: pre-wrap;
-  word-break: break-all;
-  opacity: 0.8;
+}
+
+/* Pierre diffs inside chat visualizations: blend the renderer background
+   with the app surface (the lib defaults to pure white/black) and match
+   the previous 12px code size for the transcript. */
+.pierre-viz-host {
+  --diffs-light-bg: var(--card);
+  --diffs-dark-bg: var(--card);
+  --diffs-font-size: 12px;
 }

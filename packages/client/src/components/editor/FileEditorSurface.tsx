@@ -14,11 +14,7 @@ import { queryClient } from '@/components/providers/QueryProvider';
 import { queryKeys } from '@/lib/queryKeys';
 import { useUIStore } from '@/stores/uiStore';
 import { useEditorGitDiffQuery } from '@/hooks/queries';
-import { CodeMirrorEditor } from './CodeMirrorEditor';
-import {
-  isGitDiffRemovedContentTruncated,
-  type EditorGitDiff,
-} from './gitDiffExtension';
+import { PierreCodeEditor, type PierreEditorGitDiff } from './PierreCodeEditor';
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 import { Button } from '@/components/ui/button';
 import {
@@ -464,7 +460,7 @@ function ActiveFileBody({
     diffEnabled,
   );
 
-  const gitDiff = useMemo<EditorGitDiff | null>(() => {
+  const gitDiff = useMemo<PierreEditorGitDiff | null>(() => {
     if (!diffData?.diffAvailable || diffData.hunks.length === 0) return null;
     return {
       hunks: diffData.hunks,
@@ -472,10 +468,6 @@ function ActiveFileBody({
       deletions: diffData.deletions,
     };
   }, [diffData]);
-  const removedContentTruncated = useMemo(
-    () => gitDiff ? isGitDiffRemovedContentTruncated(gitDiff.hunks) : false,
-    [gitDiff],
-  );
 
   const handleRefreshDiff = useCallback(() => {
     queryClient.invalidateQueries({
@@ -543,11 +535,6 @@ function ActiveFileBody({
                   {gitDiff.deletions > 0 && (
                     <span className="text-red-600 dark:text-red-400">-{gitDiff.deletions}</span>
                   )}
-                </span>
-              )}
-              {removedContentTruncated && (
-                <span className="shrink-0 text-[10px] text-muted-foreground">
-                  Removed details limited
                 </span>
               )}
               {diffFetching && (
@@ -618,13 +605,12 @@ function ActiveFileBody({
             <MarkdownRenderer>{doc.content}</MarkdownRenderer>
           </div>
         ) : (
-          <CodeMirrorEditor
+          <PierreCodeEditor
             docId={docId}
+            fileName={doc.name}
             value={doc.content}
-            language={doc.language}
-            mimeType={doc.mimeType}
             onChange={onChange}
-            readOnly={saving}
+            saving={saving}
             gitDiff={gitDiff}
             showGitDiff={showGitDiff}
           />

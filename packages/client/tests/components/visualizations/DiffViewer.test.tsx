@@ -15,6 +15,14 @@ vi.mock('@/stores/serverDataStore', () => ({
   ),
 }));
 
+// Pierre renders into shadow DOM, invisible to light-DOM text queries; the
+// mock surfaces the serialized patch so content assertions stay behavioral.
+vi.mock('@pierre/diffs/react', () => ({
+  PatchDiff: ({ patch }: { patch: string }) => (
+    <div data-testid="patch-diff">{patch}</div>
+  ),
+}));
+
 const sampleHunks = [
   {
     oldStart: 1,
@@ -31,68 +39,48 @@ const sampleHunks = [
 
 describe('DiffViewer', () => {
   it('renders file path in header', () => {
-    render(<DiffViewer hunks={sampleHunks} path="src/app.tsx" />);
-    expect(screen.getByText('src/app.tsx')).toBeInTheDocument();
+    render(<DiffViewer hunks={sampleHunks} path="src/app-header.tsx" />);
+    expect(screen.getByText('src/app-header.tsx')).toBeInTheDocument();
   });
 
-  it('renders diff content as text', () => {
-    const { container } = render(
-      <DiffViewer hunks={sampleHunks} path="src/app.tsx" />,
-    );
-    expect(container.textContent).toContain('old line');
-    expect(container.textContent).toContain('new line');
-    expect(container.textContent).toContain('unchanged line');
+  it('serializes hunks into the rendered patch', () => {
+    render(<DiffViewer hunks={sampleHunks} path="src/app-serialize.tsx" />);
+    const patchEl = screen.getByTestId('patch-diff');
+    expect(patchEl.textContent).toContain('--- a/src/app-serialize.tsx');
+    expect(patchEl.textContent).toContain('+++ b/src/app-serialize.tsx');
+    expect(patchEl.textContent).toContain('@@ -1,3 +1,3 @@');
+    expect(patchEl.textContent).toContain('-old line');
+    expect(patchEl.textContent).toContain('+new line');
+    expect(patchEl.textContent).toContain(' unchanged line');
   });
 
   it('displays additions and deletions count', () => {
     render(
-      <DiffViewer hunks={sampleHunks} path="src/app.tsx" additions={5} deletions={3} />,
+      <DiffViewer hunks={sampleHunks} path="src/app-counts.tsx" additions={5} deletions={3} />,
     );
     expect(screen.getByText('+5 -3')).toBeInTheDocument();
   });
 
   it('hides additions/deletions when not provided', () => {
-    render(<DiffViewer hunks={sampleHunks} path="src/app.tsx" />);
+    render(<DiffViewer hunks={sampleHunks} path="src/app-nocounts.tsx" />);
     expect(screen.queryByText(/^\+\d+ -\d+$/)).not.toBeInTheDocument();
   });
 
-  it('applies green bg to added lines', () => {
-    const { container } = render(
-      <DiffViewer hunks={sampleHunks} path="src/app.tsx" />,
-    );
-    const addedLine = container.querySelector('.bg-green-500\\/15');
-    expect(addedLine).toBeInTheDocument();
-  });
-
-  it('applies red bg to removed lines', () => {
-    const { container } = render(
-      <DiffViewer hunks={sampleHunks} path="src/app.tsx" />,
-    );
-    const removedLine = container.querySelector('.bg-red-500\\/15');
-    expect(removedLine).toBeInTheDocument();
-  });
-
   it('collapses diff when expand button clicked', async () => {
-    const { container } = render(
-      <DiffViewer hunks={sampleHunks} path="src/app.tsx" />,
-    );
+    render(<DiffViewer hunks={sampleHunks} path="src/app-collapse.tsx" />);
     const expandBtn = screen.getAllByRole('button')[0];
     await userEvent.click(expandBtn);
 
-    const codeArea = container.querySelector('[style*="background-color"]');
-    expect(codeArea).not.toBeInTheDocument();
+    expect(screen.queryByTestId('patch-diff')).not.toBeInTheDocument();
   });
 
   it('expands diff again when button clicked twice', async () => {
-    const { container } = render(
-      <DiffViewer hunks={sampleHunks} path="src/app.tsx" />,
-    );
+    render(<DiffViewer hunks={sampleHunks} path="src/app-twice.tsx" />);
     const expandBtn = screen.getAllByRole('button')[0];
     await userEvent.click(expandBtn);
     await userEvent.click(expandBtn);
 
-    const codeArea = container.querySelector('[style*="background-color"]');
-    expect(codeArea).toBeInTheDocument();
+    expect(screen.getByTestId('patch-diff')).toBeInTheDocument();
   });
 
   it('renders multiple hunks', () => {
@@ -116,24 +104,15 @@ describe('DiffViewer', () => {
         ],
       },
     ];
-    const { container } = render(
-      <DiffViewer hunks={multiHunks} path="src/app.tsx" />,
-    );
-    expect(container.textContent).toContain('hunk1 line');
-    expect(container.textContent).toContain('hunk2 line');
-  });
-
-  it('renders line number columns', () => {
-    const { container } = render(
-      <DiffViewer hunks={sampleHunks} path="src/app.tsx" />,
-    );
-    const lineNumCols = container.querySelectorAll('.select-none.border-r');
-    expect(lineNumCols.length).toBeGreaterThanOrEqual(2);
+    render(<DiffViewer hunks={multiHunks} path="src/app-multihunk.tsx" />);
+    const patchEl = screen.getByTestId('patch-diff');
+    expect(patchEl.textContent).toContain('+hunk1 line');
+    expect(patchEl.textContent).toContain('+hunk2 line');
   });
 
   it('has file path button with title', () => {
-    render(<DiffViewer hunks={sampleHunks} path="src/app.tsx" />);
-    const pathButton = screen.getByTitle('src/app.tsx');
+    render(<DiffViewer hunks={sampleHunks} path="src/app-title.tsx" />);
+    const pathButton = screen.getByTitle('src/app-title.tsx');
     expect(pathButton).toBeInTheDocument();
   });
 });

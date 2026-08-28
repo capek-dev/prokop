@@ -1,15 +1,16 @@
-import { type FC, memo, useState, useMemo, useCallback } from 'react';
+import { type FC, memo, useState, useMemo, useCallback, type ComponentProps } from 'react';
 import { Check, AlertCircle, ChevronDown, ChevronRight, ExternalLink, Copy } from 'lucide-react';
-import { Highlight, themes } from 'prism-react-renderer';
+import { File as PierreFile } from '@pierre/diffs/react';
+import type { SelectedLineRange } from '@pierre/diffs/react';
 import { useUIStore } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useTheme } from '@/components/providers/ThemeProvider';
-import { cn } from '@/lib/utils';
 import { pathBasename } from '@/lib/platform';
 import { RENDER_BUDGETS } from '@/lib/renderBudgets';
+import { resolvePierreLang } from '@/lib/pierreDiffsTheme';
+import { useVizExpanded } from '@/lib/vizExpansion';
 
-const CODE_THEME_DARK = themes.oneDark;
-const CODE_THEME_LIGHT = themes.oneLight;
+type PierreFileOptions = ComponentProps<typeof PierreFile>['options'];
 
 interface CodeBlockProps {
   content: string;
@@ -18,27 +19,8 @@ interface CodeBlockProps {
   created?: boolean;
   highlightLines?: number[];
   showOverwriteIndicator?: boolean;
-}
-
-function detectLanguage(path: string): string {
-  const ext = path.split('.').pop()?.toLowerCase();
-  const langMap: Record<string, string> = {
-    ts: 'typescript',
-    tsx: 'typescript',
-    js: 'javascript',
-    jsx: 'javascript',
-    json: 'json',
-    md: 'markdown',
-    css: 'css',
-    html: 'html',
-    py: 'python',
-    go: 'go',
-    rs: 'rust',
-    sh: 'bash',
-    yaml: 'yaml',
-    yml: 'yaml',
-  };
-  return langMap[ext || ''] || ext || 'text';
+  /** Stable identity (tool-call part id) for persisted expansion state. */
+  vizKey?: string;
 }
 
 export const CodeBlock: FC<CodeBlockProps> = memo(({
@@ -47,15 +29,17 @@ export const CodeBlock: FC<CodeBlockProps> = memo(({
   language,
   created,
   highlightLines = [],
+  vizKey,
 }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useVizExpanded(
+    vizKey ? `code:${vizKey}` : `code:${path}:${content.length}`,
+    true,
+  );
   const [copied, setCopied] = useState(false);
   const openFilePreview = useUIStore((s) => s.openFilePreview);
   const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
 
   const { resolvedMode } = useTheme();
-  const isDark = resolvedMode === 'dark';
-  const codeTheme = isDark ? CODE_THEME_DARK : CODE_THEME_LIGHT;
 
   const handlePathClick = () => {
     if (!activeWorkspace) return;
@@ -66,11 +50,7 @@ export const CodeBlock: FC<CodeBlockProps> = memo(({
     });
   };
 
-  const detectedLanguage = language || detectLanguage(path);
-  const highlightSet = useMemo(() => new Set(highlightLines), [highlightLines]);
   const lineCount = useMemo(() => content.split('\n').length, [content]);
-
-  const isLargeCode = lineCount > RENDER_BUDGETS.codePlainTextThreshold;
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(content);
@@ -84,8 +64,39 @@ export const CodeBlock: FC<CodeBlockProps> = memo(({
     return lines.join('\n');
   }, [content, expanded]);
 
+  const name = pathBasename(path);
+  const lang = useMemo(() => resolvePierreLang(name, language), [name, language]);
+
+  const file = useMemo(
+    () => ({ name, contents: previewContent, lang }),
+    [name, previewContent, lang],
+  );
+
+  const options = useMemo<PierreFileOptions>(
+    () => ({
+      theme: { dark: 'github-dark', light: 'github-light' },
+      themeType: resolvedMode,
+      disableFileHeader: true,
+      overflow: 'scroll',
+    }),
+    [resolvedMode],
+  );
+
+  // Write-tool highlight tint. highlightLines is 1-based; Pierre's selection
+  // is a single { start, end } range, so contiguous line sets (the common
+  // case for a written block) map exactly and sparse sets tint the gap.
+  // Clamped to the preview length so collapsed mode never selects past the
+  // rendered slice.
+  const selectedLines = useMemo<SelectedLineRange | null>(() => {
+    if (highlightLines.length === 0) return null;
+    const previewLineCount = previewContent.split('\n').length;
+    const start = Math.min(Math.max(1, Math.min(...highlightLines)), previewLineCount);
+    const end = Math.min(Math.max(1, Math.max(...highlightLines)), previewLineCount);
+    return { start, end };
+  }, [highlightLines, previewContent]);
+
   return (
-    <div className="visualization-container max-w-full overflow-x-auto border border-border rounded-md">
+    <div className="visualization-container max-w-full border border-border rounded-md">
       <div>
         <div className="group/path flex items-center gap-2 px-1 bg-muted/50 text-xs text-muted-foreground whitespace-nowrap">
           <button
@@ -112,13 +123,7 @@ export const CodeBlock: FC<CodeBlockProps> = memo(({
               {lineCount} lines
             </span>
           )}
-
           <div className="shrink-0 ml-auto mr-2 flex items-center gap-2">
-            {isLargeCode && expanded && (
-              <span className="text-xs text-muted-foreground/70">
-                plain text (large file)
-              </span>
-            )}
             <button
               type="button"
               onClick={handleCopy}
@@ -145,55 +150,12 @@ export const CodeBlock: FC<CodeBlockProps> = memo(({
           </div>
         </div>
 
-        <div style={{ backgroundColor: codeTheme.plain.backgroundColor }}>
-          {isLargeCode && expanded ? (
-            previewContent.split('\n').map((line, lineKey) => (
-              <div
-                key={lineKey}
-                className={cn(
-                  'flex font-mono text-xs',
-                  highlightSet.has(lineKey + 1) && 'bg-warning/20',
-                )}
-              >
-                <span className={cn('w-10 text-right pr-2 select-none border-r', isDark ? 'text-muted-foreground border-white/10' : 'text-muted-foreground border-border')}>
-                  {lineKey + 1}
-                </span>
-                <span className="pl-2 flex-1 whitespace-pre overflow-hidden text-foreground/90">
-                  {line}
-                </span>
-              </div>
-            ))
-          ) : (
-            <Highlight theme={codeTheme} code={previewContent} language={detectedLanguage}>
-              {({ tokens, getTokenProps }) => {
-                const displayedTokens = expanded ? tokens : tokens.slice(0, RENDER_BUDGETS.codePreviewLines);
-
-                return (
-                  <>
-                    {displayedTokens.map((line, lineKey) => (
-                      <div
-                        key={lineKey}
-                        className={cn(
-                          'flex font-mono text-xs',
-                          highlightSet.has(lineKey + 1) && 'bg-warning/20',
-                        )}
-                      >
-                        <span className={cn('w-10 text-right pr-2 select-none border-r', isDark ? 'text-muted-foreground border-white/10' : 'text-muted-foreground border-border')}>
-                          {lineKey + 1}
-                        </span>
-                        <span className="pl-2 flex-1 whitespace-pre overflow-hidden">
-                          {line.map((token, tokenKey) => (
-                            <span key={tokenKey} {...getTokenProps({ token })} className="token" />
-                          ))}
-                        </span>
-                      </div>
-                    ))}
-                  </>
-                );
-              }}
-            </Highlight>
-          )}
-        </div>
+        <PierreFile
+          file={file}
+          options={options}
+          selectedLines={selectedLines}
+          className="pierre-viz-host"
+        />
       </div>
     </div>
   );

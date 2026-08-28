@@ -9,7 +9,12 @@ import { RouterApp } from './router';
 import { registerJean2ServiceWorker } from '@/pwa/registerServiceWorker';
 import { startSessionCacheSync } from '@/lib/sessionCacheSync';
 import { isResizeObserverDeliveryWarning } from '@/lib/globalErrorHandling';
+import { preloadPierreDiffsHighlighter } from '@/lib/pierreDiffsPreload';
 import './index.css';
+
+// Warm the shared Pierre diffs highlighter before any code surface mounts,
+// so the first diff/code block never renders empty (see module comment).
+preloadPierreDiffsHighlighter();
 
 // Global error handlers for debugging uncaught errors
 window.addEventListener('error', (event) => {
