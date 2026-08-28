@@ -167,9 +167,7 @@ describe('FilePreviewOverlay - scroll stability', () => {
     mockPreviewFn.mockReturnValue(new Promise(() => {}));
 
     const refreshButtons = screen.getAllByRole('button');
-    const refreshBtn = refreshButtons.find((b) =>
-      b.classList.toString().includes('right-12'),
-    );
+    const refreshBtn = refreshButtons.find((b) => b.getAttribute('title') === 'Refresh file');
     expect(refreshBtn).toBeTruthy();
     await act(async () => {
       if (refreshBtn) await userEvent.click(refreshBtn);

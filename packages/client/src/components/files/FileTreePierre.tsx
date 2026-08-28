@@ -4,14 +4,19 @@ import type { ProkopaiClient, GitDiffSummary } from '@prokopai/sdk';
 import type {
   GitStatusEntry,
   FileTreeSelectionChangeListener,
+  ContextMenuItem,
+  ContextMenuOpenContext,
 } from '@pierre/trees';
 import { FileTree as PierreFileTreeReact, useFileTree } from '@pierre/trees/react';
-import type { FileEntryActionTarget } from './FileEntryContextMenu';
+import type { FileEntryActionTarget, FileOpenMode } from './FileEntryContextMenu';
 import { Button } from '@/components/ui/button';
 import { useFileTreeFullQuery } from '@/hooks/queries/useFileTreeFullQuery';
 import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
 import { fileTreeExpandedPaths, useFileTreeStateStore } from '@/stores/fileTreeStateStore';
 import { activatePierreFileSelection } from './pierreTreeHost';
+import { useFileActions } from './useFileActions';
+import { FileActionsDialogs } from './FileActionsDialogs';
+import { PierreTreeActionMenu, type PierreTreeActionMenuActions } from './PierreTreeActionMenu';
 
 /**
  * Maps our shadcn palette onto @pierre/trees' shadow-DOM custom properties.
@@ -75,12 +80,15 @@ function toPierreGitStatus(files: Array<{ path: string; git: GitDiffSummary }>):
 interface FileTreeProps {
   workspaceId: string;
   sdkClient: ProkopaiClient | null;
-  onFileSelect?: (target: FileEntryActionTarget) => void;
+  onFileSelect?: (target: FileEntryActionTarget, mode?: FileOpenMode) => void;
   root?: string;
   /** Currently open editor path (root-relative), for reveal. */
   activePath?: string;
   /** Root the activePath belongs to ('' for the main root). */
   activeRoot?: string;
+  serverId?: string;
+  isMobile?: boolean;
+  onOpenFileEdit?: (path: string, name: string) => void;
 }
 
 export interface FileTreeHandle {
@@ -88,6 +96,8 @@ export interface FileTreeHandle {
   focus: () => void;
   /** Focus the in-tree filter input. */
   focusSearch: () => void;
+  /** Open the create dialog at this tree's root ('' = root of this root). */
+  openCreateAtRoot: (kind: 'file' | 'directory') => void;
 }
 
 /**
@@ -100,7 +110,7 @@ export interface FileTreeHandle {
  * - the active editor file is revealed with scrollToPath.
  */
 export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
-  ({ workspaceId, sdkClient, onFileSelect, root, activePath, activeRoot }, ref) => {
+  ({ workspaceId, sdkClient, onFileSelect, root, activePath, activeRoot, serverId, isMobile, onOpenFileEdit }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const pathsQuery = useFileTreeFullQuery(sdkClient, workspaceId, root);
     const { data: pathsData, isLoading, error, refetch } = pathsQuery;
@@ -139,6 +149,84 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
         });
       }) satisfies FileTreeSelectionChangeListener,
     });
+
+    // Filesystem actions (create/rename/delete/copy). onMutated applies the
+    // optimistic model update; the query invalidation refetch reconciles.
+    const {
+      dialog: actionDialog,
+      openCreate,
+      openRename,
+      openDelete,
+      closeDialog,
+      submitCreate,
+      submitRename,
+      submitDelete,
+      mutating: actionMutating,
+      error: actionError,
+      overwrite,
+      renameConflict,
+      setOverwrite,
+      copyPath,
+    } = useFileActions({
+      sdkClient,
+      workspaceId,
+      serverId,
+      isMobile,
+      root,
+      onMutated: (kind, info) => {
+        try {
+          if (kind === 'create') {
+            model.add(info.path + (info.isDirectory ? '/' : ''));
+          } else if (kind === 'rename') {
+            if (info.from) {
+              model.move(
+                info.from + (info.isDirectory ? '/' : ''),
+                info.path + (info.isDirectory ? '/' : ''),
+              );
+            }
+          } else {
+            model.remove(info.path + (info.isDirectory ? '/' : ''), { recursive: true });
+          }
+        } catch {
+          // Model mutations are best-effort; refetch reconciles.
+        }
+      },
+      onOpenFileEdit,
+    });
+
+    // Stable menu surface: reads live onFileSelect/root from liveRef at open
+    // time; the hook callbacks themselves are referentially stable.
+    const menuActions = useMemo<PierreTreeActionMenuActions>(
+      () => ({
+        openPreview: (path, _isDir) => {
+          const { onFileSelect, root: liveRoot } = liveRef.current;
+          onFileSelect?.(
+            { entry: { name: path.split('/').pop() ?? path, type: 'file', path }, root: liveRoot },
+            'preview',
+          );
+        },
+        openEdit: (path) => {
+          const { onFileSelect, root: liveRoot } = liveRef.current;
+          onFileSelect?.(
+            { entry: { name: path.split('/').pop() ?? path, type: 'file', path }, root: liveRoot },
+            'edit',
+          );
+        },
+        copyRelative: (path) => copyPath(path, false),
+        copyAbsolute: (path) => copyPath(path, true),
+        rename: (target) => openRename(target),
+        del: (target) => openDelete(target),
+        createFile: (parentDirPath) => openCreate(parentDirPath, 'file'),
+        createFolder: (parentDirPath) => openCreate(parentDirPath, 'directory'),
+      }),
+      [copyPath, openCreate, openRename, openDelete],
+    );
+
+    const renderContextMenu = useCallback(
+      (item: ContextMenuItem, context: ContextMenuOpenContext) =>
+        item ? <PierreTreeActionMenu item={item} context={context} actions={menuActions} /> : null,
+      [menuActions],
+    );
 
     // Query refreshes replace model contents in place. resetPaths rebuilds
     // the expansion map, so previously opened directories are re-passed as
@@ -199,6 +287,9 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     useImperativeHandle(ref, () => ({
       refresh: () => {
         void refetch();
+      },
+      openCreateAtRoot: (kind: 'file' | 'directory') => {
+        openCreate('', kind);
       },
       focus: () => {
         // Pierre marks the model-focused row with tabIndex 0 (all others -1);
@@ -271,8 +362,20 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       <div className="min-h-0 flex-1 overflow-hidden">
         <style>{TREE_THEME_CSS}</style>
         <div ref={containerRef} className="h-full w-full" data-pierre-file-tree>
-          <PierreFileTreeReact model={model} className="size-full" />
+          <PierreFileTreeReact model={model} className="size-full" renderContextMenu={renderContextMenu} />
         </div>
+        <FileActionsDialogs
+          dialog={actionDialog}
+          mutating={actionMutating}
+          error={actionError}
+          overwrite={overwrite}
+          renameConflict={renameConflict}
+          onClose={closeDialog}
+          submitCreate={submitCreate}
+          submitRename={submitRename}
+          submitDelete={submitDelete}
+          setOverwrite={setOverwrite}
+        />
       </div>
     );
   },

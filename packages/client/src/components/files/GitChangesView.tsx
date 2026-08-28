@@ -1,12 +1,14 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { GitDiffSummary, ProkopaiClient } from '@prokopai/sdk';
 import type {
   FileTreeSelectionChangeListener,
   GitStatusEntry,
+  ContextMenuItem,
+  ContextMenuOpenContext,
 } from '@pierre/trees';
 import { FileTree as PierreFileTreeReact, useFileTree } from '@pierre/trees/react';
-import type { FileEntryActionTarget } from './FileEntryContextMenu';
+import type { FileEntryActionTarget, FileOpenMode } from './FileEntryContextMenu';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
@@ -16,6 +18,9 @@ import {
   PierreTreeHost,
   focusFocusedPierreRow,
 } from './pierreTreeHost';
+import { useFileActions } from './useFileActions';
+import { FileActionsDialogs } from './FileActionsDialogs';
+import { PierreTreeActionMenu, type PierreTreeActionMenuActions } from './PierreTreeActionMenu';
 
 export interface GitChangesViewHandle {
   focus: () => void;
@@ -25,7 +30,10 @@ interface GitChangesViewProps {
   workspaceId: string;
   sdkClient: ProkopaiClient | null;
   root?: string;
-  onFileSelect: (target: FileEntryActionTarget) => void;
+  onFileSelect: (target: FileEntryActionTarget, mode?: FileOpenMode) => void;
+  serverId?: string;
+  isMobile?: boolean;
+  onOpenFileEdit?: (path: string, name: string) => void;
 }
 
 type ChangedFile = { path: string; git: GitDiffSummary };
@@ -122,7 +130,7 @@ export function allAncestorDirectories(paths: readonly string[]): string[] {
  * across refreshes and reloads via the shared per-workspace store.
  */
 export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewProps>(
-  ({ workspaceId, sdkClient, root, onFileSelect }, ref) => {
+  ({ workspaceId, sdkClient, root, onFileSelect, serverId, isMobile, onOpenFileEdit }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const { data, isLoading, error, refetch } = useGitStatusQuery(sdkClient, workspaceId, root);
 
@@ -188,6 +196,105 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
         );
       }) satisfies FileTreeSelectionChangeListener,
     });
+
+    // Filesystem actions on changed entries. Deleted rows are filtered to
+    // preview + copy only inside the menu (deletedPaths below).
+    const {
+      dialog: actionDialog,
+      openCreate,
+      openRename,
+      openDelete,
+      closeDialog,
+      submitRename,
+      submitDelete,
+      submitCreate,
+      mutating: actionMutating,
+      error: actionError,
+      overwrite,
+      renameConflict,
+      setOverwrite,
+      copyPath,
+    } = useFileActions({
+      sdkClient,
+      workspaceId,
+      serverId,
+      isMobile,
+      root,
+      onMutated: (kind, info) => {
+        // Implicit dirs carry the trailing slash; refetch reconciles.
+        try {
+          if (kind === 'create') {
+            model.add(info.path + (info.isDirectory ? '/' : ''));
+          } else if (kind === 'rename') {
+            if (info.from) {
+              model.move(
+                info.from + (info.isDirectory ? '/' : ''),
+                info.path + (info.isDirectory ? '/' : ''),
+              );
+            }
+          } else {
+            model.remove(info.path + (info.isDirectory ? '/' : ''), { recursive: true });
+          }
+        } catch {
+          // Best-effort; the git-status refetch reconciles.
+        }
+      },
+      onOpenFileEdit,
+    });
+
+    const deletedPaths = useMemo(
+      () => new Set(files.filter((f) => f.git.status === 'deleted').map((f) => f.path)),
+      [files],
+    );
+
+    const menuActions = useMemo<PierreTreeActionMenuActions>(
+      () => ({
+        openPreview: (path, _isDir) => {
+          const { onFileSelect, root: liveRoot, files: liveFiles } = liveRef.current;
+          const name = path.split('/').pop() ?? path;
+          const changed = liveFiles.find((entry) => entry.path === path);
+          onFileSelect?.(
+            {
+              entry: { name, type: 'file', path, git: changed?.git },
+              root: liveRoot,
+            },
+            'preview',
+          );
+        },
+        openEdit: (path) => {
+          const { onFileSelect, root: liveRoot, files: liveFiles } = liveRef.current;
+          const name = path.split('/').pop() ?? path;
+          const changed = liveFiles.find((entry) => entry.path === path);
+          onFileSelect?.(
+            {
+              entry: { name, type: 'file', path, git: changed?.git },
+              root: liveRoot,
+            },
+            'edit',
+          );
+        },
+        copyRelative: (path) => copyPath(path, false),
+        copyAbsolute: (path) => copyPath(path, true),
+        rename: (target) => openRename(target),
+        del: (target) => openDelete(target),
+        createFile: (parentDirPath) => openCreate(parentDirPath, 'file'),
+        createFolder: (parentDirPath) => openCreate(parentDirPath, 'directory'),
+      }),
+      [copyPath, openCreate, openRename, openDelete],
+    );
+
+    const renderContextMenu = useCallback(
+      (item: ContextMenuItem, context: ContextMenuOpenContext) =>
+        item ? (
+          <PierreTreeActionMenu
+            item={item}
+            context={context}
+            actions={menuActions}
+            deletedPaths={deletedPaths}
+          />
+        ) : null,
+      [menuActions, deletedPaths],
+    );
 
     // Query refreshes AND mode flips rebuild the store. Mode must be part of
     // the guard: grouped keeps the persisted expansion, flat expands every
@@ -272,8 +379,20 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
       // collapsing to zero height inside this plain div.
       <div className="flex flex-1 min-h-0 min-w-0 w-full flex-col outline-none">
         <PierreTreeHost hostRef={containerRef}>
-          <PierreFileTreeReact model={model} className="size-full" />
+          <PierreFileTreeReact model={model} className="size-full" renderContextMenu={renderContextMenu} />
         </PierreTreeHost>
+        <FileActionsDialogs
+          dialog={actionDialog}
+          mutating={actionMutating}
+          error={actionError}
+          overwrite={overwrite}
+          renameConflict={renameConflict}
+          onClose={closeDialog}
+          submitCreate={submitCreate}
+          submitRename={submitRename}
+          submitDelete={submitDelete}
+          setOverwrite={setOverwrite}
+        />
       </div>
     );
   },

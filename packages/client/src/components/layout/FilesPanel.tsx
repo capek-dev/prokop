@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, RefreshCw, ChevronDown, Folder, Check } from 'lucide-react';
+import { ArrowLeft, RefreshCw, ChevronDown, Folder, Check, Plus, FilePlus2, FolderPlus } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { FileTree, type FileTreeHandle, GitChangesView, type GitChangesViewHandle } from '@/components/files';
@@ -242,8 +242,8 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       }
     }, [workspaceId, serverId, isMobile, setMobileSurface, setShowFilesPanel, setWorkbenchSurface, openFilePreview, defaultFileOpenMode]);
 
-    const handleFileSelect = useCallback((target: FileEntryActionTarget) => {
-      openFile(target);
+    const handleFileSelect = useCallback((target: FileEntryActionTarget, mode?: DefaultFileOpenMode) => {
+      openFile(target, mode);
     }, [openFile]);
 
     // Changes-tab stats in the header row. Reads the same git-status cache
@@ -279,6 +279,25 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
           >
             <RefreshCw className={cn('size-3.5', isRefreshing && 'animate-spin')} />
           </Button>
+          {filesPanelTab === 'project' && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon-xs" className="shrink-0" aria-label="New file or folder">
+                  <Plus className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => fileTreeRef.current?.openCreateAtRoot('file')}>
+                  <FilePlus2 className="size-4" />
+                  New File…
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => fileTreeRef.current?.openCreateAtRoot('directory')}>
+                  <FolderPlus className="size-4" />
+                  New Folder…
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {isChangesTab && (gitStatusQuery.data || changesStats.fileCount > 0) && (
             <span
               className="flex shrink-0 items-center gap-1 text-[10px] tabular-nums text-muted-foreground/70"
@@ -322,6 +341,11 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
           onFileSelect={handleFileSelect}
           activePath={activeEditorPath}
           activeRoot={activeEditorRoot}
+          serverId={serverId}
+          isMobile={isMobile}
+          onOpenFileEdit={(path, name) =>
+            openFile({ entry: { name, type: 'file', path }, root: isMainRoot ? undefined : selectedRoot }, 'edit')
+          }
         />
       ) : (
         <GitChangesView
@@ -330,6 +354,11 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
           sdkClient={sdkClient}
           root={isMainRoot ? undefined : selectedRoot}
           onFileSelect={handleFileSelect}
+          serverId={serverId}
+          isMobile={isMobile}
+          onOpenFileEdit={(path, name) =>
+            openFile({ entry: { name, type: 'file', path }, root: isMainRoot ? undefined : selectedRoot }, 'edit')
+          }
         />
       )
     ) : null;
