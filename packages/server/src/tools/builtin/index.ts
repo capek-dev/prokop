@@ -19,6 +19,7 @@ import * as multiedit from './multiedit/tool';
 import * as question from './question/tool';
 import * as readFile from './read-file/tool';
 import * as shell from './shell/tool';
+import * as terminal from './terminal/tool';
 import * as todoRead from './todoread/tool';
 import * as todoWrite from './todowrite/tool';
 import * as webfetch from './webfetch/tool';
@@ -51,6 +52,7 @@ const modules = [
   question,
   readFile,
   shell,
+  terminal,
   todoRead,
   todoWrite,
   webfetch,

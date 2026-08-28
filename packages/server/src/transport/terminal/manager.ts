@@ -24,6 +24,7 @@ interface TerminalSession {
   shell: string;
   title: string;
   workspaceId: string;
+  origin: 'user' | 'agent';
   clients: Set<TerminalSocket>;
   cols: number;
   rows: number;
@@ -140,13 +141,19 @@ export class TerminalManager {
     workspaceId: string;
     cols?: number;
     rows?: number;
+    origin?: 'user' | 'agent';
+    title?: string;
   }): string | null {
     const { cwd } = options;
     if (!cwd || !existsSync(cwd)) return null;
     const stat = statSync(cwd);
     if (!stat.isDirectory()) return null;
     const result = this.spawnSession(options);
-    return result?.sessionId ?? null;
+    if (!result) return null;
+    if (options.title) {
+      this.setTitle(result.sessionId, options.title);
+    }
+    return result.sessionId;
   }
 
   private spawnSession(
@@ -156,6 +163,7 @@ export class TerminalManager {
       workspaceId: string;
       cols?: number;
       rows?: number;
+      origin?: 'user' | 'agent';
       initialClient?: TerminalSocket;
     }
   ): { sessionId: string; session: TerminalSession } | null {
@@ -224,6 +232,7 @@ export class TerminalManager {
         shell,
         title: 'main',
         workspaceId,
+        origin: options.origin ?? 'user',
         clients: initialClient ? new Set([initialClient]) : new Set(),
         cols,
         rows,
@@ -433,6 +442,50 @@ export class TerminalManager {
     return this.getSessionInfo(session);
   }
 
+  /** Writes raw input into a session's PTY without a client socket.
+   * Returns false when the session is missing or already exited. */
+  writeToSession(sessionId: string, data: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.status !== 'running') return false;
+    session.lastActivityAt = Date.now();
+    try {
+      session.pty.write(data);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Reads buffered output from a byte offset. Returns null when the
+   * session is missing. nextOffset is the producer-side offset to pass
+   * on the next read; totalBytes is the current buffer size. Chunks are
+   * sliced by byte offset, so multi-byte UTF-8 sequences split across
+   * chunk boundaries may decode with replacement chars. */
+  readBuffer(sessionId: string, fromByteOffset = 0, maxBytes = 64 * 1024): { text: string; nextOffset: number; totalBytes: number } | null {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+
+    let text = '';
+    let skipped = 0;
+    let returned = 0;
+    for (const chunk of session.buffer) {
+      const chunkLen = chunk.data.length;
+      if (skipped + chunkLen <= fromByteOffset) {
+        skipped += chunkLen;
+        continue;
+      }
+      const budget = maxBytes - returned;
+      if (budget <= 0) break;
+      const takeFrom = Math.max(0, fromByteOffset - skipped);
+      const take = Math.min(chunkLen - takeFrom, budget);
+      text += Buffer.from(chunk.data.subarray(takeFrom, takeFrom + take)).toString('utf8');
+      returned += take;
+      skipped += chunkLen;
+    }
+
+    return { text, nextOffset: fromByteOffset + returned, totalBytes: session.bufferBytes };
+  }
+
   private getSessionInfo(session: TerminalSession): TerminalSessionInfo {
     return {
       id: session.id,
@@ -448,6 +501,7 @@ export class TerminalManager {
       lastActivityAt: session.lastActivityAt,
       activeClientCount: session.clients.size,
       inAlternateScreen: session.inAlternateScreen,
+      origin: session.origin,
     };
   }
 
@@ -469,6 +523,7 @@ export class TerminalManager {
           lastActivityAt: session.lastActivityAt,
           activeClientCount: session.clients.size,
           inAlternateScreen: session.inAlternateScreen,
+          origin: session.origin,
         });
       }
     }
