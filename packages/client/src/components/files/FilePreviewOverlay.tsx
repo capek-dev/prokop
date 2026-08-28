@@ -1,10 +1,19 @@
-import { Loader2, AlertCircle, RefreshCw, FileX, FilePenLine } from 'lucide-react';
+import { useState } from 'react';
+import {
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  FileX,
+  FilePenLine,
+  FileIcon,
+  Eye,
+  Code2,
+} from 'lucide-react';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import type { FilePreviewTarget } from '@/stores/uiStore';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
@@ -12,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 import { FileCodeView } from './FileCodeView';
 import FilePreviewContent from './FilePreviewContent';
+import { fileIconColor } from './fileIcons';
 import { useFilePreview } from '@/hooks/useFilePreview';
 import { useFileGitDiffQuery } from '@/hooks/queries';
 import { Button } from '@/components/ui/button';
@@ -43,6 +53,8 @@ export default function FilePreviewOverlay({
   onOpenChange,
   onOpenEdit,
 }: FilePreviewOverlayProps) {
+  const [mdView, setMdView] = useState<'preview' | 'source'>('preview');
+
   const { data, loading, refreshing, error, errorCause, reload } = useFilePreview({
     workspaceId,
     path: target?.path,
@@ -79,13 +91,19 @@ export default function FilePreviewOverlay({
 
   if (!target) return null;
 
+  const isMarkdown = data?.kind === 'markdown';
+
   const formatSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const renderContent = () => {
+  const diffProp = diffData
+    ? { hunks: diffData.hunks, additions: diffData.additions, deletions: diffData.deletions }
+    : undefined;
+
+  const renderBody = () => {
     if (loading) {
       return (
         <div
@@ -103,9 +121,9 @@ export default function FilePreviewOverlay({
     if (isDeletedFile && diffData) {
       return (
         <div className="flex flex-col h-full">
-          <div className="flex items-center gap-2 px-4 py-2 border-b border-border shrink-0">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
             <FileX className="size-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               This file was deleted. Showing the deletion diff.
             </span>
           </div>
@@ -113,7 +131,7 @@ export default function FilePreviewOverlay({
             <FileCodeView
               name={target.name}
               content=""
-              diff={{ hunks: diffData.hunks, additions: diffData.additions, deletions: diffData.deletions }}
+              diff={diffProp}
             />
           </div>
         </div>
@@ -126,7 +144,7 @@ export default function FilePreviewOverlay({
           <AlertCircle className="size-8 text-muted-foreground mb-3" />
           <p className="text-sm text-muted-foreground mb-3">{error}</p>
           <Button variant="outline" size="sm" onClick={reload}>
-            <RefreshCw className="size-3.5 mr-1.5" />
+            <RefreshCw className="size-3.5" />
             Retry
           </Button>
         </div>
@@ -135,26 +153,26 @@ export default function FilePreviewOverlay({
 
     if (!data) return null;
 
-    // Markdown: Source / Preview tabs
-    if (data.kind === 'markdown') {
+    // Markdown: Preview / Source tabs (TabsContent pair rendered by the caller
+    // so the TabsList can live in the header toolbar).
+    if (isMarkdown && data.kind === 'markdown') {
       return (
-        <Tabs defaultValue="preview" className="h-full flex flex-col">
-          <TabsList className="mx-4 mt-3 shrink-0 w-fit">
-            <TabsTrigger value="preview">Preview</TabsTrigger>
-            <TabsTrigger value="source">Source</TabsTrigger>
-          </TabsList>
-          <TabsContent value="preview" className="flex-1 min-h-0 mt-0 overflow-auto p-6 chat-transcript-scrollbar">
+        <>
+          <TabsContent
+            value="preview"
+            className="mt-0 h-full overflow-y-auto overscroll-contain p-4 sm:p-6 chat-transcript-scrollbar"
+          >
             <MarkdownRenderer>{data.content}</MarkdownRenderer>
           </TabsContent>
-          <TabsContent value="source" className="flex-1 min-h-0 mt-0">
+          <TabsContent value="source" className="mt-0 h-full">
             <FileCodeView
               name={target.name}
               content={data.content}
               language={data.language}
-              diff={diffData ? { hunks: diffData.hunks, additions: diffData.additions, deletions: diffData.deletions } : undefined}
+              diff={diffProp}
             />
           </TabsContent>
-        </Tabs>
+        </>
       );
     }
 
@@ -165,7 +183,7 @@ export default function FilePreviewOverlay({
           name={target.name}
           content={data.content}
           language={data.language}
-          diff={diffData ? { hunks: diffData.hunks, additions: diffData.additions, deletions: diffData.deletions } : undefined}
+          diff={diffProp}
         />
       );
     }
@@ -178,83 +196,99 @@ export default function FilePreviewOverlay({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={true}
-        className="sm:max-w-5xl w-[min(92vw,1100px)] h-[85vh] flex flex-col p-0 gap-0"
+        className="flex w-[min(92vw,1100px)] sm:max-w-5xl h-[85dvh] sm:h-[85vh] flex-col overflow-hidden p-0 gap-0"
       >
-        <DialogHeader className="px-6 pt-5 pb-3 pr-40 border-b border-border shrink-0">
-          <DialogTitle className="text-base font-semibold truncate">
-            {target.name}
-          </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground truncate">
-            {target.path}
-          </DialogDescription>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onOpenEdit}
-            disabled={!onOpenEdit || isDeletedFile}
-            className="absolute right-24 top-4"
-          >
-            <FilePenLine data-icon="inline-start" />
-            Edit
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="absolute right-12 top-4"
-          >
-            <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
-          </Button>
-          {data && (
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
-                {data.kind}
-              </span>
-              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                read-only
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {formatSize(data.size)}
-                {data.language && ` · ${data.language}`}
-              </span>
-              {diffData?.status?.oldPath && (
-                <span className="text-xs text-muted-foreground" title="Renamed from">
-                  from {diffData.status.oldPath}
-                </span>
-              )}
-              {diffData && (
-                <>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/10 text-green-600">
-                    +{diffData.additions}
-                  </span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-600">
-                    -{diffData.deletions}
-                  </span>
-                </>
-              )}
-            </div>
-          )}
-          {isDeletedFile && diffData && (
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-600">
-                deleted
-              </span>
-              <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-600">
-                -{diffData.deletions}
-              </span>
-              {diffData.status?.oldPath && (
-                <span className="text-xs text-muted-foreground" title="Renamed from">
-                  from {diffData.status.oldPath}
-                </span>
-              )}
-            </div>
-          )}
-        </DialogHeader>
+        <Tabs
+          value={mdView}
+          onValueChange={(v) => setMdView(v as 'preview' | 'source')}
+          className="flex-1 min-h-0 gap-0"
+        >
+          {/* Toolbar: icon, name, diff stats, markdown toggle, actions.
+              pr-12 keeps the cluster clear of the dialog close button. */}
+          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 pr-12">
+            <FileIcon className={cn('size-4 shrink-0', fileIconColor(target.path))} />
+            <DialogTitle
+              className="min-w-0 flex-1 truncate text-sm font-medium"
+              title={target.path}
+            >
+              {target.name}
+            </DialogTitle>
 
-        <div className="flex-1 min-h-0 overflow-hidden">
-          {renderContent()}
-        </div>
+            <div className="ml-auto flex shrink-0 items-center gap-1.5">
+              {isDeletedFile && (
+                <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-xs text-destructive">
+                  deleted
+                </span>
+              )}
+              {diffData && (diffData.additions > 0 || diffData.deletions > 0) && (
+                <span className="flex items-center gap-1 text-[10px] font-medium">
+                  {diffData.additions > 0 && (
+                    <span className="text-green-600 dark:text-green-400">+{diffData.additions}</span>
+                  )}
+                  {diffData.deletions > 0 && (
+                    <span className="text-red-600 dark:text-red-400">-{diffData.deletions}</span>
+                  )}
+                </span>
+              )}
+              {isMarkdown && (
+                <TabsList className="h-7">
+                  <TabsTrigger value="preview" className="px-2 text-xs">
+                    <Eye className="size-3" />
+                    Preview
+                  </TabsTrigger>
+                  <TabsTrigger value="source" className="px-2 text-xs">
+                    <Code2 className="size-3" />
+                    Source
+                  </TabsTrigger>
+                </TabsList>
+              )}
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                title="Refresh file"
+              >
+                <RefreshCw className={cn('size-3.5', isRefreshing && 'animate-spin')} />
+              </Button>
+              <Button
+                size="sm"
+                onClick={onOpenEdit}
+                disabled={!onOpenEdit || isDeletedFile}
+                className="shrink-0"
+              >
+                <FilePenLine data-icon="inline-start" />
+                Edit
+              </Button>
+            </div>
+          </div>
+
+          {/* Meta line: path, size, language, rename. Stable two-row header
+              (path is always known) so loading does not shift layout. */}
+          <DialogDescription className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3 py-1.5 pr-12 text-xs text-muted-foreground">
+            <span className="min-w-0 flex-1 truncate font-mono" title={target.path}>
+              {target.path}
+            </span>
+            {data && (
+              <span className="shrink-0">{formatSize(data.size)}</span>
+            )}
+            {data?.language && (
+              <span className="shrink-0 capitalize">{data.language}</span>
+            )}
+            {diffData?.status?.oldPath && (
+              <span
+                className="shrink-0 truncate max-w-40"
+                title={`Renamed from ${diffData.status.oldPath}`}
+              >
+                from {diffData.status.oldPath}
+              </span>
+            )}
+          </DialogDescription>
+
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {renderBody()}
+          </div>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
