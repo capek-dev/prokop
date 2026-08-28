@@ -61,7 +61,10 @@ export interface ToolDefinition {
   description: string;
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
-  timeout?: number;
+  /** Execution deadline in milliseconds. `null` disables the deadline:
+   * the tool runs until it settles or is interrupted. Omit to use the
+   * executor default (30s). */
+  timeout?: number | null;
   env?: string[];
   capabilities?: string[];
   /**
