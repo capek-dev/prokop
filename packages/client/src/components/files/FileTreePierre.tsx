@@ -109,7 +109,15 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     /** Tree identity for expansion persistence (workspace + selected root). */
     const stateKey = `${workspaceId}:${root ?? ''}`;
 
-    // Construct-once options; later updates flow through imperative calls.
+    // Construct-once model: onSelectionChange is frozen at first render, so
+    // live props are read through a ref kept current every render. The remount
+    // key covers workspace/root changes today, but the handler must not rely
+    // on that for callback identity.
+    const liveRef = useRef({ onFileSelect, root, sdkClient });
+    useEffect(() => {
+      liveRef.current = { onFileSelect, root, sdkClient };
+    });
+
     const { model } = useFileTree({
       paths,
       icons: { set: 'standard', colored: true },
@@ -119,7 +127,9 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       renaming: false,
       onSelectionChange: ((selectedPaths: readonly string[]) => {
         const first = selectedPaths[0];
-        if (!first || !onFileSelect || !sdkClient) return;
+        if (!first) return;
+        const { onFileSelect, root, sdkClient } = liveRef.current;
+        if (!onFileSelect || !sdkClient) return;
         const name = first.split('/').pop() ?? first;
         activatePierreFileSelection(model, first, () => {
           onFileSelect({

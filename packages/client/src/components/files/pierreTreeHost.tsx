@@ -78,15 +78,17 @@ interface PierreSelectionModel {
  * Treat a file selection as an activation, then clear it. Pierre emits
  * `onSelectionChange` only when selection state changes, so leaving a file
  * selected prevents clicking that same row from opening preview again.
+ * `activate` is optional: callers with a stale data set pass none so the row
+ * still deselects instead of stranding the selection.
  */
 export function activatePierreFileSelection(
   model: PierreSelectionModel,
   path: string,
-  activate: () => void,
+  activate?: () => void,
 ): boolean {
   const item = model.getItem(path);
   if (!item || item.isDirectory()) return false;
-  activate();
+  activate?.();
   item.deselect();
   return true;
 }

@@ -155,6 +155,16 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
       return allAncestors.filter((dir) => persistedExpanded.includes(dir));
     }, [allAncestors, persistedExpanded]);
 
+    // Construct-once model: onSelectionChange is frozen at first render, so
+    // live values are read through a ref kept current every render. This view
+    // does NOT remount on workspace switches (no key), so a captured `files`
+    // list would keep targeting the previous repo and clicks would stop
+    // opening files.
+    const liveRef = useRef({ files, onFileSelect, root, sdkClient });
+    useEffect(() => {
+      liveRef.current = { files, onFileSelect, root, sdkClient };
+    });
+
     const { model } = useFileTree({
       paths,
       icons: { set: 'standard', colored: true },
@@ -164,12 +174,18 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
       renaming: false,
       onSelectionChange: ((selectedPaths: readonly string[]) => {
         const first = selectedPaths[0];
-        if (!first || !onFileSelect || !sdkClient) return;
+        if (!first) return;
+        const { files, onFileSelect, root, sdkClient } = liveRef.current;
+        if (!onFileSelect || !sdkClient) return;
         const target = buildSelectionTarget(files, first);
-        if (!target) return;
-        activatePierreFileSelection(model, first, () => {
-          onFileSelect({ ...target, root });
-        });
+        // File rows always deselect: Pierre only emits onSelectionChange when
+        // selection changes, so a stranded selection would swallow every
+        // later click on that row.
+        activatePierreFileSelection(
+          model,
+          first,
+          target ? () => onFileSelect({ ...target, root }) : undefined,
+        );
       }) satisfies FileTreeSelectionChangeListener,
     });
 
