@@ -67,7 +67,6 @@ The agent and its coding tools work out of the box. Everything else (memory, ski
 | **Any Model** | Anthropic, OpenAI, Google, DeepSeek, OpenRouter, MiniMax, Zhipu. API keys, or subscription auth through Codex and Zhipu Coding Plan. |
 | **MCP Integration** | Connect any MCP server, stdio or remote. OAuth handled server-side. Tools appear alongside built-in tools. |
 | **Browser Automation** | Optional Chrome extension gives the agent real hands on Chrome: read, click, fill, navigate. Same interface as files and shell. |
-| **Sandbox** | Simulate model responses end to end. Test agent flows without spending API credits. |
 | **Open Source** | Apache 2.0. No telemetry, no account, no cloud. Prompts, memory, and skills are files on disk. |
 
 ---
