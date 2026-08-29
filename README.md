@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/promo_v1.1.0.webp" alt="Prokop web client - chat interface, workspace selector, and tool execution" width="800">
+  <img src="docs/promo.webp" alt="Prokop web client - chat interface, workspace selector, and tool execution" width="800">
 </p>
 
 <p align="center">
