@@ -6,9 +6,6 @@
   "description": "Prokop - AI Agent Monorepo",
   "workspaces": [
     "packages/*",
-    "!packages/capek",
-    "!packages/capek-tool",
-    "!packages/capek-types",
     "tools"
   ],
   "scripts": {

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 interface PackageManifest {
@@ -30,12 +31,14 @@ function expectDependency(
 }
 
 describe('Čapek npm package consumption', () => {
-  test('local Čapek source directories are excluded from Bun workspaces', async () => {
+  test('local Čapek source directories are absent from the Prokop repository', async () => {
     const rootPackage = await readJson<PackageManifest>('package.json');
+    const localPackages = ['capek', 'capek-tool', 'capek-types'];
 
-    expect(rootPackage.workspaces).toContain('!packages/capek');
-    expect(rootPackage.workspaces).toContain('!packages/capek-tool');
-    expect(rootPackage.workspaces).toContain('!packages/capek-types');
+    for (const packageName of localPackages) {
+      expect(existsSync(resolve(repositoryRoot, 'packages', packageName))).toBe(false);
+      expect(rootPackage.workspaces).not.toContain(`!packages/${packageName}`);
+    }
   });
 
   test('consumers declare published package versions instead of workspace links', async () => {

@@ -99,7 +99,7 @@ Anthropic and Google models may be available through OpenRouter, but Prokop has 
 
 **Prokop** is the coding workspace: server, client, sessions, projects, agents, terminals, permissions, and schedules.
 
-**[Capek](packages/capek)** is the plugin-based agent runtime underneath it.
+**[Capek](https://github.com/capek-dev/capek)** is the separately maintained plugin-based agent runtime underneath it.
 
 Both are written in TypeScript and run on Bun.
 

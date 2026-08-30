@@ -9,9 +9,9 @@ Prokop is an AI agent monorepo built with TypeScript and Bun.
 - **Runtime and package manager**: Bun
 - **Workspaces**: `packages/*` and `tools`
 - **Server**: Hono backend in `packages/server` (`@prokopai/server`), with HTTP, WebSocket, terminal, SQLite, MCP, scheduling, permissions, and product-specific domain logic
-- **Agent runtime**: Composable runtime in `packages/capek` (`@capekai/core`), including execution, plugins, providers, tools, storage, compaction, goals, workflows, memory, skills, and sandbox behavior
-- **Runtime contracts**: Shared neutral contracts in `packages/capek-types` (`@capekai/types`)
-- **Tool authoring contracts**: Tool interfaces and install contracts in `packages/capek-tool` (`@capekai/tool`)
+- **Agent runtime**: External `@capekai/core` package, including execution, plugins, providers, tools, storage, compaction, goals, workflows, memory, skills, and sandbox behavior
+- **Runtime contracts**: External `@capekai/types` package
+- **Tool authoring contracts**: External `@capekai/tool` package
 - **Client**: React 19, Vite 8, TanStack Router, TanStack Query, Zustand, shadcn/ui, Tailwind CSS v4, Storybook, and PWA support in `packages/client` (`@prokopai/client`)
 - **SDK**: Product wire protocol, REST clients, WebSocket namespaces, shared product types, and transports in `packages/sdk` (`@prokopai/sdk`)
 - **Browser extension**: Chrome extension for browser automation in `packages/browser` (`@prokopai/browser`)
@@ -96,7 +96,7 @@ ESLint uses the flat config in `eslint.config.js`, with TypeScript, React, and R
 ### Tests
 
 ```bash
-# Root suite: server, SDK, Čapek core, external tools, then client
+# Root suite: server, SDK, external tools, then client
 bun run test
 
 # Server
@@ -108,15 +108,11 @@ bun run test:client
 
 # External tools
 bun run test:tools
-
-# Čapek package boundaries and publish checks
-bun run capek:release:check
-bun run capek:release:validate
 ```
 
 During development, run the smallest relevant test target. Run the full root checks before committing or releasing.
 
-- **Server and Čapek**: Bun test runner with `bun:test`
+- **Server**: Bun test runner with `bun:test`
 - **Client**: Vitest with `happy-dom`; Zustand stores can be tested through `useStore.getState()`
 - **External tools**: Bun test runner with `tools/test-utils.ts`, which provides `createMockContext`, `VirtualFS`, and `WORKSPACE`
 - **Server test aliases**: `#tests/db`, `#tests/factories`, `#tests/mocks`, `#tests/seed`, `#tests/test-dir`, `#tests/mock-ws`, and `#tests/wire-application`
@@ -197,8 +193,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 
 ### AI SDK and Providers
 
-- Vercel AI SDK integration lives in `packages/capek`, not `packages/server`.
-- Provider registration and scoped provider overrides live in `packages/capek/src/providers/registry.ts`.
+- Vercel AI SDK integration and provider registration live in the external `@capekai/core` package, not `packages/server`.
 - Current provider integrations include OpenAI, DeepSeek, OpenRouter, MiniMax, and Zhipu.
 - Prokop-specific provider accounts, credentials, and OAuth wiring live in the server adapters, application services, and provider-account domain.
 
@@ -206,7 +201,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 
 The sandbox CLI in `packages/sandbox-cli` intercepts LLM calls through `/api/sandbox` so end-to-end flows can be tested without live model calls.
 
-- Runtime sandbox behavior: `packages/capek/src/sandbox/`
+- Runtime sandbox behavior: external `@capekai/core/sandbox` package subpath
 - Server composition adapter: `packages/server/src/adapters/capek/sandbox.ts`
 - HTTP routes: `packages/server/src/transport/http/routes/sandbox.ts`
 
@@ -214,36 +209,6 @@ The sandbox CLI in `packages/sandbox-cli` intercepts LLM calls through `/api/san
 
 ```text
 packages/
-  capek/                 # @capekai/core reusable agent runtime
-    src/
-      adapters/          # AI SDK and host-facing runtime adapters
-      compaction/        # Compaction contracts, policy, recovery, and execution
-      configuration/     # Runtime configuration contracts and scoped defaults
-      context/           # Context assembly and sources
-      core/              # Turn loop and execution helpers
-      goals/             # Goal evaluation and loop services
-      internal/          # Public subpath facades for composition and hosts
-      kernel/            # Composition kernel and service contracts
-      memory/            # Memory registry and tool
-      permission/        # Permission policy and ask handling
-      plugins/           # Runtime composition plugins and domain plugins
-      providers/         # Provider registry and contracts
-      retry/             # Retry policy and stream retry behavior
-      runtime/           # Runtime host, events, guidance, and drivers
-      sandbox/           # Simulated provider and controller
-      scheduler/         # Scheduler host and tool
-      session-search/    # Session search contracts and tool
-      skills/            # Skill registry and tool
-      storage/           # Storage contracts and adapters
-      subagent/          # Subagent execution and policy
-      tool-output/       # Tool output policy and artifact retrieval
-      tools/             # Tool registry, source, executor, and artifacts
-      workflow/          # Workflow orchestration
-      workspace/         # Workspace contracts and policy
-
-  capek-types/           # @capekai/types neutral shared contracts
-  capek-tool/            # @capekai/tool tool authoring contracts
-
   server/                # @prokopai/server Prokop host
     src/
       adapters/          # Čapek and compatibility adapters
@@ -296,7 +261,7 @@ tools/                   # External, separately released tool modules
 
 .architecture-v2/        # Current extraction architecture, decisions, and validation
 .agents/skills/          # Repository-specific agent procedures
-changelogs/              # capek, client, SDK, server, and tool release notes
+changelogs/              # Client, SDK, server, and tool release notes
 .github/workflows/       # release.yml and release-browser.yml
 install/                 # install-prokopai.sh and install-prokopai.ps1
 ```
