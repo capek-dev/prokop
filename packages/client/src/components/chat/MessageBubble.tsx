@@ -202,7 +202,7 @@ export function MessageBubble({
             <span
               className={cn(
                 'ml-auto flex items-center gap-0.5',
-                'opacity-0 transition-opacity group-hover/msg:opacity-100 focus-within:opacity-100',
+                'opacity-0 transition-opacity group-hover/msg:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100',
               )}
             >
               {!isQueued && (
@@ -354,7 +354,7 @@ export function MessageBubble({
           <span
             className={cn(
               'flex items-center gap-0.5',
-              'opacity-0 transition-opacity group-hover/msg:opacity-100 focus-within:opacity-100',
+              'opacity-0 transition-opacity group-hover/msg:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100',
             )}
           >
             {renderAssistantActions()}

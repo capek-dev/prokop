@@ -265,7 +265,7 @@ export const ToolCall = memo(function ToolCall({
                 size="icon-xs"
                 className={cn(
                   'ml-auto shrink-0',
-                  'opacity-0 transition-opacity group-hover/tool-row:opacity-100 focus-visible:opacity-100',
+                  'opacity-0 transition-opacity group-hover/tool-row:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100',
                 )}
                 onClick={(e) => {
                   e.stopPropagation();
