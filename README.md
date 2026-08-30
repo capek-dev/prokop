@@ -16,7 +16,8 @@
 </p>
 
 <p align="center">
-  <a href="docs/getting-started.md">Get Started</a> ·
+  <a href="https://prokopai.dev">Website</a> ·
+  <a href="https://prokopai.dev/get-started/">Get Started</a> ·
   <a href="docs/index.md">Documentation</a> ·
   <a href="https://github.com/capek-dev/prokop/releases">Releases</a> ·
   <a href="https://chromewebstore.google.com/detail/jean2browser/jpahdfmmfmmnacapmkchljmcijoedcpj">Chrome Extension</a>
@@ -40,13 +41,13 @@ Most coding agents are capable inside one session. Prokop improves the work arou
 **macOS / Linux**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/capek-dev/prokop/main/install/install-prokopai.sh | bash
+curl -fsSL https://prokopai.dev/install.sh | bash
 ```
 
 **Windows PowerShell**
 
 ```powershell
-irm https://raw.githubusercontent.com/capek-dev/prokop/main/install/install-prokopai.ps1 | iex
+irm https://prokopai.dev/install.ps1 | iex
 ```
 
 Then run:
