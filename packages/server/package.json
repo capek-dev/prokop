@@ -27,9 +27,9 @@
     "test:coverage": "bun test --coverage"
   },
   "dependencies": {
-    "@capekai/core": "workspace:*",
-    "@capekai/tool": "workspace:*",
-    "@capekai/types": "workspace:*",
+    "@capekai/core": "^1.0.2",
+    "@capekai/tool": "^1.0.1",
+    "@capekai/types": "^1.0.1",
     "@clack/prompts": "^0.10.0",
     "@hono/zod-validator": "^0.8.0",
     "@prokopai/sdk": "workspace:*",

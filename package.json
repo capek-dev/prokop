@@ -6,6 +6,9 @@
   "description": "Prokop - AI Agent Monorepo",
   "workspaces": [
     "packages/*",
+    "!packages/capek",
+    "!packages/capek-tool",
+    "!packages/capek-types",
     "tools"
   ],
   "scripts": {
@@ -29,15 +32,11 @@
     "build:bin:windows": "cd packages/server && bun run build:bin:windows",
     "build:all": "cd packages/server && bun run build:all",
     "build:tools": "bun run tools/build.ts",
-    "capek:release:check": "bun run --filter '@capekai/types' typecheck && bun run --filter '@capekai/tool' typecheck && bun run --filter '@capekai/core' typecheck && bun test packages/capek-types/tests packages/capek-tool/tests packages/capek/tests/package-boundary.test.ts packages/capek/tests/tool-entrypoint.test.ts",
-    "capek:release:pack": "(cd packages/capek-types && npm publish --dry-run --access public) && (cd packages/capek-tool && npm publish --dry-run --access public) && (cd packages/capek && npm publish --dry-run --access public)",
-    "capek:release:validate": "bun run capek:release:check && bun run capek:release:pack",
-
     "test:client": "cd packages/client && bun vitest run",
     "test:server": "bun test packages/server",
     "test:server:coverage": "cd packages/server && bun test --coverage",
     "test:tools": "bun test tools",
-    "test": "bun test packages/server packages/sdk packages/capek tools && bun run test:client",
+    "test": "bun test packages/server packages/sdk tools && bun run test:client",
     "sandbox": "bun packages/sandbox-cli/src/cli.ts"
   },
   "devDependencies": {

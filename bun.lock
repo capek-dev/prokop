@@ -29,61 +29,9 @@
         "typescript": "^5.7.2",
       },
     },
-    "packages/capek": {
-      "name": "@capekai/core",
-      "version": "1.0.1",
-      "dependencies": {
-        "@ai-sdk/deepseek": "^2.0.35",
-        "@ai-sdk/openai": "^3.0.84",
-        "@capekai/tool": "^1.0.0",
-        "@capekai/types": "^1.0.1",
-        "@openrouter/ai-sdk-provider": "^2.3.3",
-        "@zip.js/zip.js": "^2.7.60",
-        "ai": "^6.0.116",
-        "ignore": "^7.0.3",
-        "picomatch": "^4.0.2",
-        "tar": "^7.5.13",
-        "vercel-minimax-ai-provider": "^0.0.2",
-        "zhipu-ai-provider": "^0.2.2",
-      },
-      "devDependencies": {
-        "@types/bun": "^1.3.11",
-        "@types/node": "^22.19.15",
-        "@types/picomatch": "^4.0.1",
-        "@types/tar": "^7.0.87",
-        "bun-types": "^1.3.9",
-        "typescript": "^5.7.2",
-      },
-    },
-    "packages/capek-tool": {
-      "name": "@capekai/tool",
-      "version": "1.0.0",
-      "dependencies": {
-        "@capekai/types": "^1.0.0",
-      },
-      "devDependencies": {
-        "@types/bun": "^1.3.11",
-        "@types/node": "^22.19.15",
-        "bun-types": "^1.3.9",
-        "typescript": "^5.7.2",
-      },
-    },
-    "packages/capek-types": {
-      "name": "@capekai/types",
-      "version": "1.0.1",
-      "dependencies": {
-        "@capekai/tool": "^1.0.0",
-      },
-      "devDependencies": {
-        "@types/bun": "^1.3.11",
-        "@types/node": "^22.19.15",
-        "bun-types": "^1.3.9",
-        "typescript": "^5.7.2",
-      },
-    },
     "packages/client": {
       "name": "@prokopai/client",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "dependencies": {
         "@dnd-kit/core": "^6.3.1",
         "@dnd-kit/sortable": "^10.0.0",
@@ -152,20 +100,20 @@
       "name": "@prokopai/sdk",
       "version": "1.4.0",
       "dependencies": {
-        "@capekai/tool": "workspace:*",
-        "@capekai/types": "workspace:*",
+        "@capekai/tool": "^1.0.1",
+        "@capekai/types": "^1.0.1",
       },
     },
     "packages/server": {
       "name": "@prokopai/server",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "bin": {
         "prokop": "./dist/bin/prokop",
       },
       "dependencies": {
-        "@capekai/core": "workspace:*",
-        "@capekai/tool": "workspace:*",
-        "@capekai/types": "workspace:*",
+        "@capekai/core": "^1.0.2",
+        "@capekai/tool": "^1.0.1",
+        "@capekai/types": "^1.0.1",
         "@clack/prompts": "^0.10.0",
         "@hono/zod-validator": "^0.8.0",
         "@modelcontextprotocol/sdk": "^1.27.1",
@@ -200,7 +148,7 @@
       "name": "@jean2/tools",
       "version": "1.0.0",
       "dependencies": {
-        "@capekai/tool": "workspace:*",
+        "@capekai/tool": "^1.0.1",
         "@tavily/core": "^0.7.2",
         "adm-zip": "^0.5.16",
         "mammoth": "^1.8.0",
@@ -427,11 +375,11 @@
 
     "@babel/types": ["@babel/types@7.29.0", "", { "dependencies": { "@babel/helper-string-parser": "^7.27.1", "@babel/helper-validator-identifier": "^7.28.5" } }, "sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A=="],
 
-    "@capekai/core": ["@capekai/core@workspace:packages/capek"],
+    "@capekai/core": ["@capekai/core@1.0.2", "", { "dependencies": { "@ai-sdk/deepseek": "^2.0.35", "@ai-sdk/openai": "^3.0.84", "@capekai/tool": "^1.0.0", "@capekai/types": "^1.0.1", "@openrouter/ai-sdk-provider": "^2.3.3", "@zip.js/zip.js": "^2.7.60", "ai": "^6.0.116", "ignore": "^7.0.3", "picomatch": "^4.0.2", "tar": "^7.5.13", "vercel-minimax-ai-provider": "^0.0.2", "zhipu-ai-provider": "^0.2.2" } }, "sha512-6RmFoi3vWnLbYuiBZsdfT5YKq41Ct/9Da4tJ2almtnmHQy987l9usKmLp4FUGlRHAB43MR47wanTzfXU8iAAbA=="],
 
-    "@capekai/tool": ["@capekai/tool@workspace:packages/capek-tool"],
+    "@capekai/tool": ["@capekai/tool@1.0.1", "", { "dependencies": { "@capekai/types": "^1.0.0" } }, "sha512-+w48ihugLabRbSqxW9vmLFX4TrKJyLt9XEzf7n70iEiEw2EnIXVrI5YQSexdWZJtxtjUiVRV2DNOxQ2Aen39UQ=="],
 
-    "@capekai/types": ["@capekai/types@workspace:packages/capek-types"],
+    "@capekai/types": ["@capekai/types@1.0.1", "", { "dependencies": { "@capekai/tool": "^1.0.0" } }, "sha512-+DZ+pxdSnPAgs59tZ3RU/aCqWPAWoSB/3QfDAVWgX4ys1nLDopzzGbqCcpa3SPG3miqBfgFJUyHfRAK34mhDJw=="],
 
     "@clack/core": ["@clack/core@0.4.2", "", { "dependencies": { "picocolors": "^1.0.0", "sisteransi": "^1.0.5" } }, "sha512-NYQfcEy8MWIxrT5Fj8nIVchfRFA26yYKJcvBS7WlUIlw2OmQOY9DhGGXMovyI5J5PpxrCPGkgUi207EBrjpBvg=="],
 

@@ -2,3 +2,5 @@
 # Only install package versions published at least 3 days ago (259200 seconds)
 # This acts as a cooldown period to avoid supply-chain attacks or broken releases
 minimumReleaseAge = 259200
+# Čapek packages are maintained by us and must be installable immediately after release
+minimumReleaseAgeExcludes = ["@capekai/core", "@capekai/tool", "@capekai/types"]

@@ -13,10 +13,7 @@
     "resolveJsonModule": true,
     "declaration": false,
     "sourceMap": false,
-    "baseUrl": ".",
-    "paths": {
-      "@capekai/tool": ["../packages/capek-tool/src"]
-    }
+    "baseUrl": "."
   },
   "include": ["./**/*.ts", "./**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
