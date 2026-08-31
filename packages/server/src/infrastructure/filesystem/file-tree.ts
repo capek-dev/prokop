@@ -13,7 +13,7 @@ import type {
   DeleteFileResponse,
   RenameFileResponse,
 } from '@prokopai/sdk';
-import { buildIgnoreFilter, IGNORE_PATTERNS } from './workspace-files';
+import { IGNORE_PATTERNS } from './workspace-files';
 import { isBinaryExtension } from './binary-detection';
 import {
   BadRequestError,
@@ -81,7 +81,6 @@ async function walkDirectory(
   dirAbs: string,
   prefix: string,
   showHidden: boolean,
-  ig: ReturnType<typeof buildIgnoreFilter>,
   out: string[],
   truncatedFlag: { value: boolean },
 ): Promise<void> {
@@ -104,8 +103,6 @@ async function walkDirectory(
     // .next, .DS_Store, Thumbs.db are dropped regardless of showHidden.
     if (IGNORED_ENTRY_NAMES.has(entry.name)) continue;
     const relPath = `${prefix}${prefix.length > 0 ? '/' : ''}${entry.name}`;
-    // `.gitignore` rules match root-relative paths at any depth.
-    if (ig.ignores(relPath)) continue;
 
     // Directory entries carry a trailing slash (find-style) so consumers can
     // distinguish directories from extension-less files; path-store builders
@@ -115,7 +112,7 @@ async function walkDirectory(
     out.push(isDir ? `${relPath}/` : relPath);
     if (!isDir) continue;
 
-    await walkDirectory(join(dirAbs, entry.name), relPath, showHidden, ig, out, truncatedFlag);
+    await walkDirectory(join(dirAbs, entry.name), relPath, showHidden, out, truncatedFlag);
   }
 }
 
@@ -238,7 +235,6 @@ export function createFileTreeOps(policy: TreeWorkspacePolicy) {
       rootAbs,
       '',
       input.showHidden ?? true,
-      buildIgnoreFilter(rootAbs),
       paths,
       truncatedFlag,
     );

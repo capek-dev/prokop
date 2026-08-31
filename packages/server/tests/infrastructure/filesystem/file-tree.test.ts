@@ -61,7 +61,7 @@ describe('file tree listing and mutations (S5 filesystem isolation)', () => {
     ]);
   });
 
-  test('tree excludes node_modules and .git via the ignore filter', async () => {
+  test('tree excludes node_modules and .git by name', async () => {
     mkdirSync(join(main, 'node_modules/pkg'), { recursive: true });
     writeFileSync(join(main, 'node_modules/pkg/index.js'), 'x');
     mkdirSync(join(main, '.git'), { recursive: true });
@@ -69,6 +69,24 @@ describe('file tree listing and mutations (S5 filesystem isolation)', () => {
 
     const result = await files().listTreePaths(workspaceId, {});
     expect(result.paths).toEqual([]);
+  });
+
+  test('tree includes paths matched by gitignore rules', async () => {
+    writeFileSync(join(main, '.gitignore'), '*.log\n.env\ncoverage/\n');
+    writeFileSync(join(main, 'secret.log'), 'secret');
+    writeFileSync(join(main, '.env'), 'secret');
+    mkdirSync(join(main, 'coverage'), { recursive: true });
+    writeFileSync(join(main, 'coverage/lcov.info'), 'coverage');
+
+    const result = await files().listTreePaths(workspaceId, {});
+
+    expect(result.paths).toEqual([
+      '.env',
+      '.gitignore',
+      'coverage/',
+      'coverage/lcov.info',
+      'secret.log',
+    ]);
   });
 
   test('create makes an empty file with parents by default', async () => {

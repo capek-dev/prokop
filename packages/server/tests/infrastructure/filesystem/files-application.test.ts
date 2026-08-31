@@ -74,6 +74,21 @@ describe('files application over the Jean2 port (S5 filesystem isolation)', () =
     expect(aborted.files).toEqual([]);
   });
 
+  test('search excludes gitignored paths while the tree includes them', async () => {
+    writeFileSync(join(main, '.gitignore'), '*.log\n');
+    writeFileSync(join(main, 'secret.log'), 'secret');
+    writeFileSync(join(main, 'notes.txt'), 'notes');
+
+    const ignoredSearch = await files().list(workspaceId, { path: '', search: 'secret' });
+    expect(ignoredSearch.files).toEqual([]);
+
+    const visibleSearch = await files().list(workspaceId, { path: '', search: 'notes' });
+    expect(visibleSearch.files.map((entry) => entry.name)).toEqual(['notes.txt']);
+
+    const tree = await files().listTreePaths(workspaceId, {});
+    expect(tree.paths).toContain('secret.log');
+  });
+
   test('browse denies paths outside the workspace with the exact error', async () => {
     const sibling = `${main}-other`;
     mkdirSync(sibling);
