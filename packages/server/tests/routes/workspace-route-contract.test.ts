@@ -193,16 +193,31 @@ describe('workspace route contract', () => {
     expect(missing.status).toBe(404);
   });
 
-  test('terminal routes preserve the exact shapes and statuses', async () => {
-    const app = makeApp(makeFakeApplication());
+  test('terminal routes preserve shapes and pass validated starting paths', async () => {
+    const createdCwds: Array<string | undefined> = [];
+    const app = makeApp(makeFakeApplication({
+      createTerminal: (_id, cwd) => {
+        createdCwds.push(cwd);
+        return { kind: 'ok', session: { id: 't-1' } };
+      },
+    }));
 
     const list = await app.request('/api/workspaces/ws-1/terminals');
     expect(list.status).toBe(200);
     expect(await json(list)).toEqual({ sessions: [{ id: 't-1' }] });
 
-    const create = await app.request('/api/workspaces/ws-1/terminals', { method: 'POST' });
+    const create = await app.request('/api/workspaces/ws-1/terminals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd: '/shared' }),
+    });
     expect(create.status).toBe(200);
     expect(await json(create)).toEqual({ session: { id: 't-1' } });
+    expect(createdCwds).toEqual(['/shared']);
+
+    const defaultCreate = await app.request('/api/workspaces/ws-1/terminals', { method: 'POST' });
+    expect(defaultCreate.status).toBe(200);
+    expect(createdCwds).toEqual(['/shared', undefined]);
 
     const get = await app.request('/api/workspaces/ws-1/terminals/t-1');
     expect(get.status).toBe(200);
@@ -215,6 +230,18 @@ describe('workspace route contract', () => {
     const destroy = await app.request('/api/workspaces/ws-1/terminals/t-1', { method: 'DELETE' });
     expect(destroy.status).toBe(200);
     expect(await json(destroy)).toEqual({ success: true });
+
+    const invalidPath = makeApp(makeFakeApplication({ createTerminal: () => ({ kind: 'invalid_path' }) }));
+    const invalidPathRes = await invalidPath.request('/api/workspaces/ws-1/terminals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd: '/outside' }),
+    });
+    expect(invalidPathRes.status).toBe(400);
+    expect(await json(invalidPathRes)).toEqual({
+      error: 'bad_request',
+      message: 'Terminal path must be a registered workspace root',
+    });
 
     const limited = makeApp(makeFakeApplication({ createTerminal: () => ({ kind: 'limit' }) }));
     const limitRes = await limited.request('/api/workspaces/ws-1/terminals', { method: 'POST' });

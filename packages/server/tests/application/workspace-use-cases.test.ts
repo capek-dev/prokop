@@ -159,7 +159,7 @@ function makeFakes(state: FakeState) {
       return [{ id: 't-1', cwd: workspacePath }];
     },
     createDetached: (options) => {
-      state.log.push(`createTerminal:${options.workspaceId}`);
+      state.log.push(`createTerminal:${options.workspaceId}:${options.cwd}`);
       return options.workspaceId === 'limited' ? null : 't-new';
     },
     get: (sessionId) => (sessionId === 't-new' ? { id: 't-new' } : sessionId === 't-1' ? { id: 't-1' } : null),
@@ -345,20 +345,28 @@ describe('workspace application use cases', () => {
     expect(state.log).toEqual([]);
   });
 
-  test('terminal use cases preserve the exact limit and missing behaviors', () => {
+  test('terminal use cases support registered workspace roots and reject other paths', () => {
     const state = makeState();
-    state.workspaces.set('ws-1', makeWorkspace({ path: '/ws-path' }));
+    state.workspaces.set('ws-1', makeWorkspace({
+      path: '/ws-path',
+      additionalPaths: ['/shared'],
+    }));
     state.workspaces.set('limited', makeWorkspace({ id: 'limited', path: '/limited' }));
     const application = makeApplication(state);
 
     expect(application.listTerminals('ws-1')).toEqual({
       kind: 'ok',
-      sessions: [{ id: 't-1', cwd: '/ws-path' }],
+      sessions: [
+        { id: 't-1', cwd: '/ws-path' },
+        { id: 't-1', cwd: '/shared' },
+      ],
     });
     expect(application.listTerminals('missing')).toEqual({ kind: 'missing' });
     expect(application.createTerminal('missing')).toEqual({ kind: 'missing' });
     expect(application.createTerminal('limited')).toEqual({ kind: 'limit' });
-    expect(application.createTerminal('ws-1')).toEqual({ kind: 'ok', session: { id: 't-new' } });
+    expect(application.createTerminal('ws-1', '/outside')).toEqual({ kind: 'invalid_path' });
+    expect(application.createTerminal('ws-1', '/shared')).toEqual({ kind: 'ok', session: { id: 't-new' } });
+    expect(state.log).toContain('createTerminal:ws-1:/shared');
     expect(application.getTerminal('t-new')).toEqual({ id: 't-new' });
     expect(application.getTerminal('missing-terminal')).toBeNull();
     application.destroyTerminal('t-new');

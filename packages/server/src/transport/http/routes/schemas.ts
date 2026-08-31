@@ -245,6 +245,10 @@ export const updateWorkspaceSettingsSchema = z.object({
   settings: workspaceSettingsSchema.optional(),
 }).loose();
 
+export const createTerminalSchema = z.object({
+  cwd: z.string().min(1).optional(),
+}).strict();
+
 export const pinMessageSchema = z.object({
   sessionId: z.string().min(1, { message: 'sessionId is required' }),
   messageId: z.string().min(1, { message: 'messageId is required' }),

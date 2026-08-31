@@ -64,6 +64,7 @@ export type WorkspaceTerminalListResult =
 export type WorkspaceTerminalCreateResult =
   | { kind: 'ok'; session: WorkspaceTerminalSession }
   | { kind: 'missing' }
+  | { kind: 'invalid_path' }
   | { kind: 'limit' };
 
 export type WorkspaceSessionListResult =
@@ -100,7 +101,7 @@ export interface WorkspaceApplication {
   deleteWorkspace(id: string): Promise<WorkspaceDeleteResult>;
 
   listTerminals(id: string): WorkspaceTerminalListResult;
-  createTerminal(id: string): WorkspaceTerminalCreateResult;
+  createTerminal(id: string, cwd?: string): WorkspaceTerminalCreateResult;
   getTerminal(sessionId: string): WorkspaceTerminalSession | null;
   destroyTerminal(sessionId: string): void;
 
@@ -248,8 +249,10 @@ export function createWorkspaceApplication(deps: WorkspaceApplicationDeps): Work
         console.warn(`[workspace cleanup] Failed to shutdown MCP workspace ${workspace.path}:`, err);
       }
 
-      // 3. Destroy terminal sessions for that workspace
-      deps.terminals.destroyForWorkspace(workspace.path);
+      // 3. Destroy terminal sessions for every registered workspace root
+      for (const root of [workspace.path, ...workspace.additionalPaths]) {
+        deps.terminals.destroyForWorkspace(root);
+      }
 
       // 4. Delete scheduled jobs for that workspace
       deps.cleanup.deleteScheduledJobs(id);
@@ -273,18 +276,26 @@ export function createWorkspaceApplication(deps: WorkspaceApplicationDeps): Work
       if (!workspace) {
         return { kind: 'missing' };
       }
-      const sessions = deps.terminals.listForWorkspace(workspace.path);
+      const sessions = [workspace.path, ...workspace.additionalPaths].flatMap(
+        root => deps.terminals.listForWorkspace(root),
+      );
       return { kind: 'ok', sessions };
     },
 
-    createTerminal(id) {
+    createTerminal(id, requestedCwd) {
       const workspace = deps.repository.get(id);
       if (!workspace) {
         return { kind: 'missing' };
       }
 
+      const cwd = requestedCwd ? deps.paths.expandPath(requestedCwd) : workspace.path;
+      const registeredRoots = [workspace.path, ...workspace.additionalPaths];
+      if (!registeredRoots.includes(cwd)) {
+        return { kind: 'invalid_path' };
+      }
+
       const sessionId = deps.terminals.createDetached({
-        cwd: workspace.path,
+        cwd,
         workspaceId: id,
       });
 

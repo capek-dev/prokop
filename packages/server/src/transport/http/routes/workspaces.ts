@@ -3,7 +3,12 @@ import { validate } from './validate';
 import type { SessionStatus } from '@prokopai/sdk';
 import type { WorkspaceApplication } from '@/application/workspaces';
 import { BadRequestError, NotFoundError } from '@/application/http-errors';
-import { createWorkspaceSchema, updateWorkspaceSettingsSchema, pinMessageSchema } from './schemas';
+import {
+  createTerminalSchema,
+  createWorkspaceSchema,
+  updateWorkspaceSettingsSchema,
+  pinMessageSchema,
+} from './schemas';
 
 /**
  * S4 workspace routes. Validation, status mapping, and wire presentation
@@ -96,9 +101,18 @@ export function registerWorkspaceRoutes(app: Hono, application: WorkspaceApplica
 
   // POST /api/workspaces/:id/terminals - Create a new terminal session
   app.post('/api/workspaces/:id/terminals', async (c) => {
-    const result = application.createTerminal(c.req.param('id'));
+    const rawBody = await c.req.json().catch(() => ({}));
+    const parsedBody = createTerminalSchema.safeParse(rawBody);
+    if (!parsedBody.success) {
+      throw new BadRequestError('Invalid terminal options');
+    }
+
+    const result = application.createTerminal(c.req.param('id'), parsedBody.data.cwd);
     if (result.kind === 'missing') {
       throw new NotFoundError('Workspace not found');
+    }
+    if (result.kind === 'invalid_path') {
+      throw new BadRequestError('Terminal path must be a registered workspace root');
     }
     if (result.kind === 'limit') {
       return c.json(
