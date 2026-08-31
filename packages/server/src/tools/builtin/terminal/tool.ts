@@ -6,9 +6,9 @@
  * dies with the workspace. Completion detection uses a random sentinel:
  * the tool wraps the command with an echo that prints `<marker><exit>`
  * after the command finishes, and watches the session buffer for the
- * marker followed by digits. The echoed command line contains the
- * marker followed by `$` (unix) or `%` (windows), so the echo itself
- * never matches.
+ * marker followed by digits. The echoed wrapper is removed from the
+ * captured output before marker matching, so its marker literals cannot
+ * report completion early.
  */
 
 import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
@@ -17,7 +17,7 @@ import {
   createShellPermissionAskStructured,
   createWorkspaceModificationAsk,
 } from '@prokopai/sdk';
-import { analyzeRisk, stripRedundantCd } from '../shell/risk';
+import { analyzeRisk, resolveCommandPath, stripRedundantCd } from '../shell/risk';
 import { getTerminalManager } from '@/transport/terminal';
 
 interface TerminalInput {
@@ -57,9 +57,9 @@ function wrapWithMarker(command: string, marker: string, platform: 'windows' | '
   if (platform === 'windows') {
     // cmd.exe expands %ERRORLEVEL% at parse time, so the code is carried
     // by the && / || branch instead: 0 on success, 1 otherwise.
-    return `${command} & echo ${marker}0 || echo ${marker}1`;
+    return `${command} && echo ${marker}0: || echo ${marker}1:`;
   }
-  return `${command}; echo "${marker}$?"`;
+  return `${command}; __prokop_status=$?; __prokop_cwd=$(command pwd -P); echo "${marker}$__prokop_status:$__prokop_cwd"`;
 }
 
 /** Strips ANSI escape sequences and control characters so raw PTY bytes
@@ -90,16 +90,21 @@ function truncateOutput(text: string, maxBytes: number): string {
   return `... [truncated, oldest output cut]\n${text.slice(text.length - keepChars)}`;
 }
 
-async function requestPermission(command: string, ctx: ToolContext): Promise<boolean> {
-  const effectiveCommand = stripRedundantCd(command, ctx.workspacePath, ctx.resolvePath);
-  const risk = analyzeRisk(effectiveCommand, ctx);
+async function requestPermission(
+  command: string,
+  executionCwd: string,
+  ctx: ToolContext,
+): Promise<boolean> {
+  const resolveFromCwd = (path: string): string => resolveCommandPath(path, executionCwd, ctx);
+  const effectiveCommand = stripRedundantCd(command, executionCwd, resolveFromCwd);
+  const risk = analyzeRisk(effectiveCommand, ctx, executionCwd);
   if (!risk.requiresAsk) return true;
 
   let permAsk;
   if (risk.riskCategory === 'outside-workspace') {
     permAsk = createOutsideWorkspaceAsk({
       command: effectiveCommand,
-      cwd: ctx.workspacePath,
+      cwd: executionCwd,
       resolvedPaths: risk.resolvedPaths,
       hasOperators: risk.hasOperators,
     });
@@ -128,7 +133,7 @@ async function requestPermission(command: string, ctx: ToolContext): Promise<boo
 }
 
 type MarkerOutcome =
-  | { completed: true; exitCode: number; output: string }
+  | { completed: true; exitCode: number; output: string; cwd?: string }
   | { completed: false; output: string; destroyed: boolean };
 
 async function waitForMarker(
@@ -143,12 +148,15 @@ async function waitForMarker(
   // null deadline: wait until the sentinel appears or the session dies.
   // Only interrupt can stop the wait early.
   const deadline = timeoutMs === null ? Infinity : Date.now() + timeoutMs;
-  // Marker followed by digits = real sentinel. The echoed command has
-  // the marker followed by `$` or `%` and never matches.
-  const pattern = new RegExp(`${marker}(\\d+)`);
+  // Marker followed by digits = real sentinel. The echoed wrapper is
+  // removed before matching so its marker literals cannot match.
+  const pattern = new RegExp(`${marker}(\\d+):([^\\r\\n]*)`);
+
+  const hasCompletionMarker = (text: string): boolean =>
+    pattern.test(removeEchoedCommand(stripAnsi(text), wrapped));
 
   let read = manager.readBuffer(sessionId, fromOffset, MAX_OUTPUT_BYTES * 4);
-  while (read && !pattern.test(read.text) && Date.now() < deadline && !abortSignal.aborted) {
+  while (read && !hasCompletionMarker(read.text) && Date.now() < deadline && !abortSignal.aborted) {
     await Bun.sleep(50);
     read = manager.readBuffer(sessionId, fromOffset, MAX_OUTPUT_BYTES * 4);
   }
@@ -156,14 +164,15 @@ async function waitForMarker(
   // readBuffer null = the session was destroyed mid-wait (e.g. killed
   // from the terminal panel). The sentinel can never arrive after that.
   if (!read) return { completed: false, output: '', destroyed: true };
-  const text = stripAnsi(read.text);
+  const text = removeEchoedCommand(stripAnsi(read.text), wrapped);
   const match = text.match(pattern);
   if (match && match.index !== undefined) {
     const exitCode = Number(match[1]);
-    const output = removeEchoedCommand(text.slice(0, match.index), wrapped).replace(/^[\r\n]+/, '').trimEnd();
-    return { completed: true, exitCode, output };
+    const cwd = match[2]?.trim() || undefined;
+    const output = text.slice(0, match.index).replace(/^[\r\n]+/, '').trimEnd();
+    return { completed: true, exitCode, output, cwd };
   }
-  return { completed: false, output: removeEchoedCommand(text, wrapped).trimEnd(), destroyed: false };
+  return { completed: false, output: text.trimEnd(), destroyed: false };
 }
 
 export const definition: ToolDefinition = {
@@ -304,7 +313,8 @@ async function handleSend(input: TerminalInput, ctx: ToolContext): Promise<ToolR
     return { success: false, error: 'A command is already pending in this session. Wait for it to complete (or read its output) before sending another.' };
   }
 
-  const approved = await requestPermission(command, ctx);
+  const executionCwd = manager.getSessionExecutionCwd(sessionId) ?? session.cwd;
+  const approved = await requestPermission(command, executionCwd, ctx);
   if (!approved) return { success: false, error: 'USER_REJECTION' };
 
   if (input.raw === true) {
@@ -339,6 +349,9 @@ async function handleSend(input: TerminalInput, ctx: ToolContext): Promise<ToolR
   try {
     const outcome = await waitForMarker(sessionId, marker, wrapped, timeoutMs, fromOffset, ctx.abortSignal);
     if (outcome.completed) {
+      if (outcome.cwd) {
+        manager.updateSessionCwd(sessionId, outcome.cwd);
+      }
       const success = outcome.exitCode === 0;
       return {
         success,

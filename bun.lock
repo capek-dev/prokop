@@ -100,7 +100,7 @@
       "name": "@prokopai/sdk",
       "version": "1.4.0",
       "dependencies": {
-        "@capekai/tool": "^1.0.1",
+        "@capekai/tool": "^1.0.2",
         "@capekai/types": "^1.0.1",
       },
     },
@@ -111,8 +111,8 @@
         "prokop": "./dist/bin/prokop",
       },
       "dependencies": {
-        "@capekai/core": "^1.0.2",
-        "@capekai/tool": "^1.0.1",
+        "@capekai/core": "^1.0.3",
+        "@capekai/tool": "^1.0.2",
         "@capekai/types": "^1.0.1",
         "@clack/prompts": "^0.10.0",
         "@hono/zod-validator": "^0.8.0",
@@ -148,7 +148,7 @@
       "name": "@jean2/tools",
       "version": "1.0.0",
       "dependencies": {
-        "@capekai/tool": "^1.0.1",
+        "@capekai/tool": "^1.0.2",
         "@tavily/core": "^0.7.2",
         "adm-zip": "^0.5.16",
         "mammoth": "^1.8.0",
@@ -375,9 +375,9 @@
 
     "@babel/types": ["@babel/types@7.29.0", "", { "dependencies": { "@babel/helper-string-parser": "^7.27.1", "@babel/helper-validator-identifier": "^7.28.5" } }, "sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A=="],
 
-    "@capekai/core": ["@capekai/core@1.0.2", "", { "dependencies": { "@ai-sdk/deepseek": "^2.0.35", "@ai-sdk/openai": "^3.0.84", "@capekai/tool": "^1.0.0", "@capekai/types": "^1.0.1", "@openrouter/ai-sdk-provider": "^2.3.3", "@zip.js/zip.js": "^2.7.60", "ai": "^6.0.116", "ignore": "^7.0.3", "picomatch": "^4.0.2", "tar": "^7.5.13", "vercel-minimax-ai-provider": "^0.0.2", "zhipu-ai-provider": "^0.2.2" } }, "sha512-6RmFoi3vWnLbYuiBZsdfT5YKq41Ct/9Da4tJ2almtnmHQy987l9usKmLp4FUGlRHAB43MR47wanTzfXU8iAAbA=="],
+    "@capekai/core": ["@capekai/core@1.0.3", "", { "dependencies": { "@ai-sdk/deepseek": "^2.0.35", "@ai-sdk/openai": "^3.0.84", "@capekai/tool": "^1.0.2", "@capekai/types": "^1.0.1", "@openrouter/ai-sdk-provider": "^2.3.3", "@zip.js/zip.js": "^2.7.60", "ai": "^6.0.116", "ignore": "^7.0.3", "picomatch": "^4.0.2", "tar": "^7.5.13", "vercel-minimax-ai-provider": "^0.0.2", "zhipu-ai-provider": "^0.2.2" } }, "sha512-9RoaUIQl39uwzEcrYXc5Hmv2u6uS+iL5M3lLLGwC+7KUbFx6NJsisXFJ3LAQGoO00pzoe3VpYGvkvebCiUpXbA=="],
 
-    "@capekai/tool": ["@capekai/tool@1.0.1", "", { "dependencies": { "@capekai/types": "^1.0.0" } }, "sha512-+w48ihugLabRbSqxW9vmLFX4TrKJyLt9XEzf7n70iEiEw2EnIXVrI5YQSexdWZJtxtjUiVRV2DNOxQ2Aen39UQ=="],
+    "@capekai/tool": ["@capekai/tool@1.0.2", "", { "dependencies": { "@capekai/types": "^1.0.0" } }, "sha512-fsBXU2pTlqIIbroS5RAEIVk1l9ryW66pWYRTKPtKAncw3gODbWwQPr2WMZG2F9XIYQ8RhIsBlJxJ531gF1UIIg=="],
 
     "@capekai/types": ["@capekai/types@1.0.1", "", { "dependencies": { "@capekai/tool": "^1.0.0" } }, "sha512-+DZ+pxdSnPAgs59tZ3RU/aCqWPAWoSB/3QfDAVWgX4ys1nLDopzzGbqCcpa3SPG3miqBfgFJUyHfRAK34mhDJw=="],
 

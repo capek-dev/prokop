@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
-import type { ToolContext } from '@capekai/tool';
+import { resolve } from 'path';
+import type { PermissionAsk, ToolContext } from '@capekai/tool';
 import { execute, definition } from './tool';
 import { getTerminalManager, installTerminalSessionStore } from '@/transport/terminal';
 import type { TerminalSessionStorePort } from '@/application/ports/terminal';
@@ -174,7 +175,7 @@ describe('terminal tool: actions', () => {
     const markerMatch = written.match(/__T([a-f0-9]{8})_\$/);
     expect(markerMatch).not.toBeNull();
     // Simulate shell behavior: echo the line, print output, print sentinel
-    pty.emitData(`${written}\r\nhello\r\n__T${markerMatch![1]}_0\r\n`);
+    pty.emitData(`${written}\r\nhello\r\n__T${markerMatch![1]}_0:${ctx.workspacePath}\r\n`);
     pty.emitData('$ ');
 
     const sent = await sendPromise;
@@ -195,7 +196,7 @@ describe('terminal tool: actions', () => {
 
     const written = pty.writeCalls.join('');
     const markerMatch = written.match(/__T([a-f0-9]{8})_\$/);
-    pty.emitData(`${written}\r\nboom\r\n__T${markerMatch![1]}_1\r\n`);
+    pty.emitData(`${written}\r\nboom\r\n__T${markerMatch![1]}_1:${ctx.workspacePath}\r\n`);
 
     const sent = await sendPromise;
     expect(sent.success).toBe(false);
@@ -233,6 +234,66 @@ describe('terminal tool: actions', () => {
     expect(pty.writeCalls[pty.writeCalls.length - 1]).toBe('y\n');
   });
 
+  test('permission paths use an additional-workspace terminal cwd', async () => {
+    const { ctx, cwd } = makeWorkspaceCtx();
+    const additionalCwd = mkdtempSync(`${tmpdir()}/term-tool-additional-`);
+    tempDirs.push(additionalCwd);
+    ctx.isWithinWorkspace = (path: string) =>
+      path.startsWith(cwd) || path.startsWith(additionalCwd);
+    ctx.ask = mock(async () => true) as unknown as ToolContext['ask'];
+
+    const created = await execute({ action: 'create', cwd: additionalCwd }, ctx);
+    const sessionId = (created.result as { sessionId: string }).sessionId;
+    const sent = await execute({
+      action: 'send',
+      sessionId,
+      command: 'rm -rf dist',
+      raw: true,
+    }, ctx);
+
+    expect(sent.success).toBe(true);
+    const calls = (ctx.ask as ReturnType<typeof mock>).mock.calls;
+    expect(calls).toHaveLength(1);
+    const expectedPath = resolve(additionalCwd, 'dist');
+    const ask = calls[0][0] as PermissionAsk;
+    expect(ask.paths).toEqual([expectedPath]);
+    expect(ask.intents?.[0]?.targets[0]?.target).toBe(`${expectedPath}/`);
+  });
+
+  test('permission paths follow cwd changes from completed commands', async () => {
+    const { ctx, cwd } = makeWorkspaceCtx();
+    const subdirectory = resolve(cwd, 'subdirectory');
+    mkdirSync(subdirectory);
+    ctx.ask = mock(async () => true) as unknown as ToolContext['ask'];
+    const sessionId = await createSession(ctx);
+    const pty = ptyState.instances[ptyState.instances.length - 1]!;
+
+    const changeDirectory = execute({
+      action: 'send',
+      sessionId,
+      command: 'cd subdirectory',
+    }, ctx);
+    await Bun.sleep(80);
+    const wrapped = pty.writeCalls[pty.writeCalls.length - 1]!;
+    const markerMatch = wrapped.match(/__T([a-f0-9]{8})_\$/);
+    expect(markerMatch).not.toBeNull();
+    pty.emitData(`${wrapped}\r\n__T${markerMatch![1]}_0:${subdirectory}\r\n`);
+    expect((await changeDirectory).success).toBe(true);
+
+    const sent = await execute({
+      action: 'send',
+      sessionId,
+      command: 'rm -rf dist',
+      raw: true,
+    }, ctx);
+
+    expect(sent.success).toBe(true);
+    const calls = (ctx.ask as ReturnType<typeof mock>).mock.calls;
+    expect(calls).toHaveLength(1);
+    const ask = calls[0][0] as PermissionAsk;
+    expect(ask.paths).toEqual([resolve(subdirectory, 'dist')]);
+  }, 10_000);
+
   test('null timeoutMs waits past any finite deadline until the sentinel arrives', async () => {
     const { ctx } = makeWorkspaceCtx();
     const sessionId = await createSession(ctx);
@@ -256,7 +317,7 @@ describe('terminal tool: actions', () => {
     expect(early).toBe('still-waiting');
 
     // Sentinel arrives at ~1.7s: null wait must complete with the code.
-    pty.emitData(`${written}\r\nbuilt ok\r\n__T${markerMatch![1]}_0\r\n`);
+    pty.emitData(`${written}\r\nbuilt ok\r\n__T${markerMatch![1]}_0:${ctx.workspacePath}\r\n`);
     const sent = await sendPromise;
     expect(sent.success).toBe(true);
     const res = sent.result as { status: string; exitCode: number; output: string };
@@ -280,7 +341,7 @@ describe('terminal tool: actions', () => {
     expect(markerMatch).not.toBeNull();
 
     await Bun.sleep(200);
-    pty.emitData(`${written}\r\nlate\r\n__T${markerMatch![1]}_0\r\n`);
+    pty.emitData(`${written}\r\nlate\r\n__T${markerMatch![1]}_0:${ctx.workspacePath}\r\n`);
     const sent = await sendPromise;
     expect(sent.success).toBe(true);
     const res = sent.result as { status: string };

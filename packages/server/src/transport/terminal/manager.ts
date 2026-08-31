@@ -21,6 +21,7 @@ interface TerminalSession {
   id: string;
   pty: IPty;
   cwd: string;
+  currentCwd: string;
   shell: string;
   title: string;
   workspaceId: string;
@@ -229,6 +230,7 @@ export class TerminalManager {
         id: sessionId,
         pty,
         cwd,
+        currentCwd: cwd,
         shell,
         title: 'main',
         workspaceId,
@@ -440,6 +442,17 @@ export class TerminalManager {
     const session = this.sessions.get(sessionId);
     if (!session) return null;
     return this.getSessionInfo(session);
+  }
+
+  getSessionExecutionCwd(sessionId: string): string | null {
+    return this.sessions.get(sessionId)?.currentCwd ?? null;
+  }
+
+  updateSessionCwd(sessionId: string, cwd: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.status !== 'running') return false;
+    session.currentCwd = cwd;
+    return true;
   }
 
   /** Writes raw input into a session's PTY without a client socket.

@@ -7,7 +7,7 @@ import {
   createOutsideWorkspaceAsk,
   createWorkspaceModificationAsk,
 } from '@prokopai/sdk';
-import { analyzeRisk, stripRedundantCd } from './risk';
+import { analyzeRisk, resolveCommandPath, stripRedundantCd } from './risk';
 
 interface Input {
   command: string;
@@ -74,8 +74,9 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
     }
 
     const resolvedCwd = input.cwd ? ctx.resolvePath(input.cwd) : ctx.workspacePath;
-    const effectiveCommand = stripRedundantCd(commandInput, resolvedCwd, ctx.resolvePath);
-    const risk = analyzeRisk(effectiveCommand, ctx);
+    const resolveFromCwd = (path: string): string => resolveCommandPath(path, resolvedCwd, ctx);
+    const effectiveCommand = stripRedundantCd(commandInput, resolvedCwd, resolveFromCwd);
+    const risk = analyzeRisk(effectiveCommand, ctx, resolvedCwd);
 
     const outsideWorkspaceCwd = input.cwd && !ctx.isWithinWorkspace(resolvedCwd);
 
@@ -126,7 +127,7 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
       if (!approved) return { success: false, error: 'USER_REJECTION' };
     }
 
-    const cwd = input.cwd ? ctx.fs.resolve(input.cwd) : ctx.workspacePath;
+    const cwd = resolvedCwd;
 
     const platform = await detectPlatform();
     const shell = platform === 'windows'

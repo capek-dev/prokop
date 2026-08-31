@@ -3,6 +3,7 @@
  * terminal tool so both apply identical permission gating.
  */
 
+import { isAbsolute, resolve } from 'node:path';
 import type { ToolContext } from '@capekai/tool';
 import {
   SHELL_DANGEROUS_COMMANDS,
@@ -102,7 +103,24 @@ export interface RiskAnalysis {
   flags: string[];
 }
 
-export function analyzeRisk(cmd: string, ctx: ToolContext): RiskAnalysis {
+export function resolveCommandPath(path: string, executionCwd: string, ctx: ToolContext): string {
+  const resolvePathFrom = (ctx as ToolContext & {
+    resolvePathFrom?: (candidate: string, basePath: string) => string;
+  }).resolvePathFrom;
+  if (resolvePathFrom) {
+    return resolvePathFrom(path, executionCwd);
+  }
+  if (path === '~' || path.startsWith('~/') || isAbsolute(path)) {
+    return ctx.resolvePath(path);
+  }
+  return resolve(executionCwd, path);
+}
+
+export function analyzeRisk(
+  cmd: string,
+  ctx: ToolContext,
+  executionCwd: string = ctx.workspacePath,
+): RiskAnalysis {
   const effectiveCommand = getEffectiveShellCommandIdentity(cmd);
   const { flags } = parseCommand(cmd);
   const lowerEffective = effectiveCommand.toLowerCase();
@@ -111,7 +129,7 @@ export function analyzeRisk(cmd: string, ctx: ToolContext): RiskAnalysis {
   let workspaceBound = true;
 
   for (const p of paths) {
-    const resolved = ctx.resolvePath(p);
+    const resolved = resolveCommandPath(p, executionCwd, ctx);
     resolvedPaths.push(resolved);
     if (!ctx.isWithinWorkspace(resolved) && !resolved.startsWith(ctx.fs.tempDir)) {
       workspaceBound = false;

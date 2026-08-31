@@ -1,4 +1,5 @@
 import { describe, test, expect, mock, beforeEach, afterEach } from 'bun:test';
+import { resolve } from 'node:path';
 import type { ToolContext, PermissionAsk } from '@prokopai/sdk';
 import { definition, execute } from './tool';
 
@@ -531,6 +532,22 @@ describe('permission ask structure', () => {
     expect(permAsk.question).toContain('/tmp/external');
   });
 
+  test('relative targets resolve against an additional-workspace cwd', async () => {
+    const additionalWorkspace = '/workspace/project-b';
+    const ctx = createMockContext({
+      isWithinWorkspace: (path: string) =>
+        path.startsWith(WORKSPACE) || path.startsWith(additionalWorkspace),
+    });
+
+    await execute({ command: 'rm -rf dist', cwd: additionalWorkspace }, ctx);
+
+    const expectedPath = resolve(additionalWorkspace, 'dist');
+    const permAsk = getAskCall(ctx);
+    expect(permAsk.paths).toEqual([expectedPath]);
+    expect(permAsk.intents?.[0]?.targets[0]?.target).toBe(`${expectedPath}/`);
+    expect(spawnSyncCalls[0]?.cwd).toBe(additionalWorkspace);
+  });
+
   test('workspace-modification ask has correct question format', async () => {
     const ctx = createMockContext();
     await execute({ command: 'mkdir new-dir' }, ctx);
@@ -777,8 +794,8 @@ describe('edge cases', () => {
 
   test('relative path argument stays inside workspace', async () => {
     const ctx = createMockContext();
-    // ./src and ../lib are relative, resolved inside workspace
-    await execute({ command: 'ls ./src ../lib' }, ctx);
+    // Both paths normalize inside the workspace root.
+    await execute({ command: 'ls ./src ../project/lib' }, ctx);
     expect(ctx.ask).not.toHaveBeenCalled();
   });
 
