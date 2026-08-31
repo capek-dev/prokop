@@ -40,6 +40,7 @@ export function AppPanels({
         workspaceId={workspaceId}
         workspacePath={workspacePath}
         workspaceName={workspaceName}
+        additionalPaths={activeWorkspace?.additionalPaths ?? []}
         sdkClient={sdkClient}
         isOpen={showTerminalPanel}
         onOpen={() => setShowTerminalPanel(true)}

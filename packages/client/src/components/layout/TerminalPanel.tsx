@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
-import { X, Plus, Terminal as TerminalIcon, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, Plus, Folder, Terminal as TerminalIcon, ChevronUp, ChevronDown } from 'lucide-react';
 import { TerminalView } from './TerminalView';
 import {
   useTerminalConnection,
@@ -16,6 +16,12 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useVisualViewport } from '@/hooks/useVisualViewport';
 import { usePointerDrag } from '@/hooks/usePointerDrag';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Sheet,
   SheetContent,
@@ -42,6 +48,7 @@ interface TerminalPanelProps {
   workspaceId: string | undefined;
   workspacePath: string | undefined;
   workspaceName: string | undefined;
+  additionalPaths: string[];
   sdkClient: ProkopaiClient | null;
   isOpen: boolean;
   onOpen: () => void;
@@ -56,6 +63,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   workspaceId,
   workspacePath,
   workspaceName,
+  additionalPaths,
   sdkClient,
   isOpen,
   onOpen,
@@ -453,11 +461,11 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     setActiveTabServerId(serverSessionId);
   }, [workspaceId, connected, activeTabServerId, activeTabStatus, connect]);
 
-  const addTab = useCallback(async () => {
-    if (!workspaceId || !workspacePath || !sdkClient) return;
+  const addTab = useCallback(async (cwd = workspacePath) => {
+    if (!workspaceId || !cwd || !sdkClient) return;
 
     try {
-      await sdkClient.http.terminals.create(workspaceId, { body: { cwd: workspacePath } });
+      await sdkClient.http.terminals.create(workspaceId, { body: { cwd } });
     } catch (err) {
       console.error('[TerminalPanel] Failed to create terminal:', err);
     }
@@ -569,6 +577,60 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     }
   };
 
+  const terminalRoots = [
+    { label: workspaceName || workspacePath.split('/').pop() || 'Workspace', path: workspacePath },
+    ...additionalPaths.map(path => ({
+      label: path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || path,
+      path,
+    })),
+  ];
+
+  const renderAddTerminalMenu = () => {
+    if (terminalRoots.length === 1) {
+      return (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0"
+          onClick={() => addTab()}
+          title="New terminal tab"
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </Button>
+      );
+    }
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0"
+            title="New terminal tab"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-56 max-w-80">
+          {terminalRoots.map(root => (
+            <DropdownMenuItem
+              key={root.path}
+              className="gap-2"
+              onClick={() => addTab(root.path)}
+            >
+              <Folder className="size-3.5 shrink-0 text-sky-500" />
+              <span className="min-w-0">
+                <span className="block truncate">{root.label}</span>
+                <span className="block truncate text-[10px] text-muted-foreground">{root.path}</span>
+              </span>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
   const renderTabs = () => (
     <div className="flex items-center gap-0.5 overflow-x-auto px-1 min-h-[32px]">
       {tabs.map(tab => (
@@ -592,15 +654,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           </button>
         </div>
       ))}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="shrink-0"
-        onClick={addTab}
-        title="New terminal tab"
-      >
-        <Plus className="w-3.5 h-3.5" />
-      </Button>
+      {renderAddTerminalMenu()}
     </div>
   );
 
@@ -693,15 +747,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
                 </button>
               </div>
             ))}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="shrink-0"
-              onClick={addTab}
-              title="New terminal tab"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </Button>
+            {renderAddTerminalMenu()}
           </div>
         ) : (
           <span className="text-xs text-muted-foreground flex-1">Terminal</span>
