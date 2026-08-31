@@ -1,5 +1,6 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 import type { FileListVisualization } from '@prokopai/sdk';
+import { createFilePermissionAsk } from '@prokopai/sdk';
 
 interface Input {
   path?: string;
@@ -48,7 +49,7 @@ const IGNORED_NAMES = new Set([
 
 export const definition: ToolDefinition = {
   name: 'ls',
-  description: 'List directory contents with tree formatting.\n\nWhen to use:\n- Exploring project structure for the first time\n- Understanding directory layout\n- Viewing file organization\n\nWhen NOT to use:\n- Finding specific files: Use glob tool instead\n- Searching file contents: Use grep tool instead\n\nParameters:\n- path (optional): Directory to list. Defaults to workspace root.\n- ignore (optional): Additional directory/file names to ignore.\n- showHidden (optional): Show hidden files (dotfiles). Default false.\n\nNote: Output is limited to 100 entries. Common directories (node_modules, .git, dist, build, target, vendor, .venv, coverage, etc.) are automatically hidden.',
+  description: 'List directory contents with tree formatting.\n\nWhen to use:\n- Exploring project structure for the first time\n- Understanding directory layout\n- Viewing file organization\n\nWhen NOT to use:\n- Finding specific files: Use glob tool instead\n- Searching file contents: Use grep tool instead\n\nParameters:\n- path (optional): Directory to list. Defaults to workspace root.\n- ignore (optional): Additional directory/file names to ignore.\n- showHidden (optional): Show hidden files (dotfiles). Default false.\n\nNote: Output is limited to 100 entries. Common directories (node_modules, .git, dist, build, target, vendor, .venv, coverage, etc.) are automatically hidden.\n\n## Permission Model\n\nThis tool requires explicit permission for:\n- Directories outside the workspace\n- Sensitive directories (.ssh, credentials, etc.)',
   display: { summary: '{path}' },
   inputSchema: {
     type: 'object',
@@ -192,7 +193,45 @@ function renderDir(dirPath: string, depth: number, dirs: Set<string>, filesByDir
 
 export async function execute(input: Input, ctx: ToolContext): Promise<ToolResult> {
   try {
-    const cwd = input.path ? ctx.fs.resolve(input.path) : ctx.workspacePath;
+    const searchPath = input.path ?? ctx.workspacePath;
+    const cwd = ctx.resolvePath(searchPath);
+
+    if (ctx.isBlockedPath(cwd)) {
+      return { success: false, error: `Listing system directories is not allowed: ${searchPath}` };
+    }
+
+    const tempDir = ctx.env.get('JEAN2_TEMP_DIR') || ctx.env.get('TMPDIR') || '';
+    const jean2TempPrefix = tempDir ? `${tempDir.replace(/[/\\]$/, '')}/jean2/` : '';
+    const isJean2Temp = Boolean(jean2TempPrefix && cwd.startsWith(jean2TempPrefix));
+    const isAllowedPath = ctx.allowedPaths?.some((path) => {
+      const allowedPath = ctx.resolvePath(path).replace(/[/\\]+$/, '');
+      return cwd === allowedPath
+        || cwd.startsWith(`${allowedPath}/`)
+        || cwd.startsWith(`${allowedPath}\\`);
+    }) ?? false;
+
+    if (!isJean2Temp && !isAllowedPath) {
+      if (!ctx.isWithinWorkspace(cwd)) {
+        const approved = await ctx.ask(createFilePermissionAsk({
+          path: searchPath,
+          operation: 'read',
+          risk: 'medium',
+          isOutsideWorkspace: true,
+        }));
+        if (!approved) return { success: false, error: 'USER_REJECTION' };
+      }
+
+      if (ctx.isSensitivePath(cwd)) {
+        const approved = await ctx.ask(createFilePermissionAsk({
+          path: searchPath,
+          operation: 'read',
+          risk: 'medium',
+          isSensitiveFile: true,
+          reason: 'This directory may contain credentials or secrets.',
+        }));
+        if (!approved) return { success: false, error: 'USER_REJECTION' };
+      }
+    }
 
     let dirStat;
     try {

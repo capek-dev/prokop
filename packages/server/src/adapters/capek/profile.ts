@@ -1,7 +1,6 @@
 /** The Jean2 server composition profile and its exact plugin inventory. */
 
 import type { CapekPlugin } from '@capekai/core/composition';
-import { builtinToolsAgentPlugins } from './tool-resolver';
 import {
   compactionPolicyPlugin,
   contextSourcesValuePlugin,
@@ -45,6 +44,8 @@ import {
   CURRENT_SUBAGENT_DOMAIN_PLUGIN_ID,
   CURRENT_WORKFLOW_DOMAIN_PLUGIN_ID,
 } from '@capekai/core/plugins';
+import { builtinToolsAgentPlugins } from './tool-resolver';
+import { jean2WorkspacePolicyOptions } from './workspace-policy';
 
 export const JEAN2_PROCESS_PLUGIN_IDS = [
   'current.provider-registry',
@@ -99,7 +100,7 @@ export function jean2AgentPlugins(): readonly CapekPlugin<unknown>[] {
     retryPolicyPlugin('current.retry-policy'),
     compactionPolicyPlugin('current.compaction-policy'),
     permissionPolicyPlugin('current.permission-policy'),
-    workspacePolicyPlugin('current.workspace-policy'),
+    workspacePolicyPlugin('current.workspace-policy', jean2WorkspacePolicyOptions),
     toolOutputPolicyPlugin('current.tool-output-policy'),
     contextSourcesValuePlugin('current.context-sources', getContextSources()),
     createContextSectionsPlugin('current.context-sections', {

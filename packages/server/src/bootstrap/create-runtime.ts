@@ -7,6 +7,7 @@ import {
   configureJean2SchedulerHost,
   configureJean2SessionSearchHost,
   configureJean2Storage,
+  configureJean2WorkspacePolicy,
   configureJean2WorkspaceToolDiscovery,
 } from '@/adapters/capek';
 import { warmInstalledToolsCache } from '@/adapters/capek/tool-resolver';
@@ -68,6 +69,7 @@ export function createRuntime(existingAgents?: AgentsApplication): AgentsApplica
 
   configureJean2Storage();
   configureJean2RuntimeConfiguration();
+  configureJean2WorkspacePolicy();
   configureJean2PreconfigSource(agents);
   configureJean2AgentSource(agents);
   configureJean2InstructionSource();

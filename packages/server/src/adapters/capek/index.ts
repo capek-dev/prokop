@@ -32,6 +32,11 @@ export {
   jean2WorkspaceToolDiscovery,
 } from './tool-source';
 export { jean2WorkspaceBindings } from './workspace';
+export {
+  configureJean2WorkspacePolicy,
+  JEAN2_BLOCKED_PATHS,
+  jean2WorkspacePolicyOptions,
+} from './workspace-policy';
 export { createJean2AskAuthorityPort } from './ask-authority';
 export { createJean2SessionExecution } from './execution';
 export { createJean2ProviderRegistryPort } from './provider-accounts';

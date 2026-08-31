@@ -1,6 +1,6 @@
-import { describe, test, expect, beforeEach } from 'bun:test';
+import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import { definition, execute } from './tool';
-import { createMockContext, VirtualFS, WORKSPACE } from '../test-utils';
+import { createMockContext, getAskCall, VirtualFS, WORKSPACE } from '../test-utils';
 
 let vfs: VirtualFS;
 let ctx: ReturnType<typeof createMockContext>;
@@ -115,9 +115,70 @@ describe('ls: directory listing', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
-// Permissions (ls doesn't have explicit permission checks in code,
-// but blocked paths would still fail if the mock stat fails)
+// Permissions
 // ══════════════════════════════════════════════════════════════════
+
+describe('ls: permissions', () => {
+  test('blocked path returns error before listing', async () => {
+    const result = await execute({ path: '/etc/config' }, ctx);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('system directories');
+    expect(ctx.fs.stat).not.toHaveBeenCalled();
+  });
+
+  test('outside workspace requires permission', async () => {
+    vfs.writeFile('/tmp/external/file.txt', '');
+
+    const result = await execute({ path: '/tmp/external' }, ctx);
+
+    expect(result.success).toBe(true);
+    expect(ctx.ask).toHaveBeenCalledTimes(1);
+    expect(getAskCall(ctx).metadata?.isOutsideWorkspace).toBe(true);
+  });
+
+  test('outside workspace rejection prevents listing', async () => {
+    const rejectCtx = createMockContext(vfs, {
+      ask: mock(async () => false) as unknown as typeof ctx.ask,
+    });
+    vfs.writeFile('/tmp/external/file.txt', '');
+
+    const result = await execute({ path: '/tmp/external' }, rejectCtx);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('USER_REJECTION');
+    expect(rejectCtx.fs.stat).not.toHaveBeenCalled();
+  });
+
+  test('sensitive directory requires permission', async () => {
+    vfs.writeFile(`${WORKSPACE}/.ssh/keys/id_ed25519.pub`, '');
+
+    const result = await execute({ path: `${WORKSPACE}/.ssh/keys` }, ctx);
+
+    expect(result.success).toBe(true);
+    expect(ctx.ask).toHaveBeenCalledTimes(1);
+    expect(getAskCall(ctx).metadata?.isSensitiveFile).toBe(true);
+  });
+
+  test('allowed external path does not require permission', async () => {
+    const allowedCtx = createMockContext(vfs, { allowedPaths: ['/tmp/external'] });
+    vfs.writeFile('/tmp/external/file.txt', '');
+
+    const result = await execute({ path: '/tmp/external' }, allowedCtx);
+
+    expect(result.success).toBe(true);
+    expect(allowedCtx.ask).not.toHaveBeenCalled();
+  });
+
+  test('workspace directory does not require permission', async () => {
+    vfs.writeFile(`${WORKSPACE}/file.txt`, '');
+
+    const result = await execute({}, ctx);
+
+    expect(result.success).toBe(true);
+    expect(ctx.ask).not.toHaveBeenCalled();
+  });
+});
 
 describe('ls: edge cases', () => {
   test('empty directory shows just the root', async () => {

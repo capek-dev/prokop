@@ -2,11 +2,12 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import ts from 'typescript';
-import { buildSystemMessage } from '@capekai/core/execution';
+import { buildSystemMessage, createWorkspaceCapability } from '@capekai/core/execution';
 import { createModelForProvider, getConnectableProviders, getProvider } from '@capekai/core/providers';
 import { configureWorkspaceToolDiscovery, configureToolsPath, getWorkspaceToolDiscovery } from '@capekai/core/tools';
 import { sandboxController } from '@capekai/core/sandbox';
 import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/configuration';
+import { configureWorkspacePolicy } from '@capekai/core/workspace';
 import { configureAgentSource, configureInstructionSource, configurePreconfigSource, configureSchedulerHost, configureSessionSearchHost, getRuntimeHost as getJean2CompatibilityBindings, getSchedulerHost, getSessionSearchHost } from '@capekai/core/hosts';
 import {
   configureStorage,
@@ -26,6 +27,7 @@ import {
   capekStorageKey,
   capekToolResolverKey,
   capekWorkspaceToolDiscoveryKey,
+  enterAgentScope,
   type AgentScopeHandle,
   type ProcessScopeHandle,
 } from '@capekai/core/composition';
@@ -47,6 +49,7 @@ const compositionRootPath = resolve(serverSourceRoot, 'bootstrap/create-runtime.
 const expectedCompositionSteps = [
   'configureJean2Storage',
   'configureJean2RuntimeConfiguration',
+  'configureJean2WorkspacePolicy',
   'configureJean2PreconfigSource',
   'configureJean2AgentSource',
   'configureJean2InstructionSource',
@@ -100,6 +103,7 @@ describe('Čapek composition root', () => {
     configureSchedulerHost();
     configureToolsPath();
     configureWorkspaceToolDiscovery();
+    configureWorkspacePolicy();
   });
 
   test('imports only the pinned adapter, infrastructure, and store wiring set', () => {
@@ -146,6 +150,19 @@ describe('Čapek composition root', () => {
     expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);
     expect(getSchedulerHost()).toBe(focused.jean2SchedulerHost);
     expect(getWorkspaceToolDiscovery()).toBe(focused.jean2WorkspaceToolDiscovery);
+    expect(focused.jean2WorkspacePolicyOptions.blockedPaths).toEqual([
+      '/etc/', '/usr/', '/bin/', '/sbin/', '/boot/', '/dev/', '/proc/', '/sys/', '/root/',
+    ]);
+    expect(focused.jean2WorkspacePolicyOptions.sensitivePatterns).toContain('.env');
+
+    const processCapability = createWorkspaceCapability({
+      root: '/workspace',
+      additionalRoots: [],
+      allowedRoots: [],
+      tempDir: '/tmp/prokop-workspace-policy',
+    });
+    expect(processCapability.isBlockedPath('/etc/passwd')).toBe(true);
+    expect(processCapability.isSensitivePath('/workspace/.env')).toBe(true);
   });
 
   test('the runtime and HTTP composition reuse one AgentsApplication identity', () => {
@@ -217,6 +234,15 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
     expect(agentScope.require(capekSandboxControllerKey)).toBe(sandboxController);
     expect(agentScope.require(capekProviderOverridesKey)).toBeInstanceOf(Map);
     expect([...agentScope.require(capekProviderOverridesKey)]).toEqual([]);
+
+    const scopedCapability = enterAgentScope(agentScope, () => createWorkspaceCapability({
+      root: '/workspace',
+      additionalRoots: [],
+      allowedRoots: [],
+      tempDir: '/tmp/prokop-workspace-policy',
+    }));
+    expect(scopedCapability.isBlockedPath('/etc/passwd')).toBe(true);
+    expect(scopedCapability.isSensitivePath('/workspace/.env')).toBe(true);
 
     const sources = agentScope.require(capekContextSourcesKey);
     expect(sources.preconfigs).toBe(focused.jean2PreconfigSource);
