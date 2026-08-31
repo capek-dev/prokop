@@ -207,6 +207,29 @@ describe('terminal tool: actions', () => {
     expect(sent.error).toContain('code 1');
   }, 10_000);
 
+  test('send finds a sentinel after verbose output exceeds the response cap', async () => {
+    const { ctx } = makeWorkspaceCtx();
+    const sessionId = await createSession(ctx);
+    const pty = ptyState.instances[ptyState.instances.length - 1]!;
+
+    const sendPromise = execute({ action: 'send', sessionId, command: 'verbose-test', timeoutMs: 1000 }, ctx);
+    await Bun.sleep(80);
+
+    const written = pty.writeCalls.join('');
+    const markerMatch = written.match(/__T([a-f0-9]{8})_\$/);
+    expect(markerMatch).not.toBeNull();
+    // The marker is after the old 128 KiB scan window. The result sent to
+    // the model remains capped, but completion detection must not be.
+    const verboseOutput = 'x'.repeat(131_072);
+    pty.emitData(`${written}\r\n${verboseOutput}\r\n__T${markerMatch![1]}_0:${ctx.workspacePath}\r\n`);
+
+    const sent = await sendPromise;
+    expect(sent.success).toBe(true);
+    const res = sent.result as { status: string; exitCode: number };
+    expect(res.status).toBe('completed');
+    expect(res.exitCode).toBe(0);
+  }, 10_000);
+
   test('send timeout returns status running without failing the session', async () => {
     const { ctx } = makeWorkspaceCtx();
     const sessionId = await createSession(ctx);

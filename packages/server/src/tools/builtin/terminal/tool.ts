@@ -155,10 +155,14 @@ async function waitForMarker(
   const hasCompletionMarker = (text: string): boolean =>
     pattern.test(removeEchoedCommand(stripAnsi(text), wrapped));
 
-  let read = manager.readBuffer(sessionId, fromOffset, MAX_OUTPUT_BYTES * 4);
+  // Completion must be checked against the whole retained command output,
+  // not the response-size cap. A verbose test can put the sentinel beyond
+  // the first 128 KiB and would otherwise wait forever when timeoutMs is null.
+  const markerScanBytes = Number.MAX_SAFE_INTEGER;
+  let read = manager.readBuffer(sessionId, fromOffset, markerScanBytes);
   while (read && !hasCompletionMarker(read.text) && Date.now() < deadline && !abortSignal.aborted) {
     await Bun.sleep(50);
-    read = manager.readBuffer(sessionId, fromOffset, MAX_OUTPUT_BYTES * 4);
+    read = manager.readBuffer(sessionId, fromOffset, markerScanBytes);
   }
 
   // readBuffer null = the session was destroyed mid-wait (e.g. killed
