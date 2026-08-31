@@ -1,1 +1,1 @@
-export * from '@capekai/types/skill';
+export type * from '@capekai/types/skill';

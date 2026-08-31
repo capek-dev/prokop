@@ -1,1 +1,1 @@
-export * from '@capekai/types/interrupt';
+export type * from '@capekai/types/interrupt';

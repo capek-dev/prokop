@@ -29,6 +29,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import type { ProkopaiClient } from '@prokopai/sdk';
+import { FOLDER_ICON_COLOR } from '@/components/files/fileIcons';
 import { cn } from '@/lib/utils';
 import { useConnectionStore } from '@/stores/connectionStore';
 
@@ -619,7 +620,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
               className="gap-2"
               onClick={() => addTab(root.path)}
             >
-              <Folder className="size-3.5 shrink-0 text-sky-500" />
+              <Folder className={cn('size-3.5 shrink-0', FOLDER_ICON_COLOR)} />
               <span className="min-w-0">
                 <span className="block truncate">{root.label}</span>
                 <span className="block truncate text-[10px] text-muted-foreground">{root.path}</span>

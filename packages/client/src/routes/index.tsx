@@ -37,7 +37,7 @@ function StatusDot({ status }: { status: ServerStatus }) {
   return <span className="inline-block size-2 rounded-full bg-destructive" />;
 }
 
-export function LandingPage() {
+function LandingPage() {
   const navigate = useNavigate();
   const { select } = Route.useSearch();
   const {

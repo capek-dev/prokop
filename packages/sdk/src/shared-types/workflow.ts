@@ -1,1 +1,1 @@
-export * from '@capekai/types/workflow';
+export type * from '@capekai/types/workflow';

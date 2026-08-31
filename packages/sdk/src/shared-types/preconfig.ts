@@ -1,1 +1,1 @@
-export * from '@capekai/types/preconfig';
+export type * from '@capekai/types/preconfig';

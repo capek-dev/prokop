@@ -1,1 +1,1 @@
-export * from '@capekai/types/response-format';
+export type * from '@capekai/types/response-format';

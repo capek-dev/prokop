@@ -1,1 +1,1 @@
-export * from '@capekai/types/session';
+export type * from '@capekai/types/session';

@@ -1,1 +1,1 @@
-export * from '@capekai/types/visualization';
+export type * from '@capekai/types/visualization';
