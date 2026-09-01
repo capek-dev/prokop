@@ -92,6 +92,7 @@ function makeFakes(state: FakeState) {
       const updated = makeWorkspace({
         ...existing,
         ...(updates.name !== undefined ? { name: updates.name } : {}),
+        ...(updates.path !== undefined ? { path: updates.path } : {}),
         ...(updates.additionalPaths !== undefined ? { additionalPaths: updates.additionalPaths } : {}),
         ...(updates.settings !== undefined ? { settings: updates.settings } : {}),
       });
@@ -292,11 +293,24 @@ describe('workspace application use cases', () => {
     expect(application.update('ws-1', {})).toEqual({ kind: 'no_fields' });
     expect(application.update('missing', { name: 'x' })).toEqual({ kind: 'missing' });
 
-    const updated = application.update('ws-1', { name: 'Renamed', additionalPaths: ['/extra', '/missing'], settings: { memory: { enabled: true } } as WorkspaceSettings });
+    const updated = application.update('ws-1', {
+      name: 'Renamed',
+      path: '/renamed/workspace',
+      additionalPaths: ['/extra', '/missing'],
+      settings: { memory: { enabled: true } } as WorkspaceSettings,
+    });
     expect(updated.kind).toBe('ok');
     if (updated.kind === 'ok') {
-      expect(updated.workspace).toMatchObject({ name: 'Renamed', additionalPaths: ['/extra'] });
+      expect(updated.workspace).toMatchObject({
+        name: 'Renamed',
+        path: '/renamed/workspace',
+        additionalPaths: ['/extra'],
+      });
     }
+
+    expect(application.update('ws-1', { path: '/missing/workspace' })).toEqual({
+      kind: 'path_not_found',
+    });
   });
 
   test('delete performs the exact cleanup ordering and reports deleted sessions', async () => {

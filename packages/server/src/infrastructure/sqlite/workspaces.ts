@@ -124,12 +124,18 @@ export function listAgentHomeWorkspaces(): Workspace[] {
 
 export function updateWorkspace(
   id: string,
-  updates: { name?: string; additionalPaths?: string[]; settings?: WorkspaceSettings },
+  updates: { name?: string; path?: string; additionalPaths?: string[]; settings?: WorkspaceSettings },
 ): Workspace | null {
   const db = getDatabase();
   const now = new Date().toISOString();
 
   db.transaction(() => {
+    if (updates.path !== undefined) {
+      db.run('UPDATE workspaces SET path = ?, updated_at = ? WHERE id = ?', [
+        updates.path, now, id,
+      ]);
+    }
+
     if (updates.name !== undefined) {
       db.run('UPDATE workspaces SET name = ?, updated_at = ? WHERE id = ?', [
         updates.name, now, id,

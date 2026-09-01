@@ -163,7 +163,21 @@ describe('workspace route contract', () => {
       body: JSON.stringify({ name: 'Renamed' }),
     });
     expect(ok.status).toBe(200);
-    expect(updates[0]).toEqual({ id: 'ws-1', input: { name: 'Renamed', additionalPaths: undefined, settings: undefined } });
+    expect(updates[0]).toEqual({
+      id: 'ws-1',
+      input: { name: 'Renamed', path: undefined, additionalPaths: undefined, settings: undefined },
+    });
+
+    const changedPath = await app.request('/api/workspaces/ws-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: '/renamed/workspace' }),
+    });
+    expect(changedPath.status).toBe(200);
+    expect(updates[1]).toEqual({
+      id: 'ws-1',
+      input: { name: undefined, path: '/renamed/workspace', additionalPaths: undefined, settings: undefined },
+    });
 
     const noFields = await makeApp(makeFakeApplication({ update: () => ({ kind: 'no_fields' }) }))
       .request('/api/workspaces/ws-1', {
@@ -172,7 +186,17 @@ describe('workspace route contract', () => {
         body: JSON.stringify({}),
       });
     expect(noFields.status).toBe(400);
-    expect((await json(noFields)).message).toBe('Name, additionalPaths, or settings is required');
+    expect((await json(noFields)).message).toBe('Name, path, additionalPaths, or settings is required');
+
+    const pathNotFound = await makeApp(makeFakeApplication({
+      update: () => ({ kind: 'path_not_found' }),
+    })).request('/api/workspaces/ws-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: '/missing' }),
+    });
+    expect(pathNotFound.status).toBe(400);
+    expect((await json(pathNotFound)).message).toBe('Workspace path does not exist');
 
     const missing = await makeApp(makeFakeApplication({ update: () => ({ kind: 'missing' }) }))
       .request('/api/workspaces/missing', {

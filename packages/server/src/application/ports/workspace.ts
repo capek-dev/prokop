@@ -32,7 +32,7 @@ export interface WorkspaceRepositoryPort {
   create(input: WorkspaceCreateRecord): Workspace;
   update(
     id: string,
-    updates: { name?: string; additionalPaths?: string[]; settings?: WorkspaceSettings },
+    updates: { name?: string; path?: string; additionalPaths?: string[]; settings?: WorkspaceSettings },
   ): Workspace | null;
   delete(id: string): boolean;
   addAdditionalPath(id: string, path: string): boolean;

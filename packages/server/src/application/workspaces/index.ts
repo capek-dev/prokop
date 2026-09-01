@@ -51,6 +51,7 @@ export type WorkspaceCreateResult =
 export type WorkspaceUpdateResult =
   | { kind: 'ok'; workspace: Workspace }
   | { kind: 'missing' }
+  | { kind: 'path_not_found' }
   | { kind: 'no_fields' };
 
 export type WorkspaceDeleteResult =
@@ -94,6 +95,7 @@ export interface WorkspaceApplication {
     id: string,
     updates: {
       name?: string;
+      path?: string;
       additionalPaths?: string[];
       settings?: WorkspaceSettings;
     },
@@ -209,8 +211,21 @@ export function createWorkspaceApplication(deps: WorkspaceApplicationDeps): Work
     },
 
     update(id, updates) {
-      if (!updates.name && updates.additionalPaths === undefined && updates.settings === undefined) {
+      if (
+        !updates.name
+        && updates.path === undefined
+        && updates.additionalPaths === undefined
+        && updates.settings === undefined
+      ) {
         return { kind: 'no_fields' };
+      }
+
+      let validatedPath: string | undefined;
+      if (updates.path !== undefined) {
+        validatedPath = deps.paths.expandPath(updates.path);
+        if (!deps.directory.exists(validatedPath)) {
+          return { kind: 'path_not_found' };
+        }
       }
 
       // Validate additional paths
@@ -223,6 +238,7 @@ export function createWorkspaceApplication(deps: WorkspaceApplicationDeps): Work
 
       const workspace = deps.repository.update(id, {
         name: updates.name,
+        path: validatedPath,
         additionalPaths: validatedPaths,
         settings: updates.settings,
       });

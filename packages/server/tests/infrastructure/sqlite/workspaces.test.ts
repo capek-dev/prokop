@@ -108,6 +108,16 @@ describe('workspaces store', () => {
       expect(updated!.name).toBe('Updated');
     });
 
+    test('changes the path without changing workspace or session identity', () => {
+      const { workspaceId, sessionId } = seedWorkspaceWithSession();
+
+      const updated = updateWorkspace(workspaceId, { path: '/renamed/workspace' });
+
+      expect(updated).toMatchObject({ id: workspaceId, path: '/renamed/workspace' });
+      expect(getSession(sessionId)).toMatchObject({ id: sessionId, workspaceId });
+      expect(countSessionsInWorkspace(workspaceId)).toBe(1);
+    });
+
     test('returns null for non-existent workspace', () => {
       expect(updateWorkspace('nonexistent', { name: 'x' })).toBeNull();
     });

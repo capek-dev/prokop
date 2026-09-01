@@ -241,6 +241,7 @@ export const workspaceSettingsSchema = z.object({
 
 export const updateWorkspaceSettingsSchema = z.object({
   name: z.string().optional(),
+  path: z.string().min(1).optional(),
   additionalPaths: z.array(z.string()).optional(),
   settings: workspaceSettingsSchema.optional(),
 }).loose();

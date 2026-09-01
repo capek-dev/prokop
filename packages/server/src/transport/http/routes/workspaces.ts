@@ -56,22 +56,26 @@ export function registerWorkspaceRoutes(app: Hono, application: WorkspaceApplica
     return c.json({ workspace });
   });
 
-  // PATCH /api/workspaces/:id - Update a workspace (name, additionalPaths, settings)
+  // PATCH /api/workspaces/:id - Update a workspace (name, path, additionalPaths, settings)
   app.patch(
     '/api/workspaces/:id',
     validate('json', updateWorkspaceSettingsSchema),
     async (c) => {
       const id = c.req.param('id');
       const body = c.req.valid('json');
-      const { name, additionalPaths, settings } = body;
+      const { name, path, additionalPaths, settings } = body;
 
       const result = application.update(id, {
         name,
+        path,
         additionalPaths,
         settings: settings as import('@prokopai/sdk').WorkspaceSettings | undefined,
       });
       if (result.kind === 'no_fields') {
-        throw new BadRequestError('Name, additionalPaths, or settings is required');
+        throw new BadRequestError('Name, path, additionalPaths, or settings is required');
+      }
+      if (result.kind === 'path_not_found') {
+        throw new BadRequestError('Workspace path does not exist');
       }
       if (result.kind === 'missing') {
         throw new NotFoundError('Workspace not found');
