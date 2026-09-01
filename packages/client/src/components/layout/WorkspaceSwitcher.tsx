@@ -1,6 +1,6 @@
 import type { Agent, ProkopaiClient } from '@prokopai/sdk';
 import { useState, useEffect, useRef } from 'react';
-import { Bot, Check, ChevronsUpDown, Folder, Box, Plus, MoreHorizontal, Trash2, Pencil, FolderSymlink, Loader2 } from 'lucide-react';
+import { Bot, Check, ChevronsUpDown, Folder, Box, Plus, MoreHorizontal, Trash2, Pencil, FolderInput, FolderSymlink, Loader2 } from 'lucide-react';
 import type { Workspace } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { PromoteDialog } from '@/components/agent/PromoteDialog';
@@ -40,6 +40,7 @@ interface WorkspaceSwitcherProps {
   onCreatePhysicalWorkspace: (path: string) => void;
   onDeleteWorkspace: (id: string) => void;
   onRenameWorkspace: (id: string, name: string) => void;
+  onUpdateWorkspacePath: (workspaceId: string, path: string) => void;
   onUpdateWorkspacePaths: (workspaceId: string, additionalPaths: string[]) => void;
   sdkClient: ProkopaiClient | null;
   isCreatingWorkspace?: boolean;
@@ -56,6 +57,7 @@ export function WorkspaceSwitcher({
   onCreatePhysicalWorkspace,
   onDeleteWorkspace,
   onRenameWorkspace,
+  onUpdateWorkspacePath,
   onUpdateWorkspacePaths,
   sdkClient,
   isCreatingWorkspace = false,
@@ -64,6 +66,7 @@ export function WorkspaceSwitcher({
 }: WorkspaceSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const [workspaceToMove, setWorkspaceToMove] = useState<Workspace | null>(null);
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [agentToDemote, setAgentToDemote] = useState<Agent | null>(null);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null);
@@ -223,6 +226,16 @@ export function WorkspaceSwitcher({
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
+                            setWorkspaceToMove(workspace);
+                            setOpen(false);
+                          }}
+                        >
+                          <FolderInput className="size-4" />
+                          Change folder
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setEditingPathsWorkspace(workspace);
                             setOpen(false);
                           }}
@@ -284,6 +297,7 @@ export function WorkspaceSwitcher({
                 onSelect={() => {
                   if (isCreatingWorkspace) return;
                   setOpen(false);
+                  setWorkspaceToMove(null);
                   setShowFolderPicker(true);
                 }}
               >
@@ -308,14 +322,24 @@ export function WorkspaceSwitcher({
     </Popover>
     <PromoteDialog open={promoteOpen} onOpenChange={setPromoteOpen} />
     <FolderPickerDialog
-      open={showFolderPicker}
-      onOpenChange={setShowFolderPicker}
-      onSelect={(path) => {
-        if (isCreatingWorkspace) return;
-        onCreatePhysicalWorkspace(path);
-        setShowFolderPicker(false);
+      open={showFolderPicker || workspaceToMove !== null}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          setShowFolderPicker(false);
+          setWorkspaceToMove(null);
+        }
       }}
-      title="Select Workspace Folder"
+      onSelect={(path) => {
+        if (workspaceToMove) {
+          onUpdateWorkspacePath(workspaceToMove.id, path);
+          setWorkspaceToMove(null);
+        } else if (!isCreatingWorkspace) {
+          onCreatePhysicalWorkspace(path);
+          setShowFolderPicker(false);
+        }
+      }}
+      initialPath={workspaceToMove?.path}
+      title={workspaceToMove ? 'Select Renamed Workspace Folder' : 'Select Workspace Folder'}
       sdkClient={sdkClient}
     />
     <WorkspaceAdditionalPathsDialog

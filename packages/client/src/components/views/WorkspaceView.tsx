@@ -57,6 +57,7 @@ export default function WorkspaceView() {
     handleCreatePhysicalWorkspace,
     deleteWorkspace,
     renameWorkspace,
+    updateWorkspacePath,
     updateWorkspacePaths,
     isCreatingWorkspace,
     deletingWorkspaceId,
@@ -144,6 +145,7 @@ export default function WorkspaceView() {
           onCreatePhysicalWorkspace={handleCreatePhysicalWorkspace}
           onDeleteWorkspace={deleteWorkspace}
           onRenameWorkspace={renameWorkspace}
+          onUpdateWorkspacePath={updateWorkspacePath}
           onUpdateWorkspacePaths={updateWorkspacePaths}
           sdkClient={sdkClient}
           isCreatingWorkspace={isCreatingWorkspace}

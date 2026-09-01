@@ -116,6 +116,7 @@ export interface UseServerSessionManagerReturn {
 
   selectWorkspace: (workspace: Workspace) => void;
   renameWorkspace: (id: string, name: string) => void;
+  updateWorkspacePath: (id: string, path: string) => void;
   updateWorkspacePaths: (id: string, additionalPaths: string[]) => void;
   updateWorkspaceSettings: (id: string, settings: WorkspaceSettings) => void;
   handleCreateVirtualWorkspace: () => void;
@@ -620,6 +621,36 @@ export function useServerSessionManager({
     }
   };
 
+  const updateWorkspacePath = async (id: string, path: string) => {
+    const http = sdkClientRef.current?.httpClient;
+    if (!http) return;
+
+    setIsUpdatingWorkspace(prev => ({ ...prev, [id]: true }));
+    try {
+      const data = await http.patch<{ workspace: Workspace }>(`/workspaces/${id}`, { path });
+      const updatedWorkspace = data.workspace;
+
+      const currentWorkspaces = useServerDataStore.getState().workspaces;
+      useServerDataStore.getState().setWorkspaces(
+        currentWorkspaces.map(w => w.id === id ? updatedWorkspace : w),
+      );
+
+      if (useServerDataStore.getState().activeWorkspace?.id === id) {
+        useServerDataStore.getState().setActiveWorkspace(updatedWorkspace);
+      }
+
+      queryClient.invalidateQueries({ queryKey: queryKeys.sessions.all });
+      queryClient.invalidateQueries({ queryKey: ['files'] });
+      toast.success('Workspace folder updated');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to update workspace folder:', message);
+      toast.error('Failed to update workspace folder', { description: message });
+    } finally {
+      setIsUpdatingWorkspace(prev => { const next = { ...prev }; delete next[id]; return next; });
+    }
+  };
+
   const updateWorkspacePaths = async (id: string, additionalPaths: string[]) => {
     const http = sdkClientRef.current?.httpClient;
     if (!http) return;
@@ -960,6 +991,7 @@ export function useServerSessionManager({
 
     selectWorkspace,
     renameWorkspace,
+    updateWorkspacePath,
     updateWorkspacePaths,
     updateWorkspaceSettings,
     handleCreateVirtualWorkspace,

@@ -123,6 +123,7 @@ export default function ServerShell() {
       handleNavigateBack: () => manager().handleNavigateBack(),
       selectWorkspace: (...args: Parameters<SessionCommandsValue['selectWorkspace']>) => manager().selectWorkspace(...args),
       renameWorkspace: (...args: Parameters<SessionCommandsValue['renameWorkspace']>) => manager().renameWorkspace(...args),
+      updateWorkspacePath: (...args: Parameters<SessionCommandsValue['updateWorkspacePath']>) => manager().updateWorkspacePath(...args),
       updateWorkspacePaths: (...args: Parameters<SessionCommandsValue['updateWorkspacePaths']>) => manager().updateWorkspacePaths(...args),
       updateWorkspaceSettings: (...args: Parameters<SessionCommandsValue['updateWorkspaceSettings']>) => manager().updateWorkspaceSettings(...args),
       handleCreateVirtualWorkspace: () => manager().handleCreateVirtualWorkspace(),

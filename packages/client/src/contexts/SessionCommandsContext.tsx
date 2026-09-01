@@ -53,6 +53,7 @@ export interface SessionCommandsValue {
 
   selectWorkspace: (workspace: Workspace) => void;
   renameWorkspace: (id: string, name: string) => void;
+  updateWorkspacePath: (id: string, path: string) => void;
   updateWorkspacePaths: (id: string, additionalPaths: string[]) => void;
   updateWorkspaceSettings: (id: string, settings: WorkspaceSettings) => void;
   handleCreateVirtualWorkspace: () => void;
