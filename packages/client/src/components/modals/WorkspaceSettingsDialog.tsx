@@ -112,6 +112,12 @@ export function WorkspaceSettingsDialog({
     }
   }, [open, workspace.settings]);
 
+  useEffect(() => {
+    if (open) {
+      onRefreshPermissions();
+    }
+  }, [open, workspace.id, onRefreshPermissions]);
+
   const saved = useMemo(() => snapshot(workspace), [workspace.settings]);
   const isDirty = JSON.stringify(draft) !== JSON.stringify(saved);
 

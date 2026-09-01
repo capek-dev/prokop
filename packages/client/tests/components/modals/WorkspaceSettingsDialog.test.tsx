@@ -53,10 +53,23 @@ const props = {
   onUpdateWorkspacePaths: vi.fn(),
 };
 
-describe('WorkspaceSettingsDialog dirty-state footer', () => {
+describe('WorkspaceSettingsDialog', () => {
   beforeEach(() => {
     mocks.save.mockClear();
     props.onOpenChange.mockClear();
+    props.onRefreshPermissions.mockClear();
+  });
+
+  test('requests current permissions when opened', async () => {
+    render(
+      <WorkspaceSettingsDialog
+        {...props}
+        open
+        workspace={makeWorkspace()}
+      />,
+    );
+
+    await waitFor(() => expect(props.onRefreshPermissions).toHaveBeenCalledOnce());
   });
 
   test('memory edits keep the footer across tab switches and gate Save on dirty', async () => {
