@@ -12,6 +12,7 @@ import { useClientIdentityStore } from '@/stores/clientIdentityStore';
 import { useSessionStore, type SessionNavigationIntent } from '@/stores/sessionStore';
 import { useTranscriptPagination } from '@/hooks/useTranscriptPagination';
 import { RetryStatus } from './RetryStatus';
+import { UserPromptMap } from './UserPromptMap';
 
 export interface DisplayItem {
   message: import('@prokopai/sdk').Message;
@@ -51,6 +52,7 @@ interface ChatViewProps {
   targetMessageId?: string | null;
   navigationIntent?: SessionNavigationIntent;
   onTargetMessageHandled?: () => void;
+  onNavigateToMessage?: (messageId: string) => void;
   onClaimControl?: (sessionId: string) => void;
 }
 
@@ -155,6 +157,7 @@ export function ChatView({
   targetMessageId,
   navigationIntent = { mode: 'follow' },
   onTargetMessageHandled,
+  onNavigateToMessage,
   onClaimControl,
 }: ChatViewProps) {
   const isPrimarySession = !session.parentId;
@@ -283,6 +286,14 @@ export function ChatView({
           loadOlderError={contentMeta?.loadOlderError}
           onLoadOlder={loadOlder}
         />
+
+        {onNavigateToMessage && (
+          <UserPromptMap
+            displayItems={displayItems}
+            targetMessageId={targetMessageId}
+            onNavigate={onNavigateToMessage}
+          />
+        )}
 
         {/* Floating auto-follow toggle button - positioned within transcript area */}
         <button

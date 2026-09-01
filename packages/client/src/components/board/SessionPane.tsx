@@ -224,6 +224,10 @@ export function SessionPane({
           targetMessageId={targetMessageId}
           navigationIntent={navigationIntent}
           onTargetMessageHandled={() => useSessionStore.getState().setNavigationIntentForSession(sessionId, { mode: 'free' })}
+          onNavigateToMessage={(messageId) => useSessionStore.getState().setNavigationIntentForSession(
+            sessionId,
+            { mode: 'target-message', messageId },
+          )}
           onClaimControl={commands.claimControl}
         />
       )}

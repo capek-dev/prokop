@@ -112,6 +112,10 @@ export function AppMainContent({
     clearTargetMessageIntent();
   }, [clearTargetMessageIntent]);
 
+  const handleNavigateToMessage = useCallback((messageId: string) => {
+    useSessionStore.getState().setNavigationIntent({ mode: 'target-message', messageId });
+  }, []);
+
   const isCompacting = currentSession?.compacting ?? false;
 
   const handleInterrupt = () => {
@@ -197,6 +201,7 @@ export function AppMainContent({
       targetMessageId={targetMessageId}
       navigationIntent={navigationIntent}
       onTargetMessageHandled={handleTargetMessageHandled}
+      onNavigateToMessage={handleNavigateToMessage}
       onClaimControl={commands.claimControl}
     />
   );
