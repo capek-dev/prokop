@@ -48,7 +48,7 @@ export class WorkspacesRestNamespace {
 
   async update(
     id: string,
-    data: { name?: string; additionalPaths?: string[]; settings?: WorkspaceSettings },
+    data: { name?: string; path?: string; additionalPaths?: string[]; settings?: WorkspaceSettings },
     options?: GetOptions,
   ): Promise<UpdateWorkspaceResponse> {
     return this.http.patch(`/workspaces/${encodeURIComponent(id)}`, data, {
