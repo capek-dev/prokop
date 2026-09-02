@@ -7,6 +7,7 @@ describe('built-in tool catalog', () => {
       'apply-patch',
       'edit',
       'edit-range',
+      'file-to-markdown',
       'git-worktree',
       'glob',
       'grep',
@@ -24,7 +25,7 @@ describe('built-in tool catalog', () => {
   });
 
   test('every tool has a valid definition and executor', () => {
-    expect(builtinTools).toHaveLength(16);
+    expect(builtinTools).toHaveLength(17);
     for (const tool of builtinTools) {
       expect(tool.definition.name).toBeTruthy();
       expect(tool.definition.description).toBeTruthy();
@@ -41,6 +42,7 @@ describe('built-in tool catalog', () => {
 
   test('isBuiltinToolName matches catalog names only', () => {
     expect(isBuiltinToolName('read-file')).toBe(true);
+    expect(isBuiltinToolName('file-to-markdown')).toBe(true);
     expect(isBuiltinToolName('shell')).toBe(true);
     expect(isBuiltinToolName('tavily-search')).toBe(false);
     expect(isBuiltinToolName('')).toBe(false);

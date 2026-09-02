@@ -11,6 +11,7 @@ import type { LoadedTool, ToolContext, ToolDefinition, ToolResult } from '@capek
 import * as applyPatch from './apply-patch/tool';
 import * as edit from './edit/tool';
 import * as editRange from './edit-range/tool';
+import * as fileToMarkdown from './file-to-markdown/tool';
 import * as gitWorktree from './git-worktree/tool';
 import * as glob from './glob/tool';
 import * as grep from './grep/tool';
@@ -44,6 +45,7 @@ const modules = [
   applyPatch,
   edit,
   editRange,
+  fileToMarkdown,
   gitWorktree,
   glob,
   grep,

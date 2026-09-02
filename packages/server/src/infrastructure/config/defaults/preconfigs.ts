@@ -17,6 +17,7 @@ description: >
   verification.
 tools:
   - read-file
+  - file-to-markdown
   - write-file
   - edit
   - multiedit
