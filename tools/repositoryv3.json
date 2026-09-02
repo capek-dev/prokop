@@ -13,11 +13,6 @@
         "description": "Inspect and interact with browser tabs and pages.",
         "order": 20
       },
-      "web": {
-        "label": "Web",
-        "description": "Search, fetch, map, crawl, and extract web content.",
-        "order": 40
-      },
       "workflow": {
         "label": "Workflow",
         "description": "Gather input and manage task workflow state.",
@@ -66,69 +61,6 @@
       "name": "browser-tab-manage",
       "description": "Manage browser tabs: list all tabs, create a new tab, close a tab, or switch to a tab.",
       "category": "browser"
-    },
-    {
-      "name": "tavily-crawl",
-      "description": "Crawl a website and extract content from multiple pages using the Tavily API.",
-      "category": "web",
-      "envVars": [
-        {
-          "name": "TAVILY_API_KEY",
-          "required": true,
-          "sensitive": true
-        }
-      ]
-    },
-    {
-      "name": "tavily-extract",
-      "description": "Extract structured content from URLs using the Tavily API.",
-      "category": "web",
-      "envVars": [
-        {
-          "name": "TAVILY_API_KEY",
-          "required": true,
-          "sensitive": true
-        }
-      ]
-    },
-    {
-      "name": "tavily-map",
-      "description": "Discover and map URLs on a website without extracting content using the Tavily API.",
-      "category": "web",
-      "envVars": [
-        {
-          "name": "TAVILY_API_KEY",
-          "required": true,
-          "sensitive": true
-        }
-      ]
-    },
-    {
-      "name": "tavily-search",
-      "description": "Perform web searches using Tavily's search API.",
-      "category": "web",
-      "envVars": [
-        {
-          "name": "TAVILY_API_KEY",
-          "required": true,
-          "sensitive": true
-        }
-      ]
     }
-  ],
-  "envConfig": {
-    "TAVILY_API_KEY": {
-      "description": "API key for Tavily web search/crawl/extract/map tools",
-      "sensitive": true,
-      "required": true,
-      "configFile": "~/.jean2/.env",
-      "example": "TAVILY_API_KEY=tvly-xxxxxxxxxxxxxxxx",
-      "usedBy": [
-        "tavily-search",
-        "tavily-crawl",
-        "tavily-map",
-        "tavily-extract"
-      ]
-    }
-  }
+  ]
 }

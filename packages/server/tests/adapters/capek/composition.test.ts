@@ -371,6 +371,7 @@ describe('C4 coding bundle in the Jean2 composition', () => {
     'question',
     'read-file',
     'shell',
+    'tavily-search',
     'terminal',
     'todoread',
     'todowrite',

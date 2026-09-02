@@ -20,6 +20,7 @@ import * as multiedit from './multiedit/tool';
 import * as question from './question/tool';
 import * as readFile from './read-file/tool';
 import * as shell from './shell/tool';
+import * as tavilySearch from './tavily-search/tool';
 import * as terminal from './terminal/tool';
 import * as todoRead from './todoread/tool';
 import * as todoWrite from './todowrite/tool';
@@ -54,6 +55,7 @@ const modules = [
   question,
   readFile,
   shell,
+  tavilySearch,
   terminal,
   todoRead,
   todoWrite,

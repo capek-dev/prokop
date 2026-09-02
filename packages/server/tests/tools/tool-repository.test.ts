@@ -283,12 +283,17 @@ describe('tool-repository', () => {
         tools: Array<{ name: string }>;
       };
       const names = raw.tools.map((tool) => tool.name);
+      const manifestPath = join(import.meta.dir, '../../../../tools/manifest.json');
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { tools: string[] };
 
       expect(names.some((name) => name.startsWith('gmail-'))).toBe(false);
       expect(names.some((name) => name.startsWith('discord-'))).toBe(false);
       expect(names).not.toContain('file-to-markdown');
+      expect(names.some((name) => name.startsWith('tavily-'))).toBe(false);
+      expect(manifest.tools.some((name) => name.startsWith('tavily-'))).toBe(false);
       expect(raw.metadata?.categories).not.toHaveProperty('communication');
       expect(raw.metadata?.categories).not.toHaveProperty('filesystem');
+      expect(raw.metadata?.categories).not.toHaveProperty('web');
     });
   });
 

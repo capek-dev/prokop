@@ -5,10 +5,6 @@
     "browser-navigate",
     "browser-read-active-tab",
     "browser-screenshot",
-    "browser-tab-manage",
-    "tavily-crawl",
-    "tavily-extract",
-    "tavily-map",
-    "tavily-search"
+    "browser-tab-manage"
   ]
 }

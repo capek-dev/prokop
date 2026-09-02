@@ -27,6 +27,7 @@ tools:
   - grep
   - ls
   - shell
+  - tavily-search
   - terminal
   - git-worktree
   - question

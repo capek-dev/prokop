@@ -10,8 +10,7 @@
     "test:watch": "bun test --watch"
   },
   "dependencies": {
-    "@capekai/tool": "^1.0.2",
-    "@tavily/core": "^0.7.2"
+    "@capekai/tool": "^1.0.2"
   },
   "devDependencies": {
     "@types/bun": "^1.3.11",

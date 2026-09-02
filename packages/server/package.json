@@ -34,6 +34,7 @@
     "@hono/zod-validator": "^0.8.0",
     "@prokopai/sdk": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "@tavily/core": "^0.7.2",
     "@npmcli/arborist": "^9.4.3",
     "@zip.js/zip.js": "^2.7.60",
     "adm-zip": "^0.5.16",

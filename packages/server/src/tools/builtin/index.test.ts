@@ -16,6 +16,7 @@ describe('built-in tool catalog', () => {
       'question',
       'read-file',
       'shell',
+      'tavily-search',
       'terminal',
       'todoread',
       'todowrite',
@@ -25,7 +26,7 @@ describe('built-in tool catalog', () => {
   });
 
   test('every tool has a valid definition and executor', () => {
-    expect(builtinTools).toHaveLength(17);
+    expect(builtinTools).toHaveLength(18);
     for (const tool of builtinTools) {
       expect(tool.definition.name).toBeTruthy();
       expect(tool.definition.description).toBeTruthy();
@@ -44,7 +45,7 @@ describe('built-in tool catalog', () => {
     expect(isBuiltinToolName('read-file')).toBe(true);
     expect(isBuiltinToolName('file-to-markdown')).toBe(true);
     expect(isBuiltinToolName('shell')).toBe(true);
-    expect(isBuiltinToolName('tavily-search')).toBe(false);
+    expect(isBuiltinToolName('tavily-search')).toBe(true);
     expect(isBuiltinToolName('')).toBe(false);
   });
 });
