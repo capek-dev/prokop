@@ -1,9 +1,0 @@
-{
-  "name": "@jean2/tool-discord-list-guilds",
-  "version": "1.0.1",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@capekai/tool": "^1.0.0"
-  }
-}

@@ -18,11 +18,6 @@
         "description": "Inspect and interact with browser tabs and pages.",
         "order": 20
       },
-      "communication": {
-        "label": "Communication",
-        "description": "Read, organize, and send messages through external communication services.",
-        "order": 30
-      },
       "web": {
         "label": "Web",
         "description": "Search, fetch, map, crawl, and extract web content.",
@@ -78,64 +73,9 @@
       "category": "browser"
     },
     {
-      "name": "discord-list-channels",
-      "description": "List channels in a Discord server (guild). Returns channel IDs, names, types, and categories.",
-      "category": "communication"
-    },
-    {
-      "name": "discord-list-guilds",
-      "description": "List Discord servers (guilds) the bot is a member of. Returns guild IDs, names, and icon URLs.",
-      "category": "communication"
-    },
-    {
-      "name": "discord-read-messages",
-      "description": "Read message history from a Discord channel. Supports pagination and full-text search with snippets.",
-      "category": "communication"
-    },
-    {
-      "name": "discord-send-message",
-      "description": "Send a message to a Discord channel via bot token. Supports plain text and rich embeds. HIGH RISK action.",
-      "category": "communication"
-    },
-    {
       "name": "file-to-markdown",
       "description": "Converts files to Markdown format. Supports PDF, Microsoft Office (.docx, .xlsx, .pptx), LibreOffice (.odt, .ods, .odp), and ZIP archives. Does not support .7z archives.",
       "category": "filesystem"
-    },
-    {
-      "name": "gmail-draft",
-      "description": "Create a Gmail draft (saved in Drafts folder) for the user to review before sending.",
-      "category": "communication"
-    },
-    {
-      "name": "gmail-labels",
-      "description": "List all labels in the connected Gmail account, including system labels (INBOX, UNREAD, STARRED, etc.) and user-created labels.",
-      "category": "communication"
-    },
-    {
-      "name": "gmail-labels-manage",
-      "description": "Create, rename, or delete Gmail labels. Use this to set up a label structure for organizing emails.",
-      "category": "communication"
-    },
-    {
-      "name": "gmail-modify",
-      "description": "Modify labels on Gmail messages: archive, mark read/unread, star, apply custom labels, or trash.",
-      "category": "communication"
-    },
-    {
-      "name": "gmail-read",
-      "description": "Read the full content of a Gmail message or an entire email thread.",
-      "category": "communication"
-    },
-    {
-      "name": "gmail-search",
-      "description": "Search and list emails from the connected Gmail account by keyword, sender, date, or other criteria.",
-      "category": "communication"
-    },
-    {
-      "name": "gmail-send",
-      "description": "Send an email from the connected Gmail account immediately. Supports recipients, CC, BCC, and reply threading.",
-      "category": "communication"
     },
     {
       "name": "tavily-crawl",
