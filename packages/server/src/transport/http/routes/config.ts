@@ -213,9 +213,9 @@ export function registerConfigRoutes(
     },
   );
 
-  app.delete('/api/config/providers/:provider', (c) => {
+  app.delete('/api/config/providers/:provider', async (c) => {
     const provider = c.req.param('provider');
-    const result = providers.clearCredential(provider);
+    const result = await providers.clearCredential(provider);
     return c.json(result);
   });
 

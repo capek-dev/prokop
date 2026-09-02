@@ -210,9 +210,7 @@ describe('provider route contract', () => {
 
     const clear = await app.request('/api/config/providers/openai', { method: 'DELETE' });
     expect(clear.status).toBe(200);
-    // Pre-S4 legacy shape: the route returned the unawaited clear promise,
-    // which JSON-serializes to an empty object. Preserved exactly.
-    expect(await json(clear)).toEqual({});
+    expect(await json(clear)).toEqual({ provider: 'openai', configured: false });
     expect(clears).toEqual(['openai']);
   });
 });

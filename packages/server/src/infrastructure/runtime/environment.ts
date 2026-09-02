@@ -299,6 +299,9 @@ export function wasEnvInjectedFromFile(key: string): boolean {
 }
 
 export function reloadJean2Env(): void {
+  for (const key of envFileInjectedKeys) {
+    delete process.env[key];
+  }
   envOverlay.clear();
   envFileInjectedKeys.clear();
   loadEnvFile();
