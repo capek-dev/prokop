@@ -255,7 +255,6 @@ tools/                   # External, separately released tool modules
   manifest.json          # Release manifest for external tools
   browser-*/             # Browser automation tools
   tavily-*/              # Tavily web tools
-  file-to-markdown/      # Document conversion tool
 
 .architecture-v2/        # Current extraction architecture, decisions, and validation
 .agents/skills/          # Repository-specific agent procedures

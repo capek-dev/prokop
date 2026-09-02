@@ -11,6 +11,7 @@ A fresh `prokop init` can use the filesystem, shell, web fetch, task, question, 
 | Tool | Description |
 |------|-------------|
 | **read-file** | Read files or list directory contents |
+| **file-to-markdown** | Convert files (PDF, Office, LibreOffice, ZIP) to Markdown |
 | **write-file** | Create or overwrite files |
 | **edit** | String replacements in existing files with fuzzy matching |
 | **multiedit** | Multiple string replacements applied atomically |
@@ -32,7 +33,6 @@ The shell tool enforces safety: dangerous commands (`rm`, `sudo`, `curl`), files
 | Tool | Description |
 |------|-------------|
 | **webfetch** | Fetch and convert web pages to readable text |
-| **file-to-markdown** | Convert files (PDF, Office, LibreOffice, ZIP) to Markdown |
 
 ### Browser
 
@@ -88,7 +88,7 @@ MCP tools are configured per-workspace in `<workspace>/.prokopai/mcp.json`. See 
 
 ## Optional tool extensions
 
-External tools are only needed for integrations not included in the binary, such as Tavily, browser automation, or document conversion. The registry is intentionally small; other integrations can be maintained and distributed by the community through compatible repositories.
+External tools are only needed for integrations not included in the binary, such as Tavily or browser automation. The registry is intentionally small; other integrations can be maintained and distributed by the community through compatible repositories.
 
 ```bash
 # Browse optional extensions
