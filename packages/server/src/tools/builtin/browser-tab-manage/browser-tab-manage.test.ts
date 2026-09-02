@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { definition, execute } from './tool';
 import { createMockContext, VirtualFS, getAskCall } from '../test-utils';
 
@@ -68,7 +68,7 @@ describe('browser_tab_manage input validation', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
-// Permission Ask — Conditional Risk by Action
+// Permission Ask: Conditional Risk by Action
 // ══════════════════════════════════════════════════════════════════
 
 describe('browser_tab_manage permissions', () => {
@@ -165,13 +165,14 @@ describe('browser_tab_manage execution', () => {
   });
 
   test('passes action params through to client_capability', async () => {
-    await execute({ action: 'create', url: 'https://test.com', active: false }, ctx);
+    await execute({ action: 'create', url: 'https://test.com', windowId: 24, active: false }, ctx);
     const calls = (ctx.ask as ReturnType<typeof mock>).mock.calls;
     const capCall = calls[1][0] as Record<string, unknown>;
     const metadata = capCall.metadata as Record<string, unknown>;
     const params = metadata.params as Record<string, unknown>;
     expect(params.action).toBe('create');
     expect(params.url).toBe('https://test.com');
+    expect(params.windowId).toBe(24);
     expect(params.active).toBe(false);
   });
 });

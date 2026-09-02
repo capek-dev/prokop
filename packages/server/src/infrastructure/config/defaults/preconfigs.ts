@@ -5,7 +5,7 @@
 
 /**
  * ProkopCode - the main coding preconfig, primary mode
- * Tools: every built-in tool
+ * Tools: the default coding tool set. Optional built-ins are omitted.
  */
 export const prokopCodeMd = `---
 id: prokop-code

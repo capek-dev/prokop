@@ -8,11 +8,6 @@
   },
   "metadata": {
     "categories": {
-      "browser": {
-        "label": "Browser",
-        "description": "Inspect and interact with browser tabs and pages.",
-        "order": 20
-      },
       "workflow": {
         "label": "Workflow",
         "description": "Gather input and manage task workflow state.",
@@ -36,31 +31,5 @@
       }
     }
   },
-  "tools": [
-    {
-      "name": "browser-discover-elements",
-      "description": "Discover all interactive elements (buttons, links, inputs, selects, etc.) on the active browser tab. Returns a list of elements with their CSS selectors, text content, and attributes.",
-      "category": "browser"
-    },
-    {
-      "name": "browser-dom-action",
-      "description": "Perform a DOM interaction on the active browser tab. Supports: click, type, select, clear, scroll, hover, press Enter, check/uncheck.",
-      "category": "browser"
-    },
-    {
-      "name": "browser-navigate",
-      "description": "Navigate the active browser tab to a URL. Waits for the page to finish loading before returning.",
-      "category": "browser"
-    },
-    {
-      "name": "browser-read-active-tab",
-      "description": "Read the active browser tab. Returns the page title, URL, and visible text content.",
-      "category": "browser"
-    },
-    {
-      "name": "browser-tab-manage",
-      "description": "Manage browser tabs: list all tabs, create a new tab, close a tab, or switch to a tab.",
-      "category": "browser"
-    }
-  ]
+  "tools": []
 }

@@ -1,29 +1,36 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 
+interface ActiveTabResult {
+  title: string;
+  url: string;
+  text: string;
+}
+
 export const definition: ToolDefinition = {
-  name: 'browser_discover_elements',
+  name: 'browser_read_active_tab',
   description:
-    'Discover all interactive elements (buttons, links, inputs, selects, etc.) on the active browser tab. ' +
-    'Returns a list of elements with their CSS selectors, text content, attributes, ' +
-    'bounding rectangles (x, y, width, height, top, right, bottom, left), ' +
-    'visibility flags (isVisible, isInViewport), and viewport dimensions. ' +
-    'Use this before browser_dom_action to find the correct selectors and understand element layout. ' +
+    'Read a browser tab by tabId. Without tabId, reads the most recently active non-PWA browser tab. Returns the page title, URL, and visible text content. ' +
     'Requires a connected ProkopaiBrowser extension.',
   inputSchema: {
     type: 'object',
-    properties: {},
+    properties: {
+      tabId: {
+        type: 'number',
+        description: 'Optional tab ID from browser_tab_manage. Defaults to the most recently active non-PWA browser tab.',
+      },
+    },
   },
-  timeout: 15000,
+  timeout: 120000,
 };
 
 export async function execute(
-  _input: Record<string, unknown>,
+  input: Record<string, unknown>,
   ctx: ToolContext,
 ): Promise<ToolResult> {
   const approved = await ctx.ask({
     type: 'permission',
-    question: 'Discover interactive browser elements?',
-    description: 'List all interactive elements (buttons, links, inputs, etc.) on the active browser tab.',
+    question: 'Read active browser tab?',
+    description: 'Read the title, URL, and visible text content of the selected browser tab.',
     risk: 'low',
     resource: 'browser',
     action: 'read',
@@ -35,9 +42,10 @@ export async function execute(
     const executionResult = await ctx.ask({
       type: 'client_capability',
       target: 'client',
-      capability: 'browser_discover_elements',
+      capability: 'active_tab_read',
       metadata: {
-        task: 'browser.discover_elements',
+        task: 'browser.read_active_tab',
+        params: { tabId: input.tabId },
       },
     });
 
@@ -48,21 +56,21 @@ export async function execute(
       };
     }
 
-    const result = executionResult as Record<string, unknown>;
-    const elements = result.elements as Record<string, unknown>[] | undefined;
+    const result = executionResult as ActiveTabResult;
 
-    if (!elements || !Array.isArray(elements)) {
+    if (!result.title && !result.url && !result.text) {
       return {
         success: false,
-        error: 'Extension returned invalid element list.',
+        error: 'Extension returned empty result.',
       };
     }
 
     return {
       success: true,
       result: {
-        elementCount: elements.length,
-        elements,
+        title: result.title || '',
+        url: result.url || '',
+        text: result.text || '',
       },
     };
   } catch (err: unknown) {
@@ -72,13 +80,13 @@ export async function execute(
       return {
         success: false,
         error:
-          'Element discovery timed out. Ensure the ProkopaiBrowser extension is installed and connected.',
+          'Browser read timed out. Ensure the ProkopaiBrowser extension is installed, connected, and the active tab is accessible.',
       };
     }
 
     return {
       success: false,
-      error: `Element discovery failed: ${message}`,
+      error: `Browser read failed: ${message}`,
     };
   }
 }

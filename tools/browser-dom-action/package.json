@@ -1,9 +1,0 @@
-{
-  "name": "@jean2/tool-browser-dom-action",
-  "version": "1.1.1",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@capekai/tool": "^1.0.0"
-  }
-}

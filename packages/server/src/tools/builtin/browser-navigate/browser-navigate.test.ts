@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { definition, execute } from './tool';
 import { createMockContext, VirtualFS, getAskCall, getAllAskCalls } from '../test-utils';
 
@@ -147,12 +147,13 @@ describe('browser_navigate execution', () => {
   });
 
   test('sends client_capability with correct metadata', async () => {
-    await execute({ url: 'https://example.com', waitForLoad: false, timeout: 5000 }, ctx);
+    await execute({ url: 'https://example.com', tabId: 42, waitForLoad: false, timeout: 5000 }, ctx);
     const calls = getAllAskCalls(ctx);
     const capCall = calls[1] as unknown as Record<string, unknown>;
     expect(capCall.capability).toBe('browser_navigate');
     const metadata = capCall.metadata as Record<string, unknown>;
     const params = metadata.params as Record<string, unknown>;
+    expect(params.tabId).toBe(42);
     expect(params.url).toBe('https://example.com');
     expect(params.waitForLoad).toBe(false);
     expect(params.timeout).toBe(5000);

@@ -1,9 +1,0 @@
-{
-  "name": "@jean2/tool-browser-read-active-tab",
-  "version": "1.0.1",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@capekai/tool": "^1.0.0"
-  }
-}

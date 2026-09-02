@@ -3,24 +3,29 @@ import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 export const definition: ToolDefinition = {
   name: 'browser_screenshot',
   description:
-    'Capture a screenshot of the active browser tab. Returns a base64-encoded PNG image. ' +
+    'Capture a screenshot of a tab selected by tabId, or the most recently active non-PWA browser tab. Returns a base64-encoded PNG image. ' +
     'Use this to visually verify the current state of a page after performing actions. ' +
     'Requires a connected ProkopaiBrowser extension.',
   inputSchema: {
     type: 'object',
-    properties: {},
+    properties: {
+      tabId: {
+        type: 'number',
+        description: 'Optional tab ID from browser_tab_manage. Defaults to the most recently active non-PWA browser tab.',
+      },
+    },
   },
   timeout: 15000,
 };
 
 export async function execute(
-  _input: Record<string, unknown>,
+  input: Record<string, unknown>,
   ctx: ToolContext,
 ): Promise<ToolResult> {
   const approved = await ctx.ask({
     type: 'permission',
     question: 'Take browser screenshot?',
-    description: 'Capture a screenshot of the active browser tab as a PNG image.',
+    description: 'Capture a screenshot of the selected browser tab as a PNG image.',
     risk: 'low',
     resource: 'browser',
     action: 'read',
@@ -35,6 +40,7 @@ export async function execute(
       capability: 'browser_screenshot',
       metadata: {
         task: 'browser.screenshot',
+        params: { tabId: input.tabId },
       },
     });
 

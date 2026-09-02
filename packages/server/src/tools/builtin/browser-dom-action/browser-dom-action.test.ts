@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { definition, execute } from './tool';
 import { createMockContext, VirtualFS, getAskCall, getAllAskCalls } from '../test-utils';
 
@@ -141,7 +141,7 @@ describe('browser_dom_action execution', () => {
   });
 
   test('sends client_capability ask with correct params', async () => {
-    await execute({ action: 'scroll', x: 0, y: 100 }, ctx);
+    await execute({ action: 'scroll', tabId: 42, x: 0, y: 100 }, ctx);
     const calls = getAllAskCalls(ctx);
     const capCall = calls[1] as unknown as Record<string, unknown>;
     expect(capCall.type).toBe('client_capability');
@@ -149,6 +149,7 @@ describe('browser_dom_action execution', () => {
     const metadata = capCall.metadata as Record<string, unknown>;
     const params = metadata.params as Record<string, unknown>;
     expect(params.action).toBe('scroll');
+    expect(params.tabId).toBe(42);
     expect(params.x).toBe(0);
     expect(params.y).toBe(100);
   });

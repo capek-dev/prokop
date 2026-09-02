@@ -1,6 +1,7 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 
 interface DomActionParams {
+  tabId?: number;
   action: 'click' | 'type' | 'select' | 'clear' | 'scroll' | 'hover' | 'press_enter' | 'check' | 'uncheck';
   selector?: string;
   text?: string;
@@ -13,7 +14,7 @@ interface DomActionParams {
 export const definition: ToolDefinition = {
   name: 'browser_dom_action',
   description:
-    'Perform a DOM interaction on the active browser tab. Supports: click (by selector or text), type into inputs, select dropdown options, clear inputs, scroll, hover, press Enter, check/uncheck checkboxes. ' +
+    'Perform a DOM interaction on a tab selected by tabId, or the most recently active non-PWA browser tab. Supports: click (by selector or text), type into inputs, select dropdown options, clear inputs, scroll, hover, press Enter, check/uncheck checkboxes. ' +
     'Requires a connected ProkopaiBrowser extension. ' +
     'Use browser_read_active_tab first to understand the page, then use browser_dom_action to interact with it. ' +
     'All actions return scrollX, scrollY, viewportWidth, and viewportHeight for orientation context. ' +
@@ -21,6 +22,10 @@ export const definition: ToolDefinition = {
   inputSchema: {
     type: 'object',
     properties: {
+      tabId: {
+        type: 'number',
+        description: 'Optional tab ID from browser_tab_manage. Defaults to the most recently active non-PWA browser tab.',
+      },
       action: {
         type: 'string',
         enum: ['click', 'type', 'select', 'clear', 'scroll', 'hover', 'press_enter', 'check', 'uncheck'],
@@ -86,7 +91,7 @@ export async function execute(
   const approved = await ctx.ask({
     type: 'permission',
     question: `Perform "${params.action}" action in browser?`,
-    description: `Execute a "${params.action}" DOM action on the active browser tab.` +
+    description: `Execute a "${params.action}" DOM action on the selected browser tab.` +
       (params.selector ? ` Target: ${params.selector}.` : '') +
       (params.text ? ` Text: "${params.text}".` : '') +
       (params.value ? ` Value: "${params.value}".` : ''),
@@ -106,6 +111,7 @@ export async function execute(
       metadata: {
         task: 'browser.dom_action',
         params: {
+          tabId: params.tabId,
           action: params.action,
           selector: params.selector,
           text: params.text,

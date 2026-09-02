@@ -9,6 +9,12 @@
 
 import type { LoadedTool, ToolContext, ToolDefinition, ToolResult } from '@capekai/tool';
 import * as applyPatch from './apply-patch/tool';
+import * as browserDiscoverElements from './browser-discover-elements/tool';
+import * as browserDomAction from './browser-dom-action/tool';
+import * as browserNavigate from './browser-navigate/tool';
+import * as browserReadActiveTab from './browser-read-active-tab/tool';
+import * as browserScreenshot from './browser-screenshot/tool';
+import * as browserTabManage from './browser-tab-manage/tool';
 import * as edit from './edit/tool';
 import * as editRange from './edit-range/tool';
 import * as fileToMarkdown from './file-to-markdown/tool';
@@ -44,6 +50,12 @@ function toLoadedTool(module: BuiltinToolModule): LoadedTool {
 
 const modules = [
   applyPatch,
+  browserDiscoverElements,
+  browserDomAction,
+  browserNavigate,
+  browserReadActiveTab,
+  browserScreenshot,
+  browserTabManage,
   edit,
   editRange,
   fileToMarkdown,

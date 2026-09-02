@@ -1,6 +1,6 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { definition, execute } from './tool';
-import { createMockContext, VirtualFS, getAskCall } from '../test-utils';
+import { createMockContext, VirtualFS, getAskCall, getAllAskCalls } from '../test-utils';
 
 let vfs: VirtualFS;
 let ctx: ReturnType<typeof createMockContext>;
@@ -39,8 +39,8 @@ describe('browser_discover_elements tool definition', () => {
     expect(definition.description).toContain('interactive elements');
   });
 
-  test('has empty properties in inputSchema', () => {
-    expect(definition.inputSchema.properties).toEqual({});
+  test('accepts an optional tabId', () => {
+    expect(definition.inputSchema.properties).toHaveProperty('tabId');
   });
 
   test('has timeout set', () => {
@@ -98,6 +98,13 @@ describe('browser_discover_elements execution', () => {
     expect(btn.tag).toBe('button');
     expect(btn.selector).toBe('#btn1');
     expect(btn.text).toBe('Click me');
+  });
+
+  test('forwards tabId to the extension', async () => {
+    await execute({ tabId: 42 }, ctx);
+    const calls = getAllAskCalls(ctx);
+    const metadata = calls[1].metadata as Record<string, unknown>;
+    expect(metadata.params).toEqual({ tabId: 42 });
   });
 });
 

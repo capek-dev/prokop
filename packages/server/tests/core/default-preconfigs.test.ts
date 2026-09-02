@@ -11,6 +11,15 @@ import { resetTestDataDir, setupTestDataDir } from '#tests/test-dir';
 // preconfigs into a fresh data dir. This pins the contract the server
 // ships with, through the real parser and the real builtin catalog.
 
+const browserToolNames = [
+  'browser_discover_elements',
+  'browser_dom_action',
+  'browser_navigate',
+  'browser_read_active_tab',
+  'browser_screenshot',
+  'browser_tab_manage',
+] as const;
+
 describe('default preconfigs', () => {
   beforeEach(() => {
     setupTestDataDir();
@@ -27,7 +36,7 @@ describe('default preconfigs', () => {
     expect(preconfigs.map((p) => p.id).sort()).toEqual(['explore', 'prokop-code']);
   });
 
-  test('prokop-code is the default primary with every builtin tool', async () => {
+  test('prokop-code is the default primary with its explicit builtin tool set', async () => {
     await initializePreconfigs();
 
     const prokopCode = await getPreconfig('prokop-code');
@@ -36,10 +45,12 @@ describe('default preconfigs', () => {
     expect(prokopCode!.isDefault).toBe(true);
     expect(prokopCode!.mode).toBe('primary');
 
-    // Every builtin tool, and nothing the catalog does not know (the
-    // catalog includes the terminal tool this default must expose).
     const toolNames = prokopCode!.tools ?? [];
-    expect([...toolNames].sort()).toEqual([...builtinToolNames].sort());
+    for (const toolName of toolNames) {
+      expect(builtinToolNames).toContain(toolName);
+    }
+    expect(toolNames).toContain('terminal');
+    expect(toolNames).not.toContain('browser_navigate');
 
     // Prompts must carry content, not just frontmatter.
     expect(prokopCode!.systemPrompt.length).toBeGreaterThan(200);
@@ -73,6 +84,16 @@ describe('default preconfigs', () => {
     expect(tools).toContain('grep');
     expect(tools).not.toContain('shell');
     expect(tools).not.toContain('write-file');
+  });
+
+  test('bundled preconfigs do not enable browser tools', async () => {
+    await initializePreconfigs();
+
+    for (const preconfig of await listPreconfigs()) {
+      for (const toolName of browserToolNames) {
+        expect(preconfig.tools ?? []).not.toContain(toolName);
+      }
+    }
   });
 
   test('initializePreconfigs is idempotent and never overwrites existing files', async () => {

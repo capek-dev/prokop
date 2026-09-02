@@ -3,7 +3,7 @@ import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 export const definition: ToolDefinition = {
   name: 'browser_tab_manage',
   description:
-    'Manage browser tabs: list all tabs, create a new tab, close a tab, or switch to a tab. ' +
+    'Manage browser tabs across all non-PWA Chrome windows: list tabs, create a new tab, close a tab, or switch to a tab. ' +
     'Use this alongside browser_navigate and browser_dom_action to work across multiple tabs. ' +
     'Requires a connected ProkopaiBrowser extension.',
   inputSchema: {
@@ -13,10 +13,10 @@ export const definition: ToolDefinition = {
         type: 'string',
         enum: ['list', 'create', 'close', 'switch'],
         description:
-          '"list" — return all tabs in the current window. ' +
-          '"create" — open a new tab (optionally with a URL). ' +
-          '"close" — close a tab by tabId, tabIndex, or the active tab if neither is provided. ' +
-          '"switch" — switch to a tab by tabId or tabIndex.',
+          '"list": return tabs from every non-PWA Chrome window in the extension profile. ' +
+          '"create": open a new tab (optionally with a URL). ' +
+          '"close": close a tab by tabId, tabIndex, or the active tab if neither is provided. ' +
+          '"switch": switch to a tab by tabId or tabIndex.',
       },
       url: {
         type: 'string',
@@ -29,6 +29,10 @@ export const definition: ToolDefinition = {
       tabIndex: {
         type: 'number',
         description: 'Zero-based tab index to close or switch to.',
+      },
+      windowId: {
+        type: 'number',
+        description: 'Window ID used for tab creation or index-based close/switch. Get window IDs from the list action.',
       },
       active: {
         type: 'boolean',
@@ -60,7 +64,7 @@ export async function execute(
   const approved = await ctx.ask({
     type: 'permission',
     question: `${actionLabel}?`,
-    description: `${isReadAction ? 'List' : 'Manage'} browser tabs in the current window.`,
+    description: `${isReadAction ? 'List' : 'Manage'} browser tabs across connected Chrome windows.`,
     risk,
     resource: 'browser',
     action: isReadAction ? 'read' : 'write',
@@ -81,6 +85,7 @@ export async function execute(
           url: input.url,
           tabId: input.tabId,
           tabIndex: input.tabIndex,
+          windowId: input.windowId,
           active: input.active,
         },
       },

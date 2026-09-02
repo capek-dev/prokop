@@ -290,7 +290,10 @@ describe('tool-repository', () => {
       expect(names.some((name) => name.startsWith('discord-'))).toBe(false);
       expect(names).not.toContain('file-to-markdown');
       expect(names.some((name) => name.startsWith('tavily-'))).toBe(false);
+      expect(names.some((name) => name.startsWith('browser-'))).toBe(false);
       expect(manifest.tools.some((name) => name.startsWith('tavily-'))).toBe(false);
+      expect(manifest.tools.some((name) => name.startsWith('browser-'))).toBe(false);
+      expect(raw.metadata?.categories).not.toHaveProperty('browser');
       expect(raw.metadata?.categories).not.toHaveProperty('communication');
       expect(raw.metadata?.categories).not.toHaveProperty('filesystem');
       expect(raw.metadata?.categories).not.toHaveProperty('web');

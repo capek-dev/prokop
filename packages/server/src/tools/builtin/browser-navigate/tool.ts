@@ -3,11 +3,15 @@ import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 export const definition: ToolDefinition = {
   name: 'browser_navigate',
   description:
-    'Navigate the active browser tab to a URL. Waits for the page to finish loading before returning the new URL and title. ' +
+    'Navigate a tab selected by tabId, or the most recently active non-PWA browser tab, to a URL. Waits for the page to finish loading before returning the new URL and title. ' +
     'Requires a connected ProkopaiBrowser extension.',
   inputSchema: {
     type: 'object',
     properties: {
+      tabId: {
+        type: 'number',
+        description: 'Optional tab ID from browser_tab_manage. Defaults to the most recently active non-PWA browser tab.',
+      },
       url: {
         type: 'string',
         description: 'The URL to navigate to. Must be a valid http or https URL.',
@@ -33,6 +37,7 @@ export async function execute(
   const url = input.url as string;
   const waitForLoad = input.waitForLoad as boolean | undefined;
   const timeout = input.timeout as number | undefined;
+  const tabId = input.tabId as number | undefined;
 
   if (!url) {
     return { success: false, error: 'Missing required parameter: url' };
@@ -45,7 +50,7 @@ export async function execute(
   const approved = await ctx.ask({
     type: 'permission',
     question: `Navigate browser to ${url}?`,
-    description: 'Navigate the active browser tab to a new URL. This will leave the current page.',
+    description: 'Navigate the selected browser tab to a new URL. This will leave the current page.',
     risk: 'medium',
     resource: 'browser',
     action: 'navigate',
@@ -62,6 +67,7 @@ export async function execute(
       metadata: {
         task: 'browser.navigate',
         params: {
+          tabId,
           url,
           waitForLoad: waitForLoad ?? true,
           timeout: timeout ?? 10000,

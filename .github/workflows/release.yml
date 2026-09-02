@@ -54,11 +54,13 @@ jobs:
 
           # Tools
           if [ "${{ inputs.release_all_tools }}" = "true" ]; then
-            HAS_TOOLS="true"
             while IFS= read -r TOOL; do
               V=$(jq -r .version "tools/$TOOL/package.json")
               TOOLS=$(echo "$TOOLS" | jq -c --arg name "$TOOL" --arg version "$V" '. += [{"packageName": $name, "version": $version}]')
             done < <(jq -r '.tools[]' tools/manifest.json)
+            if [ "$(echo "$TOOLS" | jq 'length')" -gt 0 ]; then
+              HAS_TOOLS="true"
+            fi
           fi
 
           echo "tools=$TOOLS" >> $GITHUB_OUTPUT
