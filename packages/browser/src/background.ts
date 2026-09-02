@@ -15,6 +15,7 @@ import {
   chromeTabTargetingApi,
   getEligibleTabs,
   resolveEligibleWindowId,
+  resolveScreenshotTargetTab,
   resolveTargetTab,
 } from './tabTargeting';
 import type {
@@ -165,7 +166,7 @@ async function navigateToUrl(params: NavigateParams): Promise<NavigateResult> {
 
 async function captureScreenshot(params: BrowserTargetParams): Promise<{ success: boolean; dataUrl: string; error?: string }> {
   try {
-    const tab = await resolveTargetTab(chromeTabTargetingApi, params.tabId);
+    const tab = await resolveScreenshotTargetTab(chromeTabTargetingApi, params.tabId);
     if (tab.id == null) {
       return { success: false, dataUrl: '', error: 'Target tab has no ID' };
     }

@@ -77,6 +77,34 @@ export async function resolveTargetTab(
   return target;
 }
 
+function isScreenshotSupportedUrl(url: string | undefined): boolean {
+  return url?.startsWith('http://') === true || url?.startsWith('https://') === true;
+}
+
+export async function resolveScreenshotTargetTab(
+  api: TabTargetingApi,
+  tabId?: number,
+): Promise<chrome.tabs.Tab> {
+  if (tabId != null) {
+    const tab = await resolveTargetTab(api, tabId);
+    if (!isScreenshotSupportedUrl(tab.url)) {
+      throw new Error('Screenshots are only supported for http:// and https:// pages');
+    }
+    return tab;
+  }
+
+  const tabs = await getEligibleTabs(api);
+  const target = tabs
+    .filter((tab) => isScreenshotSupportedUrl(tab.url))
+    .sort((left, right) => (right.lastAccessed ?? 0) - (left.lastAccessed ?? 0))[0];
+
+  if (!target) {
+    throw new Error('No eligible http:// or https:// browser tab found for screenshot');
+  }
+
+  return target;
+}
+
 export async function resolveEligibleWindowId(
   api: TabTargetingApi,
   windowId?: number,

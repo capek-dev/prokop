@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   getEligibleTabs,
   resolveEligibleWindowId,
+  resolveScreenshotTargetTab,
   resolveTargetTab,
 } from './tabTargeting';
 import type { TabTargetingApi } from './tabTargeting';
@@ -12,6 +13,7 @@ function tab(
   windowId: number,
   active: boolean,
   lastAccessed: number,
+  url = 'https://example.com',
 ): chrome.tabs.Tab {
   return {
     id,
@@ -26,6 +28,7 @@ function tab(
     discarded: false,
     autoDiscardable: true,
     groupId: -1,
+    url,
   };
 }
 
@@ -81,5 +84,22 @@ describe('browser tab targeting', () => {
     ], [2]);
 
     await expect(resolveEligibleWindowId(api, 20)).rejects.toThrow('No eligible browser window found');
+  });
+
+  test('skips internal Chrome pages when selecting a screenshot target', async () => {
+    const tabs = [
+      tab(1, 10, true, 300, 'chrome://extensions/'),
+      tab(2, 10, false, 200, 'https://example.com'),
+    ];
+
+    expect((await resolveScreenshotTargetTab(createApi(tabs, []))).id).toBe(2);
+  });
+
+  test('rejects an explicitly targeted internal Chrome page for screenshots', async () => {
+    const api = createApi([tab(1, 10, true, 100, 'chrome://extensions/')], []);
+
+    await expect(resolveScreenshotTargetTab(api, 1)).rejects.toThrow(
+      'Screenshots are only supported for http:// and https:// pages',
+    );
   });
 });
