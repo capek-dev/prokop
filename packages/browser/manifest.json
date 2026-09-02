@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "ProkopaiBrowser",
-  "description": "Prokopai browser automation extension - enables AI to read, navigate, and interact with web pages",
-  "version": "0.5.0",
+  "name": "Prokop Browser",
+  "description": "Connect Prokop to Chrome so it can read, navigate, and interact with web pages",
+  "version": "1.0.0",
   "permissions": [
     "storage",
     "tabs",
@@ -30,7 +30,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "ProkopaiBrowser",
+    "default_title": "Prokop Browser",
     "default_popup": "popup.html"
   }
 }

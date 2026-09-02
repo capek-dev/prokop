@@ -1,5 +1,5 @@
 // =============================================================================
-// ProkopaiBrowser Build Script
+// Prokop Browser Build Script
 //
 // Bundles the browser extension for loading in Chrome.
 // Output: dist/ directory containing manifest.json + bundled JS files.

@@ -1,130 +1,335 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prokop Browser</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-synthesis: none;
+      --background: oklch(0.165 0.014 265);
+      --surface: oklch(0.205 0.016 265);
+      --surface-raised: oklch(0.235 0.016 265);
+      --border: oklch(0.30 0.016 265);
+      --border-strong: oklch(0.36 0.014 265);
+      --text: oklch(0.90 0.008 265);
+      --muted: oklch(0.64 0.012 265);
+      --primary: oklch(0.94 0.006 265);
+      --primary-hover: oklch(0.985 0.002 265);
+      --primary-ink: oklch(0.16 0.014 265);
+      --ring: oklch(0.42 0.01 265);
+      --success: oklch(0.7 0.15 150);
+      --warning: oklch(0.8 0.13 80);
+      --danger: oklch(0.65 0.19 25);
+      --danger-surface: oklch(0.21 0.035 25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
-      width: 340px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      width: 360px;
+      min-height: 420px;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 92% 0%, oklch(0.42 0.01 265 / 0.16), transparent 34%),
+        var(--background);
       font-size: 13px;
-      color: #1a1a1a;
-      background: #fff;
-      padding: 16px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .shell {
+      padding: 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 20px;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 32px;
+      height: 32px;
+      place-items: center;
+    }
+
+    .brand-mark img {
+      width: 32px;
+      height: 32px;
+    }
+
+    .brand-copy {
+      min-width: 0;
     }
 
     h1 {
       font-size: 15px;
-      font-weight: 600;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-weight: 650;
+      line-height: 1.25;
+      letter-spacing: -0.01em;
+    }
+
+    .tagline {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
     }
 
     .status-bar {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 8px 10px;
-      border-radius: 6px;
-      margin-bottom: 14px;
-      font-weight: 500;
+      gap: 10px;
+      min-height: 44px;
+      margin-bottom: 20px;
+      padding: 11px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(18, 21, 24, 0.84);
+      color: var(--muted);
       font-size: 12px;
+      font-weight: 600;
     }
-    .status-bar.disconnected { background: #f3f4f6; color: #6b7280; }
-    .status-bar.connecting   { background: #fef3c7; color: #92400e; }
-    .status-bar.connected    { background: #d1fae5; color: #065f46; }
-    .status-bar.error        { background: #fee2e2; color: #991b1b; }
 
     .status-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
+      width: 8px;
+      height: 8px;
+      flex: 0 0 auto;
+      border-radius: 999px;
+      background: #666e76;
+      box-shadow: 0 0 0 4px rgba(102, 110, 118, 0.12);
     }
-    .disconnected .status-dot { background: #9ca3af; }
-    .connecting   .status-dot { background: #f59e0b; animation: pulse 1s infinite; }
-    .connected    .status-dot { background: #10b981; }
-    .error        .status-dot { background: #ef4444; }
+
+    .status-bar.connecting {
+      color: var(--warning);
+      border-color: rgba(245, 191, 104, 0.28);
+    }
+
+    .connecting .status-dot {
+      background: var(--warning);
+      box-shadow: 0 0 0 4px rgba(245, 191, 104, 0.12);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    .status-bar.connected {
+      color: var(--success);
+      border-color: oklch(0.7 0.15 150 / 0.28);
+      background: oklch(0.7 0.15 150 / 0.06);
+    }
+
+    .connected .status-dot {
+      background: var(--success);
+      box-shadow: 0 0 0 4px oklch(0.7 0.15 150 / 0.12);
+    }
+
+    .status-bar.error {
+      color: var(--danger);
+      border-color: rgba(255, 139, 131, 0.28);
+      background: rgba(255, 139, 131, 0.06);
+    }
+
+    .error .status-dot {
+      background: var(--danger);
+      box-shadow: 0 0 0 4px rgba(255, 139, 131, 0.12);
+    }
 
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.55; transform: scale(0.82); }
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .field-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 7px;
     }
 
     label {
-      display: block;
+      color: #d6d9dc;
       font-size: 11px;
-      font-weight: 600;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
+      font-weight: 650;
+      letter-spacing: 0.015em;
+    }
+
+    .optional {
+      color: #70777f;
+      font-size: 10px;
+      font-weight: 500;
     }
 
     input {
       width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      font-size: 13px;
-      font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+      height: 39px;
+      padding: 0 11px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
       outline: none;
-      transition: border-color 0.15s;
-      margin-bottom: 12px;
+      color: var(--text);
+      background: var(--surface);
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
     }
-    input:focus { border-color: #6366f1; }
-    input::placeholder { color: #9ca3af; }
+
+    input:hover:not(:disabled) {
+      border-color: var(--border-strong);
+    }
+
+    input:focus {
+      border-color: var(--ring);
+      box-shadow: 0 0 0 3px oklch(0.42 0.01 265 / 0.22);
+      background: var(--surface-raised);
+    }
+
+    input::placeholder {
+      color: #60676e;
+    }
+
+    input:disabled {
+      color: #7d848b;
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
 
     .actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 4px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 9px;
+      margin-top: 19px;
     }
 
     button {
-      flex: 1;
-      padding: 8px 0;
-      border: none;
-      border-radius: 6px;
+      height: 39px;
+      padding: 0 16px;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      font: inherit;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      transition: background 0.15s, opacity 0.15s;
+      transition: transform 100ms ease, background 140ms ease, border-color 140ms ease, opacity 140ms ease;
     }
-    button:disabled { opacity: 0.5; cursor: default; }
 
-    .btn-primary { background: #6366f1; color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: #4f46e5; }
+    button:active:not(:disabled) {
+      transform: translateY(1px);
+    }
 
-    .btn-danger { background: #fee2e2; color: #991b1b; }
-    .btn-danger:hover:not(:disabled) { background: #fecaca; }
+    button:focus-visible {
+      outline: 2px solid var(--ring);
+      outline-offset: 2px;
+    }
 
-    .btn-secondary { background: #f3f4f6; color: #374151; }
-    .btn-secondary:hover:not(:disabled) { background: #e5e7eb; }
+    button:disabled {
+      opacity: 0.38;
+      cursor: default;
+    }
+
+    .btn-primary {
+      color: var(--primary-ink);
+      background: var(--primary);
+      box-shadow: 0 8px 20px oklch(0 0 0 / 0.18);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .btn-danger {
+      color: #d7dadd;
+      border-color: var(--border);
+      background: var(--surface);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      color: var(--danger);
+      border-color: rgba(255, 139, 131, 0.32);
+      background: var(--danger-surface);
+    }
+
+    .footer {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(40, 45, 50, 0.72);
+      color: #717880;
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>
-    <img src="icons/icon-32.png" width="20" height="20" alt="Prokopai" />
-    ProkopaiBrowser
-  </h1>
+  <main class="shell">
+    <header class="brand">
+      <div class="brand-mark">
+        <img src="icons/icon-32.png" width="24" height="24" alt="" />
+      </div>
+      <div class="brand-copy">
+        <h1>Prokop Browser</h1>
+        <p class="tagline">Browser access for your Prokop agent</p>
+      </div>
+    </header>
 
-  <div id="status-bar" class="status-bar disconnected">
-    <div class="status-dot"></div>
-    <span id="status-text">Disconnected</span>
-  </div>
+    <div id="status-bar" class="status-bar disconnected" role="status" aria-live="polite">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span id="status-text">Disconnected</span>
+    </div>
 
-  <label for="server-url">Server URL</label>
-  <input id="server-url" type="url" placeholder="http://localhost:8742" />
+    <div class="field">
+      <div class="field-header">
+        <label for="server-url">Server URL</label>
+      </div>
+      <input
+        id="server-url"
+        type="url"
+        inputmode="url"
+        placeholder="http://localhost:8742"
+        spellcheck="false"
+        autocomplete="url"
+      />
+    </div>
 
-  <label for="api-token">API Token <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
-  <input id="api-token" type="password" placeholder="Leave empty if not required" />
+    <div class="field">
+      <div class="field-header">
+        <label for="api-token">API token</label>
+        <span class="optional">Optional</span>
+      </div>
+      <input
+        id="api-token"
+        type="password"
+        placeholder="Leave empty if not required"
+        spellcheck="false"
+        autocomplete="off"
+      />
+    </div>
 
-  <div class="actions">
-    <button id="btn-connect" class="btn-primary">Connect</button>
-    <button id="btn-disconnect" class="btn-danger" disabled>Disconnect</button>
-  </div>
+    <div class="actions">
+      <button id="btn-connect" class="btn-primary" type="button">Connect browser</button>
+      <button id="btn-disconnect" class="btn-danger" type="button" disabled>Disconnect</button>
+    </div>
+
+    <p class="footer">Prokop can use connected tabs only when a browser tool is enabled for the active agent.</p>
+  </main>
 
   <script src="popup.js"></script>
 </body>

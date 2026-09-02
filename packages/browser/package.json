@@ -1,9 +1,9 @@
 {
   "name": "@prokopai/browser",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "ProkopaiBrowser - Browser extension for browser automation",
+  "description": "Prokop Browser extension for browser automation",
   "scripts": {
     "build": "bun run build.ts",
     "build:prod": "bun run build.ts --production",

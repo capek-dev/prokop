@@ -1,8 +1,8 @@
 // =============================================================================
-// ProkopaiBrowser Background Service Worker
+// Prokop Browser Background Service Worker
 //
 // Main extension runtime:
-// - Connects to Prokopai server on startup
+// - Connects to the Prokop server on startup
 // - Routes client_capability asks to the appropriate handler
 // - Supports: active_tab_read, browser_dom_action, browser_navigate,
 //             browser_screenshot, browser_discover_elements

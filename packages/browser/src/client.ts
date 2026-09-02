@@ -1,5 +1,5 @@
 // =============================================================================
-// ProkopaiBrowser Client
+// Prokop Browser Client
 //
 // Wraps the SDK client for the Chrome extension environment.
 // Uses a custom WebSocket constructor backed by Chrome's WebSocket API.
@@ -58,7 +58,7 @@ export class BrowserClient {
     const descriptor: ClientDescriptor = {
       clientId,
       clientType: 'extension',
-      displayName: 'ProkopaiBrowser',
+      displayName: 'Prokop Browser',
       interactionMode: 'headless',
       capabilities: [...EXTENSION_CAPABILITIES],
     };

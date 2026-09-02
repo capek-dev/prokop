@@ -1,5 +1,5 @@
 // =============================================================================
-// ProkopaiBrowser Popup
+// Prokop Browser Popup
 //
 // Settings UI for the extension popup. Lets the user configure server URL
 // and API token, and shows the current connection state.
