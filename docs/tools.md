@@ -88,7 +88,7 @@ MCP tools are configured per-workspace in `<workspace>/.prokopai/mcp.json`. See 
 
 ## Optional tool extensions
 
-External tools are only needed for integrations not included in the binary, such as Tavily, browser automation, Gmail, Discord, or document conversion.
+External tools are only needed for integrations not included in the binary, such as Tavily, browser automation, or document conversion. The registry is intentionally small; other integrations can be maintained and distributed by the community through compatible repositories.
 
 ```bash
 # Browse optional extensions

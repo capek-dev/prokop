@@ -254,8 +254,6 @@ packages/
 tools/                   # External, separately released tool modules
   manifest.json          # Release manifest for external tools
   browser-*/             # Browser automation tools
-  discord-*/             # Discord tools
-  gmail-*/               # Gmail tools
   tavily-*/              # Tavily web tools
   file-to-markdown/      # Document conversion tool
 
