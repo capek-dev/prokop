@@ -27,12 +27,14 @@ export type ToolEnvSetResult =
   | { kind: 'ok'; envVar: ToolEnvVarStatus }
   | { kind: 'invalid'; message: string }
   | { kind: 'failed'; message: string };
+export type ToolEnvClearResult = ToolEnvSetResult;
 
 export interface ToolsHttpApplication {
   listTools(): Promise<ToolListResult>;
   getTool(name: string): Promise<ToolGetResult>;
   listEnv(): Promise<ToolEnvListResult>;
   setEnv(key: string, value: string): Promise<ToolEnvSetResult>;
+  clearEnv(key: string): Promise<ToolEnvClearResult>;
 }
 
 export function createToolsHttpApplication(deps: ToolsApplicationDeps): ToolsHttpApplication {
@@ -58,6 +60,16 @@ export function createToolsHttpApplication(deps: ToolsApplicationDeps): ToolsHtt
 
     async setEnv(key, value) {
       const result = await deps.environment.setToolEnvVar(key, value.trim());
+      if (result.ok) {
+        return { kind: 'ok', envVar: result.envVar };
+      }
+      return result.kind === 'invalid'
+        ? { kind: 'invalid', message: result.message }
+        : { kind: 'failed', message: result.message };
+    },
+
+    async clearEnv(key) {
+      const result = await deps.environment.clearToolEnvVar(key);
       if (result.ok) {
         return { kind: 'ok', envVar: result.envVar };
       }

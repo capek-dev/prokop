@@ -38,6 +38,7 @@ interface FakeState {
   listFails: boolean;
   envFails: boolean;
   setResult: 'ok' | 'invalid' | 'failed' | 'throw';
+  clearResult: 'ok' | 'invalid' | 'failed' | 'throw';
   log: string[];
 }
 
@@ -48,6 +49,7 @@ function makeState(): FakeState {
     listFails: false,
     envFails: false,
     setResult: 'ok',
+    clearResult: 'ok',
     log: [],
   };
 }
@@ -77,6 +79,13 @@ function makeApplication(state: FakeState): ToolsHttpApplication {
       if (state.setResult === 'failed') return { ok: false, kind: 'failed', message: 'write failed' };
       if (state.setResult === 'throw') throw new Error('unexpected');
       return { ok: true, envVar: makeEnvVar({ key, configured: true }) };
+    },
+    clearToolEnvVar: async (key) => {
+      state.log.push(`clearEnv:${key}`);
+      if (state.clearResult === 'invalid') return { ok: false, kind: 'invalid', message: 'key must be valid' };
+      if (state.clearResult === 'failed') return { ok: false, kind: 'failed', message: 'write failed' };
+      if (state.clearResult === 'throw') throw new Error('unexpected');
+      return { ok: true, envVar: makeEnvVar({ key, configured: false }) };
     },
   };
 
@@ -128,5 +137,25 @@ describe('tools application use cases', () => {
 
     state.setResult = 'throw';
     await expect(application.setEnv('X', 'v')).rejects.toThrow('unexpected');
+  });
+
+  test('clearEnv clears the key and maps invalid, failed, and unexpected errors', async () => {
+    const state = makeState();
+    const application = makeApplication(state);
+
+    expect(await application.clearEnv('DEMO_KEY')).toEqual({
+      kind: 'ok',
+      envVar: expect.objectContaining({ key: 'DEMO_KEY', configured: false }),
+    });
+    expect(state.log).toContain('clearEnv:DEMO_KEY');
+
+    state.clearResult = 'invalid';
+    expect(await application.clearEnv('X')).toEqual({ kind: 'invalid', message: 'key must be valid' });
+
+    state.clearResult = 'failed';
+    expect(await application.clearEnv('X')).toEqual({ kind: 'failed', message: 'write failed' });
+
+    state.clearResult = 'throw';
+    await expect(application.clearEnv('X')).rejects.toThrow('unexpected');
   });
 });

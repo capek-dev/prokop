@@ -1,5 +1,5 @@
 import { jean2ToolCatalog } from '@/adapters/capek/tool-source';
-import { listToolEnvVars, setToolEnvVar } from '@/config/tool-env';
+import { clearToolEnvVar, listToolEnvVars, setToolEnvVar } from '@/config/tool-env';
 import {
   ConfigurationPersistenceError,
   ConfigurationValidationError,
@@ -7,6 +7,7 @@ import {
 import type {
   ToolCatalogPort,
   ToolEnvironmentPort,
+  ToolEnvClearPortResult,
   ToolEnvListPortResult,
   ToolEnvSetPortResult,
 } from '@/application/ports/tool-catalog';
@@ -41,6 +42,22 @@ export function createJean2ToolEnvironmentPort(): ToolEnvironmentPort {
     async setToolEnvVar(key, value): Promise<ToolEnvSetPortResult> {
       try {
         const envVar = await setToolEnvVar(key, value);
+        return { ok: true, envVar };
+      } catch (err: unknown) {
+        if (err instanceof ConfigurationValidationError) {
+          return { ok: false, kind: 'invalid', message: err.message };
+        }
+        if (err instanceof ConfigurationPersistenceError) {
+          return { ok: false, kind: 'failed', message: err.message };
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        return { ok: false, kind: 'failed', message };
+      }
+    },
+
+    async clearToolEnvVar(key): Promise<ToolEnvClearPortResult> {
+      try {
+        const envVar = await clearToolEnvVar(key);
         return { ok: true, envVar };
       } catch (err: unknown) {
         if (err instanceof ConfigurationValidationError) {

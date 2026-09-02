@@ -32,6 +32,10 @@ function makeFakeApplication(overrides: Partial<ToolsHttpApplication> = {}): Too
       kind: 'ok',
       envVar: { key: 'DEMO_KEY', configured: true, sensitive: false },
     }),
+    clearEnv: async () => ({
+      kind: 'ok',
+      envVar: { key: 'DEMO_KEY', configured: false, sensitive: false },
+    }),
     ...overrides,
   };
 }
@@ -138,6 +142,41 @@ describe('tools route contract', () => {
     });
     expect(res.status).toBe(400);
     expect((await json(res)).error).toBe('bad_request');
+  });
+
+  test('DELETE /api/tools/env/:key returns the cleared env var and passes the key', async () => {
+    const clears: string[] = [];
+    const app = makeApp(makeFakeApplication({
+      clearEnv: async (key) => {
+        clears.push(key);
+        return { kind: 'ok', envVar: { key, configured: false, sensitive: false } };
+      },
+    }));
+    const res = await app.request('/api/tools/env/DISCORD_DEFAULT_CHANNEL_ID', {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await json(res)).toEqual({
+      envVar: { key: 'DISCORD_DEFAULT_CHANNEL_ID', configured: false, sensitive: false },
+    });
+    expect(clears).toEqual(['DISCORD_DEFAULT_CHANNEL_ID']);
+  });
+
+  test('DELETE /api/tools/env/:key maps invalid and failed results exactly', async () => {
+    const invalid = makeApp(makeFakeApplication({
+      clearEnv: async () => ({ kind: 'invalid', message: 'key must be valid' }),
+    }));
+    const invalidRes = await invalid.request('/api/tools/env/X', { method: 'DELETE' });
+    expect(invalidRes.status).toBe(400);
+    expect(await json(invalidRes)).toEqual({ error: 'Bad Request', message: 'key must be valid' });
+
+    const failed = makeApp(makeFakeApplication({
+      clearEnv: async () => ({ kind: 'failed', message: 'write failed' }),
+    }));
+    const failedRes = await failed.request('/api/tools/env/X', { method: 'DELETE' });
+    expect(failedRes.status).toBe(500);
+    expect(await json(failedRes)).toEqual({ error: 'Internal Server Error', message: 'write failed' });
   });
 
   test('GET /api/tools/:name returns the tool and the exact 404 body', async () => {

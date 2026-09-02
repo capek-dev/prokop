@@ -23,7 +23,10 @@ export type ToolEnvSetPortResult =
   | { ok: true; envVar: ToolEnvVarStatus }
   | { ok: false; kind: 'invalid' | 'failed'; message: string };
 
+export type ToolEnvClearPortResult = ToolEnvSetPortResult;
+
 export interface ToolEnvironmentPort {
   listToolEnvVars(): Promise<ToolEnvListPortResult>;
   setToolEnvVar(key: string, value: string): Promise<ToolEnvSetPortResult>;
+  clearToolEnvVar(key: string): Promise<ToolEnvClearPortResult>;
 }

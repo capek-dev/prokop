@@ -43,6 +43,19 @@ export function registerToolRoutes(app: Hono, application: ToolsHttpApplication)
     },
   );
 
+  // DELETE /api/tools/env/:key - Clear a tool env var value
+  app.delete('/api/tools/env/:key', async (c) => {
+    const key = c.req.param('key');
+    const result = await application.clearEnv(key);
+    if (result.kind === 'invalid') {
+      return c.json({ error: 'Bad Request', message: result.message }, 400);
+    }
+    if (result.kind === 'failed') {
+      return c.json({ error: 'Internal Server Error', message: result.message }, 500);
+    }
+    return c.json({ envVar: result.envVar });
+  });
+
   // GET /api/tools/:name - Get a specific tool definition
   app.get('/api/tools/:name', async (c) => {
     const name = c.req.param('name');
