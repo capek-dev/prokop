@@ -8,11 +8,6 @@
   },
   "metadata": {
     "categories": {
-      "filesystem": {
-        "label": "Filesystem",
-        "description": "Read, search, convert, and modify workspace files.",
-        "order": 10
-      },
       "browser": {
         "label": "Browser",
         "description": "Inspect and interact with browser tabs and pages.",
@@ -71,11 +66,6 @@
       "name": "browser-tab-manage",
       "description": "Manage browser tabs: list all tabs, create a new tab, close a tab, or switch to a tab.",
       "category": "browser"
-    },
-    {
-      "name": "file-to-markdown",
-      "description": "Converts files to Markdown format. Supports PDF, Microsoft Office (.docx, .xlsx, .pptx), LibreOffice (.odt, .ods, .odp), and ZIP archives. Does not support .7z archives.",
-      "category": "filesystem"
     },
     {
       "name": "tavily-crawl",
