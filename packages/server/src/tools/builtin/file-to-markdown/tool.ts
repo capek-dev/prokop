@@ -1,8 +1,6 @@
 // MIT License — https://github.com/jojomondag/FileToMarkdown
 // Adapted from jojomondag/FileToMarkdown (MIT) — converted per-converter logic ported to TypeScript + Jean2 wrapper
 import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
-import { dirname, join } from 'path';
-
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const DEFAULT_READ_LIMIT = 2000;
@@ -69,16 +67,9 @@ export function detectFormat(path: string): SupportedFormat | null {
 // ---------------------------------------------------------------------------
 
 export async function convertPdf(buffer: Uint8Array): Promise<string> {
+  // Preload the worker into the main thread so Bun embeds it in compiled executables.
+  await import('pdfjs-dist/build/pdf.worker.mjs');
   const pdfjsLib = await import('pdfjs-dist');
-  // Resolve worker from the actual pdfjs-dist module location — works in dev (monorepo hoist) and production
-  try {
-    const mainUrl = import.meta.resolve('pdfjs-dist');
-    const mainPath = new URL(mainUrl).pathname;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = join(dirname(mainPath), 'pdf.worker.mjs');
-  } catch {
-    // Bundled or unusual environment — fall back to relative path
-    pdfjsLib.GlobalWorkerOptions.workerSrc = join(import.meta.dir, 'node_modules/pdfjs-dist/build/pdf.worker.mjs');
-  }
   const doc = await pdfjsLib.getDocument({ data: buffer, useSystemFonts: true }).promise;
   const pages: string[] = [];
   for (let i = 1; i <= doc.numPages; i++) {
