@@ -62,10 +62,7 @@ import {
 import { activateSandbox } from '@/infrastructure/sandbox';
 import { getEmbeddedClientAssetsRoot } from '@/infrastructure/runtime/client-assets';
 import { startPushRetryScheduler, stopPushRetryScheduler, cleanupPushData } from '@/infrastructure/web-push/retry-scheduler';
-import {
-  startProviderAccountLifecycle,
-  stopProviderAccountLifecycle,
-} from '@/infrastructure/providers';
+import { stopProviderAccountLifecycle } from '@/infrastructure/providers';
 
 export interface ServerOptions {
   port?: number;
@@ -285,7 +282,6 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     // Start the scheduler tick loop (catches jobs that became due while offline)
     application.schedulerTicker.start();
     startPushRetryScheduler();
-    startProviderAccountLifecycle();
 
     const clientAssetsRoot = getEmbeddedClientAssetsRoot();
     if (clientAssetsRoot !== null) {

@@ -1,20 +1,15 @@
 import { describe, expect, test } from 'bun:test';
-import type { CodexProviderConfig, GmailProviderConfig } from '@prokopai/sdk';
+import type { CodexProviderConfig } from '@prokopai/sdk';
 import {
   applyCodexRefresh,
-  applyGmailRefresh,
   buildAuthorizationUrl,
   buildCodexConfig,
-  buildGmailConfig,
   buildTokenExchangeParams,
   buildTokenRefreshParams,
   codexStatusFromConfig,
   extractCodexAccountId,
-  extractEmailFromIdToken,
   generateOAuthState,
   generatePkceCodes,
-  GMAIL_REAUTH_REQUIRED_MESSAGE,
-  gmailStatusFromConfig,
   OAUTH_FLOW_TIMEOUT_MS,
   OAuthTokenRefreshError,
   parseIdTokenClaims,
@@ -99,23 +94,20 @@ describe('provider-accounts domain: OAuth flow policy', () => {
     expect(parseOAuthErrorBody('upstream unavailable')).toEqual({});
     expect(parseOAuthErrorBody('')).toEqual({});
 
-    const error = new OAuthTokenRefreshError({ providerId: 'gmail', status: 400, code: 'invalid_grant', description: 'x' });
+    const error = new OAuthTokenRefreshError({ providerId: 'codex', status: 400, code: 'invalid_grant', description: 'x' });
     expect(error.name).toBe('OAuthTokenRefreshError');
-    expect(error.message).toBe('Token refresh failed for gmail: 400 - invalid_grant: x');
-    expect(error.providerId).toBe('gmail');
+    expect(error.message).toBe('Token refresh failed for codex: 400 - invalid_grant: x');
+    expect(error.providerId).toBe('codex');
     expect(error.status).toBe(400);
   });
 
-  test('parses id tokens and extracts codex account ids and gmail emails', () => {
+  test('parses id tokens and extracts codex account ids', () => {
     const token = idToken({
       chatgpt_account_id: 'acct-1',
-      email: 'user@example.com',
       organizations: [{ id: 'org-1' }],
     });
     const claims = parseIdTokenClaims(token);
-    expect(claims?.email).toBe('user@example.com');
     expect(extractCodexAccountId(claims)).toBe('acct-1');
-    expect(extractEmailFromIdToken(token)).toBe('user@example.com');
 
     expect(extractCodexAccountId(parseIdTokenClaims(idToken({
       'https://api.openai.com/auth': { chatgpt_account_id: 'auth-acct' },
@@ -123,10 +115,9 @@ describe('provider-accounts domain: OAuth flow policy', () => {
     expect(extractCodexAccountId(parseIdTokenClaims(idToken({ organizations: [{ id: 'org-only' }] })))).toBe('org-only');
     expect(extractCodexAccountId(undefined)).toBeUndefined();
     expect(parseIdTokenClaims('not-a-jwt')).toBeUndefined();
-    expect(extractEmailFromIdToken('broken')).toBeUndefined();
   });
 
-  test('builds and refreshes codex and gmail token configs', () => {
+  test('builds and refreshes codex token configs', () => {
     const now = 1_000_000;
     const codex = buildCodexConfig({
       access_token: 'a',
@@ -151,44 +142,14 @@ describe('provider-accounts domain: OAuth flow policy', () => {
     );
     expect(refreshedCodex.accountId).toBe('new-acct');
     expect(refreshedCodex.access).toBe('a2');
-
-    const gmail = buildGmailConfig({
-      access_token: 'g',
-      refresh_token: 'gr',
-      id_token: idToken({ email: 'me@example.com' }),
-    }, now);
-    expect(gmail).toMatchObject({ provider: 'gmail', email: 'me@example.com' });
-
-    const refreshedGmail = applyGmailRefresh(
-      { ...gmail, reauthRequired: true },
-      { access_token: 'g2', refresh_token: 'gr2' },
-      now,
-    );
-    expect(refreshedGmail.access).toBe('g2');
-    expect(refreshedGmail.refresh).toBe('gr2');
-    expect(refreshedGmail.reauthRequired).toBeUndefined();
   });
 
-  test('shapes codex and gmail statuses from config records', () => {
+  test('shapes codex status from config records', () => {
     expect(codexStatusFromConfig(null)).toEqual({ provider: 'codex', connected: false });
     expect(codexStatusFromConfig({
       type: 'oauth', provider: 'codex', access: 'a', refresh: 'r', expires: 1,
       connectedAt: 't', accountId: 'acct',
     } as CodexProviderConfig)).toEqual({ provider: 'codex', connected: true, connectedAt: 't', accountId: 'acct' });
-
-    expect(gmailStatusFromConfig(null)).toEqual({ provider: 'gmail', connected: false });
-    expect(gmailStatusFromConfig({
-      type: 'oauth', provider: 'gmail', access: 'a', refresh: 'r', expires: 1, connectedAt: 't', reauthRequired: true,
-    } as GmailProviderConfig)).toEqual({
-      provider: 'gmail',
-      connected: false,
-      reauthRequired: true,
-      error: GMAIL_REAUTH_REQUIRED_MESSAGE,
-      connectedAt: 't',
-      displayName: 'Gmail',
-      authType: 'oauth',
-      connectable: true,
-    });
   });
 });
 

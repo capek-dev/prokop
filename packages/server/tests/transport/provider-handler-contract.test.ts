@@ -124,12 +124,12 @@ describe('provider wire handler contract', () => {
     await handleProviderConnect(
       makeCtx(spy),
       'ws' as ConnectionId,
-      { type: 'provider.connect', provider: 'gmail' },
+      { type: 'provider.connect', provider: 'unknown' },
     );
 
     expect(spy.broadcasts).toEqual([{
       type: 'provider.status',
-      provider: 'gmail',
+      provider: 'unknown',
       connected: false,
       error: 'credentials missing',
     }]);

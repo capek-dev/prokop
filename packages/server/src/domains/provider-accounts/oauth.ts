@@ -1,6 +1,5 @@
 import type {
   CodexProviderConfig,
-  GmailProviderConfig,
   OAuthProviderConfig,
   ProviderStatus,
 } from '@prokopai/sdk';
@@ -19,8 +18,6 @@ import type {
 
 export const OAUTH_FLOW_TIMEOUT_MS = 5 * 60 * 1000;
 export const OAUTH_DEFAULT_TOKEN_LIFETIME_SECONDS = 3600;
-export const GMAIL_REAUTH_REQUIRED_MESSAGE =
-  'Gmail authorization expired or was revoked. Reconnect Gmail to continue.';
 export const CODEX_OAUTH_DUMMY_KEY = 'codex-oauth-dummy-key';
 
 const RANDOM_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
@@ -199,13 +196,6 @@ export function extractCodexAccountId(
   );
 }
 
-export function extractEmailFromIdToken(token: string): string | undefined {
-  const claims = parseIdTokenClaims(token);
-  if (!claims) return undefined;
-  const email = claims.email;
-  return typeof email === 'string' ? email : undefined;
-}
-
 // ── Token config records ─────────────────────────────────────
 
 export interface OAuthTokenSet {
@@ -237,22 +227,6 @@ export function buildCodexConfig(
   };
 }
 
-export function buildGmailConfig(
-  tokens: OAuthTokenSet,
-  now: number,
-): GmailProviderConfig {
-  const email = tokens.id_token ? extractEmailFromIdToken(tokens.id_token) : undefined;
-  return {
-    type: 'oauth',
-    provider: 'gmail',
-    access: tokens.access_token,
-    refresh: tokens.refresh_token,
-    expires: tokenExpiryMs(tokens, now),
-    ...(email && { email }),
-    connectedAt: new Date(now).toISOString(),
-  };
-}
-
 /** Codex refresh application: replace the token fields, update the account
  * id when a new id_token is present, keep the rest of the record. */
 export function applyCodexRefresh(
@@ -273,22 +247,6 @@ export function applyCodexRefresh(
   return config;
 }
 
-/** Gmail refresh application: replace the token fields, rotate the refresh
- * token when the upstream provides one, and clear the reauth flag. */
-export function applyGmailRefresh(
-  config: GmailProviderConfig,
-  tokens: OAuthTokenSet,
-  now: number,
-): GmailProviderConfig {
-  config.access = tokens.access_token;
-  if (tokens.refresh_token) {
-    config.refresh = tokens.refresh_token;
-  }
-  config.expires = tokenExpiryMs(tokens, now);
-  delete config.reauthRequired;
-  return config;
-}
-
 // ── Provider status shaping ──────────────────────────────────
 
 export function codexStatusFromConfig(
@@ -305,30 +263,3 @@ export function codexStatusFromConfig(
   };
 }
 
-export function gmailStatusFromConfig(
-  config: GmailProviderConfig | null,
-): ProviderStatus {
-  if (!config) {
-    return { provider: 'gmail', connected: false };
-  }
-  if (config.reauthRequired) {
-    return {
-      provider: 'gmail',
-      connected: false,
-      reauthRequired: true,
-      error: GMAIL_REAUTH_REQUIRED_MESSAGE,
-      connectedAt: config.connectedAt,
-      displayName: 'Gmail',
-      authType: 'oauth',
-      connectable: true,
-    };
-  }
-  return {
-    provider: 'gmail',
-    connected: true,
-    connectedAt: config.connectedAt,
-    displayName: 'Gmail',
-    authType: 'oauth',
-    connectable: true,
-  };
-}

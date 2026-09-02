@@ -275,6 +275,19 @@ describe('tool-repository', () => {
 
       expect(flagged).toEqual([]);
     });
+
+    test('does not advertise retired first-party integration families', () => {
+      const repositoryPath = join(import.meta.dir, '../../../../tools/repositoryv3.json');
+      const raw = JSON.parse(readFileSync(repositoryPath, 'utf8')) as {
+        metadata?: { categories?: Record<string, unknown> };
+        tools: Array<{ name: string }>;
+      };
+      const names = raw.tools.map((tool) => tool.name);
+
+      expect(names.some((name) => name.startsWith('gmail-'))).toBe(false);
+      expect(names.some((name) => name.startsWith('discord-'))).toBe(false);
+      expect(raw.metadata?.categories).not.toHaveProperty('communication');
+    });
   });
 
   describe('repository with envConfig', () => {

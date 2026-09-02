@@ -214,9 +214,6 @@ const layerInfrastructureExceptions: Record<string, string[]> = {
   'packages/server/src/infrastructure/oauth/oauth-manager.ts': [
     '@/transport/websocket/broadcast',
   ],
-  'packages/server/src/infrastructure/providers/gmail.ts': [
-    '@/transport/websocket/broadcast',
-  ],
   'packages/server/src/infrastructure/web-push/retry-scheduler.ts': [
     '@/adapters/jean2/notifications',
   ],

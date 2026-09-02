@@ -74,9 +74,8 @@ export async function listToolEnvVars(): Promise<ToolEnvStatus> {
   // --- Build exclusion set for keys managed by other surfaces ---
   const excludedKeys = new Set<string>();
 
-  // Prefixed keys (PROKOPAI_* or legacy JEAN2_*): managed by Credentials tab
-  // or server config (env.ts getters). Prefixed preset keys (e.g.
-  // PROKOPAI_GMAIL_*) are NOT excluded.
+  // Prefixed keys (PROKOPAI_* or legacy JEAN2_*): managed by the
+  // Credentials tab or server configuration. Declared presets are not excluded.
   for (const key of configuredKeys) {
     if ((key.startsWith('JEAN2_') || key.startsWith('PROKOPAI_')) && !isPresetKey(key)) {
       excludedKeys.add(key);

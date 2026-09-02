@@ -1,9 +1,4 @@
 import './codex';
-import './gmail';
-import {
-  startGmailProviderLifecycle,
-  stopGmailBackgroundRefresh,
-} from './gmail';
 import { disposeOAuthFlows } from '../oauth/oauth-manager';
 
 export {
@@ -14,11 +9,6 @@ export {
   refreshTokens,
 } from '../oauth/oauth-manager';
 
-export function startProviderAccountLifecycle(): void {
-  startGmailProviderLifecycle();
-}
-
 export function stopProviderAccountLifecycle(): void {
-  stopGmailBackgroundRefresh();
   disposeOAuthFlows();
 }
