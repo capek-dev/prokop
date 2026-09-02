@@ -12,7 +12,7 @@ beforeEach(() => {
       const r = request as Record<string, unknown>;
       if (r.type === 'permission') return true;
       if (r.type === 'client_capability') {
-        return { success: true, dataUrl: 'data:image/png;base64,iVBOR...' };
+        return { success: true, dataUrl: 'data:image/png;base64,iVBORw0KGgo=' };
       }
       return true;
     }) as unknown as ReturnType<typeof createMockContext>['ask'],
@@ -81,14 +81,24 @@ describe('browser_screenshot permissions', () => {
 // ══════════════════════════════════════════════════════════════════
 
 describe('browser_screenshot execution', () => {
-  test('returns dataUrl on success', async () => {
+  test('returns compact client output and raw PNG model output on success', async () => {
     const result = await execute({}, ctx);
-    expect(result.success).toBe(true);
-    const data = result.result as { dataUrl: string };
-    expect(data.dataUrl).toBe('data:image/png;base64,iVBOR...');
+
+    expect(result).toEqual({
+      success: true,
+      result: {
+        captured: true,
+        mediaType: 'image/png',
+      },
+      modelOutput: [{
+        type: 'image',
+        data: 'iVBORw0KGgo=',
+        mediaType: 'image/png',
+      }],
+    });
   });
 
-  test('falls back to empty dataUrl when not provided', async () => {
+  test('rejects a response without PNG screenshot data', async () => {
     const fallbackCtx = createMockContext(vfs, {
       ask: mock(async (request: unknown) => {
         const r = request as Record<string, unknown>;
@@ -98,9 +108,22 @@ describe('browser_screenshot execution', () => {
     });
 
     const result = await execute({}, fallbackCtx);
-    expect(result.success).toBe(true);
-    const data = result.result as { dataUrl: string };
-    expect(data.dataUrl).toBe('');
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Extension returned invalid PNG screenshot data.');
+  });
+
+  test('rejects empty PNG screenshot data', async () => {
+    const emptyCtx = createMockContext(vfs, {
+      ask: mock(async (request: unknown) => {
+        const r = request as Record<string, unknown>;
+        if (r.type === 'permission') return true;
+        return { success: true, dataUrl: 'data:image/png;base64,' };
+      }) as unknown as ReturnType<typeof createMockContext>['ask'],
+    });
+
+    const result = await execute({}, emptyCtx);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Extension returned empty PNG screenshot data.');
   });
 
   test('forwards tabId to the extension', async () => {

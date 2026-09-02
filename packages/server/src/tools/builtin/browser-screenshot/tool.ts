@@ -60,11 +60,33 @@ export async function execute(
       };
     }
 
+    const pngPrefix = 'data:image/png;base64,';
+    if (typeof result.dataUrl !== 'string' || !result.dataUrl.startsWith(pngPrefix)) {
+      return {
+        success: false,
+        error: 'Extension returned invalid PNG screenshot data.',
+      };
+    }
+
+    const pngBase64 = result.dataUrl.slice(pngPrefix.length);
+    if (!pngBase64) {
+      return {
+        success: false,
+        error: 'Extension returned empty PNG screenshot data.',
+      };
+    }
+
     return {
       success: true,
       result: {
-        dataUrl: result.dataUrl ?? '',
+        captured: true,
+        mediaType: 'image/png',
       },
+      modelOutput: [{
+        type: 'image',
+        data: pngBase64,
+        mediaType: 'image/png',
+      }],
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
