@@ -4,7 +4,7 @@ Tools give the agent the ability to interact with your filesystem, run commands,
 
 ## Built-in tools
 
-A fresh `prokop init` can use the filesystem, shell, web fetch, task, question, and worktree tools immediately. Built-in tools take precedence over optional extensions with the same name.
+A fresh `prokop init` can use the filesystem, shell, web fetch, web search, task, question, and worktree tools immediately. Built-in tools take precedence over optional extensions with the same name.
 
 ### File Tools
 
@@ -33,6 +33,9 @@ The shell tool enforces safety: dangerous commands (`rm`, `sudo`, `curl`), files
 | Tool | Description |
 |------|-------------|
 | **webfetch** | Fetch and convert web pages to readable text |
+| **tavily-search** | Search the web with topic, date, and domain filters (requires `TAVILY_API_KEY`) |
+
+Configure your own Tavily API key in Settings before using `tavily-search`. The server does not provide an API key.
 
 ### Browser
 
@@ -54,17 +57,6 @@ Requires the **ProkopaiBrowser** extension. Install it from the [Chrome Web Stor
 | **question** | Ask the user structured questions (select, multi-select, text, confirm) |
 | **todoread** | Read the current task list |
 | **todowrite** | Update the task list |
-
-### Tavily Search
-
-Requires a Tavily API key:
-
-| Tool | Description |
-|------|-------------|
-| **tavily-search** | Web search with topic and time filters |
-| **tavily-crawl** | Deep crawl a URL and its subpages |
-| **tavily-extract** | Extract clean content from URLs |
-| **tavily-map** | Map/discover URLs from a domain |
 
 ## Capability Tools
 
@@ -88,14 +80,14 @@ MCP tools are configured per-workspace in `<workspace>/.prokopai/mcp.json`. See 
 
 ## Optional tool extensions
 
-External tools are only needed for integrations not included in the binary, such as Tavily or browser automation. The registry is intentionally small; other integrations can be maintained and distributed by the community through compatible repositories.
+External tools are only needed for integrations not included in the binary, such as browser automation. The registry is intentionally small; other integrations can be maintained and distributed by the community through compatible repositories.
 
 ```bash
 # Browse optional extensions
 prokop tools list
 
 # Install a specific optional integration
-prokop tools install tavily-search
+prokop tools install browser-navigate
 
 # Update optional installed extensions
 prokop tools update
@@ -111,7 +103,7 @@ prokop tools list --installed
 prokop tools outdated
 
 # Remove an optional extension
-prokop tools remove tavily-search
+prokop tools remove browser-navigate
 ```
 
 Optional extensions are stored in `~/.prokopai/tools/` (or your custom `PROKOPAI_TOOLS_PATH`). Built-in tools remain in the binary.
