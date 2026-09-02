@@ -1,6 +1,6 @@
 # Tools
 
-Tools give the agent the ability to interact with your filesystem, run commands, search the web, and more. The baseline tools used by bundled agents ship inside the server binary and need no installation or updates. Optional integrations can be added separately.
+Tools give the agent the ability to interact with your filesystem, run commands, search the web, and more. Built-in tools ship inside the server binary and need no installation or updates. Bundled agent preconfigs enable a focused subset, and custom preconfigs can enable other built-ins.
 
 ## Built-in tools
 
@@ -39,16 +39,16 @@ Configure your own Tavily API key in Settings before using `tavily-search`. The 
 
 ### Browser
 
-Requires the **ProkopaiBrowser** extension. Install it from the [Chrome Web Store](https://chromewebstore.google.com/detail/jean2browser/jpahdfmmfmmnacapmkchljmcijoedcpj), then connect it to your Prokop server:
+Browser tools are built into the server but are not enabled by the bundled `prokop-code` or `explore` preconfigs. Add the tools you need to a custom preconfig. They require the **ProkopaiBrowser** extension, installed from the [Chrome Web Store](https://chromewebstore.google.com/detail/jean2browser/jpahdfmmfmmnacapmkchljmcijoedcpj) and connected to your Prokop server.
 
 | Tool | Description |
 |------|-------------|
-| **browser-navigate** | Navigate the browser to a URL |
-| **browser-read-active-tab** | Read the current tab's title, URL, and visible text |
-| **browser-tab-manage** | List, create, close, and switch between browser tabs |
-| **browser-discover-elements** | Find interactive elements on a page |
-| **browser-dom-action** | Click, type, and interact with page elements |
-| **browser-screenshot** | Capture screenshots of the active tab |
+| **browser_navigate** | Navigate the browser to a URL |
+| **browser_read_active_tab** | Read a tab's title, URL, and visible text |
+| **browser_tab_manage** | List, create, close, and switch between browser tabs |
+| **browser_discover_elements** | Find interactive elements on a page |
+| **browser_dom_action** | Click, type, and interact with page elements |
+| **browser_screenshot** | Capture screenshots of a browser tab |
 
 ### Interaction
 
@@ -80,14 +80,11 @@ MCP tools are configured per-workspace in `<workspace>/.prokopai/mcp.json`. See 
 
 ## Optional tool extensions
 
-External tools are only needed for integrations not included in the binary, such as browser automation. The registry is intentionally small; other integrations can be maintained and distributed by the community through compatible repositories.
+External tools are only needed for integrations not included in the binary. The registry is intentionally small; other integrations can be maintained and distributed by the community through compatible repositories.
 
 ```bash
 # Browse optional extensions
 prokop tools list
-
-# Install a specific optional integration
-prokop tools install browser-navigate
 
 # Update optional installed extensions
 prokop tools update
@@ -101,9 +98,6 @@ prokop tools list --installed
 
 # Check optional extensions for updates
 prokop tools outdated
-
-# Remove an optional extension
-prokop tools remove browser-navigate
 ```
 
 Optional extensions are stored in `~/.prokopai/tools/` (or your custom `PROKOPAI_TOOLS_PATH`). Built-in tools remain in the binary.

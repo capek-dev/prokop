@@ -253,7 +253,7 @@ packages/
 
 tools/                   # External, separately released tool modules
   manifest.json          # Release manifest for external tools
-  browser-*/             # Browser automation tools
+  <tool-name>/           # External tool source packages
 
 .architecture-v2/        # Current extraction architecture, decisions, and validation
 .agents/skills/          # Repository-specific agent procedures

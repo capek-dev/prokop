@@ -84,7 +84,7 @@ Reflection is user-directed. You choose the prompt and schedule. Prokop does not
 | **Agents** | Persistent identity, memory, skills, session search, subagents, workflows, scheduled work |
 | **Control** | Visible tool calls, scoped permissions, auto-approval boundaries, revocable grants |
 | **Client** | Responsive PWA, mobile layout, push support, multi-server connections |
-| **Tools** | Filesystem, search, shell, tasks, questions, web fetch, Git worktrees, optional browser tools |
+| **Tools** | Filesystem, search, shell, tasks, questions, web fetch, Git worktrees, opt-in browser tools |
 | **Extensibility** | MCP and Capek plugins for providers, tools, memory, workflows, and agent behavior |
 
 The board displays up to six open session panes. The server is not limited to six sessions.
