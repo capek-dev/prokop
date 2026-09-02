@@ -11,8 +11,15 @@
 import { BrowserClient } from './client';
 import { getOrCreateClientId } from './storage';
 import { getConfig } from './config';
+import {
+  chromeTabTargetingApi,
+  getEligibleTabs,
+  resolveEligibleWindowId,
+  resolveTargetTab,
+} from './tabTargeting';
 import type {
   ActiveTabData,
+  BrowserTargetParams,
   ConnectionState,
   DomActionParams,
   DomActionResult,
@@ -40,12 +47,8 @@ let intentionalDisconnect = false;
 
 // ── Active Tab Reading ──────────────────────────────────────
 
-async function readActiveTab(): Promise<ActiveTabData> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-  if (!tab?.id) {
-    throw new Error('No active tab found');
-  }
+async function readActiveTab(params: BrowserTargetParams): Promise<ActiveTabData> {
+  const tab = await resolveTargetTab(chromeTabTargetingApi, params.tabId);
 
   const title = tab.title ?? '';
   const url = tab.url ?? '';
@@ -75,13 +78,11 @@ async function readActiveTab(): Promise<ActiveTabData> {
 // ── DOM Action Execution ────────────────────────────────────
 
 async function executeDomAction(params: DomActionParams): Promise<DomActionResult> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-  if (!tab?.id) {
-    return { success: false, error: 'No active tab found' };
-  }
-
   try {
+    const tab = await resolveTargetTab(chromeTabTargetingApi, params.tabId);
+    if (tab.id == null) {
+      return { success: false, error: 'Target tab has no ID' };
+    }
     const response = await chrome.tabs.sendMessage(tab.id, {
       type: 'dom_action',
       params,
@@ -95,14 +96,10 @@ async function executeDomAction(params: DomActionParams): Promise<DomActionResul
 
 // ── Element Discovery ───────────────────────────────────────
 
-async function discoverElements(): Promise<DiscoverElementsResult> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-  if (!tab?.id) {
-    return { elements: [] };
-  }
-
+async function discoverElements(params: BrowserTargetParams): Promise<DiscoverElementsResult> {
   try {
+    const tab = await resolveTargetTab(chromeTabTargetingApi, params.tabId);
+    if (tab.id == null) return { elements: [] };
     const response = await chrome.tabs.sendMessage(tab.id, {
       type: 'discover_elements',
     });
@@ -115,16 +112,14 @@ async function discoverElements(): Promise<DiscoverElementsResult> {
 // ── Page Navigation ─────────────────────────────────────────
 
 async function navigateToUrl(params: NavigateParams): Promise<NavigateResult> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-  if (!tab?.id) {
-    return { success: false, url: '', title: '', error: 'No active tab found' };
-  }
-
   const timeout = params.timeout ?? 10000;
   const waitForLoad = params.waitForLoad ?? true;
 
   try {
+    const tab = await resolveTargetTab(chromeTabTargetingApi, params.tabId);
+    if (tab.id == null) {
+      return { success: false, url: '', title: '', error: 'Target tab has no ID' };
+    }
     if (waitForLoad) {
       // Navigate and wait for the page to finish loading
       await Promise.all([
@@ -168,9 +163,16 @@ async function navigateToUrl(params: NavigateParams): Promise<NavigateResult> {
 
 // ── Screenshot Capture ──────────────────────────────────────
 
-async function captureScreenshot(): Promise<{ success: boolean; dataUrl: string; error?: string }> {
+async function captureScreenshot(params: BrowserTargetParams): Promise<{ success: boolean; dataUrl: string; error?: string }> {
   try {
-    const dataUrl = await chrome.tabs.captureVisibleTab(chrome.windows.WINDOW_ID_CURRENT, {
+    const tab = await resolveTargetTab(chromeTabTargetingApi, params.tabId);
+    if (tab.id == null) {
+      return { success: false, dataUrl: '', error: 'Target tab has no ID' };
+    }
+    if (!tab.active) {
+      await chrome.tabs.update(tab.id, { active: true });
+    }
+    const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
       format: 'png',
       quality: 80,
     });
@@ -197,14 +199,16 @@ function toTabInfo(tab: chrome.tabs.Tab): TabInfo {
 async function manageTab(params: TabManageParams): Promise<TabManageResult> {
   switch (params.action) {
     case 'list': {
-      const tabs = await chrome.tabs.query({ currentWindow: true });
+      const tabs = await getEligibleTabs(chromeTabTargetingApi);
       return { success: true, tabs: tabs.map(toTabInfo) };
     }
 
     case 'create': {
+      const windowId = await resolveEligibleWindowId(chromeTabTargetingApi, params.windowId);
       const createProps: chrome.tabs.CreateProperties = {
         url: params.url ?? 'about:blank',
         active: params.active ?? true,
+        windowId,
       };
       const tab = await chrome.tabs.create(createProps);
       return { success: true, createdTab: toTabInfo(tab) };
@@ -214,13 +218,13 @@ async function manageTab(params: TabManageParams): Promise<TabManageResult> {
       let tabId: number | undefined;
 
       if (params.tabId != null) {
-        tabId = params.tabId;
+        tabId = (await resolveTargetTab(chromeTabTargetingApi, params.tabId)).id;
       } else if (params.tabIndex != null) {
-        const tabs = await chrome.tabs.query({ currentWindow: true, index: params.tabIndex });
+        const windowId = await resolveEligibleWindowId(chromeTabTargetingApi, params.windowId);
+        const tabs = await chrome.tabs.query({ windowId, index: params.tabIndex });
         tabId = tabs[0]?.id;
       } else {
-        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        tabId = activeTab?.id;
+        tabId = (await resolveTargetTab(chromeTabTargetingApi)).id;
       }
 
       if (tabId == null) {
@@ -233,17 +237,24 @@ async function manageTab(params: TabManageParams): Promise<TabManageResult> {
 
     case 'switch': {
       if (params.tabId != null) {
-        const tab = await chrome.tabs.update(params.tabId, { active: true });
+        const target = await resolveTargetTab(chromeTabTargetingApi, params.tabId);
+        if (target.id == null) {
+          return { success: false, error: 'Target tab has no ID' };
+        }
+        const tab = await chrome.tabs.update(target.id, { active: true });
+        await chrome.windows.update(tab.windowId, { focused: true });
         return { success: true, switchedToTab: toTabInfo(tab) };
       }
 
       if (params.tabIndex != null) {
-        const tabs = await chrome.tabs.query({ currentWindow: true, index: params.tabIndex });
+        const windowId = await resolveEligibleWindowId(chromeTabTargetingApi, params.windowId);
+        const tabs = await chrome.tabs.query({ windowId, index: params.tabIndex });
         const target = tabs[0];
         if (!target?.id) {
           return { success: false, error: `No tab at index ${params.tabIndex}` };
         }
         const tab = await chrome.tabs.update(target.id, { active: true });
+        await chrome.windows.update(tab.windowId, { focused: true });
         return { success: true, switchedToTab: toTabInfo(tab) };
       }
 
@@ -347,7 +358,8 @@ async function handleAskRequest(
   try {
     switch (capability) {
       case 'active_tab_read': {
-        const tabData = await readActiveTab();
+        const params = (ask?.params ?? ask?.metadata?.params ?? {}) as BrowserTargetParams;
+        const tabData = await readActiveTab(params);
         browserClient.sendAskResponse(toolCallId, {
           type: 'client_capability',
           capability,
@@ -395,7 +407,8 @@ async function handleAskRequest(
       }
 
       case 'browser_screenshot': {
-        const result = await captureScreenshot();
+        const params = (ask?.params ?? ask?.metadata?.params ?? {}) as BrowserTargetParams;
+        const result = await captureScreenshot(params);
         browserClient.sendAskResponse(toolCallId, {
           type: 'client_capability',
           capability,
@@ -405,7 +418,8 @@ async function handleAskRequest(
       }
 
       case 'browser_discover_elements': {
-        const result = await discoverElements();
+        const params = (ask?.params ?? ask?.metadata?.params ?? {}) as BrowserTargetParams;
+        const result = await discoverElements(params);
         browserClient.sendAskResponse(toolCallId, {
           type: 'client_capability',
           capability,

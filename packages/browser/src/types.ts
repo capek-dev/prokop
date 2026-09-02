@@ -8,7 +8,11 @@ export interface ActiveTabData {
   text: string;
 }
 
-export interface DomActionParams {
+export interface BrowserTargetParams {
+  tabId?: number;
+}
+
+export interface DomActionParams extends BrowserTargetParams {
   action: 'click' | 'type' | 'select' | 'clear' | 'scroll' | 'hover' | 'press_enter' | 'check' | 'uncheck';
   selector?: string;
   text?: string;
@@ -41,7 +45,7 @@ export interface DomActionResult {
   viewportHeight?: number;
 }
 
-export interface NavigateParams {
+export interface NavigateParams extends BrowserTargetParams {
   url: string;
   waitForLoad?: boolean;
   timeout?: number;
@@ -90,6 +94,7 @@ export interface TabManageParams {
   url?: string;
   tabIndex?: number;
   tabId?: number;
+  windowId?: number;
   active?: boolean;
 }
 

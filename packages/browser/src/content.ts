@@ -636,6 +636,17 @@ function wait(ms: number): Promise<void> {
 
 chrome.runtime.onMessage.addListener(
   (message: { type: string; [key: string]: unknown }, _sender, sendResponse) => {
+    if (message.type === 'get_display_mode') {
+      const standalone = [
+        'standalone',
+        'window-controls-overlay',
+        'minimal-ui',
+        'fullscreen',
+      ].some((mode) => window.matchMedia(`(display-mode: ${mode})`).matches);
+      sendResponse({ standalone });
+      return true;
+    }
+
     if (message.type === 'extract_visible_text') {
       const text = extractVisibleText();
       sendResponse({ text });
