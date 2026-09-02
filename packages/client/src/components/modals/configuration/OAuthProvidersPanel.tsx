@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
+  embedded?: boolean;
 }
 
 interface PendingAuth {
@@ -16,7 +17,7 @@ interface PendingAuth {
   authorizationUrl: string;
 }
 
-export function OAuthProvidersPanel({ sdkClient }: PanelProps) {
+export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps) {
   const { data: providersData, isLoading: loading, isFetching, refetch } = useProvidersQuery(sdkClient);
   const connectMut = useConnectProvider(sdkClient);
   const disconnectMut = useDisconnectProvider(sdkClient);
@@ -186,11 +187,13 @@ export function OAuthProvidersPanel({ sdkClient }: PanelProps) {
   }
 
   return (
-    <div className="p-3 sm:p-4 space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">
-          Connect subscription-based providers using OAuth. No API keys needed.
-        </p>
+    <div className={embedded ? 'space-y-4' : 'p-3 sm:p-4 space-y-4'}>
+      <div className={`flex items-center gap-2 ${embedded ? 'justify-end' : 'justify-between'}`}>
+        {!embedded && (
+          <p className="text-sm text-muted-foreground">
+            Connect subscription-based providers using OAuth. No API keys needed.
+          </p>
+        )}
         <Button
           variant="outline"
           size="sm"

@@ -11,7 +11,6 @@ export type ConfigurationSection =
   | 'files'
   // Server
   | 'providers'
-  | 'oauth'
   | 'models'
   | 'prompts'
   | 'preconfigs'

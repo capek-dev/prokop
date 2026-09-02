@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ProkopaiClient } from '@prokopai/sdk';
+import type { ProkopaiClient, ProviderCredentialStatus } from '@prokopai/sdk';
 import { useProviderCredentialsQuery, useSetProviderCredential, useClearProviderCredential } from '@/hooks/queries';
 import { Key, Check, X, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,14 +8,10 @@ import { Badge } from '@/components/ui/badge';
 
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
+  embedded?: boolean;
 }
 
-interface ProviderCredentialStatus {
-  provider: string;
-  configured: boolean;
-}
-
-export function ProviderCredentialsPanel({ sdkClient }: PanelProps) {
+export function ProviderCredentialsPanel({ sdkClient, embedded = false }: PanelProps) {
   const { data: credentialsData, isLoading: loading } = useProviderCredentialsQuery(sdkClient);
   const setCredentialMut = useSetProviderCredential(sdkClient);
   const clearCredentialMut = useClearProviderCredential(sdkClient);
@@ -53,8 +49,7 @@ export function ProviderCredentialsPanel({ sdkClient }: PanelProps) {
   };
 
   const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
-    anthropic: 'Anthropic',
-    google: 'Google',
+    deepseek: 'DeepSeek',
     minimax: 'MiniMax',
     openai: 'OpenAI',
     openrouter: 'OpenRouter',
@@ -81,13 +76,12 @@ export function ProviderCredentialsPanel({ sdkClient }: PanelProps) {
   }
 
   return (
-    <div className="p-3 sm:p-4 space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Manage API keys for LLM providers. Keys are stored in ~/.prokopai/.env and never exposed to the client.
-      </p>
-      <p className="text-xs text-muted-foreground mt-2">
-        OAuth-based providers are managed in the OAuth tab.
-      </p>
+    <div className={embedded ? 'space-y-4' : 'p-3 sm:p-4 space-y-4'}>
+      {!embedded && (
+        <p className="text-sm text-muted-foreground">
+          Manage API keys for LLM providers. Keys are stored in ~/.prokopai/.env and never exposed to the client.
+        </p>
+      )}
 
       {error && (
         <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{error}</div>

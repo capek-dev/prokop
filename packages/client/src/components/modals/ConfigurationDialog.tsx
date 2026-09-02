@@ -1,12 +1,11 @@
 import { Suspense, lazy } from 'react';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { Key, Boxes, FileText, Layers, Link2, Braces, Terminal, User, Palette, Keyboard, Wrench, FolderOpen } from 'lucide-react';
+import { Key, Boxes, FileText, Layers, Braces, Terminal, User, Palette, Keyboard, Wrench, FolderOpen } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import type { ConfigurationSection } from '@/stores/uiStore';
 import { SettingsDialogShell, PanelLoadingFallback, type SettingsSection } from './SettingsDialogShell';
 
-const ProviderCredentialsPanel = lazy(() => import('./configuration/ProviderCredentialsPanel').then((m) => ({ default: m.ProviderCredentialsPanel })));
-const OAuthProvidersPanel = lazy(() => import('./configuration/OAuthProvidersPanel').then((m) => ({ default: m.OAuthProvidersPanel })));
+const LLMProvidersPanel = lazy(() => import('./configuration/LLMProvidersPanel').then((m) => ({ default: m.LLMProvidersPanel })));
 const ModelsPanel = lazy(() => import('./configuration/ModelsPanel').then((m) => ({ default: m.ModelsPanel })));
 const PromptsPanel = lazy(() => import('./configuration/PromptsPanel').then((m) => ({ default: m.PromptsPanel })));
 const PreconfigsPanel = lazy(() => import('./configuration/PreconfigsPanel').then((m) => ({ default: m.PreconfigsPanel })));
@@ -34,8 +33,7 @@ const SECTIONS: SettingsSection[] = [
   { value: 'keybinds', label: 'Keybinds', icon: Keyboard, group: 'preferences' },
   { value: 'files', label: 'Files', icon: FolderOpen, group: 'preferences' },
   // Server
-  { value: 'providers', label: 'Credentials', icon: Key, group: 'server' },
-  { value: 'oauth', label: 'OAuth', icon: Link2, group: 'server' },
+  { value: 'providers', label: 'LLM Providers', icon: Key, group: 'server' },
   { value: 'models', label: 'Models', icon: Boxes, group: 'server' },
   { value: 'prompts', label: 'Prompts', icon: FileText, group: 'server' },
   { value: 'preconfigs', label: 'Preconfigs', icon: Layers, group: 'server' },
@@ -73,9 +71,7 @@ export function ConfigurationDialog({
           case 'files':
             return <FilesPanelPreferences />;
           case 'providers':
-            return <ProviderCredentialsPanel sdkClient={sdkClient} />;
-          case 'oauth':
-            return <OAuthProvidersPanel sdkClient={sdkClient} />;
+            return <LLMProvidersPanel sdkClient={sdkClient} />;
           case 'models':
             return <ModelsPanel sdkClient={sdkClient} />;
           case 'prompts':
@@ -98,7 +94,7 @@ export function ConfigurationDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Settings"
-      description="Manage preferences, credentials, models, and environment"
+      description="Manage preferences, LLM providers, models, and environment"
       sections={SECTIONS}
       groups={GROUPS}
       value={section}
