@@ -7,7 +7,7 @@ import {
 } from '@capekai/core/tools';
 import { listDomainToolFallbackDefinitions } from '@capekai/core/tools';
 import { resolveToolsPath } from '@/config';
-import type { ToolCatalogEntry } from '@/application/ports/tool-distribution';
+import type { ToolCatalogEntry } from '@/application/ports/tool-catalog';
 import { getTools, initializeWorkspace } from '@/infrastructure/mcp';
 import { getToolsDir } from '@/infrastructure/runtime/paths';
 import { readEnv } from '@/infrastructure/runtime/env-compat';

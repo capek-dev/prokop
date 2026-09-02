@@ -43,8 +43,7 @@ describe('registry', () => {
       expect(tools).toHaveLength(0);
     });
 
-    test('discovers tools by scanning subdirectories', async () => {
-      // Copy fixture into tools dir
+    test('discovers a manually placed tool.ts without install metadata', async () => {
       const toolDir = join(toolsDir, 'test-fixture-tool');
       cpSync(FIXTURE_DIR, toolDir, { recursive: true });
 
@@ -54,6 +53,30 @@ describe('registry', () => {
       expect(tools[0].definition.name).toBe('test-fixture-tool');
       expect(tools[0].execute).toBeTypeOf('function');
       expect(tools[0].path).toBe(toolDir);
+    });
+
+    test('discovers a manually placed self-contained tool.js', async () => {
+      const toolDir = join(toolsDir, 'plain-js-tool');
+      mkdirSync(toolDir, { recursive: true });
+      writeFileSync(join(toolDir, 'tool.js'), `
+        export const definition = {
+          name: 'plain-js-tool',
+          description: 'A directly placed JavaScript tool.',
+          inputSchema: { type: 'object', properties: {} },
+        };
+        export async function execute() {
+          return { success: true, result: { loaded: true } };
+        }
+      `);
+
+      const tools = await scanTools(toolsDir);
+
+      expect(tools).toHaveLength(1);
+      expect(tools[0].definition.name).toBe('plain-js-tool');
+      expect(await tools[0].execute({}, {} as never)).toEqual({
+        success: true,
+        result: { loaded: true },
+      });
     });
 
     test('skips .staging and .previous directories', async () => {

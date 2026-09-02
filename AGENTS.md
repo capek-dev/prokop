@@ -7,7 +7,7 @@ Guidelines for AI coding agents working in this repository.
 Prokop is an AI agent monorepo built with TypeScript and Bun.
 
 - **Runtime and package manager**: Bun
-- **Workspaces**: `packages/*` and `tools`
+- **Workspaces**: `packages/*`
 - **Server**: Hono backend in `packages/server` (`@prokopai/server`), with HTTP, WebSocket, terminal, SQLite, MCP, scheduling, permissions, and product-specific domain logic
 - **Agent runtime**: External `@capekai/core` package, including execution, plugins, providers, tools, storage, compaction, goals, workflows, memory, skills, and sandbox behavior
 - **Runtime contracts**: External `@capekai/types` package
@@ -16,7 +16,7 @@ Prokop is an AI agent monorepo built with TypeScript and Bun.
 - **SDK**: Product wire protocol, REST clients, WebSocket namespaces, shared product types, and transports in `packages/sdk` (`@prokopai/sdk`)
 - **Browser extension**: Chrome extension for browser automation in `packages/browser` (`@prokopai/browser`)
 - **Sandbox CLI**: Interactive LLM-call simulator in `packages/sandbox-cli` (`@prokopai/sandbox-cli`)
-- **External tools**: Separately versioned TypeScript tool modules in `tools/`
+- **External tools**: User-prepared modules loaded from `~/.prokopai/tools/` through `@capekai/core`
 
 ## Architecture Boundaries
 
@@ -65,9 +65,6 @@ bun run build
 # Typecheck all workspaces
 bun run typecheck
 
-# Build external tools
-bun run build:tools
-
 # Build the server binary for the current platform
 bun run build:bin
 
@@ -91,12 +88,12 @@ bun run lint
 bun run lint:fix
 ```
 
-ESLint uses the flat config in `eslint.config.js`, with TypeScript, React, and React Hooks rules. The external `tools/` tree has its own Bun globals block.
+ESLint uses the flat config in `eslint.config.js`, with TypeScript, React, and React Hooks rules.
 
 ### Tests
 
 ```bash
-# Root suite: server, SDK, external tools, then client
+# Root suite: server, SDK, then client
 bun run test
 
 # Server
@@ -106,15 +103,12 @@ bun run test:server:coverage
 # Client, using Vitest
 bun run test:client
 
-# External tools
-bun run test:tools
 ```
 
 During development, run the smallest relevant test target. Run the full root checks before committing or releasing.
 
 - **Server**: Bun test runner with `bun:test`
 - **Client**: Vitest with `happy-dom`; Zustand stores can be tested through `useStore.getState()`
-- **External tools**: Bun test runner with `tools/test-utils.ts`, which provides `createMockContext`, `VirtualFS`, and `WORKSPACE`
 - **Server test aliases**: `#tests/db`, `#tests/factories`, `#tests/mocks`, `#tests/seed`, `#tests/test-dir`, `#tests/mock-ws`, and `#tests/wire-application`
 
 Avoid live provider calls in tests. Use fake credentials, injected seams, or the sandbox provider.
@@ -251,10 +245,6 @@ packages/
   browser/               # @prokopai/browser Chrome extension
   sandbox-cli/           # @prokopai/sandbox-cli interactive simulator
 
-tools/                   # External, separately released tool modules
-  manifest.json          # Release manifest for external tools
-  <tool-name>/           # External tool source packages
-
 .architecture-v2/        # Current extraction architecture, decisions, and validation
 .agents/skills/          # Repository-specific agent procedures
 changelogs/              # Client, SDK, server, and tool release notes
@@ -262,7 +252,7 @@ changelogs/              # Client, SDK, server, and tool release notes
 install/                 # install-prokopai.sh and install-prokopai.ps1
 ```
 
-Built-in tools are not released from `tools/`. They live in `packages/server/src/tools/builtin/`. External tool directories contain `tool.ts`, `package.json`, and `VERSION`, implement the `@capekai/tool` contract, and use `ctx.ask()` for permission-sensitive operations.
+Built-in tools live in `packages/server/src/tools/builtin/`. External tools are prepared outside this repository and placed under `~/.prokopai/tools/<tool-name>/` as `tool.js` or `tool.ts` modules implementing the `@capekai/tool` contract. Prokop does not install, update, build, or release external tools.
 
 ## Working Practices
 

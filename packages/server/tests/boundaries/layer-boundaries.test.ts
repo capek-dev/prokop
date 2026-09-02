@@ -121,9 +121,6 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
     '@/transport/websocket/control-registry',
   ],
   'packages/server/src/adapters/jean2/permissions.ts': ['@/infrastructure/sqlite/permissions'],
-  'packages/server/src/adapters/jean2/tool-distribution.ts': [
-    '@/infrastructure/tools/distribution',
-  ],
   'packages/server/src/adapters/jean2/configuration.ts': [
     '@/config/models', '@/config/models-sync', '@/config/prompts',
     '@/config/preconfigs', '@/config/prompts-registry',
@@ -206,8 +203,6 @@ const layerInfrastructureExceptions: Record<string, string[]> = {
   'packages/server/src/infrastructure/mcp/manager.ts': ['@/version'],
   'packages/server/src/infrastructure/daemon/index.ts': ['@/config'],
   'packages/server/src/infrastructure/session-title.ts': ['@/config'],
-  'packages/server/src/infrastructure/tools/distribution.ts': ['@/config'],
-  'packages/server/src/infrastructure/tools/tool-installer.ts': ['@/config'],
   'packages/server/src/infrastructure/providers/provider-credential-files.ts': [
     '@/config/errors', '@/config/files',
   ],
@@ -1684,67 +1679,6 @@ describe('server layer boundaries', () => {
     ]);
   });
 
-  test('S4/S5 gate: the tool-installation domain imports only SDK types, path, and sibling modules', () => {
-    const allowedSpecifiers = [
-      '@prokopai/sdk',
-      '@capekai/tool',
-      'path',
-      './policy',
-      './selection',
-      './repository-schema',
-      './index',
-    ];
-    const violations: string[] = [];
-    for (const file of scanDirectory(serverSourceRoot)) {
-      if (!file.path.includes('domains/tool-installation')) continue;
-      for (const imp of parseImports(file.sourceText, file.path)) {
-        if (!allowedSpecifiers.includes(imp.specifier)) {
-          violations.push(`${relative(repositoryRoot, file.path)} imports ${imp.specifier}`);
-        }
-      }
-    }
-    expect(violations).toEqual([]);
-
-    const result = evaluateRules(
-      scanDirectory(serverSourceRoot),
-      serverSourceRoot,
-      repositoryRoot,
-      [layerRules[3]], // layer-domains
-    );
-    const domainViolations = result.violations.filter((v) =>
-      v.includes('packages/server/src/domains/tool-installation/'),
-    );
-    expect(domainViolations).toEqual([]);
-  });
-
-  test('S4 gate: the tool installer and repository implementations consume the tool-installation domain policy', () => {
-    const installerPath = resolve(infrastructureDir, 'tools/tool-installer.ts');
-    const installerFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === installerPath);
-    expect(installerFile).toBeDefined();
-    const installerImports = parseImports(installerFile!.sourceText, installerFile!.path);
-    expect(
-      installerImports.some((imp) =>
-        imp.specifier === '@/domains/tool-installation'
-        && imp.names.includes('buildSourceInstallManifest')
-        && imp.names.includes('buildUrlInstallManifest')
-        && imp.names.includes('validateToolModuleExports')
-        && imp.names.includes('toolInstallDir')
-      ),
-    ).toBe(true);
-
-    const repositoryPath = resolve(infrastructureDir, 'tools/tool-repository.ts');
-    const repositoryFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === repositoryPath);
-    expect(repositoryFile).toBeDefined();
-    const repositoryImports = parseImports(repositoryFile!.sourceText, repositoryFile!.path);
-    expect(
-      repositoryImports.some((imp) =>
-        imp.specifier === '@/domains/tool-installation'
-        && imp.names.includes('validateToolRepositoryShape')
-        && imp.names.includes('resolveArtifactUrlFor')
-        && imp.names.includes('resolveVersionUrlFor')
-      ),
-    ).toBe(true);
-  });
 
   test('S5 gate: the jean2 mcp adapter imports only the mcp implementation and the workspace store', () => {
     const adapterPath = resolve(adaptersDir, 'jean2/mcp.ts');
@@ -1773,23 +1707,14 @@ describe('server layer boundaries', () => {
     ].sort());
   });
 
-  test('S4 gate: the jean2 tool adapters import only the wrapped implementations and the capek catalog seam', () => {
-    const distributionPath = resolve(adaptersDir, 'jean2/tool-distribution.ts');
-    const distributionFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === distributionPath);
-    expect(distributionFile).toBeDefined();
-    const distributionImports = parseImports(distributionFile!.sourceText, distributionFile!.path);
-    expect(distributionImports.map((imp) => imp.specifier).sort()).toEqual([
-      '@/application/ports/tool-distribution',
-      '@/infrastructure/tools/distribution',
-    ].sort());
-
+  test('S4 gate: the Jean2 tool adapter imports only the catalog, environment, and Capek seams', () => {
     const toolsPath = resolve(adaptersDir, 'jean2/tools.ts');
     const toolsFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === toolsPath);
     expect(toolsFile).toBeDefined();
     const toolsImports = parseImports(toolsFile!.sourceText, toolsFile!.path);
     expect(toolsImports.map((imp) => imp.specifier).sort()).toEqual([
       '@/adapters/capek/tool-source',
-      '@/application/ports/tool-distribution',
+      '@/application/ports/tool-catalog',
       '@/config/errors',
       '@/config/tool-env',
     ].sort());
@@ -1898,7 +1823,7 @@ describe('server layer boundaries', () => {
     expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain('packages/server/src/transport/http/routes/response-formats.ts');
   });
 
-  test('S9 gate: MCP and tool implementations live under infrastructure', () => {
+  test('S9 gate: MCP implementations live under infrastructure and retired tool installers stay absent', () => {
     const files = scanDirectory(serverSourceRoot);
     for (const oldPath of [
       'packages/server/src/mcp/index.ts',
@@ -1908,22 +1833,22 @@ describe('server layer boundaries', () => {
       'packages/server/src/tools/tool-repository.ts',
       'packages/server/src/tools/tool-npm-installer.ts',
       'packages/server/src/tools/tool-bundler.ts',
+      'packages/server/src/infrastructure/tools/distribution.ts',
+      'packages/server/src/infrastructure/tools/tool-installer.ts',
+      'packages/server/src/infrastructure/tools/tool-repository.ts',
+      'packages/server/src/infrastructure/tools/tool-npm-installer.ts',
+      'packages/server/src/infrastructure/tools/tool-bundler.ts',
     ]) {
       expect(files.some((file) => relative(repositoryRoot, file.path) === oldPath)).toBe(false);
     }
     for (const ownerPath of [
       'packages/server/src/infrastructure/mcp/manager.ts',
       'packages/server/src/infrastructure/mcp/converter.ts',
-      'packages/server/src/infrastructure/tools/tool-installer.ts',
-      'packages/server/src/infrastructure/tools/tool-repository.ts',
     ]) {
       expect(files.some((file) => relative(repositoryRoot, file.path) === ownerPath)).toBe(true);
     }
     const lifecycle = files.find((file) => relative(repositoryRoot, file.path) === 'packages/server/src/infrastructure/mcp/lifecycle.ts');
-    const distribution = files.find((file) => relative(repositoryRoot, file.path) === 'packages/server/src/infrastructure/tools/distribution.ts');
     expect(lifecycle?.sourceText).not.toContain("from '@/mcp'");
-    expect(distribution?.sourceText).not.toContain("from '@/tools/tool-installer'");
-    expect(distribution?.sourceText).not.toContain("from '@/tools/tool-repository'");
   });
 
   test('S9 gate: retired compatibility wrappers, including the scheduler lifecycle seam, are absent and unimported', () => {

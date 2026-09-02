@@ -1,6 +1,6 @@
 # CLI Reference
 
-The Prokop CLI (`prokop`) manages the server daemon, tools, models, and updates.
+The Prokop CLI (`prokop`) manages the server daemon, models, and updates.
 
 ```
 prokop <command> [options]
@@ -64,57 +64,6 @@ prokop init [options]
 | `--install-preconfigs` | Install default preconfigs (default) |
 | `--no-preconfigs` | Skip preconfig installation |
 | `--force` | Force re-initialization |
-
-## Optional tool extensions
-
-The baseline tools used by bundled agents ship in the binary. These commands manage optional integrations only and are not part of installation.
-
-### `prokop tools list`
-
-List available and installed tools.
-
-```
-prokop tools list [options]
-```
-
-| Flag | Description |
-|------|-------------|
-| `--installed` | Only show installed tools |
-| `--extensions` | Show extension and env config details |
-| `--json` | JSON output |
-
-### `prokop tools install`
-
-Install tools. Interactive if no names provided.
-
-```
-prokop tools install [names...] [options]
-```
-
-| Flag | Description |
-|------|-------------|
-| `--all` | Install all tools |
-| `--force` | Reinstall even if already installed |
-
-### `prokop tools update`
-
-Update installed tools to the latest version.
-
-```
-prokop tools update [names...] [--dry-run]
-```
-
-### `prokop tools remove`
-
-Remove installed tools.
-
-```
-prokop tools remove [names...] [--all]
-```
-
-### `prokop tools outdated`
-
-Check for available updates.
 
 ## Models
 

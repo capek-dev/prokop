@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { registerToolRoutes } from '@/transport/http/routes/tools';
 import { HttpError } from '@/application/http-errors';
 import type { ToolsHttpApplication } from '@/application/tools';
-import type { ToolCatalogEntry } from '@/application/ports/tool-distribution';
+import type { ToolCatalogEntry } from '@/application/ports/tool-catalog';
 import type { LoadedTool } from '@prokopai/sdk';
 
 function makeDefinition(overrides: Partial<ToolCatalogEntry> = {}): ToolCatalogEntry {

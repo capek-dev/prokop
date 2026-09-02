@@ -11,7 +11,7 @@ import type {
   PendingAskRecord,
   SessionRepositoryPort,
 } from '../ports/session';
-import type { ToolCatalogPort } from '../ports/tool-distribution';
+import type { ToolCatalogPort } from '../ports/tool-catalog';
 import { sendGateRejection } from './chat';
 import { projectMessagesForClient } from './tool-debug';
 

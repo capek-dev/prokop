@@ -377,18 +377,7 @@ src/
     queued-messages.ts  # Message queue persistence
     tool-executions.ts  # Tool execution history
   
-  tools/
-    registry.ts         # File-system tool scanning and caching
-    repository.ts       # Remote tool catalog and artifact download
-    tool-installer.ts   # Tool download, npm install, bundle, atomic swap
-    tool-bundler.ts     # Bun.build() bundling of tool.ts → tool.js
-    tool-npm-installer.ts # npm dependency installation via @npmcli/arborist
-    tool-install-manifest.ts # Installation metadata tracking
-    executor.ts         # Tool execution with ToolContext assembly
-    enhanced-executor.ts # Security + permission + ask flow orchestration
-    ask-user-api.ts     # Ask protocol implementation (permissions + questions)
-    permission-request-manager.ts # DB-backed permission request lifecycle
-    build-tools.ts      # AI SDK tool binding with ask/llm context injection
+  tools/builtin/         # Built-in tool implementations compiled into the server
   
   mcp/
     manager.ts          # MCP client lifecycle (connect/disconnect/list tools)
@@ -432,95 +421,47 @@ src/
 
 ## Tools
 
-Tools are language-agnostic modules installed under `~/.prokopai/tools/`. Each tool is a directory containing:
+Built-in tools are compiled into the server. External tools are loaded directly from `~/.prokopai/tools/`, or from the directory configured by `PROKOPAI_TOOLS_PATH`.
 
-```
-tools/
+Prokop does not provide a remote tool repository or install, update, build, bundle, or remove external tools. Each external tool must be prepared before it is placed in the tools directory. A self-contained `tool.js` is recommended.
+
+```text
+~/.prokopai/tools/
   my-tool/
-    tool.ts              # Tool implementation (TypeScript, compiled at install)
-    package.json         # Dependencies (npm, installed at install time)
-    tool.md              # Tool description markdown
-    VERSION              # Semantic version
+    tool.js              # Recommended ES module entry point
+    package.json         # Optional, for prepared runtime dependencies
+    node_modules/        # Optional, prepared by the user or tool author
+    VERSION              # Optional
 ```
 
-### How Tool Installation Works
-
-1. **Download** — Tool artifacts are downloaded from GitHub Releases as `.tar.gz` archives
-2. **npm install** — The server binary ships with npm (via `@npmcli/arborist`), so tool dependencies are installed automatically without requiring Node.js or Bun on the host machine
-3. **Bundle** — TypeScript source is bundled via `Bun.build()` into a single `tool.js` file
-4. **Atomic swap** — The tool directory is staged and renamed atomically for safe concurrent access
-
-Install tools via CLI:
-
-```bash
-# Install all tools
-jean2 tools install --all
-
-# Install a specific tool
-jean2 tools install --name read-file
-
-# During init
-prokopai init --install-tools
-```
-
-### Tool Module Interface
-
-Tools implement the `ToolModule` interface from `@capekai/tool`:
+Čapek resolves an existing `.install-manifest.json` entry first, then `tool.js`, then `tool.ts`. The module must export `definition` and `execute` from the `@capekai/tool` contract:
 
 ```typescript
-import type { ToolModule, ToolContext, ToolResult } from '@capekai/tool';
+import type { ToolContext, ToolDefinition, ToolResult } from '@capekai/tool';
 
-const tool: ToolModule = {
-  definition: {
-    name: 'my-tool',
-    description: 'Does something useful',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        path: { type: 'string', description: 'File path' }
-      },
-      required: ['path']
+interface Input {
+  path: string;
+}
+
+export const definition: ToolDefinition = {
+  name: 'my-tool',
+  description: 'Does something useful',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'File path' },
     },
-  },
-  execute: async (input, ctx) => {
-    // Use ctx.ask() for permissions and user interaction
-    const approved = await ctx.ask({
-      type: 'permission',
-      target: 'permission',
-      question: 'Allow access to this file?',
-      risk: 'medium',
-    });
-    if (!approved) return { success: false, error: 'USER_REJECTION' };
-
-    const content = await ctx.fs.readFile(input.path);
-    return { success: true, result: { content } };
+    required: ['path'],
   },
 };
 
-export default tool;
+export async function execute(input: Input, ctx: ToolContext): Promise<ToolResult> {
+  const content = await ctx.fs.readFile(input.path);
+  return { success: true, result: { content } };
+}
 ```
 
-### ToolContext API
-
-Every tool receives a rich context object:
-
-| Property | Type | Description |
-|---|---|---|
-| `ctx.ask` | `AskApi` | Ask protocol — permissions, questions, forms, capabilities |
-| `ctx.fs` | `FileSystemApi` | File system operations within workspace |
-| `ctx.llm` | `LlmApi` | LLM access for sub-queries |
-| `ctx.env` | `EnvApi` | Environment variable access |
-| `ctx.fetch` | `typeof fetch` | HTTP fetch (bound to globalThis) |
-| `ctx.logger` | `ToolLogger` | Structured logging |
-| `ctx.sessionId` | `string` | Current session ID |
-| `ctx.workspacePath` | `string` | Workspace root path |
-| `ctx.workspaceId` | `string` | Workspace ID |
-| `ctx.abortSignal` | `AbortSignal` | Cancellation signal |
-| `ctx.allowedPaths` | `string[]` | Paths the tool may access |
-| `ctx.resolvePath()` | `(path: string) => string` | Resolve relative to workspace |
-| `ctx.isWithinWorkspace()` | `(path: string) => boolean` | Check path containment |
-| `ctx.isSensitivePath()` | `(path: string) => boolean` | Check for sensitive files |
-| `ctx.isBlockedPath()` | `(path: string) => boolean` | Check for blocked paths |
+The runtime scans the directory at startup and refreshes its snapshot while running. Built-in and domain tools win name collisions over directory-loaded tools.
 
 ## Ask Protocol
 
@@ -746,4 +687,4 @@ bun run build:bin:macos      # macOS ARM64
 bun run build:bin:linux      # Linux x64
 ```
 
-The resulting binary is self-contained and includes the Bun runtime. The CLI (`prokopai init`, `prokopai server`, etc.) works without a separate Bun installation. npm dependency installation for tools is handled by `@npmcli/arborist` bundled within the binary — no external Node.js or npm required.
+The resulting binary is self-contained and includes the Bun runtime. The CLI (`prokop init`, `prokop server`, etc.) works without a separate Bun installation.

@@ -60,7 +60,7 @@ Browser tools are built into the server but are not enabled by the bundled `prok
 
 ## Capability Tools
 
-These tools are built into the server and appear only when their corresponding workspace capability is enabled. They are not installed via `prokop tools install`.
+These tools are built into the server and appear only when their corresponding workspace capability is enabled.
 
 | Tool | Capability | Description |
 |------|------------|-------------|
@@ -78,29 +78,13 @@ When you connect an MCP server to a workspace, its tools appear alongside built-
 
 MCP tools are configured per-workspace in `<workspace>/.prokopai/mcp.json`. See [Configuration](./configuration.md#mcp-configuration) for the config format.
 
-## Optional tool extensions
+## External tool extensions
 
-External tools are only needed for integrations not included in the binary. The registry is intentionally small; other integrations can be maintained and distributed by the community through compatible repositories.
+Prokop loads external tools directly from `~/.prokopai/tools/`, or from the directory configured by `PROKOPAI_TOOLS_PATH`. It does not provide a repository, downloader, installer, updater, or removal command.
 
-```bash
-# Browse optional extensions
-prokop tools list
+Place each tool in its own directory. Čapek loads the entry named by an existing `.install-manifest.json`, then falls back to `tool.js`, then `tool.ts`. Built-in and domain tools win name collisions.
 
-# Update optional installed extensions
-prokop tools update
-```
-
-These commands are not part of first-run setup. Do not install built-in tool names from the external registry.
-
-```bash
-# List only installed extensions
-prokop tools list --installed
-
-# Check optional extensions for updates
-prokop tools outdated
-```
-
-Optional extensions are stored in `~/.prokopai/tools/` (or your custom `PROKOPAI_TOOLS_PATH`). Built-in tools remain in the binary.
+Prokop does not install dependencies or compile manually placed tools. Use a self-contained `tool.js`, or prepare the tool directory and its dependencies before placing it under the tools path.
 
 ## The Ask Protocol
 
@@ -138,16 +122,16 @@ The client renders the appropriate form (radio buttons, checkboxes, text input, 
 
 ## Writing a Custom Tool
 
-A tool is a directory with two files:
+A tool is a directory containing an ES module entry point:
 
 ```
 my-tool/
-├── tool.ts          # Tool definition + execute function
-├── package.json     # Dependencies (can be empty for simple tools)
-└── VERSION          # Semantic version (e.g., "1.0.0")
+├── tool.js          # Recommended self-contained entry point
+├── package.json     # Optional, when runtime dependencies are prepared
+└── VERSION          # Optional semantic version
 ```
 
-### `tool.ts`
+### `tool.js` or `tool.ts`
 
 ```typescript
 import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
@@ -199,10 +183,6 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 }
 ```
 
-### Installing custom tools
+### Activating a custom tool
 
-Place the tool directory in `~/.prokopai/tools/` and restart the server. Tools are discovered automatically by scanning for `tool.ts` files.
-
-### Testing tools
-
-Tools can be tested with the virtual filesystem test utilities used by the built-in tools. See `tools/test-utils.ts` for `VirtualFS`, `createMockContext`, and `WORKSPACE`.
+Place the prepared directory at `~/.prokopai/tools/<tool-name>/`. The runtime scans for `tool.js` and `tool.ts` modules at startup and refreshes its directory snapshot while running. Restart the server when an immediate, guaranteed reload is required.

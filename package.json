@@ -5,8 +5,7 @@
   "private": true,
   "description": "Prokop - AI Agent Monorepo",
   "workspaces": [
-    "packages/*",
-    "tools"
+    "packages/*"
   ],
   "scripts": {
     "dev": "bun run dev:server & bun run dev:client",
@@ -28,12 +27,10 @@
     "build:bin:linux": "cd packages/server && bun run build:bin:linux",
     "build:bin:windows": "cd packages/server && bun run build:bin:windows",
     "build:all": "cd packages/server && bun run build:all",
-    "build:tools": "bun run tools/build.ts",
     "test:client": "cd packages/client && bun vitest run",
     "test:server": "bun test packages/server",
     "test:server:coverage": "cd packages/server && bun test --coverage",
-    "test:tools": "bun test tools",
-    "test": "bun test packages/server packages/sdk tools && bun run test:client",
+    "test": "bun test packages/server packages/sdk && bun run test:client",
     "sandbox": "bun packages/sandbox-cli/src/cli.ts"
   },
   "devDependencies": {

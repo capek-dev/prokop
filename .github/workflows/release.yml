@@ -8,11 +8,6 @@ on:
         required: false
         default: false
         type: boolean
-      release_all_tools:
-        description: 'Release all tools'
-        required: false
-        default: false
-        type: boolean
       force:
         description: 'Force release (recreate existing)'
         required: false
@@ -35,37 +30,20 @@ jobs:
   prepare-releases:
     runs-on: ubuntu-latest
     outputs:
-      tools: ${{ steps.matrix.outputs.tools }}
       has_server: ${{ steps.matrix.outputs.has_server }}
-      has_tools: ${{ steps.matrix.outputs.has_tools }}
     steps:
       - uses: actions/checkout@v4
 
       - id: matrix
         run: |
-          TOOLS='[]'
           HAS_SERVER="false"
-          HAS_TOOLS="false"
 
           # Server
           if [ "${{ inputs.release_server }}" = "true" ]; then
             HAS_SERVER="true"
           fi
 
-          # Tools
-          if [ "${{ inputs.release_all_tools }}" = "true" ]; then
-            while IFS= read -r TOOL; do
-              V=$(jq -r .version "tools/$TOOL/package.json")
-              TOOLS=$(echo "$TOOLS" | jq -c --arg name "$TOOL" --arg version "$V" '. += [{"packageName": $name, "version": $version}]')
-            done < <(jq -r '.tools[]' tools/manifest.json)
-            if [ "$(echo "$TOOLS" | jq 'length')" -gt 0 ]; then
-              HAS_TOOLS="true"
-            fi
-          fi
-
-          echo "tools=$TOOLS" >> $GITHUB_OUTPUT
           echo "has_server=$HAS_SERVER" >> $GITHUB_OUTPUT
-          echo "has_tools=$HAS_TOOLS" >> $GITHUB_OUTPUT
 
   prepare-server-release:
     needs: prepare-releases
@@ -260,109 +238,6 @@ jobs:
               --head "$BRANCH" \
               --title "release: announce server $V" \
               --body "Announces server $V after all release artifacts were published successfully."
-          else
-            echo "Announcement pull request already exists for $BRANCH"
-          fi
-
-  release-tools:
-    needs: prepare-releases
-    if: needs.prepare-releases.outputs.has_tools == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        item: ${{ fromJson(needs.prepare-releases.outputs.tools) }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Release tool
-        env:
-          PACKAGE_NAME: ${{ matrix.item.packageName }}
-          V: ${{ matrix.item.version }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          P="tools/$PACKAGE_NAME"
-          TAG="tool-$PACKAGE_NAME/v${V}"
-
-          if gh release view "$TAG" 2>/dev/null; then
-            echo "Skipping $TAG - release already exists"
-            exit 0
-          fi
-          git tag -f "$TAG"
-          git push origin "$TAG" --force
-
-          # Stage source artifacts and generate VERSION from package.json version
-          STAGING=$(mktemp -d)
-          cp "$P/tool.ts" "$P/package.json" "$STAGING/"
-          echo "$V" > "$STAGING/VERSION"
-
-          tar -czf "$PACKAGE_NAME.tar.gz" -C "$STAGING" tool.ts package.json VERSION
-
-          # Compute SHA-256 checksum
-          SHA256=$(shasum -a 256 "$PACKAGE_NAME.tar.gz" | cut -d' ' -f1)
-          echo "$SHA256" > "$PACKAGE_NAME.tar.gz.sha256"
-          echo "SHA-256: $SHA256"
-
-          [[ "$V" == *"-"* ]] && PRE="--prerelease" || PRE=""
-          NOTES_FLAG=""
-          if [ -s "changelogs/tools/$PACKAGE_NAME/v${V}.md" ]; then
-            NOTES_FLAG="--notes-file changelogs/tools/$PACKAGE_NAME/v${V}.md"
-          fi
-          gh release create "$TAG" --title "Tool $PACKAGE_NAME $V" $PRE $NOTES_FLAG "$PACKAGE_NAME.tar.gz" "$PACKAGE_NAME.tar.gz.sha256"
-
-  announce-tools:
-    needs: [prepare-releases, release-tools]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          fetch-depth: 0
-
-      - name: Create tools announcement pull request
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TOOLS_JSON: ${{ needs.prepare-releases.outputs.tools }}
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
-          BRANCH="release/announce-tools"
-          git checkout -B "$BRANCH" "origin/$DEFAULT_BRANCH"
-
-          CHANGED=0
-          while IFS=$'\t' read -r TOOL V; do
-            P="tools/$TOOL"
-            CURRENT=$(cat "$P/VERSION" 2>/dev/null | tr -d '[:space:]')
-            if [ "$V" = "$CURRENT" ]; then
-              echo "$TOOL VERSION already at $V"
-              continue
-            fi
-            echo "$V" > "$P/VERSION"
-            git add "$P/VERSION"
-            CHANGED=$((CHANGED + 1))
-            echo "Announcing $TOOL $V"
-          done < <(echo "$TOOLS_JSON" | jq -r '.[] | [.packageName, .version] | @tsv')
-
-          if [ "$CHANGED" -eq 0 ]; then
-            echo "All tool VERSION files already up to date - nothing to announce"
-            exit 0
-          fi
-
-          git commit -m "release: announce tools"
-          git push --force origin "HEAD:$BRANCH"
-
-          if gh pr list --head "$BRANCH" --base "$DEFAULT_BRANCH" --state open --json number --jq 'length' | grep -q '^0$'; then
-            gh pr create \
-              --base "$DEFAULT_BRANCH" \
-              --head "$BRANCH" \
-              --title "release: announce tools" \
-              --body "Announces tool versions after all selected tool releases were published successfully."
           else
             echo "Announcement pull request already exists for $BRANCH"
           fi

@@ -105,21 +105,4 @@ export default tseslint.config(
       },
     },
   },
-
-  // Tools package - Bun globals
-  {
-    files: ['tools/**/*.ts'],
-    ignores: [
-      'tools/dist/**',
-      'tools/node_modules/**',
-    ],
-    languageOptions: {
-      globals: {
-        process: 'readonly',
-        console: 'readonly',
-        Buffer: 'readonly',
-        Bun: 'readonly',
-      },
-    },
-  }
 );

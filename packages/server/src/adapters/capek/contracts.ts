@@ -22,19 +22,9 @@ export {
 } from '@capekai/core/providers';
 
 export {
-  ArtifactError,
-  clearCache,
-  downloadArtifact,
-  extractArtifact,
   getTool,
   listTools,
-  loadToolModule,
-  readInstallManifest,
   scanTools,
-  validateArtifactStructure,
-  verifyChecksum,
-  writeInstallManifest,
-  type InstallManifest,
 } from '@capekai/core/tools';
 
 export {

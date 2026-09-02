@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { MessageWithParts } from '@prokopai/sdk';
-import type { ToolCatalogEntry, ToolCatalogPort } from '@/application/ports/tool-distribution';
+import type { ToolCatalogEntry, ToolCatalogPort } from '@/application/ports/tool-catalog';
 import { projectMessagesForClient } from '@/application/sessions/tool-debug';
 
 function makeTranscript(): MessageWithParts[] {

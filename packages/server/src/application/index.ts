@@ -5,7 +5,7 @@ export * from './ports/session';
 export * from './ports/scheduling';
 export * from './ports/agents';
 export * from './ports/workspace';
-export * from './ports/tool-distribution';
+export * from './ports/tool-catalog';
 export * from './ports/mcp';
 export * from './ports/provider-accounts';
 export * from './ports/notifications';

@@ -24,7 +24,6 @@ import {
   type RenameMigrationResult,
 } from '@/cli/rename-migrate';
 import { runMigrations, getDatabase } from '@/infrastructure/sqlite/database';
-import { runToolsCommand, type ToolsCommandArgs } from '@/cli/tools-cli';
 import { performUpdate, type UpdateOptions } from '@/cli/update';
 import { syncModels, type SyncResult } from '@/config/models-sync';
 import { cleanupOrphanedData, vacuumDatabase, formatBytes } from '@/infrastructure/sqlite/cleanup';
@@ -121,20 +120,6 @@ Commands:
     --no-preconfigs        Skip preconfig installation
     --force            Force re-initialization
 
-  tools                Optional tool extensions
-    list                List available and installed extensions
-      --installed         Only show installed tools
-      --extensions        Show extension and env config details
-      --json              JSON output
-    install [names...]  Install optional extensions (interactive if no args)
-      --all               Install all extensions
-      --force             Reinstall even if installed
-    update [names...]   Update installed tools to latest
-      --dry-run           Preview without installing
-    remove [names...]  Remove installed tools
-      --all               Remove all tools
-    outdated            Check for available updates
-
   db                   Database maintenance
     stats               Show database size and reclaimable space
     vacuum              Remove orphaned data and reclaim free space (VACUUM)
@@ -168,8 +153,6 @@ Examples:
   prokop logs                      Follow server logs
   prokop auth                      Show auth configuration
   prokop init                      Set up, start, and open Prokop
-  prokop tools list                List optional extensions
-  prokop tools list --extensions  Show extension details
   prokop migrate                   Run database migrations
   prokop migrate-legacy-data       Move legacy data to ~/.prokopai
   prokop models sync               Sync models from upstream registry
@@ -332,11 +315,6 @@ async function main(): Promise<void> {
       break;
     }
 
-    case 'tools': {
-      await runToolsCommandFromCLI(args.slice(1));
-      break;
-    }
-
     case 'db': {
       await runDbCommand(args.slice(1));
       break;
@@ -475,65 +453,6 @@ Examples:
       console.error('Run "prokop help" for usage information');
       process.exit(1);
     }
-  }
-}
-
-async function runToolsCommandFromCLI(args: string[]): Promise<void> {
-  const toolsArgs: ToolsCommandArgs = {
-    subCommand: undefined,
-    flags: {},
-    names: [],
-  };
-
-  let i = 0;
-  while (i < args.length) {
-    const arg = args[i];
-
-    if (!arg.startsWith('-')) {
-      if (!toolsArgs.subCommand) {
-        toolsArgs.subCommand = arg;
-      } else {
-        toolsArgs.names = toolsArgs.names ?? [];
-        toolsArgs.names.push(arg);
-      }
-      i++;
-      continue;
-    }
-
-    switch (arg) {
-      case '--installed':
-        toolsArgs.flags.installed = true;
-        break;
-      case '--json':
-        toolsArgs.flags.json = true;
-        break;
-      case '--all':
-        toolsArgs.flags.all = true;
-        break;
-      case '--force':
-      case '-f':
-        toolsArgs.flags.force = true;
-        break;
-      case '--dry-run':
-        toolsArgs.flags.dryRun = true;
-        break;
-      case '--help':
-      case '-h':
-        toolsArgs.subCommand = 'help';
-        break;
-      default:
-        console.error(`Unknown option: ${arg}`);
-        process.exit(1);
-    }
-    i++;
-  }
-
-  const result = await runToolsCommand(toolsArgs);
-
-  if (result.exitCode !== undefined) {
-    process.exitCode = result.exitCode;
-  } else if (!result.success) {
-    process.exit(1);
   }
 }
 

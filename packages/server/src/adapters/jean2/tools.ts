@@ -9,11 +9,11 @@ import type {
   ToolEnvironmentPort,
   ToolEnvListPortResult,
   ToolEnvSetPortResult,
-} from '@/application/ports/tool-distribution';
+} from '@/application/ports/tool-catalog';
 
 /**
  * Jean2 tool catalog and environment adapters (S4). The catalog delegates
- * to the Capek tool registry compat entrypoints; the environment adapter
+ * to the Čapek runtime catalog; the environment adapter
  * wraps the configuration env-var implementation and translates its errors
  * into port-level results so the application never imports configuration
  * error classes.

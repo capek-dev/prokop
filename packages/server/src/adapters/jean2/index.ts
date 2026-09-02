@@ -18,10 +18,6 @@ export {
   createJean2WorkspaceTerminalPort,
 } from './workspace';
 export {
-  createJean2ToolDistributionPort,
-  createJean2ToolRepositoryPort,
-} from './tool-distribution';
-export {
   createJean2ToolCatalogPort,
   createJean2ToolEnvironmentPort,
 } from './tools';

@@ -8,7 +8,7 @@ import type {
   ToolCatalogPort,
   ToolEnvironmentPort,
   ToolCatalogEntry,
-} from '@/application/ports/tool-distribution';
+} from '@/application/ports/tool-catalog';
 
 function makeDefinition(overrides: Partial<ToolCatalogEntry> = {}): ToolCatalogEntry {
   return {

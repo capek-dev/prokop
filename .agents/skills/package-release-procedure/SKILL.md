@@ -1,13 +1,13 @@
 ---
 name: package-release-procedure
-description: How to trigger server, tools, and browser releases in the Jean2 monorepo.
+description: How to trigger server and browser releases in the Prokop monorepo.
 ---
 
 # Package Release Procedure
 
 ## When to Use
 
-Use when triggering or reviewing server, tool, or browser releases in the Jean2 monorepo.
+Use when triggering or reviewing server or browser releases in the Prokop monorepo.
 
 ## Version Contract
 
@@ -20,10 +20,10 @@ Use when triggering or reviewing server, tool, or browser releases in the Jean2 
 
 | Workflow | Output | Trigger |
 |---|---|---|
-| `release.yml` | Server binaries with embedded web client, plus tools | Manual workflow dispatch |
+| `release.yml` | Server binaries with embedded web client | Manual workflow dispatch |
 | `release-browser.yml` | Browser extension | Manual workflow dispatch |
 
-The web client is private and embedded in server binaries. There is no separate client npm publishing workflow.
+The web client is private and embedded in server binaries. There is no separate client npm publishing workflow. Prokop does not build or publish external tools.
 
 ## Procedure
 
@@ -32,14 +32,8 @@ The web client is private and embedded in server binaries. There is no separate 
 1. Bump `packages/server/package.json` only when explicitly requested.
 2. Scan the client, including `.storybook/`, for stale workspace package aliases after package renames. Storybook mocks are typechecked by the production client build.
 3. Confirm `packages/client` builds successfully with the release command because its `dist` tree is embedded in every server binary with Bun `--asset`.
-4. Trigger `release.yml` with `release_server: true` and `release_all_tools: false`.
+4. Trigger `release.yml` with `release_server: true`.
 5. Confirm all platform binaries build, include the client assets, and upload before the announcement job runs.
-
-### Tools
-
-1. Bump each changed tool package only when explicitly requested.
-2. Trigger `release.yml` with `release_server: false` and `release_all_tools: true`.
-3. The matrix checks all tools and skips releases that already exist.
 
 ### Browser Extension
 
@@ -58,5 +52,5 @@ The web client is private and embedded in server binaries. There is no separate 
 ## Verification
 
 - Server: verify each binary includes `dist/index.html` and JavaScript assets before upload.
-- Tools and browser: verify expected asset names and announcement jobs.
+- Browser: verify expected asset names and the announcement job.
 - Merge announcement pull requests so `VERSION` files match published releases.

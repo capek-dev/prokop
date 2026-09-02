@@ -2,7 +2,7 @@ import type { SessionWirePorts } from '../ports/delivery';
 import type { SessionExecutionPort } from '../ports/execution';
 import type { ControllerGatePort } from '../ports/control';
 import type { SessionRepositoryPort } from '../ports/session';
-import type { ToolCatalogPort } from '../ports/tool-distribution';
+import type { ToolCatalogPort } from '../ports/tool-catalog';
 import { sendGateRejection } from './chat';
 import { projectMessagesForClient } from './tool-debug';
 

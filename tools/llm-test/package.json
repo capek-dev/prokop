@@ -1,9 +1,0 @@
-{
-  "name": "@jean2/tool-llm-test",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@capekai/tool": "^1.0.0"
-  }
-}

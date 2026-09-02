@@ -11,7 +11,7 @@ import type {
   ToolOutputArtifactPage,
   TranscriptPage,
 } from '../ports/session';
-import type { ToolCatalogPort } from '../ports/tool-distribution';
+import type { ToolCatalogPort } from '../ports/tool-catalog';
 import {
   getToolDebugData,
   projectMessagesForClient,

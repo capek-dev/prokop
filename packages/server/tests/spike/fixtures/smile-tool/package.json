@@ -1,9 +1,0 @@
-{
-  "name": "@jean2/tool-smile",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "tool.js",
-  "dependencies": {
-    "emoji-regex": "^10.4.0"
-  }
-}
