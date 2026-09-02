@@ -349,6 +349,42 @@ describe('terminal manager (PTY/transport ownership)', () => {
     });
   });
 
+  test('disables interactive pagers only for agent-created sessions', () => {
+    const cwd = makeTempDir();
+    const store = new RecordingStore();
+    const { manager } = makeManager(store);
+    const originalPager = process.env.PAGER;
+    const originalGitPager = process.env.GIT_PAGER;
+    const originalGhPager = process.env.GH_PAGER;
+
+    try {
+      process.env.PAGER = 'less';
+      process.env.GIT_PAGER = 'delta';
+      process.env.GH_PAGER = 'more';
+
+      manager.createSessionDetached({ cwd, workspaceId: 'w1', origin: 'user' });
+      manager.createSessionDetached({ cwd, workspaceId: 'w1', origin: 'agent' });
+
+      expect(ptyState.instances[0].spawnCall?.options.env).toMatchObject({
+        PAGER: 'less',
+        GIT_PAGER: 'delta',
+        GH_PAGER: 'more',
+      });
+      expect(ptyState.instances[1].spawnCall?.options.env).toMatchObject({
+        PAGER: 'cat',
+        GIT_PAGER: 'cat',
+        GH_PAGER: 'cat',
+      });
+    } finally {
+      if (originalPager === undefined) delete process.env.PAGER;
+      else process.env.PAGER = originalPager;
+      if (originalGitPager === undefined) delete process.env.GIT_PAGER;
+      else process.env.GIT_PAGER = originalGitPager;
+      if (originalGhPager === undefined) delete process.env.GH_PAGER;
+      else process.env.GH_PAGER = originalGhPager;
+    }
+  });
+
   test('PTY output reaches connected clients as OUTPUT frames and is buffered', () => {
     const cwd = makeTempDir();
     const store = new RecordingStore();

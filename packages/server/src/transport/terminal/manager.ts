@@ -45,6 +45,18 @@ function getDefaultShell(): string {
   return process.env.SHELL || '/bin/bash';
 }
 
+function getTerminalEnv(origin: 'user' | 'agent'): Record<string, string> {
+  const env = { ...process.env, TERM: 'xterm-256color' } as Record<string, string>;
+  if (origin === 'user') return env;
+
+  return {
+    ...env,
+    PAGER: 'cat',
+    GIT_PAGER: 'cat',
+    GH_PAGER: 'cat',
+  };
+}
+
 export class TerminalManager {
   private sessions = new Map<string, TerminalSession>();
   private wsToSessionId = new WeakMap<TerminalSocket, string>();
@@ -170,6 +182,7 @@ export class TerminalManager {
   ): { sessionId: string; session: TerminalSession } | null {
     const { cwd, workspaceId, cols = 80, rows = 24, initialClient } = options;
     const shell = options.shell || getDefaultShell();
+    const origin = options.origin ?? 'user';
 
     if (!cwd || !existsSync(cwd)) return null;
 
@@ -188,7 +201,7 @@ export class TerminalManager {
         cols,
         rows,
         cwd,
-        env: { ...process.env, TERM: 'xterm-256color' } as Record<string, string>,
+        env: getTerminalEnv(origin),
       });
 
       pty.onData((data: string) => {
@@ -234,7 +247,7 @@ export class TerminalManager {
         shell,
         title: 'main',
         workspaceId,
-        origin: options.origin ?? 'user',
+        origin,
         clients: initialClient ? new Set([initialClient]) : new Set(),
         cols,
         rows,
