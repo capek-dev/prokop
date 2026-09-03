@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, AlertCircle, X, Save, RotateCcw, Eye, Code2, RefreshCw, GitBranch, EyeOff } from 'lucide-react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
 import type { ProkopaiClient, FileRevisionConflictDetails } from '@prokopai/sdk';
 import { ApiError } from '@prokopai/sdk';
@@ -26,7 +27,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { resolveKeybinding, resolvePlatformBinding } from '@/lib/keybindings';
 import { cn } from '@/lib/utils';
+import { useKeybindingStore } from '@/stores/keybindingStore';
 
 interface FileEditorSurfaceProps {
   sdkClient: ProkopaiClient | null;
@@ -322,30 +325,43 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
     [reloadFromConflict],
   );
 
-  // --- Keyboard shortcuts (Cmd/Ctrl+S, Cmd/Ctrl+W) scoped to the surface ---
-  useEffect(() => {
-    const surface = surfaceRef.current;
-    if (!surface) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod) return;
-      if (e.key === 's' || e.key === 'S') {
-        if (scopedActiveDocId) {
-          e.preventDefault();
-          e.stopPropagation();
-          void handleSave(scopedActiveDocId);
-        }
-      } else if (e.key === 'w' || e.key === 'W') {
-        if (scopedActiveDocId) {
-          e.preventDefault();
-          e.stopPropagation();
-          requestClose(scopedActiveDocId);
-        }
-      }
-    };
-    surface.addEventListener('keydown', handleKeyDown, true);
-    return () => surface.removeEventListener('keydown', handleKeyDown, true);
-  }, [scopedActiveDocId, handleSave, requestClose]);
+  // --- Customizable editor commands, scoped to this surface ---
+  const keybindingOverrides = useKeybindingStore((state) => state.overrides);
+  const saveBinding = resolveKeybinding('editor.save', keybindingOverrides);
+  const closeBinding = resolveKeybinding('editor.close', keybindingOverrides);
+  const shouldIgnoreEditorHotkey = useCallback((event: KeyboardEvent) => (
+    event.isComposing
+    || event.repeat
+    || !(event.target instanceof Node)
+    || !surfaceRef.current?.contains(event.target)
+  ), []);
+  const editorHotkeyOptions = useMemo(() => ({
+    enableOnFormTags: true,
+    enableOnContentEditable: true,
+    eventListenerOptions: { capture: true },
+    ignoreEventWhen: shouldIgnoreEditorHotkey,
+    preventDefault: true,
+  } as const), [shouldIgnoreEditorHotkey]);
+
+  useHotkeys(
+    saveBinding ? resolvePlatformBinding(saveBinding) : '__prokop_disabled_editor_save__',
+    (event) => {
+      if (!scopedActiveDocId) return;
+      event.stopImmediatePropagation();
+      void handleSave(scopedActiveDocId);
+    },
+    { ...editorHotkeyOptions, enabled: saveBinding !== null },
+  );
+
+  useHotkeys(
+    closeBinding ? resolvePlatformBinding(closeBinding) : '__prokop_disabled_editor_close__',
+    (event) => {
+      if (!scopedActiveDocId) return;
+      event.stopImmediatePropagation();
+      requestClose(scopedActiveDocId);
+    },
+    { ...editorHotkeyOptions, enabled: closeBinding !== null },
+  );
 
   const closingDoc = closingDocId ? docs[closingDocId] : undefined;
 

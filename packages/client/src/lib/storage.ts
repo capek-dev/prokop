@@ -49,6 +49,7 @@ export const STORAGE_KEYS = {
   ACTIVE_WORKSPACE_ID: 'activeWorkspaceId',
   CLIENT_ID: 'prokopai_client_id',
   OVERVIEW_GROUPS: 'prokopai_overview_groups',
+  KEYBINDINGS: 'prokopai_keybindings',
 } as const;
 
 /**

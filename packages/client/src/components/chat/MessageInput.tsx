@@ -97,7 +97,6 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const [sendMode, setSendMode] = useState<'chat' | 'goal'>('chat');
   const [goalMaxTurns, setGoalMaxTurns] = useState(5);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const lastEscRef = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { data: responseFormatsData } = useResponseFormatsQuery(sdkClient ?? null);
   const responseFormats = responseFormatsData?.formats ?? [];
@@ -447,18 +446,6 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
           setTooltipIndex(null);
           return;
       }
-    }
-
-    if (e.key === 'Escape' && isStreaming && onStopStreaming) {
-      const now = Date.now();
-      if (now - lastEscRef.current < 500) {
-        e.preventDefault();
-        onStopStreaming();
-        lastEscRef.current = 0;
-      } else {
-        lastEscRef.current = now;
-      }
-      return;
     }
 
     if (e.key === 'Enter' && !e.shiftKey) {

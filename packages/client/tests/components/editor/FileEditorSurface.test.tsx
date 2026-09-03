@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { EditableFileResponse, ProkopaiClient } from '@prokopai/sdk';
 import { FileEditorSurface } from '@/components/editor/FileEditorSurface';
@@ -6,6 +6,7 @@ import {
   useFileEditorStore,
   type FileDocIdentity,
 } from '@/stores/fileEditorStore';
+import { useKeybindingStore } from '@/stores/keybindingStore';
 
 const mockUseEditorGitDiffQuery = vi.fn((..._args: unknown[]) => ({
   data: undefined,
@@ -44,6 +45,7 @@ describe('FileEditorSurface Git diff query lifecycle', () => {
       activeDocId: null,
       anyDirty: false,
     });
+    useKeybindingStore.setState({ overrides: {} });
   });
 
   test('enables the query only for the active loaded document and normalizes its identity', () => {
@@ -170,5 +172,63 @@ describe('FileEditorSurface Git diff query lifecycle', () => {
     useFileEditorStore.getState().reloadDoc(docId);
     expect(useFileEditorStore.getState().docs[docId]?.status).toBe('saving');
     expect(useFileEditorStore.getState().docs[docId]?.content).toBe(before?.content);
+  });
+
+  test('uses a customized editor save binding inside the editor surface', async () => {
+    const identity: FileDocIdentity = {
+      serverId: 'server-1',
+      workspaceId: 'workspace-1',
+      root: '',
+      path: 'src/save.ts',
+    };
+    openLoadedDoc(identity, 'save.ts');
+    useKeybindingStore.setState({ overrides: { 'editor.save': 'alt+x' } });
+    const save = vi.fn().mockResolvedValue({ revision: 'revision-saved' });
+    const sdkClient = {
+      http: { files: { save } },
+    } as unknown as ProkopaiClient;
+    const { container } = render(
+      <FileEditorSurface
+        sdkClient={sdkClient}
+        serverId="server-1"
+        workspaceId="workspace-1"
+      />,
+    );
+    const surface = container.querySelector('[data-editor-surface]');
+    expect(surface).not.toBeNull();
+
+    await act(async () => {
+      fireEvent.keyDown(surface!, { key: 'x', code: 'KeyX', altKey: true });
+      fireEvent.keyUp(surface!, { key: 'x', code: 'KeyX', altKey: true });
+    });
+
+    expect(save).toHaveBeenCalledWith('workspace-1', expect.objectContaining({
+      path: 'src/save.ts',
+    }));
+  });
+
+  test('uses a customized editor close binding inside the editor surface', () => {
+    const identity: FileDocIdentity = {
+      serverId: 'server-1',
+      workspaceId: 'workspace-1',
+      root: '',
+      path: 'src/close.ts',
+    };
+    const docId = openLoadedDoc(identity, 'close.ts');
+    useKeybindingStore.setState({ overrides: { 'editor.close': 'alt+x' } });
+    const { container } = render(
+      <FileEditorSurface
+        sdkClient={null}
+        serverId="server-1"
+        workspaceId="workspace-1"
+      />,
+    );
+    const surface = container.querySelector('[data-editor-surface]');
+    expect(surface).not.toBeNull();
+
+    fireEvent.keyDown(surface!, { key: 'x', code: 'KeyX', altKey: true });
+    fireEvent.keyUp(surface!, { key: 'x', code: 'KeyX', altKey: true });
+
+    expect(useFileEditorStore.getState().docs[docId]).toBeUndefined();
   });
 });

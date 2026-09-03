@@ -1,6 +1,15 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useHotkeys, type HotkeyCallback } from 'react-hotkeys-hook';
+import {
+  getKeybindingCommand,
+  resolveKeybinding,
+  resolvePlatformBinding,
+  type KeybindingCommandId,
+  type KeybindingOverrides,
+} from '@/lib/keybindings';
+import { useKeybindingStore } from '@/stores/keybindingStore';
 
-const DOUBLE_ESCAPE_WINDOW_MS = 400;
+const DISABLED_HOTKEY = '__prokop_disabled_hotkey__';
+const SEQUENCE_TIMEOUT_MS = 500;
 
 export interface KeyboardShortcutsConfig {
   onOpenSidebar: () => void;
@@ -24,181 +33,106 @@ function isModalDialogOpen(): boolean {
   ];
 
   for (const selector of openDialogSelectors) {
-    if (document.querySelector(selector)) {
-      return true;
-    }
+    if (document.querySelector(selector)) return true;
   }
 
   const dialogs = document.querySelectorAll('[role="dialog"]');
   for (const dialog of dialogs) {
-    if (dialog instanceof HTMLElement && isElementVisible(dialog)) {
-      return true;
-    }
+    if (dialog instanceof HTMLElement && isElementVisible(dialog)) return true;
   }
-
   return false;
 }
 
-function isElementVisible(el: HTMLElement): boolean {
-  if (!el.isConnected) return false;
-  const style = window.getComputedStyle(el);
-  return (
-    style.display !== 'none' &&
-    style.visibility !== 'hidden' &&
-    parseFloat(style.opacity) > 0 &&
-    el.getBoundingClientRect().width > 0 &&
-    el.getBoundingClientRect().height > 0
-  );
+function isElementVisible(element: HTMLElement): boolean {
+  if (!element.isConnected) return false;
+  const style = window.getComputedStyle(element);
+  const rect = element.getBoundingClientRect();
+  return style.display !== 'none'
+    && style.visibility !== 'hidden'
+    && parseFloat(style.opacity) > 0
+    && rect.width > 0
+    && rect.height > 0;
 }
 
 function isChatInputFocused(): boolean {
   const active = document.activeElement;
-  if (!active) return false;
+  return Boolean(
+    active?.hasAttribute?.('data-chat-input')
+    || active?.closest?.('[data-chat-input="true"]'),
+  );
+}
 
-  if (active.hasAttribute?.('data-chat-input')) {
-    return true;
-  }
+function shouldIgnoreGlobalEvent(event: KeyboardEvent): boolean {
+  return event.isComposing || event.repeat || isModalDialogOpen();
+}
 
-  if (active.closest?.('[data-chat-input="true"]')) {
-    return true;
-  }
-
-  return false;
+function useCommandHotkey(
+  id: KeybindingCommandId,
+  overrides: KeybindingOverrides,
+  callback: HotkeyCallback,
+  ignoreEventWhen = shouldIgnoreGlobalEvent,
+): void {
+  const command = getKeybindingCommand(id);
+  const binding = resolveKeybinding(id, overrides);
+  useHotkeys(
+    binding ? resolvePlatformBinding(binding) : DISABLED_HOTKEY,
+    callback,
+    {
+      enabled: binding !== null,
+      enableOnFormTags: command.allowInInputs ?? false,
+      enableOnContentEditable: command.allowInInputs ?? false,
+      eventListenerOptions: { capture: true },
+      ignoreEventWhen,
+      preventDefault: true,
+      sequenceTimeoutMs: SEQUENCE_TIMEOUT_MS,
+    },
+  );
 }
 
 export function useKeyboardShortcuts(config: KeyboardShortcutsConfig): void {
-  const configRef = useRef(config);
-  useLayoutEffect(() => {
-    configRef.current = config;
+  const overrides = useKeybindingStore((state) => state.overrides);
+
+  // Register the sequence first so its terminal key can suppress the single-Escape command.
+  useCommandHotkey('chat.stopStreaming', overrides, (event, hotkey) => {
+    if (
+      event.isComposing
+      || event.repeat
+      || (hotkey.isSequence && (
+        event.altKey
+        || event.ctrlKey
+        || event.metaKey
+        || event.shiftKey
+      ))
+      || isModalDialogOpen()
+      || !isChatInputFocused()
+    ) {
+      return;
+    }
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    config.onStopStreaming();
   });
 
-  const escapeStateRef = useRef({ lastEscTime: 0, armed: false });
+  useCommandHotkey('chat.focusInput', overrides, (event) => {
+    if (isChatInputFocused()) return;
+    event.preventDefault();
+    config.onFocusChatInput();
+  });
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.isComposing) {
-        return;
-      }
+  useCommandHotkey('panel.closeFocused', overrides, () => config.onCloseFocusedPanel());
+  useCommandHotkey('navigation.sessions', overrides, () => config.onOpenSidebar());
+  useCommandHotkey('navigation.files', overrides, () => config.onOpenFilesPanel());
+  useCommandHotkey('navigation.terminal', overrides, () => config.onOpenTerminal());
+  useCommandHotkey('navigation.overview', overrides, () => config.onToggleViewMode());
+  useCommandHotkey('session.create', overrides, () => config.onNewSession());
+  useCommandHotkey('chat.toggleAutoFollow', overrides, () => config.onToggleAutoFollow());
 
-      if (e.repeat) {
-        return;
-      }
-
-      if (e.key === 'Escape' && isModalDialogOpen()) {
-        return;
-      }
-
-      const {
-        onCloseFocusedPanel,
-        onFocusChatInput,
-        onStopStreaming,
-        onOpenSidebar,
-        onOpenTerminal,
-        onOpenFilesPanel,
-        onNewSession,
-        onToggleViewMode,
-        onToggleAutoFollow,
-        onFocusPane,
-        onCyclePane,
-      } = configRef.current;
-
-      if (e.shiftKey && e.key === 'Escape') {
-        e.preventDefault();
-        onCloseFocusedPanel();
-        return;
-      }
-
-      if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey) {
-        const chatFocused = isChatInputFocused();
-        const now = Date.now();
-        const { lastEscTime, armed } = escapeStateRef.current;
-        const timeSinceLastEsc = now - lastEscTime;
-
-        if (chatFocused && armed && timeSinceLastEsc < DOUBLE_ESCAPE_WINDOW_MS) {
-          e.preventDefault();
-          escapeStateRef.current = { lastEscTime: 0, armed: false };
-          onStopStreaming();
-          return;
-        }
-
-        if (chatFocused) {
-          escapeStateRef.current = { lastEscTime: now, armed: true };
-          return;
-        }
-
-        e.preventDefault();
-        onFocusChatInput();
-        return;
-      }
-
-      if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && /^Digit[1-6]$/.test(e.code)) {
-        e.preventDefault();
-        onFocusPane(Number(e.code.slice(-1)) - 1);
-        return;
-      }
-
-      if (e.altKey && e.shiftKey && !e.metaKey && !e.ctrlKey && e.code === 'ArrowLeft') {
-        e.preventDefault();
-        onCyclePane(-1);
-        return;
-      }
-
-      if (e.altKey && e.shiftKey && !e.metaKey && !e.ctrlKey && e.code === 'ArrowRight') {
-        e.preventDefault();
-        onCyclePane(1);
-        return;
-      }
-
-      const target = e.target as HTMLElement;
-      const isInputElement =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable;
-
-      const modifierPressed = e.metaKey || e.ctrlKey;
-
-      if (isInputElement && !modifierPressed) {
-        return;
-      }
-
-      if (modifierPressed && e.code === 'Digit1') {
-        e.preventDefault();
-        onOpenSidebar();
-        return;
-      }
-
-      if (modifierPressed && e.code === 'KeyT') {
-        e.preventDefault();
-        onOpenTerminal();
-        return;
-      }
-
-      if (modifierPressed && e.code === 'Digit2') {
-        e.preventDefault();
-        onOpenFilesPanel();
-        return;
-      }
-
-      if (modifierPressed && e.code === 'KeyN') {
-        e.preventDefault();
-        onNewSession();
-        return;
-      }
-
-      if (modifierPressed && e.code === 'KeyO') {
-        e.preventDefault();
-        onToggleViewMode();
-        return;
-      }
-
-      if (modifierPressed && e.shiftKey && e.code === 'KeyF') {
-        e.preventDefault();
-        onToggleAutoFollow();
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, []);
+  useCommandHotkey('pane.focus.1', overrides, () => config.onFocusPane(0));
+  useCommandHotkey('pane.focus.2', overrides, () => config.onFocusPane(1));
+  useCommandHotkey('pane.focus.3', overrides, () => config.onFocusPane(2));
+  useCommandHotkey('pane.focus.4', overrides, () => config.onFocusPane(3));
+  useCommandHotkey('pane.focus.5', overrides, () => config.onFocusPane(4));
+  useCommandHotkey('pane.focus.6', overrides, () => config.onFocusPane(5));
+  useCommandHotkey('pane.focusPrevious', overrides, () => config.onCyclePane(-1));
+  useCommandHotkey('pane.focusNext', overrides, () => config.onCyclePane(1));
 }
