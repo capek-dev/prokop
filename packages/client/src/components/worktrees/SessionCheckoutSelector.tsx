@@ -229,15 +229,13 @@ export function CheckoutMenu({ session, sdkClient, onClose }: {
 }
 
 /**
- * Compact checkout picker for the input selector row. Renders nothing when
- * the workspace has no managed worktrees and the session is unbound. On
- * small screens it collapses to an icon-only button, matching its siblings.
+ * Compact checkout picker for the input selector row. It remains available
+ * with no managed worktrees so users can create the first one. On small
+ * screens it stays icon-only, matching its siblings.
  */
 export function SessionCheckoutSelector({ session, sdkClient, disabled }: CheckoutProps) {
   const [open, setOpen] = useState(false);
-  const { all, bound, boundAvailable, pending } = useSessionCheckout({ session, sdkClient });
-
-  if (all.length === 0 && !session.workspaceRootId) return null;
+  const { bound, boundAvailable, pending } = useSessionCheckout({ session, sdkClient });
 
   const label = session.workspaceRootId
     ? (bound ? getWorktreeDisplayName(bound) : 'Managed checkout')

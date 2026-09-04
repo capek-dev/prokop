@@ -67,12 +67,13 @@ describe('SessionCheckoutSelector', () => {
     bindMutate.mockClear();
   });
 
-  test('renders nothing when the workspace has no worktrees and the session is unbound', () => {
+  test('keeps worktree management available when the workspace has no worktrees', async () => {
     mockWorktrees = [];
-    const { container } = render(
-      <SessionCheckoutSelector session={makeSession()} sdkClient={null} />,
-    );
-    expect(container).toBeEmptyDOMElement();
+    const user = userEvent.setup();
+    render(<SessionCheckoutSelector session={makeSession()} sdkClient={null} />);
+
+    await user.click(screen.getByRole('button', { name: /Primary checkout/ }));
+    expect(screen.getByRole('option', { name: /New worktree/ })).toBeInTheDocument();
   });
 
   test('shows the primary checkout label and opens the searchable list', async () => {
