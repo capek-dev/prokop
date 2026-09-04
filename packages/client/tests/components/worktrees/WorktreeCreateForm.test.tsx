@@ -23,7 +23,7 @@ const refs = [
 ];
 
 describe('WorktreeCreateForm', () => {
-  test('shows the local branch first and defaults the editable worktree name from it', async () => {
+  test('defaults to the first free branch and prefills the worktree name', async () => {
     const user = userEvent.setup();
     const onCreate = vi.fn();
     render(
@@ -36,15 +36,12 @@ describe('WorktreeCreateForm', () => {
       />,
     );
 
-    const createFrom = screen.getByRole('combobox', { name: 'Create from' });
     const worktreeName = screen.getByLabelText('Worktree name');
-    expect(createFrom.compareDocumentPosition(worktreeName) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(createFrom).toHaveTextContent('feature/available');
     expect(worktreeName).toHaveValue('feature/available');
 
     await user.clear(worktreeName);
     await user.type(worktreeName, 'available-work');
-    await user.click(screen.getByRole('button', { name: 'Create worktree' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
 
     expect(onCreate).toHaveBeenCalledWith(
       { name: 'available-work', branch: 'refs/heads/feature/available' },
@@ -84,14 +81,13 @@ describe('WorktreeCreateForm', () => {
     await user.type(worktreeName, 'existing-worktree');
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'A worktree named "existing-worktree" already exists. Choose a different name.',
+      'A worktree named "existing-worktree" already exists.',
     );
-    expect(screen.getByRole('button', { name: 'Create worktree' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
     expect(onCreate).not.toHaveBeenCalled();
   });
 
-  test('does not offer remote branches and marks checked-out local branches unavailable', async () => {
-    const user = userEvent.setup();
+  test('does not offer remote branches and marks checked-out local branches unavailable', () => {
     render(
       <WorktreeCreateForm
         refs={[
@@ -112,9 +108,7 @@ describe('WorktreeCreateForm', () => {
       />,
     );
 
-    await user.click(screen.getByRole('combobox', { name: 'Create from' }));
-
-    expect(screen.queryByRole('option', { name: /remote-only/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'main (already checked out)' })).toHaveAttribute('data-disabled');
+    expect(screen.queryByText(/remote-only/)).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /main/ })).toHaveAttribute('aria-disabled', 'true');
   });
 });

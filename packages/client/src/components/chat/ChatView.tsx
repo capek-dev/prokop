@@ -287,7 +287,7 @@ export function ChatView({
           loadOlderError={contentMeta?.loadOlderError}
           onLoadOlder={loadOlder}
           emptyContent={isMainActiveSession && !isObserver
-            ? <EmptySessionCheckout session={session} sdkClient={sdkClient ?? null} />
+            ? <EmptySessionCheckout />
             : undefined}
         />
 
@@ -328,6 +328,8 @@ export function ChatView({
           goalState={(session.metadata as Record<string, unknown> | null)?.goal as import('@prokopai/sdk').GoalState | null ?? null}
           isStreaming={isStreaming}
           onStopStreaming={onInterrupt}
+          session={session}
+          checkoutLocked={displayItems.length > 0}
         />
       )}
 

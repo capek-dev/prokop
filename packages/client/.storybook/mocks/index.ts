@@ -114,6 +114,16 @@ export {
 } from './mockFileTree';
 export type { FileTreeNode } from './mockFileTree';
 
+// --- Worktrees ---
+export {
+  createWorktree,
+  worktreePresets,
+  createRef,
+  refPresets,
+  createRefList,
+} from './mockWorktree';
+export type { MockWorktreeOverrides, MockRefOverrides } from './mockWorktree';
+
 // --- Markdown Content ---
 export {
   simpleMarkdown,

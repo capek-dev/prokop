@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
-import type { ProkopaiClient } from '@prokopai/sdk';
+import type { ProkopaiClient, Session } from '@prokopai/sdk';
 import { ArrowUp, Square, Paperclip, AlertTriangle, Target, ChevronDown } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,7 @@ import { PendingAttachment } from './PendingAttachment';
 import { FileMentionChip } from './FileMentionChip';
 import { AutoApproveSelector } from './AutoApproveSelector';
 import { ResponseFormatSelector } from './ResponseFormatSelector';
+import { SessionCheckoutSelector, SessionCheckoutStrip } from '@/components/worktrees/SessionCheckoutSelector';
 import { useResponseFormatsQuery } from '@/hooks/queries';
 // import { useHighlightBackground } from '@/hooks/useHighlightBackground';
 import { useFileSearch, extractMentionsFromText } from '@/hooks/useFileSearch';
@@ -32,6 +33,9 @@ interface MessageInputProps {
   sdkClient?: ProkopaiClient | null;
   prompts?: PromptInfo[];
   sessionId?: string;
+  session?: Session | null;
+  /** Checkout is locked once the session has messages. */
+  checkoutLocked?: boolean;
   modelSupportsImage?: boolean;
   goalState?: import('@prokopai/sdk').GoalState | null;
 }
@@ -81,6 +85,8 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   sdkClient,
   prompts = [],
   sessionId,
+  session,
+  checkoutLocked,
   modelSupportsImage,
   goalState,
 }: MessageInputProps, ref) {
@@ -466,7 +472,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
     ? 'Goal active'
     : sendMode === 'goal'
       ? 'Type the completion condition...'
-      : placeholder;
+      : `${placeholder}  (/ prompts, @ files)`;
 
   return (
     <form
@@ -481,7 +487,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
     >
       <div
         className={cn(
-          'rounded-2xl bg-background/50 overflow-hidden',
+          'relative z-10 rounded-2xl bg-background/50 overflow-hidden',
           'focus-within:ring-1 focus-within:ring-ring/30',
           'transition-shadow',
           'border border-border/60',
@@ -619,6 +625,13 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
             />
             {sessionId && (
               <>
+                {session && (
+                  <SessionCheckoutSelector
+                    session={session}
+                    sdkClient={sdkClient ?? null}
+                    disabled={disabled || checkoutLocked}
+                  />
+                )}
                 <AutoApproveSelector
                   sessionId={sessionId}
                   sdkClient={sdkClient ?? null}
@@ -633,16 +646,6 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
               </>
             )}
           </div>
-
-          {!trimmed && (
-            <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
-              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">/</kbd>
-              <span>prompts</span>
-              <span className="mx-1">•</span>
-              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px]">@</kbd>
-              <span>files</span>
-            </div>
-          )}
 
           <div className="flex h-7 items-center rounded-full border border-border/70">
             <DropdownMenu>
@@ -739,7 +742,16 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
             )}
           </div>
         </div>
+
       </div>
+
+      {session && (
+        <SessionCheckoutStrip
+          session={session}
+          sdkClient={sdkClient ?? null}
+          locked={checkoutLocked}
+        />
+      )}
     </form>
   );
 });
