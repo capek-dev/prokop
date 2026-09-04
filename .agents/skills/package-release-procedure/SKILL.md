@@ -15,6 +15,7 @@ Use when triggering or reviewing server or browser releases in the Prokop monore
 - `VERSION` files record the latest published version and are updated only by announcement pull requests.
 - Manual version bumps touch only the relevant `package.json` files.
 - Never bump a version unless the user explicitly asks.
+- When release notes are consolidated, keep one server changelog for the shipped product. Put new capabilities under `Added`, and do not create a parallel client changelog.
 
 ## Release Workflows
 
