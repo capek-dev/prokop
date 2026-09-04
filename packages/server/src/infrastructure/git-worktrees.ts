@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, realpath } from 'node:fs/promises';
+import { mkdir, realpath, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import type { GitWorktreeRef } from '@prokopai/sdk';
 import type {
@@ -129,7 +129,11 @@ async function readStatus(path: string): Promise<WorktreeGitStatus> {
   }
 
   const [statusResult, branchResult, headResult] = await Promise.all([
-    runGit(path, ['status', '--porcelain=v2', '-z', '--untracked-files=all']),
+    // --ignore-submodules=none makes modified or untracked content inside
+    // submodules count as dirty, so removal cannot silently destroy data
+    // that only exists in a submodule clone (worktrees with submodules are
+    // removed with rm -rf, which has no git-level safety net).
+    runGit(path, ['status', '--porcelain=v2', '-z', '--untracked-files=all', '--ignore-submodules=none']),
     runGit(path, ['symbolic-ref', '--quiet', '--short', 'HEAD']),
     runGit(path, ['rev-parse', '--verify', 'HEAD']),
   ]);
@@ -244,7 +248,30 @@ export function createWorktreeGitPort(): WorktreeGitPort {
     },
 
     async remove(repositoryPath, worktreePath) {
-      requireSuccess(await runGit(repositoryPath, ['worktree', 'remove', worktreePath]));
+      const result = await runGit(repositoryPath, ['worktree', 'remove', worktreePath]);
+      if (result.exitCode === 0) return;
+      // git refuses to move or remove worktrees containing submodules, even
+      // with --force (validate_no_submodules is unconditional). Fall back to
+      // removing the directory and pruning the admin record; the record's
+      // .git dir also holds the worktree's submodule gitdirs, so nothing is
+      // left behind. Only reached after the dirty check passed, so the tree
+      // holds no unrecoverable untracked data.
+      if (!/submodules? (?:cannot be moved or removed|is required) /i.test(`${result.stderr}\n${result.stdout}`)
+        && !/working trees? containing submodules? cannot be moved or removed/i.test(
+          `${result.stderr}\n${result.stdout}`,
+        )) {
+        throw new WorktreeGitError('git_error', (result.stderr || result.stdout || 'Git worktree removal failed').trim());
+      }
+      try {
+        await rm(worktreePath, { recursive: true, force: true, maxRetries: 5 });
+        await requireSuccess(await runGit(repositoryPath, ['worktree', 'prune']));
+      } catch (error: unknown) {
+        if (error instanceof WorktreeGitError) throw error;
+        throw new WorktreeGitError(
+          'git_error',
+          error instanceof Error ? error.message : 'Removing the submodule worktree failed',
+        );
+      }
     },
   };
 }

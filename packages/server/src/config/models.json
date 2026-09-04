@@ -265,6 +265,69 @@
       "name": "Codex (ChatGPT)",
       "models": [
         {
+          "id": "gpt-6-astra",
+          "name": "GPT-6 Astra",
+          "contextWindow": 372000,
+          "maxOutputTokens": 128000,
+          "tier": "premium",
+          "capabilities": {
+            "input": {
+              "text": true,
+              "image": true,
+              "file": [
+                "application/pdf"
+              ]
+            }
+          },
+          "variants": {
+            "low": {
+              "providerOptions": {
+                "reasoningEffort": "low",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              }
+            },
+            "medium": {
+              "providerOptions": {
+                "reasoningEffort": "medium",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              }
+            },
+            "high": {
+              "providerOptions": {
+                "reasoningEffort": "high",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              }
+            },
+            "xhigh": {
+              "providerOptions": {
+                "reasoningEffort": "xhigh",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              }
+            },
+            "max": {
+              "providerOptions": {
+                "reasoningEffort": "max",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              }
+            }
+          }
+        },
+        {
           "id": "gpt-5.6-sol",
           "name": "GPT-5.6 Sol",
           "contextWindow": 372000,
@@ -618,6 +681,69 @@
       "id": "openai",
       "name": "OpenAI",
       "models": [
+        {
+          "id": "gpt-6-astra",
+          "name": "GPT-6 Astra",
+          "contextWindow": 1050000,
+          "maxOutputTokens": 128000,
+          "tier": "premium",
+          "capabilities": {
+            "input": {
+              "text": true,
+              "image": true,
+              "file": [
+                "application/pdf"
+              ]
+            }
+          },
+          "variants": {
+            "low": {
+              "providerOptions": {
+                "reasoningEffort": "low",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              }
+            },
+            "medium": {
+              "providerOptions": {
+                "reasoningEffort": "medium",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              }
+            },
+            "high": {
+              "providerOptions": {
+                "reasoningEffort": "high",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              }
+            },
+            "xhigh": {
+              "providerOptions": {
+                "reasoningEffort": "xhigh",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              }
+            },
+            "max": {
+              "providerOptions": {
+                "reasoningEffort": "max",
+                "reasoningSummary": "auto",
+                "include": [
+                  "reasoning.encrypted_content"
+                ]
+              }
+            }
+          }
+        },
         {
           "id": "gpt-5.6-sol",
           "name": "GPT-5.6 Sol",

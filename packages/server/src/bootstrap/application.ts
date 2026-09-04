@@ -237,9 +237,11 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     },
     terminals: {
       listForWorktree: (worktreeId, path) => getTerminalManager().listSessionsForWorktree(worktreeId, path),
+      clearWorktreeReferences: (worktreeId) => getTerminalManager().clearWorktreeReferences(worktreeId),
     },
     events: {
       worktreeChanged: (worktree) => broadcastEvent({ type: 'worktree.updated', worktree }),
+      worktreeDeleted: (worktree) => broadcastEvent({ type: 'worktree.deleted', worktree }),
       sessionChanged: broadcastSessionUpdated,
     },
   });

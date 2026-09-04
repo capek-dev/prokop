@@ -85,6 +85,7 @@ function makeNoopStore(): TerminalSessionStorePort {
     cleanupRunningSessionsOnStartup(): number {
       return 0;
     },
+    clearManagedWorktreeReferences(): void {},
   };
 }
 

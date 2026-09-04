@@ -50,4 +50,7 @@ export interface TerminalSessionStorePort {
   listActiveTerminalSessions(workspaceId: string): TerminalSessionRow[];
   cleanupStaleTerminalSessions(): number;
   cleanupRunningSessionsOnStartup(): number;
+  /** Nulls managed_worktree_id on rows still referencing the worktree so a
+   * removed worktree record can be purged despite the foreign key. */
+  clearManagedWorktreeReferences(worktreeId: string): void;
 }

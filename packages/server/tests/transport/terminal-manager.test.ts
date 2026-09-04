@@ -184,6 +184,12 @@ class RecordingStore implements TerminalSessionStorePort {
   cleanupRunningSessionsOnStartup(): number {
     return 0;
   }
+
+  clearedWorktreeReferences: string[] = [];
+
+  clearManagedWorktreeReferences(worktreeId: string): void {
+    this.clearedWorktreeReferences.push(worktreeId);
+  }
 }
 
 function makeManager(store?: TerminalSessionStorePort) {

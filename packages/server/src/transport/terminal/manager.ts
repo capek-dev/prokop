@@ -594,6 +594,18 @@ export class TerminalManager {
     return result;
   }
 
+  /** Detaches terminals from a purged worktree record: live sessions lose
+   * the reference, lingering persisted rows have it nulled so the record
+   * can be deleted despite the foreign key. */
+  clearWorktreeReferences(worktreeId: string): void {
+    for (const session of this.sessions.values()) {
+      if (session.managedWorktreeId === worktreeId) {
+        session.managedWorktreeId = undefined;
+      }
+    }
+    this.store.clearManagedWorktreeReferences(worktreeId);
+  }
+
   getActiveSessionCount(workspacePath: string): number {
     let count = 0;
     for (const session of this.sessions.values()) {

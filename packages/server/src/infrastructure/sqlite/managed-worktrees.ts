@@ -106,5 +106,9 @@ export function createManagedWorktreeRepository(
       ).get(id) as ManagedWorktreeRow | null;
       return row ? mapRow(row) : null;
     },
+
+    delete(id) {
+      return getDatabase().run('DELETE FROM managed_worktrees WHERE id = ?', [id]).changes > 0;
+    },
   };
 }

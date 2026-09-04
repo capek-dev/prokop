@@ -101,9 +101,16 @@ export function createTerminalSessionRepository(
     cleanupRunningSessionsOnStartup(): number {
       const result = getDb().run(
         `UPDATE terminal_sessions SET status = 'destroyed', destroyed_at = ? WHERE status = 'running'`,
-        [Date.now()]
+        [Date.now()],
       );
       return result.changes;
+    },
+
+    clearManagedWorktreeReferences(worktreeId: string): void {
+      getDb().run(
+        `UPDATE terminal_sessions SET managed_worktree_id = NULL WHERE managed_worktree_id = ?`,
+        [worktreeId],
+      );
     },
   };
 }

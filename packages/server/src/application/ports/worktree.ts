@@ -29,6 +29,8 @@ export interface ManagedWorktreeRepositoryPort {
     id: string,
     updates: Partial<Pick<ManagedWorktreeRecord, 'branch' | 'head' | 'state'>>,
   ): ManagedWorktreeRecord | null;
+  /** Hard-deletes a removed record. Returns true when a row was deleted. */
+  delete(id: string): boolean;
 }
 
 export interface WorktreeGitStatus {
@@ -74,10 +76,15 @@ export interface WorktreeTerminalPort {
     worktreeId: string,
     path: string,
   ): Array<{ id?: string; cwd?: string; managedWorktreeId?: string }>;
+  /** Drops the managed-worktree reference from lingering terminal rows so a
+   * removed worktree record can be purged despite the foreign key. */
+  clearWorktreeReferences(worktreeId: string): void;
 }
 
 export interface WorktreeEventPort {
   worktreeChanged(worktree: ManagedWorktree): void;
+  /** The record row was purged after removal; clients drop the worktree. */
+  worktreeDeleted(worktree: ManagedWorktree): void;
   sessionChanged(session: Session): void;
 }
 

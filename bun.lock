@@ -113,7 +113,7 @@
         "prokop": "./dist/bin/prokop",
       },
       "dependencies": {
-        "@capekai/core": "^1.0.6",
+        "@capekai/core": "^1.0.7",
         "@capekai/tool": "^1.0.3",
         "@capekai/types": "^1.0.3",
         "@clack/prompts": "^0.10.0",
@@ -361,7 +361,7 @@
 
     "@babel/types": ["@babel/types@7.29.0", "", { "dependencies": { "@babel/helper-string-parser": "^7.27.1", "@babel/helper-validator-identifier": "^7.28.5" } }, "sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A=="],
 
-    "@capekai/core": ["@capekai/core@1.0.6", "", { "dependencies": { "@ai-sdk/deepseek": "^2.0.35", "@ai-sdk/openai": "^3.0.84", "@capekai/tool": "^1.0.3", "@capekai/types": "^1.0.3", "@openrouter/ai-sdk-provider": "^2.3.3", "@zip.js/zip.js": "^2.7.60", "ai": "^6.0.116", "ignore": "^7.0.3", "picomatch": "^4.0.2", "tar": "^7.5.13", "vercel-minimax-ai-provider": "^0.0.2", "zhipu-ai-provider": "^0.2.2" } }, "sha512-H4/qNoSOj8DS7yCDECERZo8bISyBFlN2cEixlKH0pZhzuXA2De8TksJmpumHaRTI1ea6InpDznRdLXXUHQ0YSg=="],
+    "@capekai/core": ["@capekai/core@1.0.7", "", { "dependencies": { "@ai-sdk/deepseek": "^2.0.35", "@ai-sdk/openai": "^3.0.84", "@capekai/tool": "^1.0.3", "@capekai/types": "^1.0.3", "@openrouter/ai-sdk-provider": "^2.3.3", "@zip.js/zip.js": "^2.7.60", "ai": "^6.0.116", "ignore": "^7.0.3", "picomatch": "^4.0.2", "tar": "^7.5.13", "vercel-minimax-ai-provider": "^0.0.2", "zhipu-ai-provider": "^0.2.2" } }, "sha512-M6K3xUdcYKfNJRkjFQ7I9nz+Dv8waoJ4ywH0kDycJA/Vw+j9SVBiBqTLoZkLUbc/ZTMrIMqimek3OGV5FC4y0A=="],
 
     "@capekai/tool": ["@capekai/tool@1.0.3", "", { "dependencies": { "@capekai/types": "^1.0.2" } }, "sha512-tcEwfkiBtr3rWddAOCSIvAe7fgRNg+/dcOGtHH7aeJ+x5J37gcyozr4xpn1WLMAlhhfYb+qwv/yUIrWoVJL9nA=="],
 

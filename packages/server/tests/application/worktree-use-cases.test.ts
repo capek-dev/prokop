@@ -67,6 +67,7 @@ function setup(options: {
         records.set(id, updated);
         return updated;
       },
+      delete: (id) => records.delete(id),
     },
     git: {
       inspectRepository: options.inspectRepository ?? (async () => ({
@@ -118,13 +119,21 @@ function setup(options: {
       hasMessages: () => options.hasMessages ?? false,
       isRunning: () => options.running ?? false,
     },
-    terminals: {
-      listForWorktree: () => Array.from({ length: options.terminals ?? 0 }, (_, index) => ({ id: String(index) })),
-    },
+    terminals: (() => {
+      const port = {
+        listForWorktree: () => Array.from({ length: options.terminals ?? 0 }, (_, index) => ({ id: String(index) })),
+        clearedWorktreeReferences: [] as string[],
+        clearWorktreeReferences(worktreeId: string): void {
+          port.clearedWorktreeReferences.push(worktreeId);
+        },
+      };
+      return port;
+    })(),
     events: {
       worktreeChanged: (worktree) => events.push(
         `worktree:${worktree.state}:${worktree.attachments.length}`,
       ),
+      worktreeDeleted: (worktree) => events.push(`worktree-deleted:${worktree.id}`),
       sessionChanged: (updated) => events.push(`session:${updated.workspaceRootId ?? 'primary'}`),
     },
   });
@@ -276,6 +285,42 @@ describe('managed worktree application', () => {
     expect(removed.ok).toBe(true);
     expect(state.getRemoveCalls()).toBe(1);
     expect(state.records.get(created.value.id)?.state).toBe('removed');
+  });
+
+  test('purges a removed record without invoking Git and broadcasts deletion', async () => {
+    const state = setup();
+    const created = await state.application.create('workspace-1', {
+      name: 'test-worktree',
+      branch: 'refs/heads/feature/test',
+    });
+    if (!created.ok) throw new Error(created.message);
+    await state.application.remove('workspace-1', created.value.id);
+
+    const purged = await state.application.remove('workspace-1', created.value.id);
+    expect(purged.ok).toBe(true);
+    expect(state.getRemoveCalls()).toBe(1); // git.remove not invoked again
+    expect(state.records.has(created.value.id)).toBe(false);
+    expect(state.events.at(-1)).toBe(`worktree-deleted:${created.value.id}`);
+  });
+
+  test('purging unbinds leftover sessions and clears terminal references', async () => {
+    const state = setup();
+    const created = await state.application.create('workspace-1', {
+      name: 'test-worktree',
+      branch: 'refs/heads/feature/test',
+    });
+    if (!created.ok) throw new Error(created.message);
+    await state.application.remove('workspace-1', created.value.id);
+
+    // Session still bound to the removed worktree (dead binding) and a
+    // lingering terminal row must be released before the record deletes.
+    state.sessions.set('session-1', session({ workspaceRootId: created.value.id }));
+
+    const purged = await state.application.remove('workspace-1', created.value.id);
+    expect(purged.ok).toBe(true);
+    expect(state.sessions.get('session-1')?.workspaceRootId).toBeNull();
+    expect(state.events).toContain('session:primary');
+    expect(state.events.at(-1)).toBe(`worktree-deleted:${created.value.id}`);
   });
 
   test('rejects repositories whose top level is outside the selected workspace', async () => {

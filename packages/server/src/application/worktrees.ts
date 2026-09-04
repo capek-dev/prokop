@@ -345,6 +345,26 @@ export function createWorktreeApplication(deps: WorktreeApplicationDeps): Worktr
       if (!record || record.workspaceId !== workspaceId) {
         return { ok: false, code: 'worktree_not_found', message: 'Worktree not found' };
       }
+      if (record.state === 'removed') {
+        // The worktree directory is already gone; purge the leftover record
+        // row entirely. Release FK references first: sessions still bound to
+        // the removed worktree fall back to the primary checkout (a dead
+        // binding protects nothing), and lingering terminal rows drop their
+        // reference. Broadcasts worktreeDeleted so clients drop the row.
+        const affected = deps.sessions.listByWorkspace(workspaceId)
+          .filter((candidate) => candidate.workspaceRootId === worktreeId);
+        for (const candidate of affected) {
+          const stored = deps.sessions.updateWorkspaceRoot(candidate.id, null);
+          if (stored) deps.events.sessionChanged(sessionWithWorktree(stored, null));
+        }
+        deps.terminals.clearWorktreeReferences(worktreeId);
+        if (!deps.repository.delete(worktreeId)) {
+          return { ok: false, code: 'worktree_not_found', message: 'Worktree not found' };
+        }
+        const purged = publicWorktree(record, EMPTY_STATUS, deps.sessions);
+        deps.events.worktreeDeleted(purged);
+        return { ok: true, value: purged };
+      }
       if (record.state !== 'available') {
         return { ok: false, code: 'worktree_unavailable', message: 'Worktree is not available' };
       }
