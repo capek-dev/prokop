@@ -37,6 +37,10 @@ export interface WorkspaceApplicationDeps {
   cleanup: WorkspaceCleanupPort;
   directory: WorkspaceDirectoryPort;
   paths: WorkspacePathConfigPort;
+  worktreeRoots?: {
+    listAvailablePaths(workspaceId: string): string[];
+    getAvailablePath(workspaceId: string, worktreeId: string): string | null;
+  };
 }
 
 export type WorkspaceListResult =
@@ -103,7 +107,11 @@ export interface WorkspaceApplication {
   deleteWorkspace(id: string): Promise<WorkspaceDeleteResult>;
 
   listTerminals(id: string): WorkspaceTerminalListResult;
-  createTerminal(id: string, cwd?: string): WorkspaceTerminalCreateResult;
+  createTerminal(
+    id: string,
+    cwd?: string,
+    managedWorktreeId?: string,
+  ): WorkspaceTerminalCreateResult;
   getTerminal(sessionId: string): WorkspaceTerminalSession | null;
   destroyTerminal(sessionId: string): void;
 
@@ -292,20 +300,33 @@ export function createWorkspaceApplication(deps: WorkspaceApplicationDeps): Work
       if (!workspace) {
         return { kind: 'missing' };
       }
-      const sessions = [workspace.path, ...workspace.additionalPaths].flatMap(
-        root => deps.terminals.listForWorkspace(root),
-      );
+      const roots = [
+        workspace.path,
+        ...workspace.additionalPaths,
+        ...(deps.worktreeRoots?.listAvailablePaths(id) ?? []),
+      ];
+      const sessions = roots.flatMap(root => deps.terminals.listForWorkspace(root));
       return { kind: 'ok', sessions };
     },
 
-    createTerminal(id, requestedCwd) {
+    createTerminal(id, requestedCwd, managedWorktreeId) {
       const workspace = deps.repository.get(id);
       if (!workspace) {
         return { kind: 'missing' };
       }
 
       const cwd = requestedCwd ? deps.paths.expandPath(requestedCwd) : workspace.path;
-      const registeredRoots = [workspace.path, ...workspace.additionalPaths];
+      const managedWorktreePath = managedWorktreeId
+        ? deps.worktreeRoots?.getAvailablePath(id, managedWorktreeId) ?? null
+        : null;
+      if (managedWorktreeId && managedWorktreePath !== cwd) {
+        return { kind: 'invalid_path' };
+      }
+      const registeredRoots = [
+        workspace.path,
+        ...workspace.additionalPaths,
+        ...(deps.worktreeRoots?.listAvailablePaths(id) ?? []),
+      ];
       if (!registeredRoots.includes(cwd)) {
         return { kind: 'invalid_path' };
       }
@@ -313,6 +334,7 @@ export function createWorkspaceApplication(deps: WorkspaceApplicationDeps): Work
       const sessionId = deps.terminals.createDetached({
         cwd,
         workspaceId: id,
+        managedWorktreeId,
       });
 
       if (!sessionId) {

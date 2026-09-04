@@ -34,10 +34,14 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
       const session = application.createSession({
         id: body.id,
         workspaceId: body.workspaceId,
+        workspaceRootId: body.workspaceRootId,
         preconfigId: body.preconfigId,
         title: body.title,
         metadata: body.metadata,
       });
+      if (!session) {
+        throw new BadRequestError('Selected worktree is not available for this workspace');
+      }
       return c.json({ session }, 201);
     },
   );

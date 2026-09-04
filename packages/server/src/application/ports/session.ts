@@ -58,6 +58,7 @@ export interface PendingAskRecord {
 export interface SessionRecordCreateInput {
   id: string;
   workspaceId: string;
+  workspaceRootId?: string | null;
   preconfigId: string | null;
   title: string;
   status: 'active';
@@ -84,6 +85,7 @@ export type SessionUpdateInput = Partial<
     | 'tags'
     | 'autoApproveSeverity'
     | 'agentId'
+    | 'workspaceRootId'
   >
 >;
 

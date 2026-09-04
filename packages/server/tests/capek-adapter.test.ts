@@ -22,7 +22,8 @@ const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, s
   ],
   delivery: ['emit'],
   titles: ['isDefaultSessionTitle', 'hasManualSessionTitle', 'generateSessionTitle'],
-  workspace: ['createToolWorkspaceHost'],
+  workspace: ['resolveSessionWorkspace', 'createToolWorkspaceHost'],
+  toolPolicy: ['resolveDefinition'],
   sandbox: ['isSandboxActive'],
   layout: ['workspaceMemoryDir', 'workspaceSkillsDir', 'agentSkillsDir', 'toolOutputTempRoot'],
 };

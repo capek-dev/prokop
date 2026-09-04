@@ -93,6 +93,22 @@ export function initializeSchema(db: Database): void {
     FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
   )`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS managed_worktrees (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    repository_id TEXT NOT NULL,
+    repository_root TEXT NOT NULL,
+    path TEXT NOT NULL UNIQUE,
+    branch TEXT,
+    head TEXT,
+    state TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+  )`);
+  db.run('CREATE INDEX IF NOT EXISTS idx_managed_worktrees_workspace ON managed_worktrees(workspace_id, created_at DESC)');
+  db.run('CREATE INDEX IF NOT EXISTS idx_managed_worktrees_repository ON managed_worktrees(repository_id, state)');
+
   initializeSessionMessageSchema(db, {
     perfDiagnosticsEnabled: PERF_DIAGNOSTICS_ENABLED,
   });
@@ -213,10 +229,12 @@ export function initializeSchema(db: Database): void {
     pid INTEGER,
     cols INTEGER NOT NULL DEFAULT 80,
     rows INTEGER NOT NULL DEFAULT 24,
+    managed_worktree_id TEXT,
     created_at INTEGER NOT NULL,
     last_activity_at INTEGER NOT NULL,
     destroyed_at INTEGER,
-    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+    FOREIGN KEY (managed_worktree_id) REFERENCES managed_worktrees(id)
   )`);
   db.run('CREATE INDEX IF NOT EXISTS idx_terminal_sessions_workspace ON terminal_sessions(workspace_id, status)');
   db.run('CREATE INDEX IF NOT EXISTS idx_terminal_sessions_activity ON terminal_sessions(last_activity_at)');
@@ -278,9 +296,12 @@ export function initializeSchema(db: Database): void {
     'ALTER TABLE scheduled_jobs ADD COLUMN auto_approve_severity TEXT',
     'ALTER TABLE scheduled_jobs ADD COLUMN notifications_enabled INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE workspaces ADD COLUMN settings TEXT DEFAULT "{}"',
+    'ALTER TABLE terminal_sessions ADD COLUMN managed_worktree_id TEXT REFERENCES managed_worktrees(id)',
+    'ALTER TABLE managed_worktrees ADD COLUMN name TEXT',
   ]) {
     try { db.run(sql); } catch { /* existing column */ }
   }
+  db.run('CREATE INDEX IF NOT EXISTS idx_terminal_sessions_worktree ON terminal_sessions(managed_worktree_id, status)');
 
   db.run(`CREATE TABLE IF NOT EXISTS push_subscriptions (
     id TEXT PRIMARY KEY,

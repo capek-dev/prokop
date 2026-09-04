@@ -11,6 +11,8 @@ import {
 import { removeSessionControl } from '@/transport/websocket/control-registry';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { getSession } from '@/infrastructure/sqlite/session-store';
+import { getDatabase } from '@/infrastructure/sqlite/database';
+import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { listQueuedMessages } from '@/infrastructure/sqlite/queued-messages';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
@@ -102,6 +104,41 @@ describe('S3 session wire handler integration contract', () => {
     expect(created.workspaceId).toBe(workspaceId);
     expect(getSession(created.id)).toBeDefined();
     expect(broadcast).toEqual(sent);
+  });
+
+  test('session.create forwards an available workspace root', async () => {
+    createManagedWorktreeRepository(getDatabase).create({
+      id: 'worktree-1',
+      name: 'wire-session-worktree',
+      workspaceId,
+      repositoryId: 'repository-1',
+      repositoryRoot: '/repo/.git',
+      path: '/data/worktrees/repository-1/worktree-1',
+      branch: 'feature/wire-session',
+      head: 'abc123',
+      state: 'available',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    const { ctx, sent } = makeContext();
+    const connectionId = registerClient('worktree-creator');
+
+    await handleClientMessage(ctx, connectionId, {
+      type: 'session.create',
+      workspaceId,
+      workspaceRootId: 'worktree-1',
+    } as ClientMessage);
+
+    expect(sent[0]).toMatchObject({
+      type: 'session.created',
+      session: {
+        workspaceRootId: 'worktree-1',
+        worktree: {
+          id: 'worktree-1',
+          branch: 'feature/wire-session',
+        },
+      },
+    });
   });
 
   test('session.rename trims the title, marks it manual, and broadcasts to the session', async () => {

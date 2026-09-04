@@ -179,6 +179,33 @@ describe('Čapek event adapter', () => {
     expect(messages.every((message) => message.type === 'error')).toBe(true);
   });
 
+  test('reports runtime session changes for worktree attachment refresh', () => {
+    const changedRoots: Array<string | null | undefined> = [];
+    const router: Jean2EventRouter<object> = {
+      send: () => {},
+      broadcast: () => {},
+      broadcastToSession: () => {},
+      sendToController: () => {},
+      sendToAskTargets: () => {},
+      attachOriginToSession: () => {},
+    };
+    const context = createJean2RuntimeContext(
+      router,
+      (session) => changedRoots.push(session.workspaceRootId),
+    );
+
+    context.emit({
+      audience: { scope: 'global' },
+      event: {
+        kind: 'session',
+        action: 'updated',
+        session: { id: 'session-1', workspaceRootId: 'worktree-1' } as never,
+      },
+    });
+
+    expect(changedRoots).toEqual(['worktree-1']);
+  });
+
   test('ignores origin-scoped events that bypass the request context adapter', () => {
     expect(deliverCapekEvent({
       audience: { scope: 'origin', origin: {} },

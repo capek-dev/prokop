@@ -27,6 +27,7 @@ export {
 } from './session-search';
 export { configureJean2Storage, jean2StorageBundle } from './storage';
 export { jean2TitleBindings } from './titles';
+export { jean2ToolPolicy } from './tool-policy';
 export {
   configureJean2WorkspaceToolDiscovery,
   jean2WorkspaceToolDiscovery,

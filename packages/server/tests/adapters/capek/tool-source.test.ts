@@ -60,6 +60,11 @@ describe('Čapek workspace tool discovery adapter', () => {
     expect(adapter.jean2WorkspaceToolDiscovery.discoverTools).toBe(realMcp.getTools);
   });
 
+  test('does not expose the divergent git-worktree lifecycle', async () => {
+    expect((await adapter.jean2ToolCatalog.listTools()).some((tool) => tool.name === 'git-worktree')).toBe(false);
+    expect(await adapter.jean2ToolCatalog.getTool('git-worktree')).toBeNull();
+  });
+
   test('configures the resolved tools path first and installs the module-level discovery', () => {
     process.env.JEAN2_TOOLS_PATH = '/env-must-not-win';
     adapter.configureJean2WorkspaceToolDiscovery();

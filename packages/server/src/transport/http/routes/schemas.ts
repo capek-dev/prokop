@@ -20,6 +20,7 @@ export const jobIdParam = z.object({
 export const createSessionSchema = z.object({
   id: z.string().optional(),
   workspaceId: z.string().optional(),
+  workspaceRootId: z.string().min(1).optional(),
   preconfigId: z.string().nullable().optional(),
   title: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).nullable().optional(),
@@ -248,6 +249,7 @@ export const updateWorkspaceSettingsSchema = z.object({
 
 export const createTerminalSchema = z.object({
   cwd: z.string().min(1).optional(),
+  managedWorktreeId: z.string().min(1).optional(),
 }).strict();
 
 export const pinMessageSchema = z.object({

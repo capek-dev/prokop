@@ -93,7 +93,11 @@ export interface WorkspaceTerminalSession {
 
 export interface WorkspaceTerminalPort {
   listForWorkspace(workspacePath: string): WorkspaceTerminalSession[];
-  createDetached(options: { cwd: string; workspaceId: string }): string | null;
+  createDetached(options: {
+    cwd: string;
+    workspaceId: string;
+    managedWorktreeId?: string;
+  }): string | null;
   get(sessionId: string): WorkspaceTerminalSession | null;
   destroyById(sessionId: string): void;
   destroyForWorkspace(workspacePath: string): void;

@@ -17,6 +17,7 @@ import { jean2DeliveryBindings } from './delivery';
 import { jean2InteractionBindings } from './interaction';
 import { jean2SandboxBindings } from './sandbox';
 import { jean2TitleBindings } from './titles';
+import { jean2ToolPolicy } from './tool-policy';
 import { jean2WorkspaceBindings } from './workspace';
 
 export type { RuntimeHost as Jean2CompatibilityBindings } from '@capekai/core/hosts';
@@ -26,6 +27,7 @@ export const jean2CompatibilityBindings = {
   delivery: jean2DeliveryBindings,
   titles: jean2TitleBindings,
   workspace: jean2WorkspaceBindings,
+  toolPolicy: jean2ToolPolicy,
   sandbox: jean2SandboxBindings,
   layout: {
     workspaceMemoryDir: (workspacePath: string) => resolveWorkspaceMemoryDir(workspacePath),

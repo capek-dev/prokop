@@ -3,6 +3,7 @@ import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { createTerminalSessionRepository } from '@/infrastructure/sqlite/terminal-session-repository';
+import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { createJean2TerminalSessionPort } from '@/adapters/jean2/terminal';
 import type { TerminalSessionRow } from '@/application/ports/terminal';
 
@@ -59,6 +60,7 @@ describe('terminal session SQLite repository (exact pre-slice SQL)', () => {
       pid: 4242,
       cols: 120,
       rows: 40,
+      managed_worktree_id: null,
       destroyed_at: null,
     });
     expect(row!.created_at).toBeTypeOf('number');
@@ -67,6 +69,35 @@ describe('terminal session SQLite repository (exact pre-slice SQL)', () => {
 
   test('getTerminalSession returns null for missing sessions', () => {
     expect(makeRepository().getTerminalSession('missing')).toBeNull();
+  });
+
+  test('persists managed worktree identity independently of cwd', () => {
+    createManagedWorktreeRepository(() => getDatabase()).create({
+      id: 'worktree-1',
+      name: 'test-worktree',
+      workspaceId,
+      repositoryId: 'repository-1',
+      repositoryRoot: '/term/.git',
+      path: '/managed/worktree-1',
+      branch: 'feature/test',
+      head: 'abc123',
+      state: 'available',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    const repository = makeRepository();
+    repository.createTerminalSession({
+      id: 'term-worktree',
+      workspaceId,
+      cwd: '/managed/worktree-1/subdirectory',
+      shell: '/bin/zsh',
+      pid: 4242,
+      cols: 120,
+      rows: 40,
+      managedWorktreeId: 'worktree-1',
+    });
+
+    expect(repository.getTerminalSession('term-worktree')?.managed_worktree_id).toBe('worktree-1');
   });
 
   test('updateTerminalSessionTitle updates only the title, exactly like the pre-slice store', () => {

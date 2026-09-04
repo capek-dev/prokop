@@ -25,6 +25,7 @@ export interface TerminalSessionRow {
   created_at: number;
   last_activity_at: number;
   destroyed_at: number | null;
+  managed_worktree_id: string | null;
 }
 
 export interface CreateTerminalSessionInput {
@@ -35,6 +36,7 @@ export interface CreateTerminalSessionInput {
   pid: number;
   cols: number;
   rows: number;
+  managedWorktreeId?: string;
 }
 
 export interface TerminalSessionStorePort {

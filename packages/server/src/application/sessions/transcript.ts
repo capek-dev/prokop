@@ -3,6 +3,7 @@ import type { SessionExecutionPort } from '../ports/execution';
 import type { ControllerGatePort } from '../ports/control';
 import type { SessionRepositoryPort } from '../ports/session';
 import type { ToolCatalogPort } from '../ports/tool-catalog';
+import type { WorktreeAttachmentRefreshPort } from '../ports/worktree';
 import { sendGateRejection } from './chat';
 import { projectMessagesForClient } from './tool-debug';
 
@@ -11,6 +12,7 @@ export interface SessionTranscriptDeps<Origin> {
   execution: SessionExecutionPort;
   gate: ControllerGatePort<Origin>;
   toolCatalog?: Pick<ToolCatalogPort, 'listTools'>;
+  worktreeAttachments?: WorktreeAttachmentRefreshPort;
 }
 
 export interface SessionTranscriptApplication<Origin> {
@@ -124,6 +126,9 @@ export function createSessionTranscriptApplication<Origin>(
           targetMessageId: input.messageId,
           title: input.title,
         });
+        if (result.forkedSession.workspaceRootId) {
+          deps.worktreeAttachments?.changed(result.forkedSession.workspaceRootId);
+        }
 
         const forkedPage = deps.repository.listLatestMessagesWithPartsPage(result.forkedSession.id, 50);
         const clientMessages = await projectMessagesForClient(forkedPage.messages, deps.toolCatalog);
@@ -154,6 +159,9 @@ export function createSessionTranscriptApplication<Origin>(
 
       try {
         const result = await deps.execution.interruptSession(sessionId, input.reason || 'user_request');
+        if (session.workspaceRootId) {
+          deps.worktreeAttachments?.changed(session.workspaceRootId);
+        }
         wire.delivery.broadcastToSession(sessionId, { type: 'session.interrupted', sessionId, result });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Interrupt failed';

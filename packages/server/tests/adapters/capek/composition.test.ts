@@ -360,10 +360,15 @@ describe('C4 coding bundle in the Jean2 composition', () => {
 
   const BUILTIN_BASELINE_TOOL_NAMES = [
     'apply-patch',
+    'browser_discover_elements',
+    'browser_dom_action',
+    'browser_navigate',
+    'browser_read_active_tab',
+    'browser_screenshot',
+    'browser_tab_manage',
     'edit',
     'edit-range',
     'file-to-markdown',
-    'git-worktree',
     'glob',
     'grep',
     'ls',

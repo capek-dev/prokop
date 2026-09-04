@@ -27,6 +27,7 @@ interface SessionRow {
   id: string;
   preconfig_id: string | null;
   workspace_id: string | null;
+  workspace_root_id: string | null;
   title: string;
   status: string;
   created_at: string;
@@ -60,6 +61,7 @@ function mapRowToSession(row: SessionRow): Session {
     id: row.id,
     preconfigId: row.preconfig_id,
     workspaceId: row.workspace_id || '',
+    workspaceRootId: row.workspace_root_id ?? null,
     title: row.title,
     status: row.status as SessionStatus,
     createdAt: row.created_at,
@@ -137,11 +139,12 @@ export function createSessionRepository(
     };
 
     db.run(`
-      INSERT INTO sessions (id, workspace_id, preconfig_id, title, status, created_at, updated_at, metadata, selected_model, selected_provider, selected_variant, prompt_tokens, completion_tokens, total_tokens, parent_id, agent_name, subagent_status, running_at, compacting, tags, auto_approve_severity, agent_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO sessions (id, workspace_id, workspace_root_id, preconfig_id, title, status, created_at, updated_at, metadata, selected_model, selected_provider, selected_variant, prompt_tokens, completion_tokens, total_tokens, parent_id, agent_name, subagent_status, running_at, compacting, tags, auto_approve_severity, agent_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       s.id,
       s.workspaceId,
+      s.workspaceRootId ?? null,
       s.preconfigId,
       s.title,
       s.status,
@@ -193,6 +196,10 @@ export function createSessionRepository(
     if (updates.title !== undefined) {
       setClauses.push('title = ?');
       values.push(updates.title);
+    }
+    if (updates.workspaceRootId !== undefined) {
+      setClauses.push('workspace_root_id = ?');
+      values.push(updates.workspaceRootId);
     }
     if (updates.status !== undefined) {
       setClauses.push('status = ?');

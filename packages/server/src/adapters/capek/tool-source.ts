@@ -12,6 +12,11 @@ import { getTools, initializeWorkspace } from '@/infrastructure/mcp';
 import { getToolsDir } from '@/infrastructure/runtime/paths';
 import { readEnv } from '@/infrastructure/runtime/env-compat';
 import { builtinTools } from '@/tools/builtin';
+import { isManagedWorktreeLifecycleTool } from './tool-policy';
+
+const exposedBuiltinTools = builtinTools.filter(
+  (tool) => !isManagedWorktreeLifecycleTool(tool.definition.name),
+);
 
 /** The Jean2 workspace tool discovery: the MCP manager's per-workspace
  * client lifecycle and tool listing. */
@@ -28,20 +33,25 @@ export const jean2WorkspaceToolDiscovery: WorkspaceToolDiscovery = {
 export const jean2ToolCatalog = {
   listTools: async (): Promise<ToolCatalogEntry[]> => {
     const installed = await capekListTools();
-    const builtinNames = new Set(builtinTools.map((tool) => tool.definition.name));
+    const builtinNames = new Set(exposedBuiltinTools.map((tool) => tool.definition.name));
     const domains = listDomainToolFallbackDefinitions()
       .map((definition) => ({ ...definition, source: 'domain' as const }));
     const domainNames = new Set(domains.map((tool) => tool.name));
     return [
-      ...builtinTools.map((tool) => ({ ...tool.definition, source: 'builtin' as const })),
+      ...exposedBuiltinTools.map((tool) => ({ ...tool.definition, source: 'builtin' as const })),
       ...domains.filter((tool) => !builtinNames.has(tool.name)),
       ...installed
-        .filter((definition) => !builtinNames.has(definition.name) && !domainNames.has(definition.name))
+        .filter((definition) => (
+          !isManagedWorktreeLifecycleTool(definition.name)
+          && !builtinNames.has(definition.name)
+          && !domainNames.has(definition.name)
+        ))
         .map((definition) => ({ ...definition, source: 'installed' as const })),
     ].sort((a, b) => a.name.localeCompare(b.name));
   },
   getTool: async (name: string) => {
-    const builtin = builtinTools.find((tool) => tool.definition.name === name);
+    if (isManagedWorktreeLifecycleTool(name)) return null;
+    const builtin = exposedBuiltinTools.find((tool) => tool.definition.name === name);
     if (builtin) return builtin;
     return capekGetTool(name);
   },

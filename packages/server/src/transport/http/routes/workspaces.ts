@@ -111,7 +111,11 @@ export function registerWorkspaceRoutes(app: Hono, application: WorkspaceApplica
       throw new BadRequestError('Invalid terminal options');
     }
 
-    const result = application.createTerminal(c.req.param('id'), parsedBody.data.cwd);
+    const result = application.createTerminal(
+      c.req.param('id'),
+      parsedBody.data.cwd,
+      parsedBody.data.managedWorktreeId,
+    );
     if (result.kind === 'missing') {
       throw new NotFoundError('Workspace not found');
     }

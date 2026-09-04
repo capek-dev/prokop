@@ -1,3 +1,4 @@
+import type { Session } from '@capekai/types/session';
 import type { InterruptReason } from '@prokopai/sdk';
 import {
   executeCompaction as executeCapekCompaction,
@@ -26,9 +27,13 @@ export interface Jean2SessionExecutionDependencies {
   executeCompaction?: typeof executeCapekCompaction;
   revertToStep?: typeof revertCapekToStep;
   forkSession?: typeof forkCapekSession;
+  onSessionChanged?: (session: Session) => void;
 }
 
-function runtimeContext<Origin>(wire: SessionWirePorts<Origin>) {
+function runtimeContext<Origin>(
+  wire: SessionWirePorts<Origin>,
+  onSessionChanged?: (session: Session) => void,
+) {
   return createJean2RuntimeContext({
     send: wire.delivery.send,
     broadcast: wire.delivery.broadcast,
@@ -36,7 +41,7 @@ function runtimeContext<Origin>(wire: SessionWirePorts<Origin>) {
     sendToController: wire.delivery.sendToController,
     sendToAskTargets: wire.delivery.sendToAskTargets,
     attachOriginToSession: wire.actor.attachOriginToSession,
-  });
+  }, onSessionChanged);
 }
 
 /**
@@ -56,6 +61,7 @@ export function createJean2SessionExecution(
   const executeCompaction = dependencies.executeCompaction ?? executeCapekCompaction;
   const revertToStep = dependencies.revertToStep ?? revertCapekToStep;
   const forkSession = dependencies.forkSession ?? forkCapekSession;
+  const onSessionChanged = dependencies.onSessionChanged;
 
   return {
     sendMessage<Origin>(
@@ -69,7 +75,7 @@ export function createJean2SessionExecution(
       goalMaxTurns?: number,
     ): Promise<void> {
       return withJean2ExecutionScope(() => handleChat(
-        runtimeContext(wire),
+        runtimeContext(wire, onSessionChanged),
         origin,
         sessionId,
         content,
@@ -86,7 +92,7 @@ export function createJean2SessionExecution(
       input: { sessionId: string; messageId: string; content: string },
     ): Promise<void> {
       return withJean2ExecutionScope(() => handleSessionEditMessage(
-        runtimeContext(wire),
+        runtimeContext(wire, onSessionChanged),
         origin,
         input,
       ));
@@ -99,7 +105,7 @@ export function createJean2SessionExecution(
       options?: { force?: boolean },
     ): Promise<void> {
       return withJean2ExecutionScope(() => regenerateSessionTitle(
-        runtimeContext(wire),
+        runtimeContext(wire, onSessionChanged),
         origin,
         sessionId,
         options,

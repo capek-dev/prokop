@@ -1,4 +1,5 @@
 import type { RuntimeDelivery, RuntimeEvent, RuntimeEventContext } from '@capekai/core';
+import type { Session as CapekSession } from '@capekai/types/session';
 import type { AskAuthority, ServerMessage } from '@prokopai/sdk';
 import type { NotificationsApplication } from '@/application/notifications';
 import {
@@ -124,12 +125,19 @@ export interface Jean2EventRouter<Origin> {
   attachOriginToSession(origin: Origin, sessionId: string): void;
 }
 
-export function createJean2RuntimeContext<Origin>(router: Jean2EventRouter<Origin>): RuntimeEventContext<Origin> {
+export function createJean2RuntimeContext<Origin>(
+  router: Jean2EventRouter<Origin>,
+  onSessionChanged?: (session: CapekSession) => void,
+): RuntimeEventContext<Origin> {
   return {
     emit(delivery) {
       if (delivery.event.kind === 'terminal') {
         deliverCapekEvent(delivery);
         return;
+      }
+
+      if (delivery.event.kind === 'session' && delivery.event.action !== 'state') {
+        onSessionChanged?.(delivery.event.session);
       }
 
       const message = mapCapekEventToServerMessage(delivery.event);

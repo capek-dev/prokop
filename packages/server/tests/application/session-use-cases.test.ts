@@ -389,11 +389,21 @@ describe('application session use cases', () => {
     });
 
     test('fork broadcasts session.forked with the forked transcript page', async () => {
-      const forkedSession = makeSession({ id: 'fork-1', title: 'My Fork' });
+      const forkedSession = makeSession({
+        id: 'fork-1',
+        title: 'My Fork',
+        workspaceRootId: 'worktree-1',
+      });
       const page = { messages: [{ message: { id: 'fm-1' }, parts: [] }], pagination: { hasOlder: false, oldestSequence: null, newestSequence: null, limit: 50 } };
       const execution = makeExecution({ fork: async () => ({ forkedSession, messages: [] }) });
       const repository = makeRepository({ listLatestMessagesWithPartsPage: () => page as never });
-      const app = createSessionTranscriptApplication({ repository, execution, gate: noGate() });
+      const refreshed: string[] = [];
+      const app = createSessionTranscriptApplication({
+        repository,
+        execution,
+        gate: noGate(),
+        worktreeAttachments: { changed: (worktreeId) => refreshed.push(worktreeId) },
+      });
       const spy = makeSpy();
       const wire = makeWire(spy);
 
@@ -405,6 +415,7 @@ describe('application session use cases', () => {
         originalSessionId: 'sess-1',
         forkedSession,
       });
+      expect(refreshed).toEqual(['worktree-1']);
     });
 
     test('fork maps thrown errors to fork_error', async () => {
@@ -437,13 +448,22 @@ describe('application session use cases', () => {
           return { sessionId, success: true, cascadedTo: [], interruptedTools: ['t-1'], rejectedAsks: [] };
         },
       });
-      const app = createSessionTranscriptApplication({ repository: makeRepository(), execution, gate: noGate() });
+      const refreshed: string[] = [];
+      const app = createSessionTranscriptApplication({
+        repository: makeRepository({
+          getSession: () => makeSession({ workspaceRootId: 'worktree-1' }),
+        }),
+        execution,
+        gate: noGate(),
+        worktreeAttachments: { changed: (worktreeId) => refreshed.push(worktreeId) },
+      });
       const spy = makeSpy();
       const wire = makeWire(spy);
 
       await app.interrupt(wire, origin, { sessionId: 'sess-1' });
 
       expect(interruptCalls).toEqual([['sess-1', 'user_request']]);
+      expect(refreshed).toEqual(['worktree-1']);
       expect(spy.broadcastToSession).toHaveLength(1);
       expect(spy.broadcastToSession[0].message).toMatchObject({ type: 'session.interrupted', sessionId: 'sess-1' });
     });
@@ -578,6 +598,39 @@ describe('application session use cases', () => {
 
       expect(spy.sent).toEqual([{ type: 'session.created', session: updated }]);
       expect(spy.broadcast).toEqual([{ message: { type: 'session.created', session: updated }, exclude: origin }]);
+    });
+
+    test('refreshes worktree attachments across session lifecycle changes', async () => {
+      const boundSession = makeSession({ workspaceRootId: 'worktree-1' });
+      const refreshed: string[] = [];
+      const repository = makeRepository({
+        createSession: () => boundSession,
+        getSession: () => boundSession,
+        updateSession: () => boundSession,
+      });
+      const app = createSessionLifecycleApplication({
+        ...makeDeps({ repository }),
+        workspaceRoots: { isAvailable: () => true },
+        worktreeAttachments: {
+          changed: (worktreeId) => refreshed.push(worktreeId),
+        },
+      });
+      const wire = makeWire(makeSpy());
+
+      await app.create(wire, origin, {
+        workspaceId: 'ws-1',
+        workspaceRootId: 'worktree-1',
+      });
+      await app.resume(wire, origin, boundSession.id);
+      app.rename(wire, origin, { sessionId: boundSession.id, title: 'Renamed' });
+      app.remove(wire, origin, boundSession.id);
+
+      expect(refreshed).toEqual([
+        'worktree-1',
+        'worktree-1',
+        'worktree-1',
+        'worktree-1',
+      ]);
     });
 
     test('resume delivers resumed, control transition, queue list, and pending ask sync in order', async () => {

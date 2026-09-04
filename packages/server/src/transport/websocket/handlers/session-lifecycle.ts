@@ -28,6 +28,7 @@ export async function handleCreateSession(
   const wire = createWirePorts(ctx);
   await requireWireApplication().session.lifecycle.create(wire, ws, {
     workspaceId: msg.workspaceId,
+    workspaceRootId: msg.workspaceRootId,
     preconfigId: msg.preconfigId,
     title: msg.title,
   });

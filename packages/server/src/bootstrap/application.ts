@@ -10,6 +10,7 @@ import {
   createSessionHttpApplication,
   createToolsHttpApplication,
   createWorkspaceApplication,
+  createWorktreeApplication,
   createPermissionsApplication,
   createConfigurationApplication,
   createMaintenanceApplication,
@@ -27,6 +28,7 @@ import {
   type SessionHttpApplication,
   type ToolsHttpApplication,
   type WorkspaceApplication,
+  type WorktreeApplication,
   type ConfigurationApplication,
   type MaintenanceApplication,
   type ResponseFormatsApplication,
@@ -39,6 +41,10 @@ import {
   createJean2SessionExecution,
 } from '@/adapters/capek';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
+import { getDatabase } from '@/infrastructure/sqlite/database';
+import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
+import { countMessagesInSession } from '@/infrastructure/sqlite/message-store';
+import { createWorktreeGitPort } from '@/infrastructure/git-worktrees';
 import {
   createJean2AgentPreconfigPort,
   createJean2AgentWorkspacePort,
@@ -66,7 +72,8 @@ import {
   createJean2WorkspaceSessionListingPort,
   createJean2WorkspaceTerminalPort,
 } from '@/adapters/jean2';
-import { installTerminalSessionStore } from '@/transport/terminal';
+import { getTerminalManager, installTerminalSessionStore } from '@/transport/terminal';
+import { broadcastEvent, broadcastSessionUpdated } from '@/transport/websocket/broadcast';
 import { createJean2TerminalSessionPort } from '@/adapters/jean2/terminal';
 import { createTransportControllerPorts } from '@/transport/websocket/control-port';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
@@ -84,6 +91,8 @@ export interface WiredApplication {
   agents: AgentsApplication;
   /** The wired workspace record and cleanup use cases (S4). */
   workspaces: WorkspaceApplication;
+  /** Managed session worktree lifecycle and binding use cases. */
+  worktrees: WorktreeApplication;
   /** The wired tools catalog and environment use cases (S4). */
   tools: ToolsHttpApplication;
   /** The wired MCP lifecycle use cases (S5). */
@@ -130,11 +139,39 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   configureJean2AgentSource(agents);
 
   const repository = createJean2SessionRepository(agents);
-  const execution = createJean2SessionExecution();
+  let refreshWorktreeAttachments: ((worktreeId: string) => void) | null = null;
+  const worktreeAttachments = {
+    changed: (worktreeId: string): void => refreshWorktreeAttachments?.(worktreeId),
+  };
+  const execution = createJean2SessionExecution({
+    onSessionChanged: (changedSession) => {
+      if (changedSession.workspaceRootId) {
+        worktreeAttachments.changed(changedSession.workspaceRootId);
+      }
+    },
+  });
   const askAuthority = createJean2AskAuthorityPort();
   const pendingAsks = createJean2PendingAskPort();
   const transportControl = createTransportControllerPorts();
   const toolCatalog = createJean2ToolCatalogPort();
+  const managedWorktrees = createManagedWorktreeRepository(getDatabase);
+  const workspaceRoots = {
+    isAvailable(workspaceId: string, workspaceRootId: string): boolean {
+      const worktree = managedWorktrees.get(workspaceRootId);
+      return worktree?.workspaceId === workspaceId && worktree.state === 'available';
+    },
+  };
+  const worktreeRoots = {
+    listAvailablePaths: (workspaceId: string): string[] => managedWorktrees.listByWorkspace(workspaceId)
+      .filter((worktree) => worktree.state === 'available')
+      .map((worktree) => worktree.path),
+    getAvailablePath: (workspaceId: string, worktreeId: string): string | null => {
+      const worktree = managedWorktrees.get(worktreeId);
+      return worktree?.workspaceId === workspaceId && worktree.state === 'available'
+        ? worktree.path
+        : null;
+    },
+  };
 
   const session = createSessionApplication<ConnectionId>({
     repository,
@@ -144,13 +181,20 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     pendingAsks,
     askAuthority,
     toolCatalog,
+    workspaceRoots,
+    worktreeAttachments,
   });
 
   const control = createSessionControlApplication<ConnectionId>({
     control: transportControl.control,
   });
 
-  const http = createSessionHttpApplication(repository, toolCatalog);
+  const http = createSessionHttpApplication(
+    repository,
+    toolCatalog,
+    workspaceRoots,
+    worktreeAttachments,
+  );
 
   const schedulingRepository = createJean2ScheduledJobRepository();
   const schedulingExecution = createJean2ScheduledJobExecution();
@@ -176,7 +220,32 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     cleanup: createJean2WorkspaceCleanupPort(),
     directory: createJean2WorkspaceDirectoryPort(),
     paths: createJean2WorkspacePathConfigPort(),
+    worktreeRoots,
   });
+
+  const worktrees = createWorktreeApplication({
+    dataDir: () => getDataDir(),
+    repository: managedWorktrees,
+    git: createWorktreeGitPort(),
+    workspaces: { get: getWorkspace },
+    sessions: {
+      get: (id) => repository.getSession(id),
+      listByWorkspace: (workspaceId) => repository.listSessionsByWorkspace(workspaceId),
+      updateWorkspaceRoot: (id, workspaceRootId) => repository.updateSession(id, { workspaceRootId }),
+      hasMessages: (sessionId) => countMessagesInSession(sessionId) > 0,
+      isRunning: (candidate) => Boolean(candidate.runningAt || candidate.subagentStatus === 'running'),
+    },
+    terminals: {
+      listForWorktree: (worktreeId, path) => getTerminalManager().listSessionsForWorktree(worktreeId, path),
+    },
+    events: {
+      worktreeChanged: (worktree) => broadcastEvent({ type: 'worktree.updated', worktree }),
+      sessionChanged: broadcastSessionUpdated,
+    },
+  });
+  refreshWorktreeAttachments = (worktreeId) => {
+    void worktrees.refreshAttachments(worktreeId);
+  };
 
   const tools = createToolsHttpApplication({
     catalog: toolCatalog,
@@ -200,12 +269,14 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     repository: createJean2PermissionRepositoryPort(),
   });
 
-  const files = createFilesApplication(createJean2FilesApplicationPort());
+  const files = createFilesApplication(createJean2FilesApplicationPort({
+    listAvailableWorktreePaths: worktreeRoots.listAvailablePaths,
+  }));
   const configuration = createConfigurationApplication(createJean2ConfigurationPorts());
   const maintenance = createMaintenanceApplication(createJean2MaintenanceApplication());
   const responseFormats = createResponseFormatsApplication(createJean2ResponseFormatsApplication());
 
   installTerminalSessionStore(createJean2TerminalSessionPort());
 
-  return { session, control, http, scheduling, schedulerTicker, agents, workspaces, tools, mcp, providers, notifications, permissions, files, configuration, maintenance, responseFormats };
+  return { session, control, http, scheduling, schedulerTicker, agents, workspaces, worktrees, tools, mcp, providers, notifications, permissions, files, configuration, maintenance, responseFormats };
 }

@@ -12,6 +12,7 @@ import type {
   TranscriptPage,
 } from '../ports/session';
 import type { ToolCatalogPort } from '../ports/tool-catalog';
+import type { WorktreeAttachmentRefreshPort } from '../ports/worktree';
 import {
   getToolDebugData,
   projectMessagesForClient,
@@ -21,6 +22,7 @@ import {
 export interface SessionHttpCreateInput {
   id?: string;
   workspaceId?: string;
+  workspaceRootId?: string;
   preconfigId?: string | null;
   title?: string;
   metadata?: Record<string, unknown> | null;
@@ -44,7 +46,7 @@ export interface SessionHttpAttachmentCreateInput {
 
 export interface SessionHttpApplication {
   listSessions(status?: SessionStatus): Session[];
-  createSession(input: SessionHttpCreateInput): Session;
+  createSession(input: SessionHttpCreateInput): Session | null;
   listSessionsGrouped(
     workspaceIds: string[],
     options?: { status?: SessionStatus; rootOnly?: boolean },
@@ -87,6 +89,10 @@ export interface SessionHttpApplication {
 export function createSessionHttpApplication(
   repository: SessionRepositoryPort,
   toolCatalog?: Pick<ToolCatalogPort, 'listTools'>,
+  workspaceRoots?: {
+    isAvailable(workspaceId: string, workspaceRootId: string): boolean;
+  },
+  worktreeAttachments?: WorktreeAttachmentRefreshPort,
 ): SessionHttpApplication {
   return {
     listSessions(status) {
@@ -94,9 +100,17 @@ export function createSessionHttpApplication(
     },
 
     createSession(input) {
-      return repository.createSession({
+      const workspaceId = input.workspaceId || '';
+      if (
+        input.workspaceRootId
+        && !workspaceRoots?.isAvailable(workspaceId, input.workspaceRootId)
+      ) {
+        return null;
+      }
+      const session = repository.createSession({
         id: input.id || crypto.randomUUID(),
-        workspaceId: input.workspaceId || '',
+        workspaceId,
+        workspaceRootId: input.workspaceRootId ?? null,
         preconfigId: input.preconfigId || null,
         title: input.title || 'New Session',
         status: 'active',
@@ -104,6 +118,8 @@ export function createSessionHttpApplication(
         parentId: null,
         agentName: null,
       });
+      if (session.workspaceRootId) worktreeAttachments?.changed(session.workspaceRootId);
+      return session;
     },
 
     listSessionsGrouped(workspaceIds, options) {
@@ -124,7 +140,7 @@ export function createSessionHttpApplication(
 
     updateSession(id, input) {
       const existing = repository.getSession(id);
-      return repository.updateSession(id, {
+      const updated = repository.updateSession(id, {
         title: input.title,
         status: input.status,
         metadata: input.title !== undefined
@@ -133,10 +149,17 @@ export function createSessionHttpApplication(
         tags: input.tags,
         autoApproveSeverity: input.autoApproveSeverity,
       });
+      if (updated?.workspaceRootId) worktreeAttachments?.changed(updated.workspaceRootId);
+      return updated;
     },
 
     deleteSession(id) {
-      return repository.deleteSession(id);
+      const existing = repository.getSession(id);
+      const deleted = repository.deleteSession(id);
+      if (deleted && existing?.workspaceRootId) {
+        worktreeAttachments?.changed(existing.workspaceRootId);
+      }
+      return deleted;
     },
 
     listMessages(sessionId) {

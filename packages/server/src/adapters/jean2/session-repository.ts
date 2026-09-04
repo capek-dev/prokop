@@ -41,6 +41,8 @@ import {
   type Attachment,
 } from '@/infrastructure/sqlite/attachments';
 import { getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
+import { getDatabase } from '@/infrastructure/sqlite/database';
+import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import type { AgentsApplication } from '@/application/agents';
 import { markManualSessionTitle } from '@/infrastructure/session-title';
 import {
@@ -117,6 +119,7 @@ function toCreateInput(input: SessionRecordCreateInput) {
   return {
     id: input.id,
     workspaceId: input.workspaceId,
+    workspaceRootId: input.workspaceRootId ?? null,
     preconfigId: input.preconfigId,
     title: input.title,
     status: input.status,
@@ -141,17 +144,38 @@ function toCreateInput(input: SessionRecordCreateInput) {
 export function createJean2SessionRepository(
   agents: Pick<AgentsApplication, 'getPreconfigOrAgent' | 'isAgentSync'>,
 ): SessionRepositoryPort {
+  const worktrees = createManagedWorktreeRepository(getDatabase);
+  const projectWorktree = (session: Session): Session => {
+    if (!session.workspaceRootId) return { ...session, worktree: null };
+    const worktree = worktrees.get(session.workspaceRootId);
+    return {
+      ...session,
+      worktree: worktree
+        ? {
+            id: worktree.id,
+            name: worktree.name,
+            branch: worktree.branch,
+            path: worktree.path,
+            state: worktree.state,
+          }
+        : null,
+    };
+  };
+  const projectOptional = (session: Session | null): Session | null => (
+    session ? projectWorktree(session) : null
+  );
+
   return {
     createSession(input: SessionRecordCreateInput): Session {
-      return createSession(toCreateInput(input));
+      return projectWorktree(createSession(toCreateInput(input)));
     },
 
     getSession(id: string): Session | null {
-      return getSession(id);
+      return projectOptional(getSession(id));
     },
 
     updateSession(id: string, updates: SessionUpdateInput): Session | null {
-      return updateSession(id, updates);
+      return projectOptional(updateSession(id, updates));
     },
 
     deleteSession(id: string): boolean {
@@ -159,23 +183,37 @@ export function createJean2SessionRepository(
     },
 
     listSessions(status?: SessionStatus): Session[] {
-      return listSessions(status);
+      return listSessions(status).map(projectWorktree);
     },
 
     listSessionsByWorkspace(workspaceId, options): Session[] {
-      return listSessionsByWorkspace(workspaceId, options);
+      return listSessionsByWorkspace(workspaceId, options).map(projectWorktree);
     },
 
     listSessionsByAgent(agentId: string, limit?: number): Session[] {
-      return getSessionsByAgent(agentId, undefined, limit);
+      return getSessionsByAgent(agentId, undefined, limit).map(projectWorktree);
     },
 
     listSessionsGrouped(workspaceIds, options) {
-      return listSessionsGrouped(workspaceIds, options);
+      return Object.fromEntries(
+        Object.entries(listSessionsGrouped(workspaceIds, options)).map(([workspaceId, sessions]) => [
+          workspaceId,
+          sessions.map(projectWorktree),
+        ]),
+      );
     },
 
     listSessionPageGrouped(workspaceIds, options): GroupedSessionPage {
-      return toGroupedSessionPage(listSessionPageGrouped(workspaceIds, options));
+      const page = toGroupedSessionPage(listSessionPageGrouped(workspaceIds, options));
+      return {
+        ...page,
+        sessions: Object.fromEntries(
+          Object.entries(page.sessions).map(([workspaceId, sessions]) => [
+            workspaceId,
+            sessions.map(projectWorktree),
+          ]),
+        ),
+      };
     },
 
     listTagsByWorkspace(workspaceId: string): string[] {

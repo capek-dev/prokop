@@ -9,22 +9,31 @@ import { jean2DeliveryBindings } from '@/adapters/capek/delivery';
 import { jean2InteractionBindings } from '@/adapters/capek/interaction';
 import { jean2SandboxBindings } from '@/adapters/capek/sandbox';
 import { jean2TitleBindings } from '@/adapters/capek/titles';
+import { jean2ToolPolicy } from '@/adapters/capek/tool-policy';
 import { jean2WorkspaceBindings } from '@/adapters/capek/workspace';
 import { generateSessionTitle, hasManualSessionTitle, isDefaultSessionTitle } from '@/infrastructure/session-title';
 import { isSandboxActive } from '@/infrastructure/sandbox';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { getSession } from '@/infrastructure/sqlite/session-store';
+import { getDatabase } from '@/infrastructure/sqlite/database';
+import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { seedSession, seedWorkspace } from '#tests/seed';
+import { getTestDataDir, resetTestDataDir, setupTestDataDir } from '#tests/test-dir';
+import { mkdirSync, rmSync } from 'fs';
+import { join } from 'path';
+import type { ToolDefinition } from '@capekai/tool';
 
 describe('Čapek binding group adapters', () => {
   beforeEach(() => {
+    setupTestDataDir();
     setupTestDatabase();
   });
 
   afterEach(() => {
     resetTestDatabase();
+    resetTestDataDir();
   });
 
   test('interaction group keeps the async operations and identities', async () => {
@@ -71,12 +80,13 @@ describe('Čapek binding group adapters', () => {
 
   test('bindings assemble the exact group objects in the original order', () => {
     expect(Object.keys(jean2CompatibilityBindings)).toEqual([
-      'interaction', 'delivery', 'titles', 'workspace', 'sandbox', 'layout',
+      'interaction', 'delivery', 'titles', 'workspace', 'toolPolicy', 'sandbox', 'layout',
     ]);
     expect(jean2CompatibilityBindings.interaction).toBe(jean2InteractionBindings);
     expect(jean2CompatibilityBindings.delivery).toBe(jean2DeliveryBindings);
     expect(jean2CompatibilityBindings.titles).toBe(jean2TitleBindings);
     expect(jean2CompatibilityBindings.workspace).toBe(jean2WorkspaceBindings);
+    expect(jean2CompatibilityBindings.toolPolicy).toBe(jean2ToolPolicy);
     expect(jean2CompatibilityBindings.sandbox).toBe(jean2SandboxBindings);
     expect('store' in jean2CompatibilityBindings).toBe(false);
   });
@@ -88,5 +98,70 @@ describe('Čapek binding group adapters', () => {
   test('installs the module-level compatibility bindings by identity', () => {
     configureJean2Bindings();
     expect(getJean2CompatibilityBindings()).toBe(jean2CompatibilityBindings);
+  });
+
+  test('resolves available managed roots and fails closed for unavailable roots', async () => {
+    seedWorkspace({ id: 'ws1' });
+    const path = join(getTestDataDir()!, 'worktree-1');
+    mkdirSync(path, { recursive: true });
+    const worktrees = createManagedWorktreeRepository(getDatabase);
+    worktrees.create({
+      id: 'worktree-1',
+      name: 'test-worktree',
+      workspaceId: 'ws1',
+      repositoryId: 'repository-1',
+      repositoryRoot: '/repo/.git',
+      path,
+      branch: 'feature/test',
+      head: 'abc123',
+      state: 'available',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    expect(await jean2WorkspaceBindings.resolveSessionWorkspace?.({
+      sessionId: 'session-1',
+      workspaceId: 'ws1',
+      workspaceRootId: 'worktree-1',
+      workspacePath: '/repo',
+      additionalPaths: ['/other'],
+    })).toEqual({ workspacePath: path, additionalPaths: [] });
+    await expect(jean2WorkspaceBindings.resolveSessionWorkspace?.({
+      sessionId: 'session-1',
+      workspaceId: 'foreign-workspace',
+      workspaceRootId: 'worktree-1',
+      workspacePath: '/repo',
+    })).rejects.toThrow('not available');
+
+    rmSync(path, { recursive: true });
+    await expect(jean2WorkspaceBindings.resolveSessionWorkspace?.({
+      sessionId: 'session-1',
+      workspaceId: 'ws1',
+      workspaceRootId: 'worktree-1',
+      workspacePath: '/repo',
+    })).rejects.toThrow('directory is missing');
+    expect(worktrees.get('worktree-1')?.state).toBe('missing');
+
+    worktrees.update('worktree-1', { state: 'removed' });
+    await expect(jean2WorkspaceBindings.resolveSessionWorkspace?.({
+      sessionId: 'session-1',
+      workspaceId: 'ws1',
+      workspaceRootId: 'worktree-1',
+      workspacePath: '/repo',
+    })).rejects.toThrow('not available');
+  });
+
+  test('hides the divergent git-worktree tool from runtime construction', async () => {
+    const gitWorktree = { name: 'git-worktree' } as ToolDefinition;
+    const readFile = { name: 'read-file' } as ToolDefinition;
+
+    expect(await jean2ToolPolicy.resolveDefinition?.({
+      sessionId: 'session-1',
+      definition: gitWorktree,
+    })).toBeNull();
+    expect(await jean2ToolPolicy.resolveDefinition?.({
+      sessionId: 'session-1',
+      definition: readFile,
+    })).toBe(readFile);
   });
 });

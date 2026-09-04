@@ -36,6 +36,7 @@ interface TerminalSession {
   buffer: OutputChunk[];
   bufferBytes: number;
   inAlternateScreen: boolean;
+  managedWorktreeId?: string;
 }
 
 function getDefaultShell(): string {
@@ -107,6 +108,7 @@ export class TerminalManager {
       workspaceId: string;
       cols?: number;
       rows?: number;
+      managedWorktreeId?: string;
     }
   ): string {
     const { cwd, workspaceId, cols = 80, rows = 24 } = options;
@@ -137,7 +139,15 @@ export class TerminalManager {
       return '';
     }
 
-    const result = this.spawnSession({ shell, cwd, workspaceId, cols, rows, initialClient: ws });
+    const result = this.spawnSession({
+      shell,
+      cwd,
+      workspaceId,
+      cols,
+      rows,
+      managedWorktreeId: options.managedWorktreeId,
+      initialClient: ws,
+    });
     if (!result) {
       const errorPayload = new TextEncoder().encode(JSON.stringify({ message: 'Failed to create terminal session' }));
       ws.send(encodeFrame(OPCODES.ERROR, errorPayload));
@@ -156,6 +166,7 @@ export class TerminalManager {
     rows?: number;
     origin?: 'user' | 'agent';
     title?: string;
+    managedWorktreeId?: string;
   }): string | null {
     const { cwd } = options;
     if (!cwd || !existsSync(cwd)) return null;
@@ -178,6 +189,7 @@ export class TerminalManager {
       rows?: number;
       origin?: 'user' | 'agent';
       initialClient?: TerminalSocket;
+      managedWorktreeId?: string;
     }
   ): { sessionId: string; session: TerminalSession } | null {
     const { cwd, workspaceId, cols = 80, rows = 24, initialClient } = options;
@@ -258,6 +270,7 @@ export class TerminalManager {
         buffer: [],
         bufferBytes: 0,
         inAlternateScreen: false,
+        managedWorktreeId: options.managedWorktreeId,
       };
 
       this.sessions.set(sessionId, session);
@@ -274,6 +287,7 @@ export class TerminalManager {
         pid: pty.pid,
         cols,
         rows,
+        managedWorktreeId: options.managedWorktreeId,
       });
 
       pty.onExit((event: IExitEvent) => {
@@ -528,6 +542,7 @@ export class TerminalManager {
       activeClientCount: session.clients.size,
       inAlternateScreen: session.inAlternateScreen,
       origin: session.origin,
+      managedWorktreeId: session.managedWorktreeId,
     };
   }
 
@@ -560,6 +575,19 @@ export class TerminalManager {
     const result: TerminalSessionInfo[] = [];
     for (const session of this.sessions.values()) {
       if (session.workspaceId === workspaceId) {
+        result.push(this.getSessionInfo(session));
+      }
+    }
+    return result;
+  }
+
+  listSessionsForWorktree(worktreeId: string, legacyPath: string): TerminalSessionInfo[] {
+    const result: TerminalSessionInfo[] = [];
+    for (const session of this.sessions.values()) {
+      if (
+        session.managedWorktreeId === worktreeId
+        || (!session.managedWorktreeId && session.cwd === legacyPath)
+      ) {
         result.push(this.getSessionInfo(session));
       }
     }

@@ -604,6 +604,31 @@ describe('terminal manager (PTY/transport ownership)', () => {
     expect(manager.getSession(idB)).not.toBeNull();
   });
 
+  test('worktree listing prefers managed identity and retains exact-path legacy fallback', () => {
+    const managedPath = makeTempDir();
+    const otherPath = makeTempDir();
+    const store = new RecordingStore();
+    const { manager } = makeManager(store);
+
+    const managedId = manager.createSessionDetached({
+      cwd: otherPath,
+      workspaceId: 'w1',
+      managedWorktreeId: 'worktree-1',
+    }) as string;
+    const legacyId = manager.createSessionDetached({
+      cwd: managedPath,
+      workspaceId: 'w1',
+    }) as string;
+    manager.createSessionDetached({
+      cwd: managedPath,
+      workspaceId: 'w1',
+      managedWorktreeId: 'worktree-2',
+    });
+
+    expect(manager.listSessionsForWorktree('worktree-1', managedPath).map((session) => session.id))
+      .toEqual([managedId, legacyId]);
+  });
+
   test('without an installed store port, spawn persistence fails and returns null', () => {
     const originalError = console.error;
     console.error = () => {};

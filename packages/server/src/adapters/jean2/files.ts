@@ -21,9 +21,26 @@ const editableOps = createEditableFileOps(workspacePathPolicyPort);
 const treeOps = createFileTreeOps(workspacePathPolicyPort);
 const gitOps = createGitStatus(workspacePathPolicyPort);
 
-export function createJean2FilesApplicationPort(): FilesApplicationPort {
+interface Jean2FilesApplicationPortOptions {
+  listAvailableWorktreePaths?: (workspaceId: string) => string[];
+}
+
+export function createJean2FilesApplicationPort(
+  options: Jean2FilesApplicationPortOptions = {},
+): FilesApplicationPort {
   return {
-    getWorkspace: (workspaceId) => getWorkspace(workspaceId),
+    getWorkspace: (workspaceId) => {
+      const workspace = getWorkspace(workspaceId);
+      if (!workspace) return null;
+
+      return {
+        ...workspace,
+        additionalPaths: Array.from(new Set([
+          ...workspace.additionalPaths,
+          ...(options.listAvailableWorktreePaths?.(workspaceId) ?? []),
+        ])),
+      };
+    },
 
     resolveRoot: (workspace, rootQuery) =>
       workspacePathPolicyPort.resolveRootForQuery(workspace, rootQuery),

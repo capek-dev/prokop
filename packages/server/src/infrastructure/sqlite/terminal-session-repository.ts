@@ -22,8 +22,8 @@ export function createTerminalSessionRepository(
     createTerminalSession(session: CreateTerminalSessionInput): void {
       const now = Date.now();
       getDb().run(
-        `INSERT INTO terminal_sessions (id, workspace_id, cwd, shell, pid, cols, rows, title, status, created_at, last_activity_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'main', 'running', ?, ?)`,
+        `INSERT INTO terminal_sessions (id, workspace_id, cwd, shell, pid, cols, rows, managed_worktree_id, title, status, created_at, last_activity_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'main', 'running', ?, ?)`,
         [
           session.id,
           session.workspaceId,
@@ -32,6 +32,7 @@ export function createTerminalSessionRepository(
           session.pid,
           session.cols,
           session.rows,
+          session.managedWorktreeId ?? null,
           now,
           now,
         ]

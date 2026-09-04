@@ -25,6 +25,7 @@ export function initializeSessionMessageSchema(
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
+      workspace_root_id TEXT,
       preconfig_id TEXT,
       title TEXT,
       status TEXT NOT NULL DEFAULT 'active',
@@ -45,12 +46,20 @@ export function initializeSessionMessageSchema(
       subagent_status TEXT,
       running_at TEXT,
       compacting INTEGER NOT NULL DEFAULT 0,
-      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+      FOREIGN KEY (workspace_root_id) REFERENCES managed_worktrees(id)
     )
   `);
 
   db.run('CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)');
   db.run('CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_id)');
+
+  try {
+    db.run('ALTER TABLE sessions ADD COLUMN workspace_root_id TEXT REFERENCES managed_worktrees(id)');
+  } catch {
+    // Column already exists
+  }
+  db.run('CREATE INDEX IF NOT EXISTS idx_sessions_workspace_root ON sessions(workspace_root_id)');
 
   // Phase 5: Workspace-leading indexes for paginated session queries
   db.run('CREATE INDEX IF NOT EXISTS idx_sessions_workspace_updated ON sessions(workspace_id, updated_at DESC, id DESC)');

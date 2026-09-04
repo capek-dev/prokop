@@ -12,6 +12,7 @@ import type {
   SessionRepositoryPort,
 } from '../ports/session';
 import type { ToolCatalogPort } from '../ports/tool-catalog';
+import type { WorktreeAttachmentRefreshPort } from '../ports/worktree';
 import { sendGateRejection } from './chat';
 import { projectMessagesForClient } from './tool-debug';
 
@@ -23,10 +24,15 @@ export interface SessionLifecycleDeps<Origin> {
   pendingAsks: PendingAskPort;
   askAuthority: AskAuthorityPort;
   toolCatalog?: Pick<ToolCatalogPort, 'listTools'>;
+  workspaceRoots?: {
+    isAvailable(workspaceId: string, workspaceRootId: string): boolean;
+  };
+  worktreeAttachments?: WorktreeAttachmentRefreshPort;
 }
 
 export interface SessionCreateInput {
   workspaceId?: string;
+  workspaceRootId?: string;
   preconfigId?: string;
   title?: string;
 }
@@ -97,13 +103,30 @@ function buildSyncRequests(
 export function createSessionLifecycleApplication<Origin>(
   deps: SessionLifecycleDeps<Origin>,
 ): SessionLifecycleApplication<Origin> {
+  const refreshAttachments = (workspaceRootId?: string | null): void => {
+    if (workspaceRootId) deps.worktreeAttachments?.changed(workspaceRootId);
+  };
+
   return {
     async create(wire, origin, input): Promise<void> {
+      const workspaceId = input.workspaceId || '';
+      if (
+        input.workspaceRootId
+        && !deps.workspaceRoots?.isAvailable(workspaceId, input.workspaceRootId)
+      ) {
+        wire.delivery.send(origin, {
+          type: 'error',
+          code: 'invalid_workspace_root',
+          message: 'Selected worktree is not available for this workspace',
+        });
+        return;
+      }
       const sessionId = crypto.randomUUID();
       const workspaceAutoApprove = deps.repository.getWorkspaceAutoApproveSeverity(input.workspaceId || '');
       const session = deps.repository.createSession({
         id: sessionId,
-        workspaceId: input.workspaceId || '',
+        workspaceId,
+        workspaceRootId: input.workspaceRootId ?? null,
         preconfigId: input.preconfigId || null,
         title: input.title || 'New Session',
         status: 'active',
@@ -128,12 +151,14 @@ export function createSessionLifecycleApplication<Origin>(
           updates.selectedVariant = preconfig.variant ?? null;
           updates.agentId = deps.repository.isAgentSync(input.preconfigId) ? input.preconfigId : null;
           const updated = deps.repository.updateSession(sessionId, updates);
+          refreshAttachments(updated?.workspaceRootId);
           wire.delivery.send(origin, { type: 'session.created', session: updated! });
           wire.delivery.broadcast({ type: 'session.created', session: updated! }, origin);
           return;
         }
       }
 
+      refreshAttachments(session.workspaceRootId);
       wire.delivery.send(origin, { type: 'session.created', session });
       wire.delivery.broadcast({ type: 'session.created', session }, origin);
     },
@@ -165,6 +190,7 @@ export function createSessionLifecycleApplication<Origin>(
       }
 
       const reconciledSession = deps.repository.getSession(sessionId);
+      refreshAttachments(reconciledSession?.workspaceRootId);
       const transcriptPage = deps.repository.listLatestMessagesWithPartsPage(session.id, 50);
       const clientMessages = await projectMessagesForClient(transcriptPage.messages, deps.toolCatalog);
 
@@ -295,6 +321,7 @@ export function createSessionLifecycleApplication<Origin>(
           return;
         }
         deps.repository.deleteSession(sessionId);
+        refreshAttachments(session.workspaceRootId);
         wire.delivery.send(origin, { type: 'session.deleted', sessionId });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Delete failed';
@@ -319,6 +346,7 @@ export function createSessionLifecycleApplication<Origin>(
           title: trimmedTitle,
           metadata: deps.repository.markManualSessionTitle(session.metadata),
         });
+        refreshAttachments(updatedSession?.workspaceRootId);
         wire.delivery.broadcastToSession(sessionId, { type: 'session.renamed', session: updatedSession! });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Rename failed';
