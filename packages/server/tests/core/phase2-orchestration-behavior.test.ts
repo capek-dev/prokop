@@ -18,7 +18,6 @@ import {
 } from '@/infrastructure/sqlite/message-store';
 import {
   addMessageToQueue,
-  getNextQueuedMessage,
   listQueuedMessages,
 } from '@/infrastructure/sqlite/queued-messages';
 import { createAttachment } from '@/infrastructure/sqlite/attachments';
@@ -214,18 +213,37 @@ describe.serial('Phase 2 orchestration behavior', () => {
     expect(listQueuedMessages(sessionId)).toHaveLength(0);
   });
 
-  test('keeps queued follow-ups pending when the current turn is interrupted', async () => {
-    addMessageToQueue(sessionId, 'must remain queued');
+  test('sends queued follow-ups in FIFO order with attachments after interruption', async () => {
+    const attachment = createAttachment({
+      sessionId,
+      workspaceId,
+      filename: 'queued.png',
+      mimeType: 'image/png',
+      sizeBytes: 3,
+      data: new Uint8Array([1, 2, 3]).buffer,
+    });
+    const second = addMessageToQueue(sessionId, 'second', [{ id: attachment.id, kind: 'image' }]);
+    const third = addMessageToQueue(sessionId, 'third');
     const router = createRouterContext();
     const run = handleChat(router.ctx, router.ws, sessionId, 'first');
 
     await waitForPendingCall();
+    setTextResponses(2);
     await interruptManager.interruptSession(sessionId, 'user_request');
     await run;
 
-    expect(getNextQueuedMessage(sessionId)?.content).toBe('must remain queued');
-    expect(sandboxController.getHistory()).toHaveLength(1);
-    expect(router.broadcastToSession.some((message) => message.type === 'queue.sending')).toBe(false);
+    const userEntries = listMessagesWithParts(sessionId).filter(({ message }) => message.role === 'user');
+    expect(userEntries.map(({ parts }) => parts.find((part) => part.type === 'text')?.text))
+      .toEqual(['first', 'second', 'third']);
+    expect(userEntries[1].parts.filter((part) => part.type === 'image')).toMatchObject([{
+      type: 'image',
+      mimeType: 'image/png',
+      url: `/api/sessions/${sessionId}/attachments/${attachment.id}/content?key=${attachment.accessKey}`,
+    }]);
+    expect(listQueuedMessages(sessionId)).toHaveLength(0);
+    expect(sandboxController.getHistory()).toHaveLength(3);
+    expect(router.broadcastToSession.filter((message) => message.type === 'queue.sending').map((message) => message.queueId))
+      .toEqual([second.id, third.id]);
   });
 
   test('edits a user message, reverts later messages, and reruns without duplicating the user turn', async () => {
