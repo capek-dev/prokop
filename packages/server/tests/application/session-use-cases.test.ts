@@ -429,6 +429,72 @@ describe('application session use cases', () => {
       expect(spy.sent).toEqual([{ type: 'error', code: 'fork_error', message: 'Source session not found', sessionId: 'sess-1' }]);
     });
 
+    test('fork inherits the source workspaceRootId and broadcasts the patched record', async () => {
+      const forkedSession = makeSession({ id: 'fork-1', workspaceRootId: null });
+      const execution = makeExecution({ fork: async () => ({ forkedSession, messages: [] }) });
+      const updateCalls: Array<{ id: string; updates: { workspaceRootId?: string | null } }> = [];
+      const changedWorktrees: string[] = [];
+      const repository = makeRepository({
+        getSession: () => makeSession({ workspaceRootId: 'wt-1' }),
+        updateSession: (id, updates) => {
+          updateCalls.push({ id, updates });
+          return makeSession({ id, workspaceRootId: updates.workspaceRootId ?? null });
+        },
+      });
+      const app = createSessionTranscriptApplication({
+        repository,
+        execution,
+        gate: noGate(),
+        worktreeAttachments: { changed: (worktreeId) => { changedWorktrees.push(worktreeId); } },
+      });
+      const spy = makeSpy();
+      const wire = makeWire(spy);
+
+      await app.fork(wire, origin, { sessionId: 'sess-1', messageId: 'm-1' });
+
+      expect(updateCalls).toEqual([{ id: 'fork-1', updates: { workspaceRootId: 'wt-1' } }]);
+      expect(changedWorktrees).toEqual(['wt-1']);
+      expect(spy.broadcastToSession).toEqual([{
+        sessionId: 'sess-1',
+        message: expect.objectContaining({
+          type: 'session.forked',
+          forkedSession: expect.objectContaining({ id: 'fork-1', workspaceRootId: 'wt-1' }),
+        }),
+      }]);
+    });
+
+    test('fork does not touch the binding when the fork already carries one', async () => {
+      const forkedSession = makeSession({ id: 'fork-1', workspaceRootId: 'wt-2' });
+      const execution = makeExecution({ fork: async () => ({ forkedSession, messages: [] }) });
+      const updateCalls: Array<{ id: string; updates: { workspaceRootId?: string | null } }> = [];
+      const repository = makeRepository({
+        getSession: () => makeSession({ workspaceRootId: 'wt-1' }),
+        updateSession: (id, updates) => {
+          updateCalls.push({ id, updates });
+          return makeSession({ id, workspaceRootId: updates.workspaceRootId ?? null });
+        },
+      });
+      const app = createSessionTranscriptApplication({
+        repository,
+        execution,
+        gate: noGate(),
+        worktreeAttachments: { changed: () => {} },
+      });
+      const spy = makeSpy();
+      const wire = makeWire(spy);
+
+      await app.fork(wire, origin, { sessionId: 'sess-1', messageId: 'm-1' });
+
+      expect(updateCalls).toEqual([]);
+      expect(spy.broadcastToSession).toEqual([{
+        sessionId: 'sess-1',
+        message: expect.objectContaining({
+          type: 'session.forked',
+          forkedSession: expect.objectContaining({ workspaceRootId: 'wt-2' }),
+        }),
+      }]);
+    });
+
     test('fork delivers the gate rejection and does not execute', async () => {
       const execution = makeExecution({ fork: async () => { throw new Error('must not run'); } });
       const app = createSessionTranscriptApplication({ repository: makeRepository(), execution, gate: rejectGate() });

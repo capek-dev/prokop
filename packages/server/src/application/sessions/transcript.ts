@@ -126,8 +126,17 @@ export function createSessionTranscriptApplication<Origin>(
           targetMessageId: input.messageId,
           title: input.title,
         });
-        if (result.forkedSession.workspaceRootId) {
-          deps.worktreeAttachments?.changed(result.forkedSession.workspaceRootId);
+        // Capek's fork cannot carry Prokop's workspaceRootId extension, so
+        // inherit the source binding here and broadcast the patched record.
+        let forkedSession = result.forkedSession;
+        if (session.workspaceRootId && !forkedSession.workspaceRootId) {
+          const patched = deps.repository.updateSession(forkedSession.id, {
+            workspaceRootId: session.workspaceRootId,
+          });
+          if (patched) forkedSession = patched;
+        }
+        if (forkedSession.workspaceRootId) {
+          deps.worktreeAttachments?.changed(forkedSession.workspaceRootId);
         }
 
         const forkedPage = deps.repository.listLatestMessagesWithPartsPage(result.forkedSession.id, 50);
@@ -135,7 +144,7 @@ export function createSessionTranscriptApplication<Origin>(
         wire.delivery.broadcastToSession(sessionId, {
           type: 'session.forked',
           originalSessionId: sessionId,
-          forkedSession: result.forkedSession,
+          forkedSession,
           messages: clientMessages,
         });
       } catch (error) {
