@@ -112,6 +112,7 @@ export function useSessionCommands({
         preconfigId,
         title,
         workspaceId: activeWorkspace?.id,
+        workspaceRootId: options?.workspaceRootId,
       });
     }
   }, [clientRef, partAppendRafRef, pendingPartAppendsRef, pendingSessionCreateRef, activeWorkspace]);
@@ -429,7 +430,11 @@ export function useSessionCommands({
       ? getWorkspaceDefaultPreconfigId(ws, primaryPreconfigs)
       : primaryPreconfigs[0]?.id;
     if (client && client.connected) {
-      client.sessions.create({ preconfigId: defaultId, workspaceId });
+      client.sessions.create({
+        preconfigId: defaultId,
+        workspaceId,
+        workspaceRootId: options?.workspaceRootId,
+      });
     }
   }, [clientRef, partAppendRafRef, pendingPartAppendsRef, pendingSessionCreateRef, workspaces, primaryPreconfigs, setActiveWorkspace]);
 

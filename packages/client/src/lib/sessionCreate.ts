@@ -1,5 +1,6 @@
 export interface CreateSessionOptions {
   openAlongside?: boolean;
+  workspaceRootId?: string;
 }
 
 interface ModifierClick {

@@ -23,6 +23,9 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { cn } from '@/lib/utils';
 import { useCompletionStore, selectCompletionRecord, COMPLETION_FLASH_DURATION_MS } from '@/stores/completionStore';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
+import { useSdkClient } from '@/contexts/ServerClientContext';
+import { useWorktreesQuery } from '@/hooks/queries';
+import { getSessionWorktreeLabel, resolveSessionWorktree } from '@/lib/sessionWorktree';
 
 export type ChildrenMap = Map<string, Session[]>;
 
@@ -451,7 +454,15 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
           ? 'interrupted'
           : 'idle';
 
+  const sdkClient = useSdkClient();
+  const worktrees = useWorktreesQuery(sdkClient, session.workspaceId);
+  const resolvedWorktree = resolveSessionWorktree(
+    session.workspaceRootId,
+    session.worktree,
+    worktrees.data ?? [],
+  );
   const metaParts: React.ReactNode[] = [];
+  const worktreeLabel = getSessionWorktreeLabel(resolvedWorktree);
   if (needsApproval) metaParts.push(
     <span key="status" className="rounded-full bg-warning/15 px-1.5 py-0.5 font-medium text-warning">
       Needs approval
@@ -460,6 +471,18 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
   else if (derived.isRunning) metaParts.push(<span key="status" className="text-primary">Running</span>);
   else if (session.subagentStatus === 'error') metaParts.push(<span key="status" className="text-destructive">Errored</span>);
   else if (session.subagentStatus === 'interrupted') metaParts.push(<span key="status">Interrupted</span>);
+  if (session.workspaceRootId && worktreeLabel) metaParts.push(
+    <span
+      key="worktree"
+      className={cn(
+        'inline-block max-w-32 truncate align-bottom',
+        resolvedWorktree?.state !== 'available' && 'text-destructive',
+      )}
+      title={worktreeLabel}
+    >
+      ⑂ {worktreeLabel}
+    </span>,
+  );
   for (const tag of session.tags?.slice(0, 2) ?? []) metaParts.push(<span key={`tag-${tag}`}>#{tag}</span>);
   if (childSessions.length > 0) metaParts.push(<span key="runs">{childSessions.length} {childSessions.length === 1 ? 'run' : 'runs'}</span>);
   const timeLabel = relativeSessionTime(session.updatedAt ?? session.createdAt);

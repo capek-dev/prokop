@@ -16,6 +16,10 @@ export const queryKeys = {
     toolDebug: (sessionId: string, partId: string) =>
       ['sessions', sessionId, 'tool-debug', partId] as const,
   },
+  worktrees: {
+    byWorkspace: (workspaceId: string) => ['worktrees', 'workspace', workspaceId] as const,
+    refsByWorkspace: (workspaceId: string) => ['worktrees', 'refs', workspaceId] as const,
+  },
   tools: {
     all: ['tools'] as const,
     envVars: ['tools', 'envVars'] as const,

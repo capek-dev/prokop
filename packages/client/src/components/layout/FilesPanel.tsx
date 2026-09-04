@@ -1,11 +1,12 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, RefreshCw, ChevronDown, Folder, Check, Plus, FilePlus2, FolderPlus } from 'lucide-react';
+import { ArrowLeft, RefreshCw, ChevronDown, Folder, GitBranch, Check, PinOff, Plus, FilePlus2, FolderPlus } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { FileTree, type FileTreeHandle, GitChangesView, type GitChangesViewHandle } from '@/components/files';
 import { type FileEntryActionTarget } from '@/components/files/FileEntryContextMenu';
 import { FOLDER_ICON_COLOR } from '@/components/files/fileIcons';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
+import { useWorktreeMutations, useWorktreesQuery } from '@/hooks/queries';
 import { summarizeDiffStats } from '@/components/files/GitChangesView';
 import {
   Sidebar,
@@ -26,9 +28,12 @@ import { cn } from '@/lib/utils';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { useUIStore, type DefaultFileOpenMode } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
+import { useSessionBoardStore } from '@/stores/sessionBoardStore';
+import { useSessionStore } from '@/stores/sessionStore';
 import { useFileEditorStore } from '@/stores/fileEditorStore';
 import { queryClient } from '@/components/providers/QueryProvider';
 import { queryKeys } from '@/lib/queryKeys';
+import { buildFilesPanelRootOptions, resolveFilesPanelRoot } from '@/lib/sessionWorktree';
 
 interface FilesPanelProps {
   sdkClient: ProkopaiClient | null;
@@ -40,25 +45,15 @@ export interface FilesPanelHandle {
   focus: () => void;
 }
 
-function pathBasename(p: string): string {
-  const trimmed = p.replace(/\/+$/, '');
-  const slashIdx = trimmed.lastIndexOf('/');
-  return slashIdx === -1 ? trimmed : trimmed.slice(slashIdx + 1);
-}
-
 function PathSwitcher({
-  workspace,
+  options,
   selectedRoot,
   onSelect,
 }: {
-  workspace: { name: string; path: string; additionalPaths: string[] };
+  options: Array<{ label: string; value: string }>;
   selectedRoot: string;
   onSelect: (root: string) => void;
 }) {
-  const options = [
-    { label: workspace.name || pathBasename(workspace.path) || 'Workspace', value: workspace.path },
-    ...workspace.additionalPaths.map((p) => ({ label: pathBasename(p) || p, value: p })),
-  ];
   const selectedLabel = options.find((o) => o.value === selectedRoot)?.label ?? options[0].label;
 
   return (
@@ -104,11 +99,34 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
     const filesPanelTab = useChatLayoutStore((s) => s.filesPanelTab);
     const setFilesPanelTab = useChatLayoutStore((s) => s.setFilesPanelTab);
     const filesPanelRoot = useChatLayoutStore((s) => s.filesPanelRoot);
+    const filesPanelRootPinned = useChatLayoutStore((s) => s.filesPanelRootPinned);
     const setFilesPanelRoot = useChatLayoutStore((s) => s.setFilesPanelRoot);
+    const setFilesPanelRootPinned = useChatLayoutStore((s) => s.setFilesPanelRootPinned);
     const setWorkbenchSurface = useChatLayoutStore((s) => s.setWorkbenchSurface);
     const setMobileSurface = useChatLayoutStore((s) => s.setMobileSurface);
     const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
     const workspaceId = activeWorkspace?.id;
+    const focusedSessionId = useSessionBoardStore((s) => s.focusedSessionId);
+    const focusedSession = useSessionStore((s) => (
+      s.sessions.find((session) => session.id === focusedSessionId) ?? null
+    ));
+    const worktrees = useWorktreesQuery(sdkClient, workspaceId);
+    const worktreeMutations = useWorktreeMutations(sdkClient, workspaceId);
+    const sessionWorktree = worktrees.data?.find((worktree) => (
+      worktree.id === focusedSession?.workspaceRootId
+    )) ?? focusedSession?.worktree;
+    const managedRoots = useMemo(
+      () => (worktrees.data ?? [])
+        .filter((worktree) => worktree.state === 'available')
+        .map((worktree) => worktree.path),
+      [worktrees.data],
+    );
+    const rootOptions = useMemo(
+      () => activeWorkspace
+        ? buildFilesPanelRootOptions(activeWorkspace, worktrees.data ?? [])
+        : [],
+      [activeWorkspace, worktrees.data],
+    );
     const routeParams = useParams({ from: '/server/$serverId', strict: false } as unknown as Parameters<typeof useParams>[0]);
     const serverId = routeParams?.serverId as string | undefined;
 
@@ -128,19 +146,30 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       return d.identity.root ?? '';
     });
 
-    // Resolve the effective selected root (fall back to workspace.path).
-    const selectedRoot = filesPanelRoot ?? activeWorkspace?.path ?? '';
-    const isMainRoot = selectedRoot === activeWorkspace?.path;
+    // Follow the focused session unless the user pinned a root manually.
+    const rootResolution = resolveFilesPanelRoot({
+      workspacePath: activeWorkspace?.path ?? '',
+      workspaceRootId: focusedSession?.workspaceRootId,
+      worktree: sessionWorktree,
+      pinnedRoot: filesPanelRoot,
+      pinned: filesPanelRootPinned,
+    });
+    const selectedRoot = rootResolution.selectedRoot;
+    const isMainRoot = rootResolution.isPrimary;
+    const rootBlocked = rootResolution.blocked;
 
     // Reset stale root when the active workspace changes.
     useEffect(() => {
       if (!activeWorkspace) return;
-      if (filesPanelRoot && filesPanelRoot !== activeWorkspace.path && !activeWorkspace.additionalPaths.includes(filesPanelRoot)) {
+      const allowedRoots = [...activeWorkspace.additionalPaths, ...managedRoots];
+      if (filesPanelRoot && filesPanelRoot !== activeWorkspace.path && !allowedRoots.includes(filesPanelRoot)) {
         setFilesPanelRoot(null);
+        setFilesPanelRootPinned(false);
       }
-    }, [activeWorkspace, filesPanelRoot, setFilesPanelRoot]);
+    }, [activeWorkspace, filesPanelRoot, managedRoots, setFilesPanelRoot, setFilesPanelRootPinned]);
 
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [rootRecoveryError, setRootRecoveryError] = useState<string | null>(null);
 
     const handleRefresh = useCallback(() => {
       setIsRefreshing(true);
@@ -264,11 +293,35 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
     const headerContent = activeWorkspace ? (
       <div className="flex flex-col gap-2 px-2 pt-2 pb-2">
         <div className="flex items-center gap-1.5">
-          <PathSwitcher
-            workspace={activeWorkspace}
-            selectedRoot={selectedRoot}
-            onSelect={setFilesPanelRoot}
-          />
+          {rootBlocked ? (
+            <div className="flex min-w-0 items-center gap-1.5 px-2 text-sm font-semibold text-destructive">
+              <GitBranch className="size-4 shrink-0" />
+              <span className="truncate">Worktree unavailable</span>
+            </div>
+          ) : (
+            <PathSwitcher
+              options={rootOptions}
+              selectedRoot={selectedRoot}
+              onSelect={(root) => {
+                setFilesPanelRoot(root);
+                setFilesPanelRootPinned(true);
+              }}
+            />
+          )}
+          {filesPanelRootPinned && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => {
+                setFilesPanelRoot(null);
+                setFilesPanelRootPinned(false);
+              }}
+              aria-label="Follow focused session"
+              title="Follow focused session"
+            >
+              <PinOff />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon-xs"
@@ -330,7 +383,62 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       </div>
     ) : null;
 
-    const content = workspaceId ? (
+    const content = workspaceId && rootBlocked ? (
+      <div className="p-3">
+        <Alert variant="destructive">
+          <GitBranch />
+          <AlertTitle>This session's worktree is unavailable</AlertTitle>
+          <AlertDescription>
+            <p>
+              Files and Changes are blocked so Prokop does not silently use the primary checkout.
+            </p>
+            {rootRecoveryError && <p>{rootRecoveryError}</p>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!focusedSession || worktreeMutations.unbind.isPending}
+                onClick={() => {
+                  if (!focusedSession) return;
+                  setRootRecoveryError(null);
+                  worktreeMutations.unbind.mutate(focusedSession.id, {
+                    onError: (error) => setRootRecoveryError(
+                      error instanceof Error ? error.message : String(error),
+                    ),
+                  });
+                }}
+              >
+                Use primary checkout
+              </Button>
+              {worktrees.data
+                ?.filter((worktree) => worktree.state === 'available')
+                .map((worktree) => (
+                  <Button
+                    key={worktree.id}
+                    size="sm"
+                    variant="outline"
+                    disabled={!focusedSession || worktreeMutations.bind.isPending}
+                    onClick={() => {
+                      if (!focusedSession) return;
+                      setRootRecoveryError(null);
+                      worktreeMutations.bind.mutate(
+                        { sessionId: focusedSession.id, worktreeId: worktree.id },
+                        {
+                          onError: (error) => setRootRecoveryError(
+                            error instanceof Error ? error.message : String(error),
+                          ),
+                        },
+                      );
+                    }}
+                  >
+                    Use {worktree.branch ?? 'detached worktree'}
+                  </Button>
+                ))}
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    ) : workspaceId ? (
       filesPanelTab === 'project' ? (
         <FileTree
           ref={fileTreeRef}

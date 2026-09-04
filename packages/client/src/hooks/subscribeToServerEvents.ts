@@ -1,4 +1,4 @@
-import type { ChatRetryMessage, CompactionCompleteMessage, ProkopaiClient, SessionInterruptResult, SessionControlState } from '@prokopai/sdk';
+import type { ChatRetryMessage, CompactionCompleteMessage, ManagedWorktree, ProkopaiClient, SessionInterruptResult, SessionControlState } from '@prokopai/sdk';
 import type { RefObject } from 'react';
 import type { Session, Message, Part, MessageWithParts, PermissionGrant, QueuedMessage, Ask } from '@prokopai/sdk';
 import type { SessionHandlersContext, SessionUsage } from '@/handlers/serverMessage';
@@ -8,6 +8,7 @@ import { permissionQueueHandlers } from '@/handlers/serverMessage';
 import { providerHandlers } from '@/handlers/serverMessage';
 import { askHandlers } from '@/handlers/serverMessage';
 import { controlHandlers } from '@/handlers/serverMessage';
+import { worktreeHandlers } from '@/handlers/serverMessage';
 import { useChatRetryStore } from '@/stores/chatRetryStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 
@@ -78,6 +79,9 @@ export function subscribeToServerEvents(
   });
   add('session.state', (sessionId: unknown, messages: unknown) => {
     sessionHandlers['session.state']({ type: 'session.state', sessionId: sessionId as string, messages: messages as MessageWithParts[] }, ctx()!);
+  });
+  add('worktree.updated', (worktree: unknown) => {
+    worktreeHandlers['worktree.updated'](worktree as ManagedWorktree);
   });
 
   add('session.control.updated', (control: unknown, reason: unknown) => {

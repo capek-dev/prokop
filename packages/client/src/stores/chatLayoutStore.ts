@@ -21,6 +21,7 @@ interface ChatLayoutState {
   filesPanelWidth: number;
   filesPanelTab: FilesPanelTab;
   filesPanelRoot: string | null;
+  filesPanelRootPinned: boolean;
   workbenchSurface: WorkbenchSurface;
   mobileSurface: MobileSurface;
 }
@@ -32,6 +33,7 @@ interface ChatLayoutActions {
   setFilesPanelWidth: (width: number) => void;
   setFilesPanelTab: (tab: FilesPanelTab) => void;
   setFilesPanelRoot: (root: string | null) => void;
+  setFilesPanelRootPinned: (pinned: boolean) => void;
   setWorkbenchSurface: (surface: WorkbenchSurface) => void;
   setMobileSurface: (surface: MobileSurface) => void;
 }
@@ -53,6 +55,7 @@ export const useChatLayoutStore = create<ChatLayoutStore>((set) => ({
   filesPanelWidth: getInitialFilesPanelWidth(),
   filesPanelTab: 'project',
   filesPanelRoot: null,
+  filesPanelRootPinned: false,
   workbenchSurface: 'explorer',
   mobileSurface: 'chat',
 
@@ -70,6 +73,7 @@ export const useChatLayoutStore = create<ChatLayoutStore>((set) => ({
   },
   setFilesPanelTab: (tab) => set({ filesPanelTab: tab }),
   setFilesPanelRoot: (root) => set({ filesPanelRoot: root }),
+  setFilesPanelRootPinned: (filesPanelRootPinned) => set({ filesPanelRootPinned }),
   setWorkbenchSurface: (workbenchSurface) => set({ workbenchSurface }),
   setMobileSurface: (mobileSurface) => set({ mobileSurface }),
 }));

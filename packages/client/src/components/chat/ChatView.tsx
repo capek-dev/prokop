@@ -13,6 +13,7 @@ import { useSessionStore, type SessionNavigationIntent } from '@/stores/sessionS
 import { useTranscriptPagination } from '@/hooks/useTranscriptPagination';
 import { RetryStatus } from './RetryStatus';
 import { UserPromptMap } from './UserPromptMap';
+import { EmptySessionCheckout } from './EmptySessionCheckout';
 
 export interface DisplayItem {
   message: import('@prokopai/sdk').Message;
@@ -285,6 +286,9 @@ export function ChatView({
           isLoadingOlder={contentMeta?.isLoadingOlder}
           loadOlderError={contentMeta?.loadOlderError}
           onLoadOlder={loadOlder}
+          emptyContent={isMainActiveSession && !isObserver
+            ? <EmptySessionCheckout session={session} sdkClient={sdkClient ?? null} />
+            : undefined}
         />
 
         {onNavigateToMessage && (

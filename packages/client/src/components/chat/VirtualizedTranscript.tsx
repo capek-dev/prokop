@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback, useMemo, memo, useLayoutEffect } from 'react';
+import type { ReactNode } from 'react';
 import { buildApiUrl } from '@/config/urls';
 import { LegendList, type LegendListRef } from '@legendapp/list/react';
 import { ChevronDown, ChevronRight, Download, FileIcon, Braces, Loader2 } from 'lucide-react';
@@ -65,6 +66,7 @@ interface VirtualizedTranscriptProps {
   isLoadingOlder?: boolean;
   loadOlderError?: string | null;
   onLoadOlder?: () => void;
+  emptyContent?: ReactNode;
 }
 
 function getTextContent(parts: Part[]): string {
@@ -670,6 +672,7 @@ export function VirtualizedTranscript({
   isLoadingOlder = false,
   loadOlderError = null,
   onLoadOlder,
+  emptyContent,
 }: VirtualizedTranscriptProps) {
   const listRef = useRef<LegendListRef | null>(null);
   const autoScrollRef = useRef(autoFollow);
@@ -1057,7 +1060,7 @@ export function VirtualizedTranscript({
       className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative chat-transcript-scrollbar"
       style={{ WebkitOverflowScrolling: 'touch' }}
       ListHeaderComponent={header}
-      ListEmptyComponent={EmptyTranscript}
+      ListEmptyComponent={emptyContent ? () => emptyContent : EmptyTranscript}
     />
   );
 }

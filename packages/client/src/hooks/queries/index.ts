@@ -11,6 +11,7 @@ export { useFileBrowseQuery, useFileSearchQuery, useFileBrowseFsQuery, useFileDr
 export { useResponseFormatsQuery, useCreateResponseFormat, useUpdateResponseFormat, useDeleteResponseFormat } from './useResponseFormatsQueries';
 export { usePinnedMessagesQuery, usePinMessageMutation, useUnpinMessageMutation } from './usePinnedMessagesQueries';
 export { useWorkspaceTagsQuery, useInvalidateWorkspaceTags } from './useSessionTagsQueries';
+export { useWorktreeRefsQuery, useWorktreesQuery, useWorktreeMutations } from './useWorktreeQueries';
 export {
   useScheduledJobs,
   useCreateScheduledJob,

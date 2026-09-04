@@ -32,6 +32,9 @@ import type { ProkopaiClient } from '@prokopai/sdk';
 import { FOLDER_ICON_COLOR } from '@/components/files/fileIcons';
 import { cn } from '@/lib/utils';
 import { useConnectionStore } from '@/stores/connectionStore';
+import { useSessionBoardStore } from '@/stores/sessionBoardStore';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useWorktreesQuery } from '@/hooks/queries';
 
 export interface TerminalPanelHandle {
   focus: () => void;
@@ -73,6 +76,20 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   const isMobile = useIsMobile();
   const viewport = useVisualViewport();
   const connected = useConnectionStore((state) => state.connected);
+  const focusedSessionId = useSessionBoardStore((state) => state.focusedSessionId);
+  const focusedSession = useSessionStore((state) => (
+    state.sessions.find((session) => session.id === focusedSessionId) ?? null
+  ));
+  const worktrees = useWorktreesQuery(sdkClient, workspaceId);
+  const sessionWorktree = worktrees.data?.find((worktree) => (
+    worktree.id === focusedSession?.workspaceRootId
+  )) ?? focusedSession?.worktree;
+  const sessionRootUnavailable = Boolean(
+    focusedSession?.workspaceRootId && sessionWorktree?.state !== 'available',
+  );
+  const defaultTerminalRoot = focusedSession?.workspaceRootId
+    ? sessionWorktree?.state === 'available' ? sessionWorktree.path : undefined
+    : workspacePath;
 
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
   const [activeTabServerId, setActiveTabServerId] = useState<string | null>(null);
@@ -462,15 +479,22 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     setActiveTabServerId(serverSessionId);
   }, [workspaceId, connected, activeTabServerId, activeTabStatus, connect]);
 
-  const addTab = useCallback(async (cwd = workspacePath) => {
+  const addTab = useCallback(async (cwd = defaultTerminalRoot) => {
     if (!workspaceId || !cwd || !sdkClient) return;
 
     try {
-      await sdkClient.http.terminals.create(workspaceId, { body: { cwd } });
+      await sdkClient.http.terminals.create(workspaceId, {
+        body: {
+          cwd,
+          ...(cwd === sessionWorktree?.path && sessionWorktree.state === 'available'
+            ? { managedWorktreeId: sessionWorktree.id }
+            : {}),
+        },
+      });
     } catch (err) {
       console.error('[TerminalPanel] Failed to create terminal:', err);
     }
-  }, [workspaceId, workspacePath, sdkClient]);
+  }, [workspaceId, defaultTerminalRoot, sdkClient, sessionWorktree]);
 
   useEffect(() => {
     addTabRef.current = addTab;
@@ -579,11 +603,21 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   };
 
   const terminalRoots = [
+    ...(sessionWorktree ? [{
+      label: `${sessionWorktree.branch ?? 'Detached HEAD'} (focused session)`,
+      path: sessionWorktree.path,
+    }] : []),
     { label: workspaceName || workspacePath.split('/').pop() || 'Workspace', path: workspacePath },
     ...additionalPaths.map(path => ({
       label: path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || path,
       path,
     })),
+    ...(worktrees.data ?? [])
+      .filter((worktree) => worktree.state === 'available' && worktree.id !== sessionWorktree?.id)
+      .map((worktree) => ({
+        label: worktree.branch ?? 'Detached HEAD',
+        path: worktree.path,
+      })),
   ];
 
   const renderAddTerminalMenu = () => {
