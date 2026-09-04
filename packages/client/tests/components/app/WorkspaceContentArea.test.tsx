@@ -44,6 +44,10 @@ vi.mock('@/components/editor/FileEditorSurface', () => ({
   FileEditorSurface: () => <div data-testid="editor-content" />,
 }));
 
+vi.mock('@/hooks/queries', () => ({
+  useWorktreesQuery: () => ({ data: [], isLoading: false }),
+}));
+
 function createViewRefs(): ViewRefs {
   return {
     sidebarRef: createRef(),

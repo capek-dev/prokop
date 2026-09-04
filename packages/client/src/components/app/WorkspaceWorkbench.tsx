@@ -1,9 +1,10 @@
 import type { RefObject } from 'react';
-import { ArrowLeft, Code2, FolderTree, GitBranch } from 'lucide-react';
+import { ArrowLeft, Code2, FolderTree, GitBranch, GitFork } from 'lucide-react';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { FileEditorSurface } from '@/components/editor/FileEditorSurface';
 import { FilesPanel, type FilesPanelHandle } from '@/components/layout/FilesPanel';
 import { Button } from '@/components/ui/button';
+import { useWorktreesQuery } from '@/hooks/queries';
 import { hasOpenDocsForScope, useFileEditorStore } from '@/stores/fileEditorStore';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { cn } from '@/lib/utils';
@@ -35,13 +36,17 @@ export function WorkspaceWorkbench({
   const setMobileSurface = useChatLayoutStore((state) => state.setMobileSurface);
   const openDocCount = useFileEditorStore((state) => state.openDocIds.length);
   const hasEditorDocs = openDocCount > 0 && hasOpenDocsForScope(serverId, workspaceId);
+  const { data: worktreesData } = useWorktreesQuery(sdkClient, workspaceId);
+  const hasWorktrees = (worktreesData ?? []).length > 0;
 
   const activeSurface = mobile
     ? mobileSurface === 'editor' && hasEditorDocs
       ? 'editor'
       : filesPanelTab === 'changes'
         ? 'changes'
-        : 'explorer'
+        : filesPanelTab === 'worktrees'
+          ? 'worktrees'
+          : 'explorer'
     : surface === 'editor' && !hasEditorDocs
       ? 'explorer'
       : surface;
@@ -103,6 +108,27 @@ export function WorkspaceWorkbench({
             <GitBranch className="size-3.5" />
             Changes
           </button>
+          {hasWorktrees && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeSurface === 'worktrees'}
+              onClick={() => {
+                setFilesPanelTab('worktrees');
+                setSurface('worktrees');
+                if (mobile) setMobileSurface('files');
+              }}
+              className={cn(
+                'flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',
+                activeSurface === 'worktrees'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <GitFork className="size-3.5" />
+              Worktrees
+            </button>
+          )}
           {hasEditorDocs && (
             <button
               type="button"

@@ -16,8 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
-import { useWorktreeMutations, useWorktreesQuery } from '@/hooks/queries';
-import { summarizeDiffStats } from '@/components/files/GitChangesView';
+import { useWorktreeMutations, useWorktreesQuery } from '@/hooks/queries';import { summarizeDiffStats } from '@/components/files/GitChangesView';
 import {
   Sidebar,
   SidebarContent,
@@ -34,6 +33,7 @@ import { useFileEditorStore } from '@/stores/fileEditorStore';
 import { queryClient } from '@/components/providers/QueryProvider';
 import { queryKeys } from '@/lib/queryKeys';
 import { buildFilesPanelRootOptions, resolveFilesPanelRoot } from '@/lib/sessionWorktree';
+import { WorktreesPanel } from '@/components/worktrees/WorktreesPanel';
 
 interface FilesPanelProps {
   sdkClient: ProkopaiClient | null;
@@ -203,6 +203,15 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       }
     }, [sdkClient, workspaceId]);
 
+    // When the last worktree disappears, the tab hides; leave the stored tab
+    // on a surface that still renders.
+    useEffect(() => {
+      if (filesPanelTab === 'worktrees' && !worktrees.isLoading && (worktrees.data ?? []).length === 0) {
+        setFilesPanelTab('project');
+        setWorkbenchSurface('explorer');
+      }
+    }, [filesPanelTab, worktrees.isLoading, worktrees.data, setFilesPanelTab, setWorkbenchSurface]);
+
     const focus = useCallback(() => {
       const focusActiveView = () => {
         if (filesPanelTab === 'changes') {
@@ -215,7 +224,7 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       if (isMobile) {
         setMobileSurface('files');
       } else {
-        setWorkbenchSurface(filesPanelTab === 'changes' ? 'changes' : 'explorer');
+        setWorkbenchSurface(filesPanelTab === 'changes' || filesPanelTab === 'worktrees' ? filesPanelTab : 'explorer');
         setShowFilesPanel(true);
       }
       requestAnimationFrame(() => requestAnimationFrame(focusActiveView));
@@ -373,10 +382,13 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
           )}
         </div>
         {!embedded && (
-          <Tabs value={filesPanelTab} onValueChange={(v) => setFilesPanelTab(v as 'project' | 'changes')}>
+          <Tabs value={filesPanelTab} onValueChange={(v) => setFilesPanelTab(v as 'project' | 'changes' | 'worktrees')}>
             <TabsList className="w-full">
               <TabsTrigger value="project" className="flex-1">Project</TabsTrigger>
               <TabsTrigger value="changes" className="flex-1">Changes</TabsTrigger>
+              {(worktrees.data ?? []).length > 0 && (
+                <TabsTrigger value="worktrees" className="flex-1">Worktrees</TabsTrigger>
+              )}
             </TabsList>
           </Tabs>
         )}
@@ -455,6 +467,8 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
             openFile({ entry: { name, type: 'file', path }, root: isMainRoot ? undefined : selectedRoot }, 'edit')
           }
         />
+      ) : filesPanelTab === 'worktrees' ? (
+        <WorktreesPanel sdkClient={sdkClient} workspaceId={workspaceId} />
       ) : (
         <GitChangesView
           ref={gitChangesRef}

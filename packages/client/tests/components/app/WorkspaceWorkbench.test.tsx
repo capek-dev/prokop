@@ -20,6 +20,10 @@ vi.mock('@/components/editor/FileEditorSurface', () => ({
   FileEditorSurface: () => <div data-testid="editor-content" />,
 }));
 
+vi.mock('@/hooks/queries', () => ({
+  useWorktreesQuery: () => ({ data: [], isLoading: false }),
+}));
+
 describe('WorkspaceWorkbench', () => {
   beforeEach(() => {
     useChatLayoutStore.setState({
