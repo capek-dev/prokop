@@ -7,7 +7,12 @@ export interface WorktreeUpdatedMessage {
   worktree: ManagedWorktree;
 }
 
-export type ServerMessage = CapekServerMessage | WorktreeUpdatedMessage;
+export interface WorktreeDeletedMessage {
+  type: 'worktree.deleted';
+  worktree: ManagedWorktree;
+}
+
+export type ServerMessage = CapekServerMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage;
 
 /**
  * Prokopai extends the neutral Capek gate action union with session

@@ -44,6 +44,7 @@ import type {
   InvalidRequestErrorMessage,
   ContextOverflowErrorMessage,
   WorktreeUpdatedMessage,
+  WorktreeDeletedMessage,
 } from '../shared';
 import type { TypedEventEmitter } from '../emitter';
 import type { SdkEvent } from './sdk-types';
@@ -91,6 +92,7 @@ export interface SdkEventMap {
   'session.updated': [session: SessionUpdatedMessage['session']];
   'session.renamed': [session: SessionRenamedMessage['session']];
   'worktree.updated': [worktree: WorktreeUpdatedMessage['worktree']];
+  'worktree.deleted': [worktree: WorktreeDeletedMessage['worktree']];
   'session.interrupted': [
     sessionId: SessionInterruptedMessage['sessionId'],
     result: SessionInterruptedMessage['result'],
@@ -260,6 +262,9 @@ export function routeServerMessage(
       break;
     case 'worktree.updated':
       emitter.emit('worktree.updated', msg.worktree);
+      break;
+    case 'worktree.deleted':
+      emitter.emit('worktree.deleted', msg.worktree);
       break;
     case 'session.interrupted':
       emitter.emit('session.interrupted', msg.sessionId, msg.result);
