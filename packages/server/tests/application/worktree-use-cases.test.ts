@@ -211,6 +211,36 @@ describe('managed worktree application', () => {
     });
   });
 
+  test('allows unbind with messages when the bound worktree is gone or dead', async () => {
+    for (const deadState of ['removed', 'missing'] as const) {
+      const state = setup({ hasMessages: true });
+      const created = await state.application.create('workspace-1', {
+        name: 'test-worktree',
+        branch: 'refs/heads/feature/test',
+      });
+      if (!created.ok) throw new Error(created.message);
+
+      state.records.set(created.value.id, {
+        ...state.records.get(created.value.id)!,
+        state: deadState,
+      });
+      state.sessions.set('session-1', session({ workspaceRootId: created.value.id }));
+      const unbound = await state.application.unbind('session-1');
+      expect(unbound.ok).toBe(true);
+      if (!unbound.ok) return;
+      expect(unbound.value.workspaceRootId).toBeNull();
+      expect(state.sessions.get('session-1')?.workspaceRootId).toBeNull();
+      expect(state.events).toContain('session:primary');
+    }
+
+    // A record that no longer exists at all is equally dead.
+    const state = setup({ hasMessages: true });
+    state.sessions.set('session-1', session({ workspaceRootId: 'gone-worktree' }));
+    const unbound = await state.application.unbind('session-1');
+    expect(unbound.ok).toBe(true);
+    expect(state.sessions.get('session-1')?.workspaceRootId).toBeNull();
+  });
+
   test('refuses dirty, running, and terminal-attached removal without invoking Git remove', async () => {
     const cases = [
       { options: { dirty: true }, code: 'worktree_dirty' },

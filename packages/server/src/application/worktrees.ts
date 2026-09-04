@@ -504,7 +504,16 @@ export function createWorktreeApplication(deps: WorktreeApplicationDeps): Worktr
       if (!session) {
         return { ok: false, code: 'session_not_found', message: 'Session not found' };
       }
-      if (deps.sessions.hasMessages(session.id)) {
+      // The first-message lock protects a live checkout mid-conversation.
+      // A binding whose worktree record is gone or no longer available
+      // protects nothing, so recovery must stay possible: sessions bound to
+      // removed/missing worktrees can fall back to the primary checkout.
+      const boundRecord = session.workspaceRootId
+        ? deps.repository.get(session.workspaceRootId)
+        : null;
+      const deadBinding = Boolean(session.workspaceRootId)
+        && (!boundRecord || boundRecord.state !== 'available');
+      if (deps.sessions.hasMessages(session.id) && !deadBinding) {
         return {
           ok: false,
           code: 'session_has_messages',
