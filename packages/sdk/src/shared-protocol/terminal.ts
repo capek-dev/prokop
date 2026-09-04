@@ -16,6 +16,7 @@ export interface TerminalSessionInfo {
    * panel; 'agent' terminals were spawned by the terminal tool. Omitted
    * by older servers, treat as 'user'. */
   origin?: 'user' | 'agent';
+  managedWorktreeId?: string;
 }
 
 export interface TerminalSessionInit {
@@ -31,6 +32,7 @@ export interface TerminalSessionInit {
   title: string;
   createdAt: number;
   inAlternateScreen?: boolean;
+  managedWorktreeId?: string;
 }
 
 export interface TerminalListResponse {

@@ -7,7 +7,7 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@capekai/tool": "^1.0.2",
-    "@capekai/types": "^1.0.1"
+    "@capekai/types": "^1.0.3"
   },
   "exports": {
     ".": {

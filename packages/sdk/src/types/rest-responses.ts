@@ -1,4 +1,4 @@
-import type { Session, Message, Workspace, ToolDefinition, ToolEnvVarStatus, PromptInfo, ModelWithStatus, Preconfig, ProviderStatus, ProviderCredentialStatus, ModelsConfigResponse, ModelsConfig, FileEntry, FilePreviewResponse, TerminalSessionInfo, McpServerConfig, McpStatus, PinnedMessage, GitAvailability, GitDiffSummary, GitFileDiffResponse, EditableFileResponse, SaveFileResponse as SaveFileResultResponse, FileTreeResponse as FileTreeResultResponse, CreateFileResponse, RenameFileResponse, DeleteFileResponse, Agent } from '../shared';
+import type { Session, Message, Workspace, ToolDefinition, ToolEnvVarStatus, PromptInfo, ModelWithStatus, Preconfig, ProviderStatus, ProviderCredentialStatus, ModelsConfigResponse, ModelsConfig, FileEntry, FilePreviewResponse, TerminalSessionInfo, McpServerConfig, McpStatus, PinnedMessage, GitAvailability, GitDiffSummary, GitFileDiffResponse, EditableFileResponse, SaveFileResponse as SaveFileResultResponse, FileTreeResponse as FileTreeResultResponse, CreateFileResponse, RenameFileResponse, DeleteFileResponse, Agent, GitWorktreeRef, ManagedWorktree } from '../shared';
 import type { NotificationConfig, PushSubscriptionRecord } from '../shared-types/notification';
 
 /**
@@ -122,6 +122,22 @@ export interface DeleteWorkspaceResponse {
  */
 export interface ListWorkspaceSessionsResponse {
   sessions: Session[];
+}
+
+export interface ListManagedWorktreesResponse {
+  worktrees: ManagedWorktree[];
+}
+
+export interface ListGitWorktreeRefsResponse {
+  refs: GitWorktreeRef[];
+}
+
+export interface ManagedWorktreeResponse {
+  worktree: ManagedWorktree;
+}
+
+export interface SessionWorktreeResponse {
+  session: Session;
 }
 
 /**

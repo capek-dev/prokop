@@ -5,6 +5,7 @@ export class SessionsNamespace {
 
   create(options?: {
     workspaceId?: string;
+    workspaceRootId?: string;
     preconfigId?: string;
     title?: string;
   }): void {

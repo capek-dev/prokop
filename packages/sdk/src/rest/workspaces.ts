@@ -1,4 +1,4 @@
-import type { WorkspaceSettings } from '../shared';
+import type { CreateManagedWorktreeInput, WorkspaceSettings } from '../shared';
 import type { HttpClient } from '../transport/http';
 import type {
   ListWorkspacesResponse,
@@ -10,6 +10,9 @@ import type {
   ListPinnedMessagesResponse,
   PinMessageResponse,
   UnpinMessageResponse,
+  ListManagedWorktreesResponse,
+  ListGitWorktreeRefsResponse,
+  ManagedWorktreeResponse,
 } from '../types/rest-responses';
 
 interface ListOptions {
@@ -69,6 +72,45 @@ export class WorkspacesRestNamespace {
     return this.http.get(`/workspaces/${encodeURIComponent(id)}/sessions`, {
       signal: options?.signal,
     });
+  }
+
+  async listWorktrees(
+    id: string,
+    options?: GetOptions,
+  ): Promise<ListManagedWorktreesResponse> {
+    return this.http.get(`/workspaces/${encodeURIComponent(id)}/worktrees`, {
+      signal: options?.signal,
+    });
+  }
+
+  async listWorktreeRefs(
+    id: string,
+    options?: GetOptions,
+  ): Promise<ListGitWorktreeRefsResponse> {
+    return this.http.get(`/workspaces/${encodeURIComponent(id)}/worktree-refs`, {
+      signal: options?.signal,
+    });
+  }
+
+  async createWorktree(
+    id: string,
+    input: CreateManagedWorktreeInput,
+    options?: GetOptions,
+  ): Promise<ManagedWorktreeResponse> {
+    return this.http.post(`/workspaces/${encodeURIComponent(id)}/worktrees`, input, {
+      signal: options?.signal,
+    });
+  }
+
+  async removeWorktree(
+    workspaceId: string,
+    worktreeId: string,
+    options?: GetOptions,
+  ): Promise<ManagedWorktreeResponse> {
+    return this.http.delete(
+      `/workspaces/${encodeURIComponent(workspaceId)}/worktrees/${encodeURIComponent(worktreeId)}`,
+      { signal: options?.signal },
+    );
   }
 
   async listPinnedMessages(

@@ -49,3 +49,33 @@ describe('provider status message routing', () => {
     });
   });
 });
+
+describe('worktree message routing', () => {
+  test('routes authoritative worktree updates', () => {
+    const emitter = new TypedEventEmitter<SdkEventMap>();
+    let receivedId: string | undefined;
+    emitter.on('worktree.updated', (worktree) => {
+      receivedId = worktree.id;
+    });
+
+    routeServerMessage(emitter, {
+      type: 'worktree.updated',
+      worktree: {
+        id: 'worktree-1',
+        workspaceId: 'workspace-1',
+        repositoryId: 'repository-1',
+        path: '/repo-worktree',
+        branch: 'feature/test',
+        head: 'abc123',
+        state: 'available',
+        dirty: false,
+        untrackedCount: 0,
+        attachments: [],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    });
+
+    expect(receivedId).toBe('worktree-1');
+  });
+});

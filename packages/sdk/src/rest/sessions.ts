@@ -9,6 +9,7 @@ import type {
   ListMessagesResponse,
   TranscriptPageResponse,
   GetToolDebugResponse,
+  SessionWorktreeResponse,
 } from '../types/rest-responses';
 import type { SessionStatus } from '../types';
 
@@ -20,6 +21,7 @@ interface ListOptions {
 interface CreateOptions {
   id?: string;
   workspaceId?: string;
+  workspaceRootId?: string;
   preconfigId?: string;
   title?: string;
   metadata?: Record<string, unknown>;
@@ -76,6 +78,27 @@ export class SessionsRestNamespace {
 
   async delete(id: string, options?: { signal?: AbortSignal }): Promise<DeleteSessionResponse> {
     return this.http.delete(`/sessions/${encodeURIComponent(id)}`, { signal: options?.signal });
+  }
+
+  async bindWorktree(
+    id: string,
+    worktreeId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<SessionWorktreeResponse> {
+    return this.http.put(
+      `/sessions/${encodeURIComponent(id)}/worktree`,
+      { worktreeId },
+      { signal: options?.signal },
+    );
+  }
+
+  async unbindWorktree(
+    id: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<SessionWorktreeResponse> {
+    return this.http.delete(`/sessions/${encodeURIComponent(id)}/worktree`, {
+      signal: options?.signal,
+    });
   }
 
   async listMessages(id: string, options?: { signal?: AbortSignal }): Promise<ListMessagesResponse> {

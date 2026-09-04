@@ -23,6 +23,7 @@ export interface ClientRegisterMessage {
 export interface SessionCreateMessage {
   type: 'session.create';
   workspaceId?: string;
+  workspaceRootId?: string;
   preconfigId?: string;
   title?: string;
 }
