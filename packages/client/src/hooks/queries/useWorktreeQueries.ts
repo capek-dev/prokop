@@ -68,9 +68,19 @@ export function useWorktreeMutations(
       return (await client.http.workspaces.removeWorktree(workspaceId, worktreeId)).worktree;
     },
     onSuccess: (worktree) => {
-      queryClient.setQueryData<ManagedWorktree[]>(key, (current = []) => current.map((item) => (
-        item.id === worktree.id ? worktree : item
-      )));
+      queryClient.setQueryData<ManagedWorktree[]>(key, (current = []) => {
+        const cached = current.find((item) => item.id === worktree.id);
+        // Purge: the cached row was already 'removed' and the record is
+        // deleted server-side; drop it instead of keeping a ghost row.
+        if (worktree.state === 'removed' && cached?.state === 'removed') {
+          return current.filter((item) => item.id !== worktree.id);
+        }
+        // Normal removal: keep the row with its updated state.
+        if (cached) {
+          return current.map((item) => (item.id === worktree.id ? worktree : item));
+        }
+        return worktree.state === 'removed' ? current : [worktree, ...current];
+      });
     },
   });
 

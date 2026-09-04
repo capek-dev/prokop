@@ -107,7 +107,7 @@ function WorktreeRow({ worktree, removing, onRemove, onOpenInExplorer }: RowProp
             <Button
               variant="ghost"
               size="icon-xs"
-              className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+              className="transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 md:opacity-0"
               aria-label={`Actions for ${worktree.name}`}
             >
               <MoreHorizontal className="size-3.5" />

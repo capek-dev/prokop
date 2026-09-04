@@ -84,9 +84,6 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   const sessionWorktree = worktrees.data?.find((worktree) => (
     worktree.id === focusedSession?.workspaceRootId
   )) ?? focusedSession?.worktree;
-  const sessionRootUnavailable = Boolean(
-    focusedSession?.workspaceRootId && sessionWorktree?.state !== 'available',
-  );
   const defaultTerminalRoot = focusedSession?.workspaceRootId
     ? sessionWorktree?.state === 'available' ? sessionWorktree.path : undefined
     : workspacePath;

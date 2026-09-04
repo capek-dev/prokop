@@ -144,9 +144,10 @@ function CreatePane({
 
 /**
  * Shared popover body: searchable checkout list plus an inline create pane.
- * Both the input-row selector and the strip below the input use it.
+ * Used by the input-row selector, the readout strip, and the Files panel
+ * recovery card.
  */
-function CheckoutMenu({ session, sdkClient, onClose }: {
+export function CheckoutMenu({ session, sdkClient, onClose }: {
   session: Session;
   sdkClient: ProkopaiClient | null;
   onClose: () => void;

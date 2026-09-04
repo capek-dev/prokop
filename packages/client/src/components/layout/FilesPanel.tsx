@@ -16,7 +16,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
-import { useWorktreeMutations, useWorktreesQuery } from '@/hooks/queries';import { summarizeDiffStats } from '@/components/files/GitChangesView';
+import { useWorktreeMutations, useWorktreesQuery } from '@/hooks/queries';
+import { summarizeDiffStats } from '@/components/files/GitChangesView';
 import {
   Sidebar,
   SidebarContent,
@@ -34,6 +35,8 @@ import { queryClient } from '@/components/providers/QueryProvider';
 import { queryKeys } from '@/lib/queryKeys';
 import { buildFilesPanelRootOptions, resolveFilesPanelRoot } from '@/lib/sessionWorktree';
 import { WorktreesPanel } from '@/components/worktrees/WorktreesPanel';
+import { CheckoutMenu } from '@/components/worktrees/SessionCheckoutSelector';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface FilesPanelProps {
   sdkClient: ProkopaiClient | null;
@@ -170,6 +173,7 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
 
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [rootRecoveryError, setRootRecoveryError] = useState<string | null>(null);
+    const [recoverySwitchOpen, setRecoverySwitchOpen] = useState(false);
 
     const handleRefresh = useCallback(() => {
       setIsRefreshing(true);
@@ -287,6 +291,10 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
     // Changes-tab stats in the header row. Reads the same git-status cache
     // as GitChangesView (shared query key), so no extra request.
     const isChangesTab = !embedded && filesPanelTab === 'changes';
+    // The worktrees tab manages bindings and is workspace-scoped: a dead
+    // session binding must not block it (Project and Changes stay
+    // fail-closed), and the root-switcher header row is hidden entirely.
+    const isWorktreesTab = filesPanelTab === 'worktrees';
     const changesRoot = isMainRoot ? undefined : selectedRoot;
     const gitStatusQuery = useGitStatusQuery(
       sdkClient,
@@ -299,8 +307,9 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       [gitStatusQuery.data?.files],
     );
 
-    const headerContent = activeWorkspace ? (
+    const headerContent = activeWorkspace && !(embedded && isWorktreesTab) ? (
       <div className="flex flex-col gap-2 px-2 pt-2 pb-2">
+        {!isWorktreesTab && (
         <div className="flex items-center gap-1.5">
           {rootBlocked ? (
             <div className="flex min-w-0 items-center gap-1.5 px-2 text-sm font-semibold text-destructive">
@@ -381,6 +390,7 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
             </Button>
           )}
         </div>
+        )}
         {!embedded && (
           <Tabs value={filesPanelTab} onValueChange={(v) => setFilesPanelTab(v as 'project' | 'changes' | 'worktrees')}>
             <TabsList className="w-full">
@@ -395,7 +405,7 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       </div>
     ) : null;
 
-    const content = workspaceId && rootBlocked ? (
+    const content = workspaceId && rootBlocked && !isWorktreesTab ? (
       <div className="p-3">
         <Alert variant="destructive">
           <GitBranch />
@@ -422,30 +432,27 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
               >
                 Use primary checkout
               </Button>
-              {worktrees.data
-                ?.filter((worktree) => worktree.state === 'available')
-                .map((worktree) => (
-                  <Button
-                    key={worktree.id}
-                    size="sm"
-                    variant="outline"
-                    disabled={!focusedSession || worktreeMutations.bind.isPending}
-                    onClick={() => {
-                      if (!focusedSession) return;
-                      setRootRecoveryError(null);
-                      worktreeMutations.bind.mutate(
-                        { sessionId: focusedSession.id, worktreeId: worktree.id },
-                        {
-                          onError: (error) => setRootRecoveryError(
-                            error instanceof Error ? error.message : String(error),
-                          ),
-                        },
-                      );
-                    }}
-                  >
-                    Use {worktree.branch ?? 'detached worktree'}
-                  </Button>
-                ))}
+              {focusedSession && (
+                <Popover open={recoverySwitchOpen} onOpenChange={setRecoverySwitchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={worktreeMutations.bind.isPending}
+                    >
+                      Switch worktree
+                      <ChevronDown className="size-3.5 opacity-50" data-icon="inline-end" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-0" align="start">
+                    <CheckoutMenu
+                      session={focusedSession}
+                      sdkClient={sdkClient}
+                      onClose={() => setRecoverySwitchOpen(false)}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
           </AlertDescription>
         </Alert>

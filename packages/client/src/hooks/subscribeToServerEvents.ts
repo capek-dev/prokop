@@ -83,6 +83,9 @@ export function subscribeToServerEvents(
   add('worktree.updated', (worktree: unknown) => {
     worktreeHandlers['worktree.updated'](worktree as ManagedWorktree);
   });
+  add('worktree.deleted', (worktree: unknown) => {
+    worktreeHandlers['worktree.deleted'](worktree as ManagedWorktree);
+  });
 
   add('session.control.updated', (control: unknown, reason: unknown) => {
     controlHandlers['session.control.updated'](
