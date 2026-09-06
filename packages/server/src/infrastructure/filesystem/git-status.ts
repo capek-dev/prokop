@@ -33,6 +33,8 @@ function mapStatus(x: string, y: string): GitFileStatus {
   if (x === '?' && y === '?') return 'untracked';
   if (x === '!' && y === '!') return 'ignored';
   if (x === 'U' || y === 'U' || (x === 'A' && y === 'A') || (x === 'D' && y === 'D')) return 'conflicted';
+  // The combined status must reflect a missing working-tree file, even if staged as added.
+  if (y === 'D') return 'deleted';
   if (x === 'R' || y === 'R') return 'renamed';
   if (x === 'C' || y === 'C') return 'copied';
   if (x === 'A' || y === 'A') return 'added';
@@ -58,7 +60,7 @@ function parsePorcelainStatus(output: string): Map<string, { status: GitFileStat
     let filePath = line.slice(2).trim();
     let oldPath: string | undefined;
 
-    if ((status === 'renamed' || status === 'copied') && filePath.includes(' -> ')) {
+    if ((x === 'R' || y === 'R' || x === 'C' || y === 'C') && filePath.includes(' -> ')) {
       const parts = filePath.split(' -> ');
       oldPath = parts[0];
       filePath = parts[1];

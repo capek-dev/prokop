@@ -38,6 +38,14 @@ describe('gitStatus', () => {
       expect(mapStatus('D', ' ')).toBe('deleted');
     });
 
+    test('prioritizes working-tree deletion over staged changes', () => {
+      for (const staged of ['A', 'M', 'R', 'C']) {
+        expect(mapStatus(staged, 'D')).toBe('deleted');
+      }
+      expect(mapStatus('U', 'D')).toBe('conflicted');
+      expect(mapStatus('A', 'M')).toBe('added');
+    });
+
     test('maps renamed', () => {
       expect(mapStatus('R', ' ')).toBe('renamed');
       expect(mapStatus(' ', 'R')).toBe('renamed');
@@ -86,6 +94,29 @@ describe('gitStatus', () => {
       expect(entry!.status).toBe('added');
       expect(entry!.staged).toBe(true);
       expect(entry!.unstaged).toBe(false);
+    });
+
+    test('reports a staged addition deleted from disk as deleted without losing index state', () => {
+      const result = parsePorcelainStatus('AD new-file.ts');
+      expect(result.get('new-file.ts')).toEqual({
+        status: 'deleted',
+        staged: true,
+        unstaged: true,
+        oldPath: undefined,
+      });
+    });
+
+    test('preserves destination paths for staged renames and copies deleted from disk', () => {
+      for (const staged of ['R', 'C']) {
+        const result = parsePorcelainStatus(`${staged}D old/path.ts -> new/path.ts`);
+        expect([...result.keys()]).toEqual(['new/path.ts']);
+        expect(result.get('new/path.ts')).toEqual({
+          status: 'deleted',
+          staged: true,
+          unstaged: true,
+          oldPath: 'old/path.ts',
+        });
+      }
     });
 
     test('parses untracked file', () => {
