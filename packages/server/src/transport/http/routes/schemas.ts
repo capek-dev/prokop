@@ -132,6 +132,28 @@ export const gitAddSchema = z.object({
   root: z.string().min(1).optional(),
 });
 
+const gitHeadSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);
+const gitBranchSchema = z.string().min(1).max(1024).refine((value) => !/[\0\r\n]/.test(value));
+export const gitCommitSchema = z.object({
+  root: z.string().min(1).optional(),
+  paths: z.array(gitAddSchema.shape.path).min(1).max(5000),
+  message: z.string().trim().min(1).max(8192).refine((value) => !value.includes('\0')),
+  expectedBranch: gitBranchSchema,
+  expectedHead: gitHeadSchema.nullable(),
+}).strict();
+export const gitPushPreviewSchema = z.object({
+  root: z.string().min(1).optional(),
+  remote: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/).max(1024),
+  branch: gitBranchSchema,
+}).strict();
+export const gitPushSchema = gitPushPreviewSchema.extend({
+  expectedBranch: gitBranchSchema,
+  expectedHead: gitHeadSchema,
+  force: z.boolean().optional(),
+  expectedRemoteHead: gitHeadSchema.nullable().optional(),
+  setUpstream: z.boolean().optional(),
+}).refine((value) => !value.force || value.expectedRemoteHead !== undefined, { message: 'Force push requires an explicit remote lease' });
+
 export const fileTreeQuerySchema = z.object({
   root: z.string().optional(),
   showHidden: z.enum(['true', 'false']).optional(),

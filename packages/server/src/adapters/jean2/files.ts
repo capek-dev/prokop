@@ -5,7 +5,11 @@
  * workspace store lookup.
  */
 
+import { listGitBranches, getGitHistory, getGitCommitDetails, reviewGitBranchPush, runGitBranchAction } from '@/infrastructure/filesystem/git-branches';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
+import { getGitRebaseState, startGitRebase, controlGitRebase } from '@/infrastructure/filesystem/git-rebase';
+import { getGitRebaseConflict, resolveGitRebaseConflict } from '@/infrastructure/filesystem/git-rebase-conflicts';
+import { getGitRepository, commitGitFiles, previewGitPush, pushGitBranch, removeGitStagedAddition } from '@/infrastructure/filesystem/git-operations';
 import { workspacePathPolicyPort } from '@/adapters/capek/workspace-paths';
 import type { FilesApplicationPort } from '@/application/ports/files';
 import { listDirectory, searchFiles } from '@/infrastructure/filesystem/workspace-files';
@@ -71,6 +75,21 @@ export function createJean2FilesApplicationPort(
 
     deleteFileEntry: (workspace, input) => treeOps.deleteFileEntry(workspace, input),
 
+    gitRebaseState: getGitRebaseState,
+    gitRebaseConflict: getGitRebaseConflict,
+    gitRebaseStart: startGitRebase,
+    gitRebaseControl: controlGitRebase,
+    gitRebaseResolve: resolveGitRebaseConflict,
+    gitBranches: listGitBranches,
+    gitHistory: getGitHistory,
+    gitCommitDetails: getGitCommitDetails,
+    gitBranchPushReview: reviewGitBranchPush,
+    gitBranchAction: runGitBranchAction,
+    gitRemoveStagedAddition: removeGitStagedAddition,
+    gitRepository: getGitRepository,
+    gitCommit: commitGitFiles,
+    gitPushPreview: previewGitPush,
+    gitPush: pushGitBranch,
     gitStatus: (workspacePath) => gitOps.getGitStatus(workspacePath),
 
     gitAdd: (workspacePath, relativePath) => gitOps.addUntrackedFile(workspacePath, relativePath),

@@ -63,6 +63,35 @@ describe('files application over the Jean2 port (S5 filesystem isolation)', () =
     await expect(app.gitAdd('missing-workspace', 'new.txt')).rejects.toThrow('Workspace not found');
   });
 
+  test('Rebase reads and mutations reject unavailable roots and emit after partial failures', async () => {
+    const port = createJean2FilesApplicationPort();
+    const calls: string[] = [];
+    const state = { active: false, token: null, branch: null, originalHead: null, onto: null, conflicts: [] };
+    port.gitRebaseState = async (root) => { calls.push(root); return state; };
+    port.gitRebaseStart = async (root) => { calls.push(root); throw new Error('Git operation: partial failure'); };
+    const events: unknown[] = [];
+    const app = createFilesApplication(port, (...args) => { events.push(args); });
+    const root = '/unavailable';
+    expect(() => app.gitRebaseState(workspaceId, root)).toThrow('Path outside workspace');
+    expect(() => app.gitRebaseConflict(workspaceId, { root, path: 'file' })).toThrow('Path outside workspace');
+    await expect(app.gitRebaseStart(workspaceId, { root, expectedBranch: 'feature', expectedHead: 'a'.repeat(40), baseBranch: 'main', baseHead: 'b'.repeat(40) })).rejects.toThrow('Path outside workspace');
+    await expect(app.gitRebaseControl(workspaceId, { root, action: 'abort', token: 'c'.repeat(64) })).rejects.toThrow('Path outside workspace');
+    await expect(app.gitRebaseResolve(workspaceId, { root, path: 'file', token: 'c'.repeat(64), resolution: 'delete' })).rejects.toThrow('Path outside workspace');
+    expect(calls).toEqual([]);
+    expect(events).toEqual([]);
+    await expect(app.gitRebaseStart(workspaceId, { expectedBranch: 'feature', expectedHead: 'a'.repeat(40), baseBranch: 'main', baseHead: 'b'.repeat(40) })).rejects.toThrow('partial failure');
+    expect(events).toEqual([[workspaceId, main]]);
+  });
+
+  test('Git commit/push reject unavailable roots before mutation', async () => {
+    const app = files();
+    const root = tempRoot('unavailable-git-root');
+    await expect(app.gitCommit(workspaceId, { root, paths: ['a'], message: 'x', expectedBranch: 'main', expectedHead: null })).rejects.toThrow('Path outside workspace');
+    await expect(app.gitPush(workspaceId, { root, remote: 'origin', branch: 'main', expectedBranch: 'main', expectedHead: 'a'.repeat(40) })).rejects.toThrow('Path outside workspace');
+    expect(() => app.gitRepository(workspaceId, root)).toThrow('Path outside workspace');
+    await expect(app.gitRemoveStagedAddition(workspaceId, 'new', root)).rejects.toThrow('Path outside workspace');
+  });
+
   test('browse lists entries in the exact order and shape', async () => {
     mkdirSync(join(main, 'sub'), { recursive: true });
     writeFileSync(join(main, 'b.txt'), 'b');

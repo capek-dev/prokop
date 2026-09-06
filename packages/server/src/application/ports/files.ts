@@ -15,7 +15,7 @@ import type {
   GitFileDiffResponse,
   Workspace,
 } from '@prokopai/sdk';
-import type { EditableFileResponse, SaveFileResponse } from '@prokopai/sdk';
+import type { EditableFileResponse, SaveFileResponse, GitRepositoryState, GitCommitInput, GitCommitResult, GitPushInput, GitPushResult, GitPushPreviewInput } from '@prokopai/sdk';
 import type {
   CreateFileResponse,
   DeleteFileResponse,
@@ -33,6 +33,17 @@ export interface GitStatusResult {
 }
 
 export interface FilesApplicationPort {
+  gitRebaseState(root: string): Promise<import('@prokopai/sdk').GitRebaseState>;
+  gitRebaseConflict(root: string, path: string): Promise<import('@prokopai/sdk').GitRebaseConflict>;
+  gitRebaseStart(root: string, input: import('@prokopai/sdk').GitRebaseStart): Promise<import('@prokopai/sdk').GitRebaseState>;
+  gitRebaseControl(root: string, input: import('@prokopai/sdk').GitRebaseControl): Promise<import('@prokopai/sdk').GitRebaseState>;
+  gitRebaseResolve(root: string, input: import('@prokopai/sdk').GitRebaseResolution): Promise<import('@prokopai/sdk').GitRebaseState>;
+  gitRemoveStagedAddition(root: string, path: string): Promise<{ path: string }>;
+  gitBranches(root: string): Promise<import('@prokopai/sdk').GitBranchesResult>;
+  gitHistory(root: string, head: string, offset: number): Promise<import('@prokopai/sdk').GitHistoryResult>;
+  gitCommitDetails(root: string, head: string): Promise<import('@prokopai/sdk').GitCommitDetails>;
+  gitBranchPushReview(root: string, input: import('@prokopai/sdk').GitBranchPushTarget): Promise<import('@prokopai/sdk').GitBranchPushReview>;
+  gitBranchAction(root: string, input: import('@prokopai/sdk').GitBranchAction): Promise<{ warning?: string }>;
   getWorkspace(workspaceId: string): Workspace | null;
 
   /** Root resolution for an optional `root` query (C6 workspace policy). */
@@ -115,6 +126,11 @@ export interface FilesApplicationPort {
 
   /** Add one untracked file to the index in the authorized selected root. */
   gitAdd(workspacePath: string, relativePath: string): Promise<{ path: string }>;
+
+  gitRepository(root: string): Promise<GitRepositoryState>;
+  gitCommit(root: string, input: GitCommitInput): Promise<GitCommitResult>;
+  gitPush(root: string, input: GitPushInput): Promise<GitPushResult>;
+  gitPushPreview(root: string, input: GitPushPreviewInput): Promise<{ remoteHead: string | null }>;
 
   /** Git status for a workspace root. */
   gitStatus(workspacePath: string): Promise<GitStatusResult>;

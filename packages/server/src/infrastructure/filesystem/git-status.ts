@@ -47,6 +47,22 @@ function parsePorcelainStatus(output: string): Map<string, { status: GitFileStat
 
   if (!output.trim()) return result;
 
+  if (output.includes('\0')) {
+    const records = output.split('\0');
+    for (let i = 0; i < records.length; i++) {
+      const record = records[i];
+      if (!record) continue;
+      const x = record[0];
+      const y = record[1];
+      const renamed = x === 'R' || y === 'R' || x === 'C' || y === 'C';
+      result.set(record.slice(3), {
+        status: mapStatus(x, y), staged: x !== ' ' && x !== '?', unstaged: y !== ' ' && y !== '?',
+        oldPath: renamed ? records[++i] : undefined,
+      });
+    }
+    return result;
+  }
+
   for (const line of output.split('\n')) {
     if (!line) continue;
 
@@ -143,12 +159,14 @@ async function computeGitStatus(workspacePath: string): Promise<GitStatusResult>
   }
 
   try {
-    const [statusResult, numstatResult, cachedNumstatResult] = await Promise.all([
-      execGit(['-C', workspacePath, 'status', '--porcelain=v1', '--untracked-files=all']),
+    const [statusResult, numstatResult, cachedNumstatResult, additionsResult] = await Promise.all([
+      execGit(['-C', workspacePath, 'status', '--porcelain=v1', '-z', '--untracked-files=all']),
       execGit(['-C', workspacePath, 'diff', '--numstat']),
       execGit(['-C', workspacePath, 'diff', '--cached', '--numstat']),
+      execGit(['-C', workspacePath, 'diff', '--cached', '--no-renames', '--diff-filter=A', '--name-only', '-z']),
     ]);
 
+    const stagedAdditions = new Set(additionsResult.exitCode === 0 ? additionsResult.stdout.split('\0') : []);
     const statusMap = parsePorcelainStatus(statusResult.stdout);
     const numstatMap = parseNumstat(numstatResult.stdout);
     const cachedNumstatMap = parseNumstat(cachedNumstatResult.stdout);
@@ -181,6 +199,7 @@ async function computeGitStatus(workspacePath: string): Promise<GitStatusResult>
         additions,
         deletions,
         oldPath: statusInfo.oldPath,
+        stagedAddition: statusInfo.status !== 'conflicted' && stagedAdditions.has(filePath),
       });
     }
 

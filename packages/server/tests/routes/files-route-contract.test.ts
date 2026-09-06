@@ -93,6 +93,81 @@ function filesApp(application: FilesApplication): Hono {
   return app;
 }
 
+describe('Rebase routes', () => {
+  const token = 'b'.repeat(64);
+  const state = { active: false, token: null, branch: null, originalHead: null, onto: null, conflicts: [] };
+  test('forwards selected roots and exact resolution payloads', async () => {
+    const calls: unknown[] = [];
+    const app = filesApp(makeFilesApplication({
+      gitRebaseState: async (...args) => { calls.push(args); return state; },
+      gitRebaseStart: async (...args) => { calls.push(args); return state; },
+      gitRebaseControl: async (...args) => { calls.push(args); return state; },
+      gitRebaseResolve: async (...args) => { calls.push(args); return state; },
+      gitRebaseConflict: async (...args) => { calls.push(args); return { path: 'file', token, base: null, feature: null, workingText: null }; },
+    }));
+    expect((await app.request('/api/workspaces/ws/git/rebase?root=%2Ftree')).status).toBe(200);
+    const inputs = [
+      ['start', { root: '/tree', expectedBranch: 'feature', expectedHead: 'a'.repeat(40), baseBranch: 'main', baseHead: 'c'.repeat(40) }],
+      ['control', { root: '/tree', action: 'abort', token }],
+      ['resolve', { root: '/tree', path: 'line\nbreak', token, resolution: 'text', text: '' }],
+      ['conflict', { root: '/tree', path: 'file' }],
+    ] as const;
+    for (const [route, input] of inputs) expect((await app.request(`/api/workspaces/ws/git/rebase/${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })).status).toBe(200);
+    expect(calls).toEqual([['ws', '/tree'], ...inputs.map(([, input]) => ['ws', input])]);
+  });
+  test.each([
+    ['control', { action: 'skip', token }],
+    ['control', { action: 'abort' }],
+    ['resolve', { path: 'file', token, resolution: 'text' }],
+    ['resolve', { path: 'file', token, resolution: 'base', text: 'unexpected' }],
+    ['start', { expectedBranch: 'feature', expectedHead: 'HEAD', baseBranch: 'main', baseHead: 'a'.repeat(40) }],
+  ])('rejects malformed %s without mutation', async (route, input) => {
+    const app = filesApp(makeFilesApplication());
+    expect((await app.request(`/api/workspaces/ws/git/rebase/${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })).status).toBe(400);
+  });
+  test('maps stale resolution and unavailable root errors', async () => {
+    const app = filesApp(makeFilesApplication({ gitRebaseState: async () => { throw new Error('Path outside workspace'); }, gitRebaseControl: async () => { throw new Error('Git operation: rebase changed'); } }));
+    expect((await app.request('/api/workspaces/ws/git/rebase?root=%2Fgone')).status).toBe(403);
+    expect((await app.request('/api/workspaces/ws/git/rebase/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'abort', token }) })).status).toBe(409);
+  });
+});
+
+describe('Remove staged addition route', () => {
+  test('forwards the exact path and root and rejects malformed paths', async () => {
+    const calls: unknown[] = [];
+    const app = filesApp(makeFilesApplication({ gitRemoveStagedAddition: async (...args) => { calls.push(args); return { path: args[1] }; } }));
+    const request = (path: string) => app.request('/api/workspaces/ws/git/remove-staged-addition', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, root: '/worktree' }) });
+    expect((await request('new[1]')).status).toBe(200);
+    expect((await request('../outside')).status).toBe(400);
+    expect(calls).toEqual([['ws', 'new[1]', '/worktree']]);
+  });
+});
+
+describe('Git commit and push routes', () => {
+  test('commit forwards selected whole files and the expected branch/root', async () => {
+    const input = { paths: ['a', 'line\nbreak'], message: 'Commit files', expectedBranch: 'main', expectedHead: null, root: '/worktree' };
+    let received: unknown;
+    const app = filesApp(makeFilesApplication({ gitCommit: async (_id, body) => { received = body; return { head: 'a'.repeat(40) }; } }));
+    const response = await app.request('/api/workspaces/ws/git/commit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+    expect(response.status).toBe(200);
+    expect(received).toEqual(input);
+  });
+  test.each([
+    ['commit', { paths: [], message: 'x', expectedBranch: 'main', expectedHead: null }],
+    ['commit', { paths: ['../escape'], message: 'x', expectedBranch: 'main', expectedHead: null }],
+    ['commit', { paths: ['a'], message: ' ', expectedBranch: 'main', expectedHead: null }],
+    ['push', { remote: 'origin', branch: 'main', expectedBranch: 'main', expectedHead: 'a'.repeat(40), force: true }],
+    ['push', { remote: '--all', branch: 'main', expectedBranch: 'main', expectedHead: 'a'.repeat(40) }],
+    ['push', { remote: 'origin', branch: 'main', expectedBranch: 'main', expectedHead: 'a'.repeat(40), force: 'true' }],
+  ])('rejects malformed %s before mutation', async (operation, input) => {
+    let called = false;
+    const app = filesApp(makeFilesApplication({ gitCommit: async () => { called = true; return { head: '' }; }, gitPush: async () => { called = true; return { head: '' }; } }));
+    const response = await app.request(`/api/workspaces/ws/git/${operation}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+    expect(response.status).toBe(400);
+    expect(called).toBe(false);
+  });
+});
+
 describe('Git add route', () => {
   test('delegates the selected root and file to the application', async () => {
     const calls: unknown[] = [];

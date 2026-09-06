@@ -273,7 +273,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
 
   const files = createFilesApplication(createJean2FilesApplicationPort({
     listAvailableWorktreePaths: worktreeRoots.listAvailablePaths,
-  }));
+  }), (workspaceId, root) => broadcastEvent({ type: 'git.changed', workspaceId, root }));
   const configuration = createConfigurationApplication(createJean2ConfigurationPorts());
   const maintenance = createMaintenanceApplication(createJean2MaintenanceApplication());
   const responseFormats = createResponseFormatsApplication(createJean2ResponseFormatsApplication());

@@ -11,9 +11,12 @@ import { dirname, isAbsolute, join, resolve } from 'path';
 import { homedir } from 'os';
 import type { FilesApplication } from '@/application/files';
 import { validate } from './validate';
+import { gitRebaseQuerySchema, gitRebaseConflictSchema, gitRebaseStartSchema, gitRebaseControlSchema, gitRebaseResolveSchema } from './git-rebase-schemas';
+import { gitBranchActionSchema, gitBranchPushReviewSchema, gitHistorySchema, gitCommitDetailsSchema } from './git-branch-schemas';
 import {
   saveFileSchema,
   gitAddSchema,
+  gitCommitSchema, gitPushSchema, gitPushPreviewSchema,
   fileTreeQuerySchema,
   createFileSchema,
   renameFileSchema,
@@ -35,6 +38,7 @@ function mapApplicationError(err: unknown): never {
   if (message === 'Workspace not found' || message === 'Path not found') {
     throw new NotFoundError(message);
   }
+  if (message.startsWith('Git operation:')) throw new ConflictError(message);
   if (message === 'Only untracked files can be added to Git') {
     throw new ConflictError(message);
   }
@@ -162,6 +166,71 @@ export function registerFileRoutes(app: Hono, files: FilesApplication): void {
       }
     },
   );
+
+  app.get('/api/workspaces/:id/git/rebase', validate('query', gitRebaseQuerySchema), async (c) => {
+    try { return c.json(await files.gitRebaseState(c.req.param('id'), c.req.valid('query').root)); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+  app.post('/api/workspaces/:id/git/rebase/conflict', validate('json', gitRebaseConflictSchema), async (c) => {
+    try { return c.json(await files.gitRebaseConflict(c.req.param('id'), c.req.valid('json'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+  app.post('/api/workspaces/:id/git/rebase/start', validate('json', gitRebaseStartSchema), async (c) => {
+    try { return c.json(await files.gitRebaseStart(c.req.param('id'), c.req.valid('json'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+  app.post('/api/workspaces/:id/git/rebase/control', validate('json', gitRebaseControlSchema), async (c) => {
+    try { return c.json(await files.gitRebaseControl(c.req.param('id'), c.req.valid('json'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+  app.post('/api/workspaces/:id/git/rebase/resolve', validate('json', gitRebaseResolveSchema), async (c) => {
+    try { return c.json(await files.gitRebaseResolve(c.req.param('id'), c.req.valid('json'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+
+  app.get('/api/workspaces/:id/git/branches', async (c) => {
+    try { return c.json(await files.gitBranches(c.req.param('id'), c.req.query('root'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+  app.post('/api/workspaces/:id/git/history', validate('json', gitHistorySchema), async (c) => {
+    try { return c.json(await files.gitHistory(c.req.param('id'), c.req.valid('json'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+  app.post('/api/workspaces/:id/git/commit-details', validate('json', gitCommitDetailsSchema), async (c) => {
+    try { return c.json(await files.gitCommitDetails(c.req.param('id'), c.req.valid('json'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+  app.post('/api/workspaces/:id/git/branch-push-review', validate('json', gitBranchPushReviewSchema), async (c) => {
+    try { return c.json(await files.gitBranchPushReview(c.req.param('id'), c.req.valid('json'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+  app.post('/api/workspaces/:id/git/branch-action', validate('json', gitBranchActionSchema), async (c) => {
+    try { return c.json(await files.gitBranchAction(c.req.param('id'), c.req.valid('json'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+
+  app.get('/api/workspaces/:id/git/repository', async (c) => {
+    try { return c.json(await files.gitRepository(c.req.param('id'), c.req.query('root'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+  app.post('/api/workspaces/:id/git/commit', validate('json', gitCommitSchema), async (c) => {
+    try { return c.json(await files.gitCommit(c.req.param('id'), c.req.valid('json'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+  app.post('/api/workspaces/:id/git/push-preview', validate('json', gitPushPreviewSchema), async (c) => {
+    try { return c.json(await files.gitPushPreview(c.req.param('id'), c.req.valid('json'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+  app.post('/api/workspaces/:id/git/push', validate('json', gitPushSchema), async (c) => {
+    try { return c.json(await files.gitPush(c.req.param('id'), c.req.valid('json'))); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
+
+  app.post('/api/workspaces/:id/git/remove-staged-addition', validate('json', gitAddSchema), async (c) => {
+    const { path, root } = c.req.valid('json');
+    try { return c.json(await files.gitRemoveStagedAddition(c.req.param('id'), path, root)); }
+    catch (error: unknown) { mapApplicationError(error); }
+  });
 
   app.post('/api/workspaces/:id/git/add', validate('json', gitAddSchema), async (c) => {
     const { path, root } = c.req.valid('json');

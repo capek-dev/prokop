@@ -15,6 +15,7 @@ import type {
   CreateFileResponse,
   DeleteFileResponse,
   GitAvailability,
+  GitRepositoryState, GitCommitInput, GitCommitResult, GitPushInput, GitPushResult, GitPushPreviewInput,
   GitDiffSummary,
   GitFileDiffResponse,
   RenameFileResponse,
@@ -42,6 +43,17 @@ export interface FilesGitStatusWire {
 }
 
 export interface FilesApplication {
+  gitRebaseState(workspaceId: string, root?: string): Promise<import('@prokopai/sdk').GitRebaseState>;
+  gitRebaseConflict(workspaceId: string, input: { root?: string; path: string }): Promise<import('@prokopai/sdk').GitRebaseConflict>;
+  gitRebaseStart(workspaceId: string, input: import('@prokopai/sdk').GitRebaseStart): Promise<import('@prokopai/sdk').GitRebaseState>;
+  gitRebaseControl(workspaceId: string, input: import('@prokopai/sdk').GitRebaseControl): Promise<import('@prokopai/sdk').GitRebaseState>;
+  gitRebaseResolve(workspaceId: string, input: import('@prokopai/sdk').GitRebaseResolution): Promise<import('@prokopai/sdk').GitRebaseState>;
+  gitRemoveStagedAddition(workspaceId: string, path: string, root?: string): Promise<{ path: string }>;
+  gitBranches(workspaceId: string, root?: string): Promise<import('@prokopai/sdk').GitBranchesResult>;
+  gitHistory(workspaceId: string, input: { root?: string; head: string; offset: number }): Promise<import('@prokopai/sdk').GitHistoryResult>;
+  gitCommitDetails(workspaceId: string, input: { root?: string; head: string }): Promise<import('@prokopai/sdk').GitCommitDetails>;
+  gitBranchPushReview(workspaceId: string, input: import('@prokopai/sdk').GitBranchPushTarget): Promise<import('@prokopai/sdk').GitBranchPushReview>;
+  gitBranchAction(workspaceId: string, input: import('@prokopai/sdk').GitBranchAction): Promise<{ warning?: string }>;
   list(
     workspaceId: string,
     options: {
@@ -53,6 +65,10 @@ export interface FilesApplication {
       signal?: AbortSignal;
     },
   ): Promise<FilesListResult>;
+  gitRepository(workspaceId: string, rootQuery?: string): Promise<GitRepositoryState>;
+  gitCommit(workspaceId: string, input: GitCommitInput): Promise<GitCommitResult>;
+  gitPush(workspaceId: string, input: GitPushInput): Promise<GitPushResult>;
+  gitPushPreview(workspaceId: string, input: GitPushPreviewInput): Promise<{ remoteHead: string | null }>;
   gitStatus(workspaceId: string, rootQuery?: string): Promise<FilesGitStatusWire>;
   gitDiff(workspaceId: string, path: string, rootQuery?: string): Promise<GitFileDiffResponse>;
   gitAdd(workspaceId: string, path: string, rootQuery?: string): Promise<{ path: string }>;
@@ -84,7 +100,7 @@ export interface FilesApplication {
   expandPathFor(inputPath: string): string;
 }
 
-export function createFilesApplication(port: FilesApplicationPort): FilesApplication {
+export function createFilesApplication(port: FilesApplicationPort, onGitChanged?: (workspaceId: string, root: string) => void): FilesApplication {
   function resolveWorkspace(workspaceId: string): Workspace {
     const workspace = port.getWorkspace(workspaceId);
     if (!workspace) {
@@ -118,7 +134,61 @@ export function createFilesApplication(port: FilesApplicationPort): FilesApplica
       .sort((a, b) => a.path.localeCompare(b.path));
   }
 
+  function writeRoot(workspaceId: string, rootQuery?: string): string {
+    const { root } = port.resolveRoot(resolveWorkspace(workspaceId), rootQuery);
+    if (rootQuery !== undefined && (!rootQuery || resolve(root) !== resolve(port.expandPathFor(rootQuery)))) {
+      throw new Error('Path outside workspace');
+    }
+    return root;
+  }
+
+  async function rebaseMutation<T>(workspaceId: string, rootQuery: string | undefined, run: (root: string) => Promise<T>): Promise<T> {
+    const root = writeRoot(workspaceId, rootQuery);
+    try { return await run(root); }
+    finally { try { onGitChanged?.(workspaceId, root); } catch { /* Refresh on reconnect. */ } }
+  }
+
   return {
+    gitRebaseState: (id, root) => port.gitRebaseState(writeRoot(id, root)),
+    gitRebaseConflict: (id, input) => port.gitRebaseConflict(writeRoot(id, input.root), input.path),
+    gitRebaseStart: (id, input) => rebaseMutation(id, input.root, (root) => port.gitRebaseStart(root, input)),
+    gitRebaseControl: (id, input) => rebaseMutation(id, input.root, (root) => port.gitRebaseControl(root, input)),
+    gitRebaseResolve: (id, input) => rebaseMutation(id, input.root, (root) => port.gitRebaseResolve(root, input)),
+    async gitRemoveStagedAddition(workspaceId, path, rootQuery) {
+      const root = writeRoot(workspaceId, rootQuery);
+      const result = await port.gitRemoveStagedAddition(root, path);
+      try { onGitChanged?.(workspaceId, root); } catch { /* Client also refreshes on success. */ }
+      return result;
+    },
+    gitBranches: (workspaceId, root) => port.gitBranches(writeRoot(workspaceId, root)),
+    gitHistory: (workspaceId, input) => port.gitHistory(writeRoot(workspaceId, input.root), input.head, input.offset),
+    gitCommitDetails: (workspaceId, input) => port.gitCommitDetails(writeRoot(workspaceId, input.root), input.head),
+    gitBranchPushReview: (workspaceId, input) => port.gitBranchPushReview(writeRoot(workspaceId, input.root), input),
+    async gitBranchAction(workspaceId, input) {
+      const root = writeRoot(workspaceId, input.root);
+      try { return await port.gitBranchAction(root, input); }
+      finally {
+        // Fetch/switch hooks can fail after partial changes. Always invalidate,
+        // and never turn a successful mutation into failure on delivery errors.
+        try { onGitChanged?.(workspaceId, root); } catch { /* Refresh on reconnect. */ }
+      }
+    },
+    gitRepository: (workspaceId, rootQuery) => port.gitRepository(writeRoot(workspaceId, rootQuery)),
+    gitPushPreview: (workspaceId, input) => port.gitPushPreview(writeRoot(workspaceId, input.root), input),
+    async gitCommit(workspaceId, input) {
+      const root = writeRoot(workspaceId, input.root);
+      const result = await port.gitCommit(root, input);
+      try { onGitChanged?.(workspaceId, root); }
+      catch { result.warning ??= 'Commit succeeded, but live refresh failed. Refresh Git state before continuing.'; }
+      return result;
+    },
+    async gitPush(workspaceId, input) {
+      const root = writeRoot(workspaceId, input.root);
+      const result = await port.gitPush(root, input);
+      try { onGitChanged?.(workspaceId, root); }
+      catch { result.warning ??= 'Push succeeded, but live refresh failed. Refresh Git state before continuing.'; }
+      return result;
+    },
     async list(workspaceId, options) {
       const workspace = resolveWorkspace(workspaceId);
       const { root, isMain } = port.resolveRoot(workspace, options.root);
