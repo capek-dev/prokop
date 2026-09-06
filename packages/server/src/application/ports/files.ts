@@ -113,6 +113,9 @@ export interface FilesApplicationPort {
     input: { path: string; root?: string; recursive?: boolean },
   ): Promise<DeleteFileResponse>;
 
+  /** Add one untracked file to the index in the authorized selected root. */
+  gitAdd(workspacePath: string, relativePath: string): Promise<{ path: string }>;
+
   /** Git status for a workspace root. */
   gitStatus(workspacePath: string): Promise<GitStatusResult>;
 

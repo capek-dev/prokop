@@ -55,6 +55,7 @@ export interface FilesApplication {
   ): Promise<FilesListResult>;
   gitStatus(workspaceId: string, rootQuery?: string): Promise<FilesGitStatusWire>;
   gitDiff(workspaceId: string, path: string, rootQuery?: string): Promise<GitFileDiffResponse>;
+  gitAdd(workspaceId: string, path: string, rootQuery?: string): Promise<{ path: string }>;
   previewFile(workspaceId: string, path: string, rootQuery?: string): Promise<FilePreviewResponse>;
   readEditableFile(workspaceId: string, path: string, rootQuery?: string): Promise<EditableFileResponse>;
   saveFile(
@@ -184,6 +185,18 @@ export function createFilesApplication(port: FilesApplicationPort): FilesApplica
           root,
         };
       }
+    },
+
+    async gitAdd(workspaceId, path, rootQuery) {
+      const workspace = resolveWorkspace(workspaceId);
+      const { root } = port.resolveRoot(workspace, rootQuery);
+      // Read-only root resolution can fall back to main. Mutations must never
+      // redirect an unavailable or unauthorized selected root to another checkout.
+      if (rootQuery !== undefined
+        && (!rootQuery || resolve(root) !== resolve(port.expandPathFor(rootQuery)))) {
+        throw new Error('Path outside workspace');
+      }
+      return port.gitAdd(root, path);
     },
 
     async gitDiff(workspaceId, path, rootQuery) {

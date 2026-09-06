@@ -73,6 +73,8 @@ export function createJean2FilesApplicationPort(
 
     gitStatus: (workspacePath) => gitOps.getGitStatus(workspacePath),
 
+    gitAdd: (workspacePath, relativePath) => gitOps.addUntrackedFile(workspacePath, relativePath),
+
     attachGitStatusToEntries: (entries, listedPath, gitStatus) =>
       gitOps.attachGitStatusToEntries(entries, listedPath, gitStatus),
 

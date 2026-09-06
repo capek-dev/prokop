@@ -8,8 +8,8 @@
  * instead of the retired service path.
  */
 
-import { relative, normalize, sep, resolve, join, extname } from 'path';
-import { stat, readFile } from 'fs/promises';
+import { relative, normalize, sep, resolve, join, extname, dirname, isAbsolute } from 'path';
+import { stat, readFile, lstat, realpath } from 'fs/promises';
 import type { FileEntry, GitAvailability, GitDiffSummary, GitFileStatus, GitFileDiffResponse, GitDiffHunk, GitDiffChange, GitFileDiffUnavailableReason } from '@prokopai/sdk';
 import { isBinaryExtension, isBinaryFile, FILE_PREVIEW_MAX_BYTES } from './binary-detection';
 import { getLanguageForPath } from './file-preview';
@@ -206,10 +206,54 @@ export interface GitContainment {
 export function createGitStatus(containment: GitContainment) {
   return {
     getGitStatus,
+    addUntrackedFile: (workspacePath: string, relativePath: string) =>
+      addUntrackedFile(containment, workspacePath, relativePath),
     attachGitStatusToEntries,
     getGitFileDiff: (workspacePath: string, relativePath: string, additionalPaths: string[] = []) =>
       getGitFileDiffWithContainment(containment, workspacePath, relativePath, additionalPaths),
   };
+}
+
+async function addUntrackedFile(
+  containment: GitContainment,
+  workspacePath: string,
+  inputPath: string,
+): Promise<{ path: string }> {
+  if (!inputPath || isAbsolute(inputPath) || /^[A-Za-z]:/.test(inputPath)
+    || inputPath.includes('\0') || inputPath.includes('\\')
+    || inputPath.split('/').some((part) => !part || part === '.' || part === '..' || part.toLowerCase() === '.git')) {
+    throw new Error('Invalid Git file path');
+  }
+  const fullPath = resolve(workspacePath, inputPath);
+  if (!containment.isPathWithinWorkspace(fullPath, workspacePath)) {
+    throw new Error('Path outside workspace');
+  }
+  // Check the parent, not the target: Git tracks a symlink itself, not its contents.
+  const [rootReal, parentReal, entry] = await Promise.all([
+    realpath(workspacePath), realpath(dirname(fullPath)), lstat(fullPath),
+  ]).catch((err: unknown) => {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') throw new Error('Path not found');
+    throw err;
+  });
+  if (!containment.isPathWithinWorkspace(parentReal, rootReal)) {
+    throw new Error('Path outside workspace');
+  }
+  if (!entry.isFile() && !entry.isSymbolicLink()) {
+    throw new Error('Invalid Git file path');
+  }
+  // Literal pathspecs and NUL-delimited output keep glob characters and whitespace inert.
+  const args = ['--literal-pathspecs', '-C', workspacePath];
+  const untracked = await execGit([...args, 'ls-files', '--others', '--exclude-standard', '-z', '--', inputPath]);
+  if (untracked.exitCode !== 0) throw new Error('Git add failed: unable to read repository status');
+  if (untracked.stdout !== `${inputPath}\0`) {
+    throw new Error('Only untracked files can be added to Git');
+  }
+  const result = await execGit([...args, 'add', '--', inputPath]);
+  if (result.exitCode !== 0) {
+    throw new Error('Git add failed: could not stage file (check repository permissions or index lock)');
+  }
+  clearGitStatusCache();
+  return { path: inputPath };
 }
 
 export async function getGitStatus(workspacePath: string): Promise<GitStatusResult> {
@@ -217,7 +261,7 @@ export async function getGitStatus(workspacePath: string): Promise<GitStatusResu
   if (existing) return existing;
 
   const promise = computeGitStatus(workspacePath).finally(() => {
-    inflight.delete(workspacePath);
+    if (inflight.get(workspacePath) === promise) inflight.delete(workspacePath);
   });
   inflight.set(workspacePath, promise);
   return promise;

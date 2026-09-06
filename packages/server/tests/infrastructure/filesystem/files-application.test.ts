@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import { homedir, tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { createFilesApplication } from '@/application/files';
@@ -40,6 +40,28 @@ describe('files application over the Jean2 port (S5 filesystem isolation)', () =
   function files() {
     return createFilesApplication(createJean2FilesApplicationPort());
   }
+
+  test('Git add resolves available worktree roots and rejects unavailable roots', async () => {
+    const worktree = realpathSync(tempRoot('git-add-worktree'));
+    for (const path of [main, worktree]) {
+      const result = Bun.spawnSync(['git', '-C', path, 'init', '-q']);
+      expect(result.exitCode).toBe(0);
+      writeFileSync(join(path, 'new.txt'), 'new');
+    }
+    let available = true;
+    const app = createFilesApplication(createJean2FilesApplicationPort({
+      listAvailableWorktreePaths: () => available ? [worktree] : [],
+    }));
+    await expect(app.gitAdd(workspaceId, 'new.txt', worktree)).resolves.toEqual({ path: 'new.txt' });
+    expect((await app.gitStatus(workspaceId, worktree)).files[0].git.staged).toBe(true);
+    const mainIndex = Bun.spawnSync(['git', '-C', main, 'ls-files']);
+    expect(mainIndex.exitCode).toBe(0);
+    expect(mainIndex.stdout.toString()).toBe('');
+    available = false;
+    await expect(app.gitAdd(workspaceId, 'new.txt', worktree)).rejects.toThrow('Path outside workspace');
+    expect(Bun.spawnSync(['git', '-C', main, 'ls-files']).stdout.toString()).toBe('');
+    await expect(app.gitAdd('missing-workspace', 'new.txt')).rejects.toThrow('Workspace not found');
+  });
 
   test('browse lists entries in the exact order and shape', async () => {
     mkdirSync(join(main, 'sub'), { recursive: true });

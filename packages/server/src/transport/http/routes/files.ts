@@ -13,6 +13,7 @@ import type { FilesApplication } from '@/application/files';
 import { validate } from './validate';
 import {
   saveFileSchema,
+  gitAddSchema,
   fileTreeQuerySchema,
   createFileSchema,
   renameFileSchema,
@@ -33,6 +34,12 @@ function mapApplicationError(err: unknown): never {
   const message = err instanceof Error ? err.message : 'Unknown error';
   if (message === 'Workspace not found' || message === 'Path not found') {
     throw new NotFoundError(message);
+  }
+  if (message === 'Only untracked files can be added to Git') {
+    throw new ConflictError(message);
+  }
+  if (message.startsWith('Git add failed:') || message === 'Invalid Git file path') {
+    throw new BadRequestError(message);
   }
   if (message === 'Cannot preview a directory') {
     throw new BadRequestError(message);
@@ -155,6 +162,15 @@ export function registerFileRoutes(app: Hono, files: FilesApplication): void {
       }
     },
   );
+
+  app.post('/api/workspaces/:id/git/add', validate('json', gitAddSchema), async (c) => {
+    const { path, root } = c.req.valid('json');
+    try {
+      return c.json(await files.gitAdd(c.req.param('id'), path, root));
+    } catch (err: unknown) {
+      mapApplicationError(err);
+    }
+  });
 
   app.get('/api/workspaces/:id/git/status', async (c) => {
     const workspaceId = c.req.param('id');

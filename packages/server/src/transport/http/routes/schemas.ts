@@ -123,6 +123,15 @@ const relativePathSchema = z
     { message: 'Path must not contain .. segments' },
   );
 
+export const gitAddSchema = z.object({
+  path: relativePathSchema.refine(
+    (value) => !value.includes('\0') && !value.includes('\\') && !/^[A-Za-z]:/.test(value)
+      && value.split('/').every((segment) => segment !== '' && segment !== '.' && segment.toLowerCase() !== '.git'),
+    { message: 'Path must name a single file relative to the selected root' },
+  ),
+  root: z.string().min(1).optional(),
+});
+
 export const fileTreeQuerySchema = z.object({
   root: z.string().optional(),
   showHidden: z.enum(['true', 'false']).optional(),

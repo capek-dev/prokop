@@ -93,6 +93,46 @@ function filesApp(application: FilesApplication): Hono {
   return app;
 }
 
+describe('Git add route', () => {
+  test('delegates the selected root and file to the application', async () => {
+    const calls: unknown[] = [];
+    const app = filesApp(makeFilesApplication({
+      gitAdd: async (...args) => { calls.push(args); return { path: args[1] }; },
+    }));
+    const response = await app.request('/api/workspaces/ws-1/git/add', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: 'src/new.ts', root: '/worktree' }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ path: 'src/new.ts' });
+    expect(calls).toEqual([['ws-1', 'src/new.ts', '/worktree']]);
+  });
+
+  test.each([{}, { path: '' }, { path: [] }, { path: '../file' }, { path: '.' },
+    { path: '/file' }, { path: 'C:\\file' }, { path: 'bad\0file' }, { path: '.git/config' },
+    { path: 'file', root: 123 }, { path: 'file', root: '' },
+  ])('rejects malformed input %j before delegation', async (body) => {
+    let called = false;
+    const app = filesApp(makeFilesApplication({ gitAdd: async () => { called = true; return { path: '' }; } }));
+    const response = await app.request('/api/workspaces/ws-1/git/add', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    expect(response.status).toBe(400);
+    expect(called).toBe(false);
+  });
+
+  test.each([
+    ['Workspace not found', 404], ['Path outside workspace', 403],
+    ['Only untracked files can be added to Git', 409], ['Git add failed: index locked', 400],
+  ] as const)('maps %s to %d', async (message, status) => {
+    const app = filesApp(makeFilesApplication({ gitAdd: async () => { throw new Error(message); } }));
+    const response = await app.request('/api/workspaces/ws-1/git/add', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: 'new.txt' }),
+    });
+    expect(response.status).toBe(status);
+  });
+});
+
 describe('files route contract (S5 filesystem isolation)', () => {
   test('the files list endpoint delegates every option to the application', async () => {
     const calls: Array<unknown> = [];
