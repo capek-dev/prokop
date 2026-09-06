@@ -1,4 +1,5 @@
 import type { HttpClient } from '../transport/http';
+import type { GitRepositoryState, GitCommitInput, GitCommitResult, GitPushInput, GitPushResult, GitPushPreviewInput } from '../shared-types/git';
 import type {
   BrowseFilesResponse,
   SearchFilesResponse,
@@ -168,6 +169,11 @@ export class FilesRestNamespace {
     });
   }
 
+  /** Remove a staged new file from the index only. Disk contents are untouched. */
+  async gitRemoveStagedAddition(workspaceId: string, path: string, options?: { root?: string }): Promise<{ path: string }> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/remove-staged-addition`, { path, root: options?.root });
+  }
+
   /** Stage one untracked file, without committing or force-adding ignored files. */
   async gitAdd(
     workspaceId: string,
@@ -178,6 +184,65 @@ export class FilesRestNamespace {
       path,
       root: options?.root,
     }, { signal: options?.signal });
+  }
+
+  async gitRebaseState(workspaceId: string, options?: { root?: string }): Promise<import('../shared-types/gitRebase').GitRebaseState> {
+    return this.http.get(`/workspaces/${encodeURIComponent(workspaceId)}/git/rebase`, { params: options?.root !== undefined ? { root: options.root } : undefined });
+  }
+
+  async gitRebaseConflict(workspaceId: string, input: { root?: string; path: string }): Promise<import('../shared-types/gitRebase').GitRebaseConflict> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/rebase/conflict`, input);
+  }
+
+  async gitRebaseStart(workspaceId: string, input: import('../shared-types/gitRebase').GitRebaseStart): Promise<import('../shared-types/gitRebase').GitRebaseState> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/rebase/start`, input);
+  }
+
+  async gitRebaseControl(workspaceId: string, input: import('../shared-types/gitRebase').GitRebaseControl): Promise<import('../shared-types/gitRebase').GitRebaseState> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/rebase/control`, input);
+  }
+
+  async gitRebaseResolve(workspaceId: string, input: import('../shared-types/gitRebase').GitRebaseResolution): Promise<import('../shared-types/gitRebase').GitRebaseState> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/rebase/resolve`, input);
+  }
+
+  async gitBranches(workspaceId: string, options?: { root?: string; signal?: AbortSignal }): Promise<import('../shared-types/gitBranches').GitBranchesResult> {
+    return this.http.get(`/workspaces/${encodeURIComponent(workspaceId)}/git/branches`, { params: options?.root !== undefined ? { root: options.root } : undefined, signal: options?.signal });
+  }
+
+  async gitHistory(workspaceId: string, input: { root?: string; head: string; offset: number }): Promise<import('../shared-types/gitBranches').GitHistoryResult> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/history`, input);
+  }
+
+  async gitCommitDetails(workspaceId: string, input: { root?: string; head: string }): Promise<import('../shared-types/gitBranches').GitCommitDetails> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/commit-details`, input);
+  }
+
+  async gitBranchPushReview(workspaceId: string, input: import('../shared-types/gitBranches').GitBranchPushTarget): Promise<import('../shared-types/gitBranches').GitBranchPushReview> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/branch-push-review`, input);
+  }
+
+  async gitBranchAction(workspaceId: string, input: import('../shared-types/gitBranches').GitBranchAction): Promise<{ warning?: string }> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/branch-action`, input);
+  }
+
+  async gitRepository(workspaceId: string, options?: { root?: string; signal?: AbortSignal }): Promise<GitRepositoryState> {
+    return this.http.get(`/workspaces/${encodeURIComponent(workspaceId)}/git/repository`, {
+      params: options?.root !== undefined ? { root: options.root } : undefined,
+      signal: options?.signal,
+    });
+  }
+
+  async gitCommit(workspaceId: string, input: GitCommitInput): Promise<GitCommitResult> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/commit`, input);
+  }
+
+  async gitPushPreview(workspaceId: string, input: GitPushPreviewInput): Promise<{ remoteHead: string | null }> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/push-preview`, input);
+  }
+
+  async gitPush(workspaceId: string, input: GitPushInput): Promise<GitPushResult> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/push`, input);
   }
 
   async gitDiff(

@@ -12,6 +12,8 @@ export interface GitDiffSummary {
   status: GitFileStatus;
   staged: boolean;
   unstaged: boolean;
+  /** Present in the index but absent from HEAD; safe to move to untracked. */
+  stagedAddition?: boolean;
   additions?: number;
   deletions?: number;
   oldPath?: string;

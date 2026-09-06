@@ -12,7 +12,13 @@ export interface WorktreeDeletedMessage {
   worktree: ManagedWorktree;
 }
 
-export type ServerMessage = CapekServerMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage;
+export interface GitChangedMessage {
+  type: 'git.changed';
+  workspaceId: string;
+  root: string;
+}
+
+export type ServerMessage = CapekServerMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage | GitChangedMessage;
 
 /**
  * Prokopai extends the neutral Capek gate action union with session
