@@ -42,6 +42,9 @@ const LANGUAGE_FALLBACK: Record<string, SupportedLanguages> = {
   html: 'html',
   rust: 'rust',
   go: 'go',
+  kotlin: 'kotlin',
+  kt: 'kotlin',
+  kts: 'kotlin',
 };
 
 export function resolvePierreLang(

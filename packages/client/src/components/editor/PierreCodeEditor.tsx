@@ -27,6 +27,7 @@ interface PierreCodeEditorProps {
   saving?: boolean;
   onChange: (value: string) => void;
   className?: string;
+  selectedLines?: { start: number; end: number };
 }
 
 const HOST_FONT_STYLE = {
@@ -43,6 +44,7 @@ export function PierreCodeEditor({
   saving = false,
   onChange,
   className,
+  selectedLines,
 }: PierreCodeEditorProps) {
   const { resolvedMode } = useTheme();
 
@@ -136,7 +138,7 @@ export function PierreCodeEditor({
             className="min-h-full w-full"
           />
         ) : (
-          <PierreFile file={file} options={fileOptions} edit={!saving} className="min-h-full w-full" />
+          <PierreFile file={file} selectedLines={selectedLines} options={fileOptions} edit={!saving} className="min-h-full w-full" />
         )}
       </div>
     </EditProvider>

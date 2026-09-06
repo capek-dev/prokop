@@ -35,6 +35,7 @@ import { queryClient } from '@/components/providers/QueryProvider';
 import { queryKeys } from '@/lib/queryKeys';
 import { buildFilesPanelRootOptions, resolveFilesPanelRoot } from '@/lib/sessionWorktree';
 import { WorktreesPanel } from '@/components/worktrees/WorktreesPanel';
+import { BranchesPanel } from '@/components/files/BranchesPanel';
 import { CheckoutMenu } from '@/components/worktrees/SessionCheckoutSelector';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
@@ -228,7 +229,7 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       if (isMobile) {
         setMobileSurface('files');
       } else {
-        setWorkbenchSurface(filesPanelTab === 'changes' || filesPanelTab === 'worktrees' ? filesPanelTab : 'explorer');
+        setWorkbenchSurface(filesPanelTab === 'changes' || filesPanelTab === 'branches' || filesPanelTab === 'worktrees' ? filesPanelTab : 'explorer');
         setShowFilesPanel(true);
       }
       requestAnimationFrame(() => requestAnimationFrame(focusActiveView));
@@ -392,10 +393,11 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
         </div>
         )}
         {!embedded && (
-          <Tabs value={filesPanelTab} onValueChange={(v) => setFilesPanelTab(v as 'project' | 'changes' | 'worktrees')}>
+          <Tabs value={filesPanelTab} onValueChange={(v) => setFilesPanelTab(v as 'project' | 'changes' | 'branches' | 'worktrees')}>
             <TabsList className="w-full">
               <TabsTrigger value="project" className="flex-1">Project</TabsTrigger>
               <TabsTrigger value="changes" className="flex-1">Changes</TabsTrigger>
+              <TabsTrigger value="branches" className="flex-1">Branches</TabsTrigger>
               {(worktrees.data ?? []).length > 0 && (
                 <TabsTrigger value="worktrees" className="flex-1">Worktrees</TabsTrigger>
               )}
@@ -412,7 +414,7 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
           <AlertTitle>This session's worktree is unavailable</AlertTitle>
           <AlertDescription>
             <p>
-              Files and Changes are blocked so Prokop does not silently use the primary checkout.
+              Files, Changes, and Branches are blocked so Prokop does not silently use the primary checkout.
             </p>
             {rootRecoveryError && <p>{rootRecoveryError}</p>}
             <div className="mt-3 flex flex-wrap gap-2">
@@ -474,6 +476,8 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
             openFile({ entry: { name, type: 'file', path }, root: isMainRoot ? undefined : selectedRoot }, 'edit')
           }
         />
+      ) : filesPanelTab === 'branches' ? (
+        <BranchesPanel key={JSON.stringify([serverId, workspaceId, selectedRoot])} sdkClient={sdkClient} workspaceId={workspaceId} serverId={serverId} root={isMainRoot ? undefined : selectedRoot} />
       ) : filesPanelTab === 'worktrees' ? (
         <WorktreesPanel sdkClient={sdkClient} workspaceId={workspaceId} />
       ) : (

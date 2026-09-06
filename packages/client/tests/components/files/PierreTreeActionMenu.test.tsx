@@ -4,14 +4,17 @@ import type { ContextMenuItem, ContextMenuOpenContext } from '@pierre/trees';
 import { PierreTreeActionMenu, type PierreTreeActionMenuActions } from '@/components/files/PierreTreeActionMenu';
 
 afterEach(cleanup);
-function setup(options: { untracked?: boolean; directory?: boolean; deleted?: boolean; pending?: boolean; enabled?: boolean } = {}) {
+function setup(options: { untracked?: boolean; directory?: boolean; deleted?: boolean; pending?: boolean; enabled?: boolean; stagedAddition?: boolean } = {}) {
   const addToGit = vi.fn();
+  const removeStagedAddition = vi.fn();
   const close = vi.fn();
   const actions: PierreTreeActionMenuActions = {
     openPreview: vi.fn(), openEdit: vi.fn(), copyRelative: vi.fn(), copyAbsolute: vi.fn(),
     rename: vi.fn(), del: vi.fn(), createFile: vi.fn(), createFolder: vi.fn(),
     addToGit: options.enabled === false ? undefined : addToGit,
     addingToGit: options.pending,
+    removeStagedAddition: options.enabled === false ? undefined : removeStagedAddition,
+    removingStagedAddition: options.pending,
   };
   const item = { path: 'new.txt', name: 'new.txt', kind: options.directory ? 'directory' : 'file' } as ContextMenuItem;
   const context = {
@@ -21,9 +24,27 @@ function setup(options: { untracked?: boolean; directory?: boolean; deleted?: bo
     item={item} context={context} actions={actions}
     untrackedPaths={new Set(options.untracked ? ['new.txt'] : [])}
     deletedPaths={new Set(options.deleted ? ['new.txt'] : [])}
+    stagedAdditionPaths={new Set(options.stagedAddition ? ['new.txt'] : [])}
   />);
-  return { addToGit, close };
+  return { addToGit, close, removeStagedAddition };
 }
+
+describe('Staged addition cleanup', () => {
+  test.each([[false, 'Move to untracked'], [true, 'Remove staged addition']] as const)('offers cleanup for deleted=%s', (deleted, label) => {
+    const { removeStagedAddition, close } = setup({ stagedAddition: true, deleted });
+    fireEvent.click(screen.getByRole('menuitem', { name: label }));
+    expect(removeStagedAddition).toHaveBeenCalledExactlyOnceWith('new.txt');
+    expect(close).toHaveBeenCalledOnce();
+  });
+  test.each([{}, { deleted: true }, { stagedAddition: true, directory: true }, { stagedAddition: true, enabled: false }])('hides cleanup when ineligible: %j', (options) => {
+    setup(options);
+    expect(screen.queryByRole('menuitem', { name: /Move to untracked|Remove staged addition/ })).toBeNull();
+  });
+  test('disables cleanup while pending', () => {
+    setup({ stagedAddition: true, pending: true });
+    expect(screen.getByRole('menuitem', { name: 'Removing from index…' })).toBeDisabled();
+  });
+});
 
 describe('Add to Git menu action', () => {
   test('adds the untracked file and closes the menu without confirmation', () => {

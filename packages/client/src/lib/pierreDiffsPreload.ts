@@ -1,4 +1,4 @@
-import { preloadHighlighter } from '@pierre/diffs';
+import { preloadHighlighter, setCustomExtension } from '@pierre/diffs';
 
 /**
  * Warm the shared Shiki highlighter used by every @pierre/diffs surface
@@ -17,9 +17,12 @@ import { preloadHighlighter } from '@pierre/diffs';
  * highlighting path.
  */
 export function preloadPierreDiffsHighlighter(): void {
+  // Pierre recognizes .kt but does not map Kotlin scripts by default.
+  setCustomExtension('kt', 'kotlin');
+  setCustomExtension('kts', 'kotlin');
   void preloadHighlighter({
     themes: ['github-dark', 'github-light'],
-    langs: [],
+    langs: ['kotlin'],
   }).catch(() => {
     // Per-surface async highlighting remains the fallback.
   });

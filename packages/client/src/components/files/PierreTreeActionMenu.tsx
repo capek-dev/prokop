@@ -16,6 +16,8 @@ export interface PierreTreeActionMenuActions {
   createFolder: (parentDirPath: string) => void;
   addToGit?: (path: string) => void;
   addingToGit?: boolean;
+  removeStagedAddition?: (path: string) => void;
+  removingStagedAddition?: boolean;
 }
 
 interface PierreTreeActionMenuProps {
@@ -25,6 +27,7 @@ interface PierreTreeActionMenuProps {
   /** Git-deleted file paths (Changes tab): such rows only preview + copy. */
   deletedPaths?: ReadonlySet<string>;
   untrackedPaths?: ReadonlySet<string>;
+  stagedAdditionPaths?: ReadonlySet<string>;
 }
 
 type MenuEntry =
@@ -43,8 +46,18 @@ function buildMenuEntries(
   path: string,
   target: FileActionTargetInfo,
   actions: PierreTreeActionMenuActions,
+  stagedAddition: boolean,
 ): MenuEntry[] {
   const entries: MenuEntry[] = [];
+  const remove = actions.removeStagedAddition;
+  if (!isDir && stagedAddition && remove) {
+    entries.push({ kind: 'action', key: 'git-remove-addition', icon: Trash2,
+      label: actions.removingStagedAddition ? 'Removing from index…' : isDeleted ? 'Remove staged addition' : 'Move to untracked',
+      disabled: actions.removingStagedAddition || actions.addingToGit,
+      onSelect: () => remove(path),
+    });
+    entries.push({ kind: 'separator', key: 'sep-git-remove' });
+  }
   const addToGit = actions.addToGit;
   if (!isDir && !isDeleted && isUntracked && addToGit) {
     entries.push({
@@ -130,12 +143,12 @@ function buildMenuEntries(
  * slot fixed at the pointer and handles outside-click dismissal; this
  * component only renders items and closes via `context.close()`.
  */
-export function PierreTreeActionMenu({ item, context, actions, deletedPaths, untrackedPaths }: PierreTreeActionMenuProps) {
+export function PierreTreeActionMenu({ item, context, actions, deletedPaths, untrackedPaths, stagedAdditionPaths }: PierreTreeActionMenuProps) {
   const isDir = item.kind === 'directory';
   const path = stripTrailingSlash(item.path);
   const isDeleted = !isDir && deletedPaths?.has(path) === true;
   const target: FileActionTargetInfo = { path, isDirectory: isDir, name: item.name };
-  const entries = buildMenuEntries(isDir, isDeleted, untrackedPaths?.has(path) === true, path, target, actions);
+  const entries = buildMenuEntries(isDir, isDeleted, untrackedPaths?.has(path) === true, path, target, actions, stagedAdditionPaths?.has(path) === true);
 
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   // Separator-only length estimate is fine: clamping only needs an upper bound.

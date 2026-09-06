@@ -46,7 +46,7 @@ export function WorkspaceWorkbench({
         ? 'changes'
         : filesPanelTab === 'worktrees'
           ? 'worktrees'
-          : 'explorer'
+          : filesPanelTab === 'branches' ? 'branches' : 'explorer'
     : surface === 'editor' && !hasEditorDocs
       ? 'explorer'
       : surface;
@@ -57,7 +57,7 @@ export function WorkspaceWorkbench({
       aria-label="Workspace workbench"
       data-workspace-workbench
     >
-      <div className="flex h-10 shrink-0 items-center gap-1 px-1" role="tablist">
+      <div className="flex h-10 shrink-0 items-center gap-1 overflow-x-auto px-1" role="tablist">
         {mobile && (
           <Button
             type="button"
@@ -69,7 +69,7 @@ export function WorkspaceWorkbench({
             <ArrowLeft className="size-4" />
           </Button>
         )}
-        <div className="flex items-center rounded-lg bg-muted p-0.5">
+        <div className="flex shrink-0 items-center rounded-lg bg-muted p-0.5">
           <button
             type="button"
             role="tab"
@@ -107,6 +107,23 @@ export function WorkspaceWorkbench({
           >
             <GitBranch className="size-3.5" />
             Changes
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeSurface === 'branches'}
+            onClick={() => {
+              setFilesPanelTab('branches');
+              setSurface('branches');
+              if (mobile) setMobileSurface('files');
+            }}
+            className={cn(
+              'flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',
+              activeSurface === 'branches' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <GitBranch className="size-3.5" />
+            Branches
           </button>
           {hasWorktrees && (
             <button

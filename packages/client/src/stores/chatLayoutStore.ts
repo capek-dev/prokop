@@ -10,8 +10,8 @@ import {
   saveFilesPanelWidth,
 } from '@/config/panelStorage';
 
-export type FilesPanelTab = 'project' | 'changes' | 'worktrees';
-export type WorkbenchSurface = 'explorer' | 'changes' | 'worktrees' | 'editor';
+export type FilesPanelTab = 'project' | 'changes' | 'branches' | 'worktrees';
+export type WorkbenchSurface = 'explorer' | 'changes' | 'branches' | 'worktrees' | 'editor';
 export type MobileSurface = 'chat' | 'sessions' | 'files' | 'editor';
 
 interface ChatLayoutState {

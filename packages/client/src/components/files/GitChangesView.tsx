@@ -13,6 +13,9 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
 import { useGitAddMutation } from '@/hooks/queries/useGitAddMutation';
+import { useGitRemoveStagedAddition } from '@/hooks/queries/useGitRemoveStagedAddition';
+import { GitChangesActions } from './GitChangesActions';
+import { gitDraftKey } from '@/stores/gitCommitStore';
 import { useFileTreeStateStore } from '@/stores/fileTreeStateStore';
 import {
   activatePierreFileSelection,
@@ -254,6 +257,9 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
       [files],
     );
 
+    const { mutate: removeStagedAddition, isPending: removingStagedAddition } = useGitRemoveStagedAddition(sdkClient, workspaceId, root);
+    const stagedAdditionPaths = useMemo(() => new Set(files.filter((file) => file.git.stagedAddition).map((file) => file.path)), [files]);
+
     const menuActions = useMemo<PierreTreeActionMenuActions>(
       () => ({
         openPreview: (path, _isDir) => {
@@ -284,6 +290,10 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
           if (!addingToGit && untrackedPaths.has(path)) addToGit(path);
         } : undefined,
         addingToGit,
+        removeStagedAddition: sdkClient ? (path) => {
+          if (!removingStagedAddition && !addingToGit && stagedAdditionPaths.has(path)) removeStagedAddition(path);
+        } : undefined,
+        removingStagedAddition,
         copyRelative: (path) => copyPath(path, false),
         copyAbsolute: (path) => copyPath(path, true),
         rename: (target) => openRename(target),
@@ -291,7 +301,7 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
         createFile: (parentDirPath) => openCreate(parentDirPath, 'file'),
         createFolder: (parentDirPath) => openCreate(parentDirPath, 'directory'),
       }),
-      [copyPath, openCreate, openRename, openDelete, sdkClient, addingToGit, addToGit, untrackedPaths],
+      [copyPath, openCreate, openRename, openDelete, sdkClient, addingToGit, addToGit, untrackedPaths, removeStagedAddition, removingStagedAddition, stagedAdditionPaths],
     );
 
     const renderContextMenu = useCallback(
@@ -303,9 +313,10 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
             actions={menuActions}
             deletedPaths={deletedPaths}
             untrackedPaths={untrackedPaths}
+            stagedAdditionPaths={stagedAdditionPaths}
           />
         ) : null,
-      [menuActions, deletedPaths, untrackedPaths],
+      [menuActions, deletedPaths, untrackedPaths, stagedAdditionPaths],
     );
 
     // Query refreshes AND mode flips rebuild the store. Mode must be part of
@@ -382,17 +393,23 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
       return <div className="p-4 text-sm text-muted-foreground text-center">{label}</div>;
     }
 
-    if (allFiles.length === 0) {
-      return <div className="p-4 text-sm text-muted-foreground text-center">No changes</div>;
-    }
-
     return (
       // Flex column so the tree host's flex-1/h-full resolve instead of
       // collapsing to zero height inside this plain div.
       <div className="flex flex-1 min-h-0 min-w-0 w-full flex-col outline-none">
-        <PierreTreeHost hostRef={containerRef}>
-          <PierreFileTreeReact model={model} className="size-full" renderContextMenu={renderContextMenu} />
-        </PierreTreeHost>
+        {sdkClient ? <GitChangesActions
+          key={gitDraftKey(serverId, workspaceId, root)}
+          sdkClient={sdkClient}
+          workspaceId={workspaceId}
+          serverId={serverId}
+          root={root}
+          files={files}
+          onPreview={(path) => menuActions.openPreview(path, false)}
+        >
+          {allFiles.length === 0 ? <div className="p-4 text-sm text-muted-foreground text-center">No changes</div> : <PierreTreeHost hostRef={containerRef}>
+            <PierreFileTreeReact model={model} className="size-full" renderContextMenu={renderContextMenu} />
+          </PierreTreeHost>}
+        </GitChangesActions> : <div className="p-4 text-sm text-muted-foreground text-center">No changes</div>}
         <FileActionsDialogs
           dialog={actionDialog}
           mutating={actionMutating}
