@@ -168,6 +168,18 @@ export class FilesRestNamespace {
     });
   }
 
+  /** Stage one untracked file, without committing or force-adding ignored files. */
+  async gitAdd(
+    workspaceId: string,
+    path: string,
+    options?: { root?: string; signal?: AbortSignal },
+  ): Promise<{ path: string }> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/add`, {
+      path,
+      root: options?.root,
+    }, { signal: options?.signal });
+  }
+
   async gitDiff(
     workspaceId: string,
     path: string,
