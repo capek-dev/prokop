@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Copy, Eye, FilePlus2, FolderPlus, Pencil, SquarePen, Trash2 } from 'lucide-react';
+import { Copy, Eye, FilePlus2, FolderPlus, Pencil, Plus, SquarePen, Trash2 } from 'lucide-react';
 import type { ContextMenuItem, ContextMenuOpenContext } from '@pierre/trees';
 import { stripTrailingSlash } from './fileActionsCore';
 import type { FileActionTargetInfo } from './useFileActions';
@@ -14,6 +14,8 @@ export interface PierreTreeActionMenuActions {
   del: (target: FileActionTargetInfo) => void;
   createFile: (parentDirPath: string) => void;
   createFolder: (parentDirPath: string) => void;
+  addToGit?: (path: string) => void;
+  addingToGit?: boolean;
 }
 
 interface PierreTreeActionMenuProps {
@@ -22,10 +24,11 @@ interface PierreTreeActionMenuProps {
   actions: PierreTreeActionMenuActions;
   /** Git-deleted file paths (Changes tab): such rows only preview + copy. */
   deletedPaths?: ReadonlySet<string>;
+  untrackedPaths?: ReadonlySet<string>;
 }
 
 type MenuEntry =
-  | { kind: 'action'; key: string; icon: LucideIcon; label: string; onSelect: () => void }
+  | { kind: 'action'; key: string; icon: LucideIcon; label: string; onSelect: () => void; disabled?: boolean }
   | { kind: 'separator'; key: string };
 
 const MENU_WIDTH = 192; // min-w-48
@@ -36,11 +39,24 @@ const VIEWPORT_MARGIN = 8;
 function buildMenuEntries(
   isDir: boolean,
   isDeleted: boolean,
+  isUntracked: boolean,
   path: string,
   target: FileActionTargetInfo,
   actions: PierreTreeActionMenuActions,
 ): MenuEntry[] {
   const entries: MenuEntry[] = [];
+  const addToGit = actions.addToGit;
+  if (!isDir && !isDeleted && isUntracked && addToGit) {
+    entries.push({
+      kind: 'action',
+      key: 'git-add',
+      icon: Plus,
+      label: actions.addingToGit ? 'Adding to Git…' : 'Add to Git',
+      disabled: actions.addingToGit,
+      onSelect: () => addToGit(path),
+    });
+    entries.push({ kind: 'separator', key: 'sep-git' });
+  }
   if (!isDir) {
     entries.push({
       kind: 'action',
@@ -114,12 +130,12 @@ function buildMenuEntries(
  * slot fixed at the pointer and handles outside-click dismissal; this
  * component only renders items and closes via `context.close()`.
  */
-export function PierreTreeActionMenu({ item, context, actions, deletedPaths }: PierreTreeActionMenuProps) {
+export function PierreTreeActionMenu({ item, context, actions, deletedPaths, untrackedPaths }: PierreTreeActionMenuProps) {
   const isDir = item.kind === 'directory';
   const path = stripTrailingSlash(item.path);
   const isDeleted = !isDir && deletedPaths?.has(path) === true;
   const target: FileActionTargetInfo = { path, isDirectory: isDir, name: item.name };
-  const entries = buildMenuEntries(isDir, isDeleted, path, target, actions);
+  const entries = buildMenuEntries(isDir, isDeleted, untrackedPaths?.has(path) === true, path, target, actions);
 
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   // Separator-only length estimate is fine: clamping only needs an upper bound.
@@ -128,7 +144,7 @@ export function PierreTreeActionMenu({ item, context, actions, deletedPaths }: P
   const top = Math.min(context.anchorRect.top, Math.max(window.innerHeight - menuHeight - VIEWPORT_MARGIN, 0));
 
   useEffect(() => {
-    itemRefs.current[0]?.focus();
+    itemRefs.current.find((el) => el && !el.disabled)?.focus();
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -139,7 +155,7 @@ export function PierreTreeActionMenu({ item, context, actions, deletedPaths }: P
     }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
-      const buttons = itemRefs.current.filter((el): el is HTMLButtonElement => el !== null);
+      const buttons = itemRefs.current.filter((el): el is HTMLButtonElement => el !== null && !el.disabled);
       if (buttons.length === 0) return;
       const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
       const delta = e.key === 'ArrowDown' ? 1 : -1;
@@ -180,7 +196,8 @@ export function PierreTreeActionMenu({ item, context, actions, deletedPaths }: P
               itemRefs.current[current] = el;
             }}
             onClick={run(entry.onSelect)}
-            className="flex w-full cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+            disabled={entry.disabled}
+            className="flex w-full cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm outline-none select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
           >
             <entry.icon className="size-4 shrink-0" />
             {entry.label}

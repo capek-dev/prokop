@@ -12,6 +12,7 @@ import type { FileEntryActionTarget, FileOpenMode } from './FileEntryContextMenu
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
+import { useGitAddMutation } from '@/hooks/queries/useGitAddMutation';
 import { useFileTreeStateStore } from '@/stores/fileTreeStateStore';
 import {
   activatePierreFileSelection,
@@ -133,6 +134,7 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
   ({ workspaceId, sdkClient, root, onFileSelect, serverId, isMobile, onOpenFileEdit }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const { data, isLoading, error, refetch } = useGitStatusQuery(sdkClient, workspaceId, root);
+    const { mutate: addToGit, isPending: addingToGit } = useGitAddMutation(sdkClient, workspaceId, root);
 
     // Persisted expansion identity mirrors the Project tree but under a
     // dedicated namespace so neither view clobbers the other's place.
@@ -247,6 +249,11 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
       [files],
     );
 
+    const untrackedPaths = useMemo(
+      () => new Set(files.filter((f) => f.git.status === 'untracked').map((f) => f.path)),
+      [files],
+    );
+
     const menuActions = useMemo<PierreTreeActionMenuActions>(
       () => ({
         openPreview: (path, _isDir) => {
@@ -273,6 +280,10 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
             'edit',
           );
         },
+        addToGit: sdkClient ? (path) => {
+          if (!addingToGit && untrackedPaths.has(path)) addToGit(path);
+        } : undefined,
+        addingToGit,
         copyRelative: (path) => copyPath(path, false),
         copyAbsolute: (path) => copyPath(path, true),
         rename: (target) => openRename(target),
@@ -280,7 +291,7 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
         createFile: (parentDirPath) => openCreate(parentDirPath, 'file'),
         createFolder: (parentDirPath) => openCreate(parentDirPath, 'directory'),
       }),
-      [copyPath, openCreate, openRename, openDelete],
+      [copyPath, openCreate, openRename, openDelete, sdkClient, addingToGit, addToGit, untrackedPaths],
     );
 
     const renderContextMenu = useCallback(
@@ -291,9 +302,10 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
             context={context}
             actions={menuActions}
             deletedPaths={deletedPaths}
+            untrackedPaths={untrackedPaths}
           />
         ) : null,
-      [menuActions, deletedPaths],
+      [menuActions, deletedPaths, untrackedPaths],
     );
 
     // Query refreshes AND mode flips rebuild the store. Mode must be part of
