@@ -50,7 +50,7 @@ export interface FilesApplication {
   gitRebaseResolve(workspaceId: string, input: import('@prokopai/sdk').GitRebaseResolution): Promise<import('@prokopai/sdk').GitRebaseState>;
   gitRemoveStagedAddition(workspaceId: string, path: string, root?: string): Promise<{ path: string }>;
   gitBranches(workspaceId: string, root?: string): Promise<import('@prokopai/sdk').GitBranchesResult>;
-  gitHistory(workspaceId: string, input: { root?: string; head: string; offset: number }): Promise<import('@prokopai/sdk').GitHistoryResult>;
+  gitHistory(workspaceId: string, input: { root?: string; head: string; offset: number; upstream?: string | null }): Promise<import('@prokopai/sdk').GitHistoryResult>;
   gitCommitDetails(workspaceId: string, input: { root?: string; head: string }): Promise<import('@prokopai/sdk').GitCommitDetails>;
   gitBranchPushReview(workspaceId: string, input: import('@prokopai/sdk').GitBranchPushTarget): Promise<import('@prokopai/sdk').GitBranchPushReview>;
   gitBranchAction(workspaceId: string, input: import('@prokopai/sdk').GitBranchAction): Promise<{ warning?: string }>;
@@ -161,7 +161,7 @@ export function createFilesApplication(port: FilesApplicationPort, onGitChanged?
       return result;
     },
     gitBranches: (workspaceId, root) => port.gitBranches(writeRoot(workspaceId, root)),
-    gitHistory: (workspaceId, input) => port.gitHistory(writeRoot(workspaceId, input.root), input.head, input.offset),
+    gitHistory: (workspaceId, input) => port.gitHistory(writeRoot(workspaceId, input.root), input.head, input.offset, input.upstream ?? null),
     gitCommitDetails: (workspaceId, input) => port.gitCommitDetails(writeRoot(workspaceId, input.root), input.head),
     gitBranchPushReview: (workspaceId, input) => port.gitBranchPushReview(writeRoot(workspaceId, input.root), input),
     async gitBranchAction(workspaceId, input) {

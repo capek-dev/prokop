@@ -51,11 +51,24 @@ async function log(root: string, revisions: string[], offset = 0, limit = 51): P
   }
   return commits;
 }
-export async function getGitHistory(root: string, head: string, offset: number): Promise<GitHistoryResult> {
+export async function getGitHistory(root: string, head: string, offset: number, upstream?: string | null): Promise<GitHistoryResult> {
   await commitExists(root, head);
   if (!Number.isInteger(offset) || offset < 0 || offset > 100000) fail('invalid history offset.');
-  const commits = await log(root, [head], offset);
-  return { commits: commits.slice(0, 50), nextOffset: commits.length > 50 ? offset + 50 : null };
+  // Annotation is against a tracking ref only; a vanished ref (gone upstream)
+  // degrades to the plain single-head walk instead of failing the list.
+  const upstreamRef = upstream && (await git(root, ['rev-parse', '--verify', '--quiet', upstream], { allowFailure: true })).code === 0 ? upstream : null;
+  const revisions = upstreamRef ? [head, upstreamRef] : [head];
+  const commits = await log(root, revisions, offset);
+  const marked = await annotateSync(root, head, upstreamRef, commits);
+  return { commits: marked.slice(0, 50), nextOffset: marked.length > 50 ? offset + 50 : null };
+}
+/** Marks local-only commits ahead and upstream-only commits behind using set difference. */
+async function annotateSync(root: string, head: string, upstreamRef: string | null, commits: GitHistoryEntry[]): Promise<GitHistoryEntry[]> {
+  if (!upstreamRef) return commits;
+  const shas = async (revs: string[]) => new Set((await git(root, ['rev-list', ...revs, '--'])).stdout.split(/\s+/).filter(Boolean));
+  const ahead = await shas([head, `^${upstreamRef}`]);
+  const behind = await shas([upstreamRef, `^${head}`]);
+  return commits.map((commit) => ahead.has(commit.head) ? { ...commit, sync: 'ahead' as const } : behind.has(commit.head) ? { ...commit, sync: 'behind' as const } : commit);
 }
 export async function getGitCommitDetails(root: string, head: string): Promise<GitCommitDetails> {
   await commitExists(root, head);
@@ -133,6 +146,20 @@ export async function runGitBranchAction(root: string, input: GitBranchAction): 
         await commitExists(root, input.startHead);
         await git(root, ['branch', '--no-track', '--', input.name, input.startHead]);
         break;
+      case 'track': {
+        await remoteName(root, input.remote);
+        await branchName(root, input.branch);
+        await branchName(root, input.name);
+        await commitExists(root, input.expectedHead);
+        if ((await git(root, ['rev-parse', '--verify', `refs/heads/${input.name}`], { allowFailure: true })).code === 0) fail('local branch already exists. Switch to it or choose another name.');
+        const remoteRef = `refs/remotes/${input.remote}/${input.branch}`;
+        const remoteHead = (await git(root, ['rev-parse', '--verify', remoteRef])).stdout.trim();
+        if (remoteHead !== input.expectedHead) fail('remote branch changed. Fetch and review again.');
+        // Creates the local branch at the reviewed head with the remote ref as
+        // upstream; checkout stays untouched and goes through 'switch'.
+        await git(root, ['branch', '--track', '--', input.name, remoteRef]);
+        break;
+      }
       case 'switch': {
         await branchName(root, input.name);
         await commitExists(root, input.targetHead);

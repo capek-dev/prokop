@@ -82,6 +82,52 @@ test('switch still rejects staged additions', async () => {
   expect((await listGitBranches(root)).repository.branch).toBe('main');
 });
 
+test('track creates a local branch from the reviewed remote head without checkout', async () => {
+  const remote = join(base, 'remote.git');
+  await git(root, ['init', '--bare', remote]);
+  await git(root, ['remote', 'add', 'origin', remote]);
+  await runGitBranchAction(root, { action: 'push', sourceBranch: 'main', expectedHead: head, remote: 'origin', branch: 'feature', expectedRemoteHead: null, force: false });
+  await runGitBranchAction(root, { action: 'fetch', remote: 'origin' });
+  await writeFile(join(root, 'file'), 'second');
+  await git(root, ['add', 'file']);
+  await git(root, ['commit', '-m', 'Second']);
+  const secondHead = (await git(root, ['rev-parse', 'HEAD'])).stdout.trim();
+  await runGitBranchAction(root, { action: 'track', remote: 'origin', branch: 'feature', name: 'feature', expectedHead: head });
+  const tracked = (await listGitBranches(root)).branches.find((b) => b.name === 'feature');
+  expect(tracked).toMatchObject({ kind: 'local', head, current: false, upstream: 'refs/remotes/origin/feature' });
+  expect((await listGitBranches(root)).repository.branch).toBe('main');
+  await expect(runGitBranchAction(root, { action: 'track', remote: 'origin', branch: 'feature', name: 'feature', expectedHead: head })).rejects.toThrow('already exists');
+  await expect(runGitBranchAction(root, { action: 'track', remote: 'origin', branch: 'feature', name: 'other', expectedHead: secondHead })).rejects.toThrow('remote branch changed');
+});
+
+test('history annotates ahead and behind commits against an upstream', async () => {
+  const remote = join(base, 'remote.git');
+  await git(root, ['init', '--bare', remote]);
+  await git(root, ['remote', 'add', 'origin', remote]);
+  await runGitBranchAction(root, { action: 'push', sourceBranch: 'main', expectedHead: head, remote: 'origin', branch: 'main', expectedRemoteHead: null, force: false });
+  await writeFile(join(root, 'file'), 'local');
+  await git(root, ['add', 'file']);
+  await git(root, ['commit', '-m', 'Local only']);
+  const localHead = (await git(root, ['rev-parse', 'HEAD'])).stdout.trim();
+  const clone = join(base, 'clone');
+  await git(base, ['clone', remote, 'clone']);
+  await git(clone, ['config', 'user.name', 'Test']);
+  await git(clone, ['config', 'user.email', 'test@example.invalid']);
+  await writeFile(join(clone, 'file'), 'remote');
+  await git(clone, ['add', 'file']);
+  await git(clone, ['commit', '-m', 'Remote only']);
+  await git(clone, ['push', 'origin', 'main']);
+  const remoteHead = (await git(clone, ['rev-parse', 'HEAD'])).stdout.trim();
+  await runGitBranchAction(root, { action: 'fetch', remote: 'origin' });
+  const annotated = await getGitHistory(root, localHead, 0, 'refs/remotes/origin/main');
+  expect(annotated.commits.find((c) => c.head === localHead)?.sync).toBe('ahead');
+  expect(annotated.commits.find((c) => c.head === remoteHead)?.sync).toBe('behind');
+  expect(annotated.commits.find((c) => c.head === head)?.sync).toBeUndefined();
+  const plain = await getGitHistory(root, localHead, 0);
+  expect(plain.commits.every((c) => c.sync === undefined)).toBe(true);
+  expect((await getGitHistory(root, localHead, 0, 'refs/remotes/origin/gone')).commits.every((c) => c.sync === undefined)).toBe(true);
+});
+
 test('explicit source push preview, fetch and stale remote lease', async () => {
   const remote = join(base, 'remote.git');
   await git(root, ['init', '--bare', remote]);
