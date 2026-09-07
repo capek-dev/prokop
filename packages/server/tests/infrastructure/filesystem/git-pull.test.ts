@@ -37,6 +37,73 @@ beforeEach(async () => {
 });
 afterEach(async () => { await rm(base, { recursive: true, force: true }); });
 const pull = () => runGitBranchAction(root, { action: 'pull', expectedBranch: 'main', expectedHead: head, remote: 'origin', branch: 'main' });
+const pullBranch = () => runGitBranchAction(root, { action: 'pull-branch', name: 'main', expectedHead: head });
+const mainHead = async () => (await git(root, ['rev-parse', 'refs/heads/main'])).stdout.trim();
+
+test('pull browsed main preserves development HEAD, staged, dirty, ignored and untracked files', async () => {
+  await git(root, ['switch', '-c', 'dev']);
+  const devHead = await commit(root, 'dev', 'development');
+  const next = await commit(peer, 'file', 'remote change');
+  await git(peer, ['push']);
+  await writeFile(join(root, 'file'), 'staged');
+  await git(root, ['add', 'file']);
+  await writeFile(join(root, 'file'), 'dirty');
+  await writeFile(join(root, 'untracked'), 'keep');
+  await writeFile(join(root, '.git/info/exclude'), 'ignored\n');
+  await writeFile(join(root, 'ignored'), 'keep ignored');
+  const index = await readFile(join(root, '.git/index'));
+  await pullBranch();
+  expect(await mainHead()).toBe(next);
+  expect(await sha(root)).toBe(devHead);
+  expect((await git(root, ['branch', '--show-current'])).stdout.trim()).toBe('dev');
+  expect(await readFile(join(root, '.git/index'))).toEqual(index);
+  expect(await readFile(join(root, 'file'), 'utf8')).toBe('dirty');
+  expect(await readFile(join(root, 'untracked'), 'utf8')).toBe('keep');
+  expect(await readFile(join(root, 'ignored'), 'utf8')).toBe('keep ignored');
+  head = next;
+  await pullBranch();
+  expect(await mainHead()).toBe(next);
+});
+
+test('non-checkout pull refuses divergence and stale target heads', async () => {
+  const initial = head;
+  head = await commit(root, 'local', 'local change');
+  await git(root, ['switch', '-c', 'dev']);
+  await commit(peer, 'remote', 'remote change');
+  await git(peer, ['push']);
+  await expect(pullBranch()).rejects.toThrow('diverged');
+  expect(await mainHead()).toBe(head);
+  await expect(runGitBranchAction(root, { action: 'pull-branch', name: 'main', expectedHead: initial })).rejects.toThrow('target branch changed');
+});
+
+test('non-checkout pull refuses current and other-worktree branches', async () => {
+  await expect(pullBranch()).rejects.toThrow('checked out');
+  await git(root, ['switch', '-c', 'dev']);
+  await git(root, ['worktree', 'add', join(base, 'linked'), 'main']);
+  await expect(pullBranch()).rejects.toThrow('checked out');
+  expect(await mainHead()).toBe(head);
+});
+
+test('non-checkout pull refuses detached rebase ownership', async () => {
+  await git(root, ['switch', '-c', 'dev']);
+  const linked = join(base, 'linked');
+  await git(root, ['worktree', 'add', '--detach', linked, head]);
+  const dir = (await git(linked, ['rev-parse', '--absolute-git-dir'])).stdout.trim();
+  await mkdir(join(dir, 'rebase-merge'));
+  await writeFile(join(dir, 'rebase-merge/head-name'), 'refs/heads/main\n');
+  await expect(pullBranch()).rejects.toThrow('in-progress');
+  expect(await mainHead()).toBe(head);
+});
+
+test('non-checkout pull never rewinds an ahead branch and rejects missing upstream', async () => {
+  head = await commit(root, 'local', 'local change');
+  await git(root, ['switch', '-c', 'dev']);
+  await pullBranch();
+  expect(await mainHead()).toBe(head);
+  await git(root, ['config', '--unset', 'branch.main.remote']);
+  await expect(pullBranch()).rejects.toThrow();
+  expect(await mainHead()).toBe(head);
+});
 test('pull fetches and fast-forwards without touching unrelated untracked files', async () => {
   const next = await commit(peer, 'file', 'remote change');
   await git(peer, ['push']);

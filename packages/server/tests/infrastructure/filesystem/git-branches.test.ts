@@ -138,6 +138,16 @@ test('explicit source push preview, fetch and stale remote lease', async () => {
   expect(review).toMatchObject({ remoteHead: null, outgoingCount: 1, remoteOnlyCount: 0 });
   await runGitBranchAction(root, { action: 'push', ...target, expectedRemoteHead: null, force: false });
   expect((await listGitBranches(root)).repository.branch).toBe('main');
+  expect((await listGitBranches(root)).branches.find((b) => b.name === 'feature')?.upstream).toBe('refs/remotes/origin/published');
+  await git(root, ['branch', '--unset-upstream', 'feature']);
+  await expect(runGitBranchAction(root, { action: 'push', ...target, expectedRemoteHead: null, force: false })).rejects.toThrow('remote changed');
+  expect((await listGitBranches(root)).branches.find((b) => b.name === 'feature')?.upstream).toBeNull();
+  // An already-published destination must also establish missing tracking.
+  expect(await runGitBranchAction(root, { action: 'push', ...target, expectedRemoteHead: head, force: false })).toEqual({});
+  expect((await listGitBranches(root)).branches.find((b) => b.name === 'feature')?.upstream).toBe('refs/remotes/origin/published');
+  // Publishing elsewhere must not replace an existing upstream.
+  await runGitBranchAction(root, { action: 'push', ...target, branch: 'another', expectedRemoteHead: null, force: false });
+  expect((await listGitBranches(root)).branches.find((b) => b.name === 'feature')?.upstream).toBe('refs/remotes/origin/published');
   await runGitBranchAction(root, { action: 'fetch', remote: 'origin' });
   expect((await listGitBranches(root)).branches.find((b) => b.name === 'origin/published')).toMatchObject({ kind: 'remote', head });
   expect((await reviewGitBranchPush(root, target)).outgoingCount).toBe(0);

@@ -10,6 +10,7 @@ export const gitBranchPushReviewSchema = z.object({ root, sourceBranch: name, ex
 export const gitBranchActionSchema = z.discriminatedUnion('action', [
   z.object({ root, action: z.literal('fetch'), remote }).strict(),
   z.object({ root, action: z.literal('pull'), expectedBranch: name, expectedHead: head, remote, branch: name }).strict(),
+  z.object({ root, action: z.literal('pull-branch'), name, expectedHead: head }).strict(),
   z.object({ root, action: z.literal('create'), name, startHead: head }).strict(),
   z.object({ root, action: z.literal('track'), remote, branch: name, name, expectedHead: head }).strict(),
   z.object({ root, action: z.literal('switch'), name, expectedBranch: name.nullable(), expectedHead: head.nullable(), targetHead: head }).strict(),

@@ -1,4 +1,4 @@
-import { lstat } from 'node:fs/promises';
+import { lstat, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { GitBranchAction, GitBranchesResult, GitBranchPushTarget, GitBranchPushReview, GitHistoryEntry, GitHistoryResult, GitCommitDetails } from '@prokopai/sdk';
 import { git, getGitRepository, previewGitPush } from './git-operations';
@@ -141,6 +141,57 @@ export async function runGitBranchAction(root: string, input: GitBranchAction): 
         await git(root, ['merge', '--ff-only', '--no-autostash', '--no-overwrite-ignore', '--no-edit', '--', fetchedHead]);
         break;
       }
+      case 'pull-branch': {
+        await branchName(root, input.name);
+        await commitExists(root, input.expectedHead);
+        const ref = `refs/heads/${input.name}`;
+        const upstream = async () => {
+          const remote = (await git(root, ['config', '--get', `branch.${input.name}.remote`])).stdout.trim();
+          const merge = (await git(root, ['config', '--get', `branch.${input.name}.merge`])).stdout.trim();
+          await remoteName(root, remote);
+          if (!merge.startsWith('refs/heads/')) fail('configure a remote upstream before pulling.');
+          const branch = merge.slice(11);
+          await branchName(root, branch);
+          return { remote, branch };
+        };
+        const target = await upstream();
+        const validate = async () => {
+          const branches = await listGitBranches(root);
+          const branch = branches.branches.find((b) => b.ref === ref);
+          if (!branch || branch.head !== input.expectedHead) fail('target branch changed. Refresh before pulling.');
+          if (branch.current || branch.checkedOut) fail('branch is checked out in a worktree. Pull from that checkout instead.');
+          // Rebase can detach HEAD while still owning a branch. Conservatively
+          // refuse active operations in every worktree, including the main one.
+          const common = (await git(root, ['rev-parse', '--path-format=absolute', '--git-common-dir'])).stdout.trim();
+          const linked = await readdir(join(common, 'worktrees')).catch((error: unknown) => {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+            throw error;
+          });
+          for (const dir of [common, ...linked.map((name) => join(common, 'worktrees', name))]) {
+            for (const sentinel of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply', 'sequencer', 'BISECT_LOG']) {
+              const exists = await lstat(join(dir, sentinel)).then(() => true, (error: unknown) => {
+                if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+                throw error;
+              });
+              if (exists) fail('finish the in-progress Git operation before pulling.');
+            }
+          }
+          const currentUpstream = await upstream();
+          if (currentUpstream.remote !== target.remote || currentUpstream.branch !== target.branch) fail('upstream changed. Refresh before pulling.');
+        };
+        await validate();
+        const tracking = `refs/remotes/${target.remote}/${target.branch}`;
+        await git(root, ['fetch', '--no-tags', '--no-recurse-submodules', '--refmap=', '--', target.remote, `+refs/heads/${target.branch}:${tracking}`]);
+        const fetchedHead = (await git(root, ['rev-parse', '--verify', tracking])).stdout.trim();
+        await commitExists(root, fetchedHead);
+        await validate();
+        if ((await git(root, ['merge-base', '--is-ancestor', fetchedHead, input.expectedHead], { allowFailure: true })).code === 0) break;
+        if ((await git(root, ['merge-base', '--is-ancestor', input.expectedHead, fetchedHead], { allowFailure: true })).code !== 0) fail('local and upstream branches have diverged. Pull is fast-forward only.');
+        // Ancestry is checked above; update-ref itself does not enforce FF.
+        // Compare-and-swap prevents overwriting a concurrently changed branch.
+        await git(root, ['update-ref', '--no-deref', '-m', 'pull: fast-forward without checkout', ref, fetchedHead, input.expectedHead]);
+        break;
+      }
       case 'create':
         await branchName(root, input.name);
         await commitExists(root, input.startHead);
@@ -188,6 +239,18 @@ export async function runGitBranchAction(root: string, input: GitBranchAction): 
         if (input.force) args.push(`--force-with-lease=refs/heads/${input.branch}:${input.expectedRemoteHead ?? ''}`);
         args.push('--', input.remote, `${input.expectedHead}:refs/heads/${input.branch}`);
         await git(root, args);
+        // SHA-pinned pushes cannot use --set-upstream to identify the local
+        // source branch. Configure it only after the remote push succeeds.
+        try {
+          const remote = await git(root, ['config', '--get', `branch.${input.sourceBranch}.remote`], { allowFailure: true });
+          const merge = await git(root, ['config', '--get', `branch.${input.sourceBranch}.merge`], { allowFailure: true });
+          if (remote.code > 1 || merge.code > 1) throw new Error('Unable to read tracking configuration');
+          if (remote.code === 1 && merge.code === 1) {
+            await git(root, ['branch', `--set-upstream-to=refs/remotes/${input.remote}/${input.branch}`, '--', input.sourceBranch]);
+          }
+        } catch {
+          return { warning: 'Push succeeded, but upstream tracking could not be configured. Set the branch upstream before pulling.' };
+        }
         break;
       }
     }
