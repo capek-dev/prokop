@@ -33,6 +33,21 @@ async function mode(name: string) {
   fireEvent.pointerDown(screen.getByRole('button', { name: 'Commit action' }), { button: 0, ctrlKey: false });
   fireEvent.click(await screen.findByRole('menuitem', { name }));
 }
+test('directories collapse and expand without losing nested selection', async () => {
+  setup();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Commit…' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Commit…' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select all matching files' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse directory src' }));
+  expect(screen.queryByRole('checkbox', { name: 'Commit src/a' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('checkbox', { name: 'Commit src/b' })).not.toBeInTheDocument();
+  // Directory checkbox still reflects the hidden selection.
+  expect(screen.getByRole('checkbox', { name: 'Select directory src' })).toBeChecked();
+  expect(screen.getByText('2')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Expand directory src' }));
+  expect(screen.getByRole('checkbox', { name: 'Commit src/a' })).toBeChecked();
+});
+
 test('initial render keeps tree and has no standalone push or modal', () => {
   setup();
   expect(screen.getByText('Existing tree')).toBeInTheDocument();

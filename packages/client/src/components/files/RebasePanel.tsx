@@ -11,6 +11,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { MergePane, RebaseConflictHunks } from './RebaseConflictHunks';
 import { conflictSections, hasConflictMarkers } from './rebaseConflictSections';
+import { branchLabelInGroup, groupBranchesByPrefix } from './branchGroups';
+import { cn } from '@/lib/utils';
 
 export const rebaseKey = (serverId: string | undefined, workspaceId: string, root: string | undefined) => ['git-rebase', serverId, workspaceId, root] as const;
 interface Props {
@@ -73,7 +75,7 @@ export function RebasePanel({ sdkClient, serverId, workspaceId, root, branches, 
       </> : state && <>
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild><Button variant="outline" className="justify-between" disabled={busy} aria-label="Local base branch"><span className="truncate">{base?.name ?? 'Choose local base branch'}</span><ChevronDown data-icon="inline-end" /></Button></PopoverTrigger>
-          <PopoverContent className="w-72 p-0" align="start"><Command><CommandInput placeholder="Find local branch…" /><CommandList><CommandEmpty>No other local branches</CommandEmpty><CommandGroup>{branches?.branches.filter((b) => b.kind === 'local' && !b.current).map((b) => <CommandItem key={b.ref} value={b.name} onSelect={() => { setBaseRef(b.ref); setPickerOpen(false); }}>{b.name}</CommandItem>)}</CommandGroup></CommandList></Command></PopoverContent>
+          <PopoverContent className="w-72 p-0" align="start"><Command><CommandInput placeholder="Find local branch…" /><CommandList><CommandEmpty>No other local branches</CommandEmpty>{groupBranchesByPrefix(branches?.branches.filter((b) => b.kind === 'local' && !b.current) ?? []).map((group) => <CommandGroup key={group.label ?? ''} heading={group.label ?? undefined}>{group.items.map((b) => <CommandItem key={b.ref} value={b.name} onSelect={() => { setBaseRef(b.ref); setPickerOpen(false); }}><span className={cn('truncate', group.label && 'pl-4')}>{branchLabelInGroup(b.name, group.label)}</span></CommandItem>)}</CommandGroup>)}</CommandList></Command></PopoverContent>
         </Popover>
         <p className="break-all text-sm">Rebase <strong>{branches?.repository.branch ?? 'current branch'}</strong> onto <strong>{base?.name ?? '…'}</strong></p>
         <p className="text-xs text-muted-foreground">Uses local commits only. The base branch stays unchanged. No fetch, stash or push. Replayed commit IDs change.</p>

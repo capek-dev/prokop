@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import type { GitDiffSummary, ProkopaiClient } from '@prokopai/sdk';
 import type {
   FileTreeSelectionChangeListener,
@@ -406,10 +406,10 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
           files={files}
           onPreview={(path) => menuActions.openPreview(path, false)}
         >
-          {allFiles.length === 0 ? <div className="p-4 text-sm text-muted-foreground text-center">No changes</div> : <PierreTreeHost hostRef={containerRef}>
+          {allFiles.length === 0 ? <div className="flex flex-1 flex-col items-center justify-center gap-1 px-4 py-10 text-center"><Check className="size-4 text-muted-foreground/50" /><p className="text-sm text-muted-foreground">No changes</p></div> : <PierreTreeHost hostRef={containerRef}>
             <PierreFileTreeReact model={model} className="size-full" renderContextMenu={renderContextMenu} />
           </PierreTreeHost>}
-        </GitChangesActions> : <div className="p-4 text-sm text-muted-foreground text-center">No changes</div>}
+        </GitChangesActions> : <div className="flex flex-1 flex-col items-center justify-center gap-1 px-4 py-10 text-center"><Check className="size-4 text-muted-foreground/50" /><p className="text-sm text-muted-foreground">No changes</p></div>}
         <FileActionsDialogs
           dialog={actionDialog}
           mutating={actionMutating}

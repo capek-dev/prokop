@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, GitCommitHorizontal, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitCommitHorizontal, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { GitDiffSummary, GitPushInput, ProkopaiClient } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { EMPTY_GIT_DRAFT, gitDraftKey, selectedGitPaths, useGitCommitStore } from '@/stores/gitCommitStore';
 import { queryKeys } from '@/lib/queryKeys';
+import { cn } from '@/lib/utils';
 
 interface Props {
   sdkClient: ProkopaiClient;
@@ -38,6 +39,7 @@ export function GitChangesActions({ sdkClient, workspaceId, serverId, root, file
   const [remote, setRemote] = useState('');
   const [branch, setBranch] = useState('');
   const [filter, setFilter] = useState('');
+  const [collapsed, setCollapsed] = useState<string[]>([]);
   const [retryPush, setRetryPush] = useState<GitPushInput | null>(null);
   const [confirmation, setConfirmation] = useState<GitPushInput | null>(null);
   const repository = useQuery({
@@ -122,6 +124,23 @@ export function GitChangesActions({ sdkClient, workspaceId, serverId, root, file
     }
     rows.push({ path: file.path, directory: false, depth: parts.length - 1, file });
   }
+  // Status letters follow the app-wide git-state convention (VSCode SCM):
+  // M yellow, A/U green, D red, R muted.
+  const STATUS_BADGE: Record<string, { letter: string; className: string }> = {
+    modified: { letter: 'M', className: 'text-warning' },
+    added: { letter: 'A', className: 'text-success' },
+    untracked: { letter: 'U', className: 'text-success/80' },
+    deleted: { letter: 'D', className: 'text-destructive' },
+    renamed: { letter: 'R', className: 'text-muted-foreground' },
+    copied: { letter: 'C', className: 'text-warning' },
+  };
+  // Filtering ignores collapses so matches are never hidden behind a folder.
+  const hiddenBy = new Set(filter ? [] : collapsed);
+  const isRowVisible = (row: { path: string }) => {
+    for (const dir of hiddenBy) if (row.path.startsWith(`${dir}/`)) return false;
+    return true;
+  };
+  const toggleDir = (path: string) => setCollapsed((current) => current.includes(path) ? current.filter((item) => item !== path) : [...current, path]);
   return <>
     <div className="flex shrink-0 items-center gap-1 px-2 py-1">
       <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{repository.data?.branch ?? (repository.isPending ? 'Loading Git…' : 'Git unavailable')}</span>
@@ -130,28 +149,43 @@ export function GitChangesActions({ sdkClient, workspaceId, serverId, root, file
       </Button>
     </div>
     {!editing ? children : <>
-      <div className="flex shrink-0 items-center gap-3 px-3 py-1">
-        <Checkbox aria-label="Select all matching files" disabled={busy || !!retryPush} checked={checkState(visible.map((file) => file.path))} onCheckedChange={(checked) => toggle(visible.map((file) => file.path), checked === true)} />
-        <Input aria-label="Filter files to commit" placeholder="Filter files…" value={filter} onChange={(event) => setFilter(event.target.value)} disabled={busy} />
+      <div className="flex shrink-0 items-center gap-2 px-2 pb-1.5">
+        <Checkbox aria-label="Select all matching files" className="size-3.5" disabled={busy || !!retryPush} checked={checkState(visible.map((file) => file.path))} onCheckedChange={(checked) => toggle(visible.map((file) => file.path), checked === true)} />
+        <Input aria-label="Filter files to commit" className="h-7 flex-1 text-xs" placeholder="Filter files…" value={filter} onChange={(event) => setFilter(event.target.value)} disabled={busy} />
       </div>
-      <div className="dialog-scrollbar min-h-0 flex-1 overflow-y-auto py-1">
-        {rows.map((row) => {
+      <div className="dialog-scrollbar min-h-0 flex-1 overflow-y-auto">
+        {rows.filter(isRowVisible).map((row) => {
           const paths = row.directory ? visible.filter((file) => file.path.startsWith(`${row.path}/`)).map((file) => file.path) : [row.path];
-          return <div key={`${row.directory}:${row.path}`} className="flex min-w-0 items-center gap-3 py-1 pr-3 hover:bg-muted/50" style={{ paddingLeft: 12 + row.depth * 12 }}>
-            <Checkbox aria-label={row.directory ? `Select directory ${row.path}` : `Commit ${row.path}`} checked={checkState(paths)} disabled={busy || !!retryPush} onCheckedChange={(checked) => toggle(paths, checked === true)} />
-            {row.directory ? <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{row.path.split('/').pop()}</span> : <button type="button" className="min-w-0 flex-1 truncate text-left text-xs" title={`Preview ${row.path}`} disabled={busy} onClick={() => onPreview(row.path)}>{row.path.split('/').pop()}</button>}
-            {!row.directory && <span className="text-xs text-muted-foreground" title={row.file?.git.status}>{row.file?.git.status === 'untracked' ? '?' : row.file?.git.status.slice(0, 1).toUpperCase()}</span>}
+          const status = row.file?.git.status;
+          const badge = STATUS_BADGE[status ?? 'modified'] ?? STATUS_BADGE.modified;
+          const collapsedRow = row.directory && hiddenBy.has(row.path);
+          return <div key={`${row.directory}:${row.path}`} className="group flex min-w-0 items-center gap-1.5 py-1 pr-3 hover:bg-muted/50" style={{ paddingLeft: 10 + row.depth * 14 }}>
+            <Checkbox aria-label={row.directory ? `Select directory ${row.path}` : `Commit ${row.path}`} className="size-3.5" checked={checkState(paths)} disabled={busy || !!retryPush} onCheckedChange={(checked) => toggle(paths, checked === true)} />
+            {row.directory ? <>
+              <button type="button" aria-label={collapsedRow ? `Expand directory ${row.path}` : `Collapse directory ${row.path}`} aria-expanded={!collapsedRow} className="shrink-0 text-muted-foreground/50 hover:text-foreground" onClick={() => toggleDir(row.path)}>
+                {collapsedRow ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
+              </button>
+              <button type="button" className="min-w-0 flex-1 truncate text-left text-xs text-muted-foreground/80 hover:text-foreground" onClick={() => toggleDir(row.path)}>{row.path.split('/').pop()}</button>
+              <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/50" title={`${paths.length} changed files`}>{paths.length}</span>
+            </> : <>
+              <button type="button" className="min-w-0 flex-1 truncate text-left text-xs" title={`Preview ${row.path}`} disabled={busy} onClick={() => onPreview(row.path)}>
+                {row.path.split('/').pop()}
+                {row.path.includes('/') && <span className="ml-1.5 text-muted-foreground/70">{row.path.slice(0, row.path.lastIndexOf('/'))}</span>}
+              </button>
+              <span className={cn('shrink-0 font-mono text-[10px] font-medium uppercase', badge.className)} title={status}>{badge.letter}</span>
+            </>}
           </div>;
         })}
+        {visible.length === 0 && <p className="px-3 py-4 text-xs text-muted-foreground">No matching files</p>}
       </div>
-      <div className="flex shrink-0 flex-col gap-2 border-t p-2">
-        {retryPush ? <p className="text-xs text-muted-foreground">Committed {retryPush.expectedHead.slice(0, 8)}. Push has not completed.</p> : <Textarea aria-label="Commit message" placeholder="Commit message" value={draft.message} rows={2} disabled={busy} maxLength={8192} onChange={(event) => update({ message: event.target.value })} />}
+      <div className="flex shrink-0 flex-col gap-2 border-t border-border/60 p-2">
+        {retryPush ? <p className="text-xs text-muted-foreground">Committed {retryPush.expectedHead.slice(0, 8)}. Push has not completed.</p> : <Textarea aria-label="Commit message" className="min-h-14 text-xs" placeholder="Commit message" value={draft.message} rows={2} disabled={busy} maxLength={8192} onChange={(event) => update({ message: event.target.value })} />}
         {mode !== 'commit' && !retryPush && <>
           {!repository.data?.upstream && <div className="flex gap-2">
-            <select aria-label="Remote" className="min-w-0 flex-1 rounded-md border bg-background text-xs" value={destination.remote} disabled={busy} onChange={(event) => setRemote(event.target.value)}><option value="">Remote</option>{repository.data?.remotes.map((name) => <option key={name}>{name}</option>)}</select>
-            <Input aria-label="Remote branch" value={destination.branch} disabled={busy} onChange={(event) => setBranch(event.target.value)} />
+            <select aria-label="Remote" className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 text-xs" value={destination.remote} disabled={busy} onChange={(event) => setRemote(event.target.value)}><option value="">Remote</option>{repository.data?.remotes.map((name) => <option key={name}>{name}</option>)}</select>
+            <Input aria-label="Remote branch" className="h-7 flex-1 text-xs" value={destination.branch} disabled={busy} onChange={(event) => setBranch(event.target.value)} />
           </div>}
-          <p className="text-xs text-muted-foreground">{repository.data?.branch} → {destination.remote || 'remote'}/{destination.branch}. Push includes all unpushed branch commits, not only these files.</p>
+          <p className="text-xs text-muted-foreground" title="Push includes all unpushed branch commits, not only these files">{repository.data?.branch} → {destination.remote || 'remote'}/{destination.branch}</p>
         </>}
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">{selected.length} selected</span>
