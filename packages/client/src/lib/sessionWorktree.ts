@@ -6,6 +6,8 @@ interface ResolveFilesPanelRootInput {
   worktree?: SessionWorktreeBinding | null;
   pinnedRoot?: string | null;
   pinned: boolean;
+  /** Current configured roots and available managed worktrees. */
+  allowedRoots?: string[];
 }
 
 export interface FilesPanelRootResolution {
@@ -78,14 +80,16 @@ export function resolveFilesPanelRoot({
   worktree,
   pinnedRoot,
   pinned,
+  allowedRoots,
 }: ResolveFilesPanelRootInput): FilesPanelRootResolution {
   const unavailable = Boolean(workspaceRootId && worktree?.state !== 'available');
   const followedRoot = workspaceRootId ? worktree?.path ?? '' : workspacePath;
-  const selectedRoot = pinned ? pinnedRoot ?? followedRoot : followedRoot;
+  const usePin = pinned && (!allowedRoots || (!!pinnedRoot && allowedRoots.includes(pinnedRoot)));
+  const selectedRoot = usePin ? pinnedRoot ?? followedRoot : followedRoot;
 
   return {
     selectedRoot,
-    blocked: unavailable && !pinned,
+    blocked: unavailable && !usePin,
     isPrimary: selectedRoot === workspacePath,
   };
 }

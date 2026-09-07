@@ -8,6 +8,8 @@ export function handleGitChanged(workspaceId: string): void {
   }
   void queryClient.invalidateQueries({ queryKey: ['git-repository'] });
   void queryClient.invalidateQueries({ queryKey: ['git-branches'] });
+  // Sync markers depend on upstream tips, not just the local history SHA.
+  void queryClient.invalidateQueries({ queryKey: ['git-history'] });
   void queryClient.invalidateQueries({ queryKey: ['git-rebase'] });
   void queryClient.invalidateQueries({ queryKey: [...queryKeys.files.treePrefix, workspaceId] });
   void queryClient.invalidateQueries({ queryKey: queryKeys.worktrees.refsByWorkspace(workspaceId) });

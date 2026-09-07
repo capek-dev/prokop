@@ -22,6 +22,24 @@ async function selectRemoteBranch() {
 }
 beforeEach(() => { action.mockReset().mockResolvedValue({}); branches.mockReset(); });
 
+test.each(['x', 'origin/feature/x'])('checked-out label returns from %s to current history without checkout', async (option) => {
+  setup(true);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Select branch history' })).toBeEnabled());
+  expect(screen.queryByRole('button', { name: 'View checked-out branch main' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Select branch history' }));
+  fireEvent.click(await screen.findByRole('option', { name: option }));
+  fireEvent.click(screen.getByRole('button', { name: 'New branch' }));
+  expect(screen.getByRole('textbox', { name: 'New branch name' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'View checked-out branch main' }));
+
+  expect(screen.getByRole('button', { name: 'Select branch history' })).toHaveTextContent('main');
+  expect(screen.queryByRole('button', { name: 'View checked-out branch main' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: 'New branch name' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Push…' })).toBeInTheDocument();
+  expect(action).not.toHaveBeenCalled();
+});
+
 test('checkout switches to an existing local branch without recreating it', async () => {
   setup(true);
   await selectRemoteBranch();

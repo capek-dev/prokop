@@ -25,7 +25,7 @@ import {
   PanelResizeHandle,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
-import { useChatLayoutStore } from '@/stores/chatLayoutStore';
+import { useSessionChatLayoutStore as useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { useUIStore, type DefaultFileOpenMode } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
@@ -150,27 +150,21 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       return d.identity.root ?? '';
     });
 
-    // Follow the focused session unless the user pinned a root manually.
+    // Follow the focused session unless its saved pin is still available.
     const rootResolution = resolveFilesPanelRoot({
       workspacePath: activeWorkspace?.path ?? '',
       workspaceRootId: focusedSession?.workspaceRootId,
       worktree: sessionWorktree,
       pinnedRoot: filesPanelRoot,
       pinned: filesPanelRootPinned,
+      allowedRoots: activeWorkspace ? [activeWorkspace.path, ...activeWorkspace.additionalPaths, ...managedRoots] : [],
     });
     const selectedRoot = rootResolution.selectedRoot;
     const isMainRoot = rootResolution.isPrimary;
     const rootBlocked = rootResolution.blocked;
 
-    // Reset stale root when the active workspace changes.
-    useEffect(() => {
-      if (!activeWorkspace) return;
-      const allowedRoots = [...activeWorkspace.additionalPaths, ...managedRoots];
-      if (filesPanelRoot && filesPanelRoot !== activeWorkspace.path && !allowedRoots.includes(filesPanelRoot)) {
-        setFilesPanelRoot(null);
-        setFilesPanelRootPinned(false);
-      }
-    }, [activeWorkspace, filesPanelRoot, managedRoots, setFilesPanelRoot, setFilesPanelRootPinned]);
+    // Do not erase saved worktree pins during discovery. Invalid pins are
+    // ignored at resolution time, so a removed root is never used for requests.
 
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [rootRecoveryError, setRootRecoveryError] = useState<string | null>(null);

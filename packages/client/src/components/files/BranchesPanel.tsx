@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Check, ChevronDown, Download, GitBranch, Loader2, MoreHorizontal, Plus, X } from 'lucide-react';
 import { CommitPatch } from './CommitPatch';
 import { RebasePanel, rebaseKey } from './RebasePanel';
@@ -25,6 +25,9 @@ interface Props {
 /** Shape of a git-history row (SDK type not exported; kept structural). */
 interface HistoryEntry { head: string; subject: string; author: string; date: string }
 
+const pushKey = (serverId: string | undefined, workspaceId: string, root: string | undefined) => ['git-branch-push', serverId, workspaceId, root] as const;
+type PushAction = Extract<GitBranchAction, { action: 'push' }>;
+
 export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props) {
   const cache = useQueryClient();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -44,9 +47,17 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
     enabled: !!sdkClient, retry: false,
   });
   const data = branches.data;
-  const selected = selectedRef ? data?.branches.find((b) => b.ref === selectedRef) : data?.branches.find((b) => b.current) ?? data?.branches[0];
+  const currentBranch = data?.branches.find((b) => b.current);
+  const selected = selectedRef ? data?.branches.find((b) => b.ref === selectedRef) : currentBranch ?? data?.branches[0];
+  const selectBranch = (ref: string) => {
+    setSelectedRef(ref);
+    setCommit(null);
+    setCreateFrom(null);
+    setPushBranch(null);
+    setPickerOpen(false);
+  };
   const refresh = () => {
-    for (const key of [['git-branches'], ['git-repository'], ['git-rebase'], queryKeys.files.treePrefix, queryKeys.files.browsePrefix, queryKeys.files.gitStatusPrefix, ['files', 'git-diff'], queryKeys.worktrees.refsByWorkspace(workspaceId)]) {
+    for (const key of [['git-branches'], ['git-history'], ['git-repository'], ['git-rebase'], queryKeys.files.treePrefix, queryKeys.files.browsePrefix, queryKeys.files.gitStatusPrefix, ['files', 'git-diff'], queryKeys.worktrees.refsByWorkspace(workspaceId)]) {
       void cache.invalidateQueries({ queryKey: key });
     }
   };
@@ -59,7 +70,20 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
     },
     onSettled: refresh,
   });
-  const busy = mutation.isPending || rebase.isPending || !!rebase.data?.active;
+  // Mutations outlive their originating panel. Subscribe to the cache rather
+  // than relying on a fresh useMutation observer after session navigation.
+  const pushes = useMutationState({
+    filters: { mutationKey: pushKey(serverId, workspaceId, root), exact: true },
+    select: (entry) => ({
+      status: entry.state.status,
+      input: entry.state.variables as PushAction,
+      error: entry.state.error,
+      result: entry.state.data as { warning?: string } | undefined,
+    }),
+  });
+  const pendingPush = pushes.find((entry) => entry.status === 'pending');
+  const lastPush = pushes.at(-1);
+  const busy = mutation.isPending || !!pendingPush || rebase.isPending || !!rebase.data?.active;
   // A remote selection maps to a local branch name; when that local branch
   // already exists Checkout just switches to it instead of recreating.
   const resolveCheckout = (branch: GitBranchInfo) => {
@@ -82,12 +106,21 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
 
   // One quiet meta line for the selected branch; checked-out context only when
   // the user is inspecting a different branch than the one that is active.
-  const metaParts: string[] = [];
-  if (selected && !selected.current && data?.repository.branch) metaParts.push(`Checked out: ${data.repository.branch}`);
-  if (!selected?.upstream) {
-    if (selected?.kind === 'remote') metaParts.push('Remote branch history');
-    else if (selected) metaParts.push('No upstream');
-  }
+  const showCurrentBranch = selected && !selected.current && currentBranch;
+  const branchContext = !selected?.upstream
+    ? selected?.kind === 'remote' ? 'Remote branch history' : selected ? 'No upstream' : null
+    : null;
+  const branchMeta = <>
+    {showCurrentBranch && <button
+      type="button"
+      className="min-w-0 truncate rounded-sm text-left underline decoration-dotted underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={`View checked-out branch ${currentBranch.name}`}
+      title={`View ${currentBranch.name} history without switching branches`}
+      onClick={() => selectBranch(currentBranch.ref)}
+    >Checked out: {currentBranch.name}</button>}
+    {showCurrentBranch && branchContext && <span aria-hidden="true"> · </span>}
+    {branchContext && <span className="truncate">{branchContext}</span>}
+  </>;
 
   return <div className="flex min-h-0 flex-1 flex-col">
     <div className="flex shrink-0 items-center gap-1 px-2 py-1.5">
@@ -96,10 +129,10 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
         <PopoverContent align="start" className="w-72 p-0"><Command>
           <CommandInput placeholder="Find branch…" />
           <CommandList><CommandEmpty>No branches</CommandEmpty>
-            {groupBranchesByPrefix(data?.branches.filter((b) => b.kind === 'local') ?? []).map((group) => <CommandGroup key={group.label ?? ''} heading={group.label ?? 'Local'}>{group.items.map((b) => <CommandItem key={b.ref} value={b.ref} onSelect={() => { setSelectedRef(b.ref); setCommit(null); setCreateFrom(null); setPushBranch(null); setPickerOpen(false); }}>
+            {groupBranchesByPrefix(data?.branches.filter((b) => b.kind === 'local') ?? []).map((group) => <CommandGroup key={group.label ?? ''} heading={group.label ?? 'Local'}>{group.items.map((b) => <CommandItem key={b.ref} value={b.ref} onSelect={() => selectBranch(b.ref)}>
               <span className={cn('min-w-0 flex-1 truncate', group.label && 'pl-4')}>{branchLabelInGroup(b.name, group.label)}</span>{b.current ? <Check /> : b.checkedOut ? <span className="text-xs text-muted-foreground">In use</span> : null}
             </CommandItem>)}</CommandGroup>)}
-            {(data?.branches.some((b) => b.kind === 'remote') ?? false) && <CommandGroup heading="Remote">{data!.branches.filter((b) => b.kind === 'remote').map((b) => <CommandItem key={b.ref} value={b.ref} onSelect={() => { setSelectedRef(b.ref); setCommit(null); setCreateFrom(null); setPushBranch(null); setPickerOpen(false); }}>
+            {(data?.branches.some((b) => b.kind === 'remote') ?? false) && <CommandGroup heading="Remote">{data!.branches.filter((b) => b.kind === 'remote').map((b) => <CommandItem key={b.ref} value={b.ref} onSelect={() => selectBranch(b.ref)}>
               <span className="min-w-0 flex-1 truncate">{b.name}</span>
             </CommandItem>)}</CommandGroup>}
           </CommandList>
@@ -121,23 +154,36 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
       <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
       <span className="min-w-0 flex-1 truncate">Rebase in progress — resolve conflicts, continue, or abort</span>
     </button>}
+    {pendingPush && <p role="status" className="flex shrink-0 items-center gap-2 px-3 pb-2 text-xs text-muted-foreground">
+      <Loader2 className="size-3.5 shrink-0 animate-spin" />
+      <span className="min-w-0 break-words">Pushing {pendingPush.input.sourceBranch} to {pendingPush.input.remote}/{pendingPush.input.branch}… Waiting for Git, including pre-push hooks.</span>
+    </p>}
+    {!pushBranch && lastPush?.status === 'error' && <p role="alert" className="px-3 pb-2 text-xs text-destructive">Push failed: {lastPush.error?.message}</p>}
+    {!pushBranch && lastPush?.result?.warning && <p role="alert" className="px-3 pb-2 text-xs text-destructive">{lastPush.result.warning}</p>}
     {rebase.error && <p role="alert" className="px-3 pb-1 text-xs text-destructive">Unable to read rebase state. <button type="button" className="underline underline-offset-2" onClick={() => void rebase.refetch()}>Retry</button></p>}
     {branches.isPending && <div className="flex flex-col gap-2 p-3">{[0, 1, 2, 3, 4].map((i) => <Skeleton className="h-9 w-full" key={i} />)}</div>}
     {branches.error && <div className="p-3 text-xs text-destructive" role="alert">{branches.error.message} <Button size="sm" variant="ghost" onClick={() => void branches.refetch()}>Retry</Button></div>}
     {data && selected && !pushBranch && <div className="flex shrink-0 items-center gap-1 px-3 pb-1.5">
       {selected.upstream ? <span className="flex min-w-0 flex-1 items-baseline gap-1.5 text-xs text-muted-foreground" title="Counts relative to last fetched upstream">
-        {metaParts.length > 0 && <span className="truncate">{metaParts.join(' · ')}</span>}
+        {branchMeta}
         <span className="min-w-0 truncate">{selected.upstream.replace('refs/remotes/', '')}</span>
         <span className={cn('shrink-0 font-medium tabular-nums', selected.ahead ? 'text-success' : 'text-muted-foreground/60')}>↑{selected.ahead ?? '?'}</span>
         <span className={cn('shrink-0 font-medium tabular-nums', selected.behind ? 'text-warning' : 'text-muted-foreground/60')}>↓{selected.behind ?? '?'}</span>
-      </span> : <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{metaParts.join(' · ')}</span>}
+      </span> : <span className="flex min-w-0 flex-1 items-baseline gap-1 text-xs text-muted-foreground">{branchMeta}</span>}
       {selected.kind === 'local' && (selected.current ? <>
         <Button variant="ghost" size="sm" disabled={busy || !data.repository.upstream || !data.repository.head} title={data.repository.upstream ? `Pull ${data.repository.upstream.remote}/${data.repository.upstream.branch} (fast-forward only)` : 'Configure an upstream on the server to pull'} onClick={() => {
           if (busy || !data?.repository.branch || !data.repository.head || !data.repository.upstream) return;
           mutation.mutate({ action: 'pull', expectedBranch: data.repository.branch, expectedHead: data.repository.head, ...data.repository.upstream });
         }}>{busy && mutation.variables?.action === 'pull' ? 'Pulling…' : 'Pull'}</Button>
         <Button variant="ghost" size="sm" disabled={busy || !data?.repository.remotes.length} onClick={() => { if (selected) { setPushBranch(selected); setCreateFrom(null); } }}>Push…</Button>
-      </> : <Button variant="ghost" size="sm" disabled={busy || selected.checkedOut} onClick={() => { if (selected && data) mutation.mutate({ action: 'switch', name: selected.name, expectedBranch: data.repository.branch, expectedHead: data.repository.head, targetHead: selected.head }); }}>Switch</Button>)}
+      </> : <>
+        <Button variant="ghost" size="sm" disabled={busy || !!rebase.error || selected.checkedOut || !selected.upstream?.startsWith('refs/remotes/')} title={selected.checkedOut ? 'Pull from the worktree where this branch is checked out' : selected.upstream?.startsWith('refs/remotes/') ? `Fetch and fast-forward ${selected.name} without switching branches` : 'Configure a remote upstream on the server to pull'} onClick={() => {
+          if (busy || rebase.error || selected.checkedOut || !selected.upstream?.startsWith('refs/remotes/')) return;
+          setCommit(null);
+          mutation.mutate({ action: 'pull-branch', name: selected.name, expectedHead: selected.head });
+        }}>{busy && mutation.variables?.action === 'pull-branch' ? 'Pulling…' : 'Pull'}</Button>
+        <Button variant="ghost" size="sm" disabled={busy || selected.checkedOut} onClick={() => { if (selected && data) mutation.mutate({ action: 'switch', name: selected.name, expectedBranch: data.repository.branch, expectedHead: data.repository.head, targetHead: selected.head }); }}>Switch</Button>
+      </>)}
       {selected.kind === 'remote' && (() => {
         const target = resolveCheckout(selected);
         return <Button variant="ghost" size="sm" disabled={busy || !data.repository.head || !target} title={target?.existing ? `Switch to existing local branch ${target.localName}` : `Create ${target?.localName ?? ''} tracking ${selected.name}, then switch to it`} onClick={() => void checkoutRemote(selected)}>{busy && (mutation.variables?.action === 'track' || mutation.variables?.action === 'switch') ? 'Checking out…' : 'Checkout'}</Button>;
@@ -155,7 +201,7 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
     </form>}
     {mutation.error && <p role="alert" className="px-3 py-2 text-xs text-destructive">{mutation.error.message}</p>}
     {mutation.data?.warning && <p role="alert" className="px-3 py-2 text-xs text-destructive">{mutation.data.warning}</p>}
-    {pushBranch && data ? <BranchPush key={`${pushBranch.ref}:${pushBranch.head}`} sdkClient={sdkClient} workspaceId={workspaceId} root={root} source={pushBranch} remotes={data.repository.remotes} onClose={() => setPushBranch(null)} onChanged={refresh} /> : commit ? <CommitDetails key={commit.head} sdkClient={sdkClient} workspaceId={workspaceId} serverId={serverId} root={root} entry={commit} onBack={() => setCommit(null)} /> : selected ? <BranchHistory key={selected.head} sdkClient={sdkClient} workspaceId={workspaceId} serverId={serverId} root={root} head={selected.head} upstream={selected.upstream} onSelect={setCommit} /> : data && <p className="p-3 text-xs text-muted-foreground">{selectedRef ? 'This branch no longer exists. Choose another branch.' : 'No commits yet. Create the first commit in Changes.'}</p>}
+    {pushBranch && data ? <BranchPush key={`${pushBranch.ref}:${pushBranch.head}`} sdkClient={sdkClient} serverId={serverId} workspaceId={workspaceId} root={root} source={pushBranch} remotes={data.repository.remotes} onClose={() => setPushBranch(null)} onChanged={refresh} /> : commit ? <CommitDetails key={commit.head} sdkClient={sdkClient} workspaceId={workspaceId} serverId={serverId} root={root} entry={commit} onBack={() => setCommit(null)} /> : selected ? <BranchHistory key={selected.head} sdkClient={sdkClient} workspaceId={workspaceId} serverId={serverId} root={root} head={selected.head} upstream={selected.upstream} onSelect={setCommit} /> : data && <p className="p-3 text-xs text-muted-foreground">{selectedRef ? 'This branch no longer exists. Choose another branch.' : 'No commits yet. Create the first commit in Changes.'}</p>}
   </div>;
 }
 
@@ -197,7 +243,7 @@ function CommitDetails({ sdkClient, workspaceId, serverId, root, entry, onBack }
   </div>;
 }
 
-function BranchPush({ sdkClient, workspaceId, root, source, remotes, onClose, onChanged }: { sdkClient: ProkopaiClient; workspaceId: string; root?: string; source: GitBranchInfo; remotes: string[]; onClose: () => void; onChanged: () => void }) {
+function BranchPush({ sdkClient, serverId, workspaceId, root, source, remotes, onClose, onChanged }: { sdkClient: ProkopaiClient; serverId?: string; workspaceId: string; root?: string; source: GitBranchInfo; remotes: string[]; onClose: () => void; onChanged: () => void }) {
   const upstream = source.upstream?.replace(/^refs\/remotes\//, '');
   const upstreamRemote = remotes.find((r) => upstream?.startsWith(`${r}/`));
   const [remote, setRemote] = useState(upstreamRemote ?? (remotes.length === 1 ? remotes[0] : ''));
@@ -209,7 +255,8 @@ function BranchPush({ sdkClient, workspaceId, root, source, remotes, onClose, on
     onSuccess: setReview, retry: false,
   });
   const push = useMutation({
-    mutationFn: (input: GitBranchAction) => sdkClient.http.files.gitBranchAction(workspaceId, input), retry: false,
+    mutationKey: pushKey(serverId, workspaceId, root),
+    mutationFn: (input: PushAction) => sdkClient.http.files.gitBranchAction(workspaceId, input), retry: false,
     onSuccess: onClose, onSettled: () => { setReview(null); onChanged(); },
   });
   const busy = inspect.isPending || push.isPending;

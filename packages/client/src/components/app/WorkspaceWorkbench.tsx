@@ -6,7 +6,7 @@ import { FilesPanel, type FilesPanelHandle } from '@/components/layout/FilesPane
 import { Button } from '@/components/ui/button';
 import { useWorktreesQuery } from '@/hooks/queries';
 import { hasOpenDocsForScope, useFileEditorStore } from '@/stores/fileEditorStore';
-import { useChatLayoutStore } from '@/stores/chatLayoutStore';
+import { useSessionChatLayoutStore as useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { cn } from '@/lib/utils';
 
 interface WorkspaceWorkbenchProps {
