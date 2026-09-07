@@ -21,6 +21,8 @@ export interface GitHistoryEntry {
   subject: string;
   author: string;
   date: string;
+  /** ahead = local-only (push to publish); behind = upstream-only (pull to get). */
+  sync?: 'ahead' | 'behind';
 }
 export interface GitHistoryResult {
   commits: GitHistoryEntry[];
@@ -49,6 +51,7 @@ export type GitBranchAction = { root?: string } & (
   | { action: 'fetch'; remote: string }
   | { action: 'pull'; expectedBranch: string; expectedHead: string; remote: string; branch: string }
   | { action: 'create'; name: string; startHead: string }
+  | { action: 'track'; remote: string; branch: string; name: string; expectedHead: string }
   | { action: 'switch'; name: string; expectedBranch: string | null; expectedHead: string | null; targetHead: string }
   | ({ action: 'push'; expectedRemoteHead: string | null; force: boolean } & GitBranchPushTarget)
 );

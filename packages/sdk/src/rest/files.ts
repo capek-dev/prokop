@@ -210,7 +210,7 @@ export class FilesRestNamespace {
     return this.http.get(`/workspaces/${encodeURIComponent(workspaceId)}/git/branches`, { params: options?.root !== undefined ? { root: options.root } : undefined, signal: options?.signal });
   }
 
-  async gitHistory(workspaceId: string, input: { root?: string; head: string; offset: number }): Promise<import('../shared-types/gitBranches').GitHistoryResult> {
+  async gitHistory(workspaceId: string, input: { root?: string; head: string; offset: number; upstream?: string | null }): Promise<import('../shared-types/gitBranches').GitHistoryResult> {
     return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/history`, input);
   }
 
