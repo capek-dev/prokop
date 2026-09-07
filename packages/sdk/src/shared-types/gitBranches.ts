@@ -50,6 +50,7 @@ export interface GitBranchPushReview {
 export type GitBranchAction = { root?: string } & (
   | { action: 'fetch'; remote: string }
   | { action: 'pull'; expectedBranch: string; expectedHead: string; remote: string; branch: string }
+  | { action: 'pull-branch'; name: string; expectedHead: string }
   | { action: 'create'; name: string; startHead: string }
   | { action: 'track'; remote: string; branch: string; name: string; expectedHead: string }
   | { action: 'switch'; name: string; expectedBranch: string | null; expectedHead: string | null; targetHead: string }
