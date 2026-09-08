@@ -28,6 +28,12 @@ The web client is private and embedded in server binaries. There is no separate 
 
 ## Procedure
 
+### Published Čapek dependency
+
+1. When a Prokop fix depends on unpublished `@capekai/core` changes, finish and publish the Čapek package first.
+2. Only after publication, update Prokop's dependency and lockfile, install the published package, and run the focused integration checks.
+3. Keep the Čapek and Prokop commits separate, and do not link Prokop to local Čapek source as a substitute for publication.
+
 ### Server
 
 1. Bump `packages/server/package.json` only when explicitly requested.

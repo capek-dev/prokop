@@ -13,8 +13,12 @@ Use this skill when changing Git workbench behavior, managed worktrees, session-
 2. Trace session root resolution through the authoritative managed-worktree registry and file-policy allowlist. Available managed roots may be authorized; unavailable roots must fail closed, never silently fall back to the primary checkout.
 3. Preserve session identity when workspace paths change. Update the existing workspace record and path, while leaving `workspace_id` and attached sessions unchanged.
 4. Resolve Files and Changes from the focused session's root. Display the selected branch/readable label, not the internal worktree UUID or directory basename. Keep exact-path matching only as a legacy fallback when persisted `managedWorktreeId` is absent.
-5. Refresh worktree attachment metadata from authoritative session lifecycle/runtime events. Serialize repository operations, revalidate identity and availability at operation time, and block removal for dirty, running-session, or terminal-attached worktrees.
-6. For new sessions, make the root choice explicit: primary checkout, existing managed worktree, or a newly created isolated worktree. Include recovery actions when a previously attached worktree is unavailable.
+5. Keep Git operations safe when browsing an unselected branch: a pull may fetch and fast-forward that branch without changing the checkout, but must reject divergence, active Git operations, and branches checked out in another worktree. After a successful push, establish missing upstream tracking for the pushed destination without changing existing tracking; if tracking setup fails, report it separately from push success.
+6. Treat Git UI state as server-backed operation state, not component lifetime. Keep pending push progress and completion errors in shared mutation state so switching sessions and returning restores the indicator and prevents duplicate actions. Invalidate commit history after Git actions and `git.changed` events even when branch SHA and upstream metadata are unchanged.
+7. Refresh worktree attachment metadata from authoritative session lifecycle/runtime events. Serialize repository operations, revalidate identity and availability at operation time, and block removal for dirty, running-session, or terminal-attached worktrees.
+8. For new sessions, make the root choice explicit: primary checkout, existing managed worktree, or a newly created isolated worktree. Include recovery actions when a previously attached worktree is unavailable.
+9. Treat purge as a separate persistence operation from removal: before deleting a removed worktree record, unbind any sessions still referencing it so the `sessions.workspace_root_id` foreign key cannot fail.
+10. Keep zero-state entry points usable. For large worktree sets, use one searchable switch action rather than one control per worktree; use responsive row-menu visibility so actions remain available on mobile.
 
 ## Pitfalls
 

@@ -11,7 +11,7 @@ Use when changing or relocating Jean2 provider retries, retry status events, fai
 
 1. Read `.architecture-specs/00-principles.md`, the active phase in `.architecture-specs/07-migration-phases.md`, and the current retry implementation before editing.
 2. During relocation, move the working retry path without changing policy. Keep one production implementation and use server compatibility re-exports where needed.
-3. Preserve one outer operation with a shared abort signal, `runningAt`, backoff, and cleanup. Keep exponential jitter, provider `Retry-After` as a minimum, and the existing retry count unless a separate behavior phase changes them.
+3. Preserve one outer operation with a shared abort signal, `runningAt`, backoff, and cleanup. Keep exponential jitter, provider `Retry-After` as a minimum, and the existing retry count unless a separate behavior phase changes them. After interruption cleanup completes, drain queued turns FIFO, including their attachments; an empty queue must finish normally.
 4. Classify errors before retrying. Quota or billing exhaustion is non-retryable. Retryable failed attempts use `mode: 'retry_failed'` and stay out of future model context.
 5. Stop automatic retry after any tool activity, including tool-part creation or update, to avoid replaying side effects.
 6. Keep retry state session-scoped in the client. Drive UI from `chat.retry` statuses (`scheduled`, `started`, `exhausted`, `cancelled`), not connection retry counters or polling.
