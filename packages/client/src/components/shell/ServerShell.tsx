@@ -24,6 +24,7 @@ import type { MessageInputHandle } from '@/components/chat/MessageInput';
 import type { TerminalPanelHandle } from '@/components/layout/TerminalPanel';
 import type { AppSidebarHandle } from '@/components/layout/AppSidebar';
 import { ServerDialogs } from './ServerDialogs';
+import { ReconnectStatus } from './ReconnectStatus';
 
 export default function ServerShell() {
   const router = useRouter();
@@ -140,7 +141,7 @@ export default function ServerShell() {
   }, []);
 
   if (!hasConnectedOnce) {
-    if (sessionManager.connectionTimedOut) {
+    if (sessionManager.connectionTimedOut || sessionManager.retryCount > 0 || sessionManager.authError) {
       return (
         <div className="flex min-h-screen w-full items-center justify-center bg-background">
           <OfflineState
@@ -174,8 +175,16 @@ export default function ServerShell() {
     <SessionPaneRegistryContext.Provider value={paneRegistry}>
       <ServerClientProvider value={serverClientValue}>
         <SidebarProvider panelId="sessions" defaultOpen={true} className="flex-col" style={{ '--sidebar-width': `${sessionsPanelWidth}px`, '--header-height': '2.75rem' } as React.CSSProperties}>
-          <div className="bg-background">
+          <div className="relative bg-background">
             <AppHeader />
+            {!sessionManager.connected && (
+              <ReconnectStatus
+                key={serverId}
+                authError={sessionManager.authError}
+                nextRetryIn={sessionManager.nextRetryIn}
+                onRetry={sessionManager.handleRetry}
+              />
+            )}
           </div>
 
           <div className="flex flex-1 min-h-0 p-0">

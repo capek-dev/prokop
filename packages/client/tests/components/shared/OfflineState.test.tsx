@@ -12,10 +12,10 @@ describe('OfflineState', () => {
     onLogout: vi.fn(),
   };
 
-  it('renders "Unable to connect" heading', () => {
+  it('renders reconnecting heading', () => {
     render(<OfflineState {...defaultProps} />);
     expect(
-      screen.getByText('Unable to connect to server'),
+      screen.getByText('Reconnecting to server'),
     ).toBeInTheDocument();
   });
 
@@ -48,6 +48,18 @@ describe('OfflineState', () => {
     expect(
       screen.queryByText('http://localhost:3000'),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows an active attempt without a zero-second countdown', () => {
+    render(<OfflineState {...defaultProps} nextRetryIn={0} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Reconnecting...');
+    expect(screen.queryByText('Retrying in 0s...')).not.toBeInTheDocument();
+  });
+
+  it('does not promise automatic retries after an auth failure', () => {
+    render(<OfflineState {...defaultProps} authError="Invalid token" />);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByText('Authentication required')).toBeInTheDocument();
   });
 
   it('displays retry countdown', () => {

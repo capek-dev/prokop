@@ -217,7 +217,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
         }
       };
 
-      attempt(() => transport.stopTimers());
+      attempt(() => transport.shutdown());
       attempt(() => application.schedulerTicker.stop());
       attempt(() => stopPushRetryScheduler());
       attempt(() => stopProviderAccountLifecycle());

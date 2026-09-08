@@ -1,9 +1,10 @@
-import { createFileRoute, redirect, useRouter } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router';
 import { fetchCriticalServerData, type CriticalServerData } from '@/lib/fetchServerData';
 import { StoreHydrator } from '@/components/providers/StoreHydrator';
 import ServerShell from '@/components/shell/ServerShell';
 import { setLastSelectedServerId } from '@/config/servers';
 import { mark } from '@/lib/perf';
+import { retryServerLoad } from '@/lib/retryServerLoad';
 
 function ServerErrorComponent({
   error,
@@ -65,7 +66,10 @@ export const Route = createFileRoute('/server/$serverId')({
     }
     mark('server-loader:start');
     try {
-      const data = await fetchCriticalServerData(server.url, server.token, abortController.signal);
+      const data = await retryServerLoad(
+        signal => fetchCriticalServerData(server.url, server.token, signal),
+        abortController.signal,
+      );
       setLastSelectedServerId(params.serverId);
       mark('server-loader:all-ready');
       return data;
@@ -87,7 +91,11 @@ export const Route = createFileRoute('/server/$serverId')({
     <div className="w-full flex items-center justify-center min-h-screen bg-background text-foreground">
       <div className="text-center space-y-2">
         <div className="h-8 w-8 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin mx-auto" />
-        <p className="text-sm text-muted-foreground">Connecting to server...</p>
+        <p role="status" className="text-sm text-muted-foreground">Connecting to server...</p>
+        <p className="text-xs text-muted-foreground">If the server is offline, this page will retry automatically.</p>
+        <Link to="/" search={{ select: true }} replace className="block text-sm underline underline-offset-4">
+          Back to Server Selection
+        </Link>
       </div>
     </div>
   ),

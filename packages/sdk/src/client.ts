@@ -115,9 +115,13 @@ export class ProkopaiClient extends TypedEventEmitter<SdkEventMap> {
   }
 
   async dispose(): Promise<void> {
-    await this.disconnect();
-    this.transport.dispose();
     this.removeAllListeners();
+    this.transport.dispose();
+    this._state = 'disconnected';
+  }
+
+  checkConnectionFreshness(): boolean {
+    return this.transport.checkConnectionFreshness();
   }
 
   get state(): ConnectionState {

@@ -43,6 +43,7 @@ export interface BunWebSocketAdapter {
   ): { handled: true; response: Response | undefined } | { handled: false };
   startTimers(): void;
   stopTimers(): void;
+  shutdown(): void;
   heartbeatTick(): void;
 }
 
@@ -74,6 +75,8 @@ export function runHeartbeatTick(deps: HeartbeatTickDeps): void {
 // Adapter
 
 export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWebSocketAdapter {
+  let shuttingDown = false;
+  const allSockets = new Set<ServerWebSocket<WsData>>();
   const sockets = new Map<ConnectionId, ServerWebSocket<WsData>>();
   const clients = new Map<ConnectionId, ClientEntry>();
 
@@ -112,6 +115,9 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
     upgrade: (data: WsData) => boolean,
   ): { handled: true; response: Response | undefined } | { handled: false } {
     const url = new URL(req.url);
+    if (shuttingDown && ['/ws', '/ws/terminal', '/ws/terminal/events'].includes(url.pathname)) {
+      return { handled: true, response: new Response('Server shutting down', { status: 503 }) };
+    }
 
     if (url.pathname === '/ws/terminal/events') {
       if (deps.auth.isAuthEnabled()) {
@@ -258,6 +264,11 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
     idleTimeout: readEnvInt('WS_IDLE_TIMEOUT', 255),
 
     open(ws) {
+      if (shuttingDown) {
+        ws.close(1001, 'Server shutting down');
+        return;
+      }
+      allSockets.add(ws);
       const wsData = ws.data;
       if (wsData?.path === '/ws/terminal/events') {
         const workspaceId = wsData.params?.workspaceId || '';
@@ -340,6 +351,7 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
     },
 
     close(ws) {
+      allSockets.delete(ws);
       const wsData = ws.data;
       if (wsData?.path === '/ws/terminal/events') {
         const workspaceId = wsData.params?.workspaceId || '';
@@ -359,6 +371,7 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
     },
 
     async message(ws, message) {
+      if (shuttingDown) return;
       const wsData = ws.data;
       if (wsData?.path === '/ws/terminal') {
         if (message !== undefined) {
@@ -397,7 +410,7 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
     delivery,
     handleUpgrade,
     startTimers() {
-      if (!heartbeatInterval) {
+      if (!shuttingDown && !heartbeatInterval) {
         heartbeatInterval = setInterval(heartbeatTick, HEARTBEAT_INTERVAL_MS);
       }
     },
@@ -406,6 +419,23 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
         clearInterval(heartbeatInterval);
         heartbeatInterval = undefined;
       }
+    },
+    shutdown() {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = undefined;
+      }
+      const failures: unknown[] = [];
+      for (const socket of allSockets) {
+        try {
+          socket.close(1001, 'Server shutting down');
+        } catch (error: unknown) {
+          failures.push(error);
+        }
+      }
+      if (failures.length > 0) throw new AggregateError(failures, 'Failed to close server sockets');
     },
     heartbeatTick,
   };

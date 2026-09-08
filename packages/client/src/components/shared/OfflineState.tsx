@@ -24,7 +24,7 @@ export const OfflineState: FC<OfflineStateProps> = ({
       <WifiOff className="size-12 text-destructive mb-4" />
 
       <h2 className="text-xl font-semibold text-foreground mb-2">
-        Unable to connect to server
+        {authError ? 'Authentication required' : 'Reconnecting to server'}
       </h2>
 
       <p className="text-sm text-muted-foreground mb-4 max-w-[400px]">
@@ -38,9 +38,11 @@ export const OfflineState: FC<OfflineStateProps> = ({
       )}
 
       <div className="flex flex-col items-center gap-4">
-        <p className="text-sm text-muted-foreground">
-          Retrying in {nextRetryIn}s...
-        </p>
+        {!authError && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {nextRetryIn > 0 ? `Retrying in ${nextRetryIn}s...` : 'Reconnecting...'}
+          </p>
+        )}
 
         <div className="flex items-center gap-2">
           <Button onClick={onRetry} variant="default">

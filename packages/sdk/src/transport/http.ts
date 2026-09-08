@@ -133,21 +133,39 @@ export class HttpClient {
    * Useful as a pre-flight check before opening a WebSocket connection.
    *
    * @returns true if token is valid (200), false if invalid (401)
-   * @throws ConnectionError if the server is unreachable
+   * @throws ConnectionError on timeout, cancellation, or a response other than 200/401
    */
-  static async verifyToken(url: string, token?: string): Promise<boolean> {
+  static async verifyToken(
+    url: string,
+    token?: string,
+    options: { signal?: AbortSignal; timeoutMs?: number } = {},
+  ): Promise<boolean> {
     const proto = url.startsWith('https') ? 'https' : 'http';
     const clean = url.replace(/^https?:\/\//, '');
+    const controller = new AbortController();
+    const abort = () => controller.abort(options.signal?.reason);
+    options.signal?.addEventListener('abort', abort, { once: true });
+    if (options.signal?.aborted) abort();
+    const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 5000);
     try {
       const headers: Record<string, string> = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      const response = await fetch(`${proto}://${clean}/api/auth/verify`, { headers });
-      return response.status === 200;
+      // Bun's RequestInit omits the browser cache option.
+      const requestOptions = { headers, signal: controller.signal, cache: 'no-store' as const };
+      const response = await fetch(`${proto}://${clean}/api/auth/verify`, requestOptions);
+      if (response.status === 401) return false;
+      if (response.status !== 200) {
+        throw new ConnectionError(`Auth verification unavailable (HTTP ${response.status})`);
+      }
+      return true;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       throw new ConnectionError(`Failed to reach server for auth verification: ${message}`);
+    } finally {
+      clearTimeout(timer);
+      options.signal?.removeEventListener('abort', abort);
     }
   }
 }

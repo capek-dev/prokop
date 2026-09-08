@@ -4,8 +4,6 @@ import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import type { ProkopaiClient } from '@prokopai/sdk';
 
 const CONNECTION_TIMEOUT = 10000;
-const INITIAL_RETRY_DELAY = 1000;
-const MAX_RETRY_DELAY = 30000;
 const STALE_OPS_INTERVAL = 15000;
 
 type ClientRef = { current: ProkopaiClient | null };
@@ -14,6 +12,7 @@ export interface ConnectionSupervisorOptions {
   serverUrl: () => string | null;
   clientRef: ClientRef;
   requestReconnect: () => void;
+  cancelAttempt?: () => void;
   invalidateAllQueries?: () => void;
 }
 
@@ -23,124 +22,107 @@ let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
 let backoffTimer: ReturnType<typeof setTimeout> | null = null;
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
 let cleanupInterval: ReturnType<typeof setInterval> | null = null;
+let attemptInFlight = false;
 
 function clearWatchdog(): void {
-  if (watchdogTimer !== null) {
-    clearTimeout(watchdogTimer);
-    watchdogTimer = null;
-  }
-}
-
-function clearCountdown(): void {
-  if (countdownInterval !== null) {
-    clearInterval(countdownInterval);
-    countdownInterval = null;
-  }
+  if (watchdogTimer !== null) clearTimeout(watchdogTimer);
+  watchdogTimer = null;
 }
 
 function clearBackoff(): void {
-  if (backoffTimer !== null) {
-    clearTimeout(backoffTimer);
-    backoffTimer = null;
-  }
-  clearCountdown();
+  if (backoffTimer !== null) clearTimeout(backoffTimer);
+  if (countdownInterval !== null) clearInterval(countdownInterval);
+  backoffTimer = null;
+  countdownInterval = null;
 }
 
 export function markConnectionAttempt(): void {
   clearWatchdog();
+  clearBackoff();
+  attemptInFlight = true;
+  useConnectionStore.setState({ connected: false, authError: null, connectionTimedOut: false, nextRetryIn: 0 });
   watchdogTimer = setTimeout(() => {
     watchdogTimer = null;
     if (useConnectionStore.getState().connected) return;
+    opts?.cancelAttempt?.();
     useConnectionStore.getState().setConnectionTimedOut(true);
   }, CONNECTION_TIMEOUT);
 }
 
-function startBackoff(): void {
-  const retryCount = useConnectionStore.getState().retryCount;
-  const delay = Math.min(
-    INITIAL_RETRY_DELAY * Math.pow(2, retryCount),
-    MAX_RETRY_DELAY,
-  );
-  let countdown = Math.floor(delay / 1000);
-  useConnectionStore.getState().setNextRetryIn(countdown);
-
+function requestReconnect(): void {
+  if (!opts || attemptInFlight || useConnectionStore.getState().authError) return;
   clearBackoff();
-  countdownInterval = setInterval(() => {
-    countdown -= 1;
-    useConnectionStore.getState().setNextRetryIn(Math.max(0, countdown));
-  }, 1000);
+  attemptInFlight = true;
+  useConnectionStore.setState({ connectionTimedOut: false, nextRetryIn: 0 });
+  opts.requestReconnect();
+}
+
+function startBackoff(): void {
+  clearWatchdog();
+  clearBackoff();
+  attemptInFlight = false;
+  const retryCount = useConnectionStore.getState().retryCount;
+  const cap = document.visibilityState === 'hidden' ? 30_000 : 3_000;
+  // Immediate first recovery; downward jitter keeps the maximum gap bounded.
+  const delay = retryCount === 0 ? 0
+    : Math.min(1000 * 2 ** Math.min(retryCount - 1, 5), cap) * (0.8 + Math.random() * 0.2);
+  const deadline = Date.now() + delay;
+  const updateCountdown = () => {
+    useConnectionStore.getState().setNextRetryIn(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
+  };
+  updateCountdown();
+  countdownInterval = setInterval(updateCountdown, 1000);
   backoffTimer = setTimeout(() => {
-    backoffTimer = null;
-    clearCountdown();
-    useConnectionStore.getState().setRetryCount((c) => c + 1);
-    opts?.requestReconnect();
+    useConnectionStore.getState().setRetryCount(c => c + 1);
+    requestReconnect();
   }, delay);
 }
 
-function handleOnline(): void {
-  if (!opts || !opts.serverUrl()) return;
-  const client = opts.clientRef.current;
-  if (client && client.connected) return;
-  const store = useConnectionStore.getState();
-  store.setConnected(false);
-  store.setRetryCount(0);
-  store.setConnectionTimedOut(false);
-  opts.requestReconnect();
+function recoverConnection(): void {
+  if (!opts || !opts.serverUrl() || useConnectionStore.getState().authError) return;
+  if (opts.clientRef.current?.checkConnectionFreshness()) return;
+  if (attemptInFlight) return;
+  useConnectionStore.getState().setRetryCount(0);
+  requestReconnect();
 }
 
 function handleVisibilityChange(): void {
-  if (!opts || document.visibilityState !== 'visible') return;
-  if (opts.clientRef.current?.ws?.readyState === WebSocket.OPEN) return;
-  if (!opts.serverUrl()) return;
-  const store = useConnectionStore.getState();
-  store.setRetryCount(0);
-  store.setConnectionTimedOut(false);
-  opts.requestReconnect();
+  if (document.visibilityState === 'visible') recoverConnection();
+  else if (backoffTimer !== null) startBackoff();
 }
 
 export function startConnectionSupervisor(options: ConnectionSupervisorOptions): void {
   stopConnectionSupervisor();
   opts = options;
-
   unsubscribeStore = useConnectionStore.subscribe((curr, prev) => {
-    if (curr.connected) {
+    if (curr.authError || curr.connected) {
       clearWatchdog();
       clearBackoff();
-      if (!prev.connected) {
-        const invalidate =
-          opts?.invalidateAllQueries ?? (() => queryClient.invalidateQueries());
+      attemptInFlight = false;
+      if (curr.connected && !prev.connected) {
+        const invalidate = opts?.invalidateAllQueries ?? (() => queryClient.invalidateQueries());
         invalidate();
       }
       return;
     }
-    if (curr.connectionTimedOut && !prev.connectionTimedOut) {
-      startBackoff();
-    }
+    if (curr.connectionTimedOut && !prev.connectionTimedOut) startBackoff();
   });
-
-  window.addEventListener('online', handleOnline);
+  window.addEventListener('online', recoverConnection);
   document.addEventListener('visibilitychange', handleVisibilityChange);
-
   cleanupInterval = setInterval(() => {
     usePendingOperationsStore.getState().cleanupStaleOperations();
   }, STALE_OPS_INTERVAL);
-
-  const state = useConnectionStore.getState();
-  if (state.connectionTimedOut && !state.connected) {
-    startBackoff();
-  }
 }
 
 export function stopConnectionSupervisor(): void {
   unsubscribeStore?.();
   unsubscribeStore = null;
-  window.removeEventListener('online', handleOnline);
+  window.removeEventListener('online', recoverConnection);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   clearWatchdog();
   clearBackoff();
-  if (cleanupInterval !== null) {
-    clearInterval(cleanupInterval);
-    cleanupInterval = null;
-  }
+  if (cleanupInterval !== null) clearInterval(cleanupInterval);
+  cleanupInterval = null;
+  attemptInFlight = false;
   opts = null;
 }

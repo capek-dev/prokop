@@ -70,6 +70,16 @@ export function useConnectionLifecycle({
     }
 
     let cancelled = false;
+    const controller = new AbortController();
+    let ownedClient: ProkopaiClient | null = null;
+    const cancelAttempt = () => {
+      cancelled = true;
+      controller.abort();
+      if (ownedClient) {
+        void ownedClient.dispose().catch((error: unknown) => console.error('Connection disposal failed:', error));
+        if (clientRef.current === ownedClient) clientRef.current = null;
+      }
+    };
 
     const createAndConnectClient = () => {
       const client = new ProkopaiClient({
@@ -79,9 +89,11 @@ export function useConnectionLifecycle({
         clientDescriptor,
       });
 
+      ownedClient = client;
       clientRef.current = client;
 
       client.on('connected', () => {
+        if (cancelled || clientRef.current !== client) return;
         useConnectionStore.getState().setConnected(true);
         useConnectionStore.getState().setAuthError(null);
         useConnectionStore.getState().setRetryCount(0);
@@ -129,6 +141,7 @@ export function useConnectionLifecycle({
       });
 
       client.on('disconnected', (payload) => {
+        if (cancelled || clientRef.current !== client) return;
         useConnectionStore.getState().setConnected(false);
 
         const pendingOps = usePendingOperationsStore.getState().operations;
@@ -149,26 +162,31 @@ export function useConnectionLifecycle({
       });
 
       client.on('error.connection', (error) => {
+        if (cancelled || clientRef.current !== client) return;
         console.error('WebSocket error:', error);
       });
 
       subscribeToServerEvents(client, handlerContextRef);
 
-      client.connect().catch((err) => {
+      client.connect().catch((err: unknown) => {
+        if (cancelled || clientRef.current !== client) return;
         console.error('Connection failed:', err);
+        useConnectionStore.getState().setConnectionTimedOut(true);
       });
     };
 
     // Pre-flight auth verification: check token validity via HTTP before
     // opening a WebSocket. This lets us surface "invalid token" immediately
     // instead of entering the retry loop with a bad token.
-    HttpClient.verifyToken(serverUrl, apiToken ?? undefined).then((isValid) => {
+    HttpClient.verifyToken(serverUrl, apiToken ?? undefined, { signal: controller.signal }).then((isValid) => {
       if (cancelled) return;
 
       if (!isValid) {
-        useConnectionStore.getState().setAuthError(
-          'Authentication failed. Your token may be invalid or expired.',
-        );
+        useConnectionStore.setState({
+          authError: 'Authentication failed. Your token may be invalid or expired.',
+          connectionTimedOut: true,
+          nextRetryIn: 0,
+        });
         return;
       }
 
@@ -188,19 +206,13 @@ export function useConnectionLifecycle({
       serverUrl: () => serverUrl,
       clientRef,
       requestReconnect: () => setReconnectAttempt(n => n + 1),
+      cancelAttempt,
     });
     markConnectionAttempt();
 
     return () => {
-      cancelled = true;
       stopConnectionSupervisor();
-      const client = clientRef.current;
-      if (client) {
-        client.dispose();
-        if (clientRef.current === client) {
-          clientRef.current = null;
-        }
-      }
+      cancelAttempt();
     };
   }, [serverUrl, apiToken, clientDescriptor, reconnectAttempt]);
 

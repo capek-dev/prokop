@@ -84,6 +84,38 @@ function parsed(socket: FakeSocket, index = socket.sent.length - 1): Record<stri
 }
 
 describe('bun websocket adapter', () => {
+  test('shutdown closes chat and terminal sockets and rejects late upgrades', () => {
+    const adapter = makeAdapter();
+    const sockets = ['/ws', '/ws/terminal', '/ws/terminal/events'].map(path => makeSocket(path));
+    for (const socket of sockets) adapter.websocket.open!(socket as unknown as ServerWebSocket<WsData>);
+    adapter.shutdown();
+    adapter.shutdown();
+    for (const socket of sockets) {
+      expect(socket.closedWith).toEqual({ code: 1001, reason: 'Server shutting down' });
+    }
+    let upgraded = false;
+    const result = adapter.handleUpgrade(new Request('http://test/ws'), () => { upgraded = true; return true; });
+    expect(result.handled && result.response?.status).toBe(503);
+    expect(upgraded).toBe(false);
+    const lateSocket = makeSocket('/ws');
+    adapter.websocket.open!(lateSocket as unknown as ServerWebSocket<WsData>);
+    expect(lateSocket.closedWith?.code).toBe(1001);
+    expect(getConnectionBySocket(lateSocket)).toBeUndefined();
+  });
+
+  test('shutdown rejects further messages and still closes peers when one close fails', async () => {
+    const adapter = makeAdapter();
+    const broken = makeSocket('/ws');
+    const healthy = makeSocket('/ws');
+    adapter.websocket.open!(broken as unknown as ServerWebSocket<WsData>);
+    adapter.websocket.open!(healthy as unknown as ServerWebSocket<WsData>);
+    broken.close = () => { throw new Error('close failed'); };
+    expect(() => adapter.shutdown()).toThrow('Failed to close server sockets');
+    expect(healthy.closedWith?.code).toBe(1001);
+    await adapter.websocket.message!(healthy as unknown as ServerWebSocket<WsData>, 'not json');
+    expect(healthy.sent).toEqual([]);
+  });
+
   test('open on /ws registers an opaque connection and creates the ping bookkeeping entry', () => {
     const adapter = makeAdapter();
     const socket = makeSocket('/ws');
