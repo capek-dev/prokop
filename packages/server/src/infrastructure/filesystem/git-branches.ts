@@ -126,7 +126,6 @@ export async function runGitBranchAction(root: string, input: GitBranchAction): 
           for (const sentinel of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply', 'sequencer', 'BISECT_LOG']) {
             if (await lstat(join(gitDir, sentinel)).then(() => true, () => false)) fail('finish the in-progress Git operation before pulling.');
           }
-          if ((await git(root, ['status', '--porcelain=v1', '-z', '--untracked-files=no'])).stdout) fail('commit or move tracked-file and staged changes before pulling.');
         };
         await validateCheckout();
         // Fetch one upstream branch only. Ignore broad configured fetch refspecs.
@@ -137,6 +136,7 @@ export async function runGitBranchAction(root: string, input: GitBranchAction): 
         await validateCheckout();
         if ((await git(root, ['merge-base', '--is-ancestor', fetchedHead, input.expectedHead], { allowFailure: true })).code === 0) break;
         if ((await git(root, ['merge-base', '--is-ancestor', input.expectedHead, fetchedHead], { allowFailure: true })).code !== 0) fail('local and upstream branches have diverged. Pull is fast-forward only; resolve the divergence explicitly on the server.');
+        // Git permits unrelated tracked/staged edits and rejects overwrites.
         // No merge commit, rebase, autostash, or overwriting ignored local files.
         await git(root, ['merge', '--ff-only', '--no-autostash', '--no-overwrite-ignore', '--no-edit', '--', fetchedHead]);
         break;
@@ -222,9 +222,8 @@ export async function runGitBranchAction(root: string, input: GitBranchAction): 
         for (const sentinel of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply', 'sequencer', 'BISECT_LOG']) {
           if (await lstat(join(gitDir, sentinel)).then(() => true, () => false)) fail('finish the in-progress Git operation before switching.');
         }
-        // Untracked files are allowed; git switch itself rejects collisions with
-        // destination files. Keep --no-overwrite-ignore below for ignored files too.
-        if ((await git(root, ['status', '--porcelain=v1', '-z', '--untracked-files=no'])).stdout) fail('commit or move dirty tracked-file and staged changes before switching.');
+        // Git preserves unrelated tracked/staged edits and rejects overwrites.
+        // Keep --no-overwrite-ignore below to protect ignored files too.
         const branches = await listGitBranches(root);
         if (branches.branches.some((branch) => branch.name === input.name && branch.kind === 'local' && branch.checkedOut && !branch.current)) fail('branch is checked out in another worktree.');
         await git(root, ['switch', '--no-guess', '--no-overwrite-ignore', '--', input.name]);

@@ -132,10 +132,33 @@ test.each([false, true])('pull preserves colliding files, ignored=%s', async (ig
   expect(await sha(root)).toBe(head);
   expect(await readFile(join(root, 'collision'), 'utf8')).toBe('local work');
 });
-test('pull rejects stale checkout, dirty tracked files and wrong upstream', async () => {
+test('pull rejects stale checkout and wrong upstream', async () => {
   await expect(runGitBranchAction(root, { action: 'pull', expectedBranch: 'other', expectedHead: head, remote: 'origin', branch: 'main' })).rejects.toThrow('checkout changed');
   await expect(runGitBranchAction(root, { action: 'pull', expectedBranch: 'main', expectedHead: head, remote: 'origin', branch: 'other' })).rejects.toThrow('upstream');
-  await writeFile(join(root, 'file'), 'dirty');
-  await expect(pull()).rejects.toThrow('tracked-file');
-  expect(await readFile(join(root, 'file'), 'utf8')).toBe('dirty');
+});
+
+test('pull preserves unrelated staged additions and partially staged tracked edits', async () => {
+  const next = await commit(peer, 'remote-only', 'remote work');
+  await git(peer, ['push']);
+  await writeFile(join(root, 'file'), 'staged edit');
+  await writeFile(join(root, 'new'), 'staged addition');
+  await git(root, ['add', 'file', 'new']);
+  await writeFile(join(root, 'file'), 'unstaged edit');
+  await pull();
+  expect(await sha(root)).toBe(next);
+  expect(await readFile(join(root, 'remote-only'), 'utf8')).toBe('remote work');
+  expect(await readFile(join(root, 'file'), 'utf8')).toBe('unstaged edit');
+  expect((await git(root, ['show', ':file'])).stdout).toBe('staged edit');
+  expect((await git(root, ['show', ':new'])).stdout).toBe('staged addition');
+});
+
+test.each([false, true])('pull rejects overlapping tracked edits without changing local work, staged=%s', async (staged) => {
+  await commit(peer, 'file', 'remote work');
+  await git(peer, ['push']);
+  await writeFile(join(root, 'file'), 'local work');
+  if (staged) await git(root, ['add', 'file']);
+  await expect(pull()).rejects.toThrow();
+  expect(await sha(root)).toBe(head);
+  expect(await readFile(join(root, 'file'), 'utf8')).toBe('local work');
+  expect((await git(root, ['show', ':file'])).stdout).toBe(staged ? 'local work' : 'initial');
 });

@@ -37,12 +37,9 @@ test('lists branch identity, creates without switching, reads history and initia
   await expect(getGitHistory(root, 'HEAD~1', 0)).rejects.toThrow('invalid commit');
 });
 
-test('switch is explicit and refuses dirty, stale and checked-out targets', async () => {
+test('switch is explicit and refuses stale and checked-out targets', async () => {
   await runGitBranchAction(root, { action: 'create', name: 'feature', startHead: head });
   const input = { action: 'switch' as const, name: 'feature', expectedBranch: 'main', expectedHead: head, targetHead: head };
-  await writeFile(join(root, 'file'), 'work');
-  await expect(runGitBranchAction(root, input)).rejects.toThrow('dirty');
-  await writeFile(join(root, 'file'), 'initial');
   await expect(runGitBranchAction(root, { ...input, expectedHead: null })).rejects.toThrow('checkout changed');
   await git(root, ['worktree', 'add', join(base, 'linked'), 'feature']);
   expect((await listGitBranches(root)).branches.find((b) => b.name === 'feature')?.checkedOut).toBe(true);
@@ -74,12 +71,40 @@ test.each([false, true])('switch protects colliding local files, ignored=%s', as
   expect(await readFile(join(root, 'collision'), 'utf8')).toBe('local contents');
 });
 
-test('switch still rejects staged additions', async () => {
-  await runGitBranchAction(root, { action: 'create', name: 'feature', startHead: head });
-  await writeFile(join(root, 'new'), 'staged');
-  await git(root, ['add', 'new']);
-  await expect(runGitBranchAction(root, { action: 'switch', name: 'feature', expectedBranch: 'main', expectedHead: head, targetHead: head })).rejects.toThrow('staged changes');
+test('switch preserves unrelated staged additions and partially staged tracked edits', async () => {
+  await git(root, ['switch', '-c', 'feature']);
+  await writeFile(join(root, 'destination'), 'branch contents');
+  await git(root, ['add', 'destination']);
+  await git(root, ['commit', '-m', 'Destination']);
+  const targetHead = (await git(root, ['rev-parse', 'HEAD'])).stdout.trim();
+  await git(root, ['switch', 'main']);
+  await writeFile(join(root, 'file'), 'staged edit');
+  await writeFile(join(root, 'new'), 'staged addition');
+  await git(root, ['add', 'file', 'new']);
+  await writeFile(join(root, 'file'), 'unstaged edit');
+  await runGitBranchAction(root, { action: 'switch', name: 'feature', expectedBranch: 'main', expectedHead: head, targetHead });
+  expect((await listGitBranches(root)).repository.branch).toBe('feature');
+  expect((await git(root, ['rev-parse', 'HEAD'])).stdout.trim()).toBe(targetHead);
+  expect(await readFile(join(root, 'destination'), 'utf8')).toBe('branch contents');
+  expect(await readFile(join(root, 'file'), 'utf8')).toBe('unstaged edit');
+  expect((await git(root, ['show', ':file'])).stdout).toBe('staged edit');
+  expect((await git(root, ['show', ':new'])).stdout).toBe('staged addition');
+});
+
+test.each([false, true])('switch rejects overlapping tracked edits without changing local work, staged=%s', async (staged) => {
+  await git(root, ['switch', '-c', 'feature']);
+  await writeFile(join(root, 'file'), 'branch contents');
+  await git(root, ['add', 'file']);
+  await git(root, ['commit', '-m', 'Destination']);
+  const targetHead = (await git(root, ['rev-parse', 'HEAD'])).stdout.trim();
+  await git(root, ['switch', 'main']);
+  await writeFile(join(root, 'file'), 'local work');
+  if (staged) await git(root, ['add', 'file']);
+  await expect(runGitBranchAction(root, { action: 'switch', name: 'feature', expectedBranch: 'main', expectedHead: head, targetHead })).rejects.toThrow();
   expect((await listGitBranches(root)).repository.branch).toBe('main');
+  expect((await git(root, ['rev-parse', 'HEAD'])).stdout.trim()).toBe(head);
+  expect(await readFile(join(root, 'file'), 'utf8')).toBe('local work');
+  expect((await git(root, ['show', ':file'])).stdout).toBe(staged ? 'local work' : 'initial');
 });
 
 test('track creates a local branch from the reviewed remote head without checkout', async () => {
