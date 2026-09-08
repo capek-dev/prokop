@@ -11,9 +11,10 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { RENDER_BUDGETS } from '@/lib/renderBudgets';
 import { getToolRowInfo } from '@/lib/toolSummaries';
 import type { ToolRowChip } from '@/lib/toolSummaries';
-import { useSdkClient } from '@/contexts/ServerClientContext';
+import { useSdkClient, useServerUrl } from '@/contexts/ServerClientContext';
 import { useToolDebugQuery, useToolDisplayCatalog } from '@/hooks/queries';
 import { cn } from '@/lib/utils';
+import { useVizExpanded } from '@/lib/vizExpansion';
 
 interface LazyOutputProps {
   content: string;
@@ -51,6 +52,7 @@ const LazyOutput = memo(function LazyOutput({ content, className }: LazyOutputPr
 });
 
 interface ToolCallProps {
+  collapsePreview?: boolean;
   sessionId: string;
   part: ToolPart;
   pendingAskRequests: PendingAskRequest[];
@@ -128,6 +130,7 @@ const areToolCallPropsEqual = (
   next: ToolCallProps
 ): boolean => {
   if (prev.sessionId !== next.sessionId) return false;
+  if (prev.collapsePreview !== next.collapsePreview) return false;
   if (prev.part !== next.part) return false;
   if (prev.onNavigateToSubagent !== next.onNavigateToSubagent) return false;
   if (prev.onAskResponse !== next.onAskResponse) return false;
@@ -137,24 +140,33 @@ const areToolCallPropsEqual = (
 };
 
 export const ToolCall = memo(function ToolCall({
+  collapsePreview = false,
   sessionId,
   part,
   pendingAskRequests,
   onAskResponse,
   onNavigateToSubagent,
 }: ToolCallProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const serverUrl = useServerUrl();
+  const [isOpen, setIsOpen] = useVizExpanded(`tool:${serverUrl}:${sessionId}:${part.id}`, false);
   const [copied, setCopied] = useState(false);
+  const [debugExpanded, setDebugExpanded] = useState(false);
 
   const state = part.state;
   const status = state.status;
+  const visualization = part.presentation?.visualization
+    ?? (status === 'completed' && 'output' in state
+      ? extractVisualization(state.output)
+      : undefined);
+  const hasPreview = !!visualization && visualization.type !== 'none';
+  const debugOpen = isOpen && (!hasPreview || debugExpanded);
   const sdkClient = useSdkClient();
   const shouldLoadDebug = part.presentation?.debugAvailable === true;
   const debugQuery = useToolDebugQuery(
     sdkClient,
     sessionId,
     part.id,
-    isOpen && shouldLoadDebug,
+    debugOpen && shouldLoadDebug,
   );
   const rawInput = shouldLoadDebug ? debugQuery.data?.input : state.input;
   const rawOutput = shouldLoadDebug
@@ -165,25 +177,20 @@ export const ToolCall = memo(function ToolCall({
   const debugReady = !shouldLoadDebug || debugQuery.data !== undefined;
 
   const serializedInput = useMemo((): string => {
-    if (!isOpen || rawInput === undefined) return '';
+    if (!debugOpen || rawInput === undefined) return '';
     try {
       return JSON.stringify(rawInput, null, 2);
     } catch {
       return String(rawInput);
     }
-  }, [rawInput, isOpen]);
+  }, [rawInput, debugOpen]);
 
   const serializedOutput = useMemo((): string | null => {
-    if (!isOpen || rawOutput === undefined) return null;
+    if (!debugOpen || rawOutput === undefined) return null;
     return typeof rawOutput === 'string'
       ? rawOutput
       : JSON.stringify(rawOutput, null, 2);
-  }, [rawOutput, isOpen]);
-
-  const visualization = part.presentation?.visualization
-    ?? (status === 'completed' && 'output' in state
-      ? extractVisualization(state.output)
-      : undefined);
+  }, [rawOutput, debugOpen]);
 
   const taskSessionId = extractTaskSessionId(part);
 
@@ -283,23 +290,35 @@ export const ToolCall = memo(function ToolCall({
         {isOpen && <CollapsibleContent>
           <div className="pl-5 pb-2 flex flex-col gap-2">
             {/* Pretty body for collapsed visualizations (chip-only while collapsed) */}
-            {visualization && visualization.collapsed && visualization.type !== 'none' && (
+            {visualization && (visualization.collapsed || collapsePreview) && visualization.type !== 'none' && (
               <div>
                 <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70 mb-1">Result</div>
                 <VisualizationRenderer visualization={visualization} persistKey={part.id} />
               </div>
             )}
 
-            {shouldLoadDebug && debugQuery.isFetching && (
+            {hasPreview && (
+              <Button
+                variant="link"
+                size="xs"
+                className="h-auto self-start p-0 text-muted-foreground hover:text-foreground"
+                aria-expanded={debugExpanded}
+                onClick={() => setDebugExpanded(value => !value)}
+              >
+                {debugExpanded ? 'Hide raw data' : 'Show raw data'}
+              </Button>
+            )}
+
+            {debugOpen && shouldLoadDebug && debugQuery.isFetching && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
                 <Loader2 className="size-3 animate-spin" />
-                Loading debug data...
+                Loading raw data...
               </div>
             )}
 
-            {shouldLoadDebug && debugQuery.isError && (
+            {debugOpen && shouldLoadDebug && debugQuery.isError && (
               <div className="flex items-center justify-between gap-2 rounded-md border border-destructive/20 bg-destructive/10 p-2 text-xs text-destructive">
-                <span>Debug data could not be loaded.</span>
+                <span>Raw data could not be loaded.</span>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -311,7 +330,7 @@ export const ToolCall = memo(function ToolCall({
               </div>
             )}
 
-            {debugReady && (
+            {debugOpen && debugReady && (
               <div>
                 <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70 mb-1">Input</div>
                 <LazyOutput
@@ -335,7 +354,7 @@ export const ToolCall = memo(function ToolCall({
             )}
 
             {/* Output - raw debug JSON */}
-            {debugReady && status === 'completed' && serializedOutput !== null && (
+            {debugOpen && debugReady && status === 'completed' && serializedOutput !== null && (
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">Output</div>
@@ -385,10 +404,8 @@ export const ToolCall = memo(function ToolCall({
         </div>
       )}
 
-      {/* Content below the row (no click needed): tool-declared visualizations.
-          `collapsed: true` means the tool says the row + chip suffices;
-          `none` visualizations carry no body. Expand is debug-only. */}
-      {status === 'completed' && visualization && !visualization.collapsed && visualization.type !== 'none' && (
+      {/* Older previews mount inside the existing expandable row, not hidden DOM. */}
+      {status === 'completed' && visualization && !visualization.collapsed && !collapsePreview && visualization.type !== 'none' && (
         <div className="mt-1">
           {visualization.type === 'shell-output' ? (
             <TerminalOutput stdout={visualization.stdout} stderr={visualization.stderr} />

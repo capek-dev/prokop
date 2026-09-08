@@ -71,7 +71,7 @@ describe('ToolCall debug loading', () => {
 
     expect(debugRequests).toBe(0);
     fireEvent.click(screen.getByText('shell'));
-    expect(await screen.findByText('Loading debug data...')).toBeInTheDocument();
+    expect(await screen.findByText('Loading raw data...')).toBeInTheDocument();
     expect(debugRequests).toBe(1);
 
     resolveDebug({

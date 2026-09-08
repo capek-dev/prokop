@@ -9,6 +9,9 @@
  */
 
 export const RENDER_BUDGETS = {
+  /** Submitted user prompts whose following tool previews mount automatically */
+  toolPreviewRecentPrompts: 3,
+
   /** Lines of code to highlight in a collapsed preview */
   codePreviewLines: 20,
 

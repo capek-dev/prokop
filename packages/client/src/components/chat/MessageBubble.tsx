@@ -186,7 +186,7 @@ export function MessageBubble({
   return (
     <div
       className={cn(
-        'group/msg flex flex-col gap-0.5 animate-slide-up min-w-0',
+        'group/msg flex flex-col gap-0.5 min-w-0',
         isUser ? 'items-end' : 'items-stretch'
       )}
     >

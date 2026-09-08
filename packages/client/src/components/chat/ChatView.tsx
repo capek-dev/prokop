@@ -14,6 +14,7 @@ import { useTranscriptPagination } from '@/hooks/useTranscriptPagination';
 import { RetryStatus } from './RetryStatus';
 import { UserPromptMap } from './UserPromptMap';
 import { EmptySessionCheckout } from './EmptySessionCheckout';
+import { DeferredConversation } from './DeferredConversation';
 
 export interface DisplayItem {
   message: import('@prokopai/sdk').Message;
@@ -127,7 +128,15 @@ function mergeMessagesWithQueue(
   return [...sortedRegularItems, ...sortedQueuedItems];
 }
 
-export function ChatView({
+export function ChatView(props: ChatViewProps) {
+  return (
+    <DeferredConversation key={props.session.id}>
+      <ChatViewContent {...props} />
+    </DeferredConversation>
+  );
+}
+
+function ChatViewContent({
   session,
   messagesWithParts,
   queuedMessages,

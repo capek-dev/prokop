@@ -26,6 +26,7 @@ import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 import { StructuredResponse } from '@/components/visualizations';
 import type { PendingAskRequest } from '@/stores/askStore';
 import { splitStreamingText } from './streamingText';
+import { getToolPreviewCutoff } from '@/lib/toolPreviewPolicy';
 
 const USER_SCROLL_INPUT_WINDOW_MS = 200;
 
@@ -34,6 +35,7 @@ export interface DisplayItem {
   parts: Part[];
   isQueued?: boolean;
   queueId?: string;
+  collapseToolPreviews?: boolean;
 }
 
 interface VirtualizedTranscriptProps {
@@ -275,6 +277,7 @@ function StreamingReasoning({ text, active }: { text: string; active: boolean })
 }
 
 const MessageParts = memo(function MessageParts({
+  collapseToolPreviews = false,
   sessionId,
   parts,
   pendingAskRequests,
@@ -292,6 +295,7 @@ const MessageParts = memo(function MessageParts({
   inverted?: boolean;
   isStreaming?: boolean;
   serverUrl?: string;
+  collapseToolPreviews?: boolean;
 }) {
   return (
     <>
@@ -330,6 +334,7 @@ const MessageParts = memo(function MessageParts({
                 key={part.id}
                 sessionId={sessionId}
                 part={part}
+                collapsePreview={collapseToolPreviews && part.state.status === 'completed'}
                 pendingAskRequests={pendingAskRequests}
                 onAskResponse={onAskResponse}
                 onNavigateToSubagent={onNavigateToSubagent}
@@ -397,6 +402,7 @@ const MessageParts = memo(function MessageParts({
 }, (prev, next) => {
   if (prev.sessionId !== next.sessionId) return false;
   if (prev.parts !== next.parts) return false;
+  if (prev.collapseToolPreviews !== next.collapseToolPreviews) return false;
   if (prev.inverted !== next.inverted) return false;
   if (prev.isStreaming !== next.isStreaming) return false;
   if (prev.onNavigateToSubagent !== next.onNavigateToSubagent) return false;
@@ -408,6 +414,7 @@ const MessageParts = memo(function MessageParts({
 });
 
 const StructuredOutputMessage = memo(function StructuredOutputMessage({
+  collapseToolPreviews,
   sessionId,
   parts,
   structuredOutput,
@@ -419,6 +426,7 @@ const StructuredOutputMessage = memo(function StructuredOutputMessage({
   sessionId: string;
   parts: Part[];
   structuredOutput: StructuredOutputData;
+  collapseToolPreviews?: boolean;
   pendingAskRequests: PendingAskRequest[];
   onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   onNavigateToSubagent?: (sessionId: string) => void;
@@ -455,6 +463,7 @@ const StructuredOutputMessage = memo(function StructuredOutputMessage({
                 onAskResponse={onAskResponse}
                 onNavigateToSubagent={onNavigateToSubagent}
                 inverted={false}
+                collapseToolPreviews={collapseToolPreviews}
                 serverUrl={serverUrl}
               />
             </div>
@@ -578,6 +587,7 @@ const MessageRow = memo(function MessageRow({
             sessionId={sessionId}
             parts={item.parts}
             structuredOutput={item.message.structuredOutput}
+            collapseToolPreviews={item.collapseToolPreviews}
             pendingAskRequests={pendingAskRequests}
             onAskResponse={onAskResponse}
             onNavigateToSubagent={onNavigateToSubagent}
@@ -592,6 +602,7 @@ const MessageRow = memo(function MessageRow({
             onNavigateToSubagent={onNavigateToSubagent}
             inverted={item.message.role === 'user' && !item.isQueued}
             isStreaming={isAssistantMessage(item.message) && item.message.status === 'streaming'}
+            collapseToolPreviews={item.collapseToolPreviews}
             serverUrl={serverUrl}
           />
         )}
@@ -609,6 +620,7 @@ function areMessageRowPropsEqual(prev: MessageRowProps, next: MessageRowProps): 
     prev.item.parts === next.item.parts &&
     prev.item.isQueued === next.item.isQueued &&
     prev.item.queueId === next.item.queueId &&
+    prev.item.collapseToolPreviews === next.item.collapseToolPreviews &&
     prev.revertMessageId === next.revertMessageId &&
     prev.sessionId === next.sessionId &&
     prev.pendingAskRequests === next.pendingAskRequests &&
@@ -643,7 +655,7 @@ function keyExtractor(item: DisplayItem): string {
 }
 
 export function VirtualizedTranscript({
-  displayItems,
+  displayItems: sourceItems,
   messagesWithParts,
   sessionId,
   sessionStatus,
@@ -674,6 +686,13 @@ export function VirtualizedTranscript({
   onLoadOlder,
   emptyContent,
 }: VirtualizedTranscriptProps) {
+  const displayItems = useMemo(() => {
+    const cutoff = getToolPreviewCutoff(sourceItems);
+    return sourceItems.map((item, index) => ({
+      ...item,
+      collapseToolPreviews: index < cutoff && item.message.role === 'assistant',
+    }));
+  }, [sourceItems]);
   const listRef = useRef<LegendListRef | null>(null);
   const autoScrollRef = useRef(autoFollow);
   const isProgrammaticScrollRef = useRef(false);
@@ -1055,7 +1074,8 @@ export function VirtualizedTranscript({
       initialScrollAtEnd={!targetMessageId && autoFollow}
       maintainScrollAtEnd={!targetMessageId && maintainAutoFollow ? { animated: false } : false}
       maintainScrollAtEndThreshold={0.1}
-      maintainVisibleContentPosition={{ data: true, size: false }}
+      // History rows change height as they are measured or previews are expanded.
+      maintainVisibleContentPosition={{ data: true, size: true }}
       onScroll={handleScroll}
       className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative chat-transcript-scrollbar"
       style={{ WebkitOverflowScrolling: 'touch' }}
