@@ -132,6 +132,8 @@ export const gitAddSchema = z.object({
   root: z.string().min(1).optional(),
 });
 
+export const gitRevertModifiedFileSchema = gitAddSchema.strict();
+
 const gitHeadSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);
 const gitBranchSchema = z.string().min(1).max(1024).refine((value) => !/[\0\r\n]/.test(value));
 export const gitCommitSchema = z.object({

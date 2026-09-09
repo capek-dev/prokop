@@ -90,6 +90,24 @@ describe('files application over the Jean2 port (S5 filesystem isolation)', () =
     await expect(app.gitPush(workspaceId, { root, remote: 'origin', branch: 'main', expectedBranch: 'main', expectedHead: 'a'.repeat(40) })).rejects.toThrow('Path outside workspace');
     expect(() => app.gitRepository(workspaceId, root)).toThrow('Path outside workspace');
     await expect(app.gitRemoveStagedAddition(workspaceId, 'new', root)).rejects.toThrow('Path outside workspace');
+    await expect(app.gitRevertModifiedFile(workspaceId, 'changed', root)).rejects.toThrow('Path outside workspace');
+  });
+
+  test('Git revert emits a change event after success or failure', async () => {
+    const port = createJean2FilesApplicationPort();
+    const calls: string[] = [];
+    port.gitRevertModifiedFile = async (root, path) => {
+      calls.push(`${root}:${path}`);
+      if (path === 'fail') throw new Error('Git operation: failed');
+      return { path };
+    };
+    const events: unknown[] = [];
+    const app = createFilesApplication(port, (...args) => { events.push(args); });
+
+    await expect(app.gitRevertModifiedFile(workspaceId, 'ok')).resolves.toEqual({ path: 'ok' });
+    await expect(app.gitRevertModifiedFile(workspaceId, 'fail')).rejects.toThrow('Git operation: failed');
+    expect(calls).toEqual([`${main}:ok`, `${main}:fail`]);
+    expect(events).toEqual([[workspaceId, main], [workspaceId, main]]);
   });
 
   test('browse lists entries in the exact order and shape', async () => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Copy, Eye, FilePlus2, FolderPlus, Pencil, Plus, SquarePen, Trash2 } from 'lucide-react';
+import { Copy, Eye, FilePlus2, FolderPlus, Pencil, Plus, RotateCcw, SquarePen, Trash2 } from 'lucide-react';
 import type { ContextMenuItem, ContextMenuOpenContext } from '@pierre/trees';
 import { stripTrailingSlash } from './fileActionsCore';
 import type { FileActionTargetInfo } from './useFileActions';
@@ -18,6 +18,8 @@ export interface PierreTreeActionMenuActions {
   addingToGit?: boolean;
   removeStagedAddition?: (path: string) => void;
   removingStagedAddition?: boolean;
+  revertModified?: (path: string) => void;
+  revertingModified?: boolean;
 }
 
 interface PierreTreeActionMenuProps {
@@ -28,6 +30,7 @@ interface PierreTreeActionMenuProps {
   deletedPaths?: ReadonlySet<string>;
   untrackedPaths?: ReadonlySet<string>;
   stagedAdditionPaths?: ReadonlySet<string>;
+  modifiedPaths?: ReadonlySet<string>;
 }
 
 type MenuEntry =
@@ -47,6 +50,7 @@ function buildMenuEntries(
   target: FileActionTargetInfo,
   actions: PierreTreeActionMenuActions,
   stagedAddition: boolean,
+  isModified: boolean,
 ): MenuEntry[] {
   const entries: MenuEntry[] = [];
   const remove = actions.removeStagedAddition;
@@ -118,6 +122,17 @@ function buildMenuEntries(
     label: 'Copy Absolute Path',
     onSelect: () => actions.copyAbsolute(path),
   });
+  if (!isDir && isModified && actions.revertModified) {
+    entries.push({ kind: 'separator', key: 'sep-revert' });
+    entries.push({
+      kind: 'action',
+      key: 'git-revert-modified',
+      icon: RotateCcw,
+      label: actions.revertingModified ? 'Reverting changes…' : 'Revert changes…',
+      disabled: actions.revertingModified,
+      onSelect: () => actions.revertModified?.(path),
+    });
+  }
   if (!isDeleted) {
     entries.push({ kind: 'separator', key: 'sep-mutate' });
     entries.push({
@@ -143,12 +158,12 @@ function buildMenuEntries(
  * slot fixed at the pointer and handles outside-click dismissal; this
  * component only renders items and closes via `context.close()`.
  */
-export function PierreTreeActionMenu({ item, context, actions, deletedPaths, untrackedPaths, stagedAdditionPaths }: PierreTreeActionMenuProps) {
+export function PierreTreeActionMenu({ item, context, actions, deletedPaths, untrackedPaths, stagedAdditionPaths, modifiedPaths }: PierreTreeActionMenuProps) {
   const isDir = item.kind === 'directory';
   const path = stripTrailingSlash(item.path);
   const isDeleted = !isDir && deletedPaths?.has(path) === true;
   const target: FileActionTargetInfo = { path, isDirectory: isDir, name: item.name };
-  const entries = buildMenuEntries(isDir, isDeleted, untrackedPaths?.has(path) === true, path, target, actions, stagedAdditionPaths?.has(path) === true);
+  const entries = buildMenuEntries(isDir, isDeleted, untrackedPaths?.has(path) === true, path, target, actions, stagedAdditionPaths?.has(path) === true, modifiedPaths?.has(path) === true);
 
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   // Separator-only length estimate is fine: clamping only needs an upper bound.

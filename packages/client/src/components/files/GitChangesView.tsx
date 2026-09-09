@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useCallback } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useCallback, useState } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import type { GitDiffSummary, ProkopaiClient } from '@prokopai/sdk';
 import type {
@@ -14,6 +14,7 @@ import { RefreshCw } from 'lucide-react';
 import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
 import { useGitAddMutation } from '@/hooks/queries/useGitAddMutation';
 import { useGitRemoveStagedAddition } from '@/hooks/queries/useGitRemoveStagedAddition';
+import { useGitRevertModifiedFile } from '@/hooks/queries/useGitRevertModifiedFile';
 import { GitChangesActions } from './GitChangesActions';
 import { gitDraftKey } from '@/stores/gitCommitStore';
 import { useFileTreeStateStore } from '@/stores/fileTreeStateStore';
@@ -25,6 +26,7 @@ import {
 import { useFileActions } from './useFileActions';
 import { FileActionsDialogs } from './FileActionsDialogs';
 import { PierreTreeActionMenu, type PierreTreeActionMenuActions } from './PierreTreeActionMenu';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 export interface GitChangesViewHandle {
   focus: () => void;
@@ -138,6 +140,8 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
     const containerRef = useRef<HTMLDivElement>(null);
     const { data, isLoading, error, refetch } = useGitStatusQuery(sdkClient, workspaceId, root);
     const { mutate: addToGit, isPending: addingToGit } = useGitAddMutation(sdkClient, workspaceId, root);
+    const { mutate: revertModified, isPending: revertingModified } = useGitRevertModifiedFile(sdkClient, workspaceId, root);
+    const [revertPath, setRevertPath] = useState<string | null>(null);
 
     // Persisted expansion identity mirrors the Project tree but under a
     // dedicated namespace so neither view clobbers the other's place.
@@ -257,6 +261,11 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
       [files],
     );
 
+    const modifiedPaths = useMemo(
+      () => new Set(files.filter((f) => f.git.status === 'modified').map((f) => f.path)),
+      [files],
+    );
+
     const { mutate: removeStagedAddition, isPending: removingStagedAddition } = useGitRemoveStagedAddition(sdkClient, workspaceId, root);
     const stagedAdditionPaths = useMemo(() => new Set(files.filter((file) => file.git.stagedAddition).map((file) => file.path)), [files]);
 
@@ -294,6 +303,10 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
           if (!removingStagedAddition && !addingToGit && stagedAdditionPaths.has(path)) removeStagedAddition(path);
         } : undefined,
         removingStagedAddition,
+        revertModified: sdkClient ? (path) => {
+          if (!revertingModified && modifiedPaths.has(path)) setRevertPath(path);
+        } : undefined,
+        revertingModified,
         copyRelative: (path) => copyPath(path, false),
         copyAbsolute: (path) => copyPath(path, true),
         rename: (target) => openRename(target),
@@ -301,7 +314,7 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
         createFile: (parentDirPath) => openCreate(parentDirPath, 'file'),
         createFolder: (parentDirPath) => openCreate(parentDirPath, 'directory'),
       }),
-      [copyPath, openCreate, openRename, openDelete, sdkClient, addingToGit, addToGit, untrackedPaths, removeStagedAddition, removingStagedAddition, stagedAdditionPaths],
+      [copyPath, openCreate, openRename, openDelete, sdkClient, addingToGit, addToGit, untrackedPaths, removeStagedAddition, removingStagedAddition, stagedAdditionPaths, revertingModified, modifiedPaths],
     );
 
     const renderContextMenu = useCallback(
@@ -314,9 +327,10 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
             deletedPaths={deletedPaths}
             untrackedPaths={untrackedPaths}
             stagedAdditionPaths={stagedAdditionPaths}
+            modifiedPaths={modifiedPaths}
           />
         ) : null,
-      [menuActions, deletedPaths, untrackedPaths, stagedAdditionPaths],
+      [menuActions, deletedPaths, untrackedPaths, stagedAdditionPaths, modifiedPaths],
     );
 
     // Query refreshes AND mode flips rebuild the store. Mode must be part of
@@ -410,6 +424,21 @@ export const GitChangesView = forwardRef<GitChangesViewHandle, GitChangesViewPro
             <PierreFileTreeReact model={model} className="size-full" renderContextMenu={renderContextMenu} />
           </PierreTreeHost>}
         </GitChangesActions> : <div className="flex flex-1 flex-col items-center justify-center gap-1 px-4 py-10 text-center"><Check className="size-4 text-muted-foreground/50" /><p className="text-sm text-muted-foreground">No changes</p></div>}
+        <ConfirmationDialog
+          open={revertPath !== null}
+          onOpenChange={(open) => { if (!open) setRevertPath(null); }}
+          title="Revert file changes?"
+          description={`Restore ${revertPath ?? 'this file'} to its last committed version. All staged and unstaged changes in this file will be lost.`}
+          confirmLabel="Revert changes"
+          variant="destructive"
+          loading={revertingModified}
+          onConfirm={() => {
+            if (!revertPath) return;
+            const path = revertPath;
+            setRevertPath(null);
+            revertModified(path);
+          }}
+        />
         <FileActionsDialogs
           dialog={actionDialog}
           mutating={actionMutating}

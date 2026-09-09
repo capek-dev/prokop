@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { commitGitFiles, getGitRepository, previewGitPush, pushGitBranch } from '../../../src/infrastructure/filesystem/git-operations';
+import { commitGitFiles, getGitRepository, previewGitPush, pushGitBranch, revertModifiedGitFile } from '../../../src/infrastructure/filesystem/git-operations';
 import { getGitStatus } from '../../../src/infrastructure/filesystem/git-status';
 
 let root: string;
@@ -27,6 +27,47 @@ beforeEach(async () => {
   await git('config', 'core.hooksPath', join(root, '.git/hooks'));
 });
 afterEach(async () => { await rm(base, { recursive: true, force: true }); });
+
+describe('revert modified file', () => {
+  test('restores staged and unstaged content while preserving unrelated changes', async () => {
+    await writeFile(join(root, 'selected'), 'base');
+    await writeFile(join(root, 'other'), 'base');
+    await commit(['selected', 'other']);
+
+    await writeFile(join(root, 'selected'), 'staged');
+    await git('add', 'selected');
+    await writeFile(join(root, 'selected'), 'working');
+    await writeFile(join(root, 'other'), 'unrelated');
+
+    await expect(revertModifiedGitFile(root, 'selected')).resolves.toEqual({ path: 'selected' });
+    expect(await readFile(join(root, 'selected'), 'utf8')).toBe('base');
+    expect(await git('show', ':selected')).toBe('base');
+    expect(await readFile(join(root, 'other'), 'utf8')).toBe('unrelated');
+    expect(await git('status', '--porcelain')).toBe(' M other');
+  });
+
+  test('uses literal paths and paths relative to a selected subdirectory', async () => {
+    const sub = join(root, 'sub');
+    const name = 'line\nbreak[1]';
+    await Bun.write(join(sub, name), 'base');
+    await commit([`sub/${name}`]);
+    await writeFile(join(sub, name), 'changed');
+
+    root = sub;
+    await expect(revertModifiedGitFile(root, name)).resolves.toEqual({ path: name });
+    expect(await readFile(join(sub, name), 'utf8')).toBe('base');
+  });
+
+  test('rejects non-modified statuses, missing HEAD, and invalid paths', async () => {
+    await writeFile(join(root, 'new'), 'new');
+    await expect(revertModifiedGitFile(root, 'new')).rejects.toThrow('before the first commit');
+    await commit(['new']);
+    await expect(revertModifiedGitFile(root, 'new')).rejects.toThrow('file status changed');
+    await writeFile(join(root, 'untracked'), 'new');
+    await expect(revertModifiedGitFile(root, 'untracked')).rejects.toThrow('only modified tracked files');
+    await expect(revertModifiedGitFile(root, '../escape')).rejects.toThrow('invalid file path');
+  });
+});
 
 describe('selected whole-file commits', () => {
   test('initial commit excludes unrelated staged files', async () => {

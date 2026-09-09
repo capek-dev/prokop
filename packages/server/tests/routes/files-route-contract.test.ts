@@ -168,6 +168,40 @@ describe('Git commit and push routes', () => {
   });
 });
 
+describe('Revert modified file route', () => {
+  test('forwards the exact path and selected root', async () => {
+    const calls: unknown[] = [];
+    const app = filesApp(makeFilesApplication({
+      gitRevertModifiedFile: async (...args) => { calls.push(args); return { path: args[1] }; },
+    }));
+    const response = await app.request('/api/workspaces/ws-1/git/revert-modified-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: 'src/file[1].ts', root: '/worktree' }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ path: 'src/file[1].ts' });
+    expect(calls).toEqual([['ws-1', 'src/file[1].ts', '/worktree']]);
+  });
+
+  test.each([{}, { path: '../file' }, { path: '.git/config' }, { path: 'file', extra: true }])(
+    'rejects malformed input %j before delegation',
+    async (body) => {
+      let called = false;
+      const app = filesApp(makeFilesApplication({
+        gitRevertModifiedFile: async () => { called = true; return { path: '' }; },
+      }));
+      const response = await app.request('/api/workspaces/ws-1/git/revert-modified-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      expect(response.status).toBe(400);
+      expect(called).toBe(false);
+    },
+  );
+});
+
 describe('Git add route', () => {
   test('delegates the selected root and file to the application', async () => {
     const calls: unknown[] = [];

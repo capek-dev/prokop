@@ -4,10 +4,11 @@ import type { ContextMenuItem, ContextMenuOpenContext } from '@pierre/trees';
 import { PierreTreeActionMenu, type PierreTreeActionMenuActions } from '@/components/files/PierreTreeActionMenu';
 
 afterEach(cleanup);
-function setup(options: { untracked?: boolean; directory?: boolean; deleted?: boolean; pending?: boolean; enabled?: boolean; stagedAddition?: boolean } = {}) {
+function setup(options: { untracked?: boolean; modified?: boolean; directory?: boolean; deleted?: boolean; pending?: boolean; enabled?: boolean; stagedAddition?: boolean } = {}) {
   const addToGit = vi.fn();
   const removeStagedAddition = vi.fn();
   const close = vi.fn();
+  const revertModified = vi.fn();
   const actions: PierreTreeActionMenuActions = {
     openPreview: vi.fn(), openEdit: vi.fn(), copyRelative: vi.fn(), copyAbsolute: vi.fn(),
     rename: vi.fn(), del: vi.fn(), createFile: vi.fn(), createFolder: vi.fn(),
@@ -15,6 +16,8 @@ function setup(options: { untracked?: boolean; directory?: boolean; deleted?: bo
     addingToGit: options.pending,
     removeStagedAddition: options.enabled === false ? undefined : removeStagedAddition,
     removingStagedAddition: options.pending,
+    revertModified: options.enabled === false ? undefined : revertModified,
+    revertingModified: options.pending,
   };
   const item = { path: 'new.txt', name: 'new.txt', kind: options.directory ? 'directory' : 'file' } as ContextMenuItem;
   const context = {
@@ -25,8 +28,9 @@ function setup(options: { untracked?: boolean; directory?: boolean; deleted?: bo
     untrackedPaths={new Set(options.untracked ? ['new.txt'] : [])}
     deletedPaths={new Set(options.deleted ? ['new.txt'] : [])}
     stagedAdditionPaths={new Set(options.stagedAddition ? ['new.txt'] : [])}
+    modifiedPaths={new Set(options.modified ? ['new.txt'] : [])}
   />);
-  return { addToGit, close, removeStagedAddition };
+  return { addToGit, close, removeStagedAddition, revertModified };
 }
 
 describe('Staged addition cleanup', () => {
@@ -43,6 +47,31 @@ describe('Staged addition cleanup', () => {
   test('disables cleanup while pending', () => {
     setup({ stagedAddition: true, pending: true });
     expect(screen.getByRole('menuitem', { name: 'Removing from index…' })).toBeDisabled();
+  });
+});
+
+describe('Revert modified file menu action', () => {
+  test('offers a confirmed-action entry only for modified files', () => {
+    const { revertModified, close } = setup({ modified: true });
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Revert changes…' }));
+    expect(revertModified).toHaveBeenCalledExactlyOnceWith('new.txt');
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  test.each([{}, { modified: true, directory: true }, { modified: true, enabled: false }])(
+    'hides the action when ineligible: %j',
+    (options) => {
+      setup(options);
+      expect(screen.queryByRole('menuitem', { name: /Revert changes/ })).toBeNull();
+    },
+  );
+
+  test('disables the action while reverting', () => {
+    const { revertModified } = setup({ modified: true, pending: true });
+    const button = screen.getByRole('menuitem', { name: 'Reverting changes…' });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(revertModified).not.toHaveBeenCalled();
   });
 });
 

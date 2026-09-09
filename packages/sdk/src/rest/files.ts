@@ -174,6 +174,18 @@ export class FilesRestNamespace {
     return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/remove-staged-addition`, { path, root: options?.root });
   }
 
+  /** Restore one modified tracked file in both the index and working tree from HEAD. */
+  async gitRevertModifiedFile(
+    workspaceId: string,
+    path: string,
+    options?: { root?: string; signal?: AbortSignal },
+  ): Promise<{ path: string }> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/git/revert-modified-file`, {
+      path,
+      root: options?.root,
+    }, { signal: options?.signal });
+  }
+
   /** Stage one untracked file, without committing or force-adding ignored files. */
   async gitAdd(
     workspaceId: string,

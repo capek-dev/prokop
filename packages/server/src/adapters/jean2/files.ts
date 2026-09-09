@@ -9,7 +9,7 @@ import { listGitBranches, getGitHistory, getGitCommitDetails, reviewGitBranchPus
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { getGitRebaseState, startGitRebase, controlGitRebase } from '@/infrastructure/filesystem/git-rebase';
 import { getGitRebaseConflict, resolveGitRebaseConflict } from '@/infrastructure/filesystem/git-rebase-conflicts';
-import { getGitRepository, commitGitFiles, previewGitPush, pushGitBranch, removeGitStagedAddition } from '@/infrastructure/filesystem/git-operations';
+import { getGitRepository, commitGitFiles, previewGitPush, pushGitBranch, removeGitStagedAddition, revertModifiedGitFile } from '@/infrastructure/filesystem/git-operations';
 import { workspacePathPolicyPort } from '@/adapters/capek/workspace-paths';
 import type { FilesApplicationPort } from '@/application/ports/files';
 import { listDirectory, searchFiles } from '@/infrastructure/filesystem/workspace-files';
@@ -86,6 +86,7 @@ export function createJean2FilesApplicationPort(
     gitBranchPushReview: reviewGitBranchPush,
     gitBranchAction: runGitBranchAction,
     gitRemoveStagedAddition: removeGitStagedAddition,
+    gitRevertModifiedFile: revertModifiedGitFile,
     gitRepository: getGitRepository,
     gitCommit: commitGitFiles,
     gitPushPreview: previewGitPush,

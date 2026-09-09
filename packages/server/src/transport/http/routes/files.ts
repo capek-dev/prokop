@@ -16,6 +16,7 @@ import { gitBranchActionSchema, gitBranchPushReviewSchema, gitHistorySchema, git
 import {
   saveFileSchema,
   gitAddSchema,
+  gitRevertModifiedFileSchema,
   gitCommitSchema, gitPushSchema, gitPushPreviewSchema,
   fileTreeQuerySchema,
   createFileSchema,
@@ -236,6 +237,15 @@ export function registerFileRoutes(app: Hono, files: FilesApplication): void {
     const { path, root } = c.req.valid('json');
     try {
       return c.json(await files.gitAdd(c.req.param('id'), path, root));
+    } catch (err: unknown) {
+      mapApplicationError(err);
+    }
+  });
+
+  app.post('/api/workspaces/:id/git/revert-modified-file', validate('json', gitRevertModifiedFileSchema), async (c) => {
+    const { path, root } = c.req.valid('json');
+    try {
+      return c.json(await files.gitRevertModifiedFile(c.req.param('id'), path, root));
     } catch (err: unknown) {
       mapApplicationError(err);
     }

@@ -39,6 +39,7 @@ export interface FilesApplicationPort {
   gitRebaseControl(root: string, input: import('@prokopai/sdk').GitRebaseControl): Promise<import('@prokopai/sdk').GitRebaseState>;
   gitRebaseResolve(root: string, input: import('@prokopai/sdk').GitRebaseResolution): Promise<import('@prokopai/sdk').GitRebaseState>;
   gitRemoveStagedAddition(root: string, path: string): Promise<{ path: string }>;
+  gitRevertModifiedFile(root: string, path: string): Promise<{ path: string }>;
   gitBranches(root: string): Promise<import('@prokopai/sdk').GitBranchesResult>;
   gitHistory(root: string, head: string, offset: number, upstream?: string | null): Promise<import('@prokopai/sdk').GitHistoryResult>;
   gitCommitDetails(root: string, head: string): Promise<import('@prokopai/sdk').GitCommitDetails>;

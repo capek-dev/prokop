@@ -154,6 +154,29 @@ export async function removeGitStagedAddition(root: string, path: string): Promi
   }
 }
 
+export async function revertModifiedGitFile(root: string, path: string): Promise<{ path: string }> {
+  root = await realpath(root);
+  await checkPath(root, path);
+  const repo = (await git(root, ['rev-parse', '--show-toplevel'])).stdout.replace(/\r?\n$/, '');
+  const repoPath = relative(repo, resolve(root, path)).split(sep).join('/');
+  const head = await git(repo, ['rev-parse', '--verify', 'HEAD'], { allowFailure: true });
+  if (head.code !== 0) fail('cannot revert a file before the first commit.');
+
+  try {
+    const records = (await git(repo, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', repoPath])).stdout.split('\0').filter(Boolean);
+    if (records.length !== 1 || records[0].slice(3) !== repoPath) fail('file status changed. Refresh before reverting.');
+    const [indexStatus, worktreeStatus] = records[0];
+    const modified = (indexStatus === 'M' || indexStatus === 'T' || worktreeStatus === 'M' || worktreeStatus === 'T')
+      && [indexStatus, worktreeStatus].every((status) => status === ' ' || status === 'M' || status === 'T');
+    if (!modified) fail('only modified tracked files can be reverted.');
+
+    await git(repo, ['restore', '--source=HEAD', '--staged', '--worktree', '--', repoPath]);
+    return { path };
+  } finally {
+    clearGitStatusCache();
+  }
+}
+
 export async function commitGitFiles(root: string, input: GitCommitInput): Promise<GitCommitResult> {
   root = await realpath(root);
   if (!input.message.trim() || input.message.length > 8192 || input.message.includes('\0')) fail('a commit message of at most 8192 characters is required.');

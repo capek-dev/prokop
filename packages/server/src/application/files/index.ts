@@ -49,6 +49,7 @@ export interface FilesApplication {
   gitRebaseControl(workspaceId: string, input: import('@prokopai/sdk').GitRebaseControl): Promise<import('@prokopai/sdk').GitRebaseState>;
   gitRebaseResolve(workspaceId: string, input: import('@prokopai/sdk').GitRebaseResolution): Promise<import('@prokopai/sdk').GitRebaseState>;
   gitRemoveStagedAddition(workspaceId: string, path: string, root?: string): Promise<{ path: string }>;
+  gitRevertModifiedFile(workspaceId: string, path: string, root?: string): Promise<{ path: string }>;
   gitBranches(workspaceId: string, root?: string): Promise<import('@prokopai/sdk').GitBranchesResult>;
   gitHistory(workspaceId: string, input: { root?: string; head: string; offset: number; upstream?: string | null }): Promise<import('@prokopai/sdk').GitHistoryResult>;
   gitCommitDetails(workspaceId: string, input: { root?: string; head: string }): Promise<import('@prokopai/sdk').GitCommitDetails>;
@@ -159,6 +160,14 @@ export function createFilesApplication(port: FilesApplicationPort, onGitChanged?
       const result = await port.gitRemoveStagedAddition(root, path);
       try { onGitChanged?.(workspaceId, root); } catch { /* Client also refreshes on success. */ }
       return result;
+    },
+    async gitRevertModifiedFile(workspaceId, path, rootQuery) {
+      const root = writeRoot(workspaceId, rootQuery);
+      try {
+        return await port.gitRevertModifiedFile(root, path);
+      } finally {
+        try { onGitChanged?.(workspaceId, root); } catch { /* Refresh on reconnect. */ }
+      }
     },
     gitBranches: (workspaceId, root) => port.gitBranches(writeRoot(workspaceId, root)),
     gitHistory: (workspaceId, input) => port.gitHistory(writeRoot(workspaceId, input.root), input.head, input.offset, input.upstream ?? null),
