@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
-import { Brain, Wrench, Search, Workflow, Server, Shield, FolderSymlink, Clock, ShieldCheck, Cog, Loader2 } from 'lucide-react';
+import { Brain, GraduationCap, Wrench, Search, Workflow, Server, Shield, FolderSymlink, Clock, ShieldCheck, Cog, Loader2 } from 'lucide-react';
 import type { Workspace, WorkspaceSettings, PermissionRiskLevel, PermissionGrant, ProkopaiClient, AutoApproveSeverity } from '@prokopai/sdk';
 import { learningValidationError } from '@/lib/learningValidation';
 import { useServerDataStore } from '@/stores/serverDataStore';
@@ -52,7 +52,7 @@ const ICONS: Record<Section, SettingsSection['icon']> = {
   autoApprove: ShieldCheck,
   paths: FolderSymlink,
   preconfigs: Cog,
-  learning: Brain,
+  learning: GraduationCap,
   memory: Brain,
   skills: Wrench,
   search: Search,
