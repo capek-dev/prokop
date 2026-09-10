@@ -189,6 +189,23 @@ describe('learning evidence eligibility', () => {
 });
 
 describe('learning prompt composition', () => {
+  test.each(['workspace', 'agent'] as const)('structured %s review requires evidence before knowledge changes', scope => {
+    const prompt = buildLearningPrompt({ ...promptOptions, scope });
+    expect(prompt.match(/^## \d\./gm)).toEqual(['## 1.', '## 2.', '## 3.', '## 4.', '## 5.']);
+    expect(prompt).toContain('before drawing conclusions or deciding there is nothing to save');
+    expect(prompt).toContain('what was proposed, attempted, verified, and left unfinished');
+    expect(prompt).toContain('Never remove a valid instruction merely to make room');
+    expect(prompt).toContain('Never replay earlier tool calls or restore old snapshots');
+    expect(prompt).toContain('add only missing lessons');
+    expect(prompt).toContain('A review with no changes is a successful outcome');
+  });
+
+  test('disabled skills omit procedure step and retain sequential steps', () => {
+    const prompt = buildLearningPrompt({ ...promptOptions, improveSkills: false });
+    expect(prompt.match(/^## \d\./gm)).toEqual(['## 1.', '## 2.', '## 3.', '## 4.']);
+    expect(prompt).not.toContain('Improve reusable procedures');
+    expect(prompt).not.toContain('skill_manage');
+  });
   test('workspace review writes shared knowledge without personal tools', () => {
     const prompt = buildLearningPrompt(promptOptions);
     expect(prompt).toContain('memory(action="list"');

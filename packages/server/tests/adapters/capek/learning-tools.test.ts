@@ -22,14 +22,20 @@ for (const scope of ['workspace', 'agent'] as const) {
     const process = await createProcessScope([]);
     const agent = await createAgentScope(process, [
       loadedToolsPlugin('unrelated', [{ definition: { name: 'shell', description: 'No', inputSchema: {} }, path: 'test', execute: async () => ({ success: true }) }]),
-      ...createLearningToolsPlugins(options({ scope })),
+      ...createLearningToolsPlugins(options({ scope, home: async () => ({ success: true }) })),
     ]);
     try {
       const resolver = agent.require(capekToolResolverKey);
       expect(resolver.list().map(tool => tool.definition.name).sort()).toEqual(
-        (scope === 'workspace' ? ['memory', 'session_search', 'skill_manage'] : ['agent_memory', 'agent_skill_manage', 'session_search']).sort(),
+        (scope === 'workspace' ? ['memory', 'session_search', 'skill_manage'] : ['agent_memory', 'agent_skill_manage', 'session_search', 'home_files']).sort(),
       );
       expect(resolver.get('shell')).toBeNull();
+      const home = resolver.get('home_files');
+      if (scope === 'workspace') expect(home).toBeNull();
+      else {
+        expect((await home!.execute({}, { sessionId: 'other', abortSignal: new AbortController().signal } as ToolContext)).success).toBe(false);
+        expect((await home!.execute({}, { sessionId: 'review', abortSignal: AbortSignal.abort() } as ToolContext)).success).toBe(false);
+      }
       expect(resolver.get('scheduler')).toBeNull();
       const tool = resolver.get('session_search')!;
       const context = { sessionId: 'review', abortSignal: new AbortController().signal } as ToolContext;

@@ -51,6 +51,28 @@ async function fixture(personal = false, execute?: LearningExecutionDependencies
   return { db, settings, app, wire, calls: () => calls, reviewSession: () => reviewSession };
 }
 
+test('personal home reference writes survive failure and support history undo without replay', async () => {
+  await fixture(true, async input => {
+    expect(input.home).toBeDefined();
+    expect(input.prompt).toContain('home_files');
+    expect((await input.home!({ action: 'read', path: 'examples/retry.ts' })).success).toBe(true);
+    expect((await input.home!({ action: 'write', path: 'examples/retry.ts', content: '// reference only', revision: null })).success).toBe(true);
+    throw new Error('Interrupted after home write');
+  });
+  await learning!.start();
+  for (let i = 0; i < 200 && !learning!.repository.listRuns('dev-home')[0]?.finished_at; i++) await Bun.sleep(5);
+  await learning!.stop();
+  const run = learning!.repository.listRuns('dev-home')[0]!;
+  expect(run.status).toBe('failed');
+  expect(learning!.repository.isRecovered(run.id)).toBe(true);
+  expect(learning!.repository.pending('dev-home', 'reviewer')).toHaveLength(1);
+  expect(await readFile(join(root!, 'home/examples/retry.ts'), 'utf8')).toBe('// reference only');
+  const detail = learning!.api.detail('dev-home', run.id);
+  expect(detail.changes[0].path).toBe('home/examples/retry.ts');
+  expect(await learning!.api.undo('dev-home', run.id, detail.changes[0].id)).toEqual({ result: 'undone' });
+  expect(await Bun.file(join(root!, 'home/examples/retry.ts')).exists()).toBe(false);
+});
+
 async function waitForReview(workspaceId = 'ws') {
   for (let i = 0; i < 200; i++) {
     if (learning!.repository.listRuns(workspaceId)[0]?.status === 'completed') return;

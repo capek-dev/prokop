@@ -39,7 +39,8 @@ export function createLearningHistory(deps: LearningHistoryDependencies): {
     }
     await authorize();
     const files = createLearningKnowledgeFiles({
-      memoryDirectory: binding.memory_directory, skillsDirectory: binding.skills_directory, authorize,
+      memoryDirectory: binding.memory_directory, skillsDirectory: binding.skills_directory,
+      homeDirectory: deps.workspace(workspaceId)?.settings.isAgentHome ? binding.workspace_path : undefined, authorize,
     });
     return createKnowledgeJournal({ repository: deps.repository, files, now: deps.now, authorize });
   }

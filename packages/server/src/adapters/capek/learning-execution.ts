@@ -1,3 +1,4 @@
+import { createLearningHomeTool } from './learning-home';
 import type { Database } from 'bun:sqlite';
 import { listDomainToolFallbackDefinitions } from '@capekai/core/tools';
 import type { Workspace } from '@prokopai/sdk';
@@ -47,7 +48,7 @@ export function createLearningExecution(deps: LearningExecutionDependencies): Le
       run_id: runId, workspace_path: workspace.path,
       memory_directory: directories.memoryDirectory, skills_directory: directories.skillsDirectory,
     });
-    const files = createLearningKnowledgeFiles({ ...directories, authorize });
+    const files = createLearningKnowledgeFiles({ ...directories, homeDirectory: scope.kind === 'agent' ? workspace.path : undefined, authorize });
     const journal = createKnowledgeJournal({ repository: deps.repository, files, now: Date.now, authorize });
     const mutate = createKnowledgeStagingMutator({
       snapshot: files.snapshot,
@@ -100,6 +101,9 @@ export function createLearningExecution(deps: LearningExecutionDependencies): Le
       sessionId, workspaceId: workspace.id, workspacePath: workspace.path,
       scope: scope.kind, improveSkills, definitions: listDomainToolFallbackDefinitions(),
       knowledge: knowledge.execute, search, preconfig: input.preconfig,
+      home: scope.kind === 'agent' ? createLearningHomeTool({ root: workspace.path, files, authorize,
+        apply: (relativePath, before, after) => journal.apply({ runId, operationId: crypto.randomUUID(), relativePath, before, after }),
+      }) : undefined,
       systemPrompt: `${input.preconfig.systemPrompt}\n\n${input.prompt}`, prompt, signal,
     });
     // Supporting sources can be revoked while the final provider response is pending.

@@ -2,6 +2,7 @@ import type { LoadedTool, ToolDefinition, ToolResult } from '@capekai/tool';
 import { capekToolResolverKey, type CapekPlugin } from '@capekai/core/composition';
 import { createContributedToolResolver, loadedToolsPlugin } from '@capekai/core/plugins';
 import type { LearningScope } from '@prokopai/sdk';
+import { learningHomeDefinition } from './learning-home';
 import type { LearningKnowledgeResult } from './learning-knowledge';
 
 export interface LearningToolsOptions {
@@ -12,6 +13,7 @@ export interface LearningToolsOptions {
   definitions: readonly ToolDefinition[];
   knowledge(name: string, input: unknown): Promise<LearningKnowledgeResult>;
   search(input: Record<string, unknown>): Promise<ToolResult>;
+  home?: (input: unknown) => Promise<ToolResult>;
 }
 
 /** Dedicated review composition only. Do not combine with memory/skills domain
@@ -19,9 +21,9 @@ export interface LearningToolsOptions {
 export function createLearningToolsPlugins(options: LearningToolsOptions): readonly CapekPlugin<unknown>[] {
   const memory = options.scope === 'agent' ? 'agent_memory' : 'memory';
   const skills = options.scope === 'agent' ? 'agent_skill_manage' : 'skill_manage';
-  const names = [memory, 'session_search', ...(options.improveSkills ? [skills] : [])];
+  const names = [memory, 'session_search', ...(options.scope === 'agent' && options.home ? ['home_files'] : []), ...(options.improveSkills ? [skills] : [])];
   const loaded: LoadedTool[] = names.map(name => {
-    const definitions = options.definitions.filter(item => item.name === name);
+    const definitions = name === 'home_files' ? [learningHomeDefinition] : options.definitions.filter(item => item.name === name);
     if (definitions.length !== 1) throw new Error(`Missing or ambiguous learning tool definition: ${name}`);
     return {
       definition: definitions[0]!,
@@ -30,6 +32,7 @@ export function createLearningToolsPlugins(options: LearningToolsOptions): reado
         if (context.sessionId !== options.sessionId || context.abortSignal.aborted) {
           return { success: false, error: 'Learning execution context is no longer authorized' };
         }
+        if (name === 'home_files') return options.home!(input);
         return name === 'session_search' ? options.search(input) : options.knowledge(name, input);
       },
     };

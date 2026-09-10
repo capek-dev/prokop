@@ -59,6 +59,7 @@ export async function executeLearningComposition(
         preconfig: {
           ...input.preconfig,
           tools: [input.scope === 'agent' ? 'agent_memory' : 'memory', 'session_search',
+            ...(input.scope === 'agent' && input.home ? ['home_files'] : []),
             ...(input.improveSkills ? [input.scope === 'agent' ? 'agent_skill_manage' : 'skill_manage'] : [])],
           canSpawnSubagents: false, allowSelfAsSubagent: false,
         },

@@ -9,7 +9,7 @@ import { seedSession, seedWorkspace } from '#tests/seed';
 
 afterEach(resetTestDatabase);
 
-test('full learning composition suppresses domain fallbacks during tool building and preserves foreground host', async () => {
+test.each(['workspace', 'agent'] as const)('full %s composition suppresses domain fallbacks and preserves foreground host', async scope => {
   setupTestDatabase();
   seedWorkspace({ id: 'ws', settings: {
     memory: { enabled: true, permissionRisk: 'high' },
@@ -23,7 +23,7 @@ test('full learning composition suppresses domain fallbacks during tool building
   let executed = false;
   const preconfig = { id: 'dev', name: 'Developer', model: 'test', provider: 'test', tools: ['shell'], canSpawnSubagents: true } as Preconfig;
   await executeLearningComposition({
-    sessionId: 'review', workspaceId: 'ws', workspacePath: '/test', scope: 'workspace', improveSkills: false,
+    sessionId: 'review', workspaceId: 'ws', workspacePath: '/test', scope, improveSkills: false, home: async () => ({ success: true }),
     definitions: listDomainToolFallbackDefinitions(), preconfig, systemPrompt: 'Scoped policy', prompt: 'Review',
     signal: new AbortController().signal,
     knowledge: async () => ({ success: true }), search: async () => ({ success: true }),
@@ -35,7 +35,7 @@ test('full learning composition suppresses domain fallbacks during tool building
       toolNames: options.preconfig.tools!, sessionId: 'review', workspaceId: 'ws', workspacePath: '/test',
       modelId: 'test', providerId: 'test', canSpawnSubagents: false,
     });
-    expect(Object.keys(tools).sort()).toEqual(['memory', 'session_search']);
+    expect(Object.keys(tools).sort()).toEqual(scope === 'agent' ? ['agent_memory', 'home_files', 'session_search'] : ['memory', 'session_search']);
     return { parts: [] };
   });
   expect(executed).toBe(true);

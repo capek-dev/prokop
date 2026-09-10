@@ -5,6 +5,8 @@ import { withKnowledgeMutationLock } from '@capekai/core/hosts';
 import type { KnowledgeFilePort } from '@/application/learning/knowledge-journal';
 import type { KnowledgeSnapshot, KnowledgeStagingPort } from '@/application/learning/knowledge-staging';
 
+import { isLearningHomePath } from './learning-home-policy';
+
 const MAX_BYTES = 1_048_576;
 
 function missing(error: unknown): boolean {
@@ -24,7 +26,8 @@ async function validatePath(path: string): Promise<void> {
   }
 }
 
-function validName(kind: 'memory' | 'skills', path: string): boolean {
+function validName(kind: 'memory' | 'skills' | 'home', path: string): boolean {
+  if (kind === 'home') return isLearningHomePath(path);
   return kind === 'memory'
     ? path === 'USER.md' || path === 'MEMORY.md'
     : /^[a-zA-Z0-9_-]+\/SKILL\.md$/.test(path);
@@ -35,7 +38,9 @@ async function read(path: string): Promise<string | null> {
   try {
     const stat = await lstat(path);
     if (!stat.isFile() || stat.size > MAX_BYTES) throw new Error('Invalid or oversized knowledge file');
-    return await readFile(path, 'utf8');
+    const bytes = await readFile(path);
+    if (stat.nlink !== 1 || bytes.includes(0)) throw new Error('Linked or binary knowledge file');
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch (error: unknown) {
     if (missing(error)) return null;
     throw error;
@@ -72,6 +77,7 @@ async function snapshot(root: string, kind: 'memory' | 'skills'): Promise<Knowle
 export function createLearningKnowledgeFiles(options: {
   memoryDirectory: string;
   skillsDirectory: string;
+  homeDirectory?: string;
   authorize(): Promise<void>;
 }): KnowledgeFilePort & Pick<KnowledgeStagingPort, 'snapshot' | 'create'> {
   const roots = { memory: resolve(options.memoryDirectory), skills: resolve(options.skillsDirectory) };
@@ -79,6 +85,9 @@ export function createLearningKnowledgeFiles(options: {
     const slash = relativePath.indexOf('/');
     const kind = relativePath.slice(0, slash);
     const name = relativePath.slice(slash + 1);
+    if (kind === 'home' && options.homeDirectory && validName('home', name)) {
+      return { root: resolve(options.homeDirectory), path: join(resolve(options.homeDirectory), name) };
+    }
     if ((kind !== 'memory' && kind !== 'skills') || !validName(kind, name)) throw new Error('Invalid knowledge destination');
     return { root: roots[kind], path: join(roots[kind], name) };
   }
@@ -92,7 +101,7 @@ export function createLearningKnowledgeFiles(options: {
       return withKnowledgeMutationLock(destination.root, async () => {
         await options.authorize();
         if (await read(destination.path) !== expected) return false;
-        if (replacement !== null && Buffer.byteLength(replacement) > MAX_BYTES) throw new Error('Knowledge file exceeds review budget');
+        if (replacement !== null && (replacement.includes('\0') || Buffer.byteLength(replacement) > MAX_BYTES)) throw new Error('Knowledge file exceeds review budget');
         await validatePath(destination.path);
         if (replacement === null) {
           await options.authorize();
