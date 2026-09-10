@@ -25,7 +25,7 @@ function mount() {
 
 test('shows exact changes and stale undo failure without reporting success', async () => {
   const user = userEvent.setup(); mount();
-  await user.click(await screen.findByRole('button', { name: /failed/ }));
+  await user.click(await screen.findByRole('button', { name: /failed/i }));
   await user.click(await screen.findByText('memory/MEMORY.md (applied)'));
   expect(screen.getByText('Before', { selector: 'pre' })).toBeInTheDocument();
   expect(screen.getByText('After', { selector: 'pre' })).toBeInTheDocument();
