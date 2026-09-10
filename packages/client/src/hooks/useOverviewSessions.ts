@@ -120,6 +120,7 @@ export function useOverviewSessions({
         && !session.parentId
         && session.status === 'active'
         && !session.metadata?.scheduledJobId
+        && !session.metadata?.learningRunId
       ) {
         grouped[session.workspaceId].push(session);
       }

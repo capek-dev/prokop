@@ -124,7 +124,7 @@ export const useSidebarData = (): UseSidebarDataReturn => {
 
   // Separate active, archived, and scheduled sessions (only root sessions, no parent)
   const { activeSessions, archivedSessions, scheduledSessionsByJob } = useMemo(() => {
-    const rootSessions = sessions.filter((s) => !s.parentId);
+    const rootSessions = sessions.filter((s) => !s.parentId && !s.metadata?.learningRunId);
     const scheduled = rootSessions.filter((s) => s.metadata?.scheduledJobId);
     const scheduledJobIds = new Set(scheduled.map((s) => s.metadata?.scheduledJobId as string));
 

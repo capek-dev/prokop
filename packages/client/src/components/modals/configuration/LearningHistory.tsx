@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import type { LearningRunSummary } from '@prokopai/sdk';
 import { cn } from '@/lib/utils';
+import { useServerDataStore } from '@/stores/serverDataStore';
 
 const STATUS_META: Record<LearningRunSummary['status'], { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   running: { label: 'Running', variant: 'default' },
@@ -38,6 +39,11 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
     onSettled: () => { void cache.invalidateQueries({ queryKey: key }); },
   });
 
+  const reviewerName = useServerDataStore(state => {
+    const workspace = state.workspaces.find(item => item.id === workspaceId);
+    const reviewer = workspace?.settings.learning?.reviewers.find(item => item.id === detail.data?.run.reviewerId);
+    return state.preconfigs.find(item => item.id === reviewer?.preconfigId)?.name;
+  });
   const error = runs.error ?? detail.error ?? mutation.error;
 
   return (
@@ -84,7 +90,7 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-col gap-0.5">
                 <Label>Review details</Label>
-                <p className="text-xs text-muted-foreground">Reviewer: {detail.data.run.reviewerId}</p>
+                <p className="text-xs text-muted-foreground">Reviewer: {reviewerName ?? 'Unavailable reviewer'}</p>
               </div>
               <RunStatusBadge status={detail.data.run.status} />
             </div>
@@ -133,7 +139,7 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
                 {detail.data.sources.map(source => (
                   <Link key={source.messageId} className="w-fit text-sm text-primary underline-offset-4 hover:underline"
                     to="/server/$serverId/workspace/session/$sessionId" params={{ serverId, sessionId: source.sessionId }}>
-                    Source: {source.sessionId}
+                    {source.title?.trim() || 'Untitled conversation'}
                   </Link>
                 ))}
               </div>

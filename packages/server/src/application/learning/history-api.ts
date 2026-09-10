@@ -34,7 +34,9 @@ export function createLearningHistoryApi(deps: {
     const changes = repository.changes(runId).map(c => ({ id: c.id, path: c.relative_path, before: c.before_content,
       after: c.after_content, status: c.status, undoPending: repository.hasUndoIntent(c.id) }));
     return { run: summary(run), changes,
-      sources: repository.sources(runId).filter(e => deps.eligible(scope, e.message_id)).map(e => ({ sessionId: e.session_id, messageId: e.message_id })),
+      sources: repository.sources(runId).filter(e => deps.eligible(scope, e.message_id)).map(e => ({
+        sessionId: e.session_id, messageId: e.message_id, title: deps.session(e.session_id)?.title ?? null,
+      })),
       revision: createHash('sha256').update(JSON.stringify([run, changes, repository.isResolved(runId)])).digest('hex') };
   }
   return {

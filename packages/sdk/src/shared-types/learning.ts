@@ -21,7 +21,7 @@ export interface LearningChange {
 export interface LearningRunDetail {
   run: LearningRunSummary;
   changes: LearningChange[];
-  sources: Array<{ sessionId: string; messageId: string }>;
+  sources: Array<{ sessionId: string; messageId: string; title?: string | null }>;
   revision: string;
 }
 

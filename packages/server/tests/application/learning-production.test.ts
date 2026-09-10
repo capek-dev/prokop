@@ -28,7 +28,7 @@ async function fixture(personal = false, execute?: LearningExecutionDependencies
     await mkdir(join(root, 'home'));
     seedWorkspace({ id: 'dev-home', path: join(root, 'home'), settings: { ...settings, isAgentHome: true, agentId: 'dev' } });
   }
-  seedSession('ws', { id: 'source' });
+  seedSession('ws', { id: 'source', title: 'Fix retry handling' });
   const now = Date.now() - 120_000;
   db.run(`INSERT INTO messages (id,session_id,role,created_at,status,agent,completed_at,sequence) VALUES ('answer','source','assistant',?,'completed','dev',?,0)`, [now, now]);
   let reviewSession = '';
@@ -92,7 +92,11 @@ test('production startup discovers, creates protected session, writes knowledge,
   expect(runs.runs[0].status).toBe('completed');
   const runId = runs.runs[0].id;
   const detail = await (await f.app.request(`/api/workspaces/ws/learning/runs/${runId}`)).json() as LearningRunDetail;
-  expect(detail.sources).toEqual([{ sessionId: 'source', messageId: 'answer' }]);
+  expect(detail.sources).toEqual([{ sessionId: 'source', messageId: 'answer', title: 'Fix retry handling' }]);
+  updateSession('source', { title: 'Updated conversation title' });
+  expect(learning!.api.detail('ws', runId).sources[0].title).toBe('Updated conversation title');
+  updateSession('source', { metadata: { learning: { excluded: true, includeAutomated: false } } });
+  expect(learning!.api.detail('ws', runId).sources).toEqual([]);
   expect(detail.changes[0].after).toBe('- Verified production lesson');
   const undo = await f.app.request(`/api/workspaces/ws/learning/runs/${runId}/changes/${detail.changes[0].id}/undo`, { method: 'POST' });
   expect(await undo.json()).toEqual({ result: 'undone' });

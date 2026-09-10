@@ -22,6 +22,8 @@ import {
 } from '@/infrastructure/sqlite/queued-messages';
 import { createAttachment } from '@/infrastructure/sqlite/attachments';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
+import { getDatabase } from '@/infrastructure/sqlite/database';
+import { createLearningEvidenceReader } from '@/infrastructure/sqlite/learning-evidence';
 import { seedWorkspaceWithSession } from '#tests/seed';
 import { resetTestDataDir, setupTestDataDir } from '#tests/test-dir';
 import { installTestWireApplication } from '#tests/wire-application';
@@ -149,6 +151,26 @@ describe.serial('Phase 2 orchestration behavior', () => {
     deactivateSandbox();
     resetTestDatabase();
     resetTestDataDir();
+  });
+
+  test('ordinary chat persists attribution used by personal learning', async () => {
+    updateSession(sessionId, { agentId: 'different-owner' });
+    setTextResponses(1);
+    const router = createRouterContext();
+    await handleChat(router.ctx, router.ws, sessionId, 'Explain TypeScript');
+
+    const assistants = listMessagesWithParts(sessionId).filter(({ message }) => message.role === 'assistant');
+    expect(assistants).toHaveLength(1);
+    const message = assistants[0]!.message;
+    expect(message).toMatchObject({ agent: testPreconfig.id, status: 'completed' });
+    const reader = createLearningEvidenceReader(getDatabase(), {
+      kind: 'agent', agentId: testPreconfig.id, sources: { mode: 'all' },
+    });
+    expect(reader.eligible(message.id)).toBe(true);
+    const other = createLearningEvidenceReader(getDatabase(), {
+      kind: 'agent', agentId: 'different-owner', sources: { mode: 'all' },
+    });
+    expect(other.eligible(message.id)).toBe(false);
   });
 
   test('persists and broadcasts interrupted orchestrator status after abort failure', async () => {
