@@ -80,7 +80,10 @@ import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
 import { getDataDir } from '@/infrastructure/runtime/paths';
 
+import { createWiredLearning } from './learning';
+
 export interface WiredApplication {
+  learning: ReturnType<typeof createWiredLearning>;
   session: SessionApplication<ConnectionId>;
   control: SessionControlApplication<ConnectionId>;
   http: SessionHttpApplication;
@@ -280,5 +283,5 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
 
   installTerminalSessionStore(createJean2TerminalSessionPort());
 
-  return { session, control, http, scheduling, schedulerTicker, agents, workspaces, worktrees, tools, mcp, providers, notifications, permissions, files, configuration, maintenance, responseFormats };
+  return { learning: createWiredLearning(agents), session, control, http, scheduling, schedulerTicker, agents, workspaces, worktrees, tools, mcp, providers, notifications, permissions, files, configuration, maintenance, responseFormats };
 }

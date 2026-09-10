@@ -122,6 +122,8 @@ export function listAgentHomeWorkspaces(): Workspace[] {
     .filter(w => isAgentHomeWorkspace(w.settings));
 }
 
+import { notifyLearningActivity } from '@/application/learning/activity';
+
 export function updateWorkspace(
   id: string,
   updates: { name?: string; path?: string; additionalPaths?: string[]; settings?: WorkspaceSettings },
@@ -163,6 +165,7 @@ export function updateWorkspace(
   const row = db.query('SELECT * FROM workspaces WHERE id = ?').get(id) as WorkspaceRow | undefined;
   if (!row) return null;
   const pathMap = batchLoadWorkspacePaths([row.id]);
+  notifyLearningActivity();
   return mapRowToWorkspace(row, pathMap.get(row.id));
 }
 
@@ -207,6 +210,7 @@ export function removeWorkspaceAdditionalPath(workspaceId: string, path: string)
 export function deleteWorkspace(id: string): boolean {
   const db = getDatabase();
   const result = db.run('DELETE FROM workspaces WHERE id = ?', [id]);
+  if (result.changes > 0) notifyLearningActivity();
   return result.changes > 0;
 }
 

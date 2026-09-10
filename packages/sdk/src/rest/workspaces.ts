@@ -34,6 +34,26 @@ interface GetOptions {
 export class WorkspacesRestNamespace {
   constructor(private http: HttpClient) {}
 
+  async learningRuns(id: string, options?: GetOptions): Promise<{ runs: import('../shared').LearningRunSummary[]; blocked: boolean }> {
+    return this.http.get(`/workspaces/${encodeURIComponent(id)}/learning/runs`, options);
+  }
+
+  async learningRun(id: string, runId: string, options?: GetOptions): Promise<import('../shared').LearningRunDetail> {
+    return this.http.get(`/workspaces/${encodeURIComponent(id)}/learning/runs/${encodeURIComponent(runId)}`, options);
+  }
+
+  async undoLearningChange(id: string, runId: string, changeId: string): Promise<{ result: string }> {
+    return this.http.post(`/workspaces/${encodeURIComponent(id)}/learning/runs/${encodeURIComponent(runId)}/changes/${encodeURIComponent(changeId)}/undo`, {});
+  }
+
+  async keepLearningFiles(id: string, runId: string, revision: string): Promise<{ success: boolean }> {
+    return this.http.post(`/workspaces/${encodeURIComponent(id)}/learning/runs/${encodeURIComponent(runId)}/keep-current`, { revision });
+  }
+
+  async previewLearning(id: string, settings: import('../shared').WorkspaceLearningSettings, reviewerId: string): Promise<{ prompt: string }> {
+    return this.http.post(`/workspaces/${encodeURIComponent(id)}/learning/preview`, { settings, reviewerId });
+  }
+
   async list(options?: ListOptions): Promise<ListWorkspacesResponse> {
     return this.http.get('/workspaces', { signal: options?.signal });
   }

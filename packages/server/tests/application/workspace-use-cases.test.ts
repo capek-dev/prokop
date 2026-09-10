@@ -313,6 +313,25 @@ describe('workspace application use cases', () => {
     });
   });
 
+  test('settings updates disable learning when a required dependency is disabled', () => {
+    const state = makeState();
+    state.workspaces.set('ws-1', makeWorkspace());
+    const application = makeApplication(state);
+    const settings: WorkspaceSettings = {
+      memory: { enabled: true, permissionRisk: 'low' },
+      sessionSearch: { enabled: false, permissionRisk: 'low', includeToolResults: false },
+      learning: {
+        enabled: true, improveSkills: false, instructions: '', sources: { mode: 'all' },
+        reviewers: [{ id: 'reviewer', preconfigId: 'developer', instructions: '', modelOverride: null, cadence: null }],
+      },
+    };
+    const result = application.update('ws-1', { settings });
+    expect(result.kind).toBe('ok');
+    expect(state.workspaces.get('ws-1')?.settings.learning?.enabled).toBe(false);
+    expect(state.workspaces.get('ws-1')?.settings.sessionSearch?.enabled).toBe(false);
+    expect(settings.learning?.enabled).toBe(true);
+  });
+
   test('delete performs the exact cleanup ordering and reports deleted sessions', async () => {
     const state = makeState();
     state.workspaces.set('ws-1', makeWorkspace({ path: '/ws-path' }));

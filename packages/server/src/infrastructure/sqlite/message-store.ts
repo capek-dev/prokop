@@ -5,6 +5,7 @@
  */
 
 import { getDatabase } from './database';
+import { notifyLearningActivity } from '@/application/learning/activity';
 import { getSession } from './session-store';
 import { createFtsProjector } from '@/infrastructure/session-search/fts-projector';
 import type { Message, MessageWithParts, Part, ToolPart } from '@prokopai/sdk';
@@ -50,7 +51,9 @@ function repo(): MessageStorePort {
 }
 
 export function createMessage(message: Message): Message {
-  return repo().createMessage(message);
+  const result = repo().createMessage(message);
+  notifyLearningActivity();
+  return result;
 }
 
 export function getMessage(id: string): Message | null {
@@ -62,7 +65,9 @@ export function updateMessage(
   updates: Partial<Message>,
   options?: { syncFts?: boolean },
 ): Message | null {
-  return repo().updateMessage(id, updates, options);
+  const result = repo().updateMessage(id, updates, options);
+  if ('status' in updates) notifyLearningActivity();
+  return result;
 }
 
 export function listMessages(sessionId: string): Message[] {
@@ -70,11 +75,15 @@ export function listMessages(sessionId: string): Message[] {
 }
 
 export function deleteMessages(sessionId: string): number {
-  return repo().deleteMessages(sessionId);
+  const result = repo().deleteMessages(sessionId);
+  if (result > 0) notifyLearningActivity();
+  return result;
 }
 
 export function deleteMessage(messageId: string): boolean {
-  return repo().deleteMessage(messageId);
+  const result = repo().deleteMessage(messageId);
+  if (result) notifyLearningActivity();
+  return result;
 }
 
 export function createPart(

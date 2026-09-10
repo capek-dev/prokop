@@ -217,6 +217,8 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
         }
       };
 
+      try { await application.learning.stop(); }
+      catch (error: unknown) { failures.push(error); }
       attempt(() => transport.shutdown());
       attempt(() => application.schedulerTicker.stop());
       attempt(() => stopPushRetryScheduler());
@@ -242,6 +244,8 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
 
   try {
     await initializeJean2ExecutionScope();
+    // Recovery and subscription are complete before accepting HTTP mutations.
+    await application.learning.start();
     server = Bun.serve({
       port: tlsPort ?? port,
       hostname: host,

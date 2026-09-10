@@ -56,6 +56,10 @@ interface ListByWorkspaceOptions {
 export class SessionsRestNamespace {
   constructor(private http: HttpClient) {}
 
+  async setLearning(id: string, settings: import('../shared').SessionLearningSettings): Promise<UpdateSessionResponse> {
+    return this.http.patch(`/sessions/${encodeURIComponent(id)}/learning`, settings);
+  }
+
   async list(options?: ListOptions): Promise<ListSessionsResponse> {
     return this.http.get('/sessions', {
       params: options?.status ? { status: options.status } : undefined,

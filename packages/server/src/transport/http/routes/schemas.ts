@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { learningSettingsSchema } from '@/domains/learning/settings';
 
 // ── Shared primitives ──────────────────────────────────────────
 
@@ -17,19 +18,24 @@ export const jobIdParam = z.object({
 
 // ── Session schemas ────────────────────────────────────────────
 
+const clientSessionMetadata = z.record(z.string(), z.unknown()).refine(
+  metadata => !Object.hasOwn(metadata, 'learningRunId'),
+  'Learning origin is server-owned',
+).nullable().optional();
+
 export const createSessionSchema = z.object({
   id: z.string().optional(),
   workspaceId: z.string().optional(),
   workspaceRootId: z.string().min(1).optional(),
   preconfigId: z.string().nullable().optional(),
   title: z.string().optional(),
-  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+  metadata: clientSessionMetadata,
 }).loose();
 
 export const updateSessionSchema = z.object({
   title: z.string().nullable().optional(),
   status: z.enum(['active', 'closed']).optional(),
-  metadata: z.record(z.string(), z.unknown()).nullable().optional(),
+  metadata: clientSessionMetadata,
   tags: z.array(z.string()).optional(),
   autoApproveSeverity: z.enum(['off', 'none', 'low', 'medium', 'high']).nullable().optional(),
 }).loose();
@@ -246,6 +252,8 @@ const riskLevel = z.enum(['none', 'low', 'medium', 'high', 'critical']);
 const severity = z.enum(['off', 'none', 'low', 'medium', 'high']);
 
 export const workspaceSettingsSchema = z.object({
+  learning: learningSettingsSchema.optional(),
+  allowPersonalLearning: z.boolean().optional(),
   memory: z.object({
     enabled: z.boolean(),
     permissionRisk: riskLevel,

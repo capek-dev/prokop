@@ -1,5 +1,7 @@
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
+import { dirname } from 'node:path';
+import { withKnowledgeMutationLock } from '@capekai/core/hosts';
 import type { AgentDirectoryPort } from '@/application/ports/agents';
 
 /**
@@ -43,7 +45,7 @@ export function createAgentDirectoryPort(): AgentDirectoryPort {
     },
 
     async writeFile(path, content) {
-      await writeFile(path, content, 'utf-8');
+      await withKnowledgeMutationLock(dirname(path), () => writeFile(path, content, 'utf-8'));
     },
   };
 }

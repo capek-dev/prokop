@@ -49,6 +49,30 @@ describe('workspaces store', () => {
     });
   });
 
+  test('round-trips learning reviewers and privacy through existing settings storage', () => {
+    createWorkspace({
+      id: 'learning-ws', name: 'Learning', path: '/learning', isVirtual: false,
+      settings: {
+        allowPersonalLearning: false,
+        learning: {
+          enabled: false, improveSkills: true, instructions: 'Local conventions',
+          sources: { mode: 'selected', workspaceIds: ['source-ws'] },
+          reviewers: [{
+            id: 'reviewer', preconfigId: 'developer', instructions: 'Architecture', cadence: null,
+            modelOverride: { providerId: 'provider', modelId: 'model', variant: 'low' },
+          }],
+        },
+      },
+    });
+    const before = getWorkspace('learning-ws')!;
+    updateWorkspace('learning-ws', { name: 'Renamed' });
+    expect(getWorkspace('learning-ws')?.settings).toEqual(before.settings);
+    expect(before.settings.allowPersonalLearning).toBe(false);
+    expect(before.settings.learning?.reviewers[0]?.modelOverride).toEqual({
+      providerId: 'provider', modelId: 'model', variant: 'low',
+    });
+  });
+
   describe('getWorkspace', () => {
     test('returns workspace by id', () => {
       seedWorkspace({ id: 'ws1' });

@@ -5,6 +5,7 @@ import type {
   Workspace,
   WorkspaceSettings,
 } from '@prokopai/sdk';
+import { enforceLearningDependencies } from '@/domains/learning/settings';
 import type {
   WorkspaceCleanupPort,
   WorkspaceDirectoryPort,
@@ -248,7 +249,7 @@ export function createWorkspaceApplication(deps: WorkspaceApplicationDeps): Work
         name: updates.name,
         path: validatedPath,
         additionalPaths: validatedPaths,
-        settings: updates.settings,
+        settings: updates.settings === undefined ? undefined : enforceLearningDependencies(updates.settings),
       });
       if (!workspace) {
         return { kind: 'missing' };

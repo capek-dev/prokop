@@ -5,6 +5,7 @@
  */
 
 import { getDatabase } from './database';
+import { notifyLearningActivity } from '@/application/learning/activity';
 import type { Session, SessionStatus, Workspace } from '@prokopai/sdk';
 import { getWorkspace } from './workspaces';
 import { deleteAttachmentsForSession, deleteAttachmentsForWorkspace } from './attachments';
@@ -50,6 +51,7 @@ function buildHooks(): SessionMessageRepositoryHooks {
     events: {
       publish(event) {
         if (event.type === 'session.deleted') removeSessionFromFts(getDatabase(), event.sessionId);
+        notifyLearningActivity();
       },
     },
     deleteAttachmentsForSession,
@@ -70,7 +72,14 @@ function repo(): SessionStorePort {
 export function createSession(
   session: Omit<Session, 'createdAt' | 'updatedAt'> & { createdAt?: string; updatedAt?: string },
 ): Session {
-  return repo().createSession(session);
+  const created = getDatabase().transaction(() => {
+    const result = repo().createSession(session);
+    if (session.parentId) getDatabase().run(`INSERT OR IGNORE INTO learning_session_origins (session_id, run_id)
+      SELECT ?, run_id FROM learning_session_origins WHERE session_id = ?`, [session.id, session.parentId]);
+    return result;
+  })();
+  notifyLearningActivity();
+  return created;
 }
 
 export function getSession(id: string): Session | null {
@@ -95,7 +104,9 @@ export function updateSession(
   id: string,
   updates: Partial<Pick<Session, 'title' | 'status' | 'metadata' | 'preconfigId' | 'selectedModel' | 'selectedProvider' | 'selectedVariant' | 'promptTokens' | 'completionTokens' | 'totalTokens' | 'cacheReadTokens' | 'cacheWriteTokens' | 'noCacheTokens' | 'parentId' | 'agentName' | 'subagentStatus' | 'runningAt' | 'compacting' | 'tags' | 'autoApproveSeverity' | 'agentId' | 'workspaceRootId'>>,
 ): Session | null {
-  return repo().updateSession(id, updates);
+  const result = repo().updateSession(id, updates);
+  notifyLearningActivity();
+  return result;
 }
 
 export function cleanupWorkspaceSessionsOutputDirs(workspaceId: string): void {

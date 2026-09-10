@@ -27,6 +27,7 @@ import { createWiredApplication, type WiredApplication } from '@/bootstrap/appli
 
 // Route modules
 import { registerSessionRoutes } from '@/transport/http/routes/sessions';
+import { registerLearningRoutes } from '@/transport/http/routes/learning';
 import { registerWorkspaceRoutes } from '@/transport/http/routes/workspaces';
 import { registerWorktreeRoutes } from '@/transport/http/routes/worktrees';
 import { registerFileRoutes } from '@/transport/http/routes/files';
@@ -132,6 +133,7 @@ export function createApp(application?: WiredApplication, options?: CreateAppOpt
 
   registerSessionRoutes(app, wired.http);
   registerWorkspaceRoutes(app, wired.workspaces);
+  registerLearningRoutes(app, wired.learning.api);
   registerWorktreeRoutes(app, wired.worktrees);
   registerFileRoutes(app, wired.files);
   registerToolRoutes(app, wired.tools);

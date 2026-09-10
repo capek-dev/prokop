@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { useCompletionStore, selectCompletionRecord, COMPLETION_FLASH_DURATION_MS } from '@/stores/completionStore';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import { useSdkClient } from '@/contexts/ServerClientContext';
+import { SessionLearningMenu } from './SessionLearningMenu';
 import { useWorktreesQuery } from '@/hooks/queries';
 import { getSessionWorktreeLabel, resolveSessionWorktree } from '@/lib/sessionWorktree';
 
@@ -139,6 +140,7 @@ const SessionActionsDropdown = React.memo(function SessionActionsDropdown({
         </SidebarMenuAction>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-52">
+        <SessionLearningMenu sessionId={sessionId} />
         {onOpenAlongside && (
           <DropdownMenuItem onClick={onOpenAlongside}>
             <Columns2 className="size-4" />

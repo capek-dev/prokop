@@ -9,6 +9,7 @@ import { providerHandlers } from '@/handlers/serverMessage';
 import { askHandlers } from '@/handlers/serverMessage';
 import { controlHandlers } from '@/handlers/serverMessage';
 import { worktreeHandlers } from '@/handlers/serverMessage';
+import { queryClient } from '@/components/providers/QueryProvider';
 import { handleGitChanged } from '@/handlers/serverMessage/gitHandlers';
 import { useChatRetryStore } from '@/stores/chatRetryStore';
 import { useConnectionStore } from '@/stores/connectionStore';
@@ -80,6 +81,9 @@ export function subscribeToServerEvents(
   });
   add('session.state', (sessionId: unknown, messages: unknown) => {
     sessionHandlers['session.state']({ type: 'session.state', sessionId: sessionId as string, messages: messages as MessageWithParts[] }, ctx()!);
+  });
+  add('learning.changed', (workspaceId: unknown) => {
+    if (typeof workspaceId === 'string') void queryClient.invalidateQueries({ queryKey: ['learning', workspaceId] });
   });
   add('git.changed', (workspaceId: unknown) => {
     if (typeof workspaceId === 'string') handleGitChanged(workspaceId);

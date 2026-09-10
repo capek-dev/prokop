@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { Brain, Wrench, Search, Workflow, Server, Shield, FolderSymlink, Clock, ShieldCheck, Cog, Loader2 } from 'lucide-react';
 import type { Workspace, WorkspaceSettings, PermissionRiskLevel, PermissionGrant, ProkopaiClient, AutoApproveSeverity } from '@prokopai/sdk';
+import { learningValidationError } from '@/lib/learningValidation';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { Button } from '@/components/ui/button';
 import { DialogFooter } from '@/components/ui/dialog';
@@ -17,7 +18,9 @@ const AdditionalPathsPanel = lazy(() => import('./configuration/AdditionalPathsP
 const AutoApprovePanel = lazy(() => import('./configuration/AutoApprovePanel').then((m) => ({ default: m.AutoApprovePanel })));
 const WorkspacePreconfigsPanel = lazy(() => import('./configuration/WorkspacePreconfigsPanel').then((m) => ({ default: m.WorkspacePreconfigsPanel })));
 
-type Section = 'mcp' | 'permissions' | 'paths' | 'autoApprove' | 'memory' | 'skills' | 'search' | 'workflow' | 'scheduling' | 'preconfigs';
+const LearningPanel = lazy(() => import('./configuration/LearningPanel').then(m => ({ default: m.LearningPanel })));
+
+type Section = 'learning' | 'mcp' | 'permissions' | 'paths' | 'autoApprove' | 'memory' | 'skills' | 'search' | 'workflow' | 'scheduling' | 'preconfigs';
 
 const SECTIONS: Omit<SettingsSection, 'icon'>[] = [
   { value: 'mcp', label: 'MCP Servers', group: 'general' },
@@ -25,6 +28,7 @@ const SECTIONS: Omit<SettingsSection, 'icon'>[] = [
   { value: 'autoApprove', label: 'Auto-Approve', group: 'general' },
   { value: 'paths', label: 'Additional Paths', group: 'general' },
   { value: 'preconfigs', label: 'Preconfigs', group: 'general' },
+  { value: 'learning', label: 'Learning', group: 'capabilities' },
   { value: 'memory', label: 'Memory', group: 'capabilities' },
   { value: 'skills', label: 'Skills', group: 'capabilities' },
   { value: 'search', label: 'Session Search', group: 'capabilities' },
@@ -39,7 +43,7 @@ const GROUPS = [
 
 /** Sections whose edits are held locally until Save is pressed. */
 const DEFERRED_SAVE_SECTIONS = new Set<Section>([
-  'memory', 'skills', 'search', 'workflow', 'scheduling', 'autoApprove', 'preconfigs',
+  'learning', 'memory', 'skills', 'search', 'workflow', 'scheduling', 'autoApprove', 'preconfigs',
 ]);
 
 const ICONS: Record<Section, SettingsSection['icon']> = {
@@ -48,6 +52,7 @@ const ICONS: Record<Section, SettingsSection['icon']> = {
   autoApprove: ShieldCheck,
   paths: FolderSymlink,
   preconfigs: Cog,
+  learning: Brain,
   memory: Brain,
   skills: Wrench,
   search: Search,
@@ -79,6 +84,8 @@ function snapshot(workspace: Workspace) {
       permissionRisk: s?.sessionSearch?.permissionRisk ?? 'medium' as PermissionRiskLevel,
       includeToolResults: s?.sessionSearch?.includeToolResults ?? false,
     },
+    learning: s?.learning,
+    allowPersonalLearning: s?.allowPersonalLearning !== false,
     workflow: s?.workflow?.enabled ?? false,
     scheduling: { enabled: s?.scheduling?.enabled ?? false, permissionRisk: s?.scheduling?.permissionRisk ?? 'medium' as PermissionRiskLevel },
     autoApprove: s?.autoApproveSeverity ?? 'low' as AutoApproveSeverity,
@@ -120,6 +127,8 @@ export function WorkspaceSettingsDialog({
 
   const saved = useMemo(() => snapshot(workspace), [workspace.settings]);
   const isDirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  const learningError = draft.memory.enabled && draft.search.enabled
+    ? learningValidationError(draft.learning, allPreconfigs.map(p => p.id)) : null;
 
   const sectionsWithIcons = useMemo(
     () => SECTIONS.map((s) => ({ ...s, icon: ICONS[s.value as Section] })) satisfies SettingsSection[],
@@ -127,6 +136,7 @@ export function WorkspaceSettingsDialog({
   );
 
   const handleSave = () => {
+    if (learningError) return;
     onSave(workspace.id, {
       ...workspace.settings,
       memory: { enabled: draft.memory.enabled, permissionRisk: draft.memory.permissionRisk },
@@ -136,6 +146,8 @@ export function WorkspaceSettingsDialog({
         permissionRisk: draft.search.permissionRisk,
         includeToolResults: draft.search.includeToolResults,
       },
+      learning: draft.learning ? { ...draft.learning, enabled: draft.learning.enabled && draft.memory.enabled && draft.search.enabled } : undefined,
+      allowPersonalLearning: draft.allowPersonalLearning,
       workflow: { enabled: draft.workflow },
       scheduling: { enabled: draft.scheduling.enabled, permissionRisk: draft.scheduling.permissionRisk },
       autoApproveSeverity: draft.autoApprove,
@@ -174,6 +186,14 @@ export function WorkspaceSettingsDialog({
               severity={draft.autoApprove}
               onChange={(v) => setDraft((d) => ({ ...d, autoApprove: v }))}
             />;
+          case 'learning':
+            return <LearningPanel workspace={workspace} preconfigs={allPreconfigs} value={draft.learning} allowPersonalLearning={draft.allowPersonalLearning}
+              onPersonalLearningChange={allowPersonalLearning => setDraft(d => ({ ...d, allowPersonalLearning }))}
+              onChange={learning => setDraft(d => ({ ...d, learning,
+                memory: learning.enabled ? { ...d.memory, enabled: true } : d.memory,
+                search: learning.enabled ? { ...d.search, enabled: true } : d.search,
+                skills: learning.enabled && learning.improveSkills ? { ...d.skills, enabled: true } : d.skills,
+              }))} />;
           case 'memory':
             return <MemoryPanel
               enabled={draft.memory.enabled}
@@ -231,7 +251,8 @@ export function WorkspaceSettingsDialog({
           >
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isSaving || !isDirty}>
+          {learningError && <p role="alert" className="text-xs">{learningError}</p>}
+          <Button onClick={handleSave} disabled={isSaving || !isDirty || Boolean(learningError)}>
             {isSaving ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
             {isSaving ? 'Saving...' : isDirty ? 'Save changes' : 'Saved'}
           </Button>

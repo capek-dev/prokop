@@ -28,6 +28,18 @@ export type {
 } from '../shared';
 
 export type { Workspace, WorkspaceSettings, WorkspaceMemorySettings } from '../shared';
+export type {
+  LearningRunSummary,
+  LearningRunDetail,
+  LearningChange,
+  LearningScope,
+  LearningModelOverride,
+  LearningCadence,
+  LearningReviewer,
+  LearningSources,
+  WorkspaceLearningSettings,
+  SessionLearningSettings,
+} from '../shared';
 export type { Preconfig, PreconfigMode } from '../shared';
 export type { PromptInfo } from '../shared';
 
