@@ -95,6 +95,15 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
               <RunStatusBadge status={detail.data.run.status} />
             </div>
 
+            {serverId && detail.data.sessionId && (
+              <Button asChild variant="outline" size="sm" className="w-fit">
+                <Link to="/server/$serverId/workspace/session/$sessionId"
+                  params={{ serverId, sessionId: detail.data.sessionId }} target="_blank" rel="noopener noreferrer">
+                  Open learning session
+                </Link>
+              </Button>
+            )}
+
             {detail.data.run.error && (
               <p role="status" className="rounded-md border bg-muted px-3 py-2 text-sm">{detail.data.run.error}</p>
             )}

@@ -33,7 +33,7 @@ export function createLearningHistoryApi(deps: {
     if (!run || run.workspace_id !== workspaceId) throw new NotFoundError('Learning run not found');
     const changes = repository.changes(runId).map(c => ({ id: c.id, path: c.relative_path, before: c.before_content,
       after: c.after_content, status: c.status, undoPending: repository.hasUndoIntent(c.id) }));
-    return { run: summary(run), changes,
+    return { run: summary(run), sessionId: repository.reviewSessionId(runId), changes,
       sources: repository.sources(runId).filter(e => deps.eligible(scope, e.message_id)).map(e => ({
         sessionId: e.session_id, messageId: e.message_id, title: deps.session(e.session_id)?.title ?? null,
       })),

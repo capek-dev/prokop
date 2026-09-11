@@ -104,6 +104,12 @@ export function createLearningRepository(db: Database) {
 
   return {
     getRun,
+    reviewSessionId(runId: string): string | null {
+      return db.query<{ id: string }, [string]>(`SELECT s.id FROM learning_session_origins o
+        JOIN sessions s ON s.id = o.session_id JOIN learning_runs r ON r.id = o.run_id
+        WHERE o.run_id = ? AND s.parent_id IS NULL AND s.workspace_id = r.workspace_id
+        ORDER BY s.created_at, s.id LIMIT 1`).get(runId)?.id ?? null;
+    },
     isRecovered(runId: string): boolean {
       return db.query('SELECT 1 FROM learning_recoveries WHERE run_id = ?').get(runId) !== null;
     },

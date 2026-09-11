@@ -37,6 +37,20 @@ function mount(available = true) {
   render(<QueryClientProvider client={cache}><LearningHistory workspaceId="ws" /></QueryClientProvider>);
 }
 
+test('opens the review transcript when available', async () => {
+  mocks.detail.mockResolvedValue({ run: { id: 'run', reviewerId: 'reviewer', status: 'completed' }, sessionId: 'review-session', sources: [], changes: [] });
+  const user = userEvent.setup(); mount();
+  await user.click(await screen.findByRole('button', { name: /failed/i }));
+  expect(await screen.findByRole('link', { name: 'Open learning session' })).toHaveAttribute('href', '/server/server/workspace/session/review-session');
+});
+
+test('hides the transcript button for older responses without a session', async () => {
+  const user = userEvent.setup(); mount();
+  await user.click(await screen.findByRole('button', { name: /failed/i }));
+  await screen.findByText('Review details');
+  expect(screen.queryByRole('link', { name: 'Open learning session' })).toBeNull();
+});
+
 test('shows conversation titles with readable fallbacks and keeps session link destinations', async () => {
   const user = userEvent.setup(); mount();
   await user.click(await screen.findByRole('button', { name: /failed/i }));

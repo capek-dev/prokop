@@ -20,6 +20,8 @@ export interface LearningChange {
 
 export interface LearningRunDetail {
   run: LearningRunSummary;
+  /** Review transcript, absent on older servers or when its session is unavailable. */
+  sessionId?: string | null;
   changes: LearningChange[];
   sources: Array<{ sessionId: string; messageId: string; title?: string | null }>;
   revision: string;
