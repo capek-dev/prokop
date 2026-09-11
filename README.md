@@ -93,7 +93,8 @@ Learning updates knowledge files, not model weights. It uses your configured mod
 
 | Area | Capabilities |
 |---|---|
-| **Workspace** | Session board, cross-workspace Overview, files, editor, Git, diffs, persistent terminals |
+| **Workspace** | Session board, cross-workspace Overview, files, editor, diffs, persistent terminals |
+| **Git** | Worktree management, branch creation and switching, commit history and commit diffs, commit, fast-forward pull, push, rebase |
 | **Agents** | Persistent identity, memory, skills, session search, subagents, workflows, scheduled work |
 | **Learning** | Opt-in automatic reviews, shared project and personal knowledge, optional skill improvement, history, diffs, undo |
 | **Control** | Visible tool calls, scoped permissions, auto-approval boundaries, revocable grants |
@@ -103,11 +104,11 @@ Learning updates knowledge files, not model weights. It uses your configured mod
 
 The board displays up to six open session panes. The server is not limited to six sessions.
 
-## Models
+## Providers
 
-Direct support: **OpenAI, OpenRouter, DeepSeek, MiniMax, Zhipu, Zhipu Coding, and Codex subscription authentication.**
+Connect **OpenAI, OpenRouter, DeepSeek, MiniMax, Zhipu, or Zhipu Coding**, or use **Codex subscription authentication**.
 
-Anthropic and Google models may be available through OpenRouter, but Prokop has no direct integrations for those providers.
+Available models depend on the integration and Prokop's supported model configuration. Anthropic and Google models may be available through OpenRouter, but Prokop has no direct integrations for those providers.
 
 ## Prokop and Capek
 
