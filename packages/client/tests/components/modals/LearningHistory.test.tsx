@@ -47,7 +47,7 @@ test('opens the review transcript when available', async () => {
 test('hides the transcript button for older responses without a session', async () => {
   const user = userEvent.setup(); mount();
   await user.click(await screen.findByRole('button', { name: /failed/i }));
-  await screen.findByText('Review details');
+  await screen.findByText('Run details');
   expect(screen.queryByRole('link', { name: 'Open learning session' })).toBeNull();
 });
 
@@ -59,18 +59,18 @@ test('shows conversation titles with readable fallbacks and keeps session link d
   expect(screen.queryByText('source-uuid')).toBeNull();
 });
 
-test('shows the reviewer name instead of its identity', async () => {
+test('shows the learner name instead of its identity', async () => {
   const user = userEvent.setup(); mount();
   await user.click(await screen.findByRole('button', { name: /failed/i }));
-  expect(await screen.findByText('Reviewer: Code reviewer')).toBeInTheDocument();
-  expect(screen.queryByText('Reviewer: reviewer')).toBeNull();
+  expect(await screen.findByText('Learner: Code reviewer')).toBeInTheDocument();
+  expect(screen.queryByText('Learner: reviewer')).toBeNull();
 });
 
-test('uses a readable fallback when the reviewer is unavailable', async () => {
+test('uses a readable fallback when the learner is unavailable', async () => {
   const user = userEvent.setup(); mount(false);
   await user.click(await screen.findByRole('button', { name: /failed/i }));
-  expect(await screen.findByText('Reviewer: Unavailable reviewer')).toBeInTheDocument();
-  expect(screen.queryByText('Reviewer: reviewer')).toBeNull();
+  expect(await screen.findByText('Learner: Unavailable learner')).toBeInTheDocument();
+  expect(screen.queryByText('Learner: reviewer')).toBeNull();
 });
 
 test('shows exact changes and stale undo failure without reporting success', async () => {

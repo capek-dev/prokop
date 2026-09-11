@@ -4,7 +4,7 @@ import { learningValidationError } from '@/lib/learningValidation';
 
 test('learning drafts reject missing reviewers and inconsistent timing without blocking disabled settings', () => {
   const settings: WorkspaceLearningSettings = { enabled: true, reviewers: [], improveSkills: false, instructions: '', sources: { mode: 'all' } };
-  expect(learningValidationError(settings, ['dev'])).toContain('reviewer');
+  expect(learningValidationError(settings, ['dev'])).toContain('learner');
   settings.reviewers.push({ id: 'r', preconfigId: 'dev', instructions: '', modelOverride: null, cadence: null });
   expect(learningValidationError(settings, [])).toContain('available preconfig');
   expect(learningValidationError(settings, ['dev'])).toBeNull();

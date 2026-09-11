@@ -31,7 +31,7 @@ export function SessionLearningMenu({ sessionId }: { sessionId: string }) {
     </DropdownMenuGroup>
     <Dialog open={history} onOpenChange={setHistory}>
       <DialogContent className="flex flex-col overflow-hidden sm:max-w-2xl sm:max-h-[85vh]">
-        <DialogHeader className="shrink-0"><DialogTitle>Learning history</DialogTitle><DialogDescription>Workspace reviews and revision-checked undo.</DialogDescription></DialogHeader>
+        <DialogHeader className="shrink-0"><DialogTitle>Learning history</DialogTitle><DialogDescription>Learning runs and revision-checked undo.</DialogDescription></DialogHeader>
         <div className="dialog-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain"><LearningHistory workspaceId={session.workspaceId} /></div>
       </DialogContent>
     </Dialog>

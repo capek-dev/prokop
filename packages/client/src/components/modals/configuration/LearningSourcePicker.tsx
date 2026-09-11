@@ -18,7 +18,9 @@ export function LearningSourcePicker({ workspaces, selectedIds, onChange }: Lear
     && `${workspace.name} ${workspace.path}`.toLowerCase().includes(query))
     .sort((a, b) => a.name.localeCompare(b.name));
   return <div className="flex min-w-0 flex-col gap-2">
-    <p className="text-xs text-muted-foreground">{selectedIds.length} selected. Only selected eligible workspaces contribute.</p>
+    {selectedIds.length === 0
+      ? <p className="text-xs text-muted-foreground">No sources selected yet. Learning stays idle until you select at least one workspace.</p>
+      : <p className="text-xs text-muted-foreground">{selectedIds.length} selected. Only selected eligible workspaces contribute.</p>}
     <Input aria-label="Search learning sources" placeholder="Search workspaces..." value={search} onChange={event => setSearch(event.target.value)} />
     <div className="dialog-scrollbar max-h-[200px] overflow-y-auto rounded-md border" role="group" aria-label="Workspace sources">
       {visible.map(workspace => {

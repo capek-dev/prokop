@@ -1,14 +1,14 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
+import type { LearningRunSummary } from '@prokopai/sdk';
 import { useServerClient } from '@/contexts/ServerClientContext';
+import { useServerDataStore } from '@/stores/serverDataStore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import type { LearningRunSummary } from '@prokopai/sdk';
 import { cn } from '@/lib/utils';
-import { useServerDataStore } from '@/stores/serverDataStore';
 
 const STATUS_META: Record<LearningRunSummary['status'], { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   running: { label: 'Running', variant: 'default' },
@@ -39,17 +39,25 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
     onSettled: () => { void cache.invalidateQueries({ queryKey: key }); },
   });
 
-  const reviewerName = useServerDataStore(state => {
-    const workspace = state.workspaces.find(item => item.id === workspaceId);
-    const reviewer = workspace?.settings.learning?.reviewers.find(item => item.id === detail.data?.run.reviewerId);
-    return state.preconfigs.find(item => item.id === reviewer?.preconfigId)?.name;
-  });
+  const workspaces = useServerDataStore(state => state.workspaces);
+  const preconfigs = useServerDataStore(state => state.preconfigs);
+  /** Saved settings, not the settings draft: history describes past runs. */
+  const reviewerNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const reviewer of workspaces.find(w => w.id === workspaceId)?.settings?.learning?.reviewers ?? []) {
+      map[reviewer.id] = preconfigs.find(p => p.id === reviewer.preconfigId)?.name ?? 'Unavailable preconfig';
+    }
+    return map;
+  }, [workspaces, preconfigs, workspaceId]);
+  const reviewerLabel = (id: string) => reviewerNameById[id] ?? 'Unavailable learner';
+  const sessionTitle = (title: string | null | undefined) => title?.trim() || 'Untitled conversation';
+
   const error = runs.error ?? detail.error ?? mutation.error;
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <p className="text-xs text-muted-foreground">
-        Latest 100 reviews. Interrupted reviews recover automatically. Excluding a conversation does not remove saved lessons. Undo preserves later edits.
+        Latest 100 learning runs. Interrupted runs recover automatically. Excluding a conversation does not remove saved lessons. Undo preserves later edits.
       </p>
 
       {error && (
@@ -67,14 +75,15 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
         <div className="flex flex-col gap-1" aria-label="Learning runs">
           {runs.data.runs.map(run => {
             const selected = run.id === runId;
-            const flags = [run.recovered ? 'recovered automatically' : null, run.resolved ? 'resolved' : null].filter(Boolean).join(' · ');
+            const meta = [reviewerLabel(run.reviewerId), run.recovered ? 'recovered automatically' : null, run.resolved ? 'resolved' : null]
+              .filter(Boolean).join(' · ');
             return (
               <Button key={run.id} variant="ghost"
                 className={cn('h-auto w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left', selected && 'border-primary/50 bg-accent')}
                 onClick={() => { setRunId(run.id); mutation.reset(); }}>
                 <span className="flex min-w-0 flex-col items-start gap-0.5">
                   <span className="text-sm">{new Date(run.startedAt).toLocaleString()}</span>
-                  {flags && <span className="text-xs text-muted-foreground">{flags}</span>}
+                  <span className="text-xs text-muted-foreground">{meta}</span>
                 </span>
                 <RunStatusBadge status={run.status} />
               </Button>
@@ -89,20 +98,20 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-col gap-0.5">
-                <Label>Review details</Label>
-                <p className="text-xs text-muted-foreground">Reviewer: {reviewerName ?? 'Unavailable reviewer'}</p>
+                <Label>Run details</Label>
+                <p className="text-xs text-muted-foreground">Learner: {reviewerLabel(detail.data.run.reviewerId)}</p>
               </div>
-              <RunStatusBadge status={detail.data.run.status} />
+              <div className="flex items-center gap-2">
+                {serverId && detail.data.sessionId && (
+                  <Link className="text-sm text-primary underline-offset-4 hover:underline"
+                    to="/server/$serverId/workspace/session/$sessionId"
+                    params={{ serverId, sessionId: detail.data.sessionId }}>
+                    Open learning session
+                  </Link>
+                )}
+                <RunStatusBadge status={detail.data.run.status} />
+              </div>
             </div>
-
-            {serverId && detail.data.sessionId && (
-              <Button asChild variant="outline" size="sm" className="w-fit">
-                <Link to="/server/$serverId/workspace/session/$sessionId"
-                  params={{ serverId, sessionId: detail.data.sessionId }} target="_blank" rel="noopener noreferrer">
-                  Open learning session
-                </Link>
-              </Button>
-            )}
 
             {detail.data.run.error && (
               <p role="status" className="rounded-md border bg-muted px-3 py-2 text-sm">{detail.data.run.error}</p>
@@ -148,7 +157,7 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
                 {detail.data.sources.map(source => (
                   <Link key={source.messageId} className="w-fit text-sm text-primary underline-offset-4 hover:underline"
                     to="/server/$serverId/workspace/session/$sessionId" params={{ serverId, sessionId: source.sessionId }}>
-                    {source.title?.trim() || 'Untitled conversation'}
+                    {sessionTitle(source.title)}
                   </Link>
                 ))}
               </div>

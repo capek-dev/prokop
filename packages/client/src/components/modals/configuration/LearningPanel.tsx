@@ -1,18 +1,20 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Eye, History, Plus, X } from 'lucide-react';
+import { ChevronRight, Plus, X } from 'lucide-react';
 import type { LearningCadence, LearningReviewer, Preconfig, Workspace, WorkspaceLearningSettings } from '@prokopai/sdk';
 import { useSdkClient } from '@/contexts/ServerClientContext';
 import { LearningHistory } from './LearningHistory';
 import { LearningModelPicker } from './LearningModelPicker';
 import { LearningSourcePicker } from './LearningSourcePicker';
 import { useServerDataStore } from '@/stores/serverDataStore';
+import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -35,10 +37,43 @@ function defaultCadence(personal: boolean): LearningCadence {
 }
 
 const CADENCE_FIELDS = [
-  { key: 'idleMinutes', label: 'Quiet period', hint: 'Idle minutes before a review starts' },
-  { key: 'minimumIntervalMinutes', label: 'Min interval', hint: 'Minutes between reviews' },
-  { key: 'maximumPendingMinutes', label: 'Max pending age', hint: 'Unreviewed work is picked up after' },
+  { key: 'idleMinutes', label: 'Quiet period' },
+  { key: 'minimumIntervalMinutes', label: 'Min interval' },
+  { key: 'maximumPendingMinutes', label: 'Max pending age' },
 ] as const;
+
+function formatMinutes(minutes: number): string {
+  if (minutes % 1440 === 0) return `${minutes / 1440}d`;
+  if (minutes % 60 === 0) return `${minutes / 60}h`;
+  return `${minutes}m`;
+}
+
+interface TuningCollapsibleProps {
+  label: string;
+  /** Recap of the custom value, shown on the trigger; default sections stay collapsed without one. */
+  summary: string | null;
+  /** Bounded rows sit inside the learner card, flat rows stand alone in agent-home settings. */
+  bordered: boolean;
+  children: ReactNode;
+}
+
+function TuningCollapsible({ label, summary, bordered, children }: TuningCollapsibleProps) {
+  return (
+    <Collapsible defaultOpen={summary !== null}>
+      <CollapsibleTrigger
+        className={cn(
+          'group flex w-full items-center gap-2 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground',
+          bordered ? 'border-t px-3' : 'rounded-md px-2',
+        )}
+      >
+        <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+        <span className="shrink-0">{label}</span>
+        {summary && <span className="ml-auto truncate text-xs" title={summary}>{summary}</span>}
+      </CollapsibleTrigger>
+      <CollapsibleContent className={bordered ? 'px-3 py-3' : 'py-1'}>{children}</CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearning, onChange: onSettingsChange, onPersonalLearningChange }: LearningPanelProps) {
   const client = useSdkClient();
@@ -65,6 +100,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
     instructions: '',
     sources: { mode: 'all' },
   };
+  const singleReviewer = personal ? settings.reviewers[0] : undefined;
   const createReviewer = (): LearningReviewer => ({ id: crypto.randomUUID(), preconfigId: initialId!, instructions: '', modelOverride: null, cadence: null });
   const update = (id: string, change: Partial<LearningReviewer>) =>
     onChange({ ...settings, reviewers: settings.reviewers.map(item => item.id === id ? { ...item, ...change } : item) });
@@ -74,6 +110,63 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
       update(item.id, { cadence: { ...defaults, ...item.cadence, [key]: number } });
     }
   };
+  const learnerModel = (item: LearningReviewer) => (
+    <div className="space-y-1.5">
+      <Label>Model</Label>
+      <LearningModelPicker models={models} preconfig={preconfigs.find(p => p.id === item.preconfigId)} value={item.modelOverride}
+        onChange={modelOverride => update(item.id, { modelOverride })} />
+    </div>
+  );
+
+  /** Focus and timing are rare tuning: collapsed by default, with the custom value recapped on the trigger. */
+  const learnerTuning = (item: LearningReviewer, bordered: boolean) => {
+    const cadence = { ...defaults, ...item.cadence };
+    const timingSummary = item.cadence
+      ? CADENCE_FIELDS.map(field => formatMinutes(cadence[field.key])).join(' · ')
+      : null;
+    return (
+      <>
+        <TuningCollapsible label="Learning focus" summary={item.instructions.trim() || null} bordered={bordered}>
+          <Textarea aria-label="Learning focus" value={item.instructions} maxLength={20_000}
+            placeholder="Optional focus, e.g. 'prefer updating existing notes over creating new ones'"
+            onChange={event => update(item.id, { instructions: event.target.value })} />
+        </TuningCollapsible>
+
+        <TuningCollapsible label="Timing" summary={timingSummary} bordered={bordered}>
+          <div className="space-y-1.5">
+            <div className="grid grid-cols-3 gap-2">
+              {CADENCE_FIELDS.map(field => (
+                <div key={field.key} className="space-y-1">
+                  <Label htmlFor={`cadence-${field.key}-${item.id}`} className="text-xs font-normal text-muted-foreground">{field.label}</Label>
+                  <Input id={`cadence-${field.key}-${item.id}`} type="number" min={1} max={10080}
+                    value={cadence[field.key]}
+                    onChange={event => updateCadence(item, field.key, event.target.value)} />
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Minutes. Quiet period is required idle time, min interval spaces runs apart, max pending age forces a run on unreviewed work.
+            </p>
+          </div>
+        </TuningCollapsible>
+      </>
+    );
+  };
+
+  /** One preview control for both layouts: a quiet link ending the learner's section. */
+  const previewLink = (item: LearningReviewer, bordered: boolean) => {
+    const link = (
+      <button
+        type="button"
+        className="text-xs text-primary underline-offset-4 hover:underline disabled:pointer-events-none disabled:opacity-50"
+        disabled={preview.isPending}
+        onClick={() => preview.mutate(item.id)}
+      >
+        Preview prompt
+      </button>
+    );
+    return bordered ? <div className="border-t px-3 py-2">{link}</div> : link;
+  };
 
   return (
     <div className="flex flex-col gap-6 p-3 sm:p-4">
@@ -82,10 +175,17 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
           <Label htmlFor="learning-enabled">Automatic learning</Label>
           <p className="text-xs text-muted-foreground">
             {personal
-              ? 'Review this agent\'s conversations across eligible projects and save durable improvements.'
-              : 'Review conversations during quiet periods and maintain shared project knowledge.'}{' '}
-            Enabling also turns on Memory and Session search. The first review covers the last seven days.
+              ? "Study this agent's conversations across eligible projects and save durable improvements."
+              : 'Study conversations during quiet periods and maintain shared project knowledge.'}{' '}
+            Enabling also turns on Memory and Session search. The first run covers the last seven days.
           </p>
+          <button
+            type="button"
+            className="w-fit text-xs text-primary underline-offset-4 hover:underline"
+            onClick={() => setHistoryOpen(true)}
+          >
+            Learning history
+          </button>
         </div>
         <Switch
           id="learning-enabled"
@@ -97,8 +197,12 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
 
       {!initialId && (
         <Alert>
-          <AlertTitle>Select a default preconfig first</AlertTitle>
-          <AlertDescription>Learning needs a preconfig to run reviewers. Pick one in the Preconfigs section.</AlertDescription>
+          <AlertTitle>{personal ? 'Agent reference missing' : 'Select a default preconfig first'}</AlertTitle>
+          <AlertDescription>
+            {personal
+              ? 'This agent home has no agent reference, so learning cannot run.'
+              : 'Learning needs a preconfig to run. Pick one in the Preconfigs section.'}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -118,91 +222,71 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
         <>
           <Separator />
 
-          <div className="space-y-3">
-            <div className="space-y-0.5">
-              <Label>Reviewers</Label>
-              <p className="text-xs text-muted-foreground">
-                Each reviewer studies eligible conversations and writes knowledge updates.
-              </p>
-            </div>
+          {personal ? (
+            singleReviewer && (
+              <div className="space-y-3">
+                {learnerModel(singleReviewer)}
+                {learnerTuning(singleReviewer, false)}
+                {previewLink(singleReviewer, false)}
+              </div>
+            )
+          ) : (
+            <div className="space-y-3">
+              <div className="space-y-0.5">
+                <Label>Learners</Label>
+                <p className="text-xs text-muted-foreground">
+                  Each learner studies eligible conversations and writes knowledge updates.
+                </p>
+              </div>
 
-            {settings.reviewers.map((item, index) => {
-              const cadence = { ...defaults, ...item.cadence };
-              const preconfig = preconfigs.find(p => p.id === item.preconfigId);
-              return (
-                <div key={item.id} className="space-y-4 rounded-md border p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">
-                      Reviewer {index + 1}{preconfig ? ` · ${preconfig.name}` : ''}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" disabled={preview.isPending} onClick={() => preview.mutate(item.id)}>
-                        <Eye className="size-4" /> Preview prompt
-                      </Button>
-                      {!personal && settings.reviewers.length > 1 && (
-                        <Button variant="ghost" size="icon-sm" aria-label="Remove reviewer"
-                          onClick={() => onChange({ ...settings, reviewers: settings.reviewers.filter(other => other.id !== item.id) })}>
-                          <X className="size-4" />
-                        </Button>
-                      )}
+              {settings.reviewers.map((item, index) => {
+                const preconfig = preconfigs.find(p => p.id === item.preconfigId);
+                return (
+                  <div key={item.id} className="rounded-md border">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                      <span className="truncate text-sm font-medium">
+                        Learner {index + 1}{preconfig ? ` · ${preconfig.name}` : ''}
+                      </span>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {settings.reviewers.length > 1 && (
+                          <Button variant="ghost" size="icon-sm" aria-label="Remove learner"
+                            onClick={() => onChange({ ...settings, reviewers: settings.reviewers.filter(other => other.id !== item.id) })}>
+                            <X className="size-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`reviewer-preconfig-${item.id}`}>Preconfig</Label>
-                    <Select value={item.preconfigId} disabled={personal} onValueChange={preconfigId => update(item.id, { preconfigId })}>
-                      <SelectTrigger id={`reviewer-preconfig-${item.id}`} aria-label="Reviewer preconfig" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {preconfigs.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    {personal && <p className="text-xs text-muted-foreground">Agent-home reviewers always use this agent's preconfig.</p>}
-                  </div>
+                    <div className="space-y-3 border-t px-3 py-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`reviewer-preconfig-${item.id}`}>Preconfig</Label>
+                        <Select value={item.preconfigId} onValueChange={preconfigId => update(item.id, { preconfigId })}>
+                          <SelectTrigger id={`reviewer-preconfig-${item.id}`} aria-label="Learner preconfig" className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {preconfigs.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                  <div className="space-y-1.5">
-                    <Label>Model</Label>
-                    <LearningModelPicker models={models} preconfig={preconfig} value={item.modelOverride}
-                      onChange={modelOverride => update(item.id, { modelOverride })} />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`focus-${item.id}`}>Review focus</Label>
-                    <Textarea id={`focus-${item.id}`} value={item.instructions} maxLength={20_000}
-                      placeholder="Optional focus for this reviewer, e.g. 'prefer updating existing notes over creating new ones'"
-                      onChange={event => update(item.id, { instructions: event.target.value })} />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label>Timing (minutes)</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {CADENCE_FIELDS.map(field => (
-                        <div key={field.key} className="space-y-1">
-                          <Input type="number" min={1} max={10080} aria-label={`${field.label} (minutes)`}
-                            value={cadence[field.key]}
-                            onChange={event => updateCadence(item, field.key, event.target.value)} />
-                          <p className="text-[10px] leading-tight text-muted-foreground">{field.label}</p>
-                        </div>
-                      ))}
+                      {learnerModel(item)}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Quiet period is how idle the workspace must be; min interval spaces reviews apart; max pending age forces a review of older unreviewed work.
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
 
-            {!personal && (
+                    {learnerTuning(item, true)}
+                    {previewLink(item, true)}
+                  </div>
+                );
+              })}
+
               <Button variant="outline" size="sm" disabled={!initialId || settings.reviewers.length >= 20}
                 onClick={() => onChange({ ...settings, reviewers: [...settings.reviewers, createReviewer()] })}>
-                <Plus className="size-4" /> Add reviewer
+                <Plus className="size-4" /> Add learner
               </Button>
-            )}
-          </div>
+            </div>
+          )}
 
           <Separator />
 
@@ -210,20 +294,24 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
             <div className="space-y-0.5">
               <Label htmlFor="learning-skills">Improve skills</Label>
               <p className="text-xs text-muted-foreground">
-                Reviewers may also create and refine workspace skills.
+                {personal ? "Learning may also create and refine this agent's skills." : 'Learning may also create and refine workspace skills.'}{' '}
+                Turning this on also enables skill management.
               </p>
             </div>
             <Switch id="learning-skills" checked={settings.improveSkills}
               onCheckedChange={improveSkills => onChange({ ...settings, improveSkills })} />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="learning-instructions">Additional review instructions</Label>
-            <p className="text-xs text-muted-foreground">Appended to every reviewer's prompt.</p>
-            <Textarea id="learning-instructions" value={settings.instructions} maxLength={20_000}
-              placeholder="Optional guidance applied to all reviewers"
-              onChange={event => onChange({ ...settings, instructions: event.target.value })} />
-          </div>
+          {!personal && (
+            <TuningCollapsible label="Shared instructions" summary={settings.instructions.trim() || null} bordered={false}>
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">Appended to every learner's prompt.</p>
+                <Textarea aria-label="Shared instructions" value={settings.instructions} maxLength={20_000}
+                  placeholder="Optional guidance applied to all learners"
+                  onChange={event => onChange({ ...settings, instructions: event.target.value })} />
+              </div>
+            </TuningCollapsible>
+          )}
 
           {personal && (
             <>
@@ -258,17 +346,11 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
         </Alert>
       )}
 
-      <div>
-        <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)}>
-          <History className="size-4" /> Review history
-        </Button>
-      </div>
-
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
         <DialogContent className="flex flex-col overflow-hidden sm:max-w-2xl sm:max-h-[85vh]">
           <DialogHeader className="shrink-0">
             <DialogTitle>Learning history</DialogTitle>
-            <DialogDescription>Workspace reviews and revision-checked undo.</DialogDescription>
+            <DialogDescription>Learning runs and revision-checked undo.</DialogDescription>
           </DialogHeader>
           <div className="dialog-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <LearningHistory workspaceId={workspace.id} />
@@ -279,8 +361,8 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
       <Dialog open={previewPrompt !== null} onOpenChange={open => { if (!open) setPreviewPrompt(null); }}>
         <DialogContent className="flex flex-col overflow-hidden sm:max-w-2xl sm:max-h-[85vh]">
           <DialogHeader className="shrink-0">
-            <DialogTitle>Review prompt preview</DialogTitle>
-            <DialogDescription>The exact instructions this reviewer will receive.</DialogDescription>
+            <DialogTitle>Prompt preview</DialogTitle>
+            <DialogDescription>The exact prompt this learning run uses.</DialogDescription>
           </DialogHeader>
           <div className="dialog-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <pre className="whitespace-pre-wrap break-words text-xs">{previewPrompt}</pre>
