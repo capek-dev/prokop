@@ -140,7 +140,6 @@ const SessionActionsDropdown = React.memo(function SessionActionsDropdown({
         </SidebarMenuAction>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-52">
-        <SessionLearningMenu sessionId={sessionId} />
         {onOpenAlongside && (
           <DropdownMenuItem onClick={onOpenAlongside}>
             <Columns2 className="size-4" />
@@ -230,6 +229,10 @@ const SessionActionsDropdown = React.memo(function SessionActionsDropdown({
             )}
           </div>
         )}
+
+        <DropdownMenuSeparator />
+
+        <SessionLearningMenu sessionId={sessionId} />
 
         <DropdownMenuSeparator />
 

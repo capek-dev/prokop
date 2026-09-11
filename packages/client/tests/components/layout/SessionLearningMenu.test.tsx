@@ -5,7 +5,6 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import type { Session } from '@prokopai/sdk';
 const mocks = vi.hoisted(() => ({ setLearning: vi.fn() }));
 vi.mock('@/contexts/ServerClientContext', () => ({ useSdkClient: () => ({ http: { sessions: { setLearning: mocks.setLearning } } }) }));
-vi.mock('@/components/modals/configuration/LearningHistory', () => ({ LearningHistory: () => null }));
 import { SessionLearningMenu } from '@/components/layout/SessionLearningMenu';
 import { DropdownMenu, DropdownMenuContent } from '@/components/ui/dropdown-menu';
 import { useSessionStore } from '@/stores/sessionStore';
