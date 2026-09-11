@@ -30,6 +30,7 @@
 Most coding agents are capable inside one session. Prokop improves the work around and between sessions.
 
 - **Persistent agents:** Give recurring agents their own memory, skills, and searchable history across projects.
+- **Automatic learning:** Turn it on to preserve useful lessons from conversations in project or personal knowledge. No scheduled jobs to set up.
 - **Separate context:** Agent context follows the agent. Project context stays with the project. Both remain editable.
 - **Parallel work:** Run multiple sessions and projects without a desktop full of terminal windows.
 - **Complete workspace:** Work with files, diffs, Git, terminals, tools, and permissions in one interface.
@@ -74,7 +75,19 @@ Project B
 
 Promote a reusable profile to create a persistent agent with its own home workspace. Memory and skills remain visible as files. Search can cover the current session, one workspace, or the agent's history across projects.
 
-Reflection is user-directed. You choose the prompt and schedule. Prokop does not automatically learn from every session or train model weights.
+### Automatic learning
+
+Turn on learning in a workspace or an agent's home, adjust what you need, and keep working. Prokop automatically reviews eligible conversations and maintains useful knowledge. There is no reflection prompt to write or scheduled job to create.
+
+- **Workspace learning** maintains shared project knowledge from work across participating agents.
+- **Personal learning** reviews an agent's own participation across eligible projects and preserves transferable lessons and working preferences in its personal knowledge.
+- **Optional skill improvement** lets learning create and refine reusable procedures, not just compact memory notes.
+
+Learning comes with a built-in review prompt and timing defaults. You can tune the model, learning focus, and timing, or choose which projects an agent learns from. Reviews normally run during quiet periods, with a maximum pending age for unreviewed work.
+
+Inspect learning history, source conversations, and knowledge diffs. Undo individual changes without overwriting newer edits, or exclude a session from future learning. Exclusion does not erase knowledge already saved.
+
+Learning updates knowledge files, not model weights. It uses your configured model and is separate from scheduled work.
 
 ## What is included
 
@@ -82,6 +95,7 @@ Reflection is user-directed. You choose the prompt and schedule. Prokop does not
 |---|---|
 | **Workspace** | Session board, cross-workspace Overview, files, editor, Git, diffs, persistent terminals |
 | **Agents** | Persistent identity, memory, skills, session search, subagents, workflows, scheduled work |
+| **Learning** | Opt-in automatic reviews, shared project and personal knowledge, optional skill improvement, history, diffs, undo |
 | **Control** | Visible tool calls, scoped permissions, auto-approval boundaries, revocable grants |
 | **Client** | Responsive PWA, mobile layout, push support, multi-server connections |
 | **Tools** | Filesystem, search, shell, tasks, questions, web fetch, Git worktrees, opt-in browser tools |
