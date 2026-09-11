@@ -14,6 +14,13 @@ vi.mock('@tanstack/react-router', () => ({
     <a href={`/server/${params.serverId}/workspace/session/${params.sessionId}`}>{children}</a>,
 }));
 vi.mock('@/stores/serverDataStore', () => ({ useServerDataStore: (selector: (state: unknown) => unknown) => selector(mocks.store()) }));
+vi.mock('@/stores/uiStore', () => ({
+  useUIStore: (selector: (s: Record<string, unknown>) => unknown) => selector({ openFilePreview: vi.fn() }),
+}));
+// Pierre renders into shadow DOM, invisible to light-DOM queries; the mock surfaces the serialized patch.
+vi.mock('@pierre/diffs/react', () => ({
+  PatchDiff: ({ patch }: { patch: string }) => <div data-testid="patch-diff">{patch}</div>,
+}));
 import { LearningHistory } from '@/components/modals/configuration/LearningHistory';
 
 beforeEach(() => {
@@ -22,6 +29,7 @@ beforeEach(() => {
   mocks.list.mockResolvedValue({ runs: [run], blocked: true });
   mocks.detail.mockResolvedValue({ run, revision: 'revision', sources: [
     { sessionId: 'source-uuid', messageId: 'message', title: 'Fix retry handling' },
+    { sessionId: 'source-uuid', messageId: 'message-2', title: 'Fix retry handling' },
     { sessionId: 'untitled-uuid', messageId: 'untitled', title: '  ' },
     { sessionId: 'legacy-uuid', messageId: 'legacy' },
   ], changes: [{ id: 'change', path: 'memory/MEMORY.md', before: 'Before', after: 'After', status: 'applied', undoPending: false }] });
@@ -44,17 +52,31 @@ test('opens the review transcript when available', async () => {
   expect(await screen.findByRole('link', { name: 'Open learning session' })).toHaveAttribute('href', '/server/server/workspace/session/review-session');
 });
 
+test('a run opens as its own screen and back returns to the list', async () => {
+  const user = userEvent.setup(); mount();
+  await user.click(await screen.findByRole('button', { name: /failed/i }));
+  expect(await screen.findByRole('button', { name: /back to runs/i })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /failed/i })).toBeNull();
+  await user.click(screen.getByRole('button', { name: /back to runs/i }));
+  expect(await screen.findByRole('button', { name: /failed/i })).toBeInTheDocument();
+});
+
 test('hides the transcript button for older responses without a session', async () => {
   const user = userEvent.setup(); mount();
   await user.click(await screen.findByRole('button', { name: /failed/i }));
-  await screen.findByText('Run details');
+  await screen.findByRole('button', { name: /back to runs/i });
   expect(screen.queryByRole('link', { name: 'Open learning session' })).toBeNull();
 });
 
-test('shows conversation titles with readable fallbacks and keeps session link destinations', async () => {
+test('groups source messages by conversation and stays collapsed until opened', async () => {
   const user = userEvent.setup(); mount();
   await user.click(await screen.findByRole('button', { name: /failed/i }));
-  expect(await screen.findByRole('link', { name: 'Fix retry handling' })).toHaveAttribute('href', '/server/server/workspace/session/source-uuid');
+  const trigger = await screen.findByRole('button', { name: /^Source conversations/ });
+  expect(trigger).toHaveTextContent('3 conversations · 4 messages');
+  expect(screen.queryByRole('link', { name: /Fix retry handling/ })).toBeNull();
+  await user.click(trigger);
+  expect(screen.getByRole('link', { name: /Fix retry handling/ })).toHaveAttribute('href', '/server/server/workspace/session/source-uuid');
+  expect(screen.getByRole('link', { name: /Fix retry handling/ })).toHaveTextContent('2 messages');
   expect(screen.getAllByRole('link', { name: 'Untitled conversation' })).toHaveLength(2);
   expect(screen.queryByText('source-uuid')).toBeNull();
 });
@@ -77,8 +99,9 @@ test('shows exact changes and stale undo failure without reporting success', asy
   const user = userEvent.setup(); mount();
   await user.click(await screen.findByRole('button', { name: /failed/i }));
   await user.click(await screen.findByText('memory/MEMORY.md (applied)'));
-  expect(screen.getByText('Before', { selector: 'pre' })).toBeInTheDocument();
-  expect(screen.getByText('After', { selector: 'pre' })).toBeInTheDocument();
+  const patch = screen.getByTestId('patch-diff');
+  expect(patch.textContent).toContain('-Before');
+  expect(patch.textContent).toContain('+After');
   await user.click(screen.getByRole('button', { name: 'Undo this change' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Undo did not overwrite it');
   expect(mocks.undo).toHaveBeenCalledWith('ws', 'run', 'change');

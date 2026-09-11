@@ -1,20 +1,19 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { ChevronRight, Plus, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import type { LearningCadence, LearningReviewer, Preconfig, Workspace, WorkspaceLearningSettings } from '@prokopai/sdk';
 import { useSdkClient } from '@/contexts/ServerClientContext';
 import { LearningHistory } from './LearningHistory';
 import { LearningModelPicker } from './LearningModelPicker';
 import { LearningSourcePicker } from './LearningSourcePicker';
+import { DisclosureRow } from './DisclosureRow';
 import { useServerDataStore } from '@/stores/serverDataStore';
-import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -46,33 +45,6 @@ function formatMinutes(minutes: number): string {
   if (minutes % 1440 === 0) return `${minutes / 1440}d`;
   if (minutes % 60 === 0) return `${minutes / 60}h`;
   return `${minutes}m`;
-}
-
-interface TuningCollapsibleProps {
-  label: string;
-  /** Recap of the custom value, shown on the trigger; default sections stay collapsed without one. */
-  summary: string | null;
-  /** Bounded rows sit inside the learner card, flat rows stand alone in agent-home settings. */
-  bordered: boolean;
-  children: ReactNode;
-}
-
-function TuningCollapsible({ label, summary, bordered, children }: TuningCollapsibleProps) {
-  return (
-    <Collapsible defaultOpen={summary !== null}>
-      <CollapsibleTrigger
-        className={cn(
-          'group flex w-full items-center gap-2 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground',
-          bordered ? 'border-t px-3' : 'rounded-md px-2',
-        )}
-      >
-        <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-        <span className="shrink-0">{label}</span>
-        {summary && <span className="ml-auto truncate text-xs" title={summary}>{summary}</span>}
-      </CollapsibleTrigger>
-      <CollapsibleContent className={bordered ? 'px-3 py-3' : 'py-1'}>{children}</CollapsibleContent>
-    </Collapsible>
-  );
 }
 
 export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearning, onChange: onSettingsChange, onPersonalLearningChange }: LearningPanelProps) {
@@ -126,13 +98,13 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
       : null;
     return (
       <>
-        <TuningCollapsible label="Learning focus" summary={item.instructions.trim() || null} bordered={bordered}>
+        <DisclosureRow label="Learning focus" summary={item.instructions.trim() || null} bordered={bordered}>
           <Textarea aria-label="Learning focus" value={item.instructions} maxLength={20_000}
             placeholder="Optional focus, e.g. 'prefer updating existing notes over creating new ones'"
             onChange={event => update(item.id, { instructions: event.target.value })} />
-        </TuningCollapsible>
+        </DisclosureRow>
 
-        <TuningCollapsible label="Timing" summary={timingSummary} bordered={bordered}>
+        <DisclosureRow label="Timing" summary={timingSummary} bordered={bordered}>
           <div className="space-y-1.5">
             <div className="grid grid-cols-3 gap-2">
               {CADENCE_FIELDS.map(field => (
@@ -148,7 +120,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
               Minutes. Quiet period is required idle time, min interval spaces runs apart, max pending age forces a run on unreviewed work.
             </p>
           </div>
-        </TuningCollapsible>
+        </DisclosureRow>
       </>
     );
   };
@@ -303,14 +275,14 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
           </div>
 
           {!personal && (
-            <TuningCollapsible label="Shared instructions" summary={settings.instructions.trim() || null} bordered={false}>
+            <DisclosureRow label="Shared instructions" summary={settings.instructions.trim() || null} bordered={false}>
               <div className="space-y-1.5">
                 <p className="text-xs text-muted-foreground">Appended to every learner's prompt.</p>
                 <Textarea aria-label="Shared instructions" value={settings.instructions} maxLength={20_000}
                   placeholder="Optional guidance applied to all learners"
                   onChange={event => onChange({ ...settings, instructions: event.target.value })} />
               </div>
-            </TuningCollapsible>
+            </DisclosureRow>
           )}
 
           {personal && (
