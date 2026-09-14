@@ -120,8 +120,12 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonResult
   // Child env passes both canonical PROKOPAI_* keys and legacy JEAN2_* twins
   // so the spawned server (possibly a different version during update)
   // resolves them under either prefix.
+  const dataDir = getDataDir();
   const childEnv = (): NodeJS.ProcessEnv => ({
     ...getToolEnv(),
+    // Keep the server on the same data root as the parent's PID and log files.
+    PROKOPAI_DATA_DIR: dataDir,
+    JEAN2_DATA_DIR: dataDir,
     PROKOPAI_PORT: String(port),
     PROKOPAI_HOST: host,
     JEAN2_PORT: String(port),
