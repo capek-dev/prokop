@@ -18,7 +18,7 @@
 <p align="center">
   <a href="https://prokopai.dev">Website</a> ·
   <a href="https://prokopai.dev/get-started/">Get Started</a> ·
-  <a href="docs/index.md">Documentation</a> ·
+  <a href="https://prokopai.dev/docs">Documentation</a> ·
   <a href="https://github.com/capek-dev/prokop/releases">Releases</a> ·
   <a href="https://chromewebstore.google.com/detail/jean2browser/jpahdfmmfmmnacapmkchljmcijoedcpj">Chrome Extension</a>
 </p>
@@ -57,7 +57,7 @@ Then run:
 prokop init
 ```
 
-This prepares Prokop, starts the daemon, and opens the client at `http://localhost:8742`. See [Getting Started](docs/getting-started.md) for provider setup.
+This prepares Prokop, starts the daemon, and opens the client at `http://localhost:8742`. See [Getting Started](https://prokopai.dev/get-started) for provider setup.
 
 ## How continuity works
 
@@ -128,13 +128,13 @@ Prokop is evolving and maintained by one developer. It is used for real daily wo
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md)
-- [Client and mobile access](docs/client.md)
-- [Workspaces and sessions](docs/workspaces.md)
-- [Configuration and providers](docs/configuration.md)
-- [CLI](docs/cli.md)
-- [Tools](docs/tools.md)
-- [Security and authentication](docs/auth.md)
+- [Getting Started](https://prokopai.dev/get-started)
+- [Client and mobile access](https://prokopai.dev/docs/client)
+- [Workspaces and sessions](https://prokopai.dev/docs/workspaces)
+- [Configuration and providers](https://prokopai.dev/docs/configuration)
+- [CLI](https://prokopai.dev/docs/cli)
+- [Tools](https://prokopai.dev/docs/tools)
+- [Security and authentication](https://prokopai.dev/docs/security)
 
 ## License
 
