@@ -19,6 +19,7 @@
   <a href="https://prokopai.dev">Website</a> ·
   <a href="https://prokopai.dev/get-started/">Get Started</a> ·
   <a href="https://prokopai.dev/docs">Documentation</a> ·
+  <a href="https://prokopai.dev/how-to">Video Walkthroughs</a> ·
   <a href="https://github.com/capek-dev/prokop/releases">Releases</a> ·
   <a href="https://chromewebstore.google.com/detail/jean2browser/jpahdfmmfmmnacapmkchljmcijoedcpj">Chrome Extension</a>
 </p>
@@ -37,6 +38,16 @@ Most coding agents are capable inside one session. Prokop improves the work arou
 - **Desktop and phone:** Use the same responsive PWA through networking you control.
 - **Open stack:** No required Prokop account, no telemetry, Apache 2.0.
 
+## See it in use
+
+Short videos with written steps:
+
+- [Work across projects in Overview](https://prokopai.dev/how-to/overview) · 25 seconds
+- [Work with multiple sessions](https://prokopai.dev/how-to/multiple-sessions) · 24 seconds
+- [Set up an agent and workspace capabilities](https://prokopai.dev/how-to/agent-capabilities) · 39 seconds
+
+[All walkthroughs](https://prokopai.dev/how-to), including adding a project and connecting a model provider.
+
 ## Install
 
 **macOS / Linux**
@@ -50,6 +61,8 @@ curl -fsSL https://prokopai.dev/install.sh | bash
 ```powershell
 irm https://prokopai.dev/install.ps1 | iex
 ```
+
+Prefer to inspect the installer or download a binary yourself? See the [macOS/Linux script](install/install-prokopai.sh), [PowerShell script](install/install-prokopai.ps1), and [release downloads](https://github.com/capek-dev/prokop/releases).
 
 Then run:
 
