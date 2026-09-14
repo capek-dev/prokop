@@ -57,6 +57,18 @@ export async function fetchLatestServerVersion(): Promise<string | null> {
     // Validate it looks like a semver version
     if (!/^\d+\.\d+\.\d+$/.test(version)) return null;
 
+    // main can be bumped before release artifacts are published. Only advertise
+    // a stable published release that the CLI's default update can install.
+    const releaseResponse = await fetchWithTimeout(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${encodeURIComponent(`server/v${version}`)}`,
+      FETCH_TIMEOUT,
+    );
+    if (!releaseResponse.ok) return null;
+    const release = await releaseResponse.json();
+    if (release?.tag_name !== `server/v${version}`
+      || release.draft !== false || release.prerelease !== false
+      || typeof release.published_at !== 'string') return null;
+
     setCache('latest-server', version);
     return version;
   } catch {

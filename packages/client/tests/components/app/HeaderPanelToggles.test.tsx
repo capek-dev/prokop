@@ -21,6 +21,21 @@ function renderToggles(overrides: Partial<Parameters<typeof HeaderPanelToggles>[
 }
 
 describe('HeaderPanelToggles', () => {
+  test('shows a quiet update dot and exposes the command without hover', async () => {
+    const user = userEvent.setup();
+    renderToggles({ updateVersion: '1.15.0' });
+    const button = screen.getByRole('button', { name: 'Settings, Prokop v1.15.0 update available' });
+    expect(button.querySelector('[data-update-available]')).not.toBeNull();
+    await user.click(button);
+    expect(screen.getByText('Prokop v1.15.0 available')).toBeInTheDocument();
+    expect(screen.getByText('prokop update')).toBeInTheDocument();
+  });
+
+  test('has no update marker when no newer version is known', () => {
+    renderToggles();
+    expect(screen.getByRole('button', { name: 'Settings' }).querySelector('[data-update-available]')).toBeNull();
+  });
+
   test('renders direct toggles for panels and settings, reflecting active state', async () => {
     const user = userEvent.setup();
     const props = renderToggles({ sessionsActive: true });

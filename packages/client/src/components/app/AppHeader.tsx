@@ -1,6 +1,7 @@
 import { Check, LayoutGrid, LayoutList } from 'lucide-react';
 import { useRouter, useParams, useLocation } from '@tanstack/react-router';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useServerUpdate } from '@/hooks/useServerUpdate';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ export function AppHeader() {
   const location = useLocation();
   const isOverview = location.pathname.includes('/overview');
   const isMobile = useIsMobile();
+  const updateVersion = useServerUpdate();
 
   const setShowSettings = useUIStore((s) => s.setShowSettings);
   const setShowWorkspaceSettings = useUIStore((s) => s.setShowWorkspaceSettings);
@@ -79,6 +81,7 @@ export function AppHeader() {
       hasWorkspace={Boolean(activeWorkspace)}
       onOpenWorkspaceSettings={() => setShowWorkspaceSettings(true)}
       onOpenSettings={() => setShowSettings(true)}
+      updateVersion={updateVersion}
     />
   );
 

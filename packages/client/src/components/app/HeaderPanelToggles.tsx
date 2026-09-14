@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -21,6 +24,7 @@ interface HeaderPanelTogglesProps {
   hasWorkspace: boolean;
   onOpenWorkspaceSettings: () => void;
   onOpenSettings: () => void;
+  updateVersion?: string | null;
 }
 
 /**
@@ -38,6 +42,7 @@ export function HeaderPanelToggles({
   hasWorkspace,
   onOpenWorkspaceSettings,
   onOpenSettings,
+  updateVersion,
 }: HeaderPanelTogglesProps) {
   const tooltipSide = isWindows() ? 'bottom' : undefined;
 
@@ -102,24 +107,47 @@ export function HeaderPanelToggles({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon-sm" aria-label="Settings">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="relative"
+                  aria-label={updateVersion ? `Settings, Prokop v${updateVersion} update available` : 'Settings'}
+                >
                   <Settings className="h-4 w-4" />
+                  {updateVersion && (
+                    <span aria-hidden="true" data-update-available className="absolute right-1 top-1 size-1.5 rounded-full bg-primary ring-2 ring-background" />
+                  )}
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent side={tooltipSide}>Settings</TooltipContent>
+            <TooltipContent side={tooltipSide}>
+              {updateVersion ? `Prokop v${updateVersion} available. Run prokop update on this server.` : 'Settings'}
+            </TooltipContent>
           </Tooltip>
           <DropdownMenuContent align="end" className="w-52 min-w-52">
-            {hasWorkspace && (
-              <DropdownMenuItem onClick={onOpenWorkspaceSettings}>
-                <Settings2 className="mr-2 h-4 w-4" />
-                Workspace Settings
-              </DropdownMenuItem>
+            {updateVersion && (
+              <>
+                <DropdownMenuLabel className="flex flex-col gap-1 whitespace-normal">
+                  <span>Prokop v{updateVersion} available</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    Run <code>prokop update</code> in a terminal on the machine hosting this server.
+                  </span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+              </>
             )}
-            <DropdownMenuItem onClick={onOpenSettings}>
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </DropdownMenuItem>
+            <DropdownMenuGroup>
+              {hasWorkspace && (
+                <DropdownMenuItem onClick={onOpenWorkspaceSettings}>
+                  <Settings2 className="mr-2 h-4 w-4" />
+                  Workspace Settings
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={onOpenSettings}>
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
