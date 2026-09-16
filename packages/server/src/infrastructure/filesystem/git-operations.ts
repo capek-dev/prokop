@@ -229,7 +229,7 @@ export async function commitGitFiles(root: string, input: GitCommitInput): Promi
     const configuredHooks = (await git(root, ['config', '--path', '--get', 'core.hooksPath'], { allowFailure: true })).stdout.replace(/\r?\n$/, '');
     const commonDir = resolve(root, (await git(root, ['rev-parse', '--git-common-dir'])).stdout.replace(/\r?\n$/, ''));
     const originalHooks = configuredHooks ? resolve(repo, configuredHooks) : join(commonDir, 'hooks');
-    const hooks = await createSelectedCommitHooks(temp, originalHooks, [...paths].map((path) => relative(repo, resolve(root, path)).split(sep).join('/')));
+    const hooks = await createSelectedCommitHooks(temp, originalHooks, [...paths].map((path) => relative(repo, resolve(root, path)).split(sep).join('/')), input.runHooks !== false);
     await checkExpected(root, input);
     try {
       await git(root, ['-c', `core.hooksPath=${hooks}`, 'commit', '--only', '--file=-', `--pathspec-from-file=${pathspecFile}`, '--pathspec-file-nul'], { index: privateIndex, input: input.message });

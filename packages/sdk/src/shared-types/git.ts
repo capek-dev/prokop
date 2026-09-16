@@ -9,6 +9,8 @@ export interface GitCommitInput {
   root?: string;
   paths: string[];
   message: string;
+  /** Run repository commit hooks. Defaults to true; signing is unaffected. */
+  runHooks?: boolean;
   expectedBranch: string;
   expectedHead: string | null;
 }

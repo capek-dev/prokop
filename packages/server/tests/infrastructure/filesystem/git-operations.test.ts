@@ -13,9 +13,9 @@ async function git(...args: string[]): Promise<string> {
   if (code) throw new Error(stderr);
   return stdout.replace(/\n$/, '');
 }
-async function commit(paths: string[]) {
+async function commit(paths: string[], runHooks?: boolean) {
   const state = await getGitRepository(root);
-  return commitGitFiles(root, { paths, message: 'Selected files', expectedBranch: state.branch!, expectedHead: state.head });
+  return commitGitFiles(root, { paths, runHooks, message: 'Selected files', expectedBranch: state.branch!, expectedHead: state.head });
 }
 beforeEach(async () => {
   base = await mkdtemp(join(tmpdir(), 'prokop-git-ops-'));
@@ -147,6 +147,30 @@ describe('selected whole-file commits', () => {
     expect(await git('rev-parse', 'HEAD')).toBe(head);
     expect(await readFile(join(root, '.git/index'))).toEqual(index);
   });
+  test('explicit opt-out skips all repository commit hooks and preserves unchecked staging', async () => {
+    await writeFile(join(root, 'a'), 'base');
+    await writeFile(join(root, 'other'), 'base');
+    await commit(['a', 'other']);
+    await writeFile(join(root, 'a'), 'changed');
+    await writeFile(join(root, 'other'), 'staged');
+    await git('add', 'other');
+    await writeFile(join(root, 'other'), 'working');
+    for (const name of ['pre-commit', 'prepare-commit-msg', 'commit-msg', 'post-commit']) {
+      const hook = join(root, '.git/hooks', name);
+      await writeFile(hook, '#!/bin/sh\necho ran >> hooks-ran\nexit 1\n');
+      await chmod(hook, 0o755);
+    }
+    await expect(commit(['a'], true)).rejects.toThrow('Git operation:');
+    await rm(join(root, 'hooks-ran'));
+    const result = await commit(['a'], false);
+    expect(result.warning).toBeUndefined();
+    expect(await Bun.file(join(root, 'hooks-ran')).exists()).toBe(false);
+    expect(await git('show', 'HEAD:a')).toBe('changed');
+    expect(await git('show', 'HEAD:other')).toBe('base');
+    expect(await git('show', ':other')).toBe('staged');
+    expect(await readFile(join(root, 'other'), 'utf8')).toBe('working');
+    expect(await git('config', '--get', 'core.hooksPath')).toBe(join(root, '.git/hooks'));
+  });
   test('refuses hooks that stage unchecked files without advancing HEAD', async () => {
     await writeFile(join(root, 'a'), 'base');
     await writeFile(join(root, 'other'), 'base');
@@ -171,6 +195,7 @@ describe('selected whole-file commits', () => {
     await git('config', 'commit.gpgsign', 'true');
     await git('config', 'gpg.program', 'false');
     await expect(commit(['a'])).rejects.toThrow('Git operation:');
+    await expect(commit(['a'], false)).rejects.toThrow('Git operation:');
     expect(await git('rev-parse', 'HEAD')).toBe(head);
     expect(await readFile(join(root, '.git/index'))).toEqual(index);
   });

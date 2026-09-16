@@ -3,6 +3,7 @@ import { create } from 'zustand';
 export interface GitCommitDraft {
   paths: string[];
   message: string;
+  runHooks?: boolean;
 }
 export const EMPTY_GIT_DRAFT: GitCommitDraft = { paths: [], message: '' };
 export function gitDraftKey(serverId: string | undefined, workspaceId: string, root?: string): string {

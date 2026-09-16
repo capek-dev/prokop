@@ -11,22 +11,23 @@ function quote(value: string): string {
  * (the last pre-commit hook). A formatter running `git add -A` must not silently
  * include unchecked files. Git for Windows also executes shebang hooks through sh.
  */
-export async function createSelectedCommitHooks(directory: string, original: string, repoPaths: string[]): Promise<string> {
+export async function createSelectedCommitHooks(directory: string, original: string, repoPaths: string[], runHooks = true): Promise<string> {
   const hooks = join(directory, 'hooks');
   await mkdir(hooks);
   const excludes = repoPaths.map((path) => quote(`:(top,literal,exclude)${path}`)).join(' ');
-  const originals = await readdir(original).catch((error: unknown) => {
+  const originals = runHooks ? await readdir(original).catch((error: unknown) => {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === 'ENOENT' || code === 'ENOTDIR') return [];
     throw error;
-  });
+  }) : [];
   for (const name of new Set(['commit-msg', ...originals])) {
     const originalPath = join(original, name);
     if (name !== 'commit-msg' && !await access(originalPath, constants.X_OK).then(() => true, () => false)) continue;
     const source = quote(originalPath);
     const script = [
       '#!/bin/sh',
-      `if test -x ${source}; then`,
+      // Keep the selection guard even when repository hooks are disabled.
+      `if ${runHooks ? 'true' : 'false'} && test -x ${source}; then`,
       `  ${source} "$@" || exit $?`,
       'fi',
     ];

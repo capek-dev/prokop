@@ -62,9 +62,19 @@ test('inline selection commits whole selected files and keeps preview in place',
   expect(preview).toHaveBeenCalledWith('src/a');
   expect(screen.getByLabelText('Commit message')).toHaveValue('Selected');
   fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
-  await waitFor(() => expect(gitCommit).toHaveBeenCalledWith('ws', { root: '/root', paths: ['src/a'], message: 'Selected', expectedHead: head, expectedBranch: 'main' }));
+  await waitFor(() => expect(gitCommit).toHaveBeenCalledWith('ws', { root: '/root', paths: ['src/a'], message: 'Selected', runHooks: true, expectedHead: head, expectedBranch: 'main' }));
   expect(gitPush).not.toHaveBeenCalled();
 });
+test('hooks can be unchecked for one commit and reset after success', async () => {
+  setup(); await open();
+  expect(screen.getByRole('checkbox', { name: 'Run commit hooks' })).toBeChecked();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Run commit hooks' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Commit' }));
+  await waitFor(() => expect(gitCommit).toHaveBeenCalledWith('ws', expect.objectContaining({ runHooks: false })));
+  await open();
+  expect(screen.getByRole('checkbox', { name: 'Run commit hooks' })).toBeChecked();
+});
+
 test('commit and push sends the new SHA, retry never recommits', async () => {
   gitPush.mockRejectedValueOnce(new Error('Offline'));
   setup(); await open(); await mode('Commit & push');

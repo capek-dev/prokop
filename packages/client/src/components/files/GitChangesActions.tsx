@@ -94,7 +94,7 @@ export function GitChangesActions({ sdkClient, workspaceId, serverId, root, file
         return;
       }
       setPhase('Committing…');
-      const result = await sdkClient.http.files.gitCommit(workspaceId, { root, paths: selected, message: draft.message, expectedHead: state.head, expectedBranch: state.branch });
+      const result = await sdkClient.http.files.gitCommit(workspaceId, { root, paths: selected, message: draft.message, runHooks: draft.runHooks ?? true, expectedHead: state.head, expectedBranch: state.branch });
       useGitCommitStore.getState().clear(key);
       if (result.warning) { setError(result.warning); return; }
       if (mode !== 'commit') {
@@ -180,6 +180,10 @@ export function GitChangesActions({ sdkClient, workspaceId, serverId, root, file
       </div>
       <div className="flex shrink-0 flex-col gap-2 border-t border-border/60 p-2">
         {retryPush ? <p className="text-xs text-muted-foreground">Committed {retryPush.expectedHead.slice(0, 8)}. Push has not completed.</p> : <Textarea aria-label="Commit message" className="min-h-14 text-xs" placeholder="Commit message" value={draft.message} rows={2} disabled={busy} maxLength={8192} onChange={(event) => update({ message: event.target.value })} />}
+        {!retryPush && <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Checkbox checked={draft.runHooks ?? true} disabled={busy} onCheckedChange={(checked) => update({ runHooks: checked === true })} />
+          Run commit hooks
+        </label>}
         {mode !== 'commit' && !retryPush && <>
           {!repository.data?.upstream && <div className="flex gap-2">
             <select aria-label="Remote" className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 text-xs" value={destination.remote} disabled={busy} onChange={(event) => setRemote(event.target.value)}><option value="">Remote</option>{repository.data?.remotes.map((name) => <option key={name}>{name}</option>)}</select>

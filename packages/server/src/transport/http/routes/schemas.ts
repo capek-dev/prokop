@@ -148,6 +148,7 @@ export const gitCommitSchema = z.object({
   message: z.string().trim().min(1).max(8192).refine((value) => !value.includes('\0')),
   expectedBranch: gitBranchSchema,
   expectedHead: gitHeadSchema.nullable(),
+  runHooks: z.boolean().optional(),
 }).strict();
 export const gitPushPreviewSchema = z.object({
   root: z.string().min(1).optional(),
