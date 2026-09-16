@@ -17,15 +17,24 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { SessionMenuButton, type ChildrenMap, type SessionDerivedValuesMap } from './SessionMenuButton';
 import { ScheduledJobsSection } from './ScheduledJobsSection';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { SESSION_TAG_ORDERS, isSessionTagOrder, orderedSessionGroupNames, type SessionTagOrder } from '@/lib/sessionTagOrder';
 import { useTagCollapseState } from '@/hooks/useTagCollapseState';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 
 interface WorkspaceSessionContentProps {
+  sessionTagOrder?: SessionTagOrder;
+  onSessionTagOrderChange?: (order: SessionTagOrder) => void;
+  isSavingSettings?: boolean;
   activeSessions: Session[];
   archivedSessions: Session[];
   scheduledJobs: ScheduledJob[];
@@ -60,6 +69,9 @@ interface WorkspaceSessionContentProps {
 }
 
 export function WorkspaceSessionContent({
+  sessionTagOrder = 'tagged-first',
+  onSessionTagOrderChange,
+  isSavingSettings = false,
   activeSessions,
   archivedSessions,
   scheduledJobs,
@@ -244,7 +256,7 @@ export function WorkspaceSessionContent({
                 </span>
               )}
               <span className="flex-1" />
-              <span className="flex items-center opacity-0 transition-opacity group-hover/head:opacity-100">
+              <span className="flex items-center">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -257,18 +269,37 @@ export function WorkspaceSessionContent({
                       <MoreHorizontal className="size-3.5" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-48">
-                    {selectionMode ? (
-                      <DropdownMenuItem onClick={e => { e.stopPropagation(); handleCancel(); }}>
-                        <X className="size-4" />
-                        Cancel selection
-                      </DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem onClick={e => { e.stopPropagation(); toggleSelectionMode(); }}>
-                        <CheckSquare className="size-4" />
-                        Select to archive
-                      </DropdownMenuItem>
+                  <DropdownMenuContent align="end" className="min-w-48" onClick={e => e.stopPropagation()}>
+                    {onSessionTagOrderChange && (
+                      <>
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel>Session order</DropdownMenuLabel>
+                          <DropdownMenuRadioGroup value={sessionTagOrder} onValueChange={value => {
+                            if (isSessionTagOrder(value)) onSessionTagOrderChange(value);
+                          }}>
+                            {SESSION_TAG_ORDERS.map(option => (
+                              <DropdownMenuRadioItem key={option.value} value={option.value} disabled={isSavingSettings}>
+                                {option.label}
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator />
+                      </>
                     )}
+                    <DropdownMenuGroup>
+                      {selectionMode ? (
+                        <DropdownMenuItem onClick={e => { e.stopPropagation(); handleCancel(); }}>
+                          <X className="size-4" />
+                          Cancel selection
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem onClick={e => { e.stopPropagation(); toggleSelectionMode(); }}>
+                          <CheckSquare className="size-4" />
+                          Select to archive
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </span>
@@ -279,8 +310,11 @@ export function WorkspaceSessionContent({
           <SidebarGroupContent>
             {hasTags ? (
               <>
-                {orderedTagNames.map(tagName => {
+                {orderedSessionGroupNames(orderedTagNames, ungroupedSessions.length > 0, sessionTagOrder).map(tagName => {
                   const sessions = tagGroups.get(tagName) ?? [];
+                  if (tagName === '__ungrouped__') {
+                    return <SidebarMenu key={tagName}>{sessions.map(renderSessionButton)}</SidebarMenu>;
+                  }
                   return (
                     <Collapsible key={tagName} open={isTagOpen(tagName)} onOpenChange={(open) => toggleTag(tagName, open)} className="group/tag-collapsible">
                       <div className="group/head flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-muted-foreground">
@@ -323,11 +357,6 @@ export function WorkspaceSessionContent({
                     </Collapsible>
                   );
                 })}
-                {ungroupedSessions.length > 0 && (
-                  <SidebarMenu>
-                    {ungroupedSessions.map(renderSessionButton)}
-                  </SidebarMenu>
-                )}
               </>
             ) : (
               <SidebarMenu>

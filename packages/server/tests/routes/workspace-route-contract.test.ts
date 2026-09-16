@@ -86,6 +86,32 @@ async function json(res: Response): Promise<Record<string, unknown>> {
 }
 
 describe('workspace route contract', () => {
+  test('PATCH accepts both session tag orders and rejects malformed values', async () => {
+    const updates: unknown[] = [];
+    const app = makeApp(makeFakeApplication({
+      update: (id, input) => {
+        updates.push({ id, settings: input.settings });
+        return { kind: 'ok', workspace: makeWorkspace({ settings: input.settings }) };
+      },
+    }));
+    for (const sessionTagOrder of ['tagged-first', 'untagged-first']) {
+      const response = await app.request('/api/workspaces/ws-1', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: { sessionTagOrder } }),
+      });
+      expect(response.status).toBe(200);
+      expect((await json(response)).workspace).toEqual(expect.objectContaining({ settings: { sessionTagOrder } }));
+    }
+    for (const sessionTagOrder of ['invalid', '', null, true, 1, {}]) {
+      const response = await app.request('/api/workspaces/ws-1', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: { sessionTagOrder } }),
+      });
+      expect(response.status).toBe(400);
+    }
+    expect(updates).toHaveLength(2);
+  });
+
   test('GET list returns the application workspaces', async () => {
     const res = await makeApp(makeFakeApplication()).request('/api/workspaces');
     expect(res.status).toBe(200);

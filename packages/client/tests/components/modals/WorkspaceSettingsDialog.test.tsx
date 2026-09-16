@@ -60,6 +60,20 @@ describe('WorkspaceSettingsDialog', () => {
     props.onRefreshPermissions.mockClear();
   });
 
+  test('saves session ordering while preserving other workspace settings', async () => {
+    const user = userEvent.setup();
+    render(<WorkspaceSettingsDialog {...props} open workspace={makeWorkspace()} />);
+    await user.click(screen.getByRole('tab', { name: 'Sessions' }));
+    expect(screen.getByRole('combobox', { name: 'Session order' })).toHaveTextContent('Tagged first');
+    await user.click(screen.getByRole('combobox', { name: 'Session order' }));
+    await user.click(screen.getByRole('option', { name: 'Untagged first' }));
+    expect(mocks.save).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(mocks.save).toHaveBeenCalledWith('ws-1', expect.objectContaining({
+      sessionTagOrder: 'untagged-first', autoApproveSeverity: 'low',
+    }));
+  });
+
   test('requests current permissions when opened', async () => {
     render(
       <WorkspaceSettingsDialog

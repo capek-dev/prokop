@@ -59,6 +59,7 @@ export default function WorkspaceView() {
     renameWorkspace,
     updateWorkspacePath,
     updateWorkspacePaths,
+    updateWorkspaceSettings,
     isCreatingWorkspace,
     deletingWorkspaceId,
     isUpdatingWorkspace,
@@ -187,6 +188,11 @@ export default function WorkspaceView() {
 
   const sidebarContent = (
     <WorkspaceSessionContent
+      sessionTagOrder={sidebarData.activeWorkspace?.settings?.sessionTagOrder}
+      isSavingSettings={!sidebarData.connected || Boolean(activeWorkspace && isUpdatingWorkspace[activeWorkspace.id])}
+      onSessionTagOrderChange={activeWorkspace ? order => {
+        updateWorkspaceSettings(activeWorkspace.id, { ...activeWorkspace.settings, sessionTagOrder: order });
+      } : undefined}
       activeSessions={activeSessions}
       archivedSessions={archivedSessions}
       scheduledJobs={scheduledJobs ?? []}

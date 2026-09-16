@@ -28,6 +28,7 @@ import { useTagCollapseState } from '@/hooks/useTagCollapseState';
 import { useWorkspaceCollapseState } from '@/hooks/useWorkspaceCollapseState';
 import type { OverviewGroup } from '@/config/overviewGroupsTypes';
 import type { StoreActions } from '@/hooks/useOverviewGroups';
+import { getSessionTagOrder, orderedSessionGroupNames } from '@/lib/sessionTagOrder';
 import { getCreateSessionOptions } from '@/lib/sessionCreate';
 import type { CreateSessionOptions } from '@/lib/sessionCreate';
 import { getWorkspaceDisplayName, isAgentHomeWorkspace } from '@/lib/workspaceKind';
@@ -267,8 +268,11 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
                             </div>
                           ) : hasTags ? (
                             <>
-                              {orderedTagNames.map(tagName => {
+                              {orderedSessionGroupNames(orderedTagNames, ungroupedSessions.length > 0, getSessionTagOrder(workspace.settings?.sessionTagOrder)).map(tagName => {
                                 const sessions = tagGroups.get(tagName) ?? [];
+                                if (tagName === '__ungrouped__') {
+                                  return <SidebarMenu key={tagName}>{sessions.map(session => renderSessionButton(session, workspace.id))}</SidebarMenu>;
+                                }
                                 const isTagGroupOpen = isTagOpen(tagName);
                                 return (
                                   <Collapsible key={tagName} open={isTagGroupOpen} onOpenChange={(open) => toggleTag(tagName, open)} className="group/tag-collapsible">
@@ -310,11 +314,6 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
                                   </Collapsible>
                                 );
                               })}
-                              {ungroupedSessions.length > 0 && (
-                                <SidebarMenu>
-                                  {ungroupedSessions.map(session => renderSessionButton(session, workspace.id))}
-                                </SidebarMenu>
-                              )}
                             </>
                           ) : (
                             <SidebarMenu>

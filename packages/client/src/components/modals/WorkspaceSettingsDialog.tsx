@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { Brain, GraduationCap, Wrench, Search, Workflow, Server, Shield, FolderSymlink, Clock, ShieldCheck, Cog, Loader2 } from 'lucide-react';
 import type { Workspace, WorkspaceSettings, PermissionRiskLevel, PermissionGrant, ProkopaiClient, AutoApproveSeverity } from '@prokopai/sdk';
+import { getSessionTagOrder } from '@/lib/sessionTagOrder';
+import { WorkspaceSessionsPanel } from './configuration/WorkspaceSessionsPanel';
 import { learningValidationError } from '@/lib/learningValidation';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { Button } from '@/components/ui/button';
@@ -20,9 +22,10 @@ const WorkspacePreconfigsPanel = lazy(() => import('./configuration/WorkspacePre
 
 const LearningPanel = lazy(() => import('./configuration/LearningPanel').then(m => ({ default: m.LearningPanel })));
 
-type Section = 'learning' | 'mcp' | 'permissions' | 'paths' | 'autoApprove' | 'memory' | 'skills' | 'search' | 'workflow' | 'scheduling' | 'preconfigs';
+type Section = 'sessions' | 'learning' | 'mcp' | 'permissions' | 'paths' | 'autoApprove' | 'memory' | 'skills' | 'search' | 'workflow' | 'scheduling' | 'preconfigs';
 
 const SECTIONS: Omit<SettingsSection, 'icon'>[] = [
+  { value: 'sessions', label: 'Sessions', group: 'general' },
   { value: 'mcp', label: 'MCP Servers', group: 'general' },
   { value: 'permissions', label: 'Permissions', group: 'general' },
   { value: 'autoApprove', label: 'Auto-Approve', group: 'general' },
@@ -43,10 +46,11 @@ const GROUPS = [
 
 /** Sections whose edits are held locally until Save is pressed. */
 const DEFERRED_SAVE_SECTIONS = new Set<Section>([
-  'learning', 'memory', 'skills', 'search', 'workflow', 'scheduling', 'autoApprove', 'preconfigs',
+  'sessions', 'learning', 'memory', 'skills', 'search', 'workflow', 'scheduling', 'autoApprove', 'preconfigs',
 ]);
 
 const ICONS: Record<Section, SettingsSection['icon']> = {
+  sessions: Cog,
   mcp: Server,
   permissions: Shield,
   autoApprove: ShieldCheck,
@@ -89,6 +93,7 @@ function snapshot(workspace: Workspace) {
     workflow: s?.workflow?.enabled ?? false,
     scheduling: { enabled: s?.scheduling?.enabled ?? false, permissionRisk: s?.scheduling?.permissionRisk ?? 'medium' as PermissionRiskLevel },
     autoApprove: s?.autoApproveSeverity ?? 'low' as AutoApproveSeverity,
+    sessionTagOrder: getSessionTagOrder(s?.sessionTagOrder),
     preconfigSettings: s?.preconfigs ?? { selectedIds: null, defaultId: null },
   };
 }
@@ -152,6 +157,7 @@ export function WorkspaceSettingsDialog({
       scheduling: { enabled: draft.scheduling.enabled, permissionRisk: draft.scheduling.permissionRisk },
       autoApproveSeverity: draft.autoApprove,
       preconfigs: draft.preconfigSettings,
+      sessionTagOrder: draft.sessionTagOrder,
     });
     onOpenChange(false);
   };
@@ -160,6 +166,9 @@ export function WorkspaceSettingsDialog({
     <Suspense fallback={<PanelLoadingFallback />}>
       {(() => {
         switch (value as Section) {
+          case 'sessions':
+            return <WorkspaceSessionsPanel order={draft.sessionTagOrder}
+              onChange={sessionTagOrder => setDraft(d => ({ ...d, sessionTagOrder }))} />;
           case 'mcp':
             return <MCPServersPanel workspaceId={workspace.id} sdkClient={sdkClient} />;
           case 'permissions':

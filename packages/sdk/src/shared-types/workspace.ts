@@ -9,6 +9,8 @@ export * from '@capekai/types/workspace';
 /** Product settings remain outside the neutral runtime contracts. */
 export interface WorkspaceSettings extends RuntimeWorkspaceSettings {
   learning?: WorkspaceLearningSettings;
+  /** Active session groups, defaults to tagged-first when absent. */
+  sessionTagOrder?: 'tagged-first' | 'untagged-first';
   /** Independent of workspace learning. Absent on legacy workspaces means allowed. */
   allowPersonalLearning?: boolean;
 }

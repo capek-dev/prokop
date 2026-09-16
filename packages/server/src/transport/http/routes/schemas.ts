@@ -253,6 +253,7 @@ const riskLevel = z.enum(['none', 'low', 'medium', 'high', 'critical']);
 const severity = z.enum(['off', 'none', 'low', 'medium', 'high']);
 
 export const workspaceSettingsSchema = z.object({
+  sessionTagOrder: z.enum(['tagged-first', 'untagged-first']).optional(),
   learning: learningSettingsSchema.optional(),
   allowPersonalLearning: z.boolean().optional(),
   memory: z.object({
