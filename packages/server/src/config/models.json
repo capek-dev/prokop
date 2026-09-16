@@ -52,6 +52,12 @@
                 "reasoningEffort": "max"
               }
             }
+          },
+          "capabilities": {
+            "input": {
+              "image": true,
+              "text": true
+            }
           }
         }
       ]
