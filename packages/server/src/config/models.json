@@ -30,8 +30,8 @@
           }
         },
         {
-          "id": "deepseek-v4-flash",
-          "name": "DeepSeek V4 Flash",
+          "id": "deepseek-flash",
+          "name": "DeepSeek V4.1 Flash",
           "contextWindow": 1000000,
           "maxOutputTokens": 384000,
           "tier": "budget",
