@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useViewRefs } from '@/contexts/ViewRefsContext';
 import { useSessionManager } from '@/contexts/SessionManagerContext';
 import { useSidebarData } from '@/hooks/useSidebarData';
+import { useSessionCategories } from '@/hooks/useSessionCategories';
 import { useWorkspaceSessions } from '@/hooks/useWorkspaceSessions';
 import { useWorkspaceTagsQuery, useInvalidateWorkspaceTags } from '@/hooks/queries';
 import { useScheduledJobs, usePauseScheduledJob, useResumeScheduledJob, useTriggerScheduledJob, useDeleteScheduledJob } from '@/hooks/queries';
@@ -65,6 +66,7 @@ export default function WorkspaceView() {
     isUpdatingWorkspace,
   } = sessionManager;
   const handleResumeSession = useMobileSessionSelection(resumeSession);
+  const categories = useSessionCategories(sdkClient, sidebarData.activeWorkspace?.id ?? null, sidebarData.connected);
 
   const newChatPreconfigId = getWorkspaceDefaultPreconfigId(activeWorkspace, allPreconfigs)
     ?? primaryPreconfigs[0]?.id;
@@ -188,6 +190,8 @@ export default function WorkspaceView() {
 
   const sidebarContent = (
     <WorkspaceSessionContent
+      key={sidebarData.activeWorkspace?.id}
+      categories={categories}
       sessionTagOrder={sidebarData.activeWorkspace?.settings?.sessionTagOrder}
       isSavingSettings={!sidebarData.connected || Boolean(activeWorkspace && isUpdatingWorkspace[activeWorkspace.id])}
       onSessionTagOrderChange={activeWorkspace ? order => {

@@ -12,6 +12,7 @@ import {
 } from '@/infrastructure/sqlite/workspaces';
 import {
   cleanupSessionsOutputDirs,
+  countSessionsByWorkspace,
   decodeSessionCursor,
   DEFAULT_PAGE_SIZE,
   encodeSessionCursor,
@@ -63,6 +64,7 @@ export function createJean2WorkspaceRepositoryPort(): WorkspaceRepositoryPort {
 
 export function createJean2WorkspaceSessionListingPort(): WorkspaceSessionListingPort {
   return {
+    countByWorkspace: countSessionsByWorkspace,
     listByWorkspace: (workspaceId, options) => listSessionsByWorkspace(workspaceId, options),
     listPageByWorkspace: (workspaceId, options) =>
       listSessionPageByWorkspace(workspaceId, options) as unknown as ReturnType<

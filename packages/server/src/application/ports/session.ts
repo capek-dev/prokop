@@ -143,7 +143,7 @@ export interface SessionRepositoryPort {
    * current store query. */
   listSessionsByWorkspace(
     workspaceId: string,
-    options?: { status?: SessionStatus; rootOnly?: boolean },
+    options?: import('@prokopai/sdk').SessionListFilter,
   ): Session[];
   /** Root sessions only (parent_id IS NULL), updated_at descending,
    * optional limit. Delegates verbatim to the current store query; no
@@ -151,11 +151,11 @@ export interface SessionRepositoryPort {
   listSessionsByAgent(agentId: string, limit?: number): Session[];
   listSessionsGrouped(
     workspaceIds: string[],
-    options?: { status?: SessionStatus; rootOnly?: boolean },
+    options?: import('@prokopai/sdk').SessionListFilter,
   ): Record<string, Session[]>;
   listSessionPageGrouped(
     workspaceIds: string[],
-    options: { status?: SessionStatus; rootOnly?: boolean; limitPerWorkspace: number },
+    options: import('@prokopai/sdk').SessionListFilter & { limitPerWorkspace: number },
   ): GroupedSessionPage;
   listTagsByWorkspace(workspaceId: string): string[];
 

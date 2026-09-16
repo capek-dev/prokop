@@ -3,6 +3,7 @@ import type {
   Message,
   Session,
   SessionStatus,
+  SessionListFilter,
 } from '@prokopai/sdk';
 import type {
   AttachmentRecord,
@@ -49,11 +50,11 @@ export interface SessionHttpApplication {
   createSession(input: SessionHttpCreateInput): Session | null;
   listSessionsGrouped(
     workspaceIds: string[],
-    options?: { status?: SessionStatus; rootOnly?: boolean },
+    options?: SessionListFilter,
   ): Record<string, Session[]>;
   listSessionPageGrouped(
     workspaceIds: string[],
-    options: { status?: SessionStatus; rootOnly?: boolean; limitPerWorkspace: number },
+    options: SessionListFilter & { limitPerWorkspace: number },
   ): GroupedSessionPage;
   listTagsByWorkspace(workspaceId: string): string[];
 

@@ -47,6 +47,7 @@ function makeFakeApplication(overrides: Partial<WorkspaceApplication> = {}): Wor
     createTerminal: () => ({ kind: 'ok', session: { id: 't-1' } }),
     getTerminal: (sessionId) => (sessionId === 't-1' ? { id: 't-1' } : null),
     destroyTerminal: () => {},
+    countSessions: (id) => id === 'ws-1' ? { kind: 'ok', counts: { active: 4, archived: 12, scheduled: 6 } } : { kind: 'missing' },
     listSessions: () => ({ kind: 'ok', sessions: [makeSession()] }),
     listSessionPage: () => ({
       kind: 'ok',
@@ -86,6 +87,24 @@ async function json(res: Response): Promise<Record<string, unknown>> {
 }
 
 describe('workspace route contract', () => {
+  test('counts do not load session rows, and category validation happens before listing', async () => {
+    const calls: unknown[] = [];
+    const app = makeApp(makeFakeApplication({
+      listSessions: (_id, options) => { calls.push(options); return { kind: 'ok', sessions: [] }; },
+    }));
+    expect(await json(await app.request('/api/workspaces/ws-1/sessions/counts'))).toEqual({ counts: { active: 4, archived: 12, scheduled: 6 } });
+    expect((await app.request('/api/workspaces/missing/sessions/counts')).status).toBe(404);
+    expect(calls).toHaveLength(0);
+    for (const category of ['bad', '', 'null']) {
+      expect((await app.request(`/api/workspaces/ws-1/sessions?category=${category}`)).status).toBe(400);
+    }
+    expect(calls).toHaveLength(0);
+    for (const category of ['active', 'archived', 'scheduled']) {
+      expect((await app.request(`/api/workspaces/ws-1/sessions?category=${category}`)).status).toBe(200);
+    }
+    expect(calls.map(value => (value as { category: string }).category)).toEqual(['active', 'archived', 'scheduled']);
+  });
+
   test('PATCH accepts both session tag orders and rejects malformed values', async () => {
     const updates: unknown[] = [];
     const app = makeApp(makeFakeApplication({

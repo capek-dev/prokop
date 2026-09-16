@@ -4,11 +4,13 @@ import { HttpClient } from '@prokopai/sdk';
 import { useConnectionLifecycle } from '@/hooks/useConnectionLifecycle';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
+import { queryClient } from '@/components/providers/QueryProvider';
 
 vi.mock('@/config/client-identity', () => ({
   resolveClientDescriptor: async () => ({ clientId: 'test-client', clientType: 'web' }),
 }));
 vi.mock('@/hooks/subscribeToServerEvents', () => ({ subscribeToServerEvents: vi.fn() }));
+vi.mock('@/lib/refreshWorkspaceActivity', () => ({ refreshWorkspaceActivity: vi.fn().mockResolvedValue(undefined) }));
 
 class FakeSocket {
   static OPEN = 1;
@@ -58,6 +60,7 @@ afterEach(() => {
 describe('connection lifecycle', () => {
   test('shutdown reconnects immediately and restores subscriptions without replaying mutations', async () => {
     vi.spyOn(HttpClient, 'verifyToken').mockResolvedValue(true);
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue();
     useSessionBoardStore.setState({ openSessionIds: ['session-1'], focusedSessionId: 'session-1' });
     const hook = mount();
     await flush();
@@ -70,6 +73,8 @@ describe('connection lifecycle', () => {
     act(() => latest().open());
     const messages = latest().sent.map(value => JSON.parse(value));
     expect(messages.map(message => message.type)).toEqual(['client.register', 'session.resume']);
+    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenLastCalledWith();
     expect(useConnectionStore.getState().connected).toBe(true);
     hook.unmount();
   });

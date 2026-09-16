@@ -9,7 +9,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import type { Session, SessionStatus, SubagentStatus } from '@prokopai/sdk';
+import type { Session, SessionStatus, SubagentStatus, SessionListFilter, SessionCategory, SessionCategoryCounts } from '@prokopai/sdk';
 import type {
   ListSessionPageOptions,
   SessionCreateInput,
@@ -22,6 +22,19 @@ import type {
 } from '@/application/ports/session-message';
 
 export type SessionDatabaseAccessor = () => Database;
+
+// Match sidebar classification before pagination. Malformed legacy metadata is empty.
+function categoryPredicate(category: SessionCategory): string {
+  const metadata = "CASE WHEN json_valid(metadata) THEN metadata ELSE '{}' END";
+  const truthy = (field: string) => `COALESCE(json_extract(${metadata}, '$.${field}'), '') NOT IN ('', 0)`;
+  const root = `parent_id IS NULL AND NOT (${truthy('learningRunId')})`;
+  const scheduled = truthy('scheduledJobId');
+  switch (category) {
+    case 'active': return `${root} AND NOT (${scheduled}) AND status = 'active'`;
+    case 'archived': return `${root} AND status = 'closed'`;
+    case 'scheduled': return `${root} AND (${scheduled})`;
+  }
+}
 
 interface SessionRow {
   id: string;
@@ -324,7 +337,7 @@ export function createSessionRepository(
 
   function listSessionsByWorkspace(
     workspaceId: string,
-    options?: { status?: SessionStatus; rootOnly?: boolean },
+    options?: SessionListFilter,
   ): Session[] {
     const db = getDb();
     const whereClauses: string[] = ['workspace_id = ?'];
@@ -337,6 +350,7 @@ export function createSessionRepository(
     if (options?.rootOnly === true) {
       whereClauses.push('parent_id IS NULL');
     }
+    if (options?.category) whereClauses.push(categoryPredicate(options.category));
 
     const query = `SELECT * FROM sessions WHERE ${whereClauses.join(' AND ')} ORDER BY updated_at DESC`;
     const rows = db.query(query).all(...values) as SessionRow[];
@@ -345,7 +359,7 @@ export function createSessionRepository(
 
   function listSessionsGrouped(
     workspaceIds: string[],
-    options?: { status?: SessionStatus; rootOnly?: boolean },
+    options?: SessionListFilter,
   ): Record<string, Session[]> {
     const db = getDb();
     const placeholders = workspaceIds.map(() => '?').join(', ');
@@ -359,6 +373,7 @@ export function createSessionRepository(
     if (options?.rootOnly === true) {
       whereClauses.push('parent_id IS NULL');
     }
+    if (options?.category) whereClauses.push(categoryPredicate(options.category));
 
     const query = `SELECT * FROM sessions WHERE ${whereClauses.join(' AND ')} ORDER BY updated_at DESC`;
     const rows = db.query(query).all(...values) as SessionRow[];
@@ -375,6 +390,14 @@ export function createSessionRepository(
     }
 
     return result;
+  }
+
+  function countSessionsByWorkspace(workspaceId: string): SessionCategoryCounts {
+    return getDb().query(`SELECT
+      COUNT(CASE WHEN ${categoryPredicate('active')} THEN 1 END) AS active,
+      COUNT(CASE WHEN ${categoryPredicate('archived')} THEN 1 END) AS archived,
+      COUNT(CASE WHEN ${categoryPredicate('scheduled')} THEN 1 END) AS scheduled
+      FROM sessions WHERE workspace_id = ?`).get(workspaceId) as SessionCategoryCounts;
   }
 
   function listTagsByWorkspace(workspaceId: string): string[] {
@@ -438,6 +461,7 @@ export function createSessionRepository(
     if (options.rootOnly === true) {
       whereClauses.push('parent_id IS NULL');
     }
+    if (options.category) whereClauses.push(categoryPredicate(options.category));
 
     if (options.cursor) {
       whereClauses.push('(updated_at < ? OR (updated_at = ? AND id < ?))');
@@ -485,7 +509,7 @@ export function createSessionRepository(
    */
   function listSessionPageGrouped(
     workspaceIds: string[],
-    options: { status?: SessionStatus; rootOnly?: boolean; limitPerWorkspace: number },
+    options: SessionListFilter & { limitPerWorkspace: number },
   ): { sessions: Record<string, Session[]>; pagination: Record<string, SessionPageInfo> } {
     const db = getDb();
     const limitPerWs = clampLimit(options.limitPerWorkspace);
@@ -512,6 +536,7 @@ export function createSessionRepository(
     if (options.rootOnly === true) {
       whereClauses.push('parent_id IS NULL');
     }
+    if (options.category) whereClauses.push(categoryPredicate(options.category));
 
     const query = `
       WITH ranked AS (
@@ -592,6 +617,7 @@ export function createSessionRepository(
     listSessionsByWorkspace,
     listSessionsGrouped,
     listTagsByWorkspace,
+    countSessionsByWorkspace,
     getChildSessions,
     getSessionsByAgent,
     encodeSessionCursor,

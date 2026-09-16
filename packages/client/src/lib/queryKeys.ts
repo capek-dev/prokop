@@ -1,17 +1,21 @@
+import type { SessionCategory } from '@prokopai/sdk';
+
 export const queryKeys = {
   sessions: {
     all: ['sessions'] as const,
+    counts: (workspaceId: string) => ['sessions', 'counts', workspaceId] as const,
     byWorkspace: (workspaceId: string) => ['sessions', 'workspace', workspaceId] as const,
     byWorkspaceInfinite: (options: {
       workspaceId: string;
       status?: string;
+      category?: SessionCategory;
       rootOnly?: boolean;
       limit: number;
     }) => ['sessions', 'workspace', 'infinite', options] as const,
     grouped: (workspaceIds: string[], status?: string) =>
       ['sessions', 'grouped', { workspaceIds: [...workspaceIds].sort(), status }] as const,
-    groupedBounded: (workspaceIds: string[], status: string | undefined, limitPerWorkspace: number) =>
-      ['sessions', 'grouped', 'bounded', { workspaceIds: [...workspaceIds].sort(), status, limitPerWorkspace }] as const,
+    groupedBounded: (workspaceIds: string[], status: string | undefined, limitPerWorkspace: number, category?: SessionCategory) =>
+      ['sessions', 'grouped', 'bounded', { workspaceIds: [...workspaceIds].sort(), status, limitPerWorkspace, category }] as const,
     tags: (workspaceId: string) => ['sessions', 'tags', workspaceId] as const,
     toolDebug: (sessionId: string, partId: string) =>
       ['sessions', sessionId, 'tool-debug', partId] as const,

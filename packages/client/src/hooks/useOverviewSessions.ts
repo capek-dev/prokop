@@ -43,11 +43,13 @@ export function useOverviewSessions({
       workspaceIds,
       'active',
       OVERVIEW_LIMIT_PER_WORKSPACE,
+      'active',
     ),
     queryFn: () =>
       sdkClient!.http.sessions.listGrouped({
         workspaceIds,
         status: 'active',
+        category: 'active',
         rootOnly: true,
         limitPerWorkspace: OVERVIEW_LIMIT_PER_WORKSPACE,
       }),
@@ -90,6 +92,7 @@ export function useOverviewSessions({
     sdkClient.http.sessions.listByWorkspace({
       workspaceId,
       status: 'active',
+      category: 'active',
       rootOnly: true,
       limit: OVERVIEW_LIMIT_PER_WORKSPACE,
       cursor,

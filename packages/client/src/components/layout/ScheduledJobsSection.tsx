@@ -39,8 +39,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useNow } from '@/hooks/useNow';
+import type { SessionCategories } from '@/hooks/useSessionCategories';
+import { SessionCategoryStatus } from './SessionCategoryStatus';
 
 interface ScheduledJobsSectionProps {
+  category?: SessionCategories['scheduled'];
+  sessionCount?: number;
   jobs: ScheduledJob[];
   sessionsByJob: Map<string, Session[]>;
   pendingJobIds?: ReadonlySet<string>;
@@ -67,6 +71,8 @@ function relativeTime(iso: string, now: number): string {
 }
 
 export function ScheduledJobsSection({
+  category,
+  sessionCount,
   jobs,
   sessionsByJob,
   pendingJobIds,
@@ -110,26 +116,26 @@ export function ScheduledJobsSection({
   };
 
   return (
-    <Collapsible defaultOpen className="group/collapsible">
+    <Collapsible open={category?.open} onOpenChange={category?.onOpenChange} className="group/collapsible">
       <SidebarGroup>
         <SidebarGroupLabel asChild>
           <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between w-full">
-              <span className="flex items-center gap-2">
-                <ChevronRight className="size-3 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                Scheduled
-              </span>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">{jobs.length}</Badge>
+            <div className="group/head flex w-full items-center gap-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <ChevronRight className="size-3 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+              <span>Scheduled</span>
+              <span className="text-[10px] tabular-nums text-muted-foreground/70" aria-label="Scheduled sessions">{sessionCount ?? (category ? '…' : [...sessionsByJob.values()].reduce((sum, runs) => sum + runs.length, 0))}</span>
+              <span className="flex-1" />
+              <div className="flex items-center">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
                       onClick={(e) => e.stopPropagation()}
-                      className="p-1 rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                      className="flex size-5 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                       title="Scheduled jobs"
+                      aria-label="Scheduled jobs"
                     >
-                      <MoreHorizontal className="size-4" />
+                      <MoreHorizontal className="size-3.5" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-48">
@@ -255,7 +261,7 @@ export function ScheduledJobsSection({
                     </SidebarMenuItem>
                     <CollapsibleContent>
                       <div className="ml-4 border-l border-border pl-1 space-y-0.5 mb-1">
-                        {runs.slice(0, 10).map((session) => (
+                        {runs.map((session) => (
                           <SidebarMenuButton
                             key={session.id}
                             isActive={currentSessionId === session.id}
@@ -269,17 +275,23 @@ export function ScheduledJobsSection({
                             </span>
                           </SidebarMenuButton>
                         ))}
-                        {runs.length > 10 && (
-                          <div className="px-3 py-0.5 text-[10px] text-muted-foreground">
-                            +{runs.length - 10} more
-                          </div>
-                        )}
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
                 );
               })}
             </SidebarMenu>
+            <SidebarMenu>
+              {[...sessionsByJob.entries()].filter(([jobId]) => !jobs.some(job => job.id === jobId)).flatMap(([, runs]) => runs).map(session => (
+                <SidebarMenuItem key={session.id}>
+                  <SidebarMenuButton isActive={currentSessionId === session.id} onClick={() => onOpenSession(session.id)}>
+                    <MessageSquare />
+                    <span className="truncate">{session.title ?? 'Scheduled session'}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+            <SessionCategoryStatus category={category} />
           </SidebarGroupContent>
         </CollapsibleContent>
       </SidebarGroup>

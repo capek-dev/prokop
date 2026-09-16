@@ -3,6 +3,8 @@ import type {
   PinnedMessage,
   Session,
   SessionStatus,
+  SessionListFilter,
+  SessionCategoryCounts,
   Workspace,
   WorkspaceSettings,
 } from '@prokopai/sdk';
@@ -55,13 +57,14 @@ export interface WorkspaceSessionPage {
 }
 
 export interface WorkspaceSessionListingPort {
+  countByWorkspace(workspaceId: string): SessionCategoryCounts;
   listByWorkspace(
     workspaceId: string,
-    options: { status?: SessionStatus; rootOnly?: boolean },
+    options: SessionListFilter,
   ): Session[];
   listPageByWorkspace(
     workspaceId: string,
-    options: {
+    options: SessionListFilter & {
       status?: SessionStatus;
       rootOnly?: boolean;
       cursor?: WorkspaceSessionCursor;

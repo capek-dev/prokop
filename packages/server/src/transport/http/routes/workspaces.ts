@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { validate } from './validate';
+import { parseSessionCategory } from './session-category';
 import type { SessionStatus } from '@prokopai/sdk';
 import type { WorkspaceApplication } from '@/application/workspaces';
 import { BadRequestError, NotFoundError } from '@/application/http-errors';
@@ -146,18 +147,25 @@ export function registerWorkspaceRoutes(app: Hono, application: WorkspaceApplica
     return c.json({ success: true });
   });
 
+  app.get('/api/workspaces/:id/sessions/counts', (c) => {
+    const result = application.countSessions(c.req.param('id'));
+    if (result.kind === 'missing') throw new NotFoundError('Workspace not found');
+    return c.json({ counts: result.counts });
+  });
+
   // GET /api/workspaces/:id/sessions - List sessions in a workspace
   app.get('/api/workspaces/:id/sessions', async (c) => {
     const workspaceId = c.req.param('id');
     const status = c.req.query('status') as SessionStatus | undefined;
     const rootOnly = c.req.query('rootOnly') === 'true';
+    const category = parseSessionCategory(c.req.query('category'));
     const cursorParam = c.req.query('cursor');
     const limitParam = c.req.query('limit');
 
     const usePagination = cursorParam !== undefined || limitParam !== undefined;
 
     if (!usePagination) {
-      const result = application.listSessions(workspaceId, { status, rootOnly });
+      const result = application.listSessions(workspaceId, { status, rootOnly, ...(category ? { category } : {}) });
       if (result.kind === 'missing') {
         throw new NotFoundError('Workspace not found');
       }
@@ -167,6 +175,7 @@ export function registerWorkspaceRoutes(app: Hono, application: WorkspaceApplica
     const result = application.listSessionPage(workspaceId, {
       status,
       rootOnly,
+      ...(category ? { category } : {}),
       cursorParam,
       limitParam,
     });

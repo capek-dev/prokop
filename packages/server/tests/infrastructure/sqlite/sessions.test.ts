@@ -16,6 +16,7 @@ import {
   deleteSessionsByWorkspace,
   listSessionPageByWorkspace,
   listSessionPageGrouped,
+  countSessionsByWorkspace,
   encodeSessionCursor,
   decodeSessionCursor,
 } from '@/infrastructure/sqlite/session-store';
@@ -45,6 +46,36 @@ describe('sessions store', () => {
 
   afterEach(() => {
     resetTestDatabase();
+  });
+
+  test('category counts and filtering precede workspace and grouped pagination', () => {
+    seedWorkspace({ id: 'ws1' });
+    seedWorkspace({ id: 'ws2' });
+    const records = [
+      { id: 'normal', status: 'active' as const },
+      { id: 'normal2', status: 'active' as const },
+      { id: 'archived', status: 'closed' as const },
+      { id: 'scheduled', status: 'active' as const, metadata: { scheduledJobId: 'job' } },
+      { id: 'scheduled-closed', status: 'closed' as const, metadata: { scheduledJobId: 'job' } },
+      { id: 'learning', status: 'active' as const, metadata: { learningRunId: 'run' } },
+      { id: 'learning-closed', status: 'closed' as const, metadata: { learningRunId: 'run' } },
+      { id: 'child', status: 'active' as const, parentId: 'normal' },
+    ];
+    for (const record of records) createSession(makeSession({ workspaceId: 'ws1', title: record.id, ...record }));
+    expect(countSessionsByWorkspace('ws1')).toEqual({ active: 2, archived: 2, scheduled: 2 });
+    expect(countSessionsByWorkspace('ws2')).toEqual({ active: 0, archived: 0, scheduled: 0 });
+    const page = listSessionPageByWorkspace('ws1', { category: 'active', limit: 1 });
+    expect(page.sessions).toHaveLength(1);
+    expect(page.hasMore).toBe(true);
+    const next = listSessionPageByWorkspace('ws1', { category: 'active', limit: 1, cursor: page.nextCursor! });
+    expect(new Set([...page.sessions, ...next.sessions].map(s => s.id))).toEqual(new Set(['normal', 'normal2']));
+    expect(next.hasMore).toBe(false);
+    expect(listSessionPageGrouped(['ws1'], { category: 'active', limitPerWorkspace: 1 }).sessions.ws1).toHaveLength(1);
+    expect(listSessionsByWorkspace('ws1', { category: 'archived' }).map(s => s.id).sort()).toEqual(['archived', 'scheduled-closed']);
+    expect(listSessionsGrouped(['ws1'], { category: 'scheduled' }).ws1.map(s => s.id).sort()).toEqual(['scheduled', 'scheduled-closed']);
+    expect(listSessionsByWorkspace('ws1')).toHaveLength(records.length);
+    getDatabase().run("UPDATE sessions SET metadata = 'broken json' WHERE id = 'normal'");
+    expect(countSessionsByWorkspace('ws1').active).toBe(2);
   });
 
   describe('createSession', () => {

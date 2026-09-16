@@ -33,6 +33,21 @@ function visibleSessions() {
 }
 
 describe('session panel ordering', () => {
+  test('archived shows the server count while collapsed and requests expansion', async () => {
+    const category = { open: false, onOpenChange: vi.fn(), isLoading: false, error: null, hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn(), loadedCount: 0, retry: vi.fn() };
+    const categories = { counts: { active: 2, archived: 42, scheduled: 3 }, countsError: undefined, retryCounts: vi.fn(), archived: category, scheduled: category };
+    const props = { ...panelProps, archivedSessions: [{ id: 'old-session' } as Session], categories };
+    const { rerender } = render(<WorkspaceSessionContent {...props} />);
+    expect(screen.getByText('42')).toBeVisible();
+    expect(screen.queryByText('old-session')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Archived actions' })).toBeDisabled();
+    await userEvent.setup().click(screen.getByText('Archived'));
+    expect(category.onOpenChange).toHaveBeenCalledWith(true);
+    rerender(<WorkspaceSessionContent {...props} categories={{ ...categories, archived: { ...category, open: true } }} />);
+    expect(screen.getByText('old-session')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Archived actions' })).toBeEnabled();
+  });
+
   test('updates rendered ordering when workspace preference changes', () => {
     const { rerender } = render(<WorkspaceSessionContent {...panelProps} />);
     expect(visibleSessions()).toEqual(['tagged', 'untagged']);

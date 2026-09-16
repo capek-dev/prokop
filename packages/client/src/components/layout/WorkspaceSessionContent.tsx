@@ -26,12 +26,15 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SessionMenuButton, type ChildrenMap, type SessionDerivedValuesMap } from './SessionMenuButton';
 import { ScheduledJobsSection } from './ScheduledJobsSection';
+import { SessionCategoryStatus } from './SessionCategoryStatus';
+import type { SessionCategories } from '@/hooks/useSessionCategories';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { SESSION_TAG_ORDERS, isSessionTagOrder, orderedSessionGroupNames, type SessionTagOrder } from '@/lib/sessionTagOrder';
 import { useTagCollapseState } from '@/hooks/useTagCollapseState';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 
 interface WorkspaceSessionContentProps {
+  categories?: SessionCategories;
   sessionTagOrder?: SessionTagOrder;
   onSessionTagOrderChange?: (order: SessionTagOrder) => void;
   isSavingSettings?: boolean;
@@ -69,6 +72,7 @@ interface WorkspaceSessionContentProps {
 }
 
 export function WorkspaceSessionContent({
+  categories,
   sessionTagOrder = 'tagged-first',
   onSessionTagOrderChange,
   isSavingSettings = false,
@@ -388,6 +392,8 @@ export function WorkspaceSessionContent({
       {/* Scheduled Jobs */}
       <ScheduledJobsSection
         jobs={scheduledJobs}
+        category={categories?.scheduled}
+        sessionCount={categories?.counts?.scheduled}
         sessionsByJob={scheduledSessionsByJob}
         pendingJobIds={pendingScheduledJobIds}
         currentSessionId={currentSessionId}
@@ -401,15 +407,15 @@ export function WorkspaceSessionContent({
       />
 
       {/* Archived Sessions */}
-      {archivedSessions.length > 0 && (
-        <Collapsible className="group/collapsible">
+      {(categories || archivedSessions.length > 0) && (
+        <Collapsible open={categories?.archived.open} onOpenChange={categories?.archived.onOpenChange} className="group/collapsible">
           <SidebarGroup>
             <SidebarGroupLabel asChild>
               <CollapsibleTrigger asChild>
                 <div className="group/head flex w-full items-center gap-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   <ChevronRight className="size-3 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                   <span>Archived</span>
-                  {renderCount(archivedSessions.length)}
+                  {categories && !categories.counts ? <span className="text-xs">…</span> : renderCount(categories?.counts?.archived ?? archivedSessions.length)}
                   <span className="flex-1" />
                   <span className="flex items-center opacity-0 transition-opacity group-hover/head:opacity-100">
                     <DropdownMenu>
@@ -418,6 +424,7 @@ export function WorkspaceSessionContent({
                           type="button"
                           onClick={e => e.stopPropagation()}
                           className="flex size-5 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          disabled={!archivedSessions.length || (categories && !categories.archived.open)}
                           title="Archived actions"
                           aria-label="Archived actions"
                         >
@@ -430,7 +437,7 @@ export function WorkspaceSessionContent({
                           className="text-destructive focus:text-destructive"
                         >
                           <Trash2 className="size-4" />
-                          Delete all
+                          Delete loaded sessions
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -462,14 +469,21 @@ export function WorkspaceSessionContent({
                     />
                   ))}
                 </SidebarMenu>
+                <SessionCategoryStatus category={categories?.archived} />
               </SidebarGroupContent>
             </CollapsibleContent>
           </SidebarGroup>
         </Collapsible>
       )}
 
+      {categories?.countsError && (
+        <p role="alert" className="px-2 text-xs text-destructive">
+          Session counts unavailable.
+          <Button variant="ghost" size="sm" onClick={categories.retryCounts}>Retry counts</Button>
+        </p>
+      )}
       {/* Empty State */}
-      {activeSessions.length === 0 && archivedSessions.length === 0 && (
+      {activeSessions.length === 0 && (categories ? categories.counts?.active === 0 && categories.counts.archived === 0 && categories.counts.scheduled === 0 : archivedSessions.length === 0) && (
         <div className="p-4 text-center text-sm text-muted-foreground">
           No sessions yet.
           <br />
@@ -497,9 +511,9 @@ export function WorkspaceSessionContent({
       <ConfirmationDialog
         open={deleteAllDialogOpen || isBulkDeleting}
         onOpenChange={(open) => { if (!isBulkDeleting) setDeleteAllDialogOpen(open); }}
-        title="Delete all archived sessions?"
-        description={`This will permanently delete ${archivedSessions.length} archived session${archivedSessions.length === 1 ? '' : 's'}. This action cannot be undone.`}
-        confirmLabel="Delete all"
+        title="Delete loaded archived sessions?"
+        description={`This will permanently delete the ${archivedSessions.length} loaded archived session${archivedSessions.length === 1 ? '' : 's'}. Sessions not loaded are not affected. This action cannot be undone.`}
+        confirmLabel="Delete loaded"
         variant="destructive"
         loading={isBulkDeleting}
         onConfirm={handleDeleteAllArchived}

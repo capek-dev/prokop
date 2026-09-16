@@ -11,7 +11,7 @@ import type {
   GetToolDebugResponse,
   SessionWorktreeResponse,
 } from '../types/rest-responses';
-import type { SessionStatus } from '../types';
+import type { SessionStatus, SessionListFilter, SessionCategoryCounts } from '../shared-types/session';
 
 interface ListOptions {
   status?: SessionStatus;
@@ -36,7 +36,7 @@ interface UpdateOptions {
   autoApproveSeverity?: string | null;
 }
 
-interface ListGroupedOptions {
+interface ListGroupedOptions extends SessionListFilter {
   workspaceIds: string[];
   status?: SessionStatus;
   rootOnly?: boolean;
@@ -44,7 +44,7 @@ interface ListGroupedOptions {
   signal?: AbortSignal;
 }
 
-interface ListByWorkspaceOptions {
+interface ListByWorkspaceOptions extends SessionListFilter {
   workspaceId: string;
   status?: SessionStatus;
   rootOnly?: boolean;
@@ -139,6 +139,7 @@ export class SessionsRestNamespace {
     };
     if (options.status) params.status = options.status;
     if (options.rootOnly) params.rootOnly = 'true';
+    if (options.category) params.category = options.category;
     if (options.limitPerWorkspace !== undefined) params.limitPerWorkspace = String(options.limitPerWorkspace);
     return this.http.get('/sessions/grouped', { params, signal: options.signal });
   }
@@ -147,9 +148,14 @@ export class SessionsRestNamespace {
     const params: Record<string, string> = {};
     if (options.status) params.status = options.status;
     if (options.rootOnly) params.rootOnly = 'true';
+    if (options.category) params.category = options.category;
     if (options.limit !== undefined) params.limit = String(options.limit);
     if (options.cursor) params.cursor = options.cursor;
     return this.http.get(`/workspaces/${encodeURIComponent(options.workspaceId)}/sessions`, { params, signal: options.signal });
+  }
+
+  async countsByWorkspace(workspaceId: string, options?: { signal?: AbortSignal }): Promise<{ counts: SessionCategoryCounts }> {
+    return this.http.get(`/workspaces/${encodeURIComponent(workspaceId)}/sessions/counts`, { signal: options?.signal });
   }
 
   async listTags(workspaceId: string, options?: { signal?: AbortSignal }): Promise<{ tags: string[] }> {

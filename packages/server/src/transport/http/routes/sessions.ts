@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import type { SessionStatus } from '@prokopai/sdk';
 import { validate } from './validate';
+import { parseSessionCategory } from './session-category';
 import { createSessionSchema, updateSessionSchema } from './schemas';
 import {
   BadRequestError,
@@ -59,6 +60,7 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
 
     const status = c.req.query('status') as SessionStatus | undefined;
     const rootOnly = c.req.query('rootOnly') === 'true';
+    const category = parseSessionCategory(c.req.query('category'));
     const limitPerWorkspaceParam = c.req.query('limitPerWorkspace');
 
     // When limitPerWorkspace is present, use bounded grouped pagination
@@ -68,11 +70,11 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
         throw new BadRequestError('limitPerWorkspace must be an integer between 1 and 100');
       }
 
-      const result = application.listSessionPageGrouped(workspaceIds, { status, rootOnly, limitPerWorkspace });
+      const result = application.listSessionPageGrouped(workspaceIds, { status, rootOnly, limitPerWorkspace, ...(category ? { category } : {}) });
       return c.json({ sessions: result.sessions, pagination: result.pagination });
     }
 
-    const sessions = application.listSessionsGrouped(workspaceIds, { status, rootOnly });
+    const sessions = application.listSessionsGrouped(workspaceIds, { status, rootOnly, ...(category ? { category } : {}) });
     return c.json({ sessions });
   });
 

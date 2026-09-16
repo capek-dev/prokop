@@ -6,7 +6,7 @@
 
 import { getDatabase } from './database';
 import { notifyLearningActivity } from '@/application/learning/activity';
-import type { Session, SessionStatus, Workspace } from '@prokopai/sdk';
+import type { Session, SessionStatus, Workspace, SessionListFilter, SessionCategoryCounts } from '@prokopai/sdk';
 import { getWorkspace, getWorkspaceLastConversationAt } from './workspaces';
 import { notifyWorkspaceActivity } from '@/application/workspaces/activity';
 import { deleteAttachmentsForSession, deleteAttachmentsForWorkspace } from './attachments';
@@ -137,16 +137,20 @@ export function deleteSessionsByWorkspace(workspaceId: string): void {
 
 export function listSessionsByWorkspace(
   workspaceId: string,
-  options?: { status?: SessionStatus; rootOnly?: boolean },
+  options?: SessionListFilter,
 ): Session[] {
   return repo().listSessionsByWorkspace(workspaceId, options);
 }
 
 export function listSessionsGrouped(
   workspaceIds: string[],
-  options?: { status?: SessionStatus; rootOnly?: boolean },
+  options?: SessionListFilter,
 ): Record<string, Session[]> {
   return repo().listSessionsGrouped(workspaceIds, options);
+}
+
+export function countSessionsByWorkspace(workspaceId: string): SessionCategoryCounts {
+  return repo().countSessionsByWorkspace(workspaceId);
 }
 
 export function listTagsByWorkspace(workspaceId: string): string[] {
@@ -182,7 +186,7 @@ export function listSessionPageByWorkspace(
 
 export function listSessionPageGrouped(
   workspaceIds: string[],
-  options: { status?: SessionStatus; rootOnly?: boolean; limitPerWorkspace: number },
+  options: SessionListFilter & { limitPerWorkspace: number },
 ): { sessions: Record<string, Session[]>; pagination: Record<string, SessionPageInfo> } {
   return repo().listSessionPageGrouped(workspaceIds, options);
 }

@@ -97,6 +97,22 @@ async function json(res: Response): Promise<Record<string, unknown>> {
 }
 
 describe('HTTP session route contract', () => {
+  test('grouped category filtering reaches the repository and rejects unknown categories', async () => {
+    const calls: unknown[] = [];
+    const { app } = makeApp({
+      listSessionsGrouped: (_ids, options) => { calls.push(options); return {}; },
+      listSessionPageGrouped: (_ids, options) => { calls.push(options); return { sessions: {}, pagination: {} }; },
+    });
+    expect((await app.request('/api/sessions/grouped?workspaceIds=ws-1&category=wrong')).status).toBe(400);
+    expect(calls).toHaveLength(0);
+    expect((await app.request('/api/sessions/grouped?workspaceIds=ws-1&category=active')).status).toBe(200);
+    expect((await app.request('/api/sessions/grouped?workspaceIds=ws-1&category=active&limitPerWorkspace=50')).status).toBe(200);
+    expect(calls).toEqual([
+      expect.objectContaining({ category: 'active' }),
+      expect.objectContaining({ category: 'active', limitPerWorkspace: 50 }),
+    ]);
+  });
+
   test('GET /api/sessions returns the list with status filtering', async () => {
     const { app } = makeApp({
       listSessions: (status) => (status ? [makeSession({ status })] : []),

@@ -16,6 +16,8 @@ import type {
   Part,
   Session,
   SessionStatus,
+  SessionListFilter,
+  SessionCategoryCounts,
   SubagentStatus,
   ToolPart,
   UserMessage,
@@ -50,7 +52,7 @@ export interface SessionPage {
   hasMore: boolean;
 }
 
-export interface ListSessionPageOptions {
+export interface ListSessionPageOptions extends SessionListFilter {
   status?: SessionStatus;
   rootOnly?: boolean;
   cursor?: SessionCursorPayload;
@@ -99,12 +101,13 @@ export interface SessionStorePort {
   deleteSessionsByWorkspace(workspaceId: string): void;
   listSessionsByWorkspace(
     workspaceId: string,
-    options?: { status?: SessionStatus; rootOnly?: boolean },
+    options?: SessionListFilter,
   ): Session[];
   listSessionsGrouped(
     workspaceIds: string[],
-    options?: { status?: SessionStatus; rootOnly?: boolean },
+    options?: SessionListFilter,
   ): Record<string, Session[]>;
+  countSessionsByWorkspace(workspaceId: string): SessionCategoryCounts;
   listTagsByWorkspace(workspaceId: string): string[];
   getChildSessions(parentId: string): Session[];
   getSessionsByAgent(agentId: string, sinceTimestamp?: number, limit?: number): Session[];
@@ -113,7 +116,7 @@ export interface SessionStorePort {
   listSessionPageByWorkspace(workspaceId: string, options: ListSessionPageOptions): SessionPage;
   listSessionPageGrouped(
     workspaceIds: string[],
-    options: { status?: SessionStatus; rootOnly?: boolean; limitPerWorkspace: number },
+    options: SessionListFilter & { limitPerWorkspace: number },
   ): { sessions: Record<string, Session[]>; pagination: Record<string, SessionPageInfo> };
   readonly defaultPageSize: number;
   readonly maxPageSize: number;

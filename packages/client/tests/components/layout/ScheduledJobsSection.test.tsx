@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import type { ScheduledJob, Session } from '@prokopai/sdk';
 
@@ -49,6 +49,14 @@ const noopProps = {
 };
 
 describe('ScheduledJobsSection - notifications indicator', () => {
+  test('shows session count instead of job count while collapsed', () => {
+    render(<ScheduledJobsSection {...noopProps} jobs={[makeJob()]} sessionCount={23} />);
+    expect(screen.getByLabelText('Scheduled sessions')).toHaveTextContent('23');
+    expect(screen.queryByText('Test Job')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Scheduled'));
+    expect(screen.getByText('Test Job')).toBeVisible();
+  });
+
   test('shows the bell indicator when notifications are enabled', () => {
     render(
       <ScheduledJobsSection
@@ -57,6 +65,8 @@ describe('ScheduledJobsSection - notifications indicator', () => {
       />,
     );
 
+    expect(screen.queryByText('Test Job')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Scheduled'));
     expect(screen.getByRole('img', { name: /notifications enabled/i })).toBeInTheDocument();
   });
 
@@ -68,6 +78,7 @@ describe('ScheduledJobsSection - notifications indicator', () => {
       />,
     );
 
+    fireEvent.click(screen.getByText('Scheduled'));
     expect(screen.queryByRole('img', { name: /notifications enabled/i })).not.toBeInTheDocument();
   });
 });

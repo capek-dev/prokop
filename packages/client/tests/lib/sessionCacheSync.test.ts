@@ -64,6 +64,41 @@ describe('sessionCacheSync', () => {
     expect(useSessionStore.getState().sessions).toEqual([]);
   });
 
+  test('category pages merge without erasing other categories or replaying stale pages', () => {
+    const active = queryKeys.sessions.byWorkspaceInfinite({ workspaceId: 'ws1', category: 'active', limit: 100 });
+    const archived = queryKeys.sessions.byWorkspaceInfinite({ workspaceId: 'ws1', category: 'archived', limit: 100 });
+    queryClient.setQueryData(active, { pages: [{ sessions: [s1] }], pageParams: [undefined] });
+    queryClient.setQueryData(archived, { pages: [{ sessions: [s2] }], pageParams: [undefined] });
+    expect(useSessionStore.getState().sessions.map(s => s.id).sort()).toEqual(['s1', 's2']);
+    useSessionStore.getState().removeSessionById('s2');
+    queryClient.setQueryData(archived, { pages: [{ sessions: [s2] }, { sessions: [s3] }], pageParams: [undefined, 'next'] });
+    expect(useSessionStore.getState().sessions.map(s => s.id).sort()).toEqual(['s1', 's3']);
+    queryClient.removeQueries({ queryKey: archived, exact: true });
+    expect(useSessionStore.getState().sessions.map(s => s.id).sort()).toEqual(['s1', 's3']);
+  });
+
+  test('category refresh reconciles offline deletions without clearing other categories', () => {
+    const active = queryKeys.sessions.byWorkspaceInfinite({ workspaceId: 'ws1', category: 'active', limit: 100 });
+    queryClient.setQueryData(active, { pages: [{ sessions: [{ ...s1, status: 'active' }] }], pageParams: [undefined] });
+    useSessionStore.getState().mergeSessions([{ ...s2, status: 'closed' }]);
+    queryClient.setQueryData(active, { pages: [{ sessions: [] }], pageParams: [undefined] });
+    expect(useSessionStore.getState().sessions.map(s => s.id)).toEqual(['s2']);
+  });
+
+  test('category backfill preserves updates and deletions arriving during the request', async () => {
+    const active = queryKeys.sessions.byWorkspaceInfinite({ workspaceId: 'ws1', category: 'active', limit: 100 });
+    useSessionStore.getState().mergeSessions([s1, s2]);
+    let resolve!: (value: typeof pages) => void;
+    const request = queryClient.fetchQuery({ queryKey: active, queryFn: () => new Promise<typeof pages>(r => { resolve = r; }) });
+    useSessionStore.getState().updateSession({ ...s1, title: 'Live title' });
+    useSessionStore.getState().removeSessionById('s2');
+    resolve(pages);
+    await request;
+    expect(useSessionStore.getState().sessions.find(s => s.id === 's1')?.title).toBe('Live title');
+    expect(useSessionStore.getState().sessions.some(s => s.id === 's2')).toBe(false);
+    expect(useSessionStore.getState().sessions.some(s => s.id === 's3')).toBe(true);
+  });
+
   test('stopSessionCacheSync stops syncing', () => {
     queryClient.setQueryData(key, pages);
     expect(useSessionStore.getState().sessions).toHaveLength(3);

@@ -2,6 +2,8 @@ import { join } from 'path';
 import type {
   PinnedMessage,
   SessionStatus,
+  SessionListFilter,
+  SessionCategoryCounts,
   Workspace,
   WorkspaceSettings,
 } from '@prokopai/sdk';
@@ -116,13 +118,14 @@ export interface WorkspaceApplication {
   getTerminal(sessionId: string): WorkspaceTerminalSession | null;
   destroyTerminal(sessionId: string): void;
 
+  countSessions(id: string): { kind: 'ok'; counts: SessionCategoryCounts } | { kind: 'missing' };
   listSessions(
     id: string,
-    options: { status?: SessionStatus; rootOnly?: boolean },
+    options: SessionListFilter,
   ): WorkspaceSessionListResult;
   listSessionPage(
     id: string,
-    options: {
+    options: SessionListFilter & {
       status?: SessionStatus;
       rootOnly?: boolean;
       cursorParam?: string;
@@ -354,6 +357,11 @@ export function createWorkspaceApplication(deps: WorkspaceApplicationDeps): Work
       deps.terminals.destroyById(sessionId);
     },
 
+    countSessions(id) {
+      if (!deps.repository.get(id)) return { kind: 'missing' };
+      return { kind: 'ok', counts: deps.sessions.countByWorkspace(id) };
+    },
+
     listSessions(id, options) {
       const workspace = deps.repository.get(id);
       if (!workspace) {
@@ -388,6 +396,7 @@ export function createWorkspaceApplication(deps: WorkspaceApplicationDeps): Work
       const page = deps.sessions.listPageByWorkspace(id, {
         status: options.status,
         rootOnly: options.rootOnly,
+        category: options.category,
         cursor: cursor ?? undefined,
         limit,
       });
