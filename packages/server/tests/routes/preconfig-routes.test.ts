@@ -37,6 +37,8 @@ function fakeProviders() {
   return {
     list: () => [],
     status: () => ({ provider: '', connected: false }),
+    activateAccount: () => ({ provider: '', connected: false }),
+    removeAccount: () => ({ provider: '', connected: false }),
     connect: async () => ({ result: {}, status: { provider: '', connected: false } }),
     disconnect: async () => {},
     completeOAuth: async () => ({ providerId: '' }),

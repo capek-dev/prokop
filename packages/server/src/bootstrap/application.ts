@@ -79,6 +79,7 @@ import { createTransportControllerPorts } from '@/transport/websocket/control-po
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
 import { getDataDir } from '@/infrastructure/runtime/paths';
+import { codexAccounts } from '@/infrastructure/providers/codex-accounts';
 
 import { createWiredLearning } from './learning';
 
@@ -262,10 +263,15 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     workspaces: createJean2McpWorkspacePort(),
   });
 
+  codexAccounts.setChangeListener(status => broadcastEvent({
+    type: 'provider.status', provider: 'codex', connected: status.connected,
+    reauthRequired: status.reauthRequired,
+  }));
   const providers = createProvidersApplication({
     registry: createJean2ProviderRegistryPort(),
     oauth: createJean2OAuthFlowPort(),
     credentials: createJean2ProviderCredentialPort(),
+    accounts: codexAccounts,
   });
 
   const notifications = getJean2NotificationsApplication();

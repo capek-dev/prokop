@@ -1,4 +1,5 @@
 import type { Session, Message, Workspace, ToolDefinition, ToolEnvVarStatus, PromptInfo, ModelWithStatus, Preconfig, ProviderStatus, ProviderCredentialStatus, ModelsConfigResponse, ModelsConfig, FileEntry, FilePreviewResponse, TerminalSessionInfo, McpServerConfig, McpStatus, PinnedMessage, GitAvailability, GitDiffSummary, GitFileDiffResponse, EditableFileResponse, SaveFileResponse as SaveFileResultResponse, FileTreeResponse as FileTreeResultResponse, CreateFileResponse, RenameFileResponse, DeleteFileResponse, Agent, GitWorktreeRef, ManagedWorktree } from '../shared';
+import type { ProviderAccountStatus } from '../shared-types/provider';
 import type { NotificationConfig, PushSubscriptionRecord } from '../shared-types/notification';
 
 /**
@@ -212,14 +213,14 @@ export interface DeletePreconfigResponse {
  * GET /api/providers
  */
 export interface ListProvidersResponse {
-  providers: ProviderStatus[];
+  providers: ProviderAccountStatus[];
 }
 
 /**
  * GET /api/providers/:providerId/status
  */
 export interface GetProviderStatusResponse {
-  status: ProviderStatus;
+  status: ProviderAccountStatus;
 }
 
 /**

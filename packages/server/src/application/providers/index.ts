@@ -3,12 +3,15 @@ import type {
   ProviderCredentialsResponse,
   ProviderDescriptor,
   ProviderStatus,
+  ProviderAccountStatus,
 } from '@prokopai/sdk';
+import { NotFoundError } from '../http-errors';
 import type {
   OAuthFlowPort,
   OAuthServerCallbackResult,
   ProviderCredentialPort,
   ProviderRegistryPort,
+  SubscriptionAccountsPort,
 } from '../ports/provider-accounts';
 
 /**
@@ -24,6 +27,7 @@ export interface ProvidersApplicationDeps {
   registry: ProviderRegistryPort;
   oauth: OAuthFlowPort;
   credentials: ProviderCredentialPort;
+  accounts?: SubscriptionAccountsPort;
 }
 
 export type ProviderConnectOutcome = {
@@ -32,8 +36,10 @@ export type ProviderConnectOutcome = {
 };
 
 export interface ProvidersApplication {
-  list(): Array<ProviderDescriptor & ProviderStatus>;
-  status(providerId: string): ProviderStatus;
+  list(): Array<ProviderDescriptor & ProviderAccountStatus>;
+  status(providerId: string): ProviderAccountStatus;
+  activateAccount(providerId: string, accountId: string): ProviderAccountStatus;
+  removeAccount(providerId: string, accountId: string): ProviderAccountStatus;
   connect(
     providerId: string,
     options?: { redirectStrategy?: import('@prokopai/sdk').OAuthRedirectStrategy },
@@ -54,13 +60,31 @@ export interface ProvidersApplication {
 export function createProvidersApplication(
   deps: ProvidersApplicationDeps,
 ): ProvidersApplication {
+  const accountsFor = (providerId: string): SubscriptionAccountsPort => {
+    if (providerId !== 'codex' || !deps.accounts) throw new NotFoundError('Provider accounts not available');
+    return deps.accounts;
+  };
   return {
     list() {
-      return deps.registry.list();
+      return deps.registry.list().map(provider => provider.provider === 'codex' && deps.accounts
+        ? { ...provider, ...deps.accounts.status() }
+        : provider);
     },
 
     status(providerId) {
-      return deps.registry.status(providerId);
+      return providerId === 'codex' && deps.accounts ? deps.accounts.status() : deps.registry.status(providerId);
+    },
+
+    activateAccount(providerId, accountId) {
+      const accounts = accountsFor(providerId);
+      accounts.activate(accountId);
+      return accounts.status();
+    },
+
+    removeAccount(providerId, accountId) {
+      const accounts = accountsFor(providerId);
+      accounts.remove(accountId);
+      return accounts.status();
     },
 
     async connect(providerId, options) {

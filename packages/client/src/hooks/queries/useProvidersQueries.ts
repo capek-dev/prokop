@@ -41,6 +41,23 @@ export function useDisconnectProvider(sdkClient: ProkopaiClient | null) {
   });
 }
 
+export function useProviderAccountMutation(sdkClient: ProkopaiClient | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ providerId, accountId, action }: {
+      providerId: string;
+      accountId: string;
+      action: 'activate' | 'remove';
+    }) => action === 'activate'
+      ? sdkClient!.http.providers.activateAccount(providerId, accountId)
+      : sdkClient!.http.providers.removeAccount(providerId, accountId),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.config.providers.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.config.models }),
+    ]),
+  });
+}
+
 export function useCompleteOAuth(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({

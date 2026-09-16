@@ -4,7 +4,7 @@ export { useAgentsQuery, usePromoteAgent, useDemoteAgent } from './useAgentsQuer
 export { useModelsConfigQuery, useCreateProvider, useUpdateProvider, useDeleteProvider, useCreateModel, useUpdateModel, useDeleteModel, useSetModelDefaults, useSyncModels } from './useModelsQueries';
 export { usePreconfigsQuery, useCreatePreconfig, useUpdatePreconfig, useDeletePreconfig } from './usePreconfigsQueries';
 export { usePromptsQuery, useCreatePrompt, useUpdatePrompt, useDeletePrompt } from './usePromptsQueries';
-export { useProvidersQuery, useProviderCredentialsQuery, useConnectProvider, useDisconnectProvider, useCompleteOAuth, useSetProviderCredential, useClearProviderCredential } from './useProvidersQueries';
+export { useProvidersQuery, useProviderCredentialsQuery, useConnectProvider, useDisconnectProvider, useProviderAccountMutation, useCompleteOAuth, useSetProviderCredential, useClearProviderCredential } from './useProvidersQueries';
 export { useMcpStatusQuery, useMcpConnect, useMcpDisconnect, useMcpStartAuth } from './useMcpQueries';
 export { useCreateWorkspaceMutation, useDeleteWorkspaceMutation, useRenameWorkspaceMutation, useUpdateWorkspaceMutation } from './useWorkspaceMutations';
 export { useFileBrowseQuery, useFileSearchQuery, useFileBrowseFsQuery, useFileDrivesQuery, useFileParentQuery, useFilePreviewQuery, useFileGitDiffQuery, useEditorGitDiffQuery, useGitStatusQuery } from './useFileQueries';

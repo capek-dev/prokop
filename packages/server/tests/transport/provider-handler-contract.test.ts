@@ -57,6 +57,8 @@ function makeProviders(overrides: Partial<ProvidersApplication> = {}): Providers
   return {
     list: () => [],
     status: () => ({ provider: '', connected: false }),
+    activateAccount: () => ({ provider: '', connected: false }),
+    removeAccount: () => ({ provider: '', connected: false }),
     connect: async (providerId, options) => ({
       result: {
         authorizationUrl: 'https://auth/authorize',

@@ -48,6 +48,8 @@ function makeFakeApplication(overrides: Partial<ProvidersApplication> = {}): Pro
   return {
     list: () => [{ ...descriptor, provider: 'codex', connected: true, accountId: 'acct' }],
     status: () => ({ provider: 'codex', connected: true }),
+    activateAccount: () => ({ provider: 'codex', connected: true }),
+    removeAccount: () => ({ provider: 'codex', connected: false }),
     connect: async () => ({
       result: {
         authorizationUrl: 'https://auth/authorize',

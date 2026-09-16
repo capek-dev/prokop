@@ -21,6 +21,7 @@ export function handleProviderStatus(
   });
   queryClient.invalidateQueries({ queryKey: queryKeys.config.providers.all });
   queryClient.invalidateQueries({ queryKey: queryKeys.config.providers.credentials });
+  queryClient.invalidateQueries({ queryKey: queryKeys.config.models });
 }
 
 export function handleProviderConnected(
@@ -38,6 +39,7 @@ export function handleProviderConnected(
   );
   queryClient.invalidateQueries({ queryKey: queryKeys.config.providers.all });
   queryClient.invalidateQueries({ queryKey: queryKeys.config.providers.credentials });
+  queryClient.invalidateQueries({ queryKey: queryKeys.config.models });
 }
 
 export const providerHandlers = {

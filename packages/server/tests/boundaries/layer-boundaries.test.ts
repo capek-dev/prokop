@@ -2034,6 +2034,21 @@ describe('server layer boundaries', () => {
     expect(domainViolations).toEqual([]);
   });
 
+  test('Codex account storage and runtime preserve host layer boundaries', () => {
+    const modules = new Set([
+      'infrastructure/providers/codex-accounts.ts',
+      'infrastructure/providers/codex-account-runtime.ts',
+      'infrastructure/providers/codex.ts',
+      'application/providers/index.ts',
+      'application/ports/provider-accounts.ts',
+      'bootstrap/application.ts',
+    ]);
+    const files = scanDirectory(serverSourceRoot).filter(file => modules.has(relative(serverSourceRoot, file.path)));
+    expect(files).toHaveLength(modules.size);
+    const result = evaluateRules(files, serverSourceRoot, repositoryRoot, [...globalBaselineRules, ...layerRules]);
+    expect(result.violations).toEqual([]);
+  });
+
   test('S4 gate: the oauth manager and providers consume the provider-accounts domain policy', () => {
     const managerPath = resolve(serverSourceRoot, 'infrastructure/oauth/oauth-manager.ts');
     const managerFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === managerPath);
@@ -2050,18 +2065,18 @@ describe('server layer boundaries', () => {
       ),
     ).toBe(true);
 
-    const codexPath = resolve(serverSourceRoot, 'infrastructure/providers/codex.ts');
-    const codexFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === codexPath);
-    expect(codexFile).toBeDefined();
-    const codexImports = parseImports(codexFile!.sourceText, codexFile!.path);
-    expect(
-      codexImports.some((imp) =>
-        imp.specifier === '@/domains/provider-accounts'
-        && imp.names.includes('buildCodexConfig')
-        && imp.names.includes('codexStatusFromConfig')
-        && imp.names.includes('applyCodexRefresh')
-      ),
-    ).toBe(true);
+    for (const [module, policy] of [
+      ['codex-accounts.ts', 'buildCodexConfig'],
+      ['codex-account-runtime.ts', 'applyCodexRefresh'],
+    ]) {
+      const codexPath = resolve(serverSourceRoot, `infrastructure/providers/${module}`);
+      const codexFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === codexPath);
+      expect(codexFile).toBeDefined();
+      const codexImports = parseImports(codexFile!.sourceText, codexFile!.path);
+      expect(codexImports.some((imp) =>
+        imp.specifier === '@/domains/provider-accounts/oauth' && imp.names.includes(policy),
+      )).toBe(true);
+    }
 
     const credentialsPath = resolve(serverSourceRoot, 'infrastructure/providers/provider-credential-files.ts');
     const credentialsFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === credentialsPath);

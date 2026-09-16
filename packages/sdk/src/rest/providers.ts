@@ -83,6 +83,18 @@ export class ProvidersRestNamespace {
     });
   }
 
+  async activateAccount(providerId: string, accountId: string, options?: GetStatusOptions): Promise<GetProviderStatusResponse> {
+    return this.http.post(`/providers/${encodeURIComponent(providerId)}/accounts/${encodeURIComponent(accountId)}/activate`, {}, {
+      signal: options?.signal,
+    });
+  }
+
+  async removeAccount(providerId: string, accountId: string, options?: GetStatusOptions): Promise<GetProviderStatusResponse> {
+    return this.http.delete(`/providers/${encodeURIComponent(providerId)}/accounts/${encodeURIComponent(accountId)}`, {
+      signal: options?.signal,
+    });
+  }
+
   /**
    * POST /api/oauth/callback - Complete OAuth flow by sending authorization code
    */

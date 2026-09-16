@@ -4,6 +4,7 @@ import type {
   ProviderCredentialsResponse,
   ProviderDescriptor,
   ProviderStatus,
+  ProviderAccountStatus,
 } from '@prokopai/sdk';
 
 /**
@@ -13,6 +14,12 @@ import type {
  * credential store. The Jean2 and Capek adapters wrap the current
  * implementations.
  */
+
+export interface SubscriptionAccountsPort {
+  status(): ProviderAccountStatus;
+  activate(accountId: string): void;
+  remove(accountId: string): void;
+}
 
 export interface ProviderConnectResult {
   authorizationUrl?: string;

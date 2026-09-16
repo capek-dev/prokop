@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Unplug, Copy, Check, ClipboardPaste, RefreshCw } from 'lucide-react';
-import type { ProkopaiClient, ProviderStatus } from '@prokopai/sdk';
-import { useProvidersQuery, useConnectProvider, useDisconnectProvider, useCompleteOAuth } from '@/hooks/queries';
+import type { ProkopaiClient, ProviderAccountStatus } from '@prokopai/sdk';
+import { useProvidersQuery, useConnectProvider, useDisconnectProvider, useCompleteOAuth, useProviderAccountMutation } from '@/hooks/queries';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 
 interface PanelProps {
@@ -15,6 +16,12 @@ interface PendingAuth {
   flowId: string;
   redirectUri: string;
   authorizationUrl: string;
+  previousConnections: string[];
+}
+
+function connectionIds(provider?: ProviderAccountStatus): string[] {
+  return provider?.accounts?.map(account => account.connectionId)
+    ?? (provider?.connectedAt ? [provider.connectedAt] : []);
 }
 
 export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps) {
@@ -22,7 +29,8 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
   const connectMut = useConnectProvider(sdkClient);
   const disconnectMut = useDisconnectProvider(sdkClient);
   const completeMut = useCompleteOAuth(sdkClient);
-  const providers: ProviderStatus[] = providersData?.providers ?? [];
+  const accountsMut = useProviderAccountMutation(sdkClient);
+  const providers: ProviderAccountStatus[] = providersData?.providers ?? [];
   const [error, setError] = useState<string | null>(null);
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [pendingAuth, setPendingAuth] = useState<PendingAuth | null>(null);
@@ -41,6 +49,7 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
     setConnectingId(providerId);
     setPendingAuth(null);
     setError(null);
+    const previousConnections = connectionIds(providers.find(provider => provider.provider === providerId));
     try {
       const data = await connectMut.mutateAsync({ providerId });
       if (data.authorizationUrl && data.flowId) {
@@ -49,6 +58,7 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
           flowId: data.flowId,
           redirectUri: data.redirectUri || '',
           authorizationUrl: data.authorizationUrl,
+          previousConnections,
         };
         setPendingAuth(pending);
 
@@ -65,7 +75,7 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
     } finally {
       setConnectingId(null);
     }
-  }, [connectMut]);
+  }, [connectMut, providers]);
 
   const startLocalhostListener = useCallback((pending: PendingAuth, redirectUri: string) => {
     try {
@@ -155,6 +165,15 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
     }
   }, [disconnectMut]);
 
+  const handleAccountAction = async (providerId: string, accountId: string, action: 'activate' | 'remove') => {
+    setError(null);
+    try {
+      await accountsMut.mutateAsync({ providerId, accountId, action });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update account');
+    }
+  };
+
   const handleRefresh = useCallback(async () => {
     setError(null);
     try {
@@ -170,7 +189,8 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
   useEffect(() => {
     if (!pendingAuth || completing) return;
     const provider = providers.find((p) => p.provider === pendingAuth.providerId);
-    if (provider?.connected) {
+    const newConnection = connectionIds(provider).some(id => !pendingAuth.previousConnections.includes(id));
+    if (provider && (newConnection || (!provider.accounts && provider.connected && pendingAuth.previousConnections.length === 0))) {
       toast.success(`${provider.displayName || provider.provider} connected`);
       setPendingAuth(null);
       setPasteUrl('');
@@ -243,8 +263,58 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
                 </p>
               )}
 
+              {provider.accounts && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {provider.accounts.length > 0 && (
+                      <Select
+                        value={provider.activeAccountId ?? ''}
+                        onValueChange={id => void handleAccountAction(provider.provider, id, 'activate')}
+                        disabled={!sdkClient || accountsMut.isPending}
+                      >
+                        <SelectTrigger size="sm" aria-label="Active Codex account" className="w-full min-w-0 sm:w-auto sm:max-w-80">
+                          <SelectValue placeholder="Select an account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {provider.accounts.map((account, index) => (
+                              <SelectItem key={account.id} value={account.id}>
+                                {account.label}
+                                {provider.accounts!.filter(a => a.label === account.label).length > 1 ? ` (${index + 1})` : ''}
+                                {account.reauthRequired ? ' (reconnect)' : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    )}
+                    <Button
+                      size="sm" variant="ghost"
+                      onClick={() => handleConnect(provider.provider)}
+                      disabled={!sdkClient || connectingId !== null || pendingAuth !== null || accountsMut.isPending}
+                    >
+                      {connectingId === provider.provider && <Loader2 className="animate-spin" data-icon="inline-start" />}
+                      {provider.reauthRequired ? 'Reconnect account' : 'Add account'}
+                    </Button>
+                    {provider.activeAccountId && (
+                      <Button
+                        size="sm" variant="ghost"
+                        onClick={() => void handleAccountAction(provider.provider, provider.activeAccountId!, 'remove')}
+                        disabled={!sdkClient || accountsMut.isPending || pendingAuth !== null}
+                        aria-label="Remove active Codex account"
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  {provider.accounts.length > 0 && (
+                    <p className="text-xs text-muted-foreground">Used for new Codex runs on this server. Switch before sending your next message.</p>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-2">
-                {!provider.connected && !provider.reauthRequired && pendingAuth?.providerId !== provider.provider && (
+                {!provider.accounts && !provider.connected && !provider.reauthRequired && pendingAuth?.providerId !== provider.provider && (
                   <Button
                     size="sm"
                     onClick={() => handleConnect(provider.provider)}
@@ -257,7 +327,7 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
                   </Button>
                 )}
 
-                {provider.reauthRequired && pendingAuth?.providerId !== provider.provider && (
+                {!provider.accounts && provider.reauthRequired && pendingAuth?.providerId !== provider.provider && (
                   <>
                     <Button
                       size="sm"
@@ -282,7 +352,7 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
                   </>
                 )}
 
-                {provider.connected && (
+                {!provider.accounts && provider.connected && (
                   <Button
                     variant="destructive"
                     size="sm"
@@ -298,7 +368,7 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
                 <div className="space-y-3">
                   <div className="space-y-2">
                     <p className="text-xs text-muted-foreground">
-                      Open this URL in your browser to authenticate:
+                      Open this URL in your browser to authenticate. To add a different account, use a private window or switch accounts on the sign-in page:
                     </p>
                     <div className="rounded-md bg-muted p-2">
                       <a
@@ -321,6 +391,9 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
                         <Copy className="size-3" />
                       )}
                       {copiedAuth ? 'Copied' : 'Copy URL'}
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={completing} onClick={() => { setPendingAuth(null); setPasteUrl(''); }}>
+                      Cancel
                     </Button>
                   </div>
 

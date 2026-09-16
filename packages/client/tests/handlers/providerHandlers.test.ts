@@ -55,6 +55,13 @@ describe('providerHandlers', () => {
     });
   });
 
+  test('account changes invalidate the provider list and model availability without polling', () => {
+    const { ctx } = createContext([{ provider: 'codex', connected: true }]);
+    handleProviderStatus({ type: 'provider.status', provider: 'codex', connected: true }, ctx);
+    expect(mockInvalidate).toHaveBeenCalledWith({ queryKey: ['providers'] });
+    expect(mockInvalidate).toHaveBeenCalledWith({ queryKey: ['config', 'models'] });
+  });
+
   test('clears stale reauthentication state after a successful connection', () => {
     const { ctx, getStatuses } = createContext([{
       provider: 'gmail',

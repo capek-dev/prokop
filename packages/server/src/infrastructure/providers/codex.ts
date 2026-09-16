@@ -2,28 +2,22 @@
  * Codex (ChatGPT) OAuth provider.
  * Uses the generalized OAuth manager for PKCE + authorization code flow.
  */
-import type { CodexProviderConfig, ProviderStatus } from '@prokopai/sdk';
+import type { ProviderStatus } from '@prokopai/sdk';
 import {
   createOpenAiResponsesModel,
   registerProvider,
   type ConnectableProvider,
   type TokenResponse,
 } from '@/adapters/capek/contracts';
-import { loadProviderConfig, saveProviderConfig, deleteProviderConfig } from '@/infrastructure/providers/provider-config-files';
+import { codexAccounts } from './codex-accounts';
+import { CodexAccountRuntime } from './codex-account-runtime';
 import {
   registerOAuthConfig,
   initiateOAuthFlow,
   refreshTokens,
   getDefaultRedirectUri,
 } from '../oauth/oauth-manager';
-import {
-  applyCodexRefresh,
-  buildCodexConfig,
-  CODEX_OAUTH_DUMMY_KEY,
-  codexStatusFromConfig,
-} from '@/domains/provider-accounts';
-
-const CODEX_API_ENDPOINT = 'https://chatgpt.com/backend-api/codex/responses';
+import { CODEX_OAUTH_DUMMY_KEY } from '@/domains/provider-accounts';
 const OAUTH_DUMMY_KEY = CODEX_OAUTH_DUMMY_KEY;
 
 // Register Codex OAuth config with the generalized manager
@@ -40,87 +34,7 @@ registerOAuthConfig('codex', {
   },
 });
 
-async function getCodexConfig(): Promise<CodexProviderConfig | null> {
-  const config = loadProviderConfig<CodexProviderConfig>('codex');
-  if (!config) {
-    return null;
-  }
-
-  if (config.expires < Date.now()) {
-    try {
-      const tokens = await refreshTokens('codex', config.refresh);
-      applyCodexRefresh(config, tokens, Date.now());
-
-      saveProviderConfig('codex', config);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to refresh Codex token, clearing config:', message);
-      deleteProviderConfig('codex');
-      return null;
-    }
-  }
-
-  return config;
-}
-
-function getCodexStatus(): { connected: boolean; connectedAt?: string; accountId?: string } {
-  const status = codexStatusFromConfig(loadProviderConfig<CodexProviderConfig>('codex'));
-  return {
-    connected: status.connected,
-    connectedAt: status.connectedAt,
-    accountId: status.accountId,
-  };
-}
-
-async function createCodexFetch(config: CodexProviderConfig): Promise<typeof globalThis.fetch> {
-  const currentConfig = config.expires < Date.now()
-    ? await getCodexConfig()
-    : config;
-
-  if (!currentConfig) {
-    throw new Error('Codex not connected');
-  }
-
-  const codexFetch = async (input: Parameters<typeof globalThis.fetch>[0], init?: Parameters<typeof globalThis.fetch>[1]) => {
-    const headers = new Headers(init?.headers);
-
-    headers.delete('authorization');
-    headers.delete('Authorization');
-    headers.set('authorization', `Bearer ${currentConfig.access}`);
-
-    if (currentConfig.accountId) {
-      headers.set('ChatGPT-Account-Id', currentConfig.accountId);
-    }
-
-    headers.set('originator', 'jean2');
-
-    const parsed = new URL(typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url);
-    const isCodexEndpoint = parsed.pathname.includes('/v1/responses') || parsed.pathname.includes('/chat/completions');
-    const url = isCodexEndpoint
-      ? new URL(CODEX_API_ENDPOINT)
-      : new URL(typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url);
-
-    const response = await globalThis.fetch(url, {
-      ...init,
-      headers,
-    });
-
-    if (response.status === 401) {
-      const refreshed = await getCodexConfig();
-      if (refreshed) {
-        const retryHeaders = new Headers(headers);
-        retryHeaders.set('authorization', `Bearer ${refreshed.access}`);
-        return globalThis.fetch(url, { ...init, headers: retryHeaders });
-      }
-    }
-
-    return response;
-  };
-
-  return Object.assign(codexFetch, {
-    preconnect: globalThis.fetch.preconnect,
-  });
-}
+const runtime = new CodexAccountRuntime(codexAccounts, token => refreshTokens('codex', token));
 
 export { OAUTH_DUMMY_KEY, getDefaultRedirectUri as CODEX_REDIRECT_URI };
 
@@ -135,13 +49,7 @@ const codexProvider: ConnectableProvider = {
   },
 
   getStatus(): ProviderStatus {
-    const status = getCodexStatus();
-    return {
-      provider: 'codex',
-      connected: status.connected,
-      connectedAt: status.connectedAt,
-      accountId: status.accountId,
-    };
+    return codexAccounts.status();
   },
 
   async connect(options) {
@@ -155,20 +63,15 @@ const codexProvider: ConnectableProvider = {
   },
 
   async disconnect() {
-    deleteProviderConfig('codex');
+    codexAccounts.disconnect();
   },
 
   async onTokensReceived(tokens: TokenResponse): Promise<void> {
-    const config = buildCodexConfig(tokens, Date.now());
-    saveProviderConfig('codex', config);
+    codexAccounts.add(tokens);
   },
 
   async createModel(options) {
-    const config = await getCodexConfig();
-    if (!config) {
-      throw new Error('Codex not connected. Please connect your ChatGPT subscription in Settings.');
-    }
-    const codexFetch = await createCodexFetch(config);
+    const codexFetch = await runtime.createFetch();
     return createOpenAiResponsesModel({
       modelId: options.modelId,
       apiKey: OAUTH_DUMMY_KEY,

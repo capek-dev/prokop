@@ -156,6 +156,16 @@ export function registerConfigRoutes(
     },
   );
 
+  app.post('/api/providers/:providerId/accounts/:accountId/activate', (c) => {
+    const status = providers.activateAccount(c.req.param('providerId'), c.req.param('accountId'));
+    return c.json({ status });
+  });
+
+  app.delete('/api/providers/:providerId/accounts/:accountId', (c) => {
+    const status = providers.removeAccount(c.req.param('providerId'), c.req.param('accountId'));
+    return c.json({ status });
+  });
+
   app.get('/api/providers/:providerId/status', async (c) => {
     const providerId = c.req.param('providerId');
     const status = providers.status(providerId);

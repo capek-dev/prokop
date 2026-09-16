@@ -33,6 +33,7 @@ vi.mock('@/hooks/queries', () => ({
   useConnectProvider: () => ({ mutateAsync: vi.fn() }),
   useDisconnectProvider: () => ({ mutateAsync: vi.fn() }),
   useCompleteOAuth: () => ({ mutateAsync: vi.fn() }),
+  useProviderAccountMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 import { LLMProvidersPanel } from '@/components/modals/configuration/LLMProvidersPanel';
