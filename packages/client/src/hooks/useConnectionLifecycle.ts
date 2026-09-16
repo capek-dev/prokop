@@ -10,6 +10,7 @@ import { useClientIdentityStore } from '@/stores/clientIdentityStore';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import { toast } from 'sonner';
 import { subscribeToServerEvents } from './subscribeToServerEvents';
+import { refreshWorkspaceActivity } from '@/lib/refreshWorkspaceActivity';
 import { resolveClientDescriptor } from '@/config/client-identity';
 import {
   markConnectionAttempt,
@@ -98,6 +99,9 @@ export function useConnectionLifecycle({
         useConnectionStore.getState().setAuthError(null);
         useConnectionStore.getState().setRetryCount(0);
         useConnectionStore.getState().setConnectionTimedOut(false);
+
+        void refreshWorkspaceActivity(client, () => !cancelled && clientRef.current === client)
+          .catch((error: unknown) => console.error('Workspace activity refresh failed:', error));
 
         // Clear pending ask requests on reconnection (including permission asks)
         useAskStore.getState().clearPendingRequests();

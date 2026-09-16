@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isWorkspaceOrder, loadWorkspaceOrder, WORKSPACE_ORDER_KEY, type WorkspaceOrder } from '@/lib/workspaceOrder';
 import type { PermissionRiskLevel, ScheduledJob } from '@prokopai/sdk';
 import type { UseBoundStore, StoreApi } from 'zustand';
 
@@ -93,12 +94,14 @@ function getStoredFileOpenMode(): DefaultFileOpenMode {
 }
 
 interface SettingsState {
+  workspaceOrder: WorkspaceOrder;
   chatFinishSoundEnabled: boolean;
   permissionSoundEnabled: boolean;
   defaultFileOpenMode: DefaultFileOpenMode;
 }
 
 interface SettingsActions {
+  setWorkspaceOrder: (order: WorkspaceOrder) => void;
   setChatFinishSoundEnabled: (enabled: boolean) => void;
   setPermissionSoundEnabled: (enabled: boolean) => void;
   setDefaultFileOpenMode: (mode: DefaultFileOpenMode) => void;
@@ -160,6 +163,12 @@ export const useUIStore: UseBoundStore<StoreApi<UIStore>> = create<UIStore>((set
   chatFinishSoundEnabled: getStoredBoolean(CHAT_FINISH_SOUND_KEY, true),
   permissionSoundEnabled: getStoredBoolean(PERMISSION_SOUND_KEY, true),
   defaultFileOpenMode: getStoredFileOpenMode(),
+  workspaceOrder: loadWorkspaceOrder(),
+  setWorkspaceOrder: (order) => {
+    if (!isWorkspaceOrder(order)) return;
+    try { localStorage.setItem(WORKSPACE_ORDER_KEY, order); } catch { /* Storage may be blocked. */ }
+    set({ workspaceOrder: order });
+  },
 
   setChatFinishSoundEnabled: (enabled) => {
     if (typeof window !== 'undefined') {

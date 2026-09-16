@@ -23,7 +23,13 @@ export interface LearningChangedMessage {
   workspaceId: string;
 }
 
-export type ServerMessage = CapekServerMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage | GitChangedMessage | LearningChangedMessage;
+export interface WorkspaceConversationActivityMessage {
+  type: 'workspace.conversation_activity';
+  workspaceId: string;
+  lastConversationAt: number | null;
+}
+
+export type ServerMessage = CapekServerMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage | GitChangedMessage | LearningChangedMessage | WorkspaceConversationActivityMessage;
 
 /**
  * Prokopai extends the neutral Capek gate action union with session

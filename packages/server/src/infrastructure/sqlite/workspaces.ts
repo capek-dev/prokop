@@ -34,8 +34,22 @@ export function getWorkspaceAutoApproveSeverity(workspaceId: string): AutoApprov
   return autoApproveSeverityOf(workspace);
 }
 
+/** Each session lookup walks its existing time index from the newest message. */
+export function getWorkspaceLastConversationAt(workspaceId: string): number | null {
+  const row = getDatabase().query(`
+    SELECT MAX((SELECT m.created_at FROM messages m
+      WHERE m.session_id = s.id AND m.role IN ('user', 'assistant')
+      ORDER BY m.created_at DESC LIMIT 1)) AS activity
+    FROM sessions s WHERE s.workspace_id = ?
+  `).get(workspaceId) as { activity: number | null };
+  return row.activity;
+}
+
 function mapRowToWorkspace(row: WorkspaceRow, additionalPaths?: string[]): Workspace {
-  return mapWorkspaceRecord(row, additionalPaths);
+  return {
+    ...mapWorkspaceRecord(row, additionalPaths),
+    lastConversationAt: getWorkspaceLastConversationAt(row.id),
+  };
 }
 
 function batchLoadWorkspacePaths(workspaceIds: string[]): Map<string, string[]> {

@@ -8,6 +8,7 @@ import type { ThemeMode, ThemeScheme } from '@/components/providers/ThemeProvide
 import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
 import { NotificationSettings } from './NotificationSettings';
+import { WorkspaceOrderControl } from '@/components/layout/WorkspaceOrderControl';
 
 const SCHEMES: ThemeScheme[] = ['neutral', 'ocean', 'forest', 'sunset', 'amethyst'];
 
@@ -83,6 +84,12 @@ export function AppearancePanel() {
 
   return (
     <div className="p-3 sm:p-4 flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="workspace-order">Workspace order</Label>
+        <WorkspaceOrderControl />
+        <p className="text-sm text-muted-foreground">Applies to the workspace selector on this device, across servers. Recently active uses the latest conversation message, not opening a session.</p>
+      </div>
+      <Separator />
       <div>
         <Label className="text-sm font-medium">Mode</Label>
         <p className="text-sm text-muted-foreground mb-3">

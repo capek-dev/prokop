@@ -7,7 +7,8 @@
 import { getDatabase } from './database';
 import { notifyLearningActivity } from '@/application/learning/activity';
 import type { Session, SessionStatus, Workspace } from '@prokopai/sdk';
-import { getWorkspace } from './workspaces';
+import { getWorkspace, getWorkspaceLastConversationAt } from './workspaces';
+import { notifyWorkspaceActivity } from '@/application/workspaces/activity';
 import { deleteAttachmentsForSession, deleteAttachmentsForWorkspace } from './attachments';
 import { removeSessionFromFts } from '@/infrastructure/session-search/fts';
 import { rmSync, existsSync } from 'fs';
@@ -123,11 +124,15 @@ export function cleanupSessionsOutputDirs(sessionIds: string[]): void {
 }
 
 export function deleteSession(id: string): boolean {
-  return repo().deleteSession(id);
+  const workspaceId = getSession(id)?.workspaceId;
+  const deleted = repo().deleteSession(id);
+  if (deleted && workspaceId) notifyWorkspaceActivity(workspaceId, getWorkspaceLastConversationAt(workspaceId));
+  return deleted;
 }
 
 export function deleteSessionsByWorkspace(workspaceId: string): void {
   repo().deleteSessionsByWorkspace(workspaceId);
+  notifyWorkspaceActivity(workspaceId, getWorkspaceLastConversationAt(workspaceId));
 }
 
 export function listSessionsByWorkspace(

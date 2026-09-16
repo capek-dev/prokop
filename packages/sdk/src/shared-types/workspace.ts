@@ -15,4 +15,6 @@ export interface WorkspaceSettings extends RuntimeWorkspaceSettings {
 
 export interface Workspace extends RuntimeWorkspace {
   settings: WorkspaceSettings;
+  /** Latest user/assistant message creation time (epoch ms), null when empty. */
+  lastConversationAt?: number | null;
 }

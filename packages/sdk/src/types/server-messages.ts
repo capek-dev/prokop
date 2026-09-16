@@ -91,6 +91,7 @@ export interface SdkEventMap {
   'session.deleted': [sessionId: SessionDeletedMessage['sessionId']];
   'session.updated': [session: SessionUpdatedMessage['session']];
   'session.renamed': [session: SessionRenamedMessage['session']];
+  'workspace.conversation_activity': [workspaceId: string, lastConversationAt: number | null];
   'learning.changed': [workspaceId: string];
   'git.changed': [workspaceId: string, root: string];
   'worktree.updated': [worktree: WorktreeUpdatedMessage['worktree']];
@@ -261,6 +262,9 @@ export function routeServerMessage(
       break;
     case 'session.renamed':
       emitter.emit('session.renamed', msg.session);
+      break;
+    case 'workspace.conversation_activity':
+      emitter.emit('workspace.conversation_activity', msg.workspaceId, msg.lastConversationAt);
       break;
     case 'learning.changed':
       emitter.emit('learning.changed', msg.workspaceId);

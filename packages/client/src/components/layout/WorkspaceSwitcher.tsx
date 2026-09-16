@@ -30,6 +30,9 @@ import { useDemoteAgent } from '@/hooks/queries';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { getWorkspaceDisplayName, isAgentHomeWorkspace } from '@/lib/workspaceKind';
 import { cn } from '@/lib/utils';
+import { sortWorkspaces } from '@/lib/workspaceOrder';
+import { useUIStore } from '@/stores/uiStore';
+import { WorkspaceOrderControl } from './WorkspaceOrderControl';
 
 interface WorkspaceSwitcherProps {
   workspaces: Workspace[];
@@ -65,6 +68,18 @@ export function WorkspaceSwitcher({
   isUpdatingWorkspace = {},
 }: WorkspaceSwitcherProps) {
   const [open, setOpen] = useState(false);
+  const order = useUIStore(s => s.workspaceOrder);
+  const [activitySnapshot, setActivitySnapshot] = useState<Record<string, number | null>>({});
+  // Keep conversation-driven movement out of an open menu, but retain live names/deletions.
+  const orderedWorkspaces = sortWorkspaces(
+    open ? workspaces.map(workspace => ({ ...workspace, lastConversationAt: activitySnapshot[workspace.id] ?? null })) : workspaces,
+    agents,
+    order,
+  );
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) setActivitySnapshot(Object.fromEntries(workspaces.map(workspace => [workspace.id, workspace.lastConversationAt ?? null])));
+    setOpen(nextOpen);
+  };
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [workspaceToMove, setWorkspaceToMove] = useState<Workspace | null>(null);
   const [promoteOpen, setPromoteOpen] = useState(false);
@@ -102,7 +117,7 @@ export function WorkspaceSwitcher({
 
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -131,17 +146,20 @@ export function WorkspaceSwitcher({
       </PopoverTrigger>
       <PopoverContent className="max-h-[min(80vh,var(--radix-popover-content-available-height))] w-[320px] overflow-hidden p-0">
         <Command className="h-auto max-h-[inherit]">
-          <CommandInput placeholder="Search workspace..." />
+          <div className="flex items-end gap-1 pr-1">
+            <div className="min-w-0 flex-1"><CommandInput placeholder="Search workspace..." /></div>
+            <WorkspaceOrderControl compact />
+          </div>
           <CommandList className="max-h-[min(50dvh,calc(var(--radix-popover-content-available-height)-11rem))] overflow-y-auto overscroll-contain">
             <CommandEmpty>No workspace found.</CommandEmpty>
             {[
               {
                 heading: 'Workspaces',
-                items: workspaces.filter(workspace => !isAgentHomeWorkspace(workspace)),
+                items: orderedWorkspaces.filter(workspace => !isAgentHomeWorkspace(workspace)),
               },
               {
                 heading: 'Agent homes',
-                items: workspaces.filter(workspace => isAgentHomeWorkspace(workspace)),
+                items: orderedWorkspaces.filter(workspace => isAgentHomeWorkspace(workspace)),
               },
             ].map(group => (
               <CommandGroup key={group.heading} heading={group.heading}>

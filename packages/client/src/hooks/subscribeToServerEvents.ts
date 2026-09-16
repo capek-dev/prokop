@@ -13,6 +13,7 @@ import { queryClient } from '@/components/providers/QueryProvider';
 import { handleGitChanged } from '@/handlers/serverMessage/gitHandlers';
 import { useChatRetryStore } from '@/stores/chatRetryStore';
 import { useConnectionStore } from '@/stores/connectionStore';
+import { handleWorkspaceActivity } from '@/handlers/serverMessage/workspaceActivity';
 
 type CtxRef = RefObject<SessionHandlersContext | null>;
 
@@ -82,6 +83,7 @@ export function subscribeToServerEvents(
   add('session.state', (sessionId: unknown, messages: unknown) => {
     sessionHandlers['session.state']({ type: 'session.state', sessionId: sessionId as string, messages: messages as MessageWithParts[] }, ctx()!);
   });
+  add('workspace.conversation_activity', handleWorkspaceActivity);
   add('learning.changed', (workspaceId: unknown) => {
     if (typeof workspaceId === 'string') void queryClient.invalidateQueries({ queryKey: ['learning', workspaceId] });
   });

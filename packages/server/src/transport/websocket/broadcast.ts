@@ -1,5 +1,6 @@
 import type { ServerMessage, Session, AskAuthority } from '@prokopai/sdk';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
+import { installWorkspaceActivityListener } from '@/application/workspaces/activity';
 
 export type BroadcastFn = (message: ServerMessage) => void;
 
@@ -30,6 +31,9 @@ let installedPort: DeliveryPort | null = null;
 
 export function installDeliveryPort(port: DeliveryPort): void {
   installedPort = port;
+  installWorkspaceActivityListener((workspaceId, lastConversationAt) => {
+    port.broadcast({ type: 'workspace.conversation_activity', workspaceId, lastConversationAt });
+  });
 }
 
 export function broadcastSessionCreated(session: Session): void {

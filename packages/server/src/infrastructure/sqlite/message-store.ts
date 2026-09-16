@@ -5,6 +5,8 @@
  */
 
 import { getDatabase } from './database';
+import { notifyWorkspaceActivity } from '@/application/workspaces/activity';
+import { getWorkspaceLastConversationAt } from './workspaces';
 import { notifyLearningActivity } from '@/application/learning/activity';
 import { getSession } from './session-store';
 import { createFtsProjector } from '@/infrastructure/session-search/fts-projector';
@@ -50,8 +52,14 @@ function repo(): MessageStorePort {
   ));
 }
 
+function publishConversationActivity(sessionId: string): void {
+  const workspaceId = getSession(sessionId)?.workspaceId;
+  if (workspaceId) notifyWorkspaceActivity(workspaceId, getWorkspaceLastConversationAt(workspaceId));
+}
+
 export function createMessage(message: Message): Message {
   const result = repo().createMessage(message);
+  if (message.role === 'user' || message.role === 'assistant') publishConversationActivity(message.sessionId);
   notifyLearningActivity();
   return result;
 }
@@ -76,13 +84,20 @@ export function listMessages(sessionId: string): Message[] {
 
 export function deleteMessages(sessionId: string): number {
   const result = repo().deleteMessages(sessionId);
-  if (result > 0) notifyLearningActivity();
+  if (result > 0) {
+    notifyLearningActivity();
+    publishConversationActivity(sessionId);
+  }
   return result;
 }
 
 export function deleteMessage(messageId: string): boolean {
+  const message = repo().getMessage(messageId);
   const result = repo().deleteMessage(messageId);
-  if (result) notifyLearningActivity();
+  if (result) {
+    notifyLearningActivity();
+    if (message) publishConversationActivity(message.sessionId);
+  }
   return result;
 }
 
