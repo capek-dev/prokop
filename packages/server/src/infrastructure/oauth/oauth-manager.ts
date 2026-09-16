@@ -385,7 +385,7 @@ const HTML_SUCCESS = `<!DOCTYPE html>
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
     </div>
     <h1 style="font-size: 22px; font-weight: 600; color: #f4f4f5; margin: 0 0 8px;">Connected Successfully</h1>
-    <p style="font-size: 15px; color: #a1a1aa; margin: 0; line-height: 1.5;">You can close this window and return to jean2.</p>
+    <p style="font-size: 15px; color: #a1a1aa; margin: 0; line-height: 1.5;">You can close this window and return to Prokop.</p>
   </div>
 </body>
 </html>`;
