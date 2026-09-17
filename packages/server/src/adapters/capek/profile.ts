@@ -44,6 +44,7 @@ import {
   CURRENT_SUBAGENT_DOMAIN_PLUGIN_ID,
   CURRENT_WORKFLOW_DOMAIN_PLUGIN_ID,
 } from '@capekai/core/plugins';
+import { selectedContextPlugin } from './context-assembler';
 import { builtinToolsAgentPlugins } from './tool-resolver';
 import { jean2WorkspacePolicyOptions } from './workspace-policy';
 
@@ -68,6 +69,7 @@ export const JEAN2_AGENT_PLUGIN_IDS = [
   'current.tool-output-policy',
   'current.context-sources',
   'current.context-sections',
+  'prokopai.selected-context',
   'current.orchestrator-session',
   CURRENT_SESSION_SEARCH_DOMAIN_PLUGIN_ID,
   CURRENT_SCHEDULER_DOMAIN_PLUGIN_ID,
@@ -108,6 +110,7 @@ export function jean2AgentPlugins(): readonly CapekPlugin<unknown>[] {
       includeSessionSearchGuidance: false,
       includeMemorySkillsSections: false,
     }),
+    selectedContextPlugin(),
     orchestratorSessionProviderPlugin('current.orchestrator-session'),
     sessionSearchDomainPlugin(CURRENT_SESSION_SEARCH_DOMAIN_PLUGIN_ID),
     schedulerDomainPlugin(CURRENT_SCHEDULER_DOMAIN_PLUGIN_ID),

@@ -18,6 +18,43 @@ import {
 
 export { getSupportedProviderCredential };
 
+// Credential edits and the experimental flag share one file and must not overwrite each other.
+let pendingWrite: Promise<unknown> = Promise.resolve();
+function serializeWrite<T>(write: () => Promise<T>): Promise<T> {
+  const result = pendingWrite.then(write);
+  pendingWrite = result.catch(() => {});
+  return result;
+}
+
+export function setContextSelectionEnabled(enabled: boolean): Promise<{ enabled: boolean; configured: boolean }> {
+  return serializeWrite(() => writeContextSelectionEnabled(enabled));
+}
+export function setProviderCredential(provider: string, apiKey: string): Promise<ProviderCredentialStatus> {
+  return serializeWrite(() => writeProviderCredential(provider, apiKey));
+}
+export function clearProviderCredential(provider: string): Promise<ProviderCredentialStatus> {
+  return serializeWrite(() => deleteProviderCredential(provider));
+}
+
+export function getContextSelectionSettings(): { enabled: boolean; configured: boolean } {
+  return {
+    enabled: getJean2EnvValue('PROKOPAI_CONTEXT_SELECTION_ENABLED') === 'true',
+    configured: Boolean(getJean2EnvValue('PROKOPAI_TYPESAFE_API_KEY')?.trim()),
+  };
+}
+
+async function writeContextSelectionEnabled(enabled: boolean): Promise<{ enabled: boolean; configured: boolean }> {
+  if (typeof enabled !== 'boolean') throw new ConfigurationValidationError('enabled must be a boolean');
+  if (enabled && !getContextSelectionSettings().configured) {
+    throw new ConfigurationValidationError('Configure TypeSafe in LLM Providers first');
+  }
+  const content = await readFileSafe(getEnvFilePath());
+  const merged = mergeEnvLine(content, 'PROKOPAI_CONTEXT_SELECTION_ENABLED', String(enabled));
+  await atomicWriteFile(getEnvFilePath(), merged.content);
+  reloadJean2Env();
+  return getContextSelectionSettings();
+}
+
 export function listProviderCredentials(): ProviderCredentialsResponse {
   return {
     providers: PROVIDER_CREDENTIALS.map(({ provider, envKey }) => ({
@@ -27,12 +64,13 @@ export function listProviderCredentials(): ProviderCredentialsResponse {
   };
 }
 
-export async function setProviderCredential(
+async function writeProviderCredential(
   provider: string,
   apiKey: string,
 ): Promise<ProviderCredentialStatus> {
   const credential = getSupportedProviderCredential(provider);
   if (!credential) throw new ConfigurationNotFoundError('provider', provider);
+  if (provider === 'typesafe' && /[\r\n]/.test(apiKey)) throw new ConfigurationValidationError('API key must be a single line');
 
   const validationError = validateApiKeyValue(apiKey);
   if (validationError) throw new ConfigurationValidationError(validationError);
@@ -49,13 +87,13 @@ export async function setProviderCredential(
   }
 }
 
-export async function clearProviderCredential(provider: string): Promise<ProviderCredentialStatus> {
+async function deleteProviderCredential(provider: string): Promise<ProviderCredentialStatus> {
   const credential = getSupportedProviderCredential(provider);
   if (!credential) throw new ConfigurationNotFoundError('provider', provider);
 
   try {
     const content = await readFileSafe(getEnvFilePath());
-    if (!content) {
+    if (!content && provider !== 'typesafe') {
       reloadJean2Env();
       return { provider, configured: false };
     }
@@ -67,6 +105,8 @@ export async function clearProviderCredential(provider: string): Promise<Provide
     if (legacyKey) {
       updated = removeEnvLine(updated, legacyKey);
     }
+    // An empty overlay prevents inherited process credentials from reappearing after removal.
+    if (provider === 'typesafe') updated = mergeEnvLine(updated, credential.envKey, '').content;
     await atomicWriteFile(getEnvFilePath(), updated);
     reloadJean2Env();
     return { provider, configured: false };
@@ -78,5 +118,5 @@ export async function clearProviderCredential(provider: string): Promise<Provide
 
 function isProviderConfigured(envKey: string): boolean {
   const value = getJean2EnvValue(envKey);
-  return value !== undefined && value !== '';
+  return Boolean(value?.trim());
 }

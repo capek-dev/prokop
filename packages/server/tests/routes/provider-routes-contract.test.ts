@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { Hono } from 'hono';
+import { HttpError } from '@/application/http-errors';
 import type { ConfigurationApplication } from '@/application/config';
 import type { ProvidersApplication } from '@/application/providers';
 import type { ProviderDescriptor } from '@prokopai/sdk';
@@ -66,6 +67,8 @@ function makeFakeApplication(overrides: Partial<ProvidersApplication> = {}): Pro
       status: 200,
       contentType: 'text/html; charset=utf-8',
     }),
+    getContextSelection: () => ({ enabled: false, configured: false }),
+    setContextSelection: async enabled => ({ enabled, configured: true }),
     listCredentials: () => ({ providers: [{ provider: 'openai', configured: true }] }),
     setCredential: async (provider) => ({ provider, configured: true }),
     clearCredential: async (provider) => ({ provider, configured: false }),
@@ -75,6 +78,9 @@ function makeFakeApplication(overrides: Partial<ProvidersApplication> = {}): Pro
 
 function makeApp(application: ProvidersApplication): Hono {
   const app = new Hono();
+  app.onError((error, c) => error instanceof HttpError
+    ? c.json({ error: error.code }, error.status as 400)
+    : c.json({ error: 'Internal Server Error' }, 500));
   registerConfigRoutes(app, application, {} as ConfigurationApplication);
   return app;
 }
@@ -84,6 +90,19 @@ async function json(res: Response): Promise<Record<string, unknown>> {
 }
 
 describe('provider route contract', () => {
+  test('experimental settings accept only explicit booleans and return status without secrets', async () => {
+    const calls: boolean[] = [];
+    const app = makeApp(makeFakeApplication({ setContextSelection: async enabled => { calls.push(enabled); return { enabled, configured: true }; } }));
+    const path = '/api/config/experimental/context-selection';
+    expect(await json(await app.request(path))).toEqual({ enabled: false, configured: false });
+    for (const body of [{}, { enabled: 'true' }, { enabled: true, apiKey: 'secret' }]) {
+      expect((await app.request(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).status).toBe(400);
+    }
+    expect(calls).toEqual([]);
+    const result = await app.request(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }) });
+    expect(await json(result)).toEqual({ enabled: true, configured: true });
+    expect(calls).toEqual([true]);
+  });
   afterEach(() => {
     mock.restore();
   });

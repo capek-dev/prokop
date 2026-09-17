@@ -155,7 +155,8 @@ describe('provider-accounts domain: OAuth flow policy', () => {
 
 describe('provider-accounts domain: credential policy', () => {
   test('pins the supported credential registry and lookup', () => {
-    expect(PROVIDER_CREDENTIALS).toHaveLength(6);
+    expect(PROVIDER_CREDENTIALS).toHaveLength(7);
+    expect(getSupportedProviderCredential('typesafe')).toEqual({ provider: 'typesafe', envKey: 'PROKOPAI_TYPESAFE_API_KEY' });
     expect(getSupportedProviderCredential('openai')).toEqual({
       provider: 'openai',
       envKey: 'PROKOPAI_LLM_OPENAI_API_KEY',

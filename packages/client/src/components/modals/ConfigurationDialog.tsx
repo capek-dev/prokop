@@ -1,10 +1,11 @@
 import { Suspense, lazy } from 'react';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { Key, Boxes, FileText, Layers, Braces, Terminal, User, Palette, Keyboard, Wrench, FolderOpen } from 'lucide-react';
+import { FlaskConical, Key, Boxes, FileText, Layers, Braces, Terminal, User, Palette, Keyboard, Wrench, FolderOpen } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import type { ConfigurationSection } from '@/stores/uiStore';
 import { SettingsDialogShell, PanelLoadingFallback, type SettingsSection } from './SettingsDialogShell';
 
+const ExperimentalPanel = lazy(() => import('./configuration/ExperimentalPanel').then((m) => ({ default: m.ExperimentalPanel })));
 const LLMProvidersPanel = lazy(() => import('./configuration/LLMProvidersPanel').then((m) => ({ default: m.LLMProvidersPanel })));
 const ModelsPanel = lazy(() => import('./configuration/ModelsPanel').then((m) => ({ default: m.ModelsPanel })));
 const PromptsPanel = lazy(() => import('./configuration/PromptsPanel').then((m) => ({ default: m.PromptsPanel })));
@@ -40,6 +41,7 @@ const SECTIONS: SettingsSection[] = [
   { value: 'response-formats', label: 'Formats', icon: Braces, group: 'server' },
   { value: 'env', label: 'Environment', icon: Terminal, group: 'server' },
   { value: 'tools', label: 'Tools', icon: Wrench, group: 'server' },
+  { value: 'experimental', label: 'Experimental', icon: FlaskConical, group: 'server' },
 ];
 
 const GROUPS = [
@@ -70,6 +72,8 @@ export function ConfigurationDialog({
             return <KeybindsPanel />;
           case 'files':
             return <FilesPanelPreferences />;
+          case 'experimental':
+            return <ExperimentalPanel sdkClient={sdkClient} />;
           case 'providers':
             return <LLMProvidersPanel sdkClient={sdkClient} />;
           case 'models':

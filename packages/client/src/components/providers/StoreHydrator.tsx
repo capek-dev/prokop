@@ -119,6 +119,7 @@ export function StoreHydrator({ children }: StoreHydratorProps) {
       useServerDataStore.getState().clearAll();
       queryClient.removeQueries({ queryKey: ['sessions'] });
       queryClient.removeQueries({ queryKey: ['config'] });
+      queryClient.removeQueries({ queryKey: ['providers'] });
       queryClient.removeQueries({ queryKey: ['transcript'] });
       queryClient.removeQueries({ queryKey: ['pinnedMessages'] });
       queryClient.removeQueries({ queryKey: ['mcp'] });

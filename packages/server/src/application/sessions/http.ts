@@ -62,6 +62,7 @@ export interface SessionHttpApplication {
   updateSession(id: string, input: SessionHttpUpdateInput): Session | null;
   deleteSession(id: string): boolean;
 
+  getSelectedContext(sessionId: string, messageId: string): import('@prokopai/sdk').SelectedContextRecord | null;
   listMessages(sessionId: string): Message[];
   latestTranscript(sessionId: string, limit: number): Promise<TranscriptPage>;
   transcriptBefore(sessionId: string, beforeSequence: number, limit: number): Promise<TranscriptPage>;
@@ -161,6 +162,11 @@ export function createSessionHttpApplication(
         worktreeAttachments?.changed(existing.workspaceRootId);
       }
       return deleted;
+    },
+
+    getSelectedContext(sessionId, messageId) {
+      if (!repository.getSession(sessionId)) return null;
+      return repository.getSelectedContext?.(sessionId, messageId) ?? null;
     },
 
     listMessages(sessionId) {

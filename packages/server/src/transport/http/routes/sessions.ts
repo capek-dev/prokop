@@ -125,6 +125,13 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
     return c.json({ success: true });
   });
 
+  app.get('/api/sessions/:id/messages/:messageId/selected-context', (c) => {
+    c.header('Cache-Control', 'no-store');
+    const sessionId = c.req.param('id');
+    if (!application.getSession(sessionId)) throw new NotFoundError('Session not found');
+    return c.json({ record: application.getSelectedContext(sessionId, c.req.param('messageId')) });
+  });
+
   app.get('/api/sessions/:id/messages', async (c) => {
     const sessionId = c.req.param('id');
     const session = application.getSession(sessionId);

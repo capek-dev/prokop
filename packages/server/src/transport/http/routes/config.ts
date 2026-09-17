@@ -1,4 +1,5 @@
 import type { Hono } from 'hono';
+import { z } from 'zod';
 import { validate } from './validate';
 import type { ConfigurationApplication } from '@/application/config';
 import type { ProvidersApplication } from '@/application/providers';
@@ -206,6 +207,11 @@ export function registerConfigRoutes(
   // ============================================================================
   // Configuration: Provider Credentials
   // ============================================================================
+
+  app.get('/api/config/experimental/context-selection', (c) => c.json(providers.getContextSelection()));
+  app.put('/api/config/experimental/context-selection', validate('json', z.object({ enabled: z.boolean() }).strict()), async (c) => {
+    return c.json(await providers.setContextSelection(c.req.valid('json').enabled));
+  });
 
   app.get('/api/config/providers', (c) => {
     const result = providers.listCredentials();

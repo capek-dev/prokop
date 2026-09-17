@@ -1,5 +1,7 @@
 import {
   clearProviderCredential,
+  getContextSelectionSettings,
+  setContextSelectionEnabled,
   listProviderCredentials,
   setProviderCredential,
 } from '@/config/provider-credentials';
@@ -12,6 +14,8 @@ import type { ProviderCredentialPort } from '@/application/ports/provider-accoun
  */
 export function createJean2ProviderCredentialPort(): ProviderCredentialPort {
   return {
+    getContextSelection: getContextSelectionSettings,
+    setContextSelection: setContextSelectionEnabled,
     list: listProviderCredentials,
     set: setProviderCredential,
     clear: clearProviderCredential,

@@ -43,6 +43,8 @@ function fakeProviders() {
     disconnect: async () => {},
     completeOAuth: async () => ({ providerId: '' }),
     serverCallback: async () => ({ body: '', status: 200, contentType: 'text/html' }),
+    getContextSelection: () => ({ enabled: false, configured: false }),
+    setContextSelection: async (enabled: boolean) => ({ enabled, configured: true }),
     listCredentials: () => ({ providers: [] }),
     setCredential: async () => ({ provider: '', configured: false }),
     clearCredential: async () => ({ provider: '', configured: false }),

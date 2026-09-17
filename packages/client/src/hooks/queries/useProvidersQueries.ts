@@ -69,6 +69,8 @@ export function useCompleteOAuth(sdkClient: ProkopaiClient | null) {
   });
 }
 
+const experimentalSettingsKey = queryKeys.config.contextSelection;
+
 export function useSetProviderCredential(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -76,7 +78,10 @@ export function useSetProviderCredential(sdkClient: ProkopaiClient | null) {
       provider: string;
       body: { apiKey: string };
     }) => sdkClient!.http.providers.setCredential(provider, body),
-    onSuccess: () => {
+    onSuccess: result => {
+      if (result.provider === 'typesafe') queryClient.setQueryData<{ enabled: boolean; configured: boolean }>(experimentalSettingsKey,
+        previous => previous ? { ...previous, configured: result.configured } : previous);
+      queryClient.invalidateQueries({ queryKey: experimentalSettingsKey });
       queryClient.invalidateQueries({ queryKey: queryKeys.config.providers.credentials });
     },
   });
@@ -87,7 +92,10 @@ export function useClearProviderCredential(sdkClient: ProkopaiClient | null) {
   return useMutation({
     mutationFn: (provider: string) =>
       sdkClient!.http.providers.clearCredential(provider),
-    onSuccess: () => {
+    onSuccess: result => {
+      if (result.provider === 'typesafe') queryClient.setQueryData<{ enabled: boolean; configured: boolean }>(experimentalSettingsKey,
+        previous => previous ? { ...previous, configured: result.configured } : previous);
+      queryClient.invalidateQueries({ queryKey: experimentalSettingsKey });
       queryClient.invalidateQueries({ queryKey: queryKeys.config.providers.credentials });
     },
   });

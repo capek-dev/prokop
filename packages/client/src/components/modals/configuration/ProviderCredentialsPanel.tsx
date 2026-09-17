@@ -9,13 +9,14 @@ import { Badge } from '@/components/ui/badge';
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
   embedded?: boolean;
+  category?: 'chat' | 'relevance';
 }
 
-export function ProviderCredentialsPanel({ sdkClient, embedded = false }: PanelProps) {
+export function ProviderCredentialsPanel({ sdkClient, embedded = false, category = 'chat' }: PanelProps) {
   const { data: credentialsData, isLoading: loading } = useProviderCredentialsQuery(sdkClient);
   const setCredentialMut = useSetProviderCredential(sdkClient);
   const clearCredentialMut = useClearProviderCredential(sdkClient);
-  const providers: ProviderCredentialStatus[] = credentialsData?.providers ?? [];
+  const providers: ProviderCredentialStatus[] = (credentialsData?.providers ?? []).filter(item => category === 'relevance' ? item.provider === 'typesafe' : item.provider !== 'typesafe');
   const [error, setError] = useState<string | null>(null);
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -49,6 +50,7 @@ export function ProviderCredentialsPanel({ sdkClient, embedded = false }: PanelP
   };
 
   const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+    typesafe: 'TypeSafe',
     deepseek: 'DeepSeek',
     minimax: 'MiniMax',
     openai: 'OpenAI',

@@ -47,6 +47,14 @@ interface CompleteOAuthOptions {
 export class ProvidersRestNamespace {
   constructor(private http: HttpClient) {}
 
+  async getContextSelection(options?: { signal?: AbortSignal }): Promise<{ enabled: boolean; configured: boolean }> {
+    return this.http.get('/config/experimental/context-selection', options);
+  }
+
+  async setContextSelection(enabled: boolean, options?: { signal?: AbortSignal }): Promise<{ enabled: boolean; configured: boolean }> {
+    return this.http.put('/config/experimental/context-selection', { enabled }, options);
+  }
+
   /**
    * GET /api/providers - List all connectable providers with status and metadata
    */

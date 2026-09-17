@@ -47,6 +47,7 @@ const serverSourceRoot = resolve(repositoryRoot, 'packages/server/src');
 const compositionRootPath = resolve(serverSourceRoot, 'bootstrap/create-runtime.ts');
 
 const expectedCompositionSteps = [
+  'configureSelectedContext',
   'configureJean2Storage',
   'configureJean2RuntimeConfiguration',
   'configureJean2WorkspacePolicy',
@@ -116,6 +117,10 @@ describe('Čapek composition root', () => {
     const allowedSpecifiers = [
       '@/adapters/capek',
       '@/adapters/capek/storage',
+      '@/adapters/capek/context-assembler',
+      '@/infrastructure/context/typesafe',
+      '@/infrastructure/runtime/environment',
+      '@/infrastructure/sqlite/selected-context',
       '@/adapters/capek/session-search',
       '@/adapters/capek/scheduler',
       '@/adapters/capek/composition',
@@ -293,7 +298,7 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
 
     expect(agentServices).toEqual([
       ['capek.agent-driver', 'agent', 'current.agent-driver', 'agent'],
-      ['capek.context-assembler', 'agent', 'current.context-sections', 'agent'],
+      ['capek.context-assembler', 'agent', 'prokopai.selected-context', 'agent'],
       ['capek.context-sources', 'agent', 'current.context-sources', 'agent'],
       ['capek.orchestrator-session', 'agent', 'current.orchestrator-session', 'agent'],
       ['capek.provider-overrides', 'agent', 'current.provider-overrides', 'agent'],
@@ -509,7 +514,7 @@ describe('C3 ordered context in the Jean2 composition', () => {
     processScope = composition.processScope;
     agentScope = composition.agentScope;
 
-    expect(agentScope.require(capekContextAssemblerKey).id).toBe('current.context-sections');
+    expect(agentScope.require(capekContextAssemblerKey).id).toBe('prokopai.selected-context');
     expect(agentScope.listContextSections().map((section) => [section.id, section.phase, section.order])).toEqual([
       ['agent-memory', 'identity', 10],
       ['agent-user-preferences', 'identity', 20],

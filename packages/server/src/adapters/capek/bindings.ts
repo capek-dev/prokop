@@ -12,6 +12,7 @@ import {
   setDefaultContextAssembler,
   type RuntimeHost,
 } from '@capekai/core/hosts';
+import { getJean2EnvValue } from '@/infrastructure/runtime/environment';
 import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';
 import { jean2DeliveryBindings } from './delivery';
 import { jean2InteractionBindings } from './interaction';
@@ -29,6 +30,7 @@ export const jean2CompatibilityBindings = {
   workspace: jean2WorkspaceBindings,
   toolPolicy: jean2ToolPolicy,
   sandbox: jean2SandboxBindings,
+  memoryCharLimit: () => getJean2EnvValue('PROKOPAI_CONTEXT_SELECTION_ENABLED') === 'true' ? 50000 : 2500,
   layout: {
     workspaceMemoryDir: (workspacePath: string) => resolveWorkspaceMemoryDir(workspacePath),
     workspaceSkillsDir: (workspacePath: string) => join(workspacePath, '.agents', 'skills'),

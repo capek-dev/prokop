@@ -35,6 +35,7 @@ export const PROVIDER_CREDENTIALS: readonly ProviderCredentialDefinition[] = [
   { provider: 'zhipu', envKey: 'PROKOPAI_LLM_ZHIPU_API_KEY' },
   { provider: 'zhipu-coding', envKey: 'PROKOPAI_LLM_ZHIPU_CODING_API_KEY' },
   { provider: 'deepseek', envKey: 'PROKOPAI_LLM_DEEPSEEK_API_KEY' },
+  { provider: 'typesafe', envKey: 'PROKOPAI_TYPESAFE_API_KEY' },
 ];
 
 export function getSupportedProviderCredential(

@@ -60,6 +60,10 @@ export class SessionsRestNamespace {
     return this.http.patch(`/sessions/${encodeURIComponent(id)}/learning`, settings);
   }
 
+  async getSelectedContext(sessionId: string, messageId: string, options?: { signal?: AbortSignal }): Promise<{ record: import('../shared-types/context-selection').SelectedContextRecord | null }> {
+    return this.http.get(`/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(messageId)}/selected-context`, { signal: options?.signal });
+  }
+
   async list(options?: ListOptions): Promise<ListSessionsResponse> {
     return this.http.get('/sessions', {
       params: options?.status ? { status: options.status } : undefined,

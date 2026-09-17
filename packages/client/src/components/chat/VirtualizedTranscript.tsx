@@ -19,6 +19,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Minimize2, RotateCcw, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MessageBubble } from './MessageBubble';
+import { SelectedContext } from './SelectedContext';
 import { ErrorMessageContent } from './ErrorMessageContent';
 import { ToolCall } from './ToolCall';
 import { cn } from '@/lib/utils';
@@ -531,11 +532,14 @@ const MessageRow = memo(function MessageRow({
 
   if (isCompactFailed) {
     return (
-      <CompactionFailedMessage
-        message={item.message as AssistantMessage}
-        textContent={getTextContent(item.parts)}
-        onRetry={isMainActiveSession && !isCompacting ? onCompact : undefined}
-      />
+      <>
+        <SelectedContext key={item.message.id} sessionId={sessionId} messageId={item.message.id} />
+        <CompactionFailedMessage
+          message={item.message as AssistantMessage}
+          textContent={getTextContent(item.parts)}
+          onRetry={isMainActiveSession && !isCompacting ? onCompact : undefined}
+        />
+      </>
     );
   }
 
@@ -544,9 +548,10 @@ const MessageRow = memo(function MessageRow({
 
   if (isError && !hasContentParts) {
     return (
-      <ErrorMessageContent
-        message={item.message as AssistantMessage}
-      />
+      <>
+        <SelectedContext key={item.message.id} sessionId={sessionId} messageId={item.message.id} />
+        <ErrorMessageContent message={item.message as AssistantMessage} />
+      </>
     );
   }
 

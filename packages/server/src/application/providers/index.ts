@@ -52,6 +52,8 @@ export interface ProvidersApplication {
     redirectUri: string,
   ): Promise<{ providerId: string }>;
   serverCallback(providerId: string, url: URL): Promise<OAuthServerCallbackResult>;
+  getContextSelection(): { enabled: boolean; configured: boolean };
+  setContextSelection(enabled: boolean): Promise<{ enabled: boolean; configured: boolean }>;
   listCredentials(): ProviderCredentialsResponse;
   setCredential(provider: string, apiKey: string): Promise<ProviderCredentialStatus>;
   clearCredential(provider: string): Promise<ProviderCredentialStatus>;
@@ -105,6 +107,14 @@ export function createProvidersApplication(
       return deps.oauth.serverCallback(providerId, url);
     },
 
+    getContextSelection() {
+      if (!deps.credentials.getContextSelection) throw new NotFoundError('Context selection settings unavailable');
+      return deps.credentials.getContextSelection();
+    },
+    setContextSelection(enabled) {
+      if (!deps.credentials.setContextSelection) throw new NotFoundError('Context selection settings unavailable');
+      return deps.credentials.setContextSelection(enabled);
+    },
     listCredentials() {
       return deps.credentials.list();
     },

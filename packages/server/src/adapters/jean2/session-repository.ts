@@ -42,6 +42,7 @@ import {
 } from '@/infrastructure/sqlite/attachments';
 import { getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
 import { getDatabase } from '@/infrastructure/sqlite/database';
+import { getSelectedContext } from '@/infrastructure/sqlite/selected-context';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import type { AgentsApplication } from '@/application/agents';
 import { markManualSessionTitle } from '@/infrastructure/session-title';
@@ -166,6 +167,7 @@ export function createJean2SessionRepository(
   );
 
   return {
+    getSelectedContext,
     createSession(input: SessionRecordCreateInput): Session {
       return projectWorktree(createSession(toCreateInput(input)));
     },
