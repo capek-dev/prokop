@@ -39,6 +39,19 @@ describe('Selected context', () => {
     await waitFor(() => expect(client.getQueryCache().getAll()).toHaveLength(0));
     client.clear();
   });
+  it('shows probability decisions while preserving legacy score labels', () => {
+    const view = render(<SelectedContextDetails record={{ ...record, requiredProbability: 0.7,
+      items: [{ ...record.items[0], score: 1.7, qualifyingProbability: 0.7 }],
+      excluded: [{ id: 'other', name: 'Other', source: 'agent', score: 1.6, qualifyingProbability: 0.6, reason: 'threshold' }],
+    }} />);
+    expect(screen.getByText('70.0% at level 2 or above')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Technical details' }));
+    expect(screen.getByText(/Minimum level: 2 · Required probability: 70%/)).toBeTruthy();
+    expect(screen.getByText(/60.0% at level 2 or above · Below required probability/)).toBeTruthy();
+    view.rerender(<SelectedContextDetails record={record} />);
+    expect(screen.getByText(/Threshold: 2/)).toBeTruthy();
+    expect(screen.getByText('3.0 / 3')).toBeTruthy();
+  });
   it('formats memory markdown instead of showing raw syntax', () => {
     render(<SelectedContextDetails record={{ ...record, items: [{ ...record.items[0], content: '- Use **React** for frontend work' }] }} />);
     expect(screen.getByRole('listitem')).toHaveTextContent('Use React for frontend work');

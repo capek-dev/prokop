@@ -5,6 +5,10 @@ import { assembleSelectedContext, configureSelectedContext, type ContextSelectio
 import { configureAgentSource } from '@capekai/core/hosts';
 import { createRuntime, createJean2RuntimeComposition } from '@/bootstrap/create-runtime';
 
+import type { ContextScore } from '@/application/context/selection';
+
+const judgment = (score: number): ContextScore => ({ score, probabilities: [score === 0 ? 1 : 0, score === 1 ? 1 : 0, score === 2 ? 1 : 0, score === 3 ? 1 : 0] });
+
 const data: ContextAssemblyData = {
   preconfig: { id: 'agent', name: 'Agent', description: '', systemPrompt: '', tools: null, model: null, provider: null, settings: null, isDefault: false },
   workspaceId: 'ws', workspacePath: '/workspace', assistantMessageId: 'response',
@@ -21,7 +25,7 @@ function harness(overrides: Partial<ContextSelectionDependencies> = {}) {
   const records: SelectedContextRecord[] = [];
   const deps: ContextSelectionDependencies = {
     enabled: true, credentials: true, sections: async () => sections,
-    skills: async () => [], score: async (_input, candidates) => candidates.map((_, i) => i === 0 ? 3 : 0),
+    skills: async () => [], score: async (_input, candidates) => candidates.map((_, i) => judgment(i === 0 ? 3 : 0)),
     save: record => { records.push(structuredClone(record)); }, ...overrides,
   };
   return { deps, records };
@@ -33,7 +37,7 @@ describe('request-local selected context', () => {
   afterEach(() => { logs.mockRestore(); });
 
   test('fallback honors a smaller budget across workspace and agent entries in source order', async () => {
-    const { deps, records } = harness({ enabled: false, policy: { threshold: 2, memoryChars: 20, skillChars: 0 } });
+    const { deps, records } = harness({ enabled: false, policy: { threshold: 2, requiredProbability: 0.7, memoryChars: 20, skillChars: 0 } });
     await assembleSelectedContext(data, deps);
     expect(records[0].items.filter(item => item.kind === 'memory').map(item => item.content)).toEqual(['- selected']);
     expect(records[0].items.filter(item => item.kind === 'preferences')).toHaveLength(2);
@@ -44,7 +48,7 @@ describe('request-local selected context', () => {
     for (const overrides of [
       { enabled: false }, { credentials: false },
       { score: async () => { throw new Error('offline'); } },
-      { timeoutMs: 1, score: async () => new Promise<number[]>(() => {}) },
+      { timeoutMs: 1, score: async () => new Promise<ContextScore[]>(() => {}) },
       { skills: async () => Array.from({ length: 257 }, () => ({ name: 's', description: '', content: '', location: '/s' })) },
     ]) {
       const { deps, records } = harness({ sections: async () => largeSections, ...overrides });
@@ -82,7 +86,7 @@ describe('request-local selected context', () => {
     configureAgentSource({ getDirectory: async () => '/test-agent', readMemoryFile: async (_id, name) => name === 'MEMORY.md' ? '- useful\n- unrelated' : 'Always preserved' });
     const records: SelectedContextRecord[] = [];
     configureSelectedContext(() => ({ enabled: true, credentials: true,
-      score: async (_input, candidates) => candidates.map(item => item.content === '- useful' ? 3 : 0),
+      score: async (_input, candidates) => candidates.map(item => judgment(item.content === '- useful' ? 3 : 0)),
       save: record => { records.push(record); },
     }));
     const composition = await createJean2RuntimeComposition();
@@ -107,7 +111,7 @@ describe('request-local selected context', () => {
     let called = false;
     const { deps, records } = harness({
       skills: async () => [{ name: 'large', description: 'large', content: 'x'.repeat(140000), location: '/workspace/.agents/skills/large/SKILL.md' }],
-      score: async (_input, candidates) => { called = true; return candidates.map(() => 0); },
+      score: async (_input, candidates) => { called = true; return candidates.map(() => judgment(0)); },
     });
     await assembleSelectedContext(data, deps);
     expect(called).toBe(true);
@@ -145,7 +149,7 @@ describe('request-local selected context', () => {
       sections: async value => [{ id: 'agent-memory', content: `<agent_memory>\n- ${value.workspacePath}\n</agent_memory>` }],
       score: async (input, candidates) => {
         await new Promise(resolve => setTimeout(resolve, input.sessionId === 'session' ? 5 : 0));
-        return candidates.map(candidate => candidate.content.includes(input.request!.text) ? 3 : 0);
+        return candidates.map(candidate => judgment(candidate.content.includes(input.request!.text) ? 3 : 0));
       },
     });
     const makeData = (id: string, path: string): ContextAssemblyData => ({ ...data, workspacePath: path, assistantMessageId: id,
@@ -157,6 +161,17 @@ describe('request-local selected context', () => {
     expect(records.find(record => record.sessionId === 'session')?.items[0].content).toBe('- /first');
     expect(records.find(record => record.sessionId === 'other')?.items[0].content).toBe('- /second');
   });
+  test('probability policy changes qualification and snapshot without changing budgets', async () => {
+    const { deps, records } = harness({ score: async (_input, candidates) => candidates.map(() => ({ score: 1.7, probabilities: [0, 0.3, 0.7, 0] })) });
+    expect(await assembleSelectedContext(data, deps)).toContain('- selected');
+    expect(records[0].requiredProbability).toBe(0.7);
+    expect(records[0].items.find(item => item.kind === 'memory')?.qualifyingProbability).toBe(0.7);
+    deps.policy = { threshold: 2, requiredProbability: 0.8, memoryChars: 5000, skillChars: 24000 };
+    expect(await assembleSelectedContext(data, deps)).not.toContain('- selected');
+    expect(records[1].excluded[0].qualifyingProbability).toBe(0.7);
+    expect(records[0].requiredProbability).toBe(0.7);
+  });
+
   test('filters ordinary memory while retaining both preferences and system instructions', async () => {
     const { deps, records } = harness();
     const prompt = await assembleSelectedContext(data, deps);
@@ -173,7 +188,7 @@ describe('request-local selected context', () => {
     for (const [overrides, outcome] of [
       [{ enabled: false }, 'disabled'], [{ credentials: false }, 'missing_credentials'],
       [{ score: async () => { throw new Error('failure'); } }, 'failed'],
-      [{ score: async () => [NaN] }, 'failed'],
+      [{ score: async () => [judgment(NaN)] }, 'failed'],
     ] as const) {
       const { deps, records } = harness(overrides);
       expect(await assembleSelectedContext(data, deps)).toBe(baseline);
@@ -182,7 +197,7 @@ describe('request-local selected context', () => {
     }
   });
   test('empty selection is successful, not fallback; workspace gate is not reloaded', async () => {
-    const { deps, records } = harness({ sections: async () => sections.slice(0, 3), score: async (_i, c) => c.map(() => 0) });
+    const { deps, records } = harness({ sections: async () => sections.slice(0, 3), score: async (_i, c) => c.map(() => judgment(0)) });
     const prompt = await assembleSelectedContext(data, deps);
     expect(prompt).not.toContain('workspace_memory');
     expect(prompt).not.toContain('- selected');
@@ -195,11 +210,11 @@ describe('request-local selected context', () => {
     expect(records[0].items[0].inclusion).toBe('baseline');
   });
   test('timeout returns promptly; late scorer cannot mutate the saved snapshot', async () => {
-    let finish!: (scores: number[]) => void;
+    let finish!: (scores: ContextScore[]) => void;
     const { deps, records } = harness({ timeoutMs: 5, score: () => new Promise(resolve => { finish = resolve; }) });
     expect(await assembleSelectedContext(data, deps)).toBe(baseline);
     expect(records[0].outcome).toBe('timeout');
-    finish([3, 3, 3]);
+    finish([3, 3, 3].map(judgment));
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(records).toHaveLength(1);
     expect(records[0].outcome).toBe('timeout');
@@ -225,7 +240,7 @@ describe('request-local selected context', () => {
     const { deps, records } = harness({ skills: async () => [
       { name: 'workspace-skill', description: 'local', content: 'workspace procedure', location: '/workspace/.agents/skills/local/SKILL.md' },
       { name: 'agent-skill', description: 'personal', content: 'agent procedure', location: '/agent/skills/personal/SKILL.md' },
-    ], score: async (_i, c) => c.map(() => 3) });
+    ], score: async (_i, c) => c.map(() => judgment(3)) });
     const prompt = await assembleSelectedContext(data, deps);
     const skills = records[0].items.filter(item => item.kind === 'skill');
     expect(skills.map(item => item.source)).toEqual(['agent', 'workspace']);

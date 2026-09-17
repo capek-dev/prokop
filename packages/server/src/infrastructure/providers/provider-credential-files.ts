@@ -1,4 +1,5 @@
-import type { ProviderCredentialStatus, ProviderCredentialsResponse } from '@prokopai/sdk';
+import type { ContextSelectionSettings, ContextSelectionUpdate, ProviderCredentialStatus, ProviderCredentialsResponse } from '@prokopai/sdk';
+import { DEFAULT_SELECTION_POLICY } from '@/application/context/selection';
 import { getJean2EnvValue, reloadJean2Env } from '@/infrastructure/runtime/environment';
 import { getEnvFilePath } from '@/infrastructure/runtime/paths';
 import { atomicWriteFile, readFileSafe } from '@/config/files';
@@ -26,8 +27,8 @@ function serializeWrite<T>(write: () => Promise<T>): Promise<T> {
   return result;
 }
 
-export function setContextSelectionEnabled(enabled: boolean): Promise<{ enabled: boolean; configured: boolean }> {
-  return serializeWrite(() => writeContextSelectionEnabled(enabled));
+export function setContextSelectionEnabled(update: boolean | ContextSelectionUpdate): Promise<ContextSelectionSettings> {
+  return serializeWrite(() => writeContextSelectionEnabled(typeof update === 'boolean' ? { enabled: update } : update));
 }
 export function setProviderCredential(provider: string, apiKey: string): Promise<ProviderCredentialStatus> {
   return serializeWrite(() => writeProviderCredential(provider, apiKey));
@@ -36,21 +37,40 @@ export function clearProviderCredential(provider: string): Promise<ProviderCrede
   return serializeWrite(() => deleteProviderCredential(provider));
 }
 
-export function getContextSelectionSettings(): { enabled: boolean; configured: boolean } {
+export function getContextSelectionSettings(): ContextSelectionSettings {
+  const level = getJean2EnvValue('PROKOPAI_CONTEXT_SELECTION_MINIMUM_LEVEL')?.trim();
+  const probability = getJean2EnvValue('PROKOPAI_CONTEXT_SELECTION_REQUIRED_PROBABILITY')?.trim();
+  const minimumLevel = level ? Number(level) : NaN;
+  const requiredProbability = probability ? Number(probability) : NaN;
   return {
     enabled: getJean2EnvValue('PROKOPAI_CONTEXT_SELECTION_ENABLED') === 'true',
     configured: Boolean(getJean2EnvValue('PROKOPAI_TYPESAFE_API_KEY')?.trim()),
+    minimumLevel: Number.isInteger(minimumLevel) && minimumLevel >= 0 && minimumLevel <= 3 ? minimumLevel : DEFAULT_SELECTION_POLICY.threshold,
+    requiredProbability: Number.isFinite(requiredProbability) && requiredProbability >= 0 && requiredProbability <= 1 ? requiredProbability : DEFAULT_SELECTION_POLICY.requiredProbability,
   };
 }
 
-async function writeContextSelectionEnabled(enabled: boolean): Promise<{ enabled: boolean; configured: boolean }> {
-  if (typeof enabled !== 'boolean') throw new ConfigurationValidationError('enabled must be a boolean');
+async function writeContextSelectionEnabled(update: ContextSelectionUpdate): Promise<ContextSelectionSettings> {
+  if (!update || typeof update !== 'object' || Array.isArray(update)
+    || !Object.keys(update).length || Object.keys(update).some(key => !['enabled', 'minimumLevel', 'requiredProbability'].includes(key))) {
+    throw new ConfigurationValidationError('Invalid context selection settings');
+  }
+  const { enabled, minimumLevel, requiredProbability } = update;
+  if ('enabled' in update && typeof enabled !== 'boolean') throw new ConfigurationValidationError('enabled must be a boolean');
+  if ('minimumLevel' in update && (typeof minimumLevel !== 'number' || !Number.isInteger(minimumLevel) || minimumLevel < 0 || minimumLevel > 3)) {
+    throw new ConfigurationValidationError('minimumLevel must be an integer from 0 to 3');
+  }
+  if ('requiredProbability' in update && (typeof requiredProbability !== 'number' || !Number.isFinite(requiredProbability) || requiredProbability < 0 || requiredProbability > 1)) {
+    throw new ConfigurationValidationError('requiredProbability must be between 0 and 1');
+  }
   if (enabled && !getContextSelectionSettings().configured) {
     throw new ConfigurationValidationError('Configure TypeSafe in LLM Providers first');
   }
-  const content = await readFileSafe(getEnvFilePath());
-  const merged = mergeEnvLine(content, 'PROKOPAI_CONTEXT_SELECTION_ENABLED', String(enabled));
-  await atomicWriteFile(getEnvFilePath(), merged.content);
+  let content = await readFileSafe(getEnvFilePath());
+  if (enabled !== undefined) content = mergeEnvLine(content, 'PROKOPAI_CONTEXT_SELECTION_ENABLED', String(enabled)).content;
+  if (minimumLevel !== undefined) content = mergeEnvLine(content, 'PROKOPAI_CONTEXT_SELECTION_MINIMUM_LEVEL', String(minimumLevel)).content;
+  if (requiredProbability !== undefined) content = mergeEnvLine(content, 'PROKOPAI_CONTEXT_SELECTION_REQUIRED_PROBABILITY', String(requiredProbability)).content;
+  await atomicWriteFile(getEnvFilePath(), content ?? '');
   reloadJean2Env();
   return getContextSelectionSettings();
 }

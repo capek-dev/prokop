@@ -67,8 +67,8 @@ function makeFakeApplication(overrides: Partial<ProvidersApplication> = {}): Pro
       status: 200,
       contentType: 'text/html; charset=utf-8',
     }),
-    getContextSelection: () => ({ enabled: false, configured: false }),
-    setContextSelection: async enabled => ({ enabled, configured: true }),
+    getContextSelection: () => ({ enabled: false, configured: false, minimumLevel: 2, requiredProbability: 0.7 }),
+    setContextSelection: async update => ({ enabled: false, configured: true, minimumLevel: 2, requiredProbability: 0.7, ...(typeof update === 'boolean' ? { enabled: update } : update) }),
     listCredentials: () => ({ providers: [{ provider: 'openai', configured: true }] }),
     setCredential: async (provider) => ({ provider, configured: true }),
     clearCredential: async (provider) => ({ provider, configured: false }),
@@ -90,18 +90,33 @@ async function json(res: Response): Promise<Record<string, unknown>> {
 }
 
 describe('provider route contract', () => {
-  test('experimental settings accept only explicit booleans and return status without secrets', async () => {
-    const calls: boolean[] = [];
-    const app = makeApp(makeFakeApplication({ setContextSelection: async enabled => { calls.push(enabled); return { enabled, configured: true }; } }));
+  test('experimental settings validate partial policy updates and return status without secrets', async () => {
+    const calls: unknown[] = [];
+    let settings = { enabled: false, configured: true, minimumLevel: 2, requiredProbability: 0.7 };
+    const app = makeApp(makeFakeApplication({
+      getContextSelection: () => settings,
+      setContextSelection: async update => {
+        calls.push(update);
+        settings = { ...settings, ...(typeof update === 'boolean' ? { enabled: update } : update) };
+        return settings;
+      },
+    }));
     const path = '/api/config/experimental/context-selection';
-    expect(await json(await app.request(path))).toEqual({ enabled: false, configured: false });
-    for (const body of [{}, { enabled: 'true' }, { enabled: true, apiKey: 'secret' }]) {
+    expect(await json(await app.request(path))).toEqual(settings);
+    for (const body of [{}, { enabled: 'true' }, { enabled: true, apiKey: 'secret' },
+      { minimumLevel: -1 }, { minimumLevel: 4 }, { minimumLevel: 1.5 }, { minimumLevel: '2' }, { minimumLevel: null },
+      { requiredProbability: -0.1 }, { requiredProbability: 1.1 }, { requiredProbability: '0.7' }, { requiredProbability: null },
+    ]) {
       expect((await app.request(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).status).toBe(400);
     }
     expect(calls).toEqual([]);
-    const result = await app.request(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }) });
-    expect(await json(result)).toEqual({ enabled: true, configured: true });
-    expect(calls).toEqual([true]);
+    for (const body of [{ enabled: true }, { minimumLevel: 3 }, { requiredProbability: 0.8 }]) {
+      const result = await app.request(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      expect(result.status).toBe(200);
+      expect(await json(result)).toEqual(settings);
+    }
+    expect(settings).toEqual({ enabled: true, configured: true, minimumLevel: 3, requiredProbability: 0.8 });
+    expect(calls).toEqual([{ enabled: true }, { minimumLevel: 3 }, { requiredProbability: 0.8 }]);
   });
   afterEach(() => {
     mock.restore();

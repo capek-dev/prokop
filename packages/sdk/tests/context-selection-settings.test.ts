@@ -13,5 +13,9 @@ test('context selection settings preserve explicit boolean and abort signal', as
     expect(await api.setContextSelection(true, { signal })).toEqual({ enabled: true, configured: true });
     expect(get).toHaveBeenCalledWith('/config/experimental/context-selection', { signal });
     expect(put).toHaveBeenCalledWith('/config/experimental/context-selection', { enabled: true }, { signal });
+    await api.setContextSelection({ minimumLevel: 3, requiredProbability: 0.8 }, { signal });
+    expect(put).toHaveBeenLastCalledWith('/config/experimental/context-selection', { minimumLevel: 3, requiredProbability: 0.8 }, { signal });
+    await api.setContextSelection({ requiredProbability: 0.7 });
+    expect(put).toHaveBeenLastCalledWith('/config/experimental/context-selection', { requiredProbability: 0.7 }, undefined);
   } finally { get.mockRestore(); put.mockRestore(); }
 });

@@ -29,6 +29,16 @@ describe('immutable selected-context storage', () => {
       expect(getSelectedContext('session', 'response')).toBeNull();
     }
   });
+  test('probability snapshots round-trip without changing historical records', () => {
+    record.requiredProbability = 0.7;
+    record.items[0].qualifyingProbability = 0.75;
+    record.excluded = [{ id: 'excluded', name: 'Other', source: 'agent', score: 1.6, qualifyingProbability: 0.6, reason: 'threshold' }];
+    saveSelectedContext(record);
+    createMessage(createTestAssistantMessage('session', { id: 'response' }));
+    expect(getSelectedContext('session', 'response')).toEqual(record);
+    db.run('UPDATE selected_context SET snapshot = ?', [JSON.stringify({ ...record, requiredProbability: 2 })]);
+    expect(getSelectedContext('session', 'response')).toBeNull();
+  });
   test('preparations stay hidden until the exact assistant message exists', () => {
     saveSelectedContext(record);
     expect(getSelectedContext('session', 'response')).toBeNull();

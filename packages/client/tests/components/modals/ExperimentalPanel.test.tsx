@@ -64,6 +64,30 @@ test('removing key still permits turning a previously enabled feature off', asyn
   await waitFor(() => expect(screen.getByRole('switch')).toBeDisabled());
 });
 
+test('probability settings start at 70 percent, validate input, and use persisted results', async () => {
+  const settings = { enabled: true, configured: true, minimumLevel: 2, requiredProbability: 0.7 };
+  const save = vi.fn(async (patch: Record<string, number>) => ({ ...settings, ...patch }));
+  const client = { http: { providers: { getContextSelection: async () => settings, setContextSelection: save } } } as unknown as ProkopaiClient;
+  const cache = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const view = render(<QueryClientProvider client={cache}><ExperimentalPanel sdkClient={client} /></QueryClientProvider>);
+  const probability = await screen.findByLabelText('Required probability (%)');
+  const level = screen.getByLabelText('Minimum relevance level');
+  expect(probability).toHaveValue(70);
+  expect(level).toHaveValue(2);
+  fireEvent.change(probability, { target: { value: '101' } });
+  expect(screen.getByRole('button', { name: 'Save selection settings' })).toBeDisabled();
+  fireEvent.change(probability, { target: { value: '' } });
+  expect(screen.getByRole('button', { name: 'Save selection settings' })).toBeDisabled();
+  fireEvent.change(probability, { target: { value: '80' } });
+  fireEvent.change(level, { target: { value: '3' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save selection settings' }));
+  await waitFor(() => expect(save).toHaveBeenCalledWith({ minimumLevel: 3, requiredProbability: 0.8 }));
+  await waitFor(() => expect(cache.getQueryData(queryKeys.config.contextSelection)).toEqual({ ...settings, minimumLevel: 3, requiredProbability: 0.8 }));
+  expect(screen.getByRole('switch')).toBeChecked();
+  view.unmount();
+  cache.clear();
+});
+
 test('failed writes do not pretend the feature was enabled', async () => {
   mount(false, true, true);
   await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());

@@ -1,4 +1,5 @@
 import type { HttpClient } from '../transport/http';
+import type { ContextSelectionSettings, ContextSelectionUpdate } from '../shared-types/context-selection';
 import type {
   ListProvidersResponse,
   GetProviderStatusResponse,
@@ -47,12 +48,12 @@ interface CompleteOAuthOptions {
 export class ProvidersRestNamespace {
   constructor(private http: HttpClient) {}
 
-  async getContextSelection(options?: { signal?: AbortSignal }): Promise<{ enabled: boolean; configured: boolean }> {
+  async getContextSelection(options?: { signal?: AbortSignal }): Promise<ContextSelectionSettings> {
     return this.http.get('/config/experimental/context-selection', options);
   }
 
-  async setContextSelection(enabled: boolean, options?: { signal?: AbortSignal }): Promise<{ enabled: boolean; configured: boolean }> {
-    return this.http.put('/config/experimental/context-selection', { enabled }, options);
+  async setContextSelection(update: boolean | ContextSelectionUpdate, options?: { signal?: AbortSignal }): Promise<ContextSelectionSettings> {
+    return this.http.put('/config/experimental/context-selection', typeof update === 'boolean' ? { enabled: update } : update, options);
   }
 
   /**

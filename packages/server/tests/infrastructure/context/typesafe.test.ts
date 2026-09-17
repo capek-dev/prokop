@@ -18,7 +18,7 @@ describe('TypeSafe SDK relevance contract', () => {
     await scoreContext(input, [candidate], signal, {
       apiKey: 'private-key', model: 'jev-latest', fetch: async (_url, init) => {
         sent = JSON.parse(init.body as string);
-        return Response.json({ answers: { item_0: { type: 'score', score: 2.5 } } });
+        return Response.json({ answers: { item_0: { type: 'score', score: 2.5, probabilities: { 0: 0, 1: 0, 2: 0.5, 3: 0.5 } } } });
       },
     });
     const request = String(logs.mock.calls[0][0]);
@@ -26,7 +26,7 @@ describe('TypeSafe SDK relevance contract', () => {
     expect(JSON.parse(request.slice('[context-selection] request '.length)).details.payload).toEqual(sent);
     const scores = String(logs.mock.calls[1][0]);
     expect(JSON.parse(scores.slice('[context-selection] scores '.length)).details.items).toEqual([
-      { question: 'item_0', id: 'id', name: 'entry', source: 'agent', kind: 'memory', score: 2.5 },
+      { question: 'item_0', id: 'id', name: 'entry', source: 'agent', kind: 'memory', score: 2.5, probabilities: [0, 0, 0.5, 0.5] },
     ]);
     expect(JSON.stringify(logs.mock.calls)).not.toContain('private-key');
     expect(JSON.stringify(logs.mock.calls)).not.toContain('Authorization');
@@ -34,7 +34,7 @@ describe('TypeSafe SDK relevance contract', () => {
 
   test('redacts the configured key even when echoed in candidate content', async () => {
     await scoreContext(input, [{ ...candidate, content: 'contains private-key' }], signal, {
-      apiKey: 'private-key', model: 'jev-latest', fetch: response({ answers: { item_0: { type: 'score', score: 0 } } }),
+      apiKey: 'private-key', model: 'jev-latest', fetch: response({ answers: { item_0: { type: 'score', score: 0, probabilities: { 0: 1, 1: 0, 2: 0, 3: 0 } } } }),
     });
     expect(JSON.stringify(logs.mock.calls)).not.toContain('private-key');
     expect(JSON.stringify(logs.mock.calls)).toContain('[REDACTED]');
@@ -53,11 +53,11 @@ describe('TypeSafe SDK relevance contract', () => {
       expect(body.questions.item_0.criteria).toEqual(RELEVANCE_LEVELS);
       expect(body.questions.item_0.instructions).toContain('candidates[0]');
       counts.push(body.state.candidates.length);
-      return Response.json({ answers: Object.fromEntries(Object.keys(body.questions).map(key => [key, { type: 'score', score: 2.1, confidence: 0 }])) });
+      return Response.json({ answers: Object.fromEntries(Object.keys(body.questions).map(key => [key, { type: 'score', score: 2.1, confidence: 0, probabilities: { 0: 0, 1: 0, 2: 0.9, 3: 0.1 } }])) });
     });
     const result = await scoreContext(input, Array.from({ length: 17 }, () => candidate), signal, { apiKey: 'fake', model: 'jev-latest', fetch: fakeFetch });
     expect(counts).toEqual([16, 1]);
-    expect(result).toEqual(Array(17).fill(2.1));
+    expect(result).toEqual(Array(17).fill({ score: 2.1, probabilities: [0, 0, 0.9, 0.1] }));
   });
   test('rejects malformed, out-of-range, missing and extra answers', async () => {
     for (const body of [{}, { answers: [] }, { answers: {} },
@@ -66,6 +66,18 @@ describe('TypeSafe SDK relevance contract', () => {
       { answers: { item_0: { type: 'score', score: 2 }, extra: {} } },
     ]) await expect(scoreContext(input, [candidate], signal, { apiKey: 'fake', model: 'jev-latest', fetch: response(body) })).rejects.toThrow();
   });
+  test('requires complete, bounded probability distributions instead of reconstructing them from score', async () => {
+    for (const probabilities of [undefined, null, [], { 0: 0, 1: 0, 2: 1 },
+      { 0: 0, 1: 0, 2: 1, 3: 0, 4: 0 }, { 0: 0, 1: 0, 2: '1', 3: 0 },
+      { 0: -0.1, 1: 0.1, 2: 1, 3: 0 }, { 0: 0, 1: 0, 2: 0.7, 3: 0.7 },
+    ]) await expect(scoreContext(input, [candidate], signal, { apiKey: 'fake', model: 'jev-latest',
+      fetch: response({ answers: { item_0: { type: 'score', score: 2, probabilities } } }),
+    })).rejects.toThrow(/probabilities/);
+    expect(await scoreContext(input, [candidate], signal, { apiKey: 'fake', model: 'jev-latest',
+      fetch: response({ answers: { item_0: { type: 'score', score: 1.7, probabilities: { 0: 0, 1: 0.3, 2: 0.7, 3: 0 } } } }),
+    })).toEqual([{ score: 1.7, probabilities: [0, 0.3, 0.7, 0] }]);
+  });
+
   test('HTTP failures and oversized responses reject without exposing response text', async () => {
     for (const fakeFetch of [
       async () => new Response('private error detail', { status: 500 }),

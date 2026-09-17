@@ -19,14 +19,16 @@ const OUTCOMES: Record<SelectedContextRecord['outcome'], string> = {
   input_limit: 'Candidate input exceeded the selection limit. Standard memory context used.',
 };
 
-function ContextItem({ item }: { item: SelectedContextItem }) {
+function ContextItem({ item, threshold }: { item: SelectedContextItem; threshold: number }) {
   const [open, setOpen] = useState(false);
   return <div className="flex min-w-0 flex-col gap-2 py-3">
     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
       <span>{item.source === 'agent' ? 'Agent' : 'Workspace'}</span>
       {item.inclusion === 'always' && <span>Always included</span>}
       {item.inclusion === 'baseline' && <span>Standard context</span>}
-      {item.score !== undefined && <span className="ml-auto tabular-nums" title="Relevance score out of 3">{item.score.toFixed(1)} / 3</span>}
+      {item.qualifyingProbability !== undefined
+        ? <span className="ml-auto tabular-nums">{(item.qualifyingProbability * 100).toFixed(1)}% at level {threshold} or above</span>
+        : item.score !== undefined && <span className="ml-auto tabular-nums" title="Relevance score out of 3">{item.score.toFixed(1)} / 3</span>}
     </div>
     {item.kind === 'skill' ? <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild><Button variant="ghost" size="sm" className="max-w-full" aria-label={item.name}><ChevronRight data-icon="inline-start" className={open ? 'rotate-90' : ''} /><span className="truncate">{item.name}</span></Button></CollapsibleTrigger>
@@ -50,17 +52,17 @@ export function SelectedContextDetails({ record }: { record: SelectedContextReco
       if (!items.length) return null;
       return <section key={kind} className="min-w-0" aria-label={kind === 'memory' ? 'Memories' : kind === 'skill' ? 'Skills' : 'Preferences'}>
         <h3 className="flex items-center gap-2 font-medium">{kind === 'memory' ? 'Memories' : kind === 'skill' ? 'Skills' : 'Preferences'}<Badge variant="secondary">{items.length}</Badge></h3>
-        <div className="divide-y">{items.map(item => <ContextItem key={item.id} item={item} />)}</div>
+        <div className="divide-y">{items.map(item => <ContextItem key={item.id} item={item} threshold={record.threshold} />)}</div>
       </section>;
     })}
     {record.items.length === 0 && <p>No memory, preferences, or skill bodies were included by this assembler.</p>}
     <Collapsible open={technical} onOpenChange={setTechnical}>
       <CollapsibleTrigger asChild><Button variant="ghost" size="sm">Technical details</Button></CollapsibleTrigger>
       <CollapsibleContent>{technical && <div className="flex flex-col gap-2 py-3 text-xs text-muted-foreground">
-        <p>Threshold: {record.threshold} · Selection: {record.elapsedMs} ms · {record.createdAt}</p>
+        <p>{record.requiredProbability === undefined ? `Threshold: ${record.threshold}` : `Minimum level: ${record.threshold} · Required probability: ${Number((record.requiredProbability * 100).toFixed(6))}%`} · Selection: {record.elapsedMs} ms · {record.createdAt}</p>
         <p className="break-all">Response: {record.assistantMessageId}</p>
-        {record.items.map(item => <p className="break-all" key={item.id}>{item.name}{item.score !== undefined ? ` · score ${item.score.toFixed(2)}` : ''}: revision {item.revision}</p>)}
-        {record.excluded.map(item => <p key={item.id}>{item.source} · {item.name} · {item.score.toFixed(2)} · {item.reason === 'budget' ? 'Excluded by budget' : 'Below threshold'}</p>)}
+        {record.items.map(item => <p className="break-all" key={item.id}>{item.name}{item.qualifyingProbability !== undefined ? ` · ${(item.qualifyingProbability * 100).toFixed(1)}% at level ${record.threshold} or above` : ''}{item.score !== undefined ? ` · score ${item.score.toFixed(2)}` : ''}: revision {item.revision}</p>)}
+        {record.excluded.map(item => <p key={item.id}>{item.source} · {item.name} · {item.qualifyingProbability !== undefined ? `${(item.qualifyingProbability * 100).toFixed(1)}% at level ${record.threshold} or above` : item.score.toFixed(2)} · {item.reason === 'budget' ? 'Excluded by budget' : record.requiredProbability === undefined ? 'Below threshold' : 'Below required probability'}</p>)}
       </div>}</CollapsibleContent>
     </Collapsible>
   </div>;

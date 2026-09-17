@@ -1,6 +1,6 @@
 import { score, TypeSafeClient } from '@typesafe-ai/sdk';
 import type { ContextSelectionInput } from '@capekai/core/composition';
-import type { ContextCandidate } from '@/application/context/selection';
+import { isValidContextScore, type ContextCandidate, type ContextScore } from '@/application/context/selection';
 
 export const RELEVANCE_LEVELS = [
   'The content does not help complete the current task.',
@@ -49,7 +49,7 @@ export async function scoreContext(
   candidates: readonly ContextCandidate[],
   signal: AbortSignal,
   options: TypeSafeOptions,
-): Promise<number[]> {
+): Promise<ContextScore[]> {
   signal.throwIfAborted();
   // Explicit payload diagnostics for selection debugging. Never log transport headers or errors.
   const diagnostic = (event: string, details: unknown): void => {
@@ -74,7 +74,7 @@ export async function scoreContext(
       return boundedResponse(await (options.fetch ?? fetch)(url, init ?? {}), init?.signal);
     },
   });
-  const results: number[] = [];
+  const results: ContextScore[] = [];
   for (let start = 0; start < candidates.length; start += 16) {
     signal.throwIfAborted();
     batchOffset = start;
@@ -109,10 +109,19 @@ export async function scoreContext(
       if (!answer || typeof answer !== 'object' || !('type' in answer) || answer.type !== 'score'
         || !('score' in answer) || typeof answer.score !== 'number' || !Number.isFinite(answer.score)
         || answer.score < 0 || answer.score > 3) throw new Error('Invalid relevance score');
-      results.push(answer.score);
+      if (!('probabilities' in answer) || !answer.probabilities || typeof answer.probabilities !== 'object'
+        || Array.isArray(answer.probabilities)) throw new Error('Missing relevance probabilities');
+      const probabilities = answer.probabilities as Record<string, unknown>;
+      if (Object.keys(probabilities).length !== 4 || [0, 1, 2, 3].some(level => typeof probabilities[level] !== 'number')) {
+        throw new Error('Invalid relevance probabilities');
+      }
+      const result: ContextScore = { score: answer.score,
+        probabilities: [probabilities[0], probabilities[1], probabilities[2], probabilities[3]] as [number, number, number, number] };
+      if (!isValidContextScore(result)) throw new Error('Invalid relevance probabilities');
+      results.push(result);
     }
     diagnostic('scores', { batchOffset, items: batch.map(({ id, name, source, kind }, index) => ({
-      question: `item_${index}`, id, name, source, kind, score: results[start + index],
+      question: `item_${index}`, id, name, source, kind, ...results[start + index],
     })) });
   }
   signal.throwIfAborted();

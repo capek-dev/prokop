@@ -3,7 +3,7 @@ import { capekContextAssemblerKey, capekContextSourcesKey, type CapekPlugin, typ
 import { getAvailableSkills, formatSkillContent } from '@capekai/core/hosts';
 import type { SkillInfo } from '@capekai/types';
 import type { SelectedContextItem, SelectedContextRecord } from '@prokopai/sdk';
-import { allocateContext, candidateId, DEFAULT_SELECTION_POLICY, memoryEntries, revisionOf, type ContextCandidate, type SelectionPolicy } from '@/application/context/selection';
+import { allocateContext, candidateId, DEFAULT_SELECTION_POLICY, memoryEntries, revisionOf, type ContextCandidate, type ContextScore, type SelectionPolicy } from '@/application/context/selection';
 import { SELECTOR_INPUT_CHARS, SELECTOR_MAX_CANDIDATES } from '@/application/context/selection';
 
 interface Section { id: string; content: string }
@@ -11,7 +11,7 @@ interface MemoryBlock { section: number; full: string; open: string; close: stri
 export interface ContextSelectionDependencies {
   sections(data: ContextAssemblyData): Promise<readonly Section[]>;
   skills(data: ContextAssemblyData): Promise<SkillInfo[]>;
-  score(input: ContextSelectionInput, candidates: readonly ContextCandidate[], signal: AbortSignal): Promise<number[]>;
+  score(input: ContextSelectionInput, candidates: readonly ContextCandidate[], signal: AbortSignal): Promise<ContextScore[]>;
   save(record: SelectedContextRecord): void;
   enabled: boolean;
   credentials: boolean;
@@ -105,7 +105,7 @@ export async function assembleSelectedContext(data: ContextAssemblyData, deps: C
     sessionId: input.sessionId, assistantMessageId: data.assistantMessageId,
     requestMessageId: input.request?.messageId, checkpointMessageId: input.checkpoint?.messageId,
     continuation: input.continuation, createdAt: new Date().toISOString(), outcome: 'disabled',
-    threshold: policy.threshold, elapsedMs: 0, items: [...preferences, ...baseline], excluded: [],
+    threshold: policy.threshold, requiredProbability: policy.requiredProbability, elapsedMs: 0, items: [...preferences, ...baseline], excluded: [],
   };
   let prompt = baselinePrompt;
   if (deps.enabled && !deps.credentials) record.outcome = 'missing_credentials';
@@ -193,9 +193,9 @@ export async function assembleSelectedContext(data: ContextAssemblyData, deps: C
   record.elapsedMs = Date.now() - started;
   console.info('[context-selection] outcome', JSON.stringify({
     sessionId: record.sessionId, assistantMessageId: record.assistantMessageId,
-    outcome: record.outcome, elapsedMs: record.elapsedMs, threshold: record.threshold,
-    included: record.items.map(({ id, kind, source, score, inclusion }) => ({ id, kind, source, score, inclusion })),
-    excluded: record.excluded.map(({ id, source, score, reason }) => ({ id, source, score, reason })),
+    outcome: record.outcome, elapsedMs: record.elapsedMs, threshold: record.threshold, requiredProbability: record.requiredProbability,
+    included: record.items.map(({ id, kind, source, score, qualifyingProbability, inclusion }) => ({ id, kind, source, score, qualifyingProbability, inclusion })),
+    excluded: record.excluded.map(({ id, source, score, qualifyingProbability, reason }) => ({ id, source, score, qualifyingProbability, reason })),
   }));
   deps.save(record);
   return prompt;

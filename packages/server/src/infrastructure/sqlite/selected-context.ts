@@ -5,16 +5,17 @@ import { getDatabase } from './database';
 
 const source = z.enum(['agent', 'workspace']);
 const score = z.number().finite().min(0).max(3);
+const probability = z.number().finite().min(0).max(1);
 const snapshotSchema = z.object({
   sessionId: z.string(), assistantMessageId: z.string(), requestMessageId: z.string().optional(), checkpointMessageId: z.string().optional(),
   continuation: z.boolean(), createdAt: z.string(),
   outcome: z.enum(['selected', 'disabled', 'missing_credentials', 'missing_evidence', 'timeout', 'failed', 'input_limit']),
-  threshold: score, elapsedMs: z.number().finite().nonnegative(),
+  threshold: score, requiredProbability: probability.optional(), elapsedMs: z.number().finite().nonnegative(),
   items: z.array(z.object({
     id: z.string(), kind: z.enum(['memory', 'skill', 'preferences']), source, name: z.string(), description: z.string().optional(),
-    revision: z.string(), content: z.string(), inclusion: z.enum(['selected', 'preloaded', 'always', 'baseline']), score: score.optional(),
+    revision: z.string(), content: z.string(), inclusion: z.enum(['selected', 'preloaded', 'always', 'baseline']), score: score.optional(), qualifyingProbability: probability.optional(),
   })),
-  excluded: z.array(z.object({ id: z.string(), name: z.string(), source, score, reason: z.enum(['threshold', 'budget']) })),
+  excluded: z.array(z.object({ id: z.string(), name: z.string(), source, score, qualifyingProbability: probability.optional(), reason: z.enum(['threshold', 'budget']) })),
 });
 
 export function initializeSelectedContextSchema(db: Database): void {

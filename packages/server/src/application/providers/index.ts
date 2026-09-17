@@ -1,4 +1,6 @@
 import type {
+  ContextSelectionSettings,
+  ContextSelectionUpdate,
   ProviderCredentialStatus,
   ProviderCredentialsResponse,
   ProviderDescriptor,
@@ -52,8 +54,8 @@ export interface ProvidersApplication {
     redirectUri: string,
   ): Promise<{ providerId: string }>;
   serverCallback(providerId: string, url: URL): Promise<OAuthServerCallbackResult>;
-  getContextSelection(): { enabled: boolean; configured: boolean };
-  setContextSelection(enabled: boolean): Promise<{ enabled: boolean; configured: boolean }>;
+  getContextSelection(): ContextSelectionSettings;
+  setContextSelection(update: boolean | ContextSelectionUpdate): Promise<ContextSelectionSettings>;
   listCredentials(): ProviderCredentialsResponse;
   setCredential(provider: string, apiKey: string): Promise<ProviderCredentialStatus>;
   clearCredential(provider: string): Promise<ProviderCredentialStatus>;

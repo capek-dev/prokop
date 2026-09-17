@@ -209,8 +209,12 @@ export function registerConfigRoutes(
   // ============================================================================
 
   app.get('/api/config/experimental/context-selection', (c) => c.json(providers.getContextSelection()));
-  app.put('/api/config/experimental/context-selection', validate('json', z.object({ enabled: z.boolean() }).strict()), async (c) => {
-    return c.json(await providers.setContextSelection(c.req.valid('json').enabled));
+  app.put('/api/config/experimental/context-selection', validate('json', z.object({
+    enabled: z.boolean().optional(),
+    minimumLevel: z.number().int().min(0).max(3).optional(),
+    requiredProbability: z.number().finite().min(0).max(1).optional(),
+  }).strict().refine(value => Object.keys(value).length > 0, 'Provide at least one setting')), async (c) => {
+    return c.json(await providers.setContextSelection(c.req.valid('json')));
   });
 
   app.get('/api/config/providers', (c) => {
