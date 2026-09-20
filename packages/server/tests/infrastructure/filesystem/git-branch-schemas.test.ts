@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { gitBranchActionSchema } from '../../../src/transport/http/routes/git-branch-schemas';
 
-const input = { action: 'pull-branch', name: 'main', expectedHead: 'a'.repeat(40), root: '/tree' };
+const input = { action: 'pull-branch', name: 'main', expectedHead: 'a'.repeat(40), root: '/tree' } as const;
 
 test('non-checkout pull accepts only a named target and reviewed head', () => {
   expect(gitBranchActionSchema.parse(input)).toEqual(input);
