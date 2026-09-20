@@ -1,6 +1,4 @@
 import type {
-  ContextSelectionSettings,
-  ContextSelectionUpdate,
   OAuthRedirectStrategy,
   ProviderCredentialStatus,
   ProviderCredentialsResponse,
@@ -70,8 +68,6 @@ export interface OAuthFlowPort {
  * typed errors exactly like the pre-S4 route; the application only maps
  * result values. */
 export interface ProviderCredentialPort {
-  getContextSelection?(): ContextSelectionSettings;
-  setContextSelection?(update: boolean | ContextSelectionUpdate): Promise<ContextSelectionSettings>;
   list(): ProviderCredentialsResponse;
   set(provider: string, apiKey: string): Promise<ProviderCredentialStatus>;
   clear(provider: string): Promise<ProviderCredentialStatus>;

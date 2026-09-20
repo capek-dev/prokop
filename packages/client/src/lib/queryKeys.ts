@@ -29,7 +29,6 @@ export const queryKeys = {
     envVars: ['tools', 'envVars'] as const,
   },
   config: {
-    contextSelection: ['config', 'experimental', 'context-selection'] as const,
     models: ['config', 'models'] as const,
     preconfigs: ['config', 'preconfigs'] as const,
     prompts: ['config', 'prompts'] as const,

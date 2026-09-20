@@ -13,7 +13,6 @@ vi.mock('@legendapp/list/react', () => ({
   },
 }));
 vi.mock('@/components/chat/MessageBubble', () => ({ MessageBubble: ({ children }: { children: ReactNode }) => <>{children}</> }));
-vi.mock('@/components/chat/SelectedContext', () => ({ SelectedContext: ({ messageId }: { messageId: string }) => <div data-testid={`context-${messageId}`} /> }));
 vi.mock('@/components/chat/ToolCall', () => ({
   ToolCall: ({ part, collapsePreview }: { part: ToolPart; collapsePreview: boolean }) =>
     <div data-testid={part.id} data-collapsed={String(collapsePreview)} />,
@@ -44,18 +43,6 @@ function transcript(items: DisplayItem[]) {
   return <VirtualizedTranscript displayItems={items} messagesWithParts={items} sessionId="s"
     pendingAskRequests={pendingAskRequests} onAskResponse={onAskResponse} autoFollow={false} />;
 }
-
-test('failed and compact-failed invocations expose their own context control', () => {
-  const failed = assistant('failed');
-  const compact = assistant('compact');
-  if (failed.message.role !== 'assistant' || compact.message.role !== 'assistant') throw new Error('invalid fixture');
-  failed.message.status = 'error';
-  failed.parts = [];
-  compact.message.mode = 'compact_failed';
-  render(transcript([failed, compact]));
-  expect(screen.getByTestId('context-failed')).toBeInTheDocument();
-  expect(screen.getByTestId('context-compact')).toBeInTheDocument();
-});
 
 test('cutoff changes reach mounted memoized rows, while queued prompts and running tools are unaffected', () => {
   const items = [user('u1'), assistant('a1'), assistant('running', true), user('u2'), assistant('a2')];

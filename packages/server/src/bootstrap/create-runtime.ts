@@ -21,12 +21,6 @@ import { createScheduledJobRepository } from '@/infrastructure/sqlite/scheduled-
 import { createSessionSearchQueryRepository } from '@/infrastructure/sqlite/session-search-query-repository';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
-import { configureSelectedContext } from '@/adapters/capek/context-assembler';
-import { scoreContext } from '@/infrastructure/context/typesafe';
-import { DEFAULT_SELECTION_POLICY } from '@/application/context/selection';
-import { getContextSelectionSettings } from '@/infrastructure/providers/provider-credential-files';
-import { saveSelectedContext } from '@/infrastructure/sqlite/selected-context';
-import { getJean2EnvValue } from '@/infrastructure/runtime/environment';
 
 /** S5 session-search host dependencies. The query port is the SQLite
  * infrastructure repository with an injected store accessor; session and
@@ -73,23 +67,6 @@ function createSchedulerHostDeps(): Jean2SchedulerHostDeps {
 export function createRuntime(existingAgents?: AgentsApplication): AgentsApplication {
   const agents = existingAgents ?? createWiredAgentsApplication();
 
-  configureSelectedContext(() => {
-    const apiKey = getJean2EnvValue('PROKOPAI_TYPESAFE_API_KEY')?.trim() ?? '';
-    const settings = getContextSelectionSettings();
-    return {
-      policy: { ...DEFAULT_SELECTION_POLICY, threshold: settings.minimumLevel, requiredProbability: settings.requiredProbability },
-      enabled: getJean2EnvValue('PROKOPAI_CONTEXT_SELECTION_ENABLED') === 'true',
-      credentials: Boolean(apiKey),
-      score: (input, candidates, signal) => scoreContext(input, candidates, signal, {
-        apiKey, model: getJean2EnvValue('PROKOPAI_TYPESAFE_MODEL') || 'jev-latest',
-      }),
-      save: record => {
-        // Observability must not break a turn, including disabled baseline turns.
-        try { saveSelectedContext(record); }
-        catch { console.warn('[context-selection] Snapshot unavailable'); }
-      },
-    };
-  });
   configureJean2Storage();
   configureJean2RuntimeConfiguration();
   configureJean2WorkspacePolicy();

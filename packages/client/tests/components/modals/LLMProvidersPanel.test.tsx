@@ -4,7 +4,6 @@ import type { ProkopaiClient, ProviderCredentialStatus, ProviderStatus } from '@
 
 const mocks = vi.hoisted(() => ({
   credentials: [
-    { provider: 'typesafe', configured: false },
     { provider: 'deepseek', configured: true },
     { provider: 'openai', configured: false },
   ] as ProviderCredentialStatus[],
@@ -47,9 +46,6 @@ describe('LLMProvidersPanel', () => {
 
     expect(screen.getByRole('heading', { name: 'API keys' })).toBeInTheDocument();
     expect(screen.getByText('DeepSeek')).toBeInTheDocument();
-    expect(screen.getAllByText('TypeSafe')).toHaveLength(1);
-    expect(screen.getByRole('region', { name: 'Relevance scoring' })).toHaveTextContent('TypeSafe');
-    expect(screen.getByRole('region', { name: 'API keys' })).not.toHaveTextContent('TypeSafe');
     expect(screen.getByText('OpenAI')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Account subscriptions' })).toBeInTheDocument();
     expect(screen.getByText('ChatGPT (Codex)')).toBeInTheDocument();

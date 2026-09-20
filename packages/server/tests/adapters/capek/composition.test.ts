@@ -47,7 +47,6 @@ const serverSourceRoot = resolve(repositoryRoot, 'packages/server/src');
 const compositionRootPath = resolve(serverSourceRoot, 'bootstrap/create-runtime.ts');
 
 const expectedCompositionSteps = [
-  'configureSelectedContext',
   'configureJean2Storage',
   'configureJean2RuntimeConfiguration',
   'configureJean2WorkspacePolicy',
@@ -117,10 +116,6 @@ describe('Čapek composition root', () => {
     const allowedSpecifiers = [
       '@/adapters/capek',
       '@/adapters/capek/storage',
-      '@/adapters/capek/context-assembler',
-      '@/infrastructure/context/typesafe',
-      '@/infrastructure/runtime/environment',
-      '@/infrastructure/sqlite/selected-context',
       '@/adapters/capek/session-search',
       '@/adapters/capek/scheduler',
       '@/adapters/capek/composition',
@@ -298,7 +293,7 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
 
     expect(agentServices).toEqual([
       ['capek.agent-driver', 'agent', 'current.agent-driver', 'agent'],
-      ['capek.context-assembler', 'agent', 'prokopai.selected-context', 'agent'],
+      ['capek.context-assembler', 'agent', 'current.context-sections', 'agent'],
       ['capek.context-sources', 'agent', 'current.context-sources', 'agent'],
       ['capek.orchestrator-session', 'agent', 'current.orchestrator-session', 'agent'],
       ['capek.provider-overrides', 'agent', 'current.provider-overrides', 'agent'],
@@ -507,6 +502,29 @@ describe('C3 ordered context in the Jean2 composition', () => {
     expect(ordered).toContain('You can use session_search');
   });
 
+  test('repeated assembly preserves the ordinary memory prompt byte-for-byte', async () => {
+    createRuntime();
+    const memory = `- login guidance\n- database guidance\n- ${'x'.repeat(6000)}`;
+    configureAgentSource({
+      getDirectory: async () => '/test-agent',
+      readMemoryFile: async (_id, filename) => filename === 'MEMORY.md' ? memory : 'Keep preferences',
+    });
+    try {
+      const composition = await createJean2RuntimeComposition();
+      processScope = composition.processScope;
+      agentScope = composition.agentScope;
+      const base = { ...contextData, workspaceId: undefined, workspacePath: undefined };
+      const prompt = await composition.buildContext(base);
+      for (let invocation = 0; invocation < 4; invocation++) {
+        expect(await composition.buildContext(base)).toBe(prompt);
+      }
+      expect(prompt).toContain(`<agent_memory>\n${memory}\n</agent_memory>`);
+      expect(prompt).toContain('<agent_user_preferences>\nKeep preferences\n</agent_user_preferences>');
+    } finally {
+      configureAgentSource();
+    }
+  });
+
   test('diagnostics list the exact ordered sections with the assembler service pinned', async () => {
     createRuntime();
 
@@ -514,7 +532,7 @@ describe('C3 ordered context in the Jean2 composition', () => {
     processScope = composition.processScope;
     agentScope = composition.agentScope;
 
-    expect(agentScope.require(capekContextAssemblerKey).id).toBe('prokopai.selected-context');
+    expect(agentScope.require(capekContextAssemblerKey).id).toBe('current.context-sections');
     expect(agentScope.listContextSections().map((section) => [section.id, section.phase, section.order])).toEqual([
       ['agent-memory', 'identity', 10],
       ['agent-user-preferences', 'identity', 20],

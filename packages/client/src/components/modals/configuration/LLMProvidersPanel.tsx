@@ -36,12 +36,6 @@ export function LLMProvidersPanel({ sdkClient }: LLMProvidersPanelProps) {
         </div>
         <OAuthProvidersPanel sdkClient={sdkClient} embedded />
       </section>
-
-      <section aria-labelledby="typesafe-heading" className="flex flex-col gap-3 border-t pt-5">
-        <h3 id="typesafe-heading" className="text-sm font-semibold">Relevance scoring</h3>
-        <p className="text-xs text-muted-foreground">TypeSafe selects relevant memory and skills, not chat responses. Add a key here, then enable context selection in Experimental.</p>
-        <ProviderCredentialsPanel sdkClient={sdkClient} embedded category="relevance" />
-      </section>
     </div>
   );
 }

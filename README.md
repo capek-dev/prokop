@@ -24,15 +24,6 @@
   <a href="https://chromewebstore.google.com/detail/jean2browser/jpahdfmmfmmnacapmkchljmcijoedcpj">Chrome Extension</a>
 </p>
 
-> [!TIP]
-> **New in 1.17.0 · Experimental: More memory. Context chosen for the task.**
->
-> TypeSafe Jev helps select relevant memories and skills for each response, while your usual chat model does the work. Add your TypeSafe API key in **Settings → LLM providers**, then enable **Select relevant memory and skills** in **Settings → Experimental**.
->
-> Off by default. Enabling sends task text, recent conversation, and candidate memory and skill content to TypeSafe; diagnostic logs can contain private context.
->
-> **[Explore the experiment and setup guide →](https://prokopai.dev/docs/context-selection)**
-
 ---
 
 ## Why Prokop
@@ -154,7 +145,6 @@ Prokop is evolving and maintained by one developer. It is used for real daily wo
 - [Client and mobile access](https://prokopai.dev/docs/client)
 - [Workspaces and sessions](https://prokopai.dev/docs/workspaces)
 - [Configuration and providers](https://prokopai.dev/docs/configuration)
-- [Experimental memory and skill selection](https://prokopai.dev/docs/context-selection)
 - [CLI](https://prokopai.dev/docs/cli)
 - [Tools](https://prokopai.dev/docs/tools)
 - [Security and authentication](https://prokopai.dev/docs/security)

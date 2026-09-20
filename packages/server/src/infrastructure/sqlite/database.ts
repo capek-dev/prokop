@@ -4,7 +4,6 @@ import { mkdirSync } from 'node:fs';
 import { resolveDatabasePath } from '@/config';
 import { isPerfDiagnosticsEnabled } from '@/utils/perf';
 import { initializeSessionMessageSchema } from './session-message-schema';
-import { initializeSelectedContextSchema } from './selected-context';
 import { initializeLearningSchema } from './learning-schema';
 import { seedBuiltinResponseFormats } from './response-formats';
 import { initializeFts, migrateFtsForAgents } from '@/infrastructure/session-search/fts';
@@ -115,7 +114,6 @@ export function initializeSchema(db: Database): void {
     perfDiagnosticsEnabled: PERF_DIAGNOSTICS_ENABLED,
   });
   initializeLearningSchema(db);
-  initializeSelectedContextSchema(db);
 
   // The unmerged tool-output-compression experiment created an incompatible
   // `tool_output_artifacts` shape (`part_id`/`call_id`, no `tool_call_id`).

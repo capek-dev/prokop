@@ -1,7 +1,5 @@
 export {
   clearProviderCredential,
-  getContextSelectionSettings,
-  setContextSelectionEnabled,
   getSupportedProviderCredential,
   listProviderCredentials,
   setProviderCredential,

@@ -17,8 +17,7 @@ export type ConfigurationSection =
   | 'preconfigs'
   | 'response-formats'
   | 'env'
-  | 'tools'
-  | 'experimental';
+  | 'tools';
 
 // --- Default File Open Mode ---
 export type DefaultFileOpenMode = 'preview' | 'edit';

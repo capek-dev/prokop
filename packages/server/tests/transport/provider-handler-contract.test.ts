@@ -71,8 +71,6 @@ function makeProviders(overrides: Partial<ProvidersApplication> = {}): Providers
     disconnect: async () => {},
     completeOAuth: async () => ({ providerId: '' }),
     serverCallback: async () => ({ body: '', status: 200, contentType: 'text/html' }),
-    getContextSelection: () => ({ enabled: false, configured: false, minimumLevel: 2, requiredProbability: 0.7 }),
-    setContextSelection: async update => ({ enabled: false, configured: true, minimumLevel: 2, requiredProbability: 0.7, ...(typeof update === 'boolean' ? { enabled: update } : update) }),
     listCredentials: () => ({ providers: [] }),
     setCredential: async (provider) => ({ provider, configured: false }),
     clearCredential: async (provider) => ({ provider, configured: false }),

@@ -27,7 +27,7 @@
     "test:coverage": "bun test --coverage"
   },
   "dependencies": {
-    "@capekai/core": "^1.0.16",
+    "@capekai/core": "1.0.13",
     "@capekai/tool": "^1.0.3",
     "@capekai/types": "^1.0.3",
     "@clack/prompts": "^0.10.0",
@@ -35,7 +35,6 @@
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@prokopai/sdk": "workspace:*",
     "@tavily/core": "^0.7.2",
-    "@typesafe-ai/sdk": "^0.5.7",
     "@zip.js/zip.js": "^2.7.60",
     "adm-zip": "^0.5.16",
     "bun-pty": "^0.4.8",

@@ -76,7 +76,6 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
     '@/infrastructure/runtime/workspace-dirs',
   ],
   'packages/server/src/adapters/jean2/session-repository.ts': [
-    '@/infrastructure/sqlite/selected-context',
     '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/queued-messages', '@/infrastructure/sqlite/tool-output-artifacts', '@/infrastructure/sqlite/attachments', '@/infrastructure/sqlite/pending-asks', '@/infrastructure/sqlite/workspaces', '@/adapters/capek/compaction-recovery', '@/infrastructure/session-title',
   ],
   'packages/server/src/adapters/jean2/scheduled-job-repository.ts': [

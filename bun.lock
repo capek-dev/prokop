@@ -113,7 +113,7 @@
         "prokop": "./dist/bin/prokop",
       },
       "dependencies": {
-        "@capekai/core": "^1.0.16",
+        "@capekai/core": "1.0.13",
         "@capekai/tool": "^1.0.3",
         "@capekai/types": "^1.0.3",
         "@clack/prompts": "^0.10.0",
@@ -121,7 +121,6 @@
         "@modelcontextprotocol/sdk": "^1.27.1",
         "@prokopai/sdk": "workspace:*",
         "@tavily/core": "^0.7.2",
-        "@typesafe-ai/sdk": "^0.5.7",
         "@zip.js/zip.js": "^2.7.60",
         "adm-zip": "^0.5.16",
         "bun-pty": "^0.4.8",
@@ -362,7 +361,7 @@
 
     "@babel/types": ["@babel/types@7.29.0", "", { "dependencies": { "@babel/helper-string-parser": "^7.27.1", "@babel/helper-validator-identifier": "^7.28.5" } }, "sha512-LwdZHpScM4Qz8Xw2iKSzS+cfglZzJGvofQICy7W7v4caru4EaAmyUuO6BGrbyQ2mYV11W0U8j5mBhd14dd3B0A=="],
 
-    "@capekai/core": ["@capekai/core@1.0.16", "", { "dependencies": { "@ai-sdk/anthropic": "^3.0.116", "@ai-sdk/openai": "^3.0.84", "@ai-sdk/openai-compatible": "^2.0.74", "@capekai/tool": "^1.0.3", "@capekai/types": "^1.0.3", "@openrouter/ai-sdk-provider": "^2.3.3", "@zip.js/zip.js": "^2.7.60", "ai": "^6.0.116", "ignore": "^7.0.3", "picomatch": "^4.0.2", "tar": "^7.5.13" } }, "sha512-9mR1Wq9ins86N7DCtQhBnNBedmJtFShEVdvYsspM96zhA/VAJSZtXU9Ll2lcZzSGPLw/UM0UioOUvuo1fOVQgA=="],
+    "@capekai/core": ["@capekai/core@1.0.13", "", { "dependencies": { "@ai-sdk/anthropic": "^3.0.116", "@ai-sdk/openai": "^3.0.84", "@ai-sdk/openai-compatible": "^2.0.74", "@capekai/tool": "^1.0.3", "@capekai/types": "^1.0.3", "@openrouter/ai-sdk-provider": "^2.3.3", "@zip.js/zip.js": "^2.7.60", "ai": "^6.0.116", "ignore": "^7.0.3", "picomatch": "^4.0.2", "tar": "^7.5.13" } }, "sha512-HahRMdMIE7Wk1H5/IdGQrIFwA2g4Nvg1z3sOer1U5QB8HfwAStwpqZ+npsuC5I/w5RQCXXVOMPUJK8X8B5YY7g=="],
 
     "@capekai/tool": ["@capekai/tool@1.0.3", "", { "dependencies": { "@capekai/types": "^1.0.2" } }, "sha512-tcEwfkiBtr3rWddAOCSIvAe7fgRNg+/dcOGtHH7aeJ+x5J37gcyozr4xpn1WLMAlhhfYb+qwv/yUIrWoVJL9nA=="],
 
@@ -985,8 +984,6 @@
     "@types/ws": ["@types/ws@8.18.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg=="],
 
     "@types/xml2js": ["@types/xml2js@0.4.14", "", { "dependencies": { "@types/node": "*" } }, "sha512-4YnrRemBShWRO2QjvUin8ESA41rH+9nQGLUGZV/1IDhi3SL9OhdpNC/MrulTWuptXKwhx/aDxE7toV0f/ypIXQ=="],
-
-    "@typesafe-ai/sdk": ["@typesafe-ai/sdk@0.5.7", "", {}, "sha512-OrbhDXyxDoX9l45/Mcts+TsNuvubCuZQzINQv0BMbi32ztcapzgrCnMmaW9gK5+JkgQAZcnJH1f47lAur+i1hw=="],
 
     "@typescript-eslint/eslint-plugin": ["@typescript-eslint/eslint-plugin@8.56.1", "", { "dependencies": { "@eslint-community/regexpp": "^4.12.2", "@typescript-eslint/scope-manager": "8.56.1", "@typescript-eslint/type-utils": "8.56.1", "@typescript-eslint/utils": "8.56.1", "@typescript-eslint/visitor-keys": "8.56.1", "ignore": "^7.0.5", "natural-compare": "^1.4.0", "ts-api-utils": "^2.4.0" }, "peerDependencies": { "@typescript-eslint/parser": "^8.56.1", "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0", "typescript": ">=4.8.4 <6.0.0" } }, "sha512-Jz9ZztpB37dNC+HU2HI28Bs9QXpzCz+y/twHOwhyrIRdbuVDxSytJNDl6z/aAKlaRIwC7y8wJdkBv7FxYGgi0A=="],
 

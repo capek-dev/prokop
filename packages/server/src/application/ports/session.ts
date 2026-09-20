@@ -133,7 +133,6 @@ export interface AttachmentCreateInput {
  * awaited use-case promise is the honest completion boundary.
  */
 export interface SessionRepositoryPort {
-  getSelectedContext?(sessionId: string, messageId: string): import('@prokopai/sdk').SelectedContextRecord | null;
   createSession(input: SessionRecordCreateInput): Session;
   getSession(id: string): Session | null;
   updateSession(id: string, updates: SessionUpdateInput): Session | null;

@@ -1,5 +1,3 @@
-export type { ContextSelectionSettings, ContextSelectionUpdate, SelectedContextItem, SelectedContextRecord } from './shared-types/context-selection';
-
 // Re-export everything from shared
 export * from './shared';
 

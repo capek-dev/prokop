@@ -7,7 +7,7 @@ import { createLearningToolsPlugins, type LearningToolsOptions } from './learnin
 
 const OMITTED = new Set([
   'prokopai.builtin-tools', 'prokopai.tool-resolver', 'current.runtime-host',
-  'current.context-sections', 'prokopai.selected-context', 'current.orchestrator-session',
+  'current.context-sections', 'current.orchestrator-session',
   'current.session-search-domain', 'current.scheduler-domain', 'current.subagent-domain',
   'current.workflow-domain', 'current.goal-domain', 'current.memory-domain', 'current.skills-domain',
 ]);

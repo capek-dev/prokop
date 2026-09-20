@@ -10,7 +10,7 @@ import {
 } from '@/adapters/capek';
 import { createRuntime } from '@/bootstrap/create-runtime';
 
-const expectedGroupOperations: Record<Exclude<keyof typeof jean2CompatibilityBindings, 'memoryCharLimit'>, string[]> = {
+const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, string[]> = {
   interaction: [
     'createPendingAsk', 'removePendingAsk', 'removePendingAsksByToolCallId',
     'getPermissionRequestByRequestId',
@@ -29,7 +29,6 @@ const expectedGroupOperations: Record<Exclude<keyof typeof jean2CompatibilityBin
 };
 describe('Čapek Jean2 adapter', () => {
   test('supplies every exact binding operation with no shadowed extras', () => {
-    expect(typeof jean2CompatibilityBindings.memoryCharLimit).toBe('function');
     for (const [group, expected] of Object.entries(expectedGroupOperations)) {
       expect(Object.keys(jean2CompatibilityBindings[group as keyof typeof jean2CompatibilityBindings]).sort())
         .toEqual([...expected].sort());

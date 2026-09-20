@@ -6,7 +6,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import { cn } from '@/lib/utils';
-import { SelectedContext } from './SelectedContext';
 
 interface MessageBubbleProps {
   message: Message;
@@ -258,8 +257,6 @@ export function MessageBubble({
           <span>Assistant</span>
         )}
       </div>
-
-      {message.role === 'assistant' && <SelectedContext key={message.id} sessionId={sessionId} messageId={message.id} />}
 
       {isEditing && isUser ? (
         <div className="w-full max-w-[90%] self-end">

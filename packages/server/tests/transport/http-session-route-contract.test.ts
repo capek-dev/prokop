@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
-import { isPublicRoute, requireAuth } from '@/transport/http/middleware/auth';
 import { HttpError } from '@/application/http-errors';
 import { registerSessionRoutes } from '@/transport/http/routes/sessions';
 import { createSessionHttpApplication, type SessionHttpApplication } from '@/application/sessions/http';
@@ -98,36 +97,6 @@ async function json(res: Response): Promise<Record<string, unknown>> {
 }
 
 describe('HTTP session route contract', () => {
-  test('selected context is private and rejects unauthenticated requests', async () => {
-    const old = process.env.PROKOPAI_AUTH_TOKEN;
-    process.env.PROKOPAI_AUTH_TOKEN = 'test-only-context-token';
-    try {
-      const path = '/api/sessions/sess-1/messages/response-1/selected-context';
-      expect(isPublicRoute(path)).toBe(false);
-      const app = new Hono();
-      app.use('/api/*', requireAuth);
-      registerSessionRoutes(app, makeApp().application);
-      expect((await app.request(path)).status).toBe(401);
-      const response = await app.request(path, { headers: { Authorization: 'Bearer test-only-context-token' } });
-      expect(response.status).toBe(200);
-      expect(response.headers.get('Cache-Control')).toBe('no-store');
-    } finally {
-      if (old === undefined) delete process.env.PROKOPAI_AUTH_TOKEN;
-      else process.env.PROKOPAI_AUTH_TOKEN = old;
-    }
-  });
-  test('selected context uses exact session/response identity and supports older repositories', async () => {
-    const calls: string[][] = [];
-    const { app } = makeApp({ getSelectedContext: (sessionId, messageId) => { calls.push([sessionId, messageId]); return null; } });
-    const response = await app.request('/api/sessions/sess-1/messages/response-1/selected-context');
-    expect(response.status).toBe(200);
-    expect(await json(response)).toEqual({ record: null });
-    expect(calls).toEqual([['sess-1', 'response-1']]);
-    const legacy = makeApp();
-    expect(await json(await legacy.app.request('/api/sessions/sess-1/messages/response-1/selected-context'))).toEqual({ record: null });
-    const missing = makeApp({ getSession: () => null });
-    expect((await missing.app.request('/api/sessions/missing/messages/response-1/selected-context')).status).toBe(404);
-  });
   test('grouped category filtering reaches the repository and rejects unknown categories', async () => {
     const calls: unknown[] = [];
     const { app } = makeApp({
