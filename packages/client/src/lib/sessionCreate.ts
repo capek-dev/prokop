@@ -1,4 +1,7 @@
+import type { SessionHarness } from '@prokopai/sdk';
+
 export interface CreateSessionOptions {
+  harness?: SessionHarness;
   openAlongside?: boolean;
   workspaceRootId?: string;
 }

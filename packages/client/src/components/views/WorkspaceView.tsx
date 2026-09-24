@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
-import { SquarePen } from 'lucide-react';
+import { ChevronDown, SquarePen } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useViewRefs } from '@/contexts/ViewRefsContext';
 import { useSessionManager } from '@/contexts/SessionManagerContext';
@@ -21,6 +22,7 @@ import { AppPanels } from '@/components/app/AppPanels';
 import { WorkspaceContentArea } from '@/components/app/WorkspaceContentArea';
 import { WorkspaceDock } from '@/components/app/WorkspaceDock';
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useMobileSessionSelection } from '@/hooks/useMobileSessionSelection';
@@ -67,6 +69,14 @@ export default function WorkspaceView() {
   } = sessionManager;
   const handleResumeSession = useMobileSessionSelection(resumeSession);
   const categories = useSessionCategories(sdkClient, sidebarData.activeWorkspace?.id ?? null, sidebarData.connected);
+  const { data: harnesses } = useQuery({
+    queryKey: ['harnesses', sessionManager.serverUrl],
+    queryFn: () => sdkClient!.http.sessions.harnesses(),
+    enabled: Boolean(sdkClient && sidebarData.connected),
+    staleTime: 30_000,
+    retry: false,
+  });
+  const codexCli = harnesses?.harnesses.find(harness => harness.id === 'codex-cli');
 
   const newChatPreconfigId = getWorkspaceDefaultPreconfigId(activeWorkspace, allPreconfigs)
     ?? primaryPreconfigs[0]?.id;
@@ -176,6 +186,26 @@ export default function WorkspaceView() {
             <TooltipContent>New Chat</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+        {codexCli && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-xs" aria-label="Choose session harness" disabled={!sidebarData.connected}>
+                <ChevronDown />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuGroup>
+                <DropdownMenuItem onSelect={() => createSession(newChatPreconfigId)}>New Prokop session</DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!codexCli.available || !activeWorkspace || activeWorkspace.isVirtual}
+                  onSelect={() => createSession(undefined, undefined, { harness: 'codex-cli' })}
+                >
+                  New Codex CLI session{!codexCli.available ? ' (not installed)' : ''}
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </SidebarHeader>
   );

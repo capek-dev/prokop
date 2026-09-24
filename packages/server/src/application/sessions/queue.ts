@@ -28,6 +28,11 @@ export function createSessionQueueApplication<Origin>(
         wire.delivery.send(origin, { type: 'error', code: 'not_found', message: 'Session not found' });
         return;
       }
+      if (session.harness === 'codex-cli') {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session',
+          message: 'Message queue is not supported for Codex CLI sessions', sessionId });
+        return;
+      }
       const gate = deps.gate.checkControllerGate(sessionId, 'queue.add', origin);
       if (gate) {
         sendGateRejection(wire, origin, gate);

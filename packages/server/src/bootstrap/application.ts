@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import {
   createAgentsApplication,
   createFilesApplication,
@@ -80,6 +81,9 @@ import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
 import { getDataDir } from '@/infrastructure/runtime/paths';
 import { codexAccounts } from '@/infrastructure/providers/codex-accounts';
+import { codexCliAvailable, createCodexExecution } from '@/infrastructure/codex/execution';
+import { getCodexModelSelection, listCodexModels, saveCodexModelSelection } from '@/infrastructure/codex/models';
+import { createHarnessExecution } from '@/application/sessions/harness-execution';
 
 import { createWiredLearning } from './learning';
 
@@ -147,18 +151,23 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   const worktreeAttachments = {
     changed: (worktreeId: string): void => refreshWorktreeAttachments?.(worktreeId),
   };
-  const execution = createJean2SessionExecution({
+  const codexExecution = createCodexExecution();
+  const execution = createHarnessExecution(repository, createJean2SessionExecution({
     onSessionChanged: (changedSession) => {
       if (changedSession.workspaceRootId) {
         worktreeAttachments.changed(changedSession.workspaceRootId);
       }
     },
-  });
+  }), codexExecution);
   const askAuthority = createJean2AskAuthorityPort();
   const pendingAsks = createJean2PendingAskPort();
   const transportControl = createTransportControllerPorts();
   const toolCatalog = createJean2ToolCatalogPort();
   const managedWorktrees = createManagedWorktreeRepository(getDatabase);
+  const codexWorkspaceAvailable = (workspaceId: string): boolean => {
+    const workspace = getWorkspace(workspaceId);
+    return Boolean(workspace && !workspace.isVirtual && workspace.path && existsSync(workspace.path));
+  };
   const workspaceRoots = {
     isAvailable(workspaceId: string, workspaceRootId: string): boolean {
       const worktree = managedWorktrees.get(workspaceRootId);
@@ -187,6 +196,8 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     toolCatalog,
     workspaceRoots,
     worktreeAttachments,
+    codexAvailable: codexCliAvailable,
+    codexWorkspaceAvailable,
   });
 
   const control = createSessionControlApplication<ConnectionId>({
@@ -198,6 +209,10 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     toolCatalog,
     workspaceRoots,
     worktreeAttachments,
+    codexCliAvailable,
+    codexWorkspaceAvailable,
+    { list: listCodexModels, get: getCodexModelSelection, save: saveCodexModelSelection,
+      isActive: codexExecution.isSessionActive },
   );
 
   const schedulingRepository = createJean2ScheduledJobRepository();

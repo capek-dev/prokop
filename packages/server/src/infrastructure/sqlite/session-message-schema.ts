@@ -35,6 +35,7 @@ export function initializeSessionMessageSchema(
       selected_model TEXT,
       selected_provider TEXT,
       selected_variant TEXT,
+      harness TEXT NOT NULL DEFAULT 'prokop' CHECK (harness IN ('prokop', 'codex-cli')),
       prompt_tokens INTEGER DEFAULT 0,
       completion_tokens INTEGER DEFAULT 0,
       total_tokens INTEGER DEFAULT 0,
@@ -50,6 +51,38 @@ export function initializeSessionMessageSchema(
       FOREIGN KEY (workspace_root_id) REFERENCES managed_worktrees(id)
     )
   `);
+
+  // Existing databases were created before harness became a session property.
+  if (!db.query<{ name: string }, []>('PRAGMA table_info(sessions)').all().some(column => column.name === 'harness')) {
+    db.run("ALTER TABLE sessions ADD COLUMN harness TEXT NOT NULL DEFAULT 'prokop' CHECK (harness IN ('prokop', 'codex-cli'))");
+  }
+
+  db.run(`CREATE TABLE IF NOT EXISTS codex_session_bindings (
+    session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    thread_id TEXT NOT NULL UNIQUE,
+    cli_version TEXT NOT NULL,
+    workspace_root TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    pending_turn INTEGER NOT NULL DEFAULT 0,
+    pending_user_id TEXT,
+    pending_assistant_id TEXT
+  )`);
+  const bindingColumns = db.query<{ name: string }, []>('PRAGMA table_info(codex_session_bindings)').all();
+  for (const [column, definition] of [
+    ['pending_turn', 'INTEGER NOT NULL DEFAULT 0'],
+    ['pending_user_id', 'TEXT'],
+    ['pending_assistant_id', 'TEXT'],
+  ] as const) {
+    if (!bindingColumns.some(entry => entry.name === column)) {
+      db.run(`ALTER TABLE codex_session_bindings ADD COLUMN ${column} ${definition}`);
+    }
+  }
+
+  db.run(`CREATE TABLE IF NOT EXISTS codex_session_models (
+    session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    model TEXT NOT NULL,
+    effort TEXT NOT NULL
+  )`);
 
   db.run('CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)');
   db.run('CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_id)');

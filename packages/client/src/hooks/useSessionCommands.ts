@@ -109,10 +109,11 @@ export function useSessionCommands({
     pendingPartAppendsRef.current.clear();
     if (client && client.connected) {
       client.sessions.create({
-        preconfigId,
+        preconfigId: options?.harness === 'codex-cli' ? undefined : preconfigId,
         title,
         workspaceId: activeWorkspace?.id,
         workspaceRootId: options?.workspaceRootId,
+        harness: options?.harness,
       });
     }
   }, [clientRef, partAppendRafRef, pendingPartAppendsRef, pendingSessionCreateRef, activeWorkspace]);
@@ -431,9 +432,10 @@ export function useSessionCommands({
       : primaryPreconfigs[0]?.id;
     if (client && client.connected) {
       client.sessions.create({
-        preconfigId: defaultId,
+        preconfigId: options?.harness === 'codex-cli' ? undefined : defaultId,
         workspaceId,
         workspaceRootId: options?.workspaceRootId,
+        harness: options?.harness,
       });
     }
   }, [clientRef, partAppendRafRef, pendingPartAppendsRef, pendingSessionCreateRef, workspaces, primaryPreconfigs, setActiveWorkspace]);

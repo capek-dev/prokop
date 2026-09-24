@@ -48,6 +48,19 @@ describe('sessions store', () => {
     resetTestDatabase();
   });
 
+  test('defaults legacy session creation to Prokop and preserves the harness on read', () => {
+    seedWorkspace({ id: 'ws1' });
+    const created = createSession(makeSession({ id: 'harness-default', workspaceId: 'ws1', title: 'Default', status: 'active' }));
+    expect(created.harness).toBe('prokop');
+    expect(getSession(created.id)?.harness).toBe('prokop');
+    expect(listSessionsByWorkspace('ws1')[0]?.harness).toBe('prokop');
+
+    const codex = createSession({ ...makeSession({ id: 'harness-codex', workspaceId: 'ws1', title: 'Codex', status: 'active' }), harness: 'codex-cli' });
+    expect(codex.harness).toBe('codex-cli');
+    expect(getSession(codex.id)?.harness).toBe('codex-cli');
+    expect(() => getDatabase().run("UPDATE sessions SET harness = 'unknown' WHERE id = ?", [codex.id])).toThrow();
+  });
+
   test('category counts and filtering precede workspace and grouped pagination', () => {
     seedWorkspace({ id: 'ws1' });
     seedWorkspace({ id: 'ws2' });

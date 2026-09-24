@@ -34,6 +34,8 @@ export interface SessionApplicationDeps<Origin> {
     isAvailable(workspaceId: string, workspaceRootId: string): boolean;
   };
   worktreeAttachments?: WorktreeAttachmentRefreshPort;
+  codexAvailable?: () => boolean;
+  codexWorkspaceAvailable?: (workspaceId: string) => boolean;
 }
 
 /**

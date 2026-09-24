@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import type { SessionStatus } from '@prokopai/sdk';
 import { validate } from './validate';
 import { parseSessionCategory } from './session-category';
-import { createSessionSchema, updateSessionSchema } from './schemas';
+import { createSessionSchema, updateSessionSchema, codexModelSelectionSchema } from './schemas';
 import {
   BadRequestError,
   ForbiddenError,
@@ -21,6 +21,13 @@ import type { SessionHttpApplication } from '@/application';
  * Capek implementations.
  */
 export function registerSessionRoutes(app: Hono, application: SessionHttpApplication): void {
+  app.get('/api/harnesses', c => c.json({
+    harnesses: [
+      { id: 'prokop', available: true },
+      { id: 'codex-cli', available: application.codexAvailable(), approvals: false },
+    ],
+  }));
+
   app.get('/api/sessions', async (c) => {
     const status = c.req.query('status') as SessionStatus | undefined;
     const sessions = application.listSessions(status);
@@ -32,12 +39,16 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
     validate('json', createSessionSchema),
     async (c) => {
       const body = c.req.valid('json');
+      if (body.harness === 'codex-cli' && !application.codexAvailable()) {
+        throw new BadRequestError('Codex CLI 0.156.x is unavailable on this host');
+      }
       const session = application.createSession({
         id: body.id,
         workspaceId: body.workspaceId,
         workspaceRootId: body.workspaceRootId,
         preconfigId: body.preconfigId,
         title: body.title,
+        harness: body.harness,
         metadata: body.metadata,
       });
       if (!session) {
@@ -85,6 +96,29 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
     }
     const tags = application.listTagsByWorkspace(workspaceId);
     return c.json({ tags });
+  });
+
+  app.get('/api/sessions/:id/codex-models', async c => {
+    const result = application.codexModels(c.req.param('id'));
+    if (!result) throw new NotFoundError('Codex session not found');
+    try {
+      return c.json(await result);
+    } catch {
+      throw new BadRequestError('Codex model catalog is unavailable on this host');
+    }
+  });
+
+  app.put('/api/sessions/:id/codex-model', validate('json', codexModelSelectionSchema), async c => {
+    let result: Awaited<ReturnType<SessionHttpApplication['setCodexModel']>>;
+    try {
+      result = await application.setCodexModel(c.req.param('id'), c.req.valid('json'));
+    } catch {
+      throw new BadRequestError('Codex model catalog is unavailable on this host');
+    }
+    if (result === 'not_found') throw new NotFoundError('Codex session not found');
+    if (result === 'active') throw new BadRequestError('Wait for the Codex turn to finish before changing model');
+    if (result === 'invalid') throw new BadRequestError('Model and effort must be supported by this host Codex CLI');
+    return c.json({ selection: c.req.valid('json') });
   });
 
   app.get('/api/sessions/:id', async (c) => {

@@ -123,6 +123,40 @@ describe('HTTP session route contract', () => {
     expect(await json(res)).toEqual({ sessions: [expect.objectContaining({ status: 'closed' })] });
   });
 
+  test('Codex model selection validates host models, effort, session ownership and active turns', async () => {
+    const saved: unknown[] = [];
+    let active = false;
+    const repository = makeRepository({ getSession: id => id === 'codex' ? makeSession({ id, harness: 'codex-cli' }) : null });
+    const application = createSessionHttpApplication(repository, undefined, undefined, undefined,
+      () => true, () => true, {
+        list: async () => [{ model: 'codex-one', name: 'Codex One', supportedEfforts: ['low', 'medium'],
+          defaultEffort: 'medium', isDefault: true }],
+        get: () => (saved.at(-1) as { model: string; effort: string } | undefined) ?? null,
+        save: (_id, selection) => { saved.push(selection); },
+        isActive: () => active,
+      });
+    const app = new Hono();
+    app.onError((err, c) => err instanceof HttpError
+      ? c.json({ message: err.message }, err.status as never)
+      : c.json({ message: 'unexpected error' }, 500));
+    registerSessionRoutes(app, application);
+    const put = (id: string, body: unknown) => app.request(`/api/sessions/${id}/codex-model`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    expect((await app.request('/api/sessions/prokop/codex-models')).status).toBe(404);
+    expect(await json(await app.request('/api/sessions/codex/codex-models')))
+      .toEqual({ models: [expect.objectContaining({ model: 'codex-one' })], selection: null });
+    expect((await put('codex', { model: 'codex-one', effort: 'xhigh' })).status).toBe(400);
+    expect((await put('codex', { model: 'other', effort: 'low' })).status).toBe(400);
+    expect((await put('codex', { model: 'codex-one', effort: 'low', ignored: true })).status).toBe(400);
+    expect((await put('prokop', { model: 'codex-one', effort: 'low' })).status).toBe(404);
+    active = true;
+    expect((await put('codex', { model: 'codex-one', effort: 'low' })).status).toBe(400);
+    active = false;
+    expect((await put('codex', { model: 'codex-one', effort: 'low' })).status).toBe(200);
+    expect(saved).toEqual([{ model: 'codex-one', effort: 'low' }]);
+  });
+
   test('POST /api/sessions creates with 201 and keeps the HTTP defaults', async () => {
     const { app } = makeApp();
     const res = await app.request('/api/sessions', {
@@ -133,6 +167,18 @@ describe('HTTP session route contract', () => {
 
     expect(res.status).toBe(201);
     expect(await json(res)).toEqual({ session: expect.objectContaining({ title: 'New Session' }) });
+  });
+
+  test('POST /api/sessions fails closed for unavailable or unknown harnesses', async () => {
+    const { app } = makeApp({ createSession: () => { throw new Error('must not create'); } });
+    for (const harness of ['codex-cli', 'invalid', null]) {
+      const res = await app.request('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ harness }),
+      });
+      expect(res.status).toBe(400);
+    }
   });
 
   test('GET /api/sessions/grouped validates the workspaceIds parameter', async () => {

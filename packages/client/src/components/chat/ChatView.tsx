@@ -181,11 +181,12 @@ function ChatViewContent({
   const isObserver = controlState?.status === 'controlled' && controlState.controllerClientId !== myClientId;
   // Observers see a read-only transcript: mutation callbacks are withheld so
   // revert/fork/edit/compact/queue-remove affordances never render.
-  const onRevertForMode = isObserver ? undefined : _onRevert;
-  const onForkForMode = isObserver ? undefined : _onFork;
-  const onEditMessageForMode = isObserver ? undefined : _onEditMessage;
-  const onCompactForMode = isObserver ? undefined : onCompact;
-  const onRemoveFromQueueForMode = isObserver ? undefined : onRemoveFromQueue;
+  const readOnlyTranscript = isObserver || session.harness === 'codex-cli';
+  const onRevertForMode = readOnlyTranscript ? undefined : _onRevert;
+  const onForkForMode = readOnlyTranscript ? undefined : _onFork;
+  const onEditMessageForMode = readOnlyTranscript ? undefined : _onEditMessage;
+  const onCompactForMode = readOnlyTranscript ? undefined : onCompact;
+  const onRemoveFromQueueForMode = readOnlyTranscript ? undefined : onRemoveFromQueue;
 
   const [rejectionNotice, setRejectionNotice] = useState<string | null>(null);
   const rejectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

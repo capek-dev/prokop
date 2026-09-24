@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ChatHeader } from '@/components/chat/ChatHeader';
 import { useSessionCommands } from '@/contexts/SessionCommandsContext';
+import { useSessionManager } from '@/contexts/SessionManagerContext';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useConnectionStore } from '@/stores/connectionStore';
@@ -19,6 +20,7 @@ export function WorkspaceHeader() {
   const defaultModel = useServerDataStore(s => s.defaultModel);
   const allWorkspaces = useServerDataStore(s => s.workspaces);
   const sessionManager = useSessionCommands();
+  const { sdkClient, serverUrl } = useSessionManager();
 
   const focusedSessionId = useSessionBoardStore(s => s.focusedSessionId);
   const openSessionIds = useSessionBoardStore(s => s.openSessionIds);
@@ -80,6 +82,8 @@ export function WorkspaceHeader() {
           {hasSession && currentSession && (
             <ChatHeader
               session={currentSession}
+              sdkClient={sdkClient}
+              serverUrl={serverUrl}
               preconfigs={preconfigs}
               models={models}
               defaultModel={defaultModel}

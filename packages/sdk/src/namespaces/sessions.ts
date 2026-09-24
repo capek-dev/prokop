@@ -1,4 +1,5 @@
 import type { ClientMessage } from '../shared';
+import type { SessionHarness } from '../shared-types/session';
 
 export class SessionsNamespace {
   constructor(private send: (msg: ClientMessage) => void) {}
@@ -8,6 +9,7 @@ export class SessionsNamespace {
     workspaceRootId?: string;
     preconfigId?: string;
     title?: string;
+    harness?: SessionHarness;
   }): void {
     this.send({ type: 'session.create', ...options });
   }

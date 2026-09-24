@@ -1,4 +1,5 @@
 import type { ClientDescriptor } from '@capekai/types';
+import type { SessionHarness } from '../shared-types/session';
 
 // No permission type imports needed — permission grant/deny messages removed.
 // All permission responses go through ask.response (AskResponseMessage).
@@ -26,6 +27,7 @@ export interface SessionCreateMessage {
   workspaceRootId?: string;
   preconfigId?: string;
   title?: string;
+  harness?: SessionHarness;
 }
 
 export interface SessionResumeMessage {

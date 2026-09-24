@@ -1,4 +1,4 @@
-import type { Ask, AskAuthority } from '@prokopai/sdk';
+import type { Ask, AskAuthority, SessionHarness } from '@prokopai/sdk';
 import type { SessionWirePorts } from '../ports/delivery';
 import type { SessionExecutionPort } from '../ports/execution';
 import type {
@@ -28,9 +28,12 @@ export interface SessionLifecycleDeps<Origin> {
     isAvailable(workspaceId: string, workspaceRootId: string): boolean;
   };
   worktreeAttachments?: WorktreeAttachmentRefreshPort;
+  codexAvailable?: () => boolean;
+  codexWorkspaceAvailable?: (workspaceId: string) => boolean;
 }
 
 export interface SessionCreateInput {
+  harness?: SessionHarness;
   workspaceId?: string;
   workspaceRootId?: string;
   preconfigId?: string;
@@ -109,7 +112,20 @@ export function createSessionLifecycleApplication<Origin>(
 
   return {
     async create(wire, origin, input): Promise<void> {
+      if (input.harness !== undefined && input.harness !== 'prokop' && input.harness !== 'codex-cli') {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Unknown session harness' });
+        return;
+      }
+      if (input.harness === 'codex-cli' && !deps.codexAvailable?.()) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Codex CLI 0.156.x is unavailable on this host' });
+        return;
+      }
       const workspaceId = input.workspaceId || '';
+      if (input.harness === 'codex-cli' && (input.preconfigId || !deps.codexWorkspaceAvailable?.(workspaceId))) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session',
+          message: 'Codex CLI requires a physical workspace and no Prokop agent preset' });
+        return;
+      }
       if (
         input.workspaceRootId
         && !deps.workspaceRoots?.isAvailable(workspaceId, input.workspaceRootId)
@@ -127,6 +143,7 @@ export function createSessionLifecycleApplication<Origin>(
         id: sessionId,
         workspaceId,
         workspaceRootId: input.workspaceRootId ?? null,
+        harness: input.harness ?? 'prokop',
         preconfigId: input.preconfigId || null,
         title: input.title || 'New Session',
         status: 'active',
@@ -258,6 +275,11 @@ export function createSessionLifecycleApplication<Origin>(
         wire.delivery.send(origin, { type: 'error', code: 'not_found', message: 'Session not found' });
         return;
       }
+      if (session.harness === 'codex-cli') {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session',
+          message: 'Agent selection is not supported for Codex CLI sessions', sessionId });
+        return;
+      }
       const gate = deps.gate.checkControllerGate(sessionId, 'session.update', origin);
       if (gate) {
         sendGateRejection(wire, origin, gate);
@@ -283,6 +305,11 @@ export function createSessionLifecycleApplication<Origin>(
       const session = deps.repository.getSession(sessionId);
       if (!session) {
         wire.delivery.send(origin, { type: 'error', code: 'not_found', message: 'Session not found' });
+        return;
+      }
+      if (session.harness === 'codex-cli') {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session',
+          message: 'Model selection is owned by Codex CLI for this session', sessionId });
         return;
       }
       const gate = deps.gate.checkControllerGate(sessionId, 'session.update_model', origin);

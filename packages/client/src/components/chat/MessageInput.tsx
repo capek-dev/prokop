@@ -90,6 +90,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   modelSupportsImage,
   goalState,
 }: MessageInputProps, ref) {
+  const codexSession = session?.harness === 'codex-cli';
   const { input, setInput, clearInput } = useSessionDraft(sessionId);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [autocompleteFiles, setAutocompleteFiles] = useState<FileEntry[]>([]);
@@ -145,7 +146,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
     p.name.toLowerCase().includes(promptQuery.toLowerCase())
   );
 
-  const showPromptAc = acMode === 'prompts' && prompts.length > 0;
+  const showPromptAc = !codexSession && acMode === 'prompts' && prompts.length > 0;
   const showFileAc = acMode === 'files' && showAutocomplete && !!workspaceId;
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -274,6 +275,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   }, [activeWorkspace?.id, openFilePreview]);
 
   const addFiles = useCallback(async (files: FileList | File[]) => {
+    if (codexSession) return;
     const fileArray = Array.from(files);
 
     for (const file of fileArray) {
@@ -308,7 +310,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
         setPendingAttachments(prev => prev.filter(a => a.id !== previewItem.id));
       }
     }
-  }, [uploadAttachment]);
+  }, [uploadAttachment, codexSession]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const files = e.clipboardData?.files;
@@ -341,12 +343,18 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   }, [addFiles]);
 
   const goalActive = goalState?.status === 'active';
-  const effectiveDisabled = disabled || goalActive;
+  const effectiveDisabled = disabled || goalActive || (codexSession && isStreaming);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const trimmed = input.trim();
     if ((!trimmed && pendingAttachments.length === 0) || effectiveDisabled) return;
+    if (codexSession) {
+      if (!trimmed || pendingAttachments.length > 0) return;
+      onSendMessage(trimmed);
+      cleanupPending();
+      return;
+    }
 
     if (sendMode === 'goal') {
       onSendMessage(trimmed, undefined, undefined, { condition: trimmed, maxTurns: goalMaxTurns });
@@ -467,12 +475,14 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const trimmed = input.trim();
   const hasUploadingAttachment = pendingAttachments.some(a => a.isUploading);
   const canSend = trimmed || pendingAttachments.length > 0;
-  const isDisabled = !canSend || disabled || hasUploadingAttachment || goalActive;
+  const isDisabled = !canSend || disabled || hasUploadingAttachment || goalActive || (codexSession && isStreaming);
   const effectivePlaceholder = goalActive
     ? 'Goal active'
-    : sendMode === 'goal'
-      ? 'Type the completion condition...'
-      : `${placeholder}  (/ prompts, @ files)`;
+    : codexSession
+      ? 'Message Codex CLI (@ files)'
+      : sendMode === 'goal'
+        ? 'Type the completion condition...'
+        : `${placeholder}  (/ prompts, @ files)`;
 
   return (
     <form
@@ -603,7 +613,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
 
         <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1">
           <div className="flex items-center gap-1">
-            <button
+            {!codexSession && <button
               type="button"
               className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none"
               onClick={() => fileInputRef.current?.click()}
@@ -611,7 +621,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
               aria-label="Attach file"
             >
               <Paperclip className="size-4" />
-            </button>
+            </button>}
             <input
               ref={fileInputRef}
               type="file"
@@ -632,23 +642,23 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                     disabled={disabled || checkoutLocked}
                   />
                 )}
-                <AutoApproveSelector
-                  sessionId={sessionId}
-                  sdkClient={sdkClient ?? null}
-                  disabled={disabled}
-                />
-                <ResponseFormatSelector
-                  formats={responseFormats}
-                  selectedId={selectedResponseFormatId}
-                  onSelect={setSelectedResponseFormatId}
-                  disabled={disabled}
-                />
+                {!codexSession && <>
+                  <AutoApproveSelector sessionId={sessionId} sdkClient={sdkClient ?? null} disabled={disabled} />
+                  <ResponseFormatSelector
+                    formats={responseFormats}
+                    selectedId={selectedResponseFormatId}
+                    onSelect={setSelectedResponseFormatId}
+                    disabled={disabled}
+                  />
+                </>}
               </>
             )}
           </div>
 
           <div className="flex h-7 items-center rounded-full border border-border/70">
-            <DropdownMenu>
+            {codexSession ? (
+              <span className="px-2 text-xs text-muted-foreground" title="Codex can edit this workspace within its sandbox. Requests for extra permissions are declined automatically.">Codex CLI</span>
+            ) : <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
@@ -710,9 +720,9 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                   </>
                 )}
               </DropdownMenuContent>
-            </DropdownMenu>
+            </DropdownMenu>}
 
-            {isStreaming && onStopStreaming && !canSend ? (
+            {isStreaming && onStopStreaming && (codexSession || !canSend) ? (
               <button
                 type="button"
                 onClick={onStopStreaming}

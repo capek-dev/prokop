@@ -31,6 +31,7 @@ export async function handleCreateSession(
     workspaceRootId: msg.workspaceRootId,
     preconfigId: msg.preconfigId,
     title: msg.title,
+    harness: msg.harness,
   });
 }
 

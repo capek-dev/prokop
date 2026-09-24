@@ -176,6 +176,18 @@ export const LongPickerLabels: Story = {
   },
 };
 
+export const CodexModel: Story = {
+  args: {
+    session: createSession({ title: 'Codex session', harness: 'codex-cli', selectedModel: 'gpt-5-codex' }),
+  },
+};
+
+export const CodexModelUnknown: Story = {
+  args: {
+    session: createSession({ title: 'Older Codex session', harness: 'codex-cli', selectedModel: null }),
+  },
+};
+
 export const MinimalHeader: Story = {
   args: {
     session: createSession({ title: 'Quick chat' }),

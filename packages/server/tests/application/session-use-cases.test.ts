@@ -577,6 +577,17 @@ describe('application session use cases', () => {
       expect(spy.sent).toEqual([expect.objectContaining({ type: 'queue.added', sessionId: 'sess-1' })]);
     });
 
+    test('add rejects Codex CLI sessions before enqueueing', () => {
+      const repository = makeRepository({
+        getSession: () => makeSession({ harness: 'codex-cli' }),
+        addMessageToQueue: () => { throw new Error('must not enqueue'); },
+      });
+      const spy = makeSpy();
+      createSessionQueueApplication({ repository, gate: noGate() }).add(makeWire(spy), origin,
+        { sessionId: 'sess-1', content: 'queued' });
+      expect(spy.sent).toEqual([expect.objectContaining({ type: 'error', code: 'invalid_session' })]);
+    });
+
     test('add rejects empty content with invalid_content before enqueueing', () => {
       const repository = makeRepository({ addMessageToQueue: () => { throw new Error('must not run'); } });
       const app = createSessionQueueApplication({ repository, gate: noGate() });
@@ -646,6 +657,39 @@ describe('application session use cases', () => {
       expect(spy.attached).toEqual([{ origin, sessionId: 'created-1' }]);
       expect(spy.sent).toEqual([{ type: 'session.created', session }]);
       expect(spy.broadcast).toEqual([{ message: { type: 'session.created', session }, exclude: origin }]);
+    });
+
+    test('rejects Codex and unknown harnesses before creating a session', async () => {
+      const repository = makeRepository({ createSession: () => { throw new Error('must not create'); } });
+      const app = createSessionLifecycleApplication({ ...makeDeps({ repository }) });
+      for (const harness of ['codex-cli', 'invalid'] as const) {
+        const spy = makeSpy();
+        await app.create(makeWire(spy), origin, { harness: harness as 'codex-cli', workspaceId: 'ws-1' });
+        expect(spy.sent).toEqual([expect.objectContaining({ type: 'error', code: 'invalid_session' })]);
+        expect(spy.attached).toEqual([]);
+        expect(spy.broadcast).toEqual([]);
+      }
+    });
+
+    test('Codex creation requires a physical workspace and does not apply Prokop presets', async () => {
+      const created: unknown[] = [];
+      const repository = makeRepository({
+        createSession: input => { created.push(input); return makeSession({ harness: input.harness }); },
+      });
+      const app = createSessionLifecycleApplication({
+        ...makeDeps({ repository }), codexAvailable: () => true,
+        codexWorkspaceAvailable: workspaceId => workspaceId === 'physical',
+      });
+      const rejected = makeSpy();
+      await app.create(makeWire(rejected), origin, { harness: 'codex-cli', workspaceId: 'virtual' });
+      await app.create(makeWire(rejected), origin,
+        { harness: 'codex-cli', workspaceId: 'physical', preconfigId: 'agent' });
+      expect(rejected.sent).toHaveLength(2);
+      expect(created).toHaveLength(0);
+      const accepted = makeSpy();
+      await app.create(makeWire(accepted), origin, { harness: 'codex-cli', workspaceId: 'physical' });
+      expect(created).toEqual([expect.objectContaining({ harness: 'codex-cli', preconfigId: null })]);
+      expect(accepted.sent).toEqual([expect.objectContaining({ type: 'session.created' })]);
     });
 
     test('create enriches the session from the preconfig and delivers the updated session', async () => {
@@ -799,6 +843,22 @@ describe('application session use cases', () => {
           authority: { visibilityScope: 'controller_only', resolutionMode: 'controller_only' },
         }],
       });
+    });
+
+    test('Codex sessions reject Prokop agent and model selection', async () => {
+      const repository = makeRepository({
+        getSession: () => makeSession({ harness: 'codex-cli' }),
+        updateSession: () => { throw new Error('must not update'); },
+      });
+      const app = createSessionLifecycleApplication({ ...makeDeps({ repository }) });
+      const spy = makeSpy();
+      const wire = makeWire(spy);
+      await app.update(wire, origin, { sessionId: 'sess-1', preconfigId: 'agent' });
+      app.updateModel(wire, origin, { sessionId: 'sess-1', modelId: 'model', providerId: 'provider' });
+      expect(spy.sent).toEqual([
+        expect.objectContaining({ type: 'error', code: 'invalid_session' }),
+        expect.objectContaining({ type: 'error', code: 'invalid_session' }),
+      ]);
     });
 
     test('update enriches preconfig selection and sends session.updated', async () => {

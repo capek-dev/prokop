@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Archive, Minimize2, Loader2 } from 'lucide-react';
-import type { Session, Preconfig } from '@prokopai/sdk';
+import type { Session, Preconfig, ProkopaiClient } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TokenMeter } from './TokenMeter';
 import { ModelVariantConfigSelector } from './ModelVariantConfigSelector';
+import { CodexModelSelector } from './CodexModelSelector';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useSessionControlStore } from '@/stores/sessionControlStore';
 import type { SessionUsage } from '@/stores/sessionStore';
@@ -24,6 +25,8 @@ interface Model {
 
 interface ChatHeaderProps {
   session: Session;
+  sdkClient?: ProkopaiClient | null;
+  serverUrl?: string | null;
   preconfigs: Preconfig[];
   models: Model[];
   defaultModel: string;
@@ -46,6 +49,8 @@ interface ChatHeaderProps {
 
 export function ChatHeader({
   session,
+  sdkClient = null,
+  serverUrl = null,
   preconfigs,
   models,
   usage,
@@ -151,7 +156,7 @@ export function ChatHeader({
               </h2>
             )}
 
-            <TokenMeter
+            {session.harness !== 'codex-cli' && <TokenMeter
               promptTokens={usage.promptTokens}
               completionTokens={usage.completionTokens}
               totalTokens={usage.totalTokens}
@@ -161,7 +166,7 @@ export function ChatHeader({
               contextWindow={contextWindow}
               modelName={modelName}
               compact={isMobile}
-            />
+            />}
 
             {session.status === 'closed' && (
               <Badge variant="secondary">
@@ -172,7 +177,7 @@ export function ChatHeader({
           </div>
 
           <div className="flex items-center gap-1 flex-wrap md:flex-nowrap shrink-0">
-            <ModelVariantConfigSelector
+            {session.harness !== 'codex-cli' ? <ModelVariantConfigSelector
               models={models}
               selectedModelId={selectedModel}
               selectedProviderId={session.selectedProvider}
@@ -188,9 +193,10 @@ export function ChatHeader({
               lockPreconfig={lockPreconfig}
               iconOnly={showFullModelSelector}
               compact={isCompact}
-            />
+            /> : <CodexModelSelector session={session} client={sdkClient} serverUrl={serverUrl}
+              disabled={session.status === 'closed' || isObserver || !!isStreaming} />}
 
-            {onCompact && !isObserver && (
+            {onCompact && !isObserver && session.harness !== 'codex-cli' && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

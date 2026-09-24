@@ -8,6 +8,7 @@ import type {
   Preconfig,
   QueuedMessage,
   Session,
+  SessionHarness,
   SessionStatus,
   ToolPart,
 } from '@prokopai/sdk';
@@ -59,6 +60,7 @@ export interface SessionRecordCreateInput {
   id: string;
   workspaceId: string;
   workspaceRootId?: string | null;
+  harness?: SessionHarness;
   preconfigId: string | null;
   title: string;
   status: 'active';

@@ -49,6 +49,7 @@ interface SessionRow {
   selected_model: string | null;
   selected_provider: string | null;
   selected_variant: string | null;
+  harness: string;
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
@@ -70,11 +71,15 @@ const MAX_PAGE_SIZE = 100;
 const MIN_PAGE_SIZE = 1;
 
 function mapRowToSession(row: SessionRow): Session {
+  if (row.harness !== 'prokop' && row.harness !== 'codex-cli') {
+    throw new Error('Unknown session harness');
+  }
   return {
     id: row.id,
     preconfigId: row.preconfig_id,
     workspaceId: row.workspace_id || '',
     workspaceRootId: row.workspace_root_id ?? null,
+    harness: row.harness,
     title: row.title,
     status: row.status as SessionStatus,
     createdAt: row.created_at,
@@ -146,18 +151,20 @@ export function createSessionRepository(
     const now = new Date().toISOString();
     const s: Session = {
       ...session,
+      harness: session.harness ?? 'prokop',
       tags: session.tags ?? [],
       createdAt: session.createdAt || now,
       updatedAt: session.updatedAt || now,
     };
 
     db.run(`
-      INSERT INTO sessions (id, workspace_id, workspace_root_id, preconfig_id, title, status, created_at, updated_at, metadata, selected_model, selected_provider, selected_variant, prompt_tokens, completion_tokens, total_tokens, parent_id, agent_name, subagent_status, running_at, compacting, tags, auto_approve_severity, agent_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO sessions (id, workspace_id, workspace_root_id, harness, preconfig_id, title, status, created_at, updated_at, metadata, selected_model, selected_provider, selected_variant, prompt_tokens, completion_tokens, total_tokens, parent_id, agent_name, subagent_status, running_at, compacting, tags, auto_approve_severity, agent_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       s.id,
       s.workspaceId,
       s.workspaceRootId ?? null,
+      s.harness ?? 'prokop',
       s.preconfigId,
       s.title,
       s.status,

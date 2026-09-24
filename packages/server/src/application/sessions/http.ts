@@ -2,6 +2,9 @@ import type {
   AutoApproveSeverity,
   Message,
   Session,
+  SessionHarness,
+  CodexModel,
+  CodexModelSelection,
   SessionStatus,
   SessionListFilter,
 } from '@prokopai/sdk';
@@ -24,6 +27,7 @@ export interface SessionHttpCreateInput {
   id?: string;
   workspaceId?: string;
   workspaceRootId?: string;
+  harness?: SessionHarness;
   preconfigId?: string | null;
   title?: string;
   metadata?: Record<string, unknown> | null;
@@ -45,7 +49,17 @@ export interface SessionHttpAttachmentCreateInput {
   data: ArrayBuffer;
 }
 
+export interface CodexModelPort {
+  list(): Promise<CodexModel[]>;
+  get(sessionId: string): CodexModelSelection | null;
+  save(sessionId: string, selection: CodexModelSelection): void;
+  isActive(sessionId: string): boolean;
+}
+
 export interface SessionHttpApplication {
+  codexAvailable(): boolean;
+  codexModels(sessionId: string): Promise<{ models: CodexModel[]; selection: CodexModelSelection | null }> | null;
+  setCodexModel(sessionId: string, selection: CodexModelSelection): Promise<'ok' | 'not_found' | 'invalid' | 'active'>;
   listSessions(status?: SessionStatus): Session[];
   createSession(input: SessionHttpCreateInput): Session | null;
   listSessionsGrouped(
@@ -94,14 +108,36 @@ export function createSessionHttpApplication(
     isAvailable(workspaceId: string, workspaceRootId: string): boolean;
   },
   worktreeAttachments?: WorktreeAttachmentRefreshPort,
+  codexAvailable: () => boolean = () => false,
+  codexWorkspaceAvailable: (workspaceId: string) => boolean = () => false,
+  codexModels?: CodexModelPort,
 ): SessionHttpApplication {
   return {
+    codexAvailable,
+    codexModels(sessionId) {
+      if (repository.getSession(sessionId)?.harness !== 'codex-cli' || !codexModels) return null;
+      return codexModels.list().then(models => ({ models, selection: codexModels.get(sessionId) }));
+    },
+    async setCodexModel(sessionId, selection) {
+      if (repository.getSession(sessionId)?.harness !== 'codex-cli' || !codexModels) return 'not_found';
+      if (codexModels.isActive(sessionId)) return 'active';
+      const models = await codexModels.list();
+      const model = models.find(item => item.model === selection.model);
+      if (!model || !model.supportedEfforts.includes(selection.effort)) return 'invalid';
+      if (codexModels.isActive(sessionId)) return 'active';
+      if (repository.getSession(sessionId)?.harness !== 'codex-cli') return 'not_found';
+      codexModels.save(sessionId, selection);
+      return 'ok';
+    },
     listSessions(status) {
       return repository.listSessions(status);
     },
 
     createSession(input) {
+      if (input.harness !== undefined && input.harness !== 'prokop'
+        && (input.harness !== 'codex-cli' || !codexAvailable())) return null;
       const workspaceId = input.workspaceId || '';
+      if (input.harness === 'codex-cli' && (input.preconfigId || !codexWorkspaceAvailable(workspaceId))) return null;
       if (
         input.workspaceRootId
         && !workspaceRoots?.isAvailable(workspaceId, input.workspaceRootId)
@@ -112,6 +148,7 @@ export function createSessionHttpApplication(
         id: input.id || crypto.randomUUID(),
         workspaceId,
         workspaceRootId: input.workspaceRootId ?? null,
+        harness: input.harness ?? 'prokop',
         preconfigId: input.preconfigId || null,
         title: input.title || 'New Session',
         status: 'active',

@@ -19,7 +19,24 @@ export interface SessionListFilter {
   category?: SessionCategory;
 }
 
+export type SessionHarness = 'prokop' | 'codex-cli';
+
+export interface CodexModel {
+  model: string;
+  name: string;
+  supportedEfforts: string[];
+  defaultEffort: string;
+  isDefault: boolean;
+}
+
+export interface CodexModelSelection {
+  model: string;
+  effort: string;
+}
+
 export interface Session extends CapekSession {
+  /** Persisted execution owner; missing values from older hosts mean Prokop. */
+  harness?: SessionHarness;
   workspaceRootId?: string | null;
   worktree?: SessionWorktreeBinding | null;
 }

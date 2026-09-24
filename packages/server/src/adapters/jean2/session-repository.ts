@@ -120,6 +120,7 @@ function toCreateInput(input: SessionRecordCreateInput) {
     id: input.id,
     workspaceId: input.workspaceId,
     workspaceRootId: input.workspaceRootId ?? null,
+    harness: input.harness ?? 'prokop',
     preconfigId: input.preconfigId,
     title: input.title,
     status: input.status,

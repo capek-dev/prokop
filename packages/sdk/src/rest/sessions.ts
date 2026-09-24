@@ -11,7 +11,7 @@ import type {
   GetToolDebugResponse,
   SessionWorktreeResponse,
 } from '../types/rest-responses';
-import type { SessionStatus, SessionListFilter, SessionCategoryCounts } from '../shared-types/session';
+import type { SessionStatus, SessionListFilter, SessionCategoryCounts, SessionHarness, CodexModel, CodexModelSelection } from '../shared-types/session';
 
 interface ListOptions {
   status?: SessionStatus;
@@ -24,6 +24,7 @@ interface CreateOptions {
   workspaceRootId?: string;
   preconfigId?: string;
   title?: string;
+  harness?: SessionHarness;
   metadata?: Record<string, unknown>;
   signal?: AbortSignal;
 }
@@ -55,6 +56,18 @@ interface ListByWorkspaceOptions extends SessionListFilter {
 
 export class SessionsRestNamespace {
   constructor(private http: HttpClient) {}
+
+  async harnesses(): Promise<{ harnesses: Array<{ id: 'prokop' | 'codex-cli'; available: boolean; approvals?: boolean }> }> {
+    return this.http.get('/harnesses');
+  }
+
+  async codexModels(id: string): Promise<{ models: CodexModel[]; selection: CodexModelSelection | null }> {
+    return this.http.get(`/sessions/${encodeURIComponent(id)}/codex-models`);
+  }
+
+  async setCodexModel(id: string, selection: CodexModelSelection): Promise<{ selection: CodexModelSelection }> {
+    return this.http.put(`/sessions/${encodeURIComponent(id)}/codex-model`, selection);
+  }
 
   async setLearning(id: string, settings: import('../shared').SessionLearningSettings): Promise<UpdateSessionResponse> {
     return this.http.patch(`/sessions/${encodeURIComponent(id)}/learning`, settings);
