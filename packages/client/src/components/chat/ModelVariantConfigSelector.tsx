@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Check, ChevronsUpDown, Cpu, Brain, Bot, Cog } from 'lucide-react';
-import type { Preconfig } from '@prokopai/sdk';
+import type { CodexModel, Preconfig } from '@prokopai/sdk';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,6 +46,11 @@ interface ModelVariantConfigSelectorProps {
   selectedProviderId?: string | null;
   fallbackModelName?: string;
   onChangeModel: (modelId: string, providerId: string) => void;
+  codexModels?: CodexModel[];
+  codexSelectedModel?: string | null;
+  codexEffort?: string | null;
+  codexSession?: boolean;
+  onChangeCodex?: (modelId: string, effort: string) => void;
   variants?: Record<string, VariantOption> | undefined;
   selectedVariant: string | null;
   onChangeVariant: (variant: string | null) => void;
@@ -90,6 +95,11 @@ export function ModelVariantConfigSelector({
   selectedProviderId,
   fallbackModelName,
   onChangeModel,
+  codexModels = [],
+  codexSelectedModel,
+  codexEffort,
+  codexSession = false,
+  onChangeCodex,
   variants,
   selectedVariant,
   onChangeVariant,
@@ -131,16 +141,23 @@ export function ModelVariantConfigSelector({
     : models.find((m) => m.id === selectedModelId);
 
   const selectedPreconfig = preconfigs.find((p) => p.id === selectedPreconfigId);
-  const modelDisplayName = selectedModel?.name || fallbackModelName || 'Select model';
-  const variantDisplayName = selectedVariant ? capitalizeVariant(selectedVariant) : null;
+  const selectedCodex = codexModels.find(model => model.model === codexSelectedModel)
+    ?? (codexSession ? codexModels.find(model => model.isDefault) : undefined);
+  const modelDisplayName = codexSession
+    ? `Codex · ${selectedCodex?.name ?? codexSelectedModel ?? 'Select model'}`
+    : selectedModel?.name || fallbackModelName || 'Select model';
+  const variantDisplayName = codexSession ? codexEffort ?? selectedCodex?.defaultEffort ?? null
+    : selectedVariant ? capitalizeVariant(selectedVariant) : null;
   const fullSelectionLabel = [
     modelDisplayName,
     variantDisplayName,
-    selectedPreconfig && !lockPreconfig ? selectedPreconfig.name : null,
+    selectedPreconfig && !lockPreconfig && !codexSession ? selectedPreconfig.name : null,
   ].filter(Boolean).join(', ');
 
-  const hasVariants = !!variants && Object.keys(variants).length > 0;
-  const variantKeys = hasVariants ? Object.keys(variants!) : [];
+  const hasVariants = codexSession ? !!selectedCodex?.supportedEfforts.length
+    : !!variants && Object.keys(variants).length > 0;
+  const variantKeys = codexSession ? selectedCodex?.supportedEfforts ?? []
+    : hasVariants ? Object.keys(variants!) : [];
 
   const handleSelectModel = (composite: string) => {
     const colonIdx = composite.indexOf(':');
@@ -151,7 +168,8 @@ export function ModelVariantConfigSelector({
   };
 
   const handleSelectVariant = (value: string) => {
-    onChangeVariant(value === NONE_VALUE ? null : value);
+    if (codexSession && selectedCodex) onChangeCodex?.(selectedCodex.model, value);
+    else onChangeVariant(value === NONE_VALUE ? null : value);
     setOpenSection(null);
   };
 
@@ -219,12 +237,25 @@ export function ModelVariantConfigSelector({
           })}
         </CommandGroup>
       ))}
+      {codexModels.length > 0 && <CommandGroup heading="Codex CLI">
+        {codexModels.map(model => (
+          <CommandItem key={model.model} value={`codex-cli ${model.name} ${model.model}`}
+            showCheck={false} onSelect={() => {
+              onChangeCodex?.(model.model, model.model === selectedCodex?.model
+                ? codexEffort ?? model.defaultEffort : model.defaultEffort);
+              setOpenSection(null);
+            }}>
+            <span>{model.name}</span>
+            <Check className={cn('ml-auto size-4', codexSession && selectedCodex?.model === model.model ? 'opacity-100' : 'opacity-0')} />
+          </CommandItem>
+        ))}
+      </CommandGroup>}
     </>
   );
 
   const variantItems = (
     <>
-      <CommandItem
+      {!codexSession && <CommandItem
         value="default none"
         showCheck={false}
         onSelect={() => handleSelectVariant(NONE_VALUE)}
@@ -236,7 +267,7 @@ export function ModelVariantConfigSelector({
             selectedVariant === null ? 'opacity-100' : 'opacity-0',
           )}
         />
-      </CommandItem>
+      </CommandItem>}
       {variantKeys.map((key) => (
         <CommandItem
           key={key}
@@ -248,7 +279,7 @@ export function ModelVariantConfigSelector({
           <Check
             className={cn(
               'ml-auto size-4',
-              selectedVariant === key ? 'opacity-100' : 'opacity-0',
+              (codexSession ? variantDisplayName : selectedVariant) === key ? 'opacity-100' : 'opacity-0',
             )}
           />
         </CommandItem>
@@ -358,9 +389,9 @@ export function ModelVariantConfigSelector({
   const sections: { icon: ReactNode; label: string; value: string; section: Section }[] = [
     { icon: <Cpu className="size-3.5" />, label: 'Model', value: modelDisplayName, section: 'model' },
     ...(hasVariants
-      ? [{ icon: <Brain className="size-3.5" />, label: 'Variant', value: selectedVariant ? capitalizeVariant(selectedVariant) : 'Default', section: 'variant' as const }]
+      ? [{ icon: <Brain className="size-3.5" />, label: codexSession ? 'Effort' : 'Variant', value: variantDisplayName ? capitalizeVariant(variantDisplayName) : 'Default', section: 'variant' as const }]
       : []),
-    ...(preconfigs.length > 0 && !lockPreconfig
+    ...(preconfigs.length > 0 && !lockPreconfig && !codexSession
       ? [{ icon: (() => {
             const isSelectedAgent = selectedPreconfig ? isAgentPreconfig(selectedPreconfig.id) : false;
             const Icon = isSelectedAgent ? Bot : Cog;

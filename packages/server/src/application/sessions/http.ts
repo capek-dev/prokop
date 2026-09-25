@@ -59,6 +59,7 @@ export interface CodexModelPort {
 
 export interface SessionHttpApplication {
   codexAvailable(): boolean;
+  codexCatalog(): Promise<CodexModel[]> | null;
   createSessionError(input: SessionHttpCreateInput): string | null;
   codexModels(sessionId: string): Promise<{ models: CodexModel[]; selection: CodexModelSelection | null }> | null;
   setCodexModel(sessionId: string, selection: CodexModelSelection): Promise<'ok' | 'not_found' | 'invalid' | 'active'>;
@@ -116,6 +117,9 @@ export function createSessionHttpApplication(
 ): SessionHttpApplication {
   return {
     codexAvailable,
+    codexCatalog() {
+      return codexAvailable() && codexModels ? codexModels.list() : null;
+    },
     codexModels(sessionId) {
       if (repository.getSession(sessionId)?.harness !== 'codex-cli' || !codexModels) return null;
       return codexModels.list().then(models => ({ models, selection: codexModels.get(sessionId) }));

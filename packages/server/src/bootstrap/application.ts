@@ -41,6 +41,8 @@ import {
   createJean2ProviderRegistryPort,
 } from '@/adapters/capek';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
+import { selectEmptySessionHarnessModel } from '@/infrastructure/sqlite/session-store';
+import { getModelsConfigWithStatus } from '@/config/models';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { countMessagesInSession } from '@/infrastructure/sqlite/message-store';
@@ -207,6 +209,10 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     worktreeAttachments,
     codexAvailable: codexCliAvailable,
     codexWorkspaceAvailable,
+    codexModels: listCodexModels,
+    prokopModelAvailable: (modelId, providerId) => getModelsConfigWithStatus().providers
+      .some(provider => provider.id === providerId && provider.models.some(model => model.id === modelId && model.runtimeStatus.usable)),
+    selectEmptySessionHarnessModel,
   });
 
   const control = createSessionControlApplication<ConnectionId>({

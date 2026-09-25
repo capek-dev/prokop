@@ -1,5 +1,5 @@
 import type { ClientDescriptor } from '@capekai/types';
-import type { SessionHarness } from '../shared-types/session';
+import type { HarnessModelChoice, SessionHarness } from '../shared-types/session';
 
 // No permission type imports needed — permission grant/deny messages removed.
 // All permission responses go through ask.response (AskResponseMessage).
@@ -70,6 +70,12 @@ export interface SessionUpdateModelMessage {
   modelId: string;
   providerId: string;
   variant?: string;
+}
+
+export interface SessionSelectHarnessModelMessage {
+  type: 'session.select_harness_model';
+  sessionId: string;
+  choice: HarnessModelChoice;
 }
 
 export interface SessionReopenMessage {
@@ -292,6 +298,7 @@ export type ClientMessage =
   | SessionCloseMessage
   | SessionUpdateMessage
   | SessionUpdateModelMessage
+  | SessionSelectHarnessModelMessage
   | SessionReopenMessage
   | SessionDeleteMessage
   | SessionRenameMessage

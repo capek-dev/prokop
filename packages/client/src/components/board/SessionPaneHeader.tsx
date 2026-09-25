@@ -13,6 +13,7 @@ import {
 import { useSessionStore } from '@/stores/sessionStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useSessionCommands } from '@/contexts/SessionCommandsContext';
+import { useSessionManager } from '@/contexts/SessionManagerContext';
 import { getWorkspacePreconfigs } from '@/lib/workspacePreconfigs';
 import { useServerDataStore } from '@/stores/serverDataStore';
 
@@ -56,6 +57,7 @@ export function SessionPaneHeader({
   setDragActivatorNode,
 }: SessionPaneHeaderProps) {
   const commands = useSessionCommands();
+  const { sdkClient, serverUrl } = useSessionManager();
 
   const session = useSessionStore(s => s.sessions.find(sess => sess.id === sessionId) as Session | undefined);
   const sessionUsage = useSessionStore(s => s.usageBySessionId[sessionId]);
@@ -152,6 +154,8 @@ export function SessionPaneHeader({
       {renderGrip()}
       <ChatHeader
         session={session}
+        sdkClient={sdkClient}
+        serverUrl={serverUrl}
         preconfigs={preconfigs}
         models={models}
         defaultModel={defaultModel}

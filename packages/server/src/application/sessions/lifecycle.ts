@@ -1,4 +1,4 @@
-import type { Ask, AskAuthority, SessionHarness } from '@prokopai/sdk';
+import type { Ask, AskAuthority, CodexModel, HarnessModelChoice, Session, SessionHarness } from '@prokopai/sdk';
 import type { SessionWirePorts } from '../ports/delivery';
 import type { SessionExecutionPort } from '../ports/execution';
 import type {
@@ -31,6 +31,9 @@ export interface SessionLifecycleDeps<Origin> {
   worktreeAttachments?: WorktreeAttachmentRefreshPort;
   codexAvailable?: () => boolean;
   codexWorkspaceAvailable?: (workspaceId: string) => boolean;
+  codexModels?: () => Promise<CodexModel[]>;
+  prokopModelAvailable?: (modelId: string, providerId: string) => boolean;
+  selectEmptySessionHarnessModel?: (id: string, expected: SessionHarness, updatedAt: string, choice: HarnessModelChoice) => Session | null;
 }
 
 export interface SessionCreateInput {
@@ -48,6 +51,10 @@ export interface SessionLifecycleApplication<Origin> {
     wire: SessionWirePorts<Origin>,
     origin: Origin,
     input: { sessionId: string; preconfigId?: string },
+  ): Promise<void>;
+  selectHarnessModel(
+    wire: SessionWirePorts<Origin>, origin: Origin,
+    input: { sessionId: string; choice: HarnessModelChoice },
   ): Promise<void>;
   updateModel(
     wire: SessionWirePorts<Origin>,
@@ -289,6 +296,67 @@ export function createSessionLifecycleApplication<Origin>(
       }
       const updated = deps.repository.updateSession(sessionId, updates);
       wire.delivery.send(origin, { type: 'session.updated', session: updated! });
+    },
+
+    async selectHarnessModel(wire, origin, input): Promise<void> {
+      const { sessionId, choice } = input;
+      const session = deps.repository.getSession(sessionId);
+      if (!session) {
+        wire.delivery.send(origin, { type: 'error', code: 'not_found', message: 'Session not found', sessionId });
+        return;
+      }
+      const invalid = (message: string): void => wire.delivery.send(origin,
+        { type: 'error', code: 'invalid_session', message, sessionId });
+      if (unknownHarnessError(session.harness)) return invalid('Unknown session harness');
+      if (!choice || (choice.harness !== 'codex-cli' && choice.harness !== 'prokop')
+        || typeof choice.modelId !== 'string' || !choice.modelId.trim() || choice.modelId.length > 200) {
+        return invalid('Invalid harness model selection');
+      }
+      if (choice.harness === (session.harness ?? 'prokop')) {
+        return invalid('Select a model within the current harness');
+      }
+      if (session.parentId || session.status !== 'active' || session.compacting || session.runningAt
+        || deps.execution.isSessionActive(sessionId)) {
+        return invalid('Harness is locked after the first message or while a turn is active');
+      }
+      const gate = deps.gate.checkControllerGate(sessionId, 'session.update_model', origin);
+      if (gate) return sendGateRejection(wire, origin, gate);
+      if (session.workspaceRootId && !deps.workspaceRoots?.isAvailable(session.workspaceId, session.workspaceRootId)) {
+        return invalid('Selected worktree is not available for this workspace');
+      }
+      if (choice.harness === 'codex-cli') {
+        const decision = checkHarnessCreate({ harness: 'codex-cli', workspaceId: session.workspaceId,
+          workspaceRootId: session.workspaceRootId ?? undefined }, {
+          codexAvailable: deps.codexAvailable ?? (() => false),
+          codexWorkspaceAvailable: deps.codexWorkspaceAvailable ?? (() => false),
+          workspaceRoots: deps.workspaceRoots,
+        });
+        if (!decision.ok) return invalid(decision.message);
+        if (typeof choice.effort !== 'string' || !choice.effort || choice.effort.length > 100 || !deps.codexModels) {
+          return invalid('Invalid Codex model selection');
+        }
+        try {
+          const models = await deps.codexModels();
+          if (!models.some(model => model.model === choice.modelId && model.supportedEfforts.includes(choice.effort))) {
+            return invalid('Model and effort must be supported by this host Codex CLI');
+          }
+        } catch {
+          return invalid('Codex model catalog is unavailable on this host');
+        }
+      } else if (typeof choice.providerId !== 'string' || !choice.providerId.trim() || choice.providerId.length > 200
+        || !deps.prokopModelAvailable?.(choice.modelId, choice.providerId)) {
+        return invalid('Invalid Prokop model selection');
+      }
+      // The store compare-and-swap prevents another send, queue, or switch from racing this selection.
+      let updated: Session | null | undefined;
+      try {
+        updated = deps.selectEmptySessionHarnessModel?.(sessionId, session.harness ?? 'prokop', session.updatedAt, choice);
+      } catch {
+        return invalid('Could not change the session harness');
+      }
+      if (!updated) return invalid('Harness is locked after the first message or while a turn is active');
+      wire.delivery.send(origin, { type: 'session.updated', session: updated });
+      wire.delivery.broadcast({ type: 'session.updated', session: updated }, origin);
     },
 
     updateModel(wire, origin, input): void {

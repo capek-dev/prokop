@@ -6,6 +6,7 @@ import type {
   SessionResumeMessage,
   SessionUpdateMessage,
   SessionUpdateModelMessage,
+  SessionSelectHarnessModelMessage,
   SessionCloseMessage,
   SessionReopenMessage,
   SessionDeleteMessage,
@@ -67,6 +68,14 @@ export function handleUpdateModelSession(
     modelId: msg.modelId,
     providerId: msg.providerId,
     variant: msg.variant,
+  });
+}
+
+export async function handleSelectHarnessModelSession(
+  ctx: RouterContext<ConnectionId>, ws: ConnectionId, msg: SessionSelectHarnessModelMessage,
+): Promise<void> {
+  await requireWireApplication().session.lifecycle.selectHarnessModel(createWirePorts(ctx), ws, {
+    sessionId: msg.sessionId, choice: msg.choice,
   });
 }
 

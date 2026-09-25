@@ -21,6 +21,10 @@ export interface SessionListFilter {
 
 export type SessionHarness = 'prokop' | 'codex-cli';
 
+export type HarnessModelChoice =
+  | { harness: 'prokop'; modelId: string; providerId: string }
+  | { harness: 'codex-cli'; modelId: string; effort: string };
+
 export interface CodexModel {
   model: string;
   name: string;

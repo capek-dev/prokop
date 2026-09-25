@@ -6,7 +6,7 @@
 
 import { getDatabase } from './database';
 import { notifyLearningActivity } from '@/application/learning/activity';
-import type { Session, SessionStatus, Workspace, SessionListFilter, SessionCategoryCounts } from '@prokopai/sdk';
+import type { Session, SessionStatus, SessionHarness, HarnessModelChoice, Workspace, SessionListFilter, SessionCategoryCounts } from '@prokopai/sdk';
 import { getWorkspace, getWorkspaceLastConversationAt } from './workspaces';
 import { notifyWorkspaceActivity } from '@/application/workspaces/activity';
 import { deleteAttachmentsForSession, deleteAttachmentsForWorkspace } from './attachments';
@@ -85,6 +85,41 @@ export function createSession(
 
 export function getSession(id: string): Session | null {
   return repo().getSession(id);
+}
+
+/** Compare-and-swap the owner before the first message, never changing an established thread. */
+export function selectEmptySessionHarnessModel(
+  sessionId: string,
+  expectedHarness: SessionHarness,
+  expectedUpdatedAt: string,
+  choice: HarnessModelChoice,
+): Session | null {
+  const db = getDatabase();
+  const selected = db.transaction(() => {
+    const result = db.run(`UPDATE sessions SET harness = ?, selected_model = ?, selected_provider = ?,
+      selected_variant = NULL, preconfig_id = CASE WHEN ? = 'codex-cli' THEN NULL ELSE preconfig_id END,
+      agent_id = CASE WHEN ? = 'codex-cli' THEN NULL ELSE agent_id END,
+      updated_at = ?
+      WHERE id = ? AND harness = ? AND updated_at = ? AND status = 'active' AND parent_id IS NULL
+        AND running_at IS NULL AND compacting = 0
+        AND NOT EXISTS (SELECT 1 FROM codex_session_bindings WHERE session_id = ?)
+        AND NOT EXISTS (SELECT 1 FROM messages WHERE session_id = ?)
+        AND NOT EXISTS (SELECT 1 FROM queued_messages WHERE session_id = ?)`, [
+      choice.harness, choice.modelId, choice.harness === 'prokop' ? choice.providerId : null,
+      choice.harness, choice.harness, new Date().toISOString(), sessionId, expectedHarness,
+      expectedUpdatedAt, sessionId, sessionId, sessionId,
+    ]);
+    if (result.changes !== 1) return null;
+    // An empty Codex session can have a preference, but cannot have a completed native thread.
+    db.run('DELETE FROM codex_session_models WHERE session_id = ?', [sessionId]);
+    if (choice.harness === 'codex-cli') {
+      db.run('INSERT INTO codex_session_models (session_id, model, effort) VALUES (?, ?, ?)',
+        [sessionId, choice.modelId, choice.effort]);
+    }
+    return getSession(sessionId);
+  })();
+  if (selected) notifyLearningActivity();
+  return selected;
 }
 
 export function getSessionWithWorkspace(sessionId: string): { session: Session; workspace: Workspace | null } | null {

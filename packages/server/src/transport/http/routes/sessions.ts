@@ -28,6 +28,16 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
     ],
   }));
 
+  app.get('/api/harnesses/codex-cli/models', async c => {
+    const catalog = application.codexCatalog();
+    if (!catalog) throw new BadRequestError('Codex CLI 0.156.x is unavailable on this host');
+    try {
+      return c.json({ models: await catalog });
+    } catch {
+      throw new BadRequestError('Codex model catalog is unavailable on this host');
+    }
+  });
+
   app.get('/api/sessions', async (c) => {
     const status = c.req.query('status') as SessionStatus | undefined;
     const sessions = application.listSessions(status);

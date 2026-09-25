@@ -1,5 +1,5 @@
 import type { ClientMessage } from '../shared';
-import type { SessionHarness } from '../shared-types/session';
+import type { HarnessModelChoice, SessionHarness } from '../shared-types/session';
 
 export class SessionsNamespace {
   constructor(private send: (msg: ClientMessage) => void) {}
@@ -31,6 +31,10 @@ export class SessionsNamespace {
     options: { modelId: string; providerId: string; variant?: string },
   ): void {
     this.send({ type: 'session.update_model', sessionId, ...options });
+  }
+
+  selectHarnessModel(sessionId: string, choice: HarnessModelChoice): void {
+    this.send({ type: 'session.select_harness_model', sessionId, choice });
   }
 
   reopen(sessionId: string): void {

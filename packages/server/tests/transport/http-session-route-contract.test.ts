@@ -147,6 +147,8 @@ describe('HTTP session route contract', () => {
     const put = (id: string, body: unknown) => app.request(`/api/sessions/${id}/codex-model`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
+    expect(await json(await app.request('/api/harnesses/codex-cli/models')))
+      .toEqual({ models: [expect.objectContaining({ model: 'codex-one' })] });
     expect((await app.request('/api/sessions/prokop/codex-models')).status).toBe(404);
     expect(await json(await app.request('/api/sessions/codex/codex-models')))
       .toEqual({ models: [expect.objectContaining({ model: 'codex-one' })], selection: null });
@@ -159,6 +161,11 @@ describe('HTTP session route contract', () => {
     active = false;
     expect((await put('codex', { model: 'codex-one', effort: 'low' })).status).toBe(200);
     expect(saved).toEqual([{ model: 'codex-one', effort: 'low' }]);
+  });
+
+  test('catalog is unavailable when the host has no Codex CLI', async () => {
+    const { app } = makeApp();
+    expect((await app.request('/api/harnesses/codex-cli/models')).status).toBe(400);
   });
 
   test('POST /api/sessions creates with 201 and keeps the HTTP defaults', async () => {

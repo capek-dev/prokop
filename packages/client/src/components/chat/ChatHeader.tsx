@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { ArrowLeft, Archive, Minimize2, Loader2 } from 'lucide-react';
 import type { Session, Preconfig, ProkopaiClient } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
@@ -6,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TokenMeter } from './TokenMeter';
 import { ModelVariantConfigSelector } from './ModelVariantConfigSelector';
-import { CodexModelSelector } from './CodexModelSelector';
+import { useSessionStore } from '@/stores/sessionStore';
+import { useServerDataStore } from '@/stores/serverDataStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useSessionControlStore } from '@/stores/sessionControlStore';
 import type { SessionUsage } from '@/stores/sessionStore';
@@ -71,6 +74,52 @@ export function ChatHeader({
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(session.title || '');
   const inputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+  const contentMeta = useSessionStore(s => s.contentMetaBySession[session.id]);
+  const messages = useSessionStore(s => s.messagesBySession[session.id]);
+  const queued = useSessionStore(s => s.queuedMessages[session.id]);
+  const workspace = useServerDataStore(s => s.workspaces.find(w => w.id === session.workspaceId));
+  const emptyRoot = !session.parentId && session.status === 'active' && !session.runningAt
+    && !isStreaming && contentMeta?.status === 'ready' && !contentMeta.hasOlder
+    && messages?.length === 0 && !queued?.length;
+  const codexSession = session.harness === 'codex-cli';
+  const catalog = useQuery({
+    queryKey: ['codex-catalog', serverUrl],
+    queryFn: () => sdkClient!.http.sessions.codexCatalog(),
+    enabled: !!sdkClient && !!serverUrl && emptyRoot && !codexSession
+      && !!workspace && !workspace.isVirtual && !!workspace.path,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const codexKey = ['codex-models', serverUrl, session.id, session.updatedAt];
+  const codexSelection = useQuery({
+    queryKey: codexKey,
+    queryFn: () => sdkClient!.http.sessions.codexModels(session.id),
+    enabled: !!sdkClient && !!serverUrl && codexSession,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const codexModels = codexSession ? codexSelection.data?.models ?? []
+    : emptyRoot && workspace && !workspace.isVirtual ? catalog.data?.models ?? [] : [];
+  const codexModel = codexSelection.data?.selection?.model ?? session.selectedModel;
+  const codexEffort = codexSelection.data?.selection?.effort ?? null;
+  const selectCodex = async (modelId: string, effort: string) => {
+    if (!sdkClient || isObserver || isStreaming) return;
+    if (!codexSession) {
+      sdkClient.sessions.selectHarnessModel(session.id, { harness: 'codex-cli', modelId, effort });
+      return;
+    }
+    try {
+      const response = await sdkClient.http.sessions.setCodexModel(session.id, { model: modelId, effort });
+      queryClient.setQueryData(codexKey, (old: typeof codexSelection.data) => old && { ...old, selection: response.selection });
+    } catch {
+      toast.error('Could not change the Codex model or effort. Check the host and try again.');
+    }
+  };
+  const selectProkop = (modelId: string, providerId: string) => {
+    if (codexSession) sdkClient?.sessions.selectHarnessModel(session.id, { harness: 'prokop', modelId, providerId });
+    else onChangeModel(modelId, providerId);
+  };
   const isMobile = useIsMobile();
   const isCompact = useIsCompact();
   const hasMultipleOpenSessions = useSessionBoardStore((s) => s.openSessionIds.length > 1);
@@ -177,24 +226,28 @@ export function ChatHeader({
           </div>
 
           <div className="flex items-center gap-1 flex-wrap md:flex-nowrap shrink-0">
-            {session.harness !== 'codex-cli' ? <ModelVariantConfigSelector
-              models={models}
+            <ModelVariantConfigSelector
+              models={codexSession && !emptyRoot ? [] : models}
+              codexModels={codexModels}
+              codexSession={codexSession}
+              codexSelectedModel={codexModel}
+              codexEffort={codexEffort}
+              onChangeCodex={(modelId, effort) => void selectCodex(modelId, effort)}
               selectedModelId={selectedModel}
               selectedProviderId={session.selectedProvider}
               fallbackModelName={modelName}
-              onChangeModel={onChangeModel}
+              onChangeModel={selectProkop}
               variants={variants}
               selectedVariant={selectedVariant}
               onChangeVariant={onChangeVariant}
               preconfigs={preconfigs}
               selectedPreconfigId={session.preconfigId}
               onChangePreconfig={onChangePreconfig}
-              disabled={session.status === 'closed' || !!session.parentId || isObserver}
-              lockPreconfig={lockPreconfig}
+              disabled={session.status === 'closed' || !!session.parentId || isObserver || (codexSession && !!isStreaming)}
+              lockPreconfig={lockPreconfig || codexSession}
               iconOnly={showFullModelSelector}
               compact={isCompact}
-            /> : <CodexModelSelector session={session} client={sdkClient} serverUrl={serverUrl}
-              disabled={session.status === 'closed' || isObserver || !!isStreaming} />}
+            />
 
             {onCompact && !isObserver && session.harness !== 'codex-cli' && (
               <Tooltip>

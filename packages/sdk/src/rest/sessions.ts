@@ -61,6 +61,10 @@ export class SessionsRestNamespace {
     return this.http.get('/harnesses');
   }
 
+  async codexCatalog(): Promise<{ models: CodexModel[] }> {
+    return this.http.get('/harnesses/codex-cli/models');
+  }
+
   async codexModels(id: string): Promise<{ models: CodexModel[]; selection: CodexModelSelection | null }> {
     return this.http.get(`/sessions/${encodeURIComponent(id)}/codex-models`);
   }

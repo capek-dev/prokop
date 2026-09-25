@@ -36,6 +36,10 @@ export interface SessionApplicationDeps<Origin> {
   worktreeAttachments?: WorktreeAttachmentRefreshPort;
   codexAvailable?: () => boolean;
   codexWorkspaceAvailable?: (workspaceId: string) => boolean;
+  codexModels?: () => Promise<import('@prokopai/sdk').CodexModel[]>;
+  prokopModelAvailable?: (modelId: string, providerId: string) => boolean;
+  selectEmptySessionHarnessModel?: (id: string, expected: import('@prokopai/sdk').SessionHarness, updatedAt: string,
+    choice: import('@prokopai/sdk').HarnessModelChoice) => import('@prokopai/sdk').Session | null;
 }
 
 /**

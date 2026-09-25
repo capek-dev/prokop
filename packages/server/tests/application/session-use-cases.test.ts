@@ -888,6 +888,38 @@ describe('application session use cases', () => {
       ]);
     });
 
+    test('cross-harness selection validates catalog and current owner before the atomic store', async () => {
+      const spy = makeSpy();
+      const selected = makeSession({ harness: 'codex-cli', selectedModel: 'codex-model' });
+      const current = makeSession({ updatedAt: 'current' });
+      const writes: unknown[] = [];
+      const app = createSessionLifecycleApplication({
+        ...makeDeps({ repository: makeRepository({ getSession: () => current }) }),
+        codexAvailable: () => true,
+        codexWorkspaceAvailable: () => true,
+        codexModels: async () => [{ model: 'codex-model', name: 'Codex', isDefault: true,
+          defaultEffort: 'medium', supportedEfforts: ['medium', 'high'] }],
+        prokopModelAvailable: (model, provider) => model === 'prokop-model' && provider === 'provider',
+        selectEmptySessionHarnessModel: (...args) => { writes.push(args); return selected; },
+      });
+      const wire = makeWire(spy);
+      await app.selectHarnessModel(wire, origin, { sessionId: 'sess-1', choice: {
+        harness: 'codex-cli', modelId: 'absent', effort: 'high',
+      } });
+      await app.selectHarnessModel(wire, origin, { sessionId: 'sess-1', choice: {
+        harness: 'codex-cli', modelId: 'codex-model', effort: 'invalid',
+      } });
+      await app.selectHarnessModel(wire, origin, { sessionId: 'sess-1', choice: null as never });
+      expect(writes).toHaveLength(0);
+      await app.selectHarnessModel(wire, origin, { sessionId: 'sess-1', choice: {
+        harness: 'codex-cli', modelId: 'codex-model', effort: 'high',
+      } });
+      expect(writes).toEqual([['sess-1', 'prokop', 'current', {
+        harness: 'codex-cli', modelId: 'codex-model', effort: 'high',
+      }]]);
+      expect(spy.sent.at(-1)).toEqual({ type: 'session.updated', session: selected });
+    });
+
     test('update enriches preconfig selection and sends session.updated', async () => {
       const preconfig = { id: 'pre-1', name: 'P', model: null, provider: null, variant: 'v2' };
       const updated = makeSession({ preconfigId: 'pre-1' });
