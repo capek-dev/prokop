@@ -61,6 +61,7 @@ import {
 } from '@/infrastructure/runtime/environment';
 import { activateSandbox } from '@/infrastructure/sandbox';
 import { getEmbeddedClientAssetsRoot } from '@/infrastructure/runtime/client-assets';
+import { getOrCreateInstallationId } from '@/infrastructure/runtime/installation-id';
 import { startPushRetryScheduler, stopPushRetryScheduler, cleanupPushData } from '@/infrastructure/web-push/retry-scheduler';
 import { stopProviderAccountLifecycle } from '@/infrastructure/providers';
 
@@ -155,7 +156,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   const tools = await scanTools();
   console.log(`Found ${tools.length} tools: ${tools.map(t => t.definition.name).join(', ')}`);
 
-  const app = createApp(application);
+  const app = createApp(application, { installationId: getOrCreateInstallationId() });
 
   if (readEnv('SANDBOX') === 'true') {
     activateSandbox((event) => {

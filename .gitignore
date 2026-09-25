@@ -78,6 +78,7 @@ certs/
 # ==========================================
 # client-tauri (Tauri / Rust)
 # ==========================================
+apps/desktop/target/
 packages/client-tauri/target/
 packages/client-tauri/gen/
 

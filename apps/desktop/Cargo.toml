@@ -1,0 +1,26 @@
+[package]
+name = "prokop-desktop"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+async-channel = "2"
+gpui-kit = "=0.6.6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tungstenite = { version = "=0.30.0", features = ["rustls-tls-native-roots"] }
+ureq = { version = "3", features = ["json"] }
+url = "2"
+
+# GPUI Kit's recommended debug profile keeps its rendering and text stack responsive.
+[profile.dev.package]
+gpui-pre = { opt-level = 3 }
+gpui-component = { opt-level = 3 }
+gpui-kit = { opt-level = 3 }
+gpui-kit-assets = { opt-level = 3 }
+gpui-pre-macros = { opt-level = 3 }
+gpui-pre-platform = { opt-level = 3 }
+rustybuzz = { opt-level = 3 }
+taffy = { opt-level = 3 }
+ttf-parser = { opt-level = 3 }

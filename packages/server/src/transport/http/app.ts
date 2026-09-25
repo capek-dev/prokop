@@ -43,6 +43,7 @@ import { registerNotificationRoutes } from '@/transport/http/routes/notification
 
 export interface CreateAppOptions {
   clientAssetsRoot?: string | null;
+  installationId?: string;
 }
 
 export function createApp(application?: WiredApplication, options?: CreateAppOptions) {
@@ -100,6 +101,7 @@ export function createApp(application?: WiredApplication, options?: CreateAppOpt
       name: 'AI Agent Server',
       version: VERSION,
       runtime: 'bun',
+      ...(options?.installationId ? { installationId: options.installationId } : {}),
       features: {
         websocket: true,
         sessions: true,
