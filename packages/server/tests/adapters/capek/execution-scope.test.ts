@@ -20,7 +20,7 @@ import { configureJean2WorkspaceToolDiscovery } from '@/adapters/capek/tool-sour
 import {
   createJean2SessionExecution,
   type Jean2SessionExecutionDependencies,
-} from '@/adapters/capek/execution';
+} from '@/harnesses/prokop/execution';
 import { createJean2ScheduledJobExecution } from '@/adapters/jean2/scheduled-job-execution';
 import {
   disposeJean2ExecutionScope,

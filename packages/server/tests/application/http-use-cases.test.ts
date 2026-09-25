@@ -80,6 +80,8 @@ describe('session HTTP application', () => {
     expect(createInputs).toEqual([{
       id: expect.any(String),
       workspaceId: 'ws-9',
+      workspaceRootId: null,
+      harness: 'prokop',
       preconfigId: null,
       title: 'From HTTP',
       status: 'active',

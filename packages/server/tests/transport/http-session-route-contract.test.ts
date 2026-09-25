@@ -76,11 +76,15 @@ function makeRepository(overrides: Partial<SessionRepositoryPort> = {}): Session
   };
 }
 
-function makeApp(overrides: Partial<SessionRepositoryPort> = {}): {
+function makeApp(
+  overrides: Partial<SessionRepositoryPort> = {},
+  options: { codexAvailable?: boolean; codexWorkspaceAvailable?: (id: string) => boolean } = {},
+): {
   app: Hono;
   application: SessionHttpApplication;
 } {
-  const application = createSessionHttpApplication(makeRepository(overrides));
+  const application = createSessionHttpApplication(makeRepository(overrides), undefined, undefined, undefined,
+    () => options.codexAvailable ?? false, options.codexWorkspaceAvailable ?? (() => false));
   const app = new Hono();
   app.onError((err, c) => {
     if (err instanceof HttpError) {
@@ -179,6 +183,47 @@ describe('HTTP session route contract', () => {
       });
       expect(res.status).toBe(400);
     }
+  });
+
+  test('POST /api/sessions reports the policy rejection before creating', async () => {
+    const { app } = makeApp({ createSession: () => { throw new Error('must not create'); } },
+      { codexAvailable: true, codexWorkspaceAvailable: () => false });
+    const res = await app.request('/api/sessions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ harness: 'codex-cli', workspaceId: 'virtual' }),
+    });
+    expect(res.status).toBe(400);
+    expect(await json(res)).toEqual({ error: 'bad_request',
+      message: 'Codex CLI requires a physical workspace and no Prokop agent preset' });
+  });
+
+  test('POST /api/sessions does not misreport an application refusal as a worktree error', async () => {
+    const { app, application } = makeApp();
+    application.createSession = () => null;
+    const res = await app.request('/api/sessions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ harness: 'prokop' }),
+    });
+    expect(res.status).toBe(400);
+    expect(await json(res)).toEqual({ error: 'bad_request', message: 'Session could not be created' });
+  });
+
+  test('POST /api/sessions accepts available Codex only in physical workspaces without Prokop presets', async () => {
+    const created: unknown[] = [];
+    const { app } = makeApp({
+      createSession: input => { created.push(input); return makeSession({ harness: input.harness }); },
+    }, { codexAvailable: true, codexWorkspaceAvailable: id => id === 'physical' });
+    const post = (body: unknown) => app.request('/api/sessions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    for (const body of [
+      { harness: 'codex-cli', workspaceId: 'virtual' },
+      { harness: 'codex-cli', workspaceId: 'physical', preconfigId: 'prokop-agent' },
+      { harness: '__proto__', workspaceId: 'physical' },
+    ]) expect((await post(body)).status).toBe(400);
+    expect(created).toHaveLength(0);
+    expect((await post({ harness: 'codex-cli', workspaceId: 'physical' })).status).toBe(201);
+    expect(created).toEqual([expect.objectContaining({ harness: 'codex-cli', preconfigId: null })]);
   });
 
   test('GET /api/sessions/grouped validates the workspaceIds parameter', async () => {

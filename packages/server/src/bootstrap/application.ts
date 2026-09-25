@@ -39,7 +39,6 @@ import {
   createJean2AskAuthorityPort,
   configureJean2PreconfigSource,
   createJean2ProviderRegistryPort,
-  createJean2SessionExecution,
 } from '@/adapters/capek';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { getDatabase } from '@/infrastructure/sqlite/database';
@@ -81,8 +80,15 @@ import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
 import { getDataDir } from '@/infrastructure/runtime/paths';
 import { codexAccounts } from '@/infrastructure/providers/codex-accounts';
-import { codexCliAvailable, createCodexExecution } from '@/infrastructure/codex/execution';
-import { getCodexModelSelection, listCodexModels, saveCodexModelSelection } from '@/infrastructure/codex/models';
+import { createProkopHarness } from '@/harnesses/prokop';
+import {
+  codexCliAvailable,
+  createCodexCliHarness,
+  createCodexExecution,
+  getCodexModelSelection,
+  listCodexModels,
+  saveCodexModelSelection,
+} from '@/harnesses/codex-cli';
 import { createHarnessExecution } from '@/application/sessions/harness-execution';
 
 import { createWiredLearning } from './learning';
@@ -152,13 +158,16 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     changed: (worktreeId: string): void => refreshWorktreeAttachments?.(worktreeId),
   };
   const codexExecution = createCodexExecution();
-  const execution = createHarnessExecution(repository, createJean2SessionExecution({
-    onSessionChanged: (changedSession) => {
-      if (changedSession.workspaceRootId) {
-        worktreeAttachments.changed(changedSession.workspaceRootId);
-      }
-    },
-  }), codexExecution);
+  const execution = createHarnessExecution(repository, {
+    prokop: createProkopHarness({
+      onSessionChanged: (changedSession) => {
+        if (changedSession.workspaceRootId) {
+          worktreeAttachments.changed(changedSession.workspaceRootId);
+        }
+      },
+    }),
+    'codex-cli': createCodexCliHarness(codexExecution),
+  });
   const askAuthority = createJean2AskAuthorityPort();
   const pendingAsks = createJean2PendingAskPort();
   const transportControl = createTransportControllerPorts();

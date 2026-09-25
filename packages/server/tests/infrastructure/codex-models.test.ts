@@ -2,8 +2,8 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
 import { createSession } from '@/infrastructure/sqlite/session-store';
-import { getCodexModelSelection, listCodexModels, saveCodexModelSelection } from '@/infrastructure/codex/models';
-import type { CodexConnection } from '@/infrastructure/codex/app-server';
+import { getCodexModelSelection, listCodexModels, saveCodexModelSelection } from '@/harnesses/codex-cli/models';
+import type { CodexConnection } from '@/harnesses/codex-cli/app-server';
 
 beforeEach(() => { setupTestDatabase(); seedWorkspace({ id: 'ws', path: process.cwd() }); });
 afterEach(() => resetTestDatabase());

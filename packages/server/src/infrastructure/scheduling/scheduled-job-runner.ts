@@ -97,6 +97,7 @@ function createScheduledSession(
   sessions.createSession({
     id: sessionId,
     workspaceId: job.workspaceId,
+    harness: 'prokop',
     preconfigId: preconfig.id,
     title: `[Scheduled] ${job.name}`,
     status: 'active',

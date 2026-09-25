@@ -9,7 +9,7 @@ import type { ScheduledJobRunnerDeps } from '@/infrastructure/scheduling/schedul
 const executeChildSession = mock(async (_input: unknown) => ({ error: 'run failed' }));
 const findProviderFromModel = mock(() => 'inferred-provider');
 
-mock.module('@capekai/core/providers', () => ({
+mock.module('@/adapters/capek/contracts', () => ({
   executeChildSession,
   findProviderFromModel,
 }));
@@ -48,6 +48,7 @@ const job = {
 function dependencies(events: string[]): ScheduledJobRunnerDeps {
   const sessions: ScheduledRunSessionPort = {
     createSession: (session) => {
+      expect(session.harness).toBe('prokop');
       events.push(`create:${session.selectedModel}:${session.selectedProvider}`);
       return session as never;
     },

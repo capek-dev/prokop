@@ -93,6 +93,7 @@ test('production startup discovers, creates protected session, writes knowledge,
   const runId = runs.runs[0].id;
   const detail = await (await f.app.request(`/api/workspaces/ws/learning/runs/${runId}`)).json() as LearningRunDetail;
   expect(detail.sessionId).toBe(f.reviewSession());
+  expect(getSession(f.reviewSession())?.harness).toBe('prokop');
   expect(learning!.repository.reviewSessionId('missing-run')).toBeNull();
   expect(detail.sources).toEqual([{ sessionId: 'source', messageId: 'answer', title: 'Fix retry handling' }]);
   updateSession('source', { title: 'Updated conversation title' });

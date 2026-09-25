@@ -20,9 +20,10 @@ const domainsDir = resolve(serverSourceRoot, 'domains');
 const infrastructureDir = resolve(serverSourceRoot, 'infrastructure');
 const adaptersDir = resolve(serverSourceRoot, 'adapters');
 const adaptersCapekDir = resolve(adaptersDir, 'capek');
+const harnessesDir = resolve(serverSourceRoot, 'harnesses');
 const routesDir = resolve(serverSourceRoot, 'transport/http/routes');
 const utilsDir = resolve(serverSourceRoot, 'utils');
-const layerDirs = [bootstrapDir, transportDir, applicationDir, domainsDir, infrastructureDir, adaptersDir];
+const layerDirs = [bootstrapDir, transportDir, applicationDir, domainsDir, infrastructureDir, adaptersDir, harnessesDir];
 const infrastructureSqliteDir = resolve(infrastructureDir, 'sqlite');
 const builtinToolsDir = resolve(serverSourceRoot, 'tools', 'builtin');
 
@@ -270,7 +271,7 @@ const globalBaselineRules: DependencyRule[] = [
 const layerRules: DependencyRule[] = [
   {
     name: 'layer-bootstrap',
-    rationale: 'Bootstrap composes the six layers; relative imports must stay inside the layer directories.',
+    rationale: 'Bootstrap composes the host layers and named harnesses; relative imports must stay inside their directories.',
     appliesTo: [bootstrapDir],
     allowedResolvedDirs: layerDirs,
     exceptions: layerBootstrapExceptions,
@@ -1749,10 +1750,10 @@ describe('server layer boundaries', () => {
   });
 
   test('S10 gate: stateful session execution enters the composed scope', () => {
-    const executionPath = resolve(adaptersCapekDir, 'execution.ts');
+    const executionPath = resolve(harnessesDir, 'prokop/execution.ts');
     const execution = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === executionPath);
     expect(execution).toBeDefined();
-    expect(parseImports(execution!.sourceText, execution!.path).map((imp) => imp.specifier)).toContain('./execution-scope');
+    expect(parseImports(execution!.sourceText, execution!.path).map((imp) => imp.specifier)).toContain('@/adapters/capek/execution-scope');
     expect(execution!.sourceText).toContain('withJean2ExecutionScope');
 
     const scopePath = resolve(adaptersCapekDir, 'execution-scope.ts');
@@ -2032,6 +2033,34 @@ describe('server layer boundaries', () => {
       v.includes('packages/server/src/domains/provider-accounts/'),
     );
     expect(domainViolations).toEqual([]);
+  });
+
+  test('named harness implementations stay separate from host dispatch and provider accounts', () => {
+    const files = scanDirectory(serverSourceRoot);
+    const named = files.filter(file => file.path.startsWith(`${harnessesDir}/`));
+    const paths = named.map(file => relative(harnessesDir, file.path));
+    for (const path of [
+      'codex-cli/app-server.ts', 'codex-cli/bindings.ts', 'codex-cli/execution.ts',
+      'codex-cli/index.ts', 'codex-cli/models.ts', 'prokop/execution.ts', 'prokop/index.ts',
+    ]) expect(paths).toContain(path);
+    const bootstrap = files.find(file => file.path === resolve(bootstrapDir, 'application.ts'))!;
+    const imports = parseImports(bootstrap.sourceText, bootstrap.path).map(imp => imp.specifier);
+    expect(imports).toContain('@/harnesses/prokop');
+    expect(imports).toContain('@/harnesses/codex-cli');
+    expect(imports.some(specifier => specifier.startsWith('@/infrastructure/codex/'))).toBe(false);
+    const dispatch = files.find(file => file.path === resolve(applicationDir, 'sessions/harness-execution.ts'))!;
+    expect(parseImports(dispatch.sourceText, dispatch.path).some(imp => imp.specifier.startsWith('@/harnesses/'))).toBe(false);
+    for (const file of named) {
+      const path = relative(harnessesDir, file.path);
+      const specifiers = parseImports(file.sourceText, file.path).map(imp => imp.specifier);
+      if (path.startsWith('codex-cli/')) {
+        expect(specifiers.some(specifier => specifier.startsWith('@capekai/core'))).toBe(false);
+        expect(specifiers.some(specifier => specifier.startsWith('@/infrastructure/providers/'))).toBe(false);
+      }
+      if (path.startsWith('prokop/')) {
+        expect(specifiers.some(specifier => specifier.startsWith('@/infrastructure/codex/'))).toBe(false);
+      }
+    }
   });
 
   test('Codex account storage and runtime preserve host layer boundaries', () => {

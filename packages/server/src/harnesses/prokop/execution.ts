@@ -17,8 +17,8 @@ import type {
   SessionExecutionPort,
 } from '@/application/ports/execution';
 import type { SessionWirePorts } from '@/application/ports/delivery';
-import { createJean2RuntimeContext } from './events';
-import { withJean2ComposedScopeSync, withJean2ExecutionScope } from './execution-scope';
+import { createJean2RuntimeContext } from '@/adapters/capek/events';
+import { withJean2ComposedScopeSync, withJean2ExecutionScope } from '@/adapters/capek/execution-scope';
 
 export interface Jean2SessionExecutionDependencies {
   handleChat?: typeof handleCapekChat;
@@ -49,8 +49,8 @@ function runtimeContext<Origin>(
  *
  * Fulfills the application execution port with the exact current Capek
  * execution identities. Every stateful execution entry enters the composed
- * Jean2 agent scope for its full awaited duration. Interrupt methods remain
- * direct because interruptManager has no AsyncLocalStorage state.
+ * Jean2 agent scope for its full awaited duration. Wire-side interruption
+ * enters the same composed scope to settle pending asks.
  */
 export function createJean2SessionExecution(
   dependencies: Jean2SessionExecutionDependencies = {},

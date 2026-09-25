@@ -2,6 +2,7 @@ import type { SessionWirePorts } from '../ports/delivery';
 import type { ControllerGatePort } from '../ports/control';
 import type { SessionRepositoryPort } from '../ports/session';
 import { sendGateRejection } from './chat';
+import { prokopFeatureError } from './harness-policy';
 
 export interface SessionQueueDeps<Origin> {
   repository: SessionRepositoryPort;
@@ -28,9 +29,9 @@ export function createSessionQueueApplication<Origin>(
         wire.delivery.send(origin, { type: 'error', code: 'not_found', message: 'Session not found' });
         return;
       }
-      if (session.harness === 'codex-cli') {
-        wire.delivery.send(origin, { type: 'error', code: 'invalid_session',
-          message: 'Message queue is not supported for Codex CLI sessions', sessionId });
+      const featureError = prokopFeatureError(session.harness, 'queue');
+      if (featureError) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: featureError, sessionId });
         return;
       }
       const gate = deps.gate.checkControllerGate(sessionId, 'queue.add', origin);

@@ -3,10 +3,10 @@ import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
 import { createSession, getSession } from '@/infrastructure/sqlite/session-store';
 import { listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
-import { getCodexBinding } from '@/infrastructure/codex/bindings';
-import { saveCodexModelSelection } from '@/infrastructure/codex/models';
-import { createCodexExecution } from '@/infrastructure/codex/execution';
-import type { CodexConnection } from '@/infrastructure/codex/app-server';
+import { getCodexBinding } from '@/harnesses/codex-cli/bindings';
+import { saveCodexModelSelection } from '@/harnesses/codex-cli/models';
+import { createCodexExecution } from '@/harnesses/codex-cli/execution';
+import type { CodexConnection } from '@/harnesses/codex-cli/app-server';
 import type { ServerMessage } from '@prokopai/sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { CodexAppServer, type CodexConnection } from '@/infrastructure/codex/app-server';
+import { CodexAppServer, type CodexConnection } from '@/harnesses/codex-cli/app-server';
 
 function fixture() {
   let controller!: ReadableStreamDefaultController<Uint8Array>;

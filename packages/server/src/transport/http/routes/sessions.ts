@@ -39,10 +39,7 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
     validate('json', createSessionSchema),
     async (c) => {
       const body = c.req.valid('json');
-      if (body.harness === 'codex-cli' && !application.codexAvailable()) {
-        throw new BadRequestError('Codex CLI 0.156.x is unavailable on this host');
-      }
-      const session = application.createSession({
+      const input = {
         id: body.id,
         workspaceId: body.workspaceId,
         workspaceRootId: body.workspaceRootId,
@@ -50,10 +47,11 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
         title: body.title,
         harness: body.harness,
         metadata: body.metadata,
-      });
-      if (!session) {
-        throw new BadRequestError('Selected worktree is not available for this workspace');
-      }
+      };
+      const creationError = application.createSessionError(input);
+      if (creationError) throw new BadRequestError(creationError);
+      const session = application.createSession(input);
+      if (!session) throw new BadRequestError('Session could not be created');
       return c.json({ session }, 201);
     },
   );

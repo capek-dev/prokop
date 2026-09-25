@@ -22,6 +22,7 @@ import {
   projectMessagesForClient,
   type ToolDebugData,
 } from './tool-debug';
+import { checkHarnessCreate } from './harness-policy';
 
 export interface SessionHttpCreateInput {
   id?: string;
@@ -58,6 +59,7 @@ export interface CodexModelPort {
 
 export interface SessionHttpApplication {
   codexAvailable(): boolean;
+  createSessionError(input: SessionHttpCreateInput): string | null;
   codexModels(sessionId: string): Promise<{ models: CodexModel[]; selection: CodexModelSelection | null }> | null;
   setCodexModel(sessionId: string, selection: CodexModelSelection): Promise<'ok' | 'not_found' | 'invalid' | 'active'>;
   listSessions(status?: SessionStatus): Session[];
@@ -133,22 +135,19 @@ export function createSessionHttpApplication(
       return repository.listSessions(status);
     },
 
+    createSessionError(input) {
+      const decision = checkHarnessCreate(input, { codexAvailable, codexWorkspaceAvailable, workspaceRoots });
+      return decision.ok ? null : decision.message;
+    },
     createSession(input) {
-      if (input.harness !== undefined && input.harness !== 'prokop'
-        && (input.harness !== 'codex-cli' || !codexAvailable())) return null;
+      const decision = checkHarnessCreate(input, { codexAvailable, codexWorkspaceAvailable, workspaceRoots });
+      if (!decision.ok) return null;
       const workspaceId = input.workspaceId || '';
-      if (input.harness === 'codex-cli' && (input.preconfigId || !codexWorkspaceAvailable(workspaceId))) return null;
-      if (
-        input.workspaceRootId
-        && !workspaceRoots?.isAvailable(workspaceId, input.workspaceRootId)
-      ) {
-        return null;
-      }
       const session = repository.createSession({
         id: input.id || crypto.randomUUID(),
         workspaceId,
         workspaceRootId: input.workspaceRootId ?? null,
-        harness: input.harness ?? 'prokop',
+        harness: decision.harness,
         preconfigId: input.preconfigId || null,
         title: input.title || 'New Session',
         status: 'active',

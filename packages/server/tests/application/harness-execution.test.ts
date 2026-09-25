@@ -1,0 +1,105 @@
+import { expect, test } from 'bun:test';
+import type { Session } from '@prokopai/sdk';
+import type { SessionExecutionPort } from '@/application/ports/execution';
+import type { SessionWirePorts } from '@/application/ports/delivery';
+import { createHarnessExecution, type HarnessRegistration } from '@/application/sessions/harness-execution';
+
+function fixture() {
+  const calls: string[] = [];
+  const messages: unknown[] = [];
+  const wire = { delivery: { send: (_origin: string, message: unknown) => { messages.push(message); } } } as unknown as SessionWirePorts<string>;
+  const sessions: Record<string, Session> = {
+    prokop: { id: 'prokop', harness: 'prokop' } as Session,
+    legacy: { id: 'legacy' } as Session,
+    codex: { id: 'codex', harness: 'codex-cli' } as Session,
+    unknown: { id: 'unknown', harness: 'other' } as unknown as Session,
+    malformed: { id: 'malformed', harness: null } as unknown as Session,
+  };
+  const makeExecutor = (name: string): SessionExecutionPort => ({
+    sendMessage: async () => { calls.push(`${name}:send`); },
+    interruptSession: async id => {
+      calls.push(`${name}:interrupt`);
+      return { sessionId: id, success: true, cascadedTo: [], interruptedTools: [], rejectedAsks: [] };
+    },
+    isSessionActive: () => { calls.push(`${name}:active`); return true; },
+    editMessage: async () => { calls.push(`${name}:edit`); },
+    regenerateTitle: async () => { calls.push(`${name}:title`); },
+    compact: async () => { calls.push(`${name}:compact`); return { ok: false, error: 'test' }; },
+    revert: async () => { calls.push(`${name}:revert`); return { revertedTo: { messageId: null, messageCount: 0 }, removed: { messageIds: [], partCount: 0 } }; },
+    fork: async () => { calls.push(`${name}:fork`); return { forkedSession: sessions.prokop, messages: [] }; },
+  });
+  const prokop = makeExecutor('prokop');
+  const codexBase = makeExecutor('codex');
+  const codex: HarnessRegistration = {
+    execution: {
+      sendMessage: codexBase.sendMessage,
+      interruptSession: codexBase.interruptSession,
+      isSessionActive: codexBase.isSessionActive,
+    },
+    unsupportedMessages: {
+      editMessage: 'Editing is not supported for Codex CLI sessions',
+      regenerateTitle: 'Title generation is not supported for Codex CLI sessions',
+      compact: 'Compaction is not supported for Codex CLI sessions',
+      revert: 'Revert is not supported for Codex CLI sessions',
+      fork: 'Fork is not supported for Codex CLI sessions',
+    },
+  };
+  const execution = createHarnessExecution({ getSession: id => sessions[id] ?? null }, {
+    prokop: { execution: prokop }, 'codex-cli': codex,
+  });
+  return { execution, calls, messages, wire };
+}
+
+test('dispatches each operation by stored harness, including legacy Prokop identity', async () => {
+  const { execution, calls, wire } = fixture();
+  for (const id of ['prokop', 'legacy', 'codex']) {
+    await execution.sendMessage(wire, 'origin', id, 'hello');
+    await execution.interruptSession(id);
+    expect(execution.isSessionActive(id)).toBe(true);
+  }
+  await execution.editMessage(wire, 'origin', { sessionId: 'legacy', messageId: 'm', content: 'edit' });
+  await execution.regenerateTitle(wire, 'origin', 'prokop');
+  await execution.compact('legacy', 'manual');
+  await execution.revert({ sessionId: 'prokop', targetMessageId: 'm' });
+  await execution.fork({ sessionId: 'prokop', targetMessageId: 'm' });
+  expect(calls).toEqual([
+    'prokop:send', 'prokop:interrupt', 'prokop:active',
+    'prokop:send', 'prokop:interrupt', 'prokop:active',
+    'codex:send', 'codex:interrupt', 'codex:active',
+    'prokop:edit', 'prokop:title', 'prokop:compact', 'prokop:revert', 'prokop:fork',
+  ]);
+});
+
+test('unsupported Codex operations preserve refusal shapes and never reach Prokop', async () => {
+  const { execution, calls, wire, messages } = fixture();
+  await execution.editMessage(wire, 'origin', { sessionId: 'codex', messageId: 'm', content: 'edit' });
+  await execution.regenerateTitle(wire, 'origin', 'codex');
+  expect(messages).toEqual([
+    { type: 'error', code: 'invalid_session', sessionId: 'codex', message: 'Editing is not supported for Codex CLI sessions' },
+    { type: 'error', code: 'invalid_session', sessionId: 'codex', message: 'Title generation is not supported for Codex CLI sessions' },
+  ]);
+  expect(await execution.compact('codex', 'manual')).toEqual({ ok: false, skipped: true, error: 'Compaction is not supported for Codex CLI sessions' });
+  expect(execution.revert({ sessionId: 'codex', targetMessageId: 'm' })).rejects.toThrow('Revert is not supported for Codex CLI sessions');
+  expect(execution.fork({ sessionId: 'codex', targetMessageId: 'm' })).rejects.toThrow('Fork is not supported for Codex CLI sessions');
+  expect(calls).toEqual([]);
+});
+
+test('missing or unknown owners fail closed for every execution route', async () => {
+  const { execution, calls, wire, messages } = fixture();
+  for (const id of ['missing', 'unknown', 'malformed']) {
+    await execution.sendMessage(wire, 'origin', id, 'hello');
+    expect(await execution.interruptSession(id)).toMatchObject({ success: false, sessionId: id });
+    expect(execution.isSessionActive(id)).toBe(false);
+    await execution.editMessage(wire, 'origin', { sessionId: id, messageId: 'm', content: 'edit' });
+    await execution.regenerateTitle(wire, 'origin', id);
+    expect(await execution.compact(id, 'manual')).toMatchObject({ ok: false, skipped: true });
+    expect(execution.revert({ sessionId: id, targetMessageId: 'm' })).rejects.toThrow();
+    expect(execution.fork({ sessionId: id, targetMessageId: 'm' })).rejects.toThrow();
+  }
+  expect(messages).toEqual([
+    ...Array.from({ length: 3 }, () => expect.objectContaining({ code: 'invalid_session', message: 'Session not found', sessionId: 'missing' })),
+    ...Array.from({ length: 3 }, () => expect.objectContaining({ code: 'invalid_session', message: 'Unknown session harness', sessionId: 'unknown' })),
+    ...Array.from({ length: 3 }, () => expect.objectContaining({ code: 'invalid_session', message: 'Unknown session harness', sessionId: 'malformed' })),
+  ]);
+  expect(calls).toEqual([]);
+});

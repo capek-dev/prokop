@@ -39,5 +39,4 @@ export {
   jean2WorkspacePolicyOptions,
 } from './workspace-policy';
 export { createJean2AskAuthorityPort } from './ask-authority';
-export { createJean2SessionExecution } from './execution';
 export { createJean2ProviderRegistryPort } from './provider-accounts';

@@ -5,7 +5,7 @@ import {
   createInMemoryStorageBundle,
 } from '@capekai/core/storage';
 import type { AskRequestMessage, AskTimedOutMessage } from '@prokopai/sdk';
-import { createJean2SessionExecution } from '@/adapters/capek/execution';
+import { createJean2SessionExecution } from '@/harnesses/prokop/execution';
 import { configureJean2Bindings } from '@/adapters/capek/bindings';
 import { configureJean2RuntimeConfiguration } from '@/adapters/capek/runtime-configuration';
 import { configureJean2Storage } from '@/adapters/capek/storage';

@@ -545,6 +545,18 @@ describe('application session use cases', () => {
       expect(spy.sent).toEqual([expect.objectContaining({ type: 'session.action_rejected', action: 'session.interrupt' })]);
     });
 
+    test('interrupt refuses malformed session owners without broadcasting', async () => {
+      const spy = makeSpy();
+      const app = createSessionTranscriptApplication({
+        repository: makeRepository({ getSession: () => makeSession({ harness: 'other' as Session['harness'] }) }),
+        execution: makeExecution({ interruptSession: async () => { throw new Error('must not run'); } }),
+        gate: noGate(),
+      });
+      await app.interrupt(makeWire(spy), origin, { sessionId: 'sess-1' });
+      expect(spy.sent).toEqual([{ type: 'error', code: 'invalid_session', message: 'Unknown session harness', sessionId: 'sess-1' }]);
+      expect(spy.broadcastToSession).toEqual([]);
+    });
+
     test('interrupt maps thrown errors to interrupt_error without a sessionId', async () => {
       const execution = makeExecution({ interruptSession: async () => { throw new Error('boom'); } });
       const app = createSessionTranscriptApplication({ repository: makeRepository(), execution, gate: noGate() });
@@ -662,7 +674,7 @@ describe('application session use cases', () => {
     test('rejects Codex and unknown harnesses before creating a session', async () => {
       const repository = makeRepository({ createSession: () => { throw new Error('must not create'); } });
       const app = createSessionLifecycleApplication({ ...makeDeps({ repository }) });
-      for (const harness of ['codex-cli', 'invalid'] as const) {
+      for (const harness of ['codex-cli', 'invalid', null, '__proto__'] as const) {
         const spy = makeSpy();
         await app.create(makeWire(spy), origin, { harness: harness as 'codex-cli', workspaceId: 'ws-1' });
         expect(spy.sent).toEqual([expect.objectContaining({ type: 'error', code: 'invalid_session' })]);
@@ -843,6 +855,21 @@ describe('application session use cases', () => {
           authority: { visibilityScope: 'controller_only', resolutionMode: 'controller_only' },
         }],
       });
+    });
+
+    test('resume refuses unknown owners before attaching or clearing running state', async () => {
+      const spy = makeSpy();
+      const app = createSessionLifecycleApplication(makeDeps({
+        repository: makeRepository({
+          getSession: () => makeSession({ harness: 'other' as Session['harness'], runningAt: '2025-01-01T00:00:00Z' }),
+          reconcileCompaction: async () => { throw new Error('must not reconcile'); },
+          updateSession: () => { throw new Error('must not clear'); },
+        }),
+        execution: makeExecution({ isSessionActive: () => { throw new Error('must not query'); } }),
+      }));
+      await app.resume(makeWire(spy), origin, 'sess-1');
+      expect(spy.sent).toEqual([{ type: 'error', code: 'invalid_session', message: 'Unknown session harness', sessionId: 'sess-1' }]);
+      expect(spy.attached).toEqual([]);
     });
 
     test('Codex sessions reject Prokop agent and model selection', async () => {

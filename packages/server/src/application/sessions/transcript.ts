@@ -5,6 +5,7 @@ import type { SessionRepositoryPort } from '../ports/session';
 import type { ToolCatalogPort } from '../ports/tool-catalog';
 import type { WorktreeAttachmentRefreshPort } from '../ports/worktree';
 import { sendGateRejection } from './chat';
+import { unknownHarnessError } from './harness-policy';
 import { projectMessagesForClient } from './tool-debug';
 
 export interface SessionTranscriptDeps<Origin> {
@@ -163,6 +164,12 @@ export function createSessionTranscriptApplication<Origin>(
       const gate = deps.gate.checkControllerGate(sessionId, 'session.interrupt', origin);
       if (gate) {
         sendGateRejection(wire, origin, gate);
+        return;
+      }
+
+      const harnessError = unknownHarnessError(session.harness);
+      if (harnessError) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: harnessError, sessionId });
         return;
       }
 
