@@ -10,6 +10,7 @@ import { getDatabase } from '@/infrastructure/sqlite/database';
 import { CodexAppServer, CodexRequestError, codexObject, spawnCodexAppServer, type CodexConnection, type CodexNotification } from './app-server';
 import { bindCodexThread, getCodexBinding, markCodexTurnPending, markCodexTurnCompleted, type CodexBinding } from './bindings';
 import { getCodexModelSelection } from './models';
+import { codexWorkspaceMemory } from './workspace-memory';
 
 interface ActiveTurn {
   client: CodexAppServer;
@@ -280,13 +281,19 @@ export function createCodexExecution(deps: CodexExecutionDependencies = defaultD
         phase = 'app-server initialization';
         client = new CodexAppServer(deps.connect(), notify);
         await client.initialize();
+        phase = 'workspace memory';
+        const workspace = getWorkspace(session.workspaceId);
+        if (!workspace) throw new Error('Workspace is unavailable');
+        const memory = await codexWorkspaceMemory(workspace, root);
         phase = binding ? 'thread resume' : 'thread creation';
         const selection = getCodexModelSelection(sessionId);
         const threadResponse = codexObject(await client.request(binding ? 'thread/resume' : 'thread/start',
           binding ? { threadId: binding.threadId, cwd: root, approvalPolicy: 'on-request', sandbox: 'workspace-write',
-            ...(selection ? { model: selection.model } : {}) } : {
+            ...(selection ? { model: selection.model } : {}),
+            ...(memory ? { developerInstructions: memory } : {}) } : {
             cwd: root, approvalPolicy: 'on-request', sandbox: 'workspace-write',
             ...(selection ? { model: selection.model } : {}),
+            ...(memory ? { developerInstructions: memory } : {}),
           }));
         const threadId = id(codexObject(threadResponse?.thread)?.id);
         if (!threadId || (binding && binding.threadId !== threadId)) throw new Error('Invalid Codex thread');

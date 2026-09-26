@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
 import { createSession, getSession } from '@/infrastructure/sqlite/session-store';
+import { updateWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
 import { getCodexBinding } from '@/harnesses/codex-cli/bindings';
 import { saveCodexModelSelection } from '@/harnesses/codex-cli/models';
@@ -116,6 +120,84 @@ test('Codex turn applies selected model and effort, streams, and resumes its thr
   processes[1]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
   processes[1]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
   await second;
+});
+
+test('workspace memory is opt-in and refreshed in Codex thread instructions on resume', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'codex-memory-'));
+  try {
+    updateWorkspace('ws', { path: root });
+    create();
+    const directory = join(root, '.prokopai');
+    mkdirSync(directory);
+    writeFileSync(join(directory, 'USER.md'), '- prefer focused tests');
+    writeFileSync(join(directory, 'MEMORY.md'), '- first fact');
+    const processes: ReturnType<typeof fakeCodex>[] = [];
+    const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+      const fake = fakeCodex(); processes.push(fake); return fake.connection;
+    } });
+    const messages: ServerMessage[] = [];
+    const first = execution.sendMessage(wire(messages), 'origin', 's', 'hello');
+    await waitFor(() => processes[0]?.sent.some(message => message.method === 'turn/start') ?? false);
+    expect((processes[0]!.sent.find(message => message.method === 'thread/start')?.params as Record<string, unknown>)
+      .developerInstructions).toBeUndefined();
+    processes[0]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+    processes[0]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+    await first;
+
+    updateWorkspace('ws', { settings: { memory: { enabled: true, permissionRisk: 'low' } } });
+    const second = execution.sendMessage(wire(messages), 'origin', 's', 'again');
+    await waitFor(() => processes[1]?.sent.some(message => message.method === 'turn/start') ?? false);
+    const instructions = (processes[1]!.sent.find(message => message.method === 'thread/resume')?.params as Record<string, unknown>)
+      .developerInstructions as string;
+    expect(instructions).toContain('<user_memory path="USER.md"');
+    expect(instructions).toContain('- prefer focused tests');
+    expect(instructions).toContain('<workspace_memory path="MEMORY.md"');
+    expect(instructions).toContain('- first fact');
+    expect(instructions).not.toContain('preconfig');
+    expect((processes[1]!.sent.find(message => message.method === 'turn/start')?.params as Record<string, unknown>)
+      .developerInstructions).toBeUndefined();
+    processes[1]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+    processes[1]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+    await second;
+
+    writeFileSync(join(directory, 'MEMORY.md'), '- changed fact');
+    const third = execution.sendMessage(wire(messages), 'origin', 's', 'third');
+    await waitFor(() => processes[2]?.sent.some(message => message.method === 'turn/start') ?? false);
+    const refreshed = (processes[2]!.sent.find(message => message.method === 'thread/resume')?.params as Record<string, unknown>)
+      .developerInstructions as string;
+    expect(refreshed).toContain('- changed fact');
+    expect(refreshed).not.toContain('- first fact');
+    processes[2]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+    processes[2]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+    await third;
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('enabled workspace memory is sent on thread creation and oversized files are omitted', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'codex-memory-'));
+  try {
+    updateWorkspace('ws', { path: root, settings: { memory: { enabled: true, permissionRisk: 'low' } } });
+    create();
+    const directory = join(root, '.prokopai');
+    mkdirSync(directory);
+    writeFileSync(join(directory, 'USER.md'), '- use simple examples');
+    writeFileSync(join(directory, 'MEMORY.md'), 'x'.repeat(2501));
+    const fake = fakeCodex();
+    const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+    const pending = execution.sendMessage(wire([]), 'origin', 's', 'hello');
+    await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+    const instructions = (fake.sent.find(message => message.method === 'thread/start')?.params as Record<string, unknown>)
+      .developerInstructions as string;
+    expect(instructions).toContain('- use simple examples');
+    expect(instructions).not.toContain('<workspace_memory');
+    fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+    fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+    await pending;
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('a rejected thread request reports its stage without leaking upstream details', async () => {
