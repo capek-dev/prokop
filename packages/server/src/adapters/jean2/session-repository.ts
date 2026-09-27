@@ -47,10 +47,12 @@ import type { AgentsApplication } from '@/application/agents';
 import { markManualSessionTitle } from '@/infrastructure/session-title';
 import {
   cleanupAllPendingAsks,
+  expirePermissionRequest,
   listAllPendingAsks,
   listPendingRequestsByRootSession,
 } from '@/infrastructure/sqlite/pending-asks';
 import { existsSync, readFileSync } from 'fs';
+import { getCodexApprovalPort } from '@/application/ports/codex-approval';
 import type {
   AttachmentRecord,
   GroupedSessionPage,
@@ -330,13 +332,22 @@ export function createJean2SessionRepository(
   };
 }
 
+function livePendingAsks(records: ReturnType<typeof listAllPendingAsks>): ReturnType<typeof listAllPendingAsks> {
+  return records.filter(record => {
+    if (!record.toolCallId.startsWith('codex-approval:') || record.status !== 'pending') return true;
+    if (getCodexApprovalPort()?.hasLiveRequest(record.requestId)) return true;
+    expirePermissionRequest(record.id);
+    return false;
+  });
+}
+
 export function createJean2PendingAskPort(): PendingAskPort {
   return {
     listAllPendingAsks() {
-      return listAllPendingAsks();
+      return livePendingAsks(listAllPendingAsks());
     },
     listPendingRequestsByRootSession(rootSessionId: string) {
-      return listPendingRequestsByRootSession(rootSessionId);
+      return livePendingAsks(listPendingRequestsByRootSession(rootSessionId));
     },
     cleanupAllPendingAsks(maxAgeMs?: number): number {
       return cleanupAllPendingAsks(maxAgeMs);

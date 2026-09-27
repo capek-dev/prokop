@@ -154,6 +154,11 @@ export function AutoApproveSelector({
       </TooltipProvider>
       <DropdownMenuContent align="end" sideOffset={4} className="w-56">
         <DropdownMenuLabel>{config.label}</DropdownMenuLabel>
+        {session?.harness === 'codex-cli' && (
+          <div className="px-2 pb-1 text-xs text-muted-foreground">
+            Applies to Codex shell and patch asks. Critical native approvals still ask.
+          </div>
+        )}
         <DropdownMenuSeparator />
         {SEVERITY_ORDER.map((level) => {
           const levelConfig = SEVERITY_CONFIGS[level];

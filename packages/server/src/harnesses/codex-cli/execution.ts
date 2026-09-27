@@ -11,6 +11,10 @@ import { CodexAppServer, CodexRequestError, codexObject, spawnCodexAppServer, ty
 import { bindCodexThread, getCodexBinding, markCodexTurnPending, markCodexTurnCompleted, type CodexBinding } from './bindings';
 import { getCodexModelSelection } from './models';
 import { codexWorkspaceMemory } from './workspace-memory';
+import { codexApprovals } from './approvals';
+import { CodexToolItems } from './tool-items';
+import { createPretoolChannel, verifyPretoolHook, type PretoolChannel } from './pretool-hook';
+import { classifyCodexHook } from './hook-policy';
 
 interface ActiveTurn {
   client: CodexAppServer;
@@ -22,6 +26,7 @@ interface ActiveTurn {
 export interface CodexExecutionDependencies {
   connect(): CodexConnection;
   version(): string;
+  prepareHook?: typeof createPretoolChannel;
 }
 
 export function codexCliVersion(): string {
@@ -45,6 +50,7 @@ export function codexCliAvailable(): boolean {
 const defaultDependencies: CodexExecutionDependencies = {
   connect: spawnCodexAppServer,
   version: codexCliVersion,
+  prepareHook: createPretoolChannel,
 };
 
 function id(value: unknown): string | null {
@@ -139,6 +145,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies = defaultD
       const run = active.get(sessionId);
       if (!run) return { sessionId, success: false, cascadedTo: [], interruptedTools: [], rejectedAsks: [] };
       if (run.turnId) {
+        codexApprovals.cancelSession(sessionId);
         await run.client.request('turn/interrupt', { threadId: run.threadId, turnId: run.turnId });
       } else {
         // The turn may already be running before turn/start responds. Closing
@@ -166,8 +173,10 @@ export function createCodexExecution(deps: CodexExecutionDependencies = defaultD
       }
       starting.add(sessionId);
       let client: CodexAppServer | undefined;
+      let hookChannel: PretoolChannel | undefined;
       let assistant: AssistantMessage | undefined;
       let run: ActiveTurn | undefined;
+      let toolItems: CodexToolItems | undefined;
       let phase = 'workspace validation';
       try {
         const root = workspaceRoot(session);
@@ -225,6 +234,13 @@ export function createCodexExecution(deps: CodexExecutionDependencies = defaultD
             return;
           }
           if (!run.turnId || eventTurnId !== run.turnId || completed) return;
+          if (event.method === 'item/started' || event.method === 'item/completed') {
+            if (assistant) {
+              toolItems ??= new CodexToolItems(sessionId, assistant.id, run.turnId, wire.delivery);
+              if (event.method === 'item/started') toolItems.started(params.item);
+              else toolItems.completed(params.item);
+            }
+          }
           if (event.method === 'model/rerouted') {
             reportModel(params.toModel);
             return;
@@ -262,6 +278,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies = defaultD
             }
           } else if (event.method === 'turn/completed') {
             completed = true;
+            toolItems?.finish();
             const status = turn?.status;
             if (status !== 'completed' && status !== 'interrupted' && status !== 'failed') {
               rejectDone(new Error('Invalid Codex turn status'));
@@ -278,9 +295,26 @@ export function createCodexExecution(deps: CodexExecutionDependencies = defaultD
             }
           }
         };
+        phase = 'Codex permission hook';
+        hookChannel = await deps.prepareHook?.(async call => {
+          if (!run?.turnId || completed || call.session_id !== run.threadId || call.turn_id !== run.turnId
+            || call.cwd !== root) return false;
+          const ask = classifyCodexHook(call, root);
+          if (ask === undefined) return false;
+          if (ask === null) return true;
+          const input = codexObject(call.tool_input);
+          return codexApprovals.requestHook({ ...ask, allowedScopes: ['once'] },
+            call.tool_name as 'Bash' | 'apply_patch', input?.command as string, call.tool_use_id,
+            run.threadId, run.turnId, sessionId, root, session.workspaceId, wire.delivery);
+        });
         phase = 'app-server initialization';
-        client = new CodexAppServer(deps.connect(), notify);
+        client = new CodexAppServer(hookChannel ? hookChannel.connect() : deps.connect(), notify, (method, params) => {
+          if (!run?.turnId || completed) return Promise.resolve({ decision: 'decline' });
+          return codexApprovals.request(method, params, run.threadId, run.turnId,
+            sessionId, root, session.workspaceId, wire.delivery);
+        });
         await client.initialize();
+        if (hookChannel) await verifyPretoolHook(client);
         phase = 'workspace memory';
         const workspace = getWorkspace(session.workspaceId);
         if (!workspace) throw new Error('Workspace is unavailable');
@@ -327,9 +361,12 @@ export function createCodexExecution(deps: CodexExecutionDependencies = defaultD
             ? `Codex failed during ${phase}${rpcCode}. The turn may have run; it will not be resent until reconciled.`
             : `Codex failed during ${phase}${rpcCode}. Check the host CLI setup.`, sessionId });
       } finally {
+        codexApprovals.cancelSession(sessionId);
+        toolItems?.finish();
         starting.delete(sessionId);
         if (run) active.delete(sessionId);
         if (client) await client.close();
+        if (hookChannel) await hookChannel.close();
       }
     },
   };

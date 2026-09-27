@@ -7,7 +7,9 @@ import { useSessionStore } from '@/stores/sessionStore';
 const RISK_ORDER: PermissionRiskLevel[] = ['none', 'low', 'medium', 'high', 'critical'];
 
 function isAtOrBelow(risk: PermissionRiskLevel, max: PermissionRiskLevel): boolean {
-  return RISK_ORDER.indexOf(risk) <= RISK_ORDER.indexOf(max);
+  const riskIndex = RISK_ORDER.indexOf(risk);
+  const maxIndex = RISK_ORDER.indexOf(max);
+  return riskIndex !== -1 && maxIndex !== -1 && riskIndex <= maxIndex;
 }
 
 function getSessionAutoApproveSeverity(sessionId: string): PermissionRiskLevel | 'off' | null {
@@ -21,6 +23,11 @@ function createPermissionHandler(): AskHandler {
     const isPermissionAsk = ('target' in ask && ask.target === 'permission') || ask.type === 'permission';
 
     if (!isPermissionAsk) return undefined;
+
+    // Codex checks the current persisted session ceiling before sending an ask.
+    // A client with stale session state must not approve a Codex request.
+    const session = useSessionStore.getState().sessions.find((s) => s.id === request.sessionId);
+    if (session?.harness === 'codex-cli' || request.toolName.startsWith('codex-cli:')) return undefined;
 
     // Check the per-session auto-approve severity setting
     const maxSeverity = getSessionAutoApproveSeverity(request.sessionId);

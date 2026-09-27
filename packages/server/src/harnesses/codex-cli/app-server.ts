@@ -22,9 +22,9 @@ function record(value: unknown): Record<string, unknown> | null {
     ? value as Record<string, unknown> : null;
 }
 
-export function spawnCodexAppServer(): CodexConnection {
-  const process = Bun.spawn(['codex', 'app-server', '--stdio'], {
-    stdin: 'pipe', stdout: 'pipe', stderr: 'ignore',
+export function spawnCodexAppServer(args: string[] = [], env?: Record<string, string | undefined>): CodexConnection {
+  const process = Bun.spawn(['codex', 'app-server', '--stdio', ...args], {
+    stdin: 'pipe', stdout: 'pipe', stderr: 'ignore', ...(env ? { env } : {}),
   });
   if (!process.stdin || !process.stdout || typeof process.stdin === 'number'
     || typeof process.stdout === 'number') {
@@ -61,6 +61,7 @@ export class CodexAppServer {
   constructor(
     private readonly io: CodexConnection,
     private readonly onNotification: (notification: CodexNotification) => void,
+    private readonly onApproval?: (method: string, params: unknown) => Promise<{ decision: 'accept' | 'decline' }>,
   ) {
     this.disconnected = new Promise<never>((_resolve, reject) => { this.rejectDisconnected = reject; });
     void this.disconnected.catch(() => {});
@@ -161,14 +162,15 @@ export class CodexAppServer {
     if (!message) throw new Error('Invalid Codex message');
     const id = message.id;
     if ((typeof id === 'number' || typeof id === 'string') && typeof message.method === 'string') {
-      // User-facing approval handling is not wired yet. Deny known requests
-      // explicitly, including permission grants and MCP elicitation.
+      if (message.method === 'item/commandExecution/requestApproval'
+        || message.method === 'item/fileChange/requestApproval') {
+        void (this.onApproval?.(message.method, message.params) ?? Promise.resolve({ decision: 'decline' as const }))
+          .catch(() => ({ decision: 'decline' as const }))
+          .then(result => { if (!this.closed) void this.write({ id, result }); });
+        return;
+      }
       let result: unknown;
       switch (message.method) {
-        case 'item/commandExecution/requestApproval':
-        case 'item/fileChange/requestApproval':
-          result = { decision: 'decline' };
-          break;
         case 'item/permissions/requestApproval':
           result = { permissions: {}, scope: 'turn' };
           break;

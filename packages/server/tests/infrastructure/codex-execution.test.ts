@@ -4,14 +4,19 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
-import { createSession, getSession } from '@/infrastructure/sqlite/session-store';
+import { createSession, getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { updateWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
 import { getCodexBinding } from '@/harnesses/codex-cli/bindings';
+import { getDatabase } from '@/infrastructure/sqlite/database';
+import { CodexApprovals, canAutoApproveCodexHook, codexApprovals } from '@/harnesses/codex-cli/approvals';
+import { getPermissionRequestByRequestId, listPendingAsksBySession } from '@/infrastructure/sqlite/pending-asks';
 import { saveCodexModelSelection } from '@/harnesses/codex-cli/models';
 import { createCodexExecution } from '@/harnesses/codex-cli/execution';
+import { hookCommand } from '@/harnesses/codex-cli/pretool-hook';
+import type { CodexHookCall } from '@/harnesses/codex-cli/hook-policy';
 import type { CodexConnection } from '@/harnesses/codex-cli/app-server';
-import type { ServerMessage } from '@prokopai/sdk';
+import type { PermissionAsk, ServerMessage } from '@prokopai/sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 
 beforeEach(() => { setupTestDatabase(); seedWorkspace({ id: 'ws', path: process.cwd() }); });
@@ -22,7 +27,7 @@ function create(harness: 'prokop' | 'codex-cli' = 'codex-cli'): void {
     preconfigId: null, metadata: null, parentId: null, agentName: null, harness });
 }
 
-function fakeCodex(readThread?: () => unknown, rejectMethod?: string): { connection: CodexConnection; sent: Record<string, unknown>[]; send(message: unknown): void } {
+function fakeCodex(readThread?: () => unknown, rejectMethod?: string, trustedHook = false): { connection: CodexConnection; sent: Record<string, unknown>[]; send(message: unknown): void } {
   let controller!: ReadableStreamDefaultController<Uint8Array>;
   const sent: Record<string, unknown>[] = [];
   const connection: CodexConnection = {
@@ -35,6 +40,12 @@ function fakeCodex(readThread?: () => unknown, rejectMethod?: string): { connect
         return bytes.length;
       }
       if (message.method === 'initialize') queueMicrotask(() => send({ id: message.id, result: {} }));
+      if (message.method === 'hooks/list' && trustedHook) queueMicrotask(() => send({ id: message.id, result: {
+        data: [{ hooks: [{ key: '/<session-flags>/config.toml:pre_tool_use:0:0',
+          currentHash: `sha256:${'a'.repeat(64)}`, eventName: 'preToolUse', source: 'sessionFlags',
+          enabled: true, trustStatus: 'trusted', matcher: '^(Bash|apply_patch)$', command: hookCommand() }],
+        warnings: [], errors: [] }],
+      } }));
       if (message.method === 'thread/start' || message.method === 'thread/resume') {
         queueMicrotask(() => send({ id: message.id, result: { thread: { id: 'thread-1' }, model: 'gpt-5-codex' } }));
       }
@@ -198,6 +209,352 @@ test('enabled workspace memory is sent on thread creation and oversized files ar
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('Codex tool items appear in the transcript and settle on completion or process loss', async () => {
+  create();
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const turn = execution.sendMessage(wire(messages), 'origin', 's', 'run tools');
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  const command = { type: 'commandExecution', id: 'cmd-1', command: 'git status', cwd: process.cwd(), status: 'inProgress' };
+  fake.send({ method: 'item/started', params: { threadId: 'other', turnId: 'turn-1', item: command } });
+  fake.send({ method: 'item/started', params: { threadId: 'thread-1', turnId: 'turn-1', item: command } });
+  fake.send({ method: 'item/started', params: { threadId: 'thread-1', turnId: 'turn-1', item: command } });
+  await waitFor(() => messages.some(message => message.type === 'part.created' && message.part.type === 'tool'));
+  expect(listMessagesWithParts('s')[1]?.parts.filter(part => part.type === 'tool')).toHaveLength(1);
+  fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1', item: {
+    ...command, status: 'completed', aggregatedOutput: 'clean', exitCode: 0,
+  } } });
+  fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1', item: {
+    type: 'fileChange', id: 'file-1', status: 'completed',
+    changes: [{ path: 'src/a.ts', kind: { type: 'update' }, diff: '@@ -1 +1 @@\n-old line\n+new line' }],
+  } } });
+  fake.send({ method: 'item/started', params: { threadId: 'thread-1', turnId: 'turn-1', item: {
+    type: 'mcpToolCall', id: 'mcp-1', server: 'docs', tool: 'search', status: 'inProgress', arguments: { q: 'x' },
+  } } });
+  fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1', item: {
+    type: 'dynamicToolCall', id: 'dynamic-1', tool: 'fetch', status: 'failed', arguments: {},
+  } } });
+  await waitFor(() => listMessagesWithParts('s')[1]?.parts.filter(part => part.type === 'tool').length === 4);
+  fake.connection.kill();
+  await turn;
+  const tools = listMessagesWithParts('s')[1]!.parts.filter(part => part.type === 'tool');
+  expect(tools.map(part => [part.name, part.state.status]).sort()).toEqual([
+    ['Codex command', 'completed'], ['Codex file change', 'completed'],
+    ['Codex MCP', 'interrupted'], ['Codex tool', 'error'],
+  ].sort());
+  expect(tools.find(part => part.name === 'Codex command')?.state)
+    .toMatchObject({ output: { exitCode: 0, _visualization: { type: 'shell-output', stdout: 'clean' } } });
+  expect(tools.find(part => part.name === 'Codex file change')?.presentation?.summary).toContain('src/a.ts');
+  const fileChange = tools.find(part => part.name === 'Codex file change');
+  expect(fileChange?.state).toMatchObject({ output: { _visualization: {
+    type: 'diff', path: 'src/a.ts', additions: 1, deletions: 1,
+    hunks: [{ oldStart: 1, newStart: 1, changes: [
+      { type: 'removed', content: 'old line' }, { type: 'added', content: 'new line' },
+    ] }],
+  } } });
+  expect(messages.filter(message => message.type === 'part.created' && message.part.type === 'tool')).toHaveLength(4);
+  expect(messages.filter(message => message.type === 'part.updated' && message.part.type === 'tool')).toHaveLength(4);
+});
+
+test('Codex command approval uses ask UI, exact session grants and one-time replies', async () => {
+  create();
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(); processes.push(fake); return fake.connection;
+  } });
+  const messages: ServerMessage[] = [];
+  const first = execution.sendMessage(wire(messages), 'origin', 's', 'hello');
+  await waitFor(() => processes[0]?.sent.some(message => message.method === 'turn/start') ?? false);
+  const fake = processes[0]!;
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  fake.send({ id: 88, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command: 'git status', cwd: process.cwd(),
+  } });
+  await waitFor(() => messages.some(message => message.type === 'ask.request'));
+  const ask = messages.find(message => message.type === 'ask.request')!;
+  expect(ask.ask).toMatchObject({ risk: 'critical', allowedScopes: ['once', 'session', 'workspace'],
+    metadata: { command: 'git status' } });
+  expect(codexApprovals.getSessionId(ask.toolCallId, ask.requestId)).toBe('s');
+  expect(codexApprovals.getSessionId(ask.toolCallId, 'wrong')).toBeNull();
+  expect(await codexApprovals.resolve(ask.toolCallId, { type: 'permission', grant: 'session' }, ask.requestId)).toBe(true);
+  await waitFor(() => fake.sent.some(message => message.id === 88));
+  expect(fake.sent.find(message => message.id === 88)?.result).toEqual({ decision: 'accept' });
+  expect(getPermissionRequestByRequestId(ask.requestId!)?.status).toBe('approved');
+  fake.send({ id: 89, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-2', command: 'git status', cwd: process.cwd(),
+  } });
+  await waitFor(() => fake.sent.some(message => message.id === 89));
+  expect(fake.sent.find(message => message.id === 89)?.result).toEqual({ decision: 'accept' });
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(1);
+  fake.send({ id: 90, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-3', command: 'git diff', cwd: process.cwd(),
+  } });
+  await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 2);
+  const other = messages.filter(message => message.type === 'ask.request')[1]!;
+  expect(await codexApprovals.resolve(other.toolCallId, { type: 'permission', grant: 'once' }, other.requestId)).toBe(true);
+  await waitFor(() => fake.sent.some(message => message.id === 90));
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await first;
+});
+
+test('trusted hook asks through the turn, denies invalid identity, and hands an approved call to native escalation once', async () => {
+  create();
+  const fake = fakeCodex(undefined, undefined, true);
+  const messages: ServerMessage[] = [];
+  let onCall!: (call: CodexHookCall) => Promise<boolean>;
+  let closed = false;
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => { throw new Error('Protected turns must not use the bare connection'); },
+    prepareHook: async callback => {
+      onCall = callback;
+      return { connect: () => fake.connection, close: async () => { closed = true; } };
+    },
+  });
+  const turn = execution.sendMessage(wire(messages), 'origin', 's', 'hello');
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => execution.isSessionActive('s'));
+  const call: CodexHookCall = { session_id: 'thread-1', turn_id: 'turn-1', tool_use_id: 'item-1',
+    hook_event_name: 'PreToolUse', tool_name: 'Bash', cwd: process.cwd(), tool_input: { command: 'rm -rf ./generated' } };
+  expect(await onCall({ ...call, turn_id: 'other' })).toBe(false);
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(0);
+  const denied = onCall(call);
+  await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 1);
+  const firstAsk = messages.find(message => message.type === 'ask.request')!;
+  expect(firstAsk.ask).toMatchObject({ allowedScopes: ['once'], action: 'delete' });
+  expect(await codexApprovals.resolve(firstAsk.toolCallId, { type: 'permission', grant: 'denied' }, firstAsk.requestId)).toBe(true);
+  expect(await denied).toBe(false);
+  const approved = onCall(call);
+  await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 2);
+  const secondAsk = messages.filter(message => message.type === 'ask.request')[1]!;
+  expect(codexApprovals.getSessionId(secondAsk.toolCallId, secondAsk.requestId)).toBe('s');
+  expect(await codexApprovals.resolve(secondAsk.toolCallId, { type: 'permission', grant: 'once' }, secondAsk.requestId)).toBe(true);
+  expect(await approved).toBe(true);
+  fake.send({ id: 88, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', cwd: process.cwd(), command: 'rm -rf ./generated',
+  } });
+  await waitFor(() => fake.sent.some(message => message.id === 88));
+  expect(fake.sent.find(message => message.id === 88)?.result).toEqual({ decision: 'accept' });
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(2);
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await turn;
+  expect(closed).toBe(true);
+});
+
+test('Codex hook auto-approval follows the current session risk and remains once-only', async () => {
+  create();
+  const messages: ServerMessage[] = [];
+  const approvals = new CodexApprovals(() => 1000);
+  const delivery = wire(messages).delivery;
+  const request = (risk: PermissionAsk['risk'], itemId: string) => approvals.requestHook({
+    type: 'permission', question: 'Allow access?', resource: 'file', action: 'read',
+    risk, allowedScopes: ['once'],
+  }, 'Bash', 'cat .env', itemId, 'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
+  const missing = request('low', 'missing-setting');
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(1);
+  approvals.cancelSession('s');
+  expect(await missing).toBe(false);
+  updateSession('s', { autoApproveSeverity: 'low' });
+  const low = await request('low', 'item-1');
+  expect(low).toBe(true);
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(1);
+  const native = { threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command: 'cat .env', cwd: process.cwd() };
+  expect(await approvals.request('item/commandExecution/requestApproval', native,
+    'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery)).toEqual({ decision: 'accept' });
+  const repeat = request('medium', 'item-2');
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(2);
+  approvals.cancelSession('s');
+  expect(await repeat).toBe(false);
+
+  updateSession('s', { autoApproveSeverity: 'high' });
+  expect(await request('high', 'item-3')).toBe(true);
+  const nativeCritical = approvals.request('item/commandExecution/requestApproval', { ...native, itemId: 'other' },
+    'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(3);
+  approvals.cancelSession('s');
+  expect(await nativeCritical).toEqual({ decision: 'decline' });
+  updateSession('s', { autoApproveSeverity: 'off' });
+  const disabled = request('none', 'item-4');
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(4);
+  approvals.cancelSession('s');
+  expect(await disabled).toBe(false);
+  updateSession('s', { autoApproveSeverity: 'high' });
+  const critical = request('critical', 'item-5');
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(5);
+  approvals.cancelSession('s');
+  expect(await critical).toBe(false);
+});
+
+test('Codex risk auto-approval rejects missing, unknown and critical risks', () => {
+  const ask = (risk?: PermissionAsk['risk']): PermissionAsk => ({
+    type: 'permission', question: 'Allow?', resource: 'file', action: 'read', risk,
+  });
+  expect(canAutoApproveCodexHook(ask('none'), 'none')).toBe(true);
+  expect(canAutoApproveCodexHook(ask('medium'), 'low')).toBe(false);
+  expect(canAutoApproveCodexHook(ask('critical'), 'high')).toBe(false);
+  expect(canAutoApproveCodexHook(ask(undefined), 'high')).toBe(false);
+  expect(canAutoApproveCodexHook(ask('unrecognized' as PermissionAsk['risk']), 'high')).toBe(false);
+  expect(canAutoApproveCodexHook(ask('low'), 'off')).toBe(false);
+  expect(canAutoApproveCodexHook(ask('low'), undefined)).toBe(false);
+  expect(canAutoApproveCodexHook(ask('low'), 'unknown')).toBe(false);
+});
+
+test('hook ask timeout and interruption deny and expire pending requests', async () => {
+  create();
+  const messages: ServerMessage[] = [];
+  const approvals = new CodexApprovals(() => 5);
+  const delivery = wire(messages).delivery;
+  const ask: PermissionAsk = { type: 'permission', question: 'Allow deletion?', resource: 'file', action: 'delete',
+    risk: 'high', allowedScopes: ['once'] };
+  const expired = approvals.requestHook(ask, 'Bash', 'rm file', 'item-1',
+    'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
+  expect(await expired).toBe(false);
+  const first = messages.find(message => message.type === 'ask.request')!;
+  expect(getPermissionRequestByRequestId(first.requestId!)?.status).toBe('expired');
+  expect(await approvals.resolve(first.toolCallId, { type: 'permission', grant: 'once' }, first.requestId)).toBe(false);
+  const interrupted = approvals.requestHook(ask, 'Bash', 'rm file', 'item-2',
+    'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
+  approvals.cancelSession('s');
+  expect(await interrupted).toBe(false);
+  expect(messages.filter(message => message.type === 'ask.timeout')).toHaveLength(2);
+});
+
+test('hook approval suppresses only a matching native command prompt for that turn', async () => {
+  create();
+  const messages: ServerMessage[] = [];
+  const approvals = new CodexApprovals(() => 1000);
+  const delivery = wire(messages).delivery;
+  const command = 'rm -rf ./generated';
+  const pending = approvals.requestHook({ type: 'permission', question: 'Allow deletion?',
+    resource: 'shell-command', action: 'execute', risk: 'high', allowedScopes: ['once'] },
+  'Bash', command, 'item-1', 'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
+  const ask = messages.find(message => message.type === 'ask.request')!;
+  expect(await approvals.resolve(ask.toolCallId, { type: 'permission', grant: 'once' }, ask.requestId)).toBe(true);
+  expect(await pending).toBe(true);
+  const params = { threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command, cwd: process.cwd() };
+  expect(await approvals.request('item/commandExecution/requestApproval', params,
+    'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery)).toEqual({ decision: 'accept' });
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(1);
+  const next = approvals.request('item/commandExecution/requestApproval', { ...params, itemId: 'item-2' },
+    'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(2);
+  approvals.cancelSession('s');
+  expect(await next).toEqual({ decision: 'decline' });
+});
+
+test('Codex malformed requests decline and interrupted file approvals cannot be reused', async () => {
+  create();
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const turn = execution.sendMessage(wire(messages), 'origin', 's', 'hello');
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  fake.send({ id: 70, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'other', turnId: 'turn-1', itemId: 'item', command: 'rm -rf .', cwd: process.cwd(),
+  } });
+  await waitFor(() => fake.sent.some(message => message.id === 70));
+  expect(fake.sent.find(message => message.id === 70)?.result).toEqual({ decision: 'decline' });
+  fake.send({ id: 71, method: 'item/fileChange/requestApproval', params: {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'file-1', reason: 'edit files',
+  } });
+  await waitFor(() => messages.some(message => message.type === 'ask.request'));
+  const ask = messages.find(message => message.type === 'ask.request')!;
+  expect(ask.ask).toMatchObject({ allowedScopes: ['once'] });
+  expect(await codexApprovals.resolve(ask.toolCallId, { type: 'permission', grant: 'workspace' }, ask.requestId)).toBe(true);
+  await waitFor(() => fake.sent.some(message => message.id === 71));
+  expect(fake.sent.find(message => message.id === 71)?.result).toEqual({ decision: 'decline' });
+  fake.send({ id: 72, method: 'item/fileChange/requestApproval', params: {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'file-2',
+  } });
+  await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 2);
+  const pending = messages.filter(message => message.type === 'ask.request')[1]!;
+  await execution.interruptSession('s');
+  await waitFor(() => fake.sent.some(message => message.id === 72));
+  expect(fake.sent.find(message => message.id === 72)?.result).toEqual({ decision: 'decline' });
+  expect(await codexApprovals.resolve(pending.toolCallId, { type: 'permission', grant: 'once' }, pending.requestId)).toBe(false);
+  expect(listPendingAsksBySession('s').find(record => record.requestId === pending.requestId)?.status).toBe('expired');
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'interrupted' } } });
+  await turn;
+});
+
+test('grant persistence failure declines and rolls back the approval', async () => {
+  create();
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const turn = execution.sendMessage(wire(messages), 'origin', 's', 'hello');
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  fake.send({ id: 91, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command: 'git status', cwd: process.cwd(),
+  } });
+  await waitFor(() => messages.some(message => message.type === 'ask.request'));
+  const ask = messages.find(message => message.type === 'ask.request')!;
+  getDatabase().run(`CREATE TRIGGER reject_codex_grant BEFORE INSERT ON permission_grants
+    WHEN NEW.tool_name = 'codex-cli:command' BEGIN SELECT RAISE(FAIL, 'test failure'); END`);
+  expect(await codexApprovals.resolve(ask.toolCallId, { type: 'permission', grant: 'workspace' }, ask.requestId)).toBe(true);
+  await waitFor(() => fake.sent.some(message => message.id === 91));
+  expect(fake.sent.find(message => message.id === 91)?.result).toEqual({ decision: 'decline' });
+  expect(getPermissionRequestByRequestId(ask.requestId!)?.status).toBe('denied');
+  expect(getDatabase().query("SELECT COUNT(*) AS count FROM permission_grants WHERE tool_name = 'codex-cli:command'")
+    .get()).toEqual({ count: 0 });
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await turn;
+});
+
+test('delivery failure expires a Codex approval and declines without leaving a waiter', async () => {
+  create();
+  const messages: ServerMessage[] = [];
+  const delivery = wire(messages).delivery;
+  const result = await codexApprovals.request('item/fileChange/requestApproval', {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1',
+  }, 'thread-1', 'turn-1', 's', process.cwd(), 'ws', {
+    ...delivery,
+    sendToAskTargets: () => { throw new Error('delivery unavailable'); },
+  });
+  expect(result).toEqual({ decision: 'decline' });
+  const record = listPendingAsksBySession('s')[0]!;
+  expect(record.status).toBe('expired');
+  expect(codexApprovals.hasLiveRequest(record.requestId)).toBe(false);
+});
+
+test('Codex approval timeout declines and removes its live request', async () => {
+  create();
+  const messages: ServerMessage[] = [];
+  const approvals = new CodexApprovals(() => 5);
+  const pending = approvals.request('item/fileChange/requestApproval', {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1',
+  }, 'thread-1', 'turn-1', 's', process.cwd(), 'ws', wire(messages).delivery);
+  expect(await pending).toEqual({ decision: 'decline' });
+  const ask = messages.find(message => message.type === 'ask.request')!;
+  expect(getPermissionRequestByRequestId(ask.requestId!)?.status).toBe('expired');
+  expect(approvals.hasLiveRequest(ask.requestId!)).toBe(false);
+  expect(messages.some(message => message.type === 'ask.timeout')).toBe(true);
+});
+
+test('a lost Codex process expires an outstanding approval and rejects stale replies', async () => {
+  create();
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const turn = execution.sendMessage(wire(messages), 'origin', 's', 'hello');
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  fake.send({ id: 92, method: 'item/fileChange/requestApproval', params: {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1',
+  } });
+  await waitFor(() => messages.some(message => message.type === 'ask.request'));
+  const ask = messages.find(message => message.type === 'ask.request')!;
+  fake.connection.kill();
+  await turn;
+  expect(codexApprovals.hasLiveRequest(ask.requestId!)).toBe(false);
+  expect(getPermissionRequestByRequestId(ask.requestId!)?.status).toBe('expired');
+  expect(await codexApprovals.resolve(ask.toolCallId, { type: 'permission', grant: 'once' }, ask.requestId)).toBe(false);
 });
 
 test('a rejected thread request reports its stage without leaking upstream details', async () => {

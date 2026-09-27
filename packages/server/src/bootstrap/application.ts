@@ -83,6 +83,8 @@ import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-director
 import { getDataDir } from '@/infrastructure/runtime/paths';
 import { codexAccounts } from '@/infrastructure/providers/codex-accounts';
 import { createProkopHarness } from '@/harnesses/prokop';
+import { codexApprovals } from '@/harnesses/codex-cli/approvals';
+import { installCodexApprovalPort } from '@/application/ports/codex-approval';
 import {
   codexCliAvailable,
   createCodexCliHarness,
@@ -159,6 +161,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   const worktreeAttachments = {
     changed: (worktreeId: string): void => refreshWorktreeAttachments?.(worktreeId),
   };
+  installCodexApprovalPort(codexApprovals);
   const codexExecution = createCodexExecution();
   const execution = createHarnessExecution(repository, {
     prokop: createProkopHarness({

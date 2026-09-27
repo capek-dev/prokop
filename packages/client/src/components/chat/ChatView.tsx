@@ -6,6 +6,7 @@ import { MessageInput } from './MessageInput';
 import type { MessageInputHandle } from './MessageInput';
 import { Button } from '@/components/ui/button';
 import { VirtualizedTranscript } from './VirtualizedTranscript';
+import { AskQuestion } from './AskQuestion';
 import type { PendingAskRequest } from '@/stores/askStore';
 import { useSessionControlStore, type ActionRejection } from '@/stores/sessionControlStore';
 import { useClientIdentityStore } from '@/stores/clientIdentityStore';
@@ -322,6 +323,14 @@ function ChatViewContent({
           )}
         </button>
       </div>
+
+      {session.harness === 'codex-cli' && pendingAskRequests.filter(request =>
+        request.sessionId === session.id && request.toolCallId.startsWith('codex-approval:')
+      ).map(request => (
+        <div key={request.requestId ?? request.toolCallId} className="mx-auto w-full max-w-3xl overflow-y-auto px-4 py-3">
+          <AskQuestion request={request} onRespond={onAskResponse} />
+        </div>
+      ))}
 
       {session.status === 'active' && <RetryStatus sessionId={session.id} />}
 

@@ -5,6 +5,7 @@ import { resolveAsk, getSessionIdForPendingAsk, getAuthorityForPendingAsk, sandb
 import { getControlState } from '../control-registry';
 import { requireWireApplication } from '../application';
 import { checkAskResponseEligibility } from '@/application/ports/control';
+import { getCodexApprovalPort } from '@/application/ports/codex-approval';
 import type {
   ClientRegisterMessage,
   AskResponseMessage,
@@ -53,9 +54,15 @@ export interface AskResponseDependencies {
 }
 
 const askResponseDependencies: AskResponseDependencies = {
-  resolveAsk,
-  getSessionIdForPendingAsk,
-  getAuthorityForPendingAsk,
+  resolveAsk: (toolCallId, response, requestId) => toolCallId.startsWith('codex-approval:')
+    ? (getCodexApprovalPort()?.resolve(toolCallId, response, requestId) ?? Promise.resolve(false))
+    : resolveAsk(toolCallId, response, requestId),
+  getSessionIdForPendingAsk: (toolCallId, requestId) => toolCallId.startsWith('codex-approval:')
+    ? Promise.resolve(getCodexApprovalPort()?.getSessionId(toolCallId, requestId) ?? null)
+    : getSessionIdForPendingAsk(toolCallId, requestId),
+  getAuthorityForPendingAsk: (toolCallId) => toolCallId.startsWith('codex-approval:')
+    ? { visibilityScope: 'controller_only', resolutionMode: 'controller_only' }
+    : getAuthorityForPendingAsk(toolCallId),
 };
 
 export async function handleAskResponseWithDependencies(
@@ -66,6 +73,8 @@ export async function handleAskResponseWithDependencies(
 ): Promise<void> {
   const { toolCallId, response, requestId } = msg;
   const askSessionId = await dependencies.getSessionIdForPendingAsk(toolCallId, requestId);
+  // Codex requests require the live request identity, not a legacy tool-call fallback.
+  if (toolCallId.startsWith('codex-approval:') && (!requestId || !askSessionId)) return;
   if (askSessionId) {
     const controlState = getControlState(askSessionId);
     const senderClientId = getClientIdForConnection(ws);

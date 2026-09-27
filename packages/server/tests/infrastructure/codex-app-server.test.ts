@@ -56,7 +56,7 @@ test('server-initiated approvals deny by default and malformed traffic closes re
   f.send({ id: 30, method: 'unknown/request', params: {} });
   f.send({ id: 31, method: 'mcpServer/elicitation/request', params: {} });
   await f.waitFor(5);
-  expect(f.outgoing).toEqual([
+  expect([...f.outgoing].sort((a, b) => Number(a.id) - Number(b.id))).toEqual([
     { id: 27, result: { decision: 'decline' } },
     { id: 28, result: { decision: 'decline' } },
     { id: 29, result: { permissions: {}, scope: 'turn' } },

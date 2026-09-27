@@ -642,8 +642,8 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                     disabled={disabled || checkoutLocked}
                   />
                 )}
+                <AutoApproveSelector sessionId={sessionId} sdkClient={sdkClient ?? null} disabled={disabled} />
                 {!codexSession && <>
-                  <AutoApproveSelector sessionId={sessionId} sdkClient={sdkClient ?? null} disabled={disabled} />
                   <ResponseFormatSelector
                     formats={responseFormats}
                     selectedId={selectedResponseFormatId}
@@ -657,7 +657,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
 
           <div className="flex h-7 items-center rounded-full border border-border/70">
             {codexSession ? (
-              <span className="px-2 text-xs text-muted-foreground" title="Codex can edit this workspace within its sandbox. Requests for extra permissions are declined automatically.">Codex CLI</span>
+              <span className="px-2 text-xs text-muted-foreground" title="Codex uses its workspace sandbox. Some tool calls require approval; native escalation remains manual.">Codex CLI</span>
             ) : <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button

@@ -248,10 +248,10 @@ export const ToolCall = memo(function ToolCall({
             )}
 
             <span className="flex min-w-0 flex-1 items-baseline">
-              <span className="text-xs truncate max-w-[120px] sm:max-w-none">{part.name}</span>
+              <span className="text-xs truncate shrink-0 max-w-[90px] sm:max-w-none">{part.name}</span>
 
               {summary && (
-                <span className="text-xs text-muted-foreground font-mono truncate min-w-0 flex-1 hidden sm:inline">
+                <span className="text-xs text-muted-foreground font-mono truncate min-w-0 flex-1">
                   {`: ${summary}`}
                 </span>
               )}
