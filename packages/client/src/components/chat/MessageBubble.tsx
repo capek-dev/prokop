@@ -125,6 +125,7 @@ export function MessageBubble({
   const showPinButton = canPin && onTogglePin && !isQueued;
   const showEditButton = canEdit && onEdit && !isQueued && isUser;
   const showAssistantFork = message.role === 'assistant' && canFork && Boolean(onFork);
+  const hoverActionClass = 'opacity-0 transition-opacity group-hover/msg:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
 
   const renderAssistantActions = () => (
     <>
@@ -134,7 +135,7 @@ export function MessageBubble({
           size="icon"
           onClick={() => setShowForkConfirm(true)}
           disabled={isForking}
-          className="size-5 text-muted-foreground hover:text-foreground"
+          className={cn('size-5 text-muted-foreground hover:text-foreground', hoverActionClass)}
           title="Fork from this response"
         >
           {isForking ? (
@@ -150,28 +151,21 @@ export function MessageBubble({
           size="icon"
           onClick={onTogglePin}
           disabled={isPinningMessage}
-          className={cn(
-            'size-5',
-            isPinned
-              ? 'text-primary hover:text-primary/80'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-          title={isPinningMessage ? 'Updating...' : isPinned ? 'Unpin message' : 'Pin message'}
+          className={cn('size-5', isPinned
+            ? 'text-primary hover:text-primary/80'
+            : 'text-muted-foreground hover:text-foreground',
+          !isPinned && hoverActionClass)}
+          title={isPinned ? 'Unpin message' : 'Pin message'}
         >
-          {isPinningMessage ? (
-            <Loader2 className="size-3 animate-spin" />
-          ) : isPinned ? (
-            <PinOff className="size-3" />
-          ) : (
-            <Pin className="size-3" />
-          )}
+          {isPinningMessage ? <Loader2 className="size-3 animate-spin" />
+            : isPinned ? <PinOff className="size-3" /> : <Pin className="size-3" />}
         </Button>
       )}
       <Button
         variant="ghost"
         size="icon"
         onClick={handleCopy}
-        className="size-5 text-muted-foreground hover:text-foreground"
+        className={cn('size-5 text-muted-foreground hover:text-foreground', hoverActionClass)}
         title="Copy response"
       >
         {copied ? (
@@ -335,30 +329,7 @@ export function MessageBubble({
 
       {showAssistantFork && (
         <div className="flex items-center gap-0.5 pt-0.5">
-          {showPinButton && isPinned && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onTogglePin}
-              disabled={isPinningMessage}
-              className="size-6 text-primary hover:text-primary/80"
-              title="Unpin message"
-            >
-              {isPinningMessage ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <PinOff className="size-3" />
-              )}
-            </Button>
-          )}
-          <span
-            className={cn(
-              'flex items-center gap-0.5',
-              'opacity-0 transition-opacity group-hover/msg:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100',
-            )}
-          >
-            {renderAssistantActions()}
-          </span>
+          {renderAssistantActions()}
         </div>
       )}
 
