@@ -23,6 +23,7 @@ import { parseCodexContextUsage, publishCodexContextUsage } from './usage';
 import { createCodexMemoryTools, type CodexMemoryBridge } from './memory-tools';
 import { createCodexSessionSearchTools, type CodexSessionSearchBridge } from './session-search-tools';
 import { applyRollback, clearRollbackIntent, getRollbackIntent, readRollbackHistory, readTurnIds, sameTurns, saveRollbackIntent, setRollbackPhase } from './rollback';
+import { forkCodexSession } from './fork';
 
 interface ActiveTurn {
   client: CodexAppServer;
@@ -245,9 +246,18 @@ const SAFE_EDIT_ERRORS = new Set([
   'Codex edit text is unavailable', 'Codex transcript deletion failed',
 ]);
 
+const SAFE_FORK_ERRORS = new Set([
+  'Codex session is unavailable or busy', 'Codex thread binding is unavailable or changed',
+  'Codex history requires recovery before fork', 'A Codex fork has an uncertain outcome; do not retry it',
+  'Codex thread is not idle after resume', 'Codex goal history cannot be forked',
+  'Codex thread history is unavailable', 'Codex transcript does not match turn history',
+  'Codex turn identity is incomplete', 'Codex turn identity is ambiguous',
+  'Codex fork requires a completed assistant response', 'Codex fork of image history is not supported',
+]);
+
 /** One CLI process per active turn. Codex owns thread history, Prokop owns its transcript. */
 export function createCodexExecution(deps: CodexExecutionDependencies): Pick<SessionExecutionPort,
-  'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert'> {
+  'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork'> {
   const active = new Map<string, ActiveTurn>();
   const starting = new Set<string>();
   const resubmitting = new Map<string, string>();
@@ -332,7 +342,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
       if (client) await client.close();
     }
   }
-  const execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert'> = {
+  const execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork'> = {
     isSessionActive: (sessionId) => active.has(sessionId) || starting.has(sessionId),
     async interruptSession(sessionId): Promise<InterruptExecutionResult> {
       const run = active.get(sessionId);
@@ -835,6 +845,22 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         }
         if (client) await client.close();
         if (hookChannel) await hookChannel.close();
+      }
+    },
+    async fork(input) {
+      if (active.has(input.sessionId) || starting.has(input.sessionId)) throw new Error('Codex session is busy');
+      starting.add(input.sessionId);
+      try {
+        return await forkCodexSession(input, { connect: deps.connect, version: deps.version,
+          root: id => workspaceRoot(getSession(id)!), busy: id => active.has(id), });
+      } catch (error: unknown) {
+        if (getDatabase().query('SELECT 1 FROM codex_fork_intents WHERE source_session_id = ?')
+          .get(input.sessionId)) throw new Error('Codex fork outcome is uncertain; do not retry in this session', { cause: error });
+        const safe = error instanceof Error && SAFE_FORK_ERRORS.has(error.message)
+          ? error.message : 'Codex fork could not be started';
+        throw new Error(safe, { cause: error });
+      } finally {
+        starting.delete(input.sessionId);
       }
     },
     async revert(input) {

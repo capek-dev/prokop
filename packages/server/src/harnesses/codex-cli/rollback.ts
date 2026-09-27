@@ -51,6 +51,9 @@ export async function readRollbackHistory(client: CodexAppServer, binding: Codex
   const local = listMessagesWithParts(binding.sessionId);
   const users = local.filter(entry => entry.message.role === 'user');
   const assistants = local.filter(entry => entry.message.role === 'assistant');
+  const inherited = getDatabase().query<{ upstream_client_id: string }, [string]>(
+    'SELECT upstream_client_id FROM codex_inherited_user_ids WHERE message_id = ?',
+  );
   if (users.length !== assistants.length || users.length !== thread.turns.length
     || local.length !== users.length + assistants.length) throw new Error('Codex transcript does not match turn history');
   const ids = thread.turns.map((raw: unknown, index: number) => {
@@ -60,7 +63,8 @@ export async function readRollbackHistory(client: CodexAppServer, binding: Codex
       || turn.items.filter((rawItem: unknown) => codexObject(rawItem)?.type === 'userMessage').length !== 1
       || !turn.items.some((rawItem: unknown) => {
         const item = codexObject(rawItem);
-        return item?.type === 'userMessage' && item.clientId === users[index]!.message.id;
+        return item?.type === 'userMessage' && item.clientId ===
+          (inherited.get(users[index]!.message.id)?.upstream_client_id ?? users[index]!.message.id);
       }) || local[index * 2]?.message.id !== users[index]?.message.id
       || local[index * 2 + 1]?.message.id !== assistants[index]?.message.id
       || (assistants[index]?.message.role === 'assistant'
@@ -113,6 +117,8 @@ export function applyRollback(intent: RollbackIntent): RevertExecutionResult {
       if (!text || intent.content === null || !updatePart(text.id, { text: intent.content })) {
         throw new Error('Codex edit text is unavailable');
       }
+      // Resubmission creates a new Codex user item with this local ID.
+      getDatabase().run('DELETE FROM codex_inherited_user_ids WHERE message_id = ?', [local[index]!.message.id]);
     }
     for (const messageId of result.removed.messageIds) {
       if (!deleteMessage(messageId)) throw new Error('Codex transcript deletion failed');

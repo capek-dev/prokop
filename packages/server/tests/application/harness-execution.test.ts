@@ -35,13 +35,13 @@ function fixture() {
       sendMessage: codexBase.sendMessage,
       interruptSession: codexBase.interruptSession,
       isSessionActive: codexBase.isSessionActive,
+      fork: codexBase.fork,
     },
     unsupportedMessages: {
       editMessage: 'Editing is not supported for Codex CLI sessions',
       regenerateTitle: 'Title generation is not supported for Codex CLI sessions',
       compact: 'Compaction is not supported for Codex CLI sessions',
       revert: 'Revert is not supported for Codex CLI sessions',
-      fork: 'Fork is not supported for Codex CLI sessions',
     },
   };
   const execution = createHarnessExecution({ getSession: id => sessions[id] ?? null }, {
@@ -95,8 +95,8 @@ test('unsupported Codex operations preserve refusal shapes and never reach Proko
   ]);
   expect(await execution.compact('codex', 'manual')).toEqual({ ok: false, skipped: true, error: 'Compaction is not supported for Codex CLI sessions' });
   expect(execution.revert({ sessionId: 'codex', targetMessageId: 'm' })).rejects.toThrow('Revert is not supported for Codex CLI sessions');
-  expect(execution.fork({ sessionId: 'codex', targetMessageId: 'm' })).rejects.toThrow('Fork is not supported for Codex CLI sessions');
-  expect(calls).toEqual([]);
+  await execution.fork({ sessionId: 'codex', targetMessageId: 'm' });
+  expect(calls).toEqual(['codex:fork']);
 });
 
 test('missing or unknown owners fail closed for every execution route', async () => {

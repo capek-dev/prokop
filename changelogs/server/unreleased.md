@@ -1,5 +1,7 @@
 ### Changed
 
+- Fork a completed Codex CLI response into a new native Codex thread and session with matching retained history. Keep the original thread intact; reject in-flight, goal, image-bearing, or uncertain histories. User-message cutoffs remain unavailable for Codex because they cannot preserve Prokop's user-only cutoff on a native turn boundary.
+
 - Add Codex CLI user-message edit and conversation revert support with upstream-history validation and durable rollback intent. A failed edit reports a bounded local reason and distinguishes preflight failure from a possibly executed rollback without exposing upstream RPC details.
 
 - Register Prokop and Codex CLI as separate server harnesses. Session execution dispatches by persisted harness ownership, while shared session creation rules apply to HTTP and WebSocket requests.

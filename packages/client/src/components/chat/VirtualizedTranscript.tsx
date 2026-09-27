@@ -49,6 +49,7 @@ interface VirtualizedTranscriptProps {
   onRemoveFromQueue?: (queueId: string) => void;
   onRevert?: (sessionId: string, stepPartId: string) => void;
   onFork?: (sessionId: string, messageId: string) => void;
+  assistantOnlyFork?: boolean;
   onEditMessage?: (sessionId: string, messageId: string, content: string) => void;
   onCompact?: () => void;
   isMainActiveSession?: boolean;
@@ -492,6 +493,7 @@ interface MessageRowProps {
   onRemoveFromQueue?: (queueId: string) => void;
   onRevert?: (sessionId: string, stepPartId: string) => void;
   onFork?: (sessionId: string, messageId: string) => void;
+  assistantOnlyFork?: boolean;
   isMainActiveSession?: boolean;
   isCompacting?: boolean;
   onCompact?: () => void;
@@ -513,6 +515,7 @@ const MessageRow = memo(function MessageRow({
   onRemoveFromQueue,
   onRevert,
   onFork,
+  assistantOnlyFork = false,
   onEditMessage,
   isMainActiveSession = false,
   isCompacting = false,
@@ -556,7 +559,7 @@ const MessageRow = memo(function MessageRow({
 
   const canRevert = !item.isQueued && item.message.role === 'user';
   const canFork = !item.isQueued && (
-    (item.message.role === 'user' && revertMessageId !== null) ||
+    (!assistantOnlyFork && item.message.role === 'user' && revertMessageId !== null) ||
     (isAssistantMessage(item.message) && item.message.status === 'completed')
   );
   const isClearAll = revertMessageId === item.message.id;
@@ -629,6 +632,7 @@ function areMessageRowPropsEqual(prev: MessageRowProps, next: MessageRowProps): 
     prev.onRemoveFromQueue === next.onRemoveFromQueue &&
     prev.onRevert === next.onRevert &&
     prev.onFork === next.onFork &&
+    prev.assistantOnlyFork === next.assistantOnlyFork &&
     prev.onEditMessage === next.onEditMessage &&
     prev.isMainActiveSession === next.isMainActiveSession &&
     prev.isCompacting === next.isCompacting &&
@@ -668,6 +672,7 @@ export function VirtualizedTranscript({
   onRemoveFromQueue,
   onRevert,
   onFork,
+  assistantOnlyFork = false,
   onEditMessage,
   onCompact,
   isMainActiveSession = false,
@@ -967,6 +972,7 @@ export function VirtualizedTranscript({
         onRemoveFromQueue={onRemoveFromQueue}
         onRevert={onRevert}
         onFork={onFork}
+        assistantOnlyFork={assistantOnlyFork}
         onEditMessage={onEditMessage}
         isMainActiveSession={isMainActiveSession}
         isCompacting={isCompacting}
@@ -991,6 +997,7 @@ export function VirtualizedTranscript({
     onRemoveFromQueue,
     onRevert,
     onFork,
+    assistantOnlyFork,
     onEditMessage,
     isMainActiveSession,
     isCompacting,

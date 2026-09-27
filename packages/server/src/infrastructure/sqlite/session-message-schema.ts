@@ -79,6 +79,16 @@ export function initializeSessionMessageSchema(
     turn_ids TEXT NOT NULL,
     phase TEXT NOT NULL DEFAULT 'rollback' CHECK (phase IN ('rollback', 'ready', 'sent'))
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS codex_inherited_user_ids (
+    message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+    upstream_client_id TEXT NOT NULL
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS codex_fork_intents (
+    source_session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    target_message_id TEXT NOT NULL,
+    before_turn_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`);
   const bindingColumns = db.query<{ name: string }, []>('PRAGMA table_info(codex_session_bindings)').all();
   for (const [column, definition] of [
     ['pending_turn', 'INTEGER NOT NULL DEFAULT 0'],

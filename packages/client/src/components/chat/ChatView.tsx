@@ -184,7 +184,7 @@ function ChatViewContent({
   // revert/fork/edit/compact/queue-remove affordances never render.
   const readOnlyTranscript = isObserver;
   const onRevertForMode = readOnlyTranscript ? undefined : _onRevert;
-  const onForkForMode = readOnlyTranscript || session.harness === 'codex-cli' ? undefined : _onFork;
+  const onForkForMode = readOnlyTranscript ? undefined : _onFork;
   const onEditMessageForMode = readOnlyTranscript ? undefined : _onEditMessage;
   const onCompactForMode = readOnlyTranscript || session.harness === 'codex-cli' ? undefined : onCompact;
   const onRemoveFromQueueForMode = readOnlyTranscript || session.harness === 'codex-cli' ? undefined : onRemoveFromQueue;
@@ -281,6 +281,7 @@ function ChatViewContent({
           onRemoveFromQueue={onRemoveFromQueueForMode}
           onRevert={onRevertForMode}
           onFork={onForkForMode}
+          assistantOnlyFork={session.harness === 'codex-cli'}
           onEditMessage={onEditMessageForMode}
           onCompact={onCompactForMode}
           isMainActiveSession={isMainActiveSession}
