@@ -683,10 +683,14 @@ describe('application session use cases', () => {
       }
     });
 
-    test('Codex creation requires a physical workspace and does not apply Prokop presets', async () => {
+    test('Codex creation validates the selected preconfig without applying its model', async () => {
       const created: unknown[] = [];
+      const updates: unknown[] = [];
       const repository = makeRepository({
         createSession: input => { created.push(input); return makeSession({ harness: input.harness }); },
+        getPreconfigOrAgent: async id => id === 'agent'
+          ? { id, model: 'prokop-model', provider: 'provider', variant: 'v1' } as never : null,
+        updateSession: (_id, input) => { updates.push(input); return makeSession({ harness: 'codex-cli', preconfigId: 'agent' }); },
       });
       const app = createSessionLifecycleApplication({
         ...makeDeps({ repository }), codexAvailable: () => true,
@@ -695,12 +699,14 @@ describe('application session use cases', () => {
       const rejected = makeSpy();
       await app.create(makeWire(rejected), origin, { harness: 'codex-cli', workspaceId: 'virtual' });
       await app.create(makeWire(rejected), origin,
-        { harness: 'codex-cli', workspaceId: 'physical', preconfigId: 'agent' });
+        { harness: 'codex-cli', workspaceId: 'physical', preconfigId: 'missing' });
       expect(rejected.sent).toHaveLength(2);
       expect(created).toHaveLength(0);
       const accepted = makeSpy();
-      await app.create(makeWire(accepted), origin, { harness: 'codex-cli', workspaceId: 'physical' });
-      expect(created).toEqual([expect.objectContaining({ harness: 'codex-cli', preconfigId: null })]);
+      await app.create(makeWire(accepted), origin,
+        { harness: 'codex-cli', workspaceId: 'physical', preconfigId: 'agent' });
+      expect(created).toEqual([expect.objectContaining({ harness: 'codex-cli', preconfigId: 'agent' })]);
+      expect(updates).toEqual([{ agentId: null }]);
       expect(accepted.sent).toEqual([expect.objectContaining({ type: 'session.created' })]);
     });
 
@@ -872,17 +878,26 @@ describe('application session use cases', () => {
       expect(spy.attached).toEqual([]);
     });
 
-    test('Codex sessions reject Prokop agent and model selection', async () => {
+    test('Codex sessions allow agent preconfig changes without applying model settings', async () => {
+      const changes: unknown[] = [];
+      const updated = makeSession({ harness: 'codex-cli', preconfigId: 'agent' });
       const repository = makeRepository({
         getSession: () => makeSession({ harness: 'codex-cli' }),
-        updateSession: () => { throw new Error('must not update'); },
+        getPreconfigOrAgent: async id => id === 'agent'
+          ? { id, model: 'prokop-model', variant: 'v1' } as never : null,
+        isAgentSync: () => true,
+        updateSession: (_id, patch) => { changes.push(patch); return updated; },
       });
       const app = createSessionLifecycleApplication({ ...makeDeps({ repository }) });
       const spy = makeSpy();
       const wire = makeWire(spy);
       await app.update(wire, origin, { sessionId: 'sess-1', preconfigId: 'agent' });
+      expect(changes).toEqual([{ preconfigId: 'agent', agentId: 'agent' }]);
+      expect(spy.sent.at(-1)).toEqual({ type: 'session.updated', session: updated });
+      await app.update(wire, origin, { sessionId: 'sess-1', preconfigId: 'missing' });
       app.updateModel(wire, origin, { sessionId: 'sess-1', modelId: 'model', providerId: 'provider' });
-      expect(spy.sent).toEqual([
+      expect(changes).toHaveLength(1);
+      expect(spy.sent.slice(-2)).toEqual([
         expect.objectContaining({ type: 'error', code: 'invalid_session' }),
         expect.objectContaining({ type: 'error', code: 'invalid_session' }),
       ]);
@@ -891,10 +906,11 @@ describe('application session use cases', () => {
     test('cross-harness selection validates catalog and current owner before the atomic store', async () => {
       const spy = makeSpy();
       const selected = makeSession({ harness: 'codex-cli', selectedModel: 'codex-model' });
-      const current = makeSession({ updatedAt: 'current' });
+      const current = makeSession({ updatedAt: 'current', preconfigId: 'agent' });
       const writes: unknown[] = [];
       const app = createSessionLifecycleApplication({
-        ...makeDeps({ repository: makeRepository({ getSession: () => current }) }),
+        ...makeDeps({ repository: makeRepository({ getSession: () => current,
+          getPreconfigOrAgent: async () => ({ id: 'agent' }) as never }) }),
         codexAvailable: () => true,
         codexWorkspaceAvailable: () => true,
         codexModels: async () => [{ model: 'codex-model', name: 'Codex', isDefault: true,

@@ -30,9 +30,12 @@ export function checkHarnessCreate(
     return { ok: false, code: 'invalid_session', message: 'Codex CLI 0.156.x is unavailable on this host' };
   }
   const workspaceId = input.workspaceId || '';
-  if (harness === 'codex-cli' && (input.preconfigId || !policy.codexWorkspaceAvailable(workspaceId))) {
+  if (harness === 'codex-cli' && !policy.codexWorkspaceAvailable(workspaceId)) {
     return { ok: false, code: 'invalid_session',
-      message: 'Codex CLI requires a physical workspace and no Prokop agent preset' };
+      message: 'Codex CLI requires a physical workspace' };
+  }
+  if (harness === 'codex-cli' && (typeof input.preconfigId !== 'string' || !input.preconfigId.trim())) {
+    return { ok: false, code: 'invalid_session', message: 'Codex CLI requires a preconfig' };
   }
   if (input.workspaceRootId && !policy.workspaceRoots?.isAvailable(workspaceId, input.workspaceRootId)) {
     return { ok: false, code: 'invalid_workspace_root',
@@ -46,7 +49,7 @@ export function unknownHarnessError(harness: unknown): string | null {
     ? null : 'Unknown session harness';
 }
 
-export type ProkopFeature = 'queue' | 'agentSelection' | 'modelSelection';
+export type ProkopFeature = 'queue' | 'modelSelection';
 
 /** These operations use Čapek semantics; other harnesses must opt in deliberately. */
 export function prokopFeatureError(harness: unknown, feature: ProkopFeature): string | null {
@@ -54,7 +57,6 @@ export function prokopFeatureError(harness: unknown, feature: ProkopFeature): st
   if (harness !== 'codex-cli') return 'Unknown session harness';
   const messages: Record<ProkopFeature, string> = {
     queue: 'Message queue is not supported for Codex CLI sessions',
-    agentSelection: 'Agent selection is not supported for Codex CLI sessions',
     modelSelection: 'Model selection is owned by Codex CLI for this session',
   };
   return messages[feature];

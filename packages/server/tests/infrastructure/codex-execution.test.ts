@@ -14,7 +14,7 @@ import { getDatabase } from '@/infrastructure/sqlite/database';
 import { CodexApprovals, canAutoApproveCodexHook, codexApprovals } from '@/harnesses/codex-cli/approvals';
 import { getPermissionRequestByRequestId, listPendingAsksBySession } from '@/infrastructure/sqlite/pending-asks';
 import { saveCodexModelSelection } from '@/harnesses/codex-cli/models';
-import { createCodexExecution } from '@/harnesses/codex-cli/execution';
+import { createCodexExecution as createExecution, type CodexExecutionDependencies } from '@/harnesses/codex-cli/execution';
 import { hookCommand } from '@/harnesses/codex-cli/pretool-hook';
 import type { CodexHookCall } from '@/harnesses/codex-cli/hook-policy';
 import type { CodexConnection } from '@/harnesses/codex-cli/app-server';
@@ -26,7 +26,17 @@ afterEach(() => resetTestDatabase());
 
 function create(harness: 'prokop' | 'codex-cli' = 'codex-cli'): void {
   createSession({ id: 's', workspaceId: 'ws', title: 'Test', status: 'active',
-    preconfigId: null, metadata: null, parentId: null, agentName: null, harness });
+    preconfigId: harness === 'codex-cli' ? 'test' : null, metadata: null, parentId: null, agentName: null, harness });
+}
+
+function createCodexExecution(deps: Omit<CodexExecutionDependencies, 'instructions'> &
+  { instructions?: CodexExecutionDependencies['instructions'] }) {
+  return createExecution({ ...deps, instructions: deps.instructions ?? {
+    listPreconfigs: async () => [{ id: 'test', mode: 'primary', systemPrompt: 'Test instruction' } as import('@prokopai/sdk').Preconfig],
+    getPreconfig: async id => id === 'test' ? { id, systemPrompt: 'Test instruction' } as import('@prokopai/sdk').Preconfig : null,
+    getAgentDirectory: async () => null,
+    readAgentMemoryFile: async () => null,
+  } });
 }
 
 function fakeCodex(readThread?: () => unknown, rejectMethod?: string, trustedHook = false,
@@ -253,7 +263,7 @@ test('workspace memory is opt-in and refreshed in Codex thread instructions on r
     const first = execution.sendMessage(wire(messages), 'origin', 's', 'hello');
     await waitFor(() => processes[0]?.sent.some(message => message.method === 'turn/start') ?? false);
     expect((processes[0]!.sent.find(message => message.method === 'thread/start')?.params as Record<string, unknown>)
-      .developerInstructions).toBeUndefined();
+      .developerInstructions).toContain('Test instruction');
     processes[0]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
     processes[0]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
     await first;
@@ -267,7 +277,7 @@ test('workspace memory is opt-in and refreshed in Codex thread instructions on r
     expect(instructions).toContain('- prefer focused tests');
     expect(instructions).toContain('<workspace_memory path="MEMORY.md"');
     expect(instructions).toContain('- first fact');
-    expect(instructions).not.toContain('preconfig');
+    expect(instructions).toContain('Test instruction');
     expect((processes[1]!.sent.find(message => message.method === 'turn/start')?.params as Record<string, unknown>)
       .developerInstructions).toBeUndefined();
     processes[1]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
@@ -1144,6 +1154,55 @@ test('an unexpected goal clear fails closed without claiming completion', async 
   expect(getSession('s')?.metadata).toMatchObject({ codexGoal: null });
   expect(getCodexBinding('s')?.pendingTurn).toBe(true);
   expect(messages.some(message => message.type === 'error')).toBe(true);
+});
+
+test('legacy Codex session picks the workspace default before starting its thread', async () => {
+  create();
+  updateSession('s', { preconfigId: null });
+  updateWorkspace('ws', { settings: { preconfigs: { selectedIds: ['other'], defaultId: 'other' } } });
+  const preconfigs = ['test', 'other'].map(id => ({ id, mode: 'primary', systemPrompt: `${id} instruction`,
+    model: 'prokop-model' } as import('@prokopai/sdk').Preconfig));
+  const fake = fakeCodex();
+  const events: ServerMessage[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection,
+    instructions: {
+      listPreconfigs: async () => preconfigs,
+      getPreconfig: async id => preconfigs.find(item => item.id === id) ?? null,
+      getAgentDirectory: async () => null,
+      readAgentMemoryFile: async () => null,
+    } });
+  const pending = execution.sendMessage(wire(events), 'origin', 's', 'hello');
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  expect(getSession('s')?.preconfigId).toBe('other');
+  expect((fake.sent.find(message => message.method === 'thread/start')?.params as Record<string, unknown>)
+    .developerInstructions).toContain('other instruction');
+  expect((fake.sent.find(message => message.method === 'turn/start')?.params as Record<string, unknown>)
+    .model).toBeUndefined();
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await pending;
+});
+
+test('Codex refuses missing or deleted preconfigs before starting a turn', async () => {
+  create();
+  const messages: ServerMessage[] = [];
+  let launches = 0;
+  const sources = {
+    listPreconfigs: async () => [],
+    getPreconfig: async () => null,
+    getAgentDirectory: async () => null,
+    readAgentMemoryFile: async () => null,
+  };
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => { launches++; return fakeCodex().connection; }, instructions: sources });
+  await execution.sendMessage(wire(messages), 'origin', 's', 'hello');
+  expect(launches).toBe(0);
+  expect(listMessagesWithParts('s')).toHaveLength(0);
+  expect(messages.at(-1)).toMatchObject({ type: 'error', code: 'invalid_session' });
+  updateSession('s', { preconfigId: null });
+  await execution.sendMessage(wire(messages), 'origin', 's', 'hello');
+  expect(launches).toBe(0);
+  expect(listMessagesWithParts('s')).toHaveLength(0);
 });
 
 test('a Prokop session cannot spawn or route into Codex', async () => {

@@ -10,10 +10,10 @@ import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { getAttachment, MAX_ATTACHMENT_SIZE, validateImageMime, type Attachment } from '@/infrastructure/sqlite/attachments';
 import { getAttachmentDir } from '@/infrastructure/runtime/paths';
-import { CodexAppServer, CodexRequestError, codexObject, spawnCodexAppServer, type CodexConnection, type CodexNotification } from './app-server';
+import { CodexAppServer, CodexRequestError, codexObject, type CodexConnection, type CodexNotification } from './app-server';
 import { bindCodexThread, getCodexBinding, markCodexTurnPending, markCodexTurnStarted, markCodexGoalRequested, markCodexGoalUncertain, markCodexTurnCompleted, type CodexBinding } from './bindings';
 import { getCodexModelSelection } from './models';
-import { codexWorkspaceMemory } from './workspace-memory';
+import { codexDeveloperInstructions, defaultCodexPreconfigId, type CodexInstructionSources } from './instructions';
 import { codexApprovals } from './approvals';
 import { CodexToolItems } from './tool-items';
 import { createPretoolChannel, verifyPretoolHook, type PretoolChannel } from './pretool-hook';
@@ -39,6 +39,7 @@ export interface CodexExecutionDependencies {
   version(): string;
   prepareHook?: typeof createPretoolChannel;
   goalIdleTimeoutMs?: number;
+  instructions: CodexInstructionSources;
 }
 
 export function codexCliVersion(): string {
@@ -58,12 +59,6 @@ export function codexCliAvailable(): boolean {
     return false;
   }
 }
-
-const defaultDependencies: CodexExecutionDependencies = {
-  connect: spawnCodexAppServer,
-  version: codexCliVersion,
-  prepareHook: createPretoolChannel,
-};
 
 function id(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
@@ -231,7 +226,7 @@ async function reconcileTurn<Origin>(
 }
 
 /** One CLI process per active turn. Codex owns thread history, Prokop owns its transcript. */
-export function createCodexExecution(deps: CodexExecutionDependencies = defaultDependencies): Pick<SessionExecutionPort,
+export function createCodexExecution(deps: CodexExecutionDependencies): Pick<SessionExecutionPort,
   'sendMessage' | 'interruptSession' | 'isSessionActive'> {
   const active = new Map<string, ActiveTurn>();
   const starting = new Set<string>();
@@ -317,6 +312,19 @@ export function createCodexExecution(deps: CodexExecutionDependencies = defaultD
       let phase = 'workspace validation';
       try {
         const root = workspaceRoot(session);
+        const workspace = getWorkspace(session.workspaceId);
+        const sources = deps.instructions;
+        if (!workspace) throw new Error('Codex workspace is unavailable');
+        const preconfigId = session.preconfigId || defaultCodexPreconfigId(workspace, await sources.listPreconfigs());
+        if (!preconfigId) throw new Error('Codex requires a preconfig');
+        const preconfig = await sources.getPreconfig(preconfigId);
+        if (!preconfig) throw new Error('Codex preconfig is unavailable');
+        const instructions = await codexDeveloperInstructions(workspace, root, preconfig, sources);
+        if (!session.preconfigId) {
+          const updated = updateSession(sessionId, { preconfigId,
+            agentId: await sources.getAgentDirectory(preconfigId) ? preconfigId : null });
+          if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
+        }
         phase = 'CLI version check';
         const version = deps.version();
         const binding = getCodexBinding(sessionId);
@@ -532,19 +540,13 @@ export function createCodexExecution(deps: CodexExecutionDependencies = defaultD
         });
         await client.initialize();
         if (hookChannel) await verifyPretoolHook(client);
-        phase = 'workspace memory';
-        const workspace = getWorkspace(session.workspaceId);
-        if (!workspace) throw new Error('Workspace is unavailable');
-        const memory = await codexWorkspaceMemory(workspace, root);
         phase = binding ? 'thread resume' : 'thread creation';
         const selection = getCodexModelSelection(sessionId);
         const threadResponse = codexObject(await client.request(binding ? 'thread/resume' : 'thread/start',
           binding ? { threadId: binding.threadId, cwd: root, approvalPolicy: 'on-request', sandbox: 'workspace-write',
-            ...(selection ? { model: selection.model } : {}),
-            ...(memory ? { developerInstructions: memory } : {}) } : {
+            ...(selection ? { model: selection.model } : {}), developerInstructions: instructions } : {
             cwd: root, approvalPolicy: 'on-request', sandbox: 'workspace-write',
-            ...(selection ? { model: selection.model } : {}),
-            ...(memory ? { developerInstructions: memory } : {}),
+            ...(selection ? { model: selection.model } : {}), developerInstructions: instructions,
           }));
         const threadId = id(codexObject(threadResponse?.thread)?.id);
         if (!threadId || (binding && binding.threadId !== threadId)) throw new Error('Invalid Codex thread');

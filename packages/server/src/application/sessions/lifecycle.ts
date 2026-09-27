@@ -130,6 +130,11 @@ export function createSessionLifecycleApplication<Origin>(
         return;
       }
       const workspaceId = input.workspaceId || '';
+      if (decision.harness === 'codex-cli' && input.preconfigId
+        && !await deps.repository.getPreconfigOrAgent(input.preconfigId)) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Preconfig is unavailable' });
+        return;
+      }
       const sessionId = crypto.randomUUID();
       const workspaceAutoApprove = deps.repository.getWorkspaceAutoApproveSeverity(input.workspaceId || '');
       const session = deps.repository.createSession({
@@ -156,9 +161,11 @@ export function createSessionLifecycleApplication<Origin>(
             selectedVariant?: string | null;
             agentId?: string | null;
           } = {};
-          if (preconfig.model) updates.selectedModel = preconfig.model;
-          if (preconfig.provider) updates.selectedProvider = preconfig.provider;
-          updates.selectedVariant = preconfig.variant ?? null;
+          if (decision.harness === 'prokop') {
+            if (preconfig.model) updates.selectedModel = preconfig.model;
+            if (preconfig.provider) updates.selectedProvider = preconfig.provider;
+            updates.selectedVariant = preconfig.variant ?? null;
+          }
           updates.agentId = deps.repository.isAgentSync(input.preconfigId) ? input.preconfigId : null;
           const updated = deps.repository.updateSession(sessionId, updates);
           refreshAttachments(updated?.workspaceRootId);
@@ -273,7 +280,7 @@ export function createSessionLifecycleApplication<Origin>(
         wire.delivery.send(origin, { type: 'error', code: 'not_found', message: 'Session not found' });
         return;
       }
-      const featureError = prokopFeatureError(session.harness, 'agentSelection');
+      const featureError = unknownHarnessError(session.harness);
       if (featureError) {
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: featureError, sessionId });
         return;
@@ -291,7 +298,11 @@ export function createSessionLifecycleApplication<Origin>(
       if (input.preconfigId !== undefined) {
         updates.preconfigId = input.preconfigId;
         const preconfig = await deps.repository.getPreconfigOrAgent(input.preconfigId);
-        updates.selectedVariant = preconfig?.variant ? preconfig.variant : null;
+        if (!preconfig && session.harness === 'codex-cli') {
+          wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Preconfig is unavailable', sessionId });
+          return;
+        }
+        if (session.harness !== 'codex-cli') updates.selectedVariant = preconfig?.variant ? preconfig.variant : null;
         updates.agentId = deps.repository.isAgentSync(input.preconfigId) ? input.preconfigId : null;
       }
       const updated = deps.repository.updateSession(sessionId, updates);
@@ -326,12 +337,13 @@ export function createSessionLifecycleApplication<Origin>(
       }
       if (choice.harness === 'codex-cli') {
         const decision = checkHarnessCreate({ harness: 'codex-cli', workspaceId: session.workspaceId,
-          workspaceRootId: session.workspaceRootId ?? undefined }, {
+          preconfigId: session.preconfigId, workspaceRootId: session.workspaceRootId ?? undefined }, {
           codexAvailable: deps.codexAvailable ?? (() => false),
           codexWorkspaceAvailable: deps.codexWorkspaceAvailable ?? (() => false),
           workspaceRoots: deps.workspaceRoots,
         });
         if (!decision.ok) return invalid(decision.message);
+        if (!await deps.repository.getPreconfigOrAgent(session.preconfigId!)) return invalid('Preconfig is unavailable');
         if (typeof choice.effort !== 'string' || !choice.effort || choice.effort.length > 100 || !deps.codexModels) {
           return invalid('Invalid Codex model selection');
         }

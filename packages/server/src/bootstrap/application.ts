@@ -41,6 +41,9 @@ import {
   createJean2ProviderRegistryPort,
 } from '@/adapters/capek';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
+import { listPreconfigs } from '@/infrastructure/config/preconfig';
+import { spawnCodexAppServer } from '@/harnesses/codex-cli/app-server';
+import { createPretoolChannel } from '@/harnesses/codex-cli/pretool-hook';
 import { selectEmptySessionHarnessModel } from '@/infrastructure/sqlite/session-store';
 import { getModelsConfigWithStatus } from '@/config/models';
 import { getDatabase } from '@/infrastructure/sqlite/database';
@@ -87,6 +90,7 @@ import { codexApprovals } from '@/harnesses/codex-cli/approvals';
 import { installCodexApprovalPort } from '@/application/ports/codex-approval';
 import {
   codexCliAvailable,
+  codexCliVersion,
   createCodexCliHarness,
   createCodexExecution,
   getCodexModelSelection,
@@ -162,7 +166,17 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     changed: (worktreeId: string): void => refreshWorktreeAttachments?.(worktreeId),
   };
   installCodexApprovalPort(codexApprovals);
-  const codexExecution = createCodexExecution();
+  const codexExecution = createCodexExecution({
+    connect: spawnCodexAppServer,
+    version: codexCliVersion,
+    prepareHook: createPretoolChannel,
+    instructions: {
+      listPreconfigs,
+      getPreconfig: id => agents.getPreconfigOrAgent(id),
+      getAgentDirectory: id => agents.getAgentDirectory(id),
+      readAgentMemoryFile: (id, filename) => agents.readAgentMemoryFile(id, filename),
+    },
+  });
   const execution = createHarnessExecution(repository, {
     prokop: createProkopHarness({
       onSessionChanged: (changedSession) => {

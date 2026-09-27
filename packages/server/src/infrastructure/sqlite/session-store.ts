@@ -97,16 +97,14 @@ export function selectEmptySessionHarnessModel(
   const db = getDatabase();
   const selected = db.transaction(() => {
     const result = db.run(`UPDATE sessions SET harness = ?, selected_model = ?, selected_provider = ?,
-      selected_variant = NULL, preconfig_id = CASE WHEN ? = 'codex-cli' THEN NULL ELSE preconfig_id END,
-      agent_id = CASE WHEN ? = 'codex-cli' THEN NULL ELSE agent_id END,
-      updated_at = ?
+      selected_variant = NULL, updated_at = ?
       WHERE id = ? AND harness = ? AND updated_at = ? AND status = 'active' AND parent_id IS NULL
         AND running_at IS NULL AND compacting = 0
         AND NOT EXISTS (SELECT 1 FROM codex_session_bindings WHERE session_id = ?)
         AND NOT EXISTS (SELECT 1 FROM messages WHERE session_id = ?)
         AND NOT EXISTS (SELECT 1 FROM queued_messages WHERE session_id = ?)`, [
       choice.harness, choice.modelId, choice.harness === 'prokop' ? choice.providerId : null,
-      choice.harness, choice.harness, new Date().toISOString(), sessionId, expectedHarness,
+      new Date().toISOString(), sessionId, expectedHarness,
       expectedUpdatedAt, sessionId, sessionId, sessionId,
     ]);
     if (result.changes !== 1) return null;

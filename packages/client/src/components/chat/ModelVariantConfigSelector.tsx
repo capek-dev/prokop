@@ -151,7 +151,7 @@ export function ModelVariantConfigSelector({
   const fullSelectionLabel = [
     modelDisplayName,
     variantDisplayName,
-    selectedPreconfig && !lockPreconfig && !codexSession ? selectedPreconfig.name : null,
+    selectedPreconfig && !lockPreconfig ? selectedPreconfig.name : null,
   ].filter(Boolean).join(', ');
 
   const hasVariants = codexSession ? !!selectedCodex?.supportedEfforts.length
@@ -391,7 +391,7 @@ export function ModelVariantConfigSelector({
     ...(hasVariants
       ? [{ icon: <Brain className="size-3.5" />, label: codexSession ? 'Effort' : 'Variant', value: variantDisplayName ? capitalizeVariant(variantDisplayName) : 'Default', section: 'variant' as const }]
       : []),
-    ...(preconfigs.length > 0 && !lockPreconfig && !codexSession
+    ...(preconfigs.length > 0 && !lockPreconfig
       ? [{ icon: (() => {
             const isSelectedAgent = selectedPreconfig ? isAgentPreconfig(selectedPreconfig.id) : false;
             const Icon = isSelectedAgent ? Bot : Cog;

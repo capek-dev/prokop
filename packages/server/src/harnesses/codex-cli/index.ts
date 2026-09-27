@@ -1,7 +1,7 @@
 import type { HarnessRegistration } from '@/application/sessions/harness-execution';
 import type { SessionExecutionPort } from '@/application/ports/execution';
 
-export { codexCliAvailable, createCodexExecution } from './execution';
+export { codexCliAvailable, codexCliVersion, createCodexExecution } from './execution';
 export { getCodexModelSelection, listCodexModels, saveCodexModelSelection } from './models';
 
 /** Codex CLI owns turns and model choice; unsupported Čapek operations remain explicit. */

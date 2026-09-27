@@ -109,14 +109,16 @@ export function useSessionCommands({
     pendingPartAppendsRef.current.clear();
     if (client && client.connected) {
       client.sessions.create({
-        preconfigId: options?.harness === 'codex-cli' ? undefined : preconfigId,
+        preconfigId: options?.harness === 'codex-cli'
+          ? preconfigId ?? (activeWorkspace ? getWorkspaceDefaultPreconfigId(activeWorkspace, primaryPreconfigs) : undefined)
+          : preconfigId,
         title,
         workspaceId: activeWorkspace?.id,
         workspaceRootId: options?.workspaceRootId,
         harness: options?.harness,
       });
     }
-  }, [clientRef, partAppendRafRef, pendingPartAppendsRef, pendingSessionCreateRef, activeWorkspace]);
+  }, [clientRef, partAppendRafRef, pendingPartAppendsRef, pendingSessionCreateRef, activeWorkspace, primaryPreconfigs]);
 
   const resumeSession = useCallback((sessionId: string, options?: ResumeSessionOptions) => {
     const client = clientRef.current;
@@ -433,7 +435,7 @@ export function useSessionCommands({
       : primaryPreconfigs[0]?.id;
     if (client && client.connected) {
       client.sessions.create({
-        preconfigId: options?.harness === 'codex-cli' ? undefined : defaultId,
+        preconfigId: defaultId,
         workspaceId,
         workspaceRootId: options?.workspaceRootId,
         harness: options?.harness,

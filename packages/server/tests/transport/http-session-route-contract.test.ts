@@ -201,7 +201,7 @@ describe('HTTP session route contract', () => {
     });
     expect(res.status).toBe(400);
     expect(await json(res)).toEqual({ error: 'bad_request',
-      message: 'Codex CLI requires a physical workspace and no Prokop agent preset' });
+      message: 'Codex CLI requires a physical workspace' });
   });
 
   test('POST /api/sessions does not misreport an application refusal as a worktree error', async () => {
@@ -215,7 +215,7 @@ describe('HTTP session route contract', () => {
     expect(await json(res)).toEqual({ error: 'bad_request', message: 'Session could not be created' });
   });
 
-  test('POST /api/sessions accepts available Codex only in physical workspaces without Prokop presets', async () => {
+  test('POST /api/sessions accepts a Codex preconfig only in a physical workspace', async () => {
     const created: unknown[] = [];
     const { app } = makeApp({
       createSession: input => { created.push(input); return makeSession({ harness: input.harness }); },
@@ -225,12 +225,12 @@ describe('HTTP session route contract', () => {
     });
     for (const body of [
       { harness: 'codex-cli', workspaceId: 'virtual' },
-      { harness: 'codex-cli', workspaceId: 'physical', preconfigId: 'prokop-agent' },
       { harness: '__proto__', workspaceId: 'physical' },
     ]) expect((await post(body)).status).toBe(400);
     expect(created).toHaveLength(0);
-    expect((await post({ harness: 'codex-cli', workspaceId: 'physical' })).status).toBe(201);
-    expect(created).toEqual([expect.objectContaining({ harness: 'codex-cli', preconfigId: null })]);
+    expect((await post({ harness: 'codex-cli', workspaceId: 'physical' })).status).toBe(400);
+    expect((await post({ harness: 'codex-cli', workspaceId: 'physical', preconfigId: 'prokop-agent' })).status).toBe(201);
+    expect(created).toEqual([expect.objectContaining({ harness: 'codex-cli', preconfigId: 'prokop-agent' })]);
   });
 
   test('GET /api/sessions/grouped validates the workspaceIds parameter', async () => {

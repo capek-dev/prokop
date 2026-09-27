@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { createTestSession } from '#tests/factories';
 import { seedWorkspace } from '#tests/seed';
-import { createSession, getSession, selectEmptySessionHarnessModel } from '@/infrastructure/sqlite/session-store';
+import { createSession, getSession, selectEmptySessionHarnessModel, updateSession } from '@/infrastructure/sqlite/session-store';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 
 beforeEach(() => {
@@ -22,9 +22,11 @@ const codex = { harness: 'codex-cli', modelId: 'codex-model', effort: 'high' } a
 const prokop = { harness: 'prokop', modelId: 'prokop-model', providerId: 'provider' } as const;
 
 test('switches a root session both ways, clearing the other harness selection', () => {
-  const initial = makeSession('root');
+  makeSession('root');
+  const initial = updateSession('root', { preconfigId: 'agent', agentId: 'agent' })!;
   const selected = selectEmptySessionHarnessModel('root', 'prokop', initial.updatedAt, codex);
-  expect(selected).toMatchObject({ harness: 'codex-cli', selectedModel: codex.modelId, preconfigId: null });
+  expect(selected).toMatchObject({ harness: 'codex-cli', selectedModel: codex.modelId,
+    preconfigId: initial.preconfigId, agentId: initial.agentId });
   expect(getDatabase().query('SELECT model, effort FROM codex_session_models WHERE session_id = ?').get('root'))
     .toEqual({ model: codex.modelId, effort: codex.effort });
   const returned = selectEmptySessionHarnessModel('root', 'codex-cli', selected!.updatedAt, prokop);

@@ -244,7 +244,7 @@ export function ChatHeader({
               selectedPreconfigId={session.preconfigId}
               onChangePreconfig={onChangePreconfig}
               disabled={session.status === 'closed' || !!session.parentId || isObserver || (codexSession && !!isStreaming)}
-              lockPreconfig={lockPreconfig || codexSession}
+              lockPreconfig={lockPreconfig}
               iconOnly={showFullModelSelector}
               compact={isCompact}
             />
