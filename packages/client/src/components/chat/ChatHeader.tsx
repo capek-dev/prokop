@@ -205,7 +205,9 @@ export function ChatHeader({
               </h2>
             )}
 
-            {session.harness !== 'codex-cli' && <TokenMeter
+            <TokenMeter
+              codex={codexSession}
+              codexUsage={session.metadata?.codexUsage}
               promptTokens={usage.promptTokens}
               completionTokens={usage.completionTokens}
               totalTokens={usage.totalTokens}
@@ -215,7 +217,7 @@ export function ChatHeader({
               contextWindow={contextWindow}
               modelName={modelName}
               compact={isMobile}
-            />}
+            />
 
             {session.status === 'closed' && (
               <Badge variant="secondary">

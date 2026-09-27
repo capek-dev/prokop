@@ -73,6 +73,38 @@ describe('TokenMeter', () => {
     expect(tooltipContent.getByText('10,000')).toBeInTheDocument();
   });
 
+  const codexUsage = {
+    last: { totalTokens: 5000, inputTokens: 4000, cachedInputTokens: 1200,
+      cacheWriteInputTokens: 0, outputTokens: 1000, reasoningOutputTokens: 300 },
+    total: { totalTokens: 25000, inputTokens: 20000, cachedInputTokens: 4000,
+      cacheWriteInputTokens: 0, outputTokens: 5000, reasoningOutputTokens: 1500 },
+    modelContextWindow: 20000,
+  };
+
+  it('uses Codex latest total for occupancy and labels cumulative usage separately', async () => {
+    render(<TokenMeter codex codexUsage={codexUsage} totalTokens={19000} contextWindow={1000} />);
+    expect(screen.getByText('25%')).toBeInTheDocument();
+    const button = screen.getByRole('button', { name: 'Token usage: 25% of context window' });
+    await userEvent.hover(button);
+    const tooltip = within(await screen.findByRole('tooltip'));
+    expect(tooltip.getByText('Latest input')).toBeInTheDocument();
+    expect(tooltip.getByText('Latest cached input')).toBeInTheDocument();
+    expect(tooltip.getByText('Latest reasoning output')).toBeInTheDocument();
+    expect(tooltip.getByText('Thread total')).toBeInTheDocument();
+    expect(tooltip.getByText('25,000')).toBeInTheDocument();
+    await userEvent.click(button);
+    expect(screen.getByText('5.0k/20.0k')).toBeInTheDocument();
+  });
+
+  it('does not fabricate a Codex percentage when the window or usage is missing', () => {
+    const { rerender } = render(<TokenMeter codex codexUsage={{ ...codexUsage, modelContextWindow: null }} />);
+    expect(screen.getByText('5.0k/?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Codex context usage: unknown' })).toBeInTheDocument();
+    rerender(<TokenMeter codex codexUsage={{ ...codexUsage, last: { ...codexUsage.last, inputTokens: -1 } }} />);
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.queryByText('25%')).not.toBeInTheDocument();
+  });
+
   it('renders SVG ring indicator', () => {
     const { container } = render(<TokenMeter />);
     const svg = container.querySelector('svg');

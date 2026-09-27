@@ -19,6 +19,7 @@ import { CodexToolItems } from './tool-items';
 import { createPretoolChannel, verifyPretoolHook, type PretoolChannel } from './pretool-hook';
 import { classifyCodexHook } from './hook-policy';
 import { parseCodexGoal, publishCodexGoal, validGoalBudget } from './goal';
+import { parseCodexContextUsage, publishCodexContextUsage } from './usage';
 
 interface ActiveTurn {
   client: CodexAppServer;
@@ -397,6 +398,12 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
           if (!params || !run || params.threadId !== run.threadId) return;
           const turn = codexObject(params.turn);
           const eventTurnId = id(params.turnId) ?? id(turn?.id);
+          if (event.method === 'thread/tokenUsage/updated') {
+            if (!run.turnId || eventTurnId !== run.turnId || completed) return;
+            const usage = parseCodexContextUsage(params.tokenUsage);
+            if (usage) publishCodexContextUsage(sessionId, usage, wire.delivery);
+            return;
+          }
           if (event.method === 'thread/goal/cleared' && goalTokenBudget !== undefined) {
             publishCodexGoal(session, null, wire.delivery);
             rejectDone(new Error('Codex goal was cleared before completion'));

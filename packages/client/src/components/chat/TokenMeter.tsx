@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { CodexContextUsage, CodexTokenBreakdown } from '@prokopai/sdk';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface TokenMeterProps {
@@ -11,6 +12,27 @@ interface TokenMeterProps {
   contextWindow?: number;
   modelName?: string;
   compact?: boolean;
+  /** Codex reports the latest response separately from cumulative thread usage. */
+  codexUsage?: unknown;
+  codex?: boolean;
+}
+
+const CODEX_FIELDS = ['totalTokens', 'inputTokens', 'cachedInputTokens', 'cacheWriteInputTokens',
+  'outputTokens', 'reasoningOutputTokens'] as const;
+
+function validBreakdown(value: unknown): value is CodexTokenBreakdown {
+  return !!value && typeof value === 'object' && CODEX_FIELDS.every(field => {
+    const count = (value as Record<string, unknown>)[field];
+    return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0;
+  });
+}
+
+function validCodexUsage(value: unknown): value is CodexContextUsage {
+  if (!value || typeof value !== 'object') return false;
+  const usage = value as Record<string, unknown>;
+  return validBreakdown(usage.last) && validBreakdown(usage.total)
+    && (usage.modelContextWindow === null || typeof usage.modelContextWindow === 'number'
+      && Number.isSafeInteger(usage.modelContextWindow) && usage.modelContextWindow > 0);
 }
 
 function formatCompact(num: number): string {
@@ -36,12 +58,16 @@ export function TokenMeter({
   modelName,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   compact,
+  codex = false,
+  codexUsage,
 }: TokenMeterProps) {
   const [showTokens, setShowTokens] = useState(false);
-  const effectiveContext = totalTokens === 0 ? 0 : contextWindow;
+  const reported = codex && validCodexUsage(codexUsage) ? codexUsage : null;
+  const used = codex ? reported?.last.totalTokens ?? 0 : totalTokens;
+  const effectiveContext = codex ? reported?.modelContextWindow ?? 0 : totalTokens === 0 ? 0 : contextWindow;
   const percentage = effectiveContext === 0
     ? 0
-    : Math.min(100, Math.round((totalTokens / effectiveContext) * 100));
+    : Math.min(100, Math.round((used / effectiveContext) * 100));
 
   const status = getUsageStatus(percentage);
 
@@ -57,15 +83,25 @@ export function TokenMeter({
         ? 'text-warning'
         : 'text-primary';
 
-  const usageRows = [
-    ['Prompt tokens', promptTokens],
-    ['Completion tokens', completionTokens],
-    ['Total tokens', totalTokens],
-    ['Cache read', cacheReadTokens],
-    ['Cache write', cacheWriteTokens],
-    ['Not cached', noCacheTokens],
-    ['Context window', contextWindow],
-  ] as const;
+  const usageRows: Array<[string, number | string]> = codex
+    ? reported ? [
+      ['Latest input', reported.last.inputTokens],
+      ['Latest output', reported.last.outputTokens],
+      ['Latest cached input', reported.last.cachedInputTokens],
+      ['Latest reasoning output', reported.last.reasoningOutputTokens],
+      ['Latest total', reported.last.totalTokens],
+      ['Thread total', reported.total.totalTokens],
+      ['Context window', reported.modelContextWindow ?? 'Not reported'],
+    ] : [['Context usage', 'Not reported']]
+    : [
+      ['Prompt tokens', promptTokens],
+      ['Completion tokens', completionTokens],
+      ['Total tokens', totalTokens],
+      ['Cache read', cacheReadTokens],
+      ['Cache write', cacheWriteTokens],
+      ['Not cached', noCacheTokens],
+      ['Context window', contextWindow],
+    ];
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -75,7 +111,8 @@ export function TokenMeter({
             type="button"
             className="flex items-center gap-1.5 cursor-pointer select-none"
             onClick={() => setShowTokens((current) => !current)}
-            aria-label={`Token usage: ${percentage}% of context window`}
+            aria-label={codex && !effectiveContext ? 'Codex context usage: unknown'
+              : `Token usage: ${percentage}% of context window`}
           >
             <svg
               viewBox="0 0 20 20"
@@ -105,9 +142,8 @@ export function TokenMeter({
               />
             </svg>
             <span className="text-xs font-mono text-muted-foreground">
-              {showTokens
-                ? `${formatCompact(totalTokens)}/${formatCompact(effectiveContext)}`
-                : `${percentage}%`}
+              {codex && !effectiveContext ? (reported ? `${formatCompact(used)}/?` : '—')
+                : showTokens ? `${formatCompact(used)}/${formatCompact(effectiveContext)}` : `${percentage}%`}
             </span>
           </button>
         </TooltipTrigger>
@@ -117,7 +153,7 @@ export function TokenMeter({
             {usageRows.map(([label, value]) => (
               <div key={label} className="contents">
                 <span>{label}</span>
-                <span className="text-right">{value.toLocaleString()}</span>
+                <span className="text-right">{typeof value === 'number' ? value.toLocaleString() : value}</span>
               </div>
             ))}
           </div>

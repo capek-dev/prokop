@@ -1205,6 +1205,51 @@ test('Codex refuses missing or deleted preconfigs before starting a turn', async
   expect(listMessagesWithParts('s')).toHaveLength(0);
 });
 
+test('Codex usage accepts only active matching turns, including goal continuations', async () => {
+  create();
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const pending = execution.sendMessage(wire(messages), 'origin', 's', 'Ship it', undefined,
+    undefined, 'Ship it', undefined, 50000);
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  const usage = { last: { totalTokens: 1000, inputTokens: 800, cachedInputTokens: 100,
+    cacheWriteInputTokens: 0, outputTokens: 200, reasoningOutputTokens: 50 },
+  total: { totalTokens: 3000, inputTokens: 2400, cachedInputTokens: 300,
+    cacheWriteInputTokens: 0, outputTokens: 600, reasoningOutputTokens: 100 },
+  modelContextWindow: 10000 };
+  const notify = (threadId: string, turnId: string, tokenUsage: unknown) => fake.send({
+    method: 'thread/tokenUsage/updated', params: { threadId, turnId, tokenUsage },
+  });
+  notify('other', 'turn-1', usage);
+  notify('thread-1', 'other', usage);
+  notify('thread-1', 'turn-1', { ...usage, modelContextWindow: 'invalid' });
+  await Bun.sleep(5);
+  expect(getSession('s')?.metadata?.codexUsage).toBeUndefined();
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => fake.sent.some(message => message.method === 'thread/goal/set'));
+  notify('thread-1', 'turn-1', usage);
+  await waitFor(() => getSession('s')?.metadata?.codexUsage !== undefined);
+  expect(getSession('s')?.metadata?.codexUsage).toEqual(usage);
+  expect(messages.some(message => message.type === 'session.updated'
+    && (message.session.metadata?.codexUsage as { last?: { totalTokens: number } } | undefined)?.last?.totalTokens === 1000)).toBe(true);
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  notify('thread-1', 'turn-1', { ...usage, modelContextWindow: 1 });
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-2' } } });
+  await waitFor(() => getCodexBinding('s')?.pendingTurnId === 'turn-2');
+  notify('thread-1', 'turn-1', { ...usage, modelContextWindow: 2 });
+  notify('thread-1', 'turn-2', { ...usage, modelContextWindow: null });
+  await waitFor(() => (getSession('s')?.metadata?.codexUsage as { modelContextWindow: number | null })?.modelContextWindow === null);
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-2', status: 'completed' } } });
+  fake.send({ method: 'thread/goal/updated', params: { threadId: 'thread-1', goal: {
+    threadId: 'thread-1', objective: 'Ship it', status: 'complete', tokenBudget: 50000,
+    tokensUsed: 3000, timeUsedSeconds: 3, createdAt: 1, updatedAt: 2,
+  } } });
+  await pending;
+  expect((getSession('s')?.metadata?.codexUsage as { modelContextWindow: number | null }).modelContextWindow).toBeNull();
+});
+
 test('a Prokop session cannot spawn or route into Codex', async () => {
   create('prokop');
   let launches = 0;
