@@ -29,7 +29,9 @@ function create(harness: 'prokop' | 'codex-cli' = 'codex-cli'): void {
     preconfigId: null, metadata: null, parentId: null, agentName: null, harness });
 }
 
-function fakeCodex(readThread?: () => unknown, rejectMethod?: string, trustedHook = false): { connection: CodexConnection; sent: Record<string, unknown>[]; send(message: unknown): void } {
+function fakeCodex(readThread?: () => unknown, rejectMethod?: string, trustedHook = false,
+  readGoal?: () => unknown, deferActiveGoal = false,
+  deferTurnStart = false, deferPauseGoal = false): { connection: CodexConnection; sent: Record<string, unknown>[]; send(message: unknown): void } {
   let controller!: ReadableStreamDefaultController<Uint8Array>;
   const sent: Record<string, unknown>[] = [];
   const connection: CodexConnection = {
@@ -54,10 +56,21 @@ function fakeCodex(readThread?: () => unknown, rejectMethod?: string, trustedHoo
       if (message.method === 'thread/read' && readThread) {
         queueMicrotask(() => send({ id: message.id, result: { thread: readThread() } }));
       }
-      if (message.method === 'turn/start') {
+      if (message.method === 'thread/goal/get') queueMicrotask(() => send({ id: message.id, result: {
+        goal: readGoal ? readGoal() : { threadId: 'thread-1', objective: 'Ship it', status: 'active',
+          tokenBudget: 50000, tokensUsed: 0, timeUsedSeconds: 0, createdAt: 1, updatedAt: 1 },
+      } }));
+      if (message.method === 'turn/start' && !deferTurnStart) {
         queueMicrotask(() => send({ id: message.id, result: { turn: { id: 'turn-1' } } }));
       }
       if (message.method === 'turn/interrupt') queueMicrotask(() => send({ id: message.id, result: {} }));
+      if (message.method === 'thread/goal/set' && !(deferActiveGoal
+        && (message.params as { status: string }).status === 'active') && !(deferPauseGoal
+        && (message.params as { status: string }).status === 'paused')) queueMicrotask(() => send({ id: message.id, result: { goal: {
+        threadId: 'thread-1', objective: 'Ship it',
+        status: (message.params as { status: string }).status, tokenBudget: 50000,
+        tokensUsed: 0, timeUsedSeconds: 0, createdAt: 1, updatedAt: 1,
+      } } }));
       return bytes.length;
     } },
     exited: new Promise(() => {}),
@@ -743,6 +756,394 @@ test('restart recovers a finished turn by client user ID without replaying it', 
   processes[2]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
   await next;
   expect(getCodexBinding('s')?.pendingTurn).toBe(false);
+});
+
+test('Codex rejects malformed budgets and mismatched objectives before starting', async () => {
+  create();
+  const messages: ServerMessage[] = [];
+  const execution = createCodexExecution({ version: () => { throw new Error('must not start'); },
+    connect: () => { throw new Error('must not connect'); } });
+  for (const [objective, budget] of [['Ship it', 0], ['Ship it', 1.5],
+    ['Ship it', 1_000_001], ['different', 50000], [null, 50000]] as const) {
+    await execution.sendMessage(wire(messages), 'origin', 's', 'Ship it', undefined, undefined,
+      objective as string | undefined, undefined, budget);
+    expect(messages.at(-1)).toMatchObject({ type: 'error', code: 'invalid_session' });
+  }
+  expect(listMessagesWithParts('s')).toHaveLength(0);
+});
+
+test('Codex starts the user turn before activating a native goal', async () => {
+  create();
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const send = execution.sendMessage(wire(messages), 'origin', 's', 'Ship it', undefined, undefined,
+    'Ship it', undefined, 50000);
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  expect(fake.sent.some(message => message.method === 'thread/goal/set')).toBe(false);
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => fake.sent.some(message => message.method === 'thread/goal/set'));
+  expect(fake.sent.filter(message => message.method === 'turn/start')).toHaveLength(1);
+  expect(fake.sent.find(message => message.method === 'thread/goal/set')?.params).toEqual({
+    threadId: 'thread-1', objective: 'Ship it', status: 'active', tokenBudget: 50000,
+  });
+  fake.send({ method: 'thread/goal/updated', params: { threadId: 'thread-1', turnId: 'turn-1', goal: {
+    threadId: 'thread-1', objective: 'Ship it', status: 'complete', tokenBudget: 50000,
+    tokensUsed: 120, timeUsedSeconds: 1, createdAt: 1, updatedAt: 2,
+  } } });
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await send;
+  expect(getSession('s')?.metadata).toMatchObject({ codexGoal: { status: 'complete', tokensUsed: 120 } });
+});
+
+test('native goal continuations stay in one process and create separate assistant messages', async () => {
+  create();
+  const fake = fakeCodex();
+  let launches = 0;
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => { launches++; return fake.connection; } });
+  const messages: ServerMessage[] = [];
+  const send = execution.sendMessage(wire(messages), 'origin', 's', 'Ship it', undefined, undefined,
+    'Ship it', undefined, 50000);
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => fake.sent.some(message => message.method === 'thread/goal/set'));
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await waitFor(() => {
+    const message = listMessagesWithParts('s')[1]?.message;
+    return message?.role === 'assistant' && message.status === 'completed';
+  });
+  expect(execution.isSessionActive('s')).toBe(true);
+  expect(getCodexBinding('s')?.pendingTurn).toBe(true);
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-2' } } });
+  fake.send({ method: 'item/agentMessage/delta', params: {
+    threadId: 'thread-1', turnId: 'turn-2', itemId: 'a2', delta: 'Continued',
+  } });
+  fake.send({ method: 'thread/goal/updated', params: { threadId: 'thread-1', turnId: 'turn-2', goal: {
+    threadId: 'thread-1', objective: 'Ship it', status: 'budgetLimited', tokenBudget: 50000,
+    tokensUsed: 50000, timeUsedSeconds: 5, createdAt: 1, updatedAt: 2,
+  } } });
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-2', status: 'completed' } } });
+  await send;
+  expect(launches).toBe(1);
+  expect(getCodexBinding('s')?.pendingTurn).toBe(false);
+  expect(getSession('s')?.metadata).toMatchObject({ codexGoal: { status: 'budgetLimited' } });
+  expect(listMessagesWithParts('s').map(entry => entry.message.role)).toEqual(['user', 'assistant', 'assistant']);
+  expect(listMessagesWithParts('s')[2]?.parts).toMatchObject([{ type: 'text', text: 'Continued' }]);
+});
+
+test('Stop before turn/start response does not activate the goal', async () => {
+  create();
+  const fake = fakeCodex(undefined, undefined, false, undefined, false, true);
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const send = execution.sendMessage(wire(messages), 'origin', 's', 'Ship it', undefined, undefined,
+    'Ship it', undefined, 50000);
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  const request = fake.sent.find(message => message.method === 'turn/start')!;
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => getCodexBinding('s')?.pendingTurnId === 'turn-1');
+  const stop = execution.interruptSession('s');
+  fake.send({ id: request.id, result: { turn: { id: 'turn-1' } } });
+  await stop;
+  expect(fake.sent.some(message => message.method === 'thread/goal/set')).toBe(false);
+  expect(fake.sent.some(message => message.method === 'turn/interrupt')).toBe(true);
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'interrupted' } } });
+  await send;
+  expect(getCodexBinding('s')?.pendingTurn).toBe(false);
+});
+
+test('Stop waits for in-flight goal activation before pausing and interrupting', async () => {
+  create();
+  const fake = fakeCodex(undefined, undefined, false, undefined, true);
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const send = execution.sendMessage(wire(messages), 'origin', 's', 'Ship it', undefined, undefined,
+    'Ship it', undefined, 50000);
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => fake.sent.some(message => message.method === 'thread/goal/set'));
+  const activation = fake.sent.find(message => message.method === 'thread/goal/set')!;
+  const stop = execution.interruptSession('s');
+  await Bun.sleep(5);
+  expect(fake.sent.filter(message => message.method === 'thread/goal/set')).toHaveLength(1);
+  fake.send({ id: activation.id, result: { goal: {
+    threadId: 'thread-1', objective: 'Ship it', status: 'active', tokenBudget: 50000,
+    tokensUsed: 0, timeUsedSeconds: 0, createdAt: 1, updatedAt: 1,
+  } } });
+  await stop;
+  expect(fake.sent.map(message => message.method).filter(method => method === 'thread/goal/set' || method === 'turn/interrupt'))
+    .toEqual(['thread/goal/set', 'thread/goal/set', 'turn/interrupt']);
+  expect(getSession('s')?.metadata).toMatchObject({ codexGoal: { status: 'paused' } });
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'interrupted' } } });
+  await send;
+  expect(getCodexBinding('s')?.pendingTurn).toBe(false);
+});
+
+test('Stop between goal turns pauses without interrupting the completed turn', async () => {
+  create();
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const send = execution.sendMessage(wire(messages), 'origin', 's', 'Ship it', undefined, undefined,
+    'Ship it', undefined, 50000);
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => getSession('s')?.metadata !== null && fake.sent.some(message => message.method === 'thread/goal/set'));
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await waitFor(() => {
+    const message = listMessagesWithParts('s')[1]?.message;
+    return message?.role === 'assistant' && message.status === 'completed';
+  });
+  expect(execution.isSessionActive('s')).toBe(true);
+  expect((await execution.interruptSession('s')).success).toBe(true);
+  await send;
+  expect(fake.sent.filter(message => message.method === 'turn/interrupt')).toHaveLength(0);
+  expect(getSession('s')?.metadata).toMatchObject({ codexGoal: { status: 'paused' } });
+  expect(getCodexBinding('s')?.pendingTurn).toBe(false);
+});
+
+test('interrupt pauses a native goal before interrupting its current turn', async () => {
+  create();
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const send = execution.sendMessage(wire(messages), 'origin', 's', 'Ship it', undefined, undefined,
+    'Ship it', undefined, 50000);
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => getSession('s')?.metadata !== null && fake.sent.some(message => message.method === 'thread/goal/set'));
+  await execution.interruptSession('s');
+  expect(fake.sent.map(message => message.method).filter(method => method === 'thread/goal/set' || method === 'turn/interrupt'))
+    .toEqual(['thread/goal/set', 'thread/goal/set', 'turn/interrupt']);
+  expect(getSession('s')?.metadata).toMatchObject({ codexGoal: { status: 'paused' } });
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'interrupted' } } });
+  await send;
+  expect(getCodexBinding('s')?.pendingTurn).toBe(false);
+});
+
+test('goal activation response after turn completion still bounds continuation wait', async () => {
+  create();
+  const fake = fakeCodex(undefined, undefined, false, undefined, true);
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => fake.connection, goalIdleTimeoutMs: 15 });
+  const messages: ServerMessage[] = [];
+  const send = execution.sendMessage(wire(messages), 'origin', 's', 'Ship it', undefined, undefined,
+    'Ship it', undefined, 50000);
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => fake.sent.some(message => message.method === 'thread/goal/set'));
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  const request = fake.sent.find(message => message.method === 'thread/goal/set')!;
+  fake.send({ id: request.id, result: { goal: { threadId: 'thread-1', objective: 'Ship it',
+    status: 'active', tokenBudget: 50000, tokensUsed: 0, timeUsedSeconds: 0, createdAt: 1, updatedAt: 1 } } });
+  await send;
+  expect(messages.some(message => message.type === 'error')).toBe(true);
+  expect(getCodexBinding('s')?.pendingTurn).toBe(true);
+});
+
+test('stalled active goal reports an error and keeps recovery pending', async () => {
+  create();
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => fake.connection, goalIdleTimeoutMs: 15 });
+  const messages: ServerMessage[] = [];
+  const send = execution.sendMessage(wire(messages), 'origin', 's', 'Ship it', undefined, undefined,
+    'Ship it', undefined, 50000);
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => getSession('s')?.metadata !== null);
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await send;
+  expect(messages.some(message => message.type === 'error')).toBe(true);
+  expect(getCodexBinding('s')?.pendingTurn).toBe(true);
+  expect(getSession('s')?.metadata).toMatchObject({ codexGoal: { status: 'active' } });
+});
+
+test('late active goal update and continuation after Stop stay unresolved', async () => {
+  create();
+  const fake = fakeCodex(undefined, undefined, false, undefined, false, false, true);
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const send = execution.sendMessage(wire(messages), 'origin', 's', 'Ship it', undefined, undefined,
+    'Ship it', undefined, 50000);
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => getSession('s')?.metadata !== null);
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await waitFor(() => {
+    const message = listMessagesWithParts('s')[1]?.message;
+    return message?.role === 'assistant' && message.status === 'completed';
+  });
+  const stop = execution.interruptSession('s');
+  await waitFor(() => fake.sent.filter(message => message.method === 'thread/goal/set').length === 2);
+  const pause = fake.sent.filter(message => message.method === 'thread/goal/set')[1]!;
+  fake.send({ id: pause.id, result: { goal: {
+    threadId: 'thread-1', objective: 'Ship it', status: 'paused', tokenBudget: 50000,
+    tokensUsed: 1, timeUsedSeconds: 1, createdAt: 1, updatedAt: 3,
+  } } });
+  fake.send({ method: 'thread/goal/updated', params: { threadId: 'thread-1', turnId: 'turn-1', goal: {
+    threadId: 'thread-1', objective: 'Ship it', status: 'active', tokenBudget: 50000,
+    tokensUsed: 1, timeUsedSeconds: 1, createdAt: 1, updatedAt: 2,
+  } } });
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-2' } } });
+  await stop;
+  await send;
+  expect(getSession('s')?.metadata).toMatchObject({ codexGoal: { status: 'paused' } });
+  expect(getCodexBinding('s')?.goalRequested).toBe(true);
+  expect(listMessagesWithParts('s')).toHaveLength(2);
+  const next = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => { throw new Error('must not connect'); } });
+  await next.sendMessage(wire(messages), 'origin', 's', 'Again');
+  expect(listMessagesWithParts('s')).toHaveLength(2);
+});
+
+test('process loss during a goal continuation cannot replay or accept a new user turn', async () => {
+  create();
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  let userId: string | null = null;
+  const deps = { version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns: [
+      { id: 'turn-1', status: 'completed', itemsView: 'full', items: [
+        { type: 'userMessage', clientId: userId }, { type: 'agentMessage', text: 'First' },
+      ] },
+      { id: 'turn-2', status: 'completed', itemsView: 'full', items: [{ type: 'agentMessage', text: 'Second' }] },
+    ] }));
+    processes.push(fake); return fake.connection;
+  } };
+  const messages: ServerMessage[] = [];
+  const first = createCodexExecution(deps).sendMessage(wire(messages), 'origin', 's', 'Ship it',
+    undefined, undefined, 'Ship it', undefined, 50000);
+  await waitFor(() => processes[0]?.sent.some(message => message.method === 'turn/start') ?? false);
+  userId = (processes[0]!.sent.find(message => message.method === 'turn/start')!.params as { clientUserMessageId: string }).clientUserMessageId;
+  processes[0]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => getSession('s')?.metadata !== null);
+  processes[0]!.send({ method: 'turn/completed', params: {
+    threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' },
+  } });
+  processes[0]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-2' } } });
+  await waitFor(() => listMessagesWithParts('s').length === 3);
+  processes[0]!.connection.kill();
+  await first;
+  expect(getCodexBinding('s')?.pendingTurn).toBe(true);
+  expect(listMessagesWithParts('s')[1]?.message).toMatchObject({ status: 'completed' });
+  const count = listMessagesWithParts('s').length;
+  await createCodexExecution(deps).sendMessage(wire(messages), 'origin', 's', 'again');
+  expect(listMessagesWithParts('s')).toHaveLength(count);
+  expect(processes).toHaveLength(2);
+  expect(processes[1]!.sent.map(message => message.method)).toContain('thread/goal/get');
+  expect(processes[1]!.sent.some(message => message.method === 'turn/start')).toBe(false);
+});
+
+test('lost goal activation stays pending even if the original turn ended', async () => {
+  create();
+  let userId: string | null = null;
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  const deps = { version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns: [{
+      id: 'turn-1', status: 'completed', itemsView: 'full', items: [{ type: 'userMessage', clientId: userId }],
+    }] }), processes.length === 0 ? 'thread/goal/set' : undefined);
+    processes.push(fake); return fake.connection;
+  } };
+  const messages: ServerMessage[] = [];
+  const first = createCodexExecution(deps).sendMessage(wire(messages), 'origin', 's', 'Ship it',
+    undefined, undefined, 'Ship it', undefined, 50000);
+  await waitFor(() => processes[0]?.sent.some(message => message.method === 'turn/start') ?? false);
+  userId = (processes[0]!.sent.find(message => message.method === 'turn/start')!.params as { clientUserMessageId: string }).clientUserMessageId;
+  processes[0]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await first;
+  expect(getCodexBinding('s')).toMatchObject({ pendingTurn: true, goalRequested: true });
+  await createCodexExecution(deps).sendMessage(wire(messages), 'origin', 's', 'Again');
+  expect(processes[1]!.sent.some(message => message.method === 'turn/start')).toBe(false);
+  expect(getCodexBinding('s')?.pendingTurn).toBe(true);
+  expect(listMessagesWithParts('s')).toHaveLength(2);
+});
+
+test('lost activation with no upstream goal reconciles only the original terminal turn', async () => {
+  create();
+  let userId: string | null = null;
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  const deps = { version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns: [{
+      id: 'turn-1', status: 'completed', itemsView: 'full', items: [
+        { type: 'userMessage', clientId: userId }, { type: 'agentMessage', text: 'Recovered' },
+      ],
+    }] }), processes.length === 0 ? 'thread/goal/set' : undefined, false, () => null);
+    processes.push(fake); return fake.connection;
+  } };
+  const messages: ServerMessage[] = [];
+  const first = createCodexExecution(deps).sendMessage(wire(messages), 'origin', 's', 'Ship it',
+    undefined, undefined, 'Ship it', undefined, 50000);
+  await waitFor(() => processes[0]?.sent.some(message => message.method === 'turn/start') ?? false);
+  userId = (processes[0]!.sent.find(message => message.method === 'turn/start')!.params as { clientUserMessageId: string }).clientUserMessageId;
+  processes[0]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await first;
+  expect(getCodexBinding('s')?.goalRequested).toBe(true);
+  const next = createCodexExecution(deps).sendMessage(wire(messages), 'origin', 's', 'Next');
+  await waitFor(() => processes[2]?.sent.some(message => message.method === 'turn/start') ?? false);
+  expect(processes[1]!.sent.some(message => message.method === 'thread/goal/get')).toBe(true);
+  expect(listMessagesWithParts('s')[1]?.parts).toMatchObject([{ type: 'text', text: 'Recovered' }]);
+  expect(getSession('s')?.metadata).not.toHaveProperty('codexGoalPending');
+  processes[2]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  processes[2]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await next;
+});
+
+test('restart reconciles the exact terminal goal continuation without replaying it', async () => {
+  create();
+  let userId: string | null = null;
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  const deps = { version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns: [
+      { id: 'turn-1', status: 'completed', itemsView: 'full', items: [
+        { type: 'userMessage', clientId: userId }, { type: 'agentMessage', text: 'First' },
+      ] },
+      { id: 'turn-2', status: 'completed', itemsView: 'full', items: [{ type: 'agentMessage', text: 'Recovered' }] },
+    ] }), undefined, false, () => ({ threadId: 'thread-1', objective: 'Ship it', status: 'complete',
+      tokenBudget: 50000, tokensUsed: 650, timeUsedSeconds: 2, createdAt: 1, updatedAt: 2 }));
+    processes.push(fake); return fake.connection;
+  } };
+  const messages: ServerMessage[] = [];
+  const first = createCodexExecution(deps).sendMessage(wire(messages), 'origin', 's', 'Ship it',
+    undefined, undefined, 'Ship it', undefined, 50000);
+  await waitFor(() => processes[0]?.sent.some(message => message.method === 'turn/start') ?? false);
+  userId = (processes[0]!.sent.find(message => message.method === 'turn/start')!.params as { clientUserMessageId: string }).clientUserMessageId;
+  processes[0]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => getSession('s')?.metadata !== null);
+  processes[0]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  processes[0]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-2' } } });
+  await waitFor(() => getCodexBinding('s')?.pendingTurnId === 'turn-2');
+  processes[0]!.connection.kill();
+  await first;
+  const next = createCodexExecution(deps).sendMessage(wire(messages), 'origin', 's', 'Next');
+  await waitFor(() => processes[2]?.sent.some(message => message.method === 'turn/start') ?? false);
+  expect(processes[1]!.sent.map(message => message.method)).toEqual([
+    'initialize', 'initialized', 'thread/read', 'thread/goal/get',
+  ]);
+  expect(getSession('s')?.metadata).toMatchObject({ codexGoal: { status: 'complete', tokensUsed: 650 } });
+  expect(listMessagesWithParts('s')[2]?.parts).toMatchObject([{ type: 'text', text: 'Recovered' }]);
+  expect(listMessagesWithParts('s')[2]?.message).toMatchObject({ status: 'completed' });
+  processes[2]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  processes[2]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await next;
+  expect(getCodexBinding('s')?.pendingTurn).toBe(false);
+});
+
+test('an unexpected goal clear fails closed without claiming completion', async () => {
+  create();
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const send = execution.sendMessage(wire(messages), 'origin', 's', 'Ship it', undefined, undefined,
+    'Ship it', undefined, 50000);
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  await waitFor(() => getSession('s')?.metadata !== null);
+  fake.send({ method: 'thread/goal/cleared', params: { threadId: 'thread-1' } });
+  await send;
+  expect(getSession('s')?.metadata).toMatchObject({ codexGoal: null });
+  expect(getCodexBinding('s')?.pendingTurn).toBe(true);
+  expect(messages.some(message => message.type === 'error')).toBe(true);
 });
 
 test('a Prokop session cannot spawn or route into Codex', async () => {

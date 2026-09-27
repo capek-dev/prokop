@@ -70,6 +70,21 @@ test('dispatches each operation by stored harness, including legacy Prokop ident
   ]);
 });
 
+test('Codex token budgets reject ambiguous and non-Codex sends before dispatch', async () => {
+  const { execution, calls, wire, messages } = fixture();
+  await execution.sendMessage(wire, 'origin', 'prokop', 'goal', undefined, undefined, 'goal', undefined, 100);
+  await execution.sendMessage(wire, 'origin', 'codex', 'goal', undefined, undefined, 'goal', 5, 100);
+  await execution.sendMessage(wire, 'origin', 'codex', 'chat', undefined, undefined, undefined, undefined, 100);
+  expect(calls).toEqual([]);
+  expect(messages).toEqual([
+    expect.objectContaining({ code: 'invalid_session', message: 'Token budgets require a Codex session' }),
+    expect.objectContaining({ code: 'invalid_session', message: 'A Codex token budget requires a goal and cannot use max turns' }),
+    expect.objectContaining({ code: 'invalid_session', message: 'A Codex token budget requires a goal and cannot use max turns' }),
+  ]);
+  await execution.sendMessage(wire, 'origin', 'codex', 'goal', undefined, undefined, 'goal', undefined, 100);
+  expect(calls).toEqual(['codex:send']);
+});
+
 test('unsupported Codex operations preserve refusal shapes and never reach Prokop', async () => {
   const { execution, calls, wire, messages } = fixture();
   await execution.editMessage(wire, 'origin', { sessionId: 'codex', messageId: 'm', content: 'edit' });

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
-import type { ProkopaiClient, Session } from '@prokopai/sdk';
+import type { ProkopaiClient, Session, CodexGoalState } from '@prokopai/sdk';
 import { ArrowUp, Square, Paperclip, AlertTriangle, Target, ChevronDown } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,7 @@ import { useServerDataStore } from '@/stores/serverDataStore';
 type AutocompleteMode = 'none' | 'files' | 'prompts';
 
 interface MessageInputProps {
-  onSendMessage: (content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number }) => void;
+  onSendMessage: (content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }) => void;
   disabled?: boolean;
   isStreaming?: boolean;
   onStopStreaming?: () => void;
@@ -38,6 +38,7 @@ interface MessageInputProps {
   checkoutLocked?: boolean;
   modelSupportsImage?: boolean;
   goalState?: import('@prokopai/sdk').GoalState | null;
+  codexGoal?: CodexGoalState | null;
 }
 
 interface PendingAttachmentData {
@@ -89,6 +90,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   checkoutLocked,
   modelSupportsImage,
   goalState,
+  codexGoal,
 }: MessageInputProps, ref) {
   const codexSession = session?.harness === 'codex-cli';
   const { input, setInput, clearInput } = useSessionDraft(sessionId);
@@ -103,6 +105,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const [selectedResponseFormatId, setSelectedResponseFormatId] = useState<string | undefined>(undefined);
   const [sendMode, setSendMode] = useState<'chat' | 'goal'>('chat');
   const [goalMaxTurns, setGoalMaxTurns] = useState(5);
+  const [goalTokenBudget, setGoalTokenBudget] = useState(50_000);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { data: responseFormatsData } = useResponseFormatsQuery(sdkClient ?? null);
@@ -340,7 +343,8 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
     }
   }, [addFiles]);
 
-  const goalActive = goalState?.status === 'active';
+  const goalActive = goalState?.status === 'active' || codexSession && codexGoal?.status === 'active';
+  const budgetValid = Number.isSafeInteger(goalTokenBudget) && goalTokenBudget > 0 && goalTokenBudget <= 1_000_000;
   const effectiveDisabled = disabled || goalActive || (codexSession && isStreaming);
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -349,6 +353,13 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
     if ((!trimmed && pendingAttachments.length === 0) || effectiveDisabled
       || pendingAttachments.some(a => a.isUploading)) return;
     if (codexSession) {
+      if (sendMode === 'goal') {
+        if (!trimmed || pendingAttachments.length > 0 || !budgetValid) return;
+        onSendMessage(trimmed, undefined, undefined, { condition: trimmed, tokenBudget: goalTokenBudget });
+        cleanupPending();
+        setSendMode('chat');
+        return;
+      }
       const images = pendingAttachments.filter(a => a.uploadedId && a.uploadedKind === 'image')
         .map(a => ({ id: a.uploadedId!, kind: 'image' as const }));
       if (images.length !== pendingAttachments.length) return;
@@ -476,10 +487,12 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const trimmed = input.trim();
   const hasUploadingAttachment = pendingAttachments.some(a => a.isUploading);
   const canSend = trimmed || pendingAttachments.length > 0;
-  const isDisabled = !canSend || disabled || hasUploadingAttachment || goalActive || (codexSession && isStreaming);
+  const isDisabled = !canSend || disabled || hasUploadingAttachment || goalActive
+    || (sendMode === 'goal' && (!trimmed || pendingAttachments.length > 0 || codexSession && !budgetValid))
+    || (codexSession && isStreaming);
   const effectivePlaceholder = goalActive
     ? 'Goal active'
-    : codexSession
+    : codexSession && sendMode !== 'goal'
       ? 'Message Codex CLI (@ files)'
       : sendMode === 'goal'
         ? 'Type the completion condition...'
@@ -539,7 +552,14 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
             ))}
           </div>
         )}
-        {goalActive && (
+        {codexSession && codexGoal && (
+          <div className="flex items-center gap-2 px-3 pt-3 text-xs text-muted-foreground">
+            <Target className="size-3 shrink-0" />
+            <span className="min-w-0 truncate" title={codexGoal.objective}>{codexGoal.objective}</span>
+            <span className="ml-auto shrink-0 tabular-nums">{codexGoal.status} · {codexGoal.tokensUsed.toLocaleString()}/{codexGoal.tokenBudget?.toLocaleString() ?? 'unlimited'} tokens</span>
+          </div>
+        )}
+        {!codexSession && goalActive && (
           <div className="flex items-center gap-2 px-3 pt-3 text-xs">
             <Target className="size-3 shrink-0 text-warning" />
             <span className="min-w-0 truncate text-warning" title={goalState?.condition ?? ''}>
@@ -657,9 +677,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
           </div>
 
           <div className="flex h-7 items-center rounded-full border border-border/70">
-            {codexSession ? (
-              <span className="px-2 text-xs text-muted-foreground" title="Codex uses its workspace sandbox. Some tool calls require approval; native escalation remains manual.">Codex CLI</span>
-            ) : <DropdownMenu>
+            <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
@@ -698,7 +716,12 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                 {sendMode === 'goal' && (
                   <>
                     <DropdownMenuSeparator />
-                    <div className="px-2 py-1.5 flex items-center justify-between gap-2">
+                    {codexSession ? <div className="px-2 py-1.5 flex items-center justify-between gap-2">
+                      <label htmlFor="codex-goal-budget" className="text-xs text-muted-foreground">Token budget</label>
+                      <input id="codex-goal-budget" type="number" min={1} max={1_000_000} step={1000}
+                        value={goalTokenBudget} onChange={event => setGoalTokenBudget(Number(event.target.value))}
+                        className="w-24 rounded bg-muted px-1 text-xs tabular-nums" />
+                    </div> : <div className="px-2 py-1.5 flex items-center justify-between gap-2">
                       <span className="text-xs text-muted-foreground">Max turns</span>
                       <div className="flex items-center gap-1">
                         <button
@@ -717,11 +740,11 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                           +
                         </button>
                       </div>
-                    </div>
+                    </div>}
                   </>
                 )}
               </DropdownMenuContent>
-            </DropdownMenu>}
+            </DropdownMenu>
 
             {isStreaming && onStopStreaming && (codexSession || !canSend) ? (
               <button

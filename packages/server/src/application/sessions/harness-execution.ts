@@ -32,14 +32,23 @@ export function createHarnessExecution(
     target.adapter?.unsupportedMessages?.[operation]
       ?? (target.error || `${operation} is not supported for ${target.owner} sessions`);
   return {
-    async sendMessage(wire, origin, sessionId, content, attachments, responseFormatId, goalCondition, goalMaxTurns) {
+    async sendMessage(wire, origin, sessionId, content, attachments, responseFormatId, goalCondition, goalMaxTurns, goalTokenBudget) {
       const target = resolve(sessionId);
       if (!target.adapter) {
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: target.error!, sessionId });
         return;
       }
+      if (goalTokenBudget !== undefined && (goalMaxTurns !== undefined || goalCondition === undefined)) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session',
+          message: 'A Codex token budget requires a goal and cannot use max turns', sessionId });
+        return;
+      }
+      if (target.owner !== 'codex-cli' && goalTokenBudget !== undefined) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Token budgets require a Codex session', sessionId });
+        return;
+      }
       await target.adapter.execution.sendMessage(
-        wire, origin, sessionId, content, attachments, responseFormatId, goalCondition, goalMaxTurns,
+        wire, origin, sessionId, content, attachments, responseFormatId, goalCondition, goalMaxTurns, goalTokenBudget,
       );
     },
     async interruptSession(sessionId, reason) {

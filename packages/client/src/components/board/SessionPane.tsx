@@ -147,7 +147,7 @@ export function SessionPane({
     content: string,
     attachments?: Array<{ id: string; kind: import('@prokopai/sdk').AttachmentKind }>,
     responseFormatId?: string,
-    goal?: { condition: string; maxTurns?: number },
+    goal?: { condition: string; maxTurns?: number; tokenBudget?: number },
   ) => {
     commands.sendChatMessageForSession(sessionId, content, attachments, responseFormatId, goal);
   }, [commands, sessionId]);

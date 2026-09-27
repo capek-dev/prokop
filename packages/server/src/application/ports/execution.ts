@@ -59,6 +59,7 @@ export interface SessionExecutionPort {
     responseFormatId?: string,
     goalCondition?: string,
     goalMaxTurns?: number,
+    goalTokenBudget?: number,
   ): Promise<void>;
   editMessage<Origin>(
     wire: SessionWirePorts<Origin>,

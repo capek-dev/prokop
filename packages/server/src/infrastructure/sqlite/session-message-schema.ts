@@ -65,13 +65,19 @@ export function initializeSessionMessageSchema(
     created_at TEXT NOT NULL,
     pending_turn INTEGER NOT NULL DEFAULT 0,
     pending_user_id TEXT,
-    pending_assistant_id TEXT
+    pending_assistant_id TEXT,
+    pending_turn_id TEXT,
+    goal_root_turn_id TEXT,
+    goal_requested INTEGER NOT NULL DEFAULT 0
   )`);
   const bindingColumns = db.query<{ name: string }, []>('PRAGMA table_info(codex_session_bindings)').all();
   for (const [column, definition] of [
     ['pending_turn', 'INTEGER NOT NULL DEFAULT 0'],
     ['pending_user_id', 'TEXT'],
     ['pending_assistant_id', 'TEXT'],
+    ['pending_turn_id', 'TEXT'],
+    ['goal_root_turn_id', 'TEXT'],
+    ['goal_requested', 'INTEGER NOT NULL DEFAULT 0'],
   ] as const) {
     if (!bindingColumns.some(entry => entry.name === column)) {
       db.run(`ALTER TABLE codex_session_bindings ADD COLUMN ${column} ${definition}`);

@@ -11,6 +11,7 @@ export class ChatNamespace {
       responseFormatId?: string;
       goalCondition?: string;
       goalMaxTurns?: number;
+      goalTokenBudget?: number;
     },
   ): void {
     const msg: ChatMessage = {
@@ -27,9 +28,8 @@ export class ChatNamespace {
     if (options?.goalCondition) {
       msg.goalCondition = options.goalCondition;
     }
-    if (options?.goalMaxTurns) {
-      msg.goalMaxTurns = options.goalMaxTurns;
-    }
+    if (options?.goalMaxTurns !== undefined) msg.goalMaxTurns = options.goalMaxTurns;
+    if (options?.goalTokenBudget !== undefined) msg.goalTokenBudget = options.goalTokenBudget;
     this._send(msg);
   }
 }

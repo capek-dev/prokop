@@ -51,6 +51,7 @@ export interface ChatMessage {
   responseFormatId?: string;
   goalCondition?: string;
   goalMaxTurns?: number;
+  goalTokenBudget?: number;
 }
 
 export interface SessionCloseMessage {

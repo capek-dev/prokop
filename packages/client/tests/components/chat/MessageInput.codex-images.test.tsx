@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest';
 import type { ProkopaiClient, Session } from '@prokopai/sdk';
 import { MessageInput } from '@/components/chat/MessageInput';
+import { clearDraft } from '@/config/draftStorage';
 
 vi.mock('@/components/worktrees/SessionCheckoutSelector', () => ({
   SessionCheckoutSelector: () => null,
@@ -16,6 +17,7 @@ const originalRevokeObjectURL = URL.revokeObjectURL;
 afterEach(() => {
   URL.createObjectURL = originalCreateObjectURL;
   URL.revokeObjectURL = originalRevokeObjectURL;
+  clearDraft(session.id);
 });
 
 function setup() {
@@ -31,6 +33,32 @@ function setup() {
   const fileInput = view.container.querySelector('input[type="file"]') as HTMLInputElement;
   return { fileInput, upload, onSendMessage, view };
 }
+
+test('Codex Goal sends a token budget separately from max turns', async () => {
+  const { onSendMessage } = setup();
+  fireEvent.pointerDown(screen.getByRole('button', { name: 'Send mode: chat' }), { button: 0, ctrlKey: false });
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Goal' }));
+  const budget = screen.getByLabelText('Token budget') as HTMLInputElement;
+  expect(budget.value).toBe('50000');
+  fireEvent.change(budget, { target: { value: '0' } });
+  fireEvent.change(screen.getByPlaceholderText('Type the completion condition...'), { target: { value: 'Ship it' } });
+  const sendGoal = document.querySelector('button[aria-label="Set goal"]') as HTMLButtonElement;
+  expect(sendGoal).toBeDisabled();
+  fireEvent.change(budget, { target: { value: '25000' } });
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  fireEvent.click(sendGoal);
+  expect(onSendMessage).toHaveBeenCalledWith('Ship it', undefined, undefined,
+    { condition: 'Ship it', tokenBudget: 25000 });
+});
+
+test('an active Codex Goal shows usage and disables the composer', () => {
+  const { onSendMessage, view } = setup();
+  view.rerender(<MessageInput session={session} sessionId={session.id} workspaceId="ws"
+    onSendMessage={onSendMessage} codexGoal={{ objective: 'Ship it', status: 'active',
+      tokenBudget: 50000, tokensUsed: 123 }} />);
+  expect(screen.getByText('123/50,000 tokens', { exact: false })).toBeInTheDocument();
+  expect(screen.getByPlaceholderText('Goal active')).toBeDisabled();
+});
 
 test('Codex picker accepts images and sends image-only messages', async () => {
   const { fileInput, upload, onSendMessage } = setup();

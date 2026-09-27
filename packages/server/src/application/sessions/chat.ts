@@ -20,6 +20,7 @@ export interface SessionChatApplication<Origin> {
     responseFormatId?: string,
     goalCondition?: string,
     goalMaxTurns?: number,
+    goalTokenBudget?: number,
   ): Promise<void>;
   editMessage(
     wire: SessionWirePorts<Origin>,
@@ -61,6 +62,7 @@ export function createSessionChatApplication<Origin>(deps: SessionChatDeps<Origi
       responseFormatId,
       goalCondition,
       goalMaxTurns,
+      goalTokenBudget,
     ): Promise<void> {
       const gate = deps.gate.checkControllerGate(sessionId, 'chat.message', origin);
       if (gate) {
@@ -76,6 +78,7 @@ export function createSessionChatApplication<Origin>(deps: SessionChatDeps<Origi
         responseFormatId,
         goalCondition,
         goalMaxTurns,
+        goalTokenBudget,
       );
     },
 

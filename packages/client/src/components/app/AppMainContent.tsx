@@ -26,7 +26,8 @@ export interface AppMainContentProps {
   inputRef: React.RefObject<MessageInputHandle | null>;
   onRetry: () => void;
   onLogout: () => void;
-  onSendMessage: (content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>) => void;
+  onSendMessage: (content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string,
+    goal?: { condition: string; maxTurns?: number; tokenBudget?: number }) => void;
   onRemoveFromQueue: (queueItemId: string) => void;
   onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   onNavigateToSubagent: (sessionId: string) => void;

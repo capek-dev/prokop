@@ -354,7 +354,7 @@ export function useSessionCommands({
     }
   }, [clientRef]);
 
-  const sendChatMessageForSession = useCallback((sessionId: string, content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number }) => {
+  const sendChatMessageForSession = useCallback((sessionId: string, content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }) => {
     const client = clientRef.current;
     const session = sessions.find(s => s.id === sessionId);
     if (!session || session.compacting) return;
@@ -365,13 +365,14 @@ export function useSessionCommands({
         client.chat.send(
           sessionId,
           content,
-          { attachments, responseFormatId, goalCondition: goal?.condition, goalMaxTurns: goal?.maxTurns },
+          { attachments, responseFormatId, goalCondition: goal?.condition,
+            goalMaxTurns: goal?.maxTurns, goalTokenBudget: goal?.tokenBudget },
         );
       }
     }
   }, [clientRef, sessions, streamingSessionIds, addToQueue]);
 
-  const sendChatMessage = useCallback((content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number }) => {
+  const sendChatMessage = useCallback((content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }) => {
     if (!currentSession) return;
     sendChatMessageForSession(currentSession.id, content, attachments, responseFormatId, goal);
   }, [currentSession, sendChatMessageForSession]);

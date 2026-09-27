@@ -29,7 +29,7 @@ interface ChatViewProps {
   messagesWithParts: MessageWithParts[];
   queuedMessages: QueuedMessage[];
   prompts?: import('@prokopai/sdk').PromptInfo[];
-  onSendMessage: (content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number }) => void;
+  onSendMessage: (content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }) => void;
   onRemoveFromQueue: (queueId: string) => void;
   pendingAskRequests: PendingAskRequest[];
   onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
@@ -345,6 +345,7 @@ function ChatViewContent({
           sessionId={session.id}
           modelSupportsImage={modelSupportsImage}
           goalState={(session.metadata as Record<string, unknown> | null)?.goal as import('@prokopai/sdk').GoalState | null ?? null}
+          codexGoal={(session.metadata as Record<string, unknown> | null)?.codexGoal as import('@prokopai/sdk').CodexGoalState | null ?? null}
           isStreaming={isStreaming}
           onStopStreaming={onInterrupt}
           session={session}

@@ -42,7 +42,7 @@ type Handler = (ctx: RouterContext<ConnectionId>, ws: ConnectionId, msg: ClientM
 
 async function handleChatMessage(ctx: RouterContext<ConnectionId>, ws: ConnectionId, msg: ClientMessage): Promise<void> {
   const chatMsg = msg as Extract<ClientMessage, { type: 'chat.message' }>;
-  await handleChat(ctx, ws, chatMsg.sessionId, chatMsg.content, chatMsg.attachments, chatMsg.responseFormatId, chatMsg.goalCondition, chatMsg.goalMaxTurns);
+  await handleChat(ctx, ws, chatMsg.sessionId, chatMsg.content, chatMsg.attachments, chatMsg.responseFormatId, chatMsg.goalCondition, chatMsg.goalMaxTurns, chatMsg.goalTokenBudget);
 }
 
 async function handleEditMessage(ctx: RouterContext<ConnectionId>, ws: ConnectionId, msg: ClientMessage): Promise<void> {

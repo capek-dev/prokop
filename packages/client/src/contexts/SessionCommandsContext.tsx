@@ -31,14 +31,14 @@ export interface SessionCommandsValue {
     content: string,
     attachments?: Array<{ id: string; kind: AttachmentKind }>,
     responseFormatId?: string,
-    goal?: { condition: string; maxTurns?: number },
+    goal?: { condition: string; maxTurns?: number; tokenBudget?: number },
   ) => void;
   sendChatMessageForSession: (
     sessionId: string,
     content: string,
     attachments?: Array<{ id: string; kind: AttachmentKind }>,
     responseFormatId?: string,
-    goal?: { condition: string; maxTurns?: number },
+    goal?: { condition: string; maxTurns?: number; tokenBudget?: number },
   ) => void;
   handleAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   handleInterruptSession: () => void;
