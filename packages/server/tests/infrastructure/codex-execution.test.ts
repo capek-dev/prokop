@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, unlinkSync, symlinkSync, realpathSync } from 'node:fs';
+import { createAttachment } from '@/infrastructure/sqlite/attachments';
+import { Paths } from '@/infrastructure/runtime/paths';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
@@ -84,6 +86,94 @@ async function waitFor(predicate: () => boolean): Promise<void> {
   for (let i = 0; i < 100 && !predicate(); i++) await Bun.sleep(1);
   expect(predicate()).toBe(true);
 }
+
+test('Codex sends session images as localImage inputs and persists image-only thumbnails', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'codex-images-'));
+  Paths.configure({ dataDir: dir });
+  try {
+    create();
+    const first = createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'first.png',
+      mimeType: 'image/png', sizeBytes: 3, data: new Uint8Array([1, 2, 3]).buffer });
+    const second = createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'second.webp',
+      mimeType: 'image/webp', sizeBytes: 2, data: new Uint8Array([4, 5]).buffer });
+    const processes: ReturnType<typeof fakeCodex>[] = [];
+    const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+      const fake = fakeCodex(); processes.push(fake); return fake.connection;
+    } });
+    const messages: ServerMessage[] = [];
+    const send = (text: string, ids: string[]) => execution.sendMessage(wire(messages), 'origin', 's', text,
+      ids.map(id => ({ id, kind: 'image' })));
+    const turn = send('Describe these', [first.id, second.id]);
+    await waitFor(() => processes[0]?.sent.some(message => message.method === 'turn/start') ?? false);
+    expect(processes[0]!.sent.find(message => message.method === 'turn/start')?.params).toMatchObject({
+      input: [{ type: 'text', text: 'Describe these' }, { type: 'localImage', path: realpathSync(first.absolutePath) },
+        { type: 'localImage', path: realpathSync(second.absolutePath) }],
+    });
+    const parts = listMessagesWithParts('s')[0]!.parts;
+    expect(parts.filter(part => part.type === 'image')).toMatchObject([
+      { type: 'image', mimeType: 'image/png', url: `/api/sessions/s/attachments/${first.id}/content?key=${first.accessKey}` },
+      { type: 'image', mimeType: 'image/webp', url: `/api/sessions/s/attachments/${second.id}/content?key=${second.accessKey}` },
+    ]);
+    processes[0]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+    processes[0]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+    await turn;
+    const imageOnly = send('', [first.id]);
+    await waitFor(() => processes[1]?.sent.some(message => message.method === 'turn/start') ?? false);
+    expect(processes[1]!.sent.find(message => message.method === 'turn/start')?.params).toMatchObject({
+      input: [{ type: 'localImage', path: realpathSync(first.absolutePath) }],
+    });
+    expect(listMessagesWithParts('s').filter(entry => entry.message.role === 'user')[1]!.parts.map(part => part.type))
+      .toEqual(['image']);
+    processes[1]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+    processes[1]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+    await imageOnly;
+  } finally {
+    Paths.reset();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Codex rejects invalid image references before creating a turn', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'codex-images-invalid-'));
+  Paths.configure({ dataDir: dir });
+  try {
+    create();
+    createSession({ id: 'other', workspaceId: 'ws', title: 'Other', status: 'active',
+      preconfigId: null, metadata: null, parentId: null, agentName: null, harness: 'codex-cli' });
+    const image = createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'valid.png',
+      mimeType: 'image/png', sizeBytes: 1, data: new Uint8Array([1]).buffer });
+    const foreign = createAttachment({ sessionId: 'other', workspaceId: 'ws', filename: 'foreign.png',
+      mimeType: 'image/png', sizeBytes: 1, data: new Uint8Array([1]).buffer });
+    const file = createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'note.txt',
+      mimeType: 'text/plain', sizeBytes: 1, data: new Uint8Array([1]).buffer });
+    const messages: ServerMessage[] = [];
+    const execution = createCodexExecution({ version: () => { throw new Error('must not start'); },
+      connect: () => { throw new Error('must not connect'); } });
+    const reject = async (refs: Array<{ id: string; kind: string }>) => {
+      await execution.sendMessage(wire(messages), 'origin', 's', 'hello', refs);
+      expect(messages.at(-1)).toMatchObject({ type: 'error', code: 'invalid_session' });
+      expect(listMessagesWithParts('s')).toHaveLength(0);
+    };
+    await reject([{ id: 'missing', kind: 'image' }]);
+    await reject([{ id: foreign.id, kind: 'image' }]);
+    await reject([{ id: file.id, kind: 'image' }]);
+    await reject([{ id: image.id, kind: 'file' }]);
+    await reject([{ id: image.id, kind: 'image' }, { id: 'missing', kind: 'image' }]);
+    getDatabase().run('UPDATE attachments SET mime_type = ? WHERE id = ?', ['image/svg+xml', image.id]);
+    await reject([{ id: image.id, kind: 'image' }]);
+    getDatabase().run('UPDATE attachments SET mime_type = ? WHERE id = ?', ['image/png', image.id]);
+    getDatabase().run('UPDATE attachments SET absolute_path = ? WHERE id = ?', [file.absolutePath, image.id]);
+    await reject([{ id: image.id, kind: 'image' }]);
+    getDatabase().run('UPDATE attachments SET absolute_path = ? WHERE id = ?', [image.absolutePath, image.id]);
+    unlinkSync(image.absolutePath);
+    await reject([{ id: image.id, kind: 'image' }]);
+    symlinkSync(file.absolutePath, image.absolutePath);
+    await reject([{ id: image.id, kind: 'image' }]);
+  } finally {
+    Paths.reset();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('Codex turn applies selected model and effort, streams, and resumes its thread', async () => {
   create();

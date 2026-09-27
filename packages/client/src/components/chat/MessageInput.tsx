@@ -239,7 +239,6 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
         kind: attachment.kind as AttachmentKind,
         filename: attachment.filename,
         size: attachment.size,
-        previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
         uploadedId: attachment.id,
         uploadedKind: attachment.kind as AttachmentKind,
       };
@@ -275,8 +274,8 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   }, [activeWorkspace?.id, openFilePreview]);
 
   const addFiles = useCallback(async (files: FileList | File[]) => {
-    if (codexSession) return;
-    const fileArray = Array.from(files);
+    const fileArray = Array.from(files).filter(file => !codexSession
+      || ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type));
 
     for (const file of fileArray) {
       if (file.size > 20 * 1024 * 1024) continue;
@@ -299,14 +298,12 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
       if (result) {
         setPendingAttachments(prev => prev.map(a => {
           if (a.id === previewItem.id) {
-            if (a.previewUrl && a.previewUrl !== result.previewUrl) {
-              URL.revokeObjectURL(a.previewUrl);
-            }
-            return { ...result, isUploading: false };
+            return { ...result, previewUrl: a.previewUrl, isUploading: false };
           }
           return a;
         }));
       } else {
+        if (previewItem.previewUrl) URL.revokeObjectURL(previewItem.previewUrl);
         setPendingAttachments(prev => prev.filter(a => a.id !== previewItem.id));
       }
     }
@@ -314,11 +311,12 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const files = e.clipboardData?.files;
-    if (files && files.length > 0) {
+    if (files && Array.from(files).some(file => !codexSession
+      || ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type))) {
       e.preventDefault();
-      addFiles(files);
+      void addFiles(files);
     }
-  }, [addFiles]);
+  }, [addFiles, codexSession]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -348,10 +346,13 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const trimmed = input.trim();
-    if ((!trimmed && pendingAttachments.length === 0) || effectiveDisabled) return;
+    if ((!trimmed && pendingAttachments.length === 0) || effectiveDisabled
+      || pendingAttachments.some(a => a.isUploading)) return;
     if (codexSession) {
-      if (!trimmed || pendingAttachments.length > 0) return;
-      onSendMessage(trimmed);
+      const images = pendingAttachments.filter(a => a.uploadedId && a.uploadedKind === 'image')
+        .map(a => ({ id: a.uploadedId!, kind: 'image' as const }));
+      if (images.length !== pendingAttachments.length) return;
+      onSendMessage(trimmed, images.length ? images : undefined);
       cleanupPending();
       return;
     }
@@ -520,7 +521,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
             ))}
           </div>
         )}
-        {pendingAttachments.length > 0 && modelSupportsImage === false && (
+        {!codexSession && pendingAttachments.length > 0 && modelSupportsImage === false && (
           <div className="flex items-center gap-1.5 px-3 pt-2 text-xs text-warning">
             <AlertTriangle className="size-3 shrink-0" />
             <span>This model will not inspect images directly. They will be sent as file paths instead.</span>
@@ -613,7 +614,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
 
         <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-1">
           <div className="flex items-center gap-1">
-            {!codexSession && <button
+            <button
               type="button"
               className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none"
               onClick={() => fileInputRef.current?.click()}
@@ -621,11 +622,11 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
               aria-label="Attach file"
             >
               <Paperclip className="size-4" />
-            </button>}
+            </button>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,video/*,.pdf,.doc,.docx,.txt,.csv,.json,.xml,.md"
+              accept={codexSession ? 'image/png,image/jpeg,image/webp,image/gif' : 'image/*,video/*,.pdf,.doc,.docx,.txt,.csv,.json,.xml,.md'}
               multiple
               className="hidden"
               onChange={(e) => {

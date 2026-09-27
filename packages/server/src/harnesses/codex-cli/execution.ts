@@ -1,4 +1,5 @@
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, realpathSync } from 'node:fs';
+import { relative, isAbsolute, sep } from 'node:path';
 import type { AssistantMessage, Session, TextPart } from '@prokopai/sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import type { SessionExecutionPort, InterruptExecutionResult } from '@/application/ports/execution';
@@ -7,6 +8,8 @@ import { createMessage, createPart, getMessageWithParts, updateMessage, updatePa
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { getDatabase } from '@/infrastructure/sqlite/database';
+import { getAttachment, MAX_ATTACHMENT_SIZE, validateImageMime, type Attachment } from '@/infrastructure/sqlite/attachments';
+import { getAttachmentDir } from '@/infrastructure/runtime/paths';
 import { CodexAppServer, CodexRequestError, codexObject, spawnCodexAppServer, type CodexConnection, type CodexNotification } from './app-server';
 import { bindCodexThread, getCodexBinding, markCodexTurnPending, markCodexTurnCompleted, type CodexBinding } from './bindings';
 import { getCodexModelSelection } from './models';
@@ -55,6 +58,26 @@ const defaultDependencies: CodexExecutionDependencies = {
 
 function id(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function resolveImages(session: Session, references: Array<{ id: string; kind: string }>): Attachment[] | null {
+  const directory = getAttachmentDir(session.workspaceId, session.id);
+  const images: Attachment[] = [];
+  for (const reference of references) {
+    if (reference?.kind !== 'image' || typeof reference.id !== 'string') return null;
+    const image = getAttachment(session.id, reference.id);
+    if (!image || image.workspaceId !== session.workspaceId || image.kind !== 'image'
+      || !validateImageMime(image.mimeType) || image.sizeBytes < 1 || image.sizeBytes > MAX_ATTACHMENT_SIZE) return null;
+    try {
+      const stat = lstatSync(image.absolutePath);
+      const path = realpathSync(image.absolutePath);
+      const offset = relative(realpathSync(directory), path);
+      if (!offset || offset === '..' || offset.startsWith(`..${sep}`) || isAbsolute(offset)
+        || !stat.isFile() || stat.isSymbolicLink() || stat.size !== image.sizeBytes) return null;
+      images.push({ ...image, absolutePath: path });
+    } catch { return null; }
+  }
+  return images;
 }
 
 function workspaceRoot(session: Session): string {
@@ -167,8 +190,13 @@ export function createCodexExecution(deps: CodexExecutionDependencies = defaultD
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Codex turn already running', sessionId });
         return;
       }
-      if (!content.trim() || attachments?.length || responseFormatId || goalCondition || goalMaxTurns !== undefined) {
-        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Codex CLI supports text messages only', sessionId });
+      if ((!content.trim() && !attachments?.length) || responseFormatId || goalCondition || goalMaxTurns !== undefined) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Codex CLI supports text and image messages only', sessionId });
+        return;
+      }
+      const images = resolveImages(session, attachments ?? []);
+      if (!images) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Codex image attachment is unavailable or unsupported', sessionId });
         return;
       }
       starting.add(sessionId);
@@ -191,9 +219,19 @@ export function createCodexExecution(deps: CodexExecutionDependencies = defaultD
           await reconcileTurn(binding, deps, wire, sessionId);
         }
         const user = createMessage({ id: crypto.randomUUID(), sessionId, role: 'user', createdAt: Date.now() });
-        const userPart = createPart({ id: crypto.randomUUID(), messageId: user.id, type: 'text', text: content, createdAt: Date.now() }, sessionId);
         wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: user });
-        wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part: userPart });
+        if (content.trim()) {
+          const userPart = createPart({ id: crypto.randomUUID(), messageId: user.id,
+            type: 'text', text: content, createdAt: Date.now() }, sessionId);
+          wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part: userPart });
+        }
+        const imagePartStart = Date.now() + (content.trim() ? 1 : 0);
+        for (const [index, image] of images.entries()) {
+          const part = createPart({ id: crypto.randomUUID(), messageId: user.id, type: 'image',
+            url: `/api/sessions/${sessionId}/attachments/${image.id}/content?key=${image.accessKey}`,
+            mimeType: image.mimeType, createdAt: imagePartStart + index }, sessionId);
+          wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part });
+        }
         wire.actor.attachOriginToSession(origin, sessionId);
         assistant = createMessage({ id: crypto.randomUUID(), sessionId, role: 'assistant',
           status: 'streaming', modelId: 'codex-cli', providerId: 'codex-cli',
@@ -340,7 +378,9 @@ export function createCodexExecution(deps: CodexExecutionDependencies = defaultD
         phase = 'turn start';
         markCodexTurnPending(sessionId, user.id, assistant.id);
         const response = codexObject(await client.request('turn/start', {
-          threadId, clientUserMessageId: user.id, input: [{ type: 'text', text: content }], cwd: root,
+          threadId, clientUserMessageId: user.id,
+          input: [...(content.trim() ? [{ type: 'text', text: content }] : []),
+            ...images.map(image => ({ type: 'localImage', path: image.absolutePath }))], cwd: root,
           approvalPolicy: 'on-request',
           ...(selection ? { model: selection.model, effort: selection.effort } : {}),
         }));
