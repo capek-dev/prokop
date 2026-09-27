@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
-import type { ProkopaiClient, Session } from '@prokopai/sdk';
+import type { ProkopaiClient, PromptInfo, Session } from '@prokopai/sdk';
 import { MessageInput } from '@/components/chat/MessageInput';
 import { clearDraft } from '@/config/draftStorage';
 
@@ -20,7 +20,7 @@ afterEach(() => {
   clearDraft(session.id);
 });
 
-function setup() {
+function setup(prompts?: PromptInfo[]) {
   URL.createObjectURL = vi.fn(() => 'blob:image');
   URL.revokeObjectURL = vi.fn();
   const upload = vi.fn(async (_id: string, file: File) => ({
@@ -29,7 +29,7 @@ function setup() {
   const onSendMessage = vi.fn();
   const client = { http: { attachments: { upload } } } as unknown as ProkopaiClient;
   const view = render(<MessageInput session={session} sessionId={session.id} workspaceId="ws"
-    sdkClient={client} onSendMessage={onSendMessage} modelSupportsImage={false} />);
+    sdkClient={client} prompts={prompts} onSendMessage={onSendMessage} modelSupportsImage={false} />);
   const fileInput = view.container.querySelector('input[type="file"]') as HTMLInputElement;
   return { fileInput, upload, onSendMessage, view };
 }
@@ -76,7 +76,7 @@ test('Codex picker accepts images and sends image-only messages', async () => {
 
 test('Codex paste and drop ignore non-images while keeping image with text', async () => {
   const { view, upload, onSendMessage } = setup();
-  const textarea = screen.getByPlaceholderText('Message Codex CLI (@ files)');
+  const textarea = screen.getByPlaceholderText('Message Codex CLI (/ prompts, @ files)');
   const file = new File(['text'], 'note.txt', { type: 'text/plain' });
   const image = new File(['img'], 'b.webp', { type: 'image/webp' });
   await act(async () => {
@@ -90,6 +90,19 @@ test('Codex paste and drop ignore non-images while keeping image with text', asy
   fireEvent.change(textarea, { target: { value: 'Describe this' } });
   fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
   expect(onSendMessage).toHaveBeenCalledWith('Describe this', [{ id: 'uploaded-b.webp', kind: 'image' }]);
+});
+
+test('Codex expands a prompt while preserving an uploaded image', async () => {
+  const { fileInput, onSendMessage } = setup([
+    { name: 'describe', description: 'Describe image', content: 'Describe this image' },
+  ]);
+  await act(async () => {
+    fireEvent.change(fileInput, { target: { files: [new File(['img'], 'c.png', { type: 'image/png' })] } });
+  });
+  fireEvent.change(screen.getByPlaceholderText('Message Codex CLI (/ prompts, @ files)'),
+    { target: { value: '/describe' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+  expect(onSendMessage).toHaveBeenCalledWith('Describe this image', [{ id: 'uploaded-c.png', kind: 'image' }]);
 });
 
 test('Codex cannot send an image before its upload completes', async () => {

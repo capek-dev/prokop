@@ -1,5 +1,7 @@
 ### Changed
 
+- Expand saved slash prompts in Codex CLI chat messages, including arguments and uploaded images. Leave goal conditions and unknown slash commands unchanged.
+
 - Fork a completed Codex CLI response into a new native Codex thread and session with matching retained history. Keep the original thread intact; reject in-flight, goal, image-bearing, or uncertain histories. User-message cutoffs remain unavailable for Codex because they cannot preserve Prokop's user-only cutoff on a native turn boundary.
 
 - Add Codex CLI user-message edit and conversation revert support with upstream-history validation and durable rollback intent. A failed edit reports a bounded local reason and distinguishes preflight failure from a possibly executed rollback without exposing upstream RPC details.

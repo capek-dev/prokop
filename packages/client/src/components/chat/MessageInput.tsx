@@ -149,7 +149,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
     p.name.toLowerCase().includes(promptQuery.toLowerCase())
   );
 
-  const showPromptAc = !codexSession && acMode === 'prompts' && prompts.length > 0;
+  const showPromptAc = acMode === 'prompts' && prompts.length > 0 && (!codexSession || sendMode === 'chat');
   const showFileAc = acMode === 'files' && showAutocomplete && !!workspaceId;
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -363,7 +363,10 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
       const images = pendingAttachments.filter(a => a.uploadedId && a.uploadedKind === 'image')
         .map(a => ({ id: a.uploadedId!, kind: 'image' as const }));
       if (images.length !== pendingAttachments.length) return;
-      onSendMessage(trimmed, images.length ? images : undefined);
+      const parsed = extractPromptCommand(input);
+      const prompt = parsed && prompts.find(p => p.name === parsed.command);
+      const content = prompt ? expandPromptContent(prompt, parsed.rest) : trimmed;
+      onSendMessage(content, images.length ? images : undefined);
       cleanupPending();
       return;
     }
@@ -493,7 +496,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const effectivePlaceholder = goalActive
     ? 'Goal active'
     : codexSession && sendMode !== 'goal'
-      ? 'Message Codex CLI (@ files)'
+      ? 'Message Codex CLI (/ prompts, @ files)'
       : sendMode === 'goal'
         ? 'Type the completion condition...'
         : `${placeholder}  (/ prompts, @ files)`;
