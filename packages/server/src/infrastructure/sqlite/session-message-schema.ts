@@ -70,6 +70,15 @@ export function initializeSessionMessageSchema(
     goal_root_turn_id TEXT,
     goal_requested INTEGER NOT NULL DEFAULT 0
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS codex_rollback_intents (
+    session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    operation TEXT NOT NULL CHECK (operation IN ('edit', 'revert')),
+    target_message_id TEXT NOT NULL,
+    content TEXT,
+    before_turn_id TEXT NOT NULL,
+    turn_ids TEXT NOT NULL,
+    phase TEXT NOT NULL DEFAULT 'rollback' CHECK (phase IN ('rollback', 'ready', 'sent'))
+  )`);
   const bindingColumns = db.query<{ name: string }, []>('PRAGMA table_info(codex_session_bindings)').all();
   for (const [column, definition] of [
     ['pending_turn', 'INTEGER NOT NULL DEFAULT 0'],

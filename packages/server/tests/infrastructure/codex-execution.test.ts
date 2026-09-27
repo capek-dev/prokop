@@ -8,8 +8,9 @@ import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
 import { createSession, getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { updateWorkspace } from '@/infrastructure/sqlite/workspaces';
-import { listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
-import { getCodexBinding } from '@/harnesses/codex-cli/bindings';
+import { createMessage, createPart, listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
+import { bindCodexThread, getCodexBinding } from '@/harnesses/codex-cli/bindings';
+import { getRollbackIntent } from '@/harnesses/codex-cli/rollback';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { CodexApprovals, canAutoApproveCodexHook, codexApprovals } from '@/harnesses/codex-cli/approvals';
 import { getPermissionRequestByRequestId, listPendingAsksBySession } from '@/infrastructure/sqlite/pending-asks';
@@ -41,7 +42,9 @@ function createCodexExecution(deps: Omit<CodexExecutionDependencies, 'instructio
 
 function fakeCodex(readThread?: () => unknown, rejectMethod?: string, trustedHook = false,
   readGoal?: () => unknown, deferActiveGoal = false,
-  deferTurnStart = false, deferPauseGoal = false): { connection: CodexConnection; sent: Record<string, unknown>[]; send(message: unknown): void } {
+  deferTurnStart = false, deferPauseGoal = false, revertThread?: (beforeTurnId: string) => void,
+  resumeStatus: 'idle' | 'active' = 'idle'):
+  { connection: CodexConnection; sent: Record<string, unknown>[]; send(message: unknown): void } {
   let controller!: ReadableStreamDefaultController<Uint8Array>;
   const sent: Record<string, unknown>[] = [];
   const connection: CodexConnection = {
@@ -66,10 +69,18 @@ function fakeCodex(readThread?: () => unknown, rejectMethod?: string, trustedHoo
         const capabilities = (init?.params as { capabilities?: { experimentalApi?: boolean } })?.capabilities;
         queueMicrotask(() => send(tools !== undefined && capabilities?.experimentalApi !== true
           ? { id: message.id, error: { code: -32600, message: 'Experimental API is not enabled' } }
-          : { id: message.id, result: { thread: { id: 'thread-1' }, model: 'gpt-5-codex' } }));
+          : { id: message.id, result: { thread: { id: 'thread-1', status: { type: message.method === 'thread/resume'
+            ? resumeStatus : 'idle' } }, model: 'gpt-5-codex' } }));
       }
       if (message.method === 'thread/read' && readThread) {
         queueMicrotask(() => send({ id: message.id, result: { thread: readThread() } }));
+      }
+      if (message.method === 'thread/revert' && revertThread) {
+        queueMicrotask(() => {
+          revertThread((message.params as { beforeTurnId: string }).beforeTurnId);
+          send({ id: message.id, result: { thread: { id: 'thread-1', turns: [] },
+            turnsBackwardsCursor: null, itemsBackwardsCursor: null } });
+        });
       }
       if (message.method === 'thread/goal/get') queueMicrotask(() => send({ id: message.id, result: {
         goal: readGoal ? readGoal() : { threadId: 'thread-1', objective: 'Ship it', status: 'active',
@@ -1534,4 +1545,233 @@ test('a Prokop session cannot spawn or route into Codex', async () => {
   expect(launches).toBe(0);
   expect(messages[0]?.type).toBe('error');
   expect(getSession('s')?.harness).toBe('prokop');
+});
+
+function seedRollbackTurns(count = 2): { users: string[]; assistants: string[]; turns: Array<Record<string, unknown>> } {
+  create();
+  bindCodexThread({ sessionId: 's', threadId: 'thread-1', cliVersion: 'codex-cli 0.156.1',
+    workspaceRoot: realpathSync(process.cwd()) });
+  const users: string[] = [];
+  const assistants: string[] = [];
+  const turns: Array<Record<string, unknown>> = [];
+  for (let index = 0; index < count; index++) {
+    const userId = `user-${index}`;
+    const assistantId = `assistant-${index}`;
+    createMessage({ id: userId, sessionId: 's', role: 'user', createdAt: index * 2 + 1 });
+    createPart({ id: `text-${index}`, messageId: userId, type: 'text', text: `question ${index}`,
+      createdAt: index * 2 + 1 }, 's');
+    createMessage({ id: assistantId, sessionId: 's', role: 'assistant', status: 'completed',
+      modelId: 'codex-cli', providerId: 'codex-cli', tokens: { prompt: 0, completion: 0 }, cost: 0,
+      createdAt: index * 2 + 2 });
+    users.push(userId);
+    assistants.push(assistantId);
+    turns.push({ id: `turn-${index}`, status: 'completed', itemsView: 'full',
+      items: [{ type: 'userMessage', clientId: userId }] });
+  }
+  return { users, assistants, turns };
+}
+
+test('Codex revert preserves the prior assistant and never reverts workspace files', async () => {
+  const { users, assistants, turns } = seedRollbackTurns(3);
+  const upstream = [...turns];
+  const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns: upstream }),
+    undefined, false, undefined, false, false, false, before => {
+      upstream.splice(upstream.findIndex(turn => turn.id === before));
+    });
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const result = await execution.revert({ sessionId: 's', targetMessageId: assistants[1]! });
+  expect(fake.sent.find(entry => entry.method === 'thread/revert')?.params).toEqual({
+    threadId: 'thread-1', beforeTurnId: 'turn-2',
+  });
+  expect(result).toEqual({ revertedTo: { messageId: assistants[1], messageCount: 4 },
+    removed: { messageIds: [users[2], assistants[2]], partCount: 1 } });
+  expect(listMessagesWithParts('s').map(entry => entry.message.id)).toEqual([
+    users[0], assistants[0], users[1], assistants[1],
+  ]);
+  expect(getRollbackIntent('s')).toBeNull();
+});
+
+test('Codex edit resumes an unloaded bound thread before reading and reverting history', async () => {
+  const { users, turns } = seedRollbackTurns();
+  const upstream = [...turns];
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(() => ({ id: 'thread-1',
+      status: { type: fake.sent.some(message => message.method === 'thread/resume') ? 'idle' : 'notLoaded' },
+      turns: upstream }), undefined, false, undefined, false, false, false,
+    before => { upstream.splice(upstream.findIndex(turn => turn.id === before)); });
+    processes.push(fake);
+    return fake.connection;
+  } });
+  const events: ServerMessage[] = [];
+  const operation = execution.editMessage(wire(events), 'origin', {
+    sessionId: 's', messageId: users[0]!, content: 'updated',
+  });
+  await waitFor(() => processes.some(fake => fake.sent.some(message => message.method === 'turn/start')));
+  expect(processes[0]!.sent.map(message => message.method)).toEqual([
+    'initialize', 'initialized', 'thread/resume', 'thread/read', 'thread/revert', 'thread/read',
+  ]);
+  expect(events.some(event => event.type === 'error')).toBe(false);
+  processes.at(-1)!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-2' } } });
+  processes.at(-1)!.send({ method: 'turn/completed', params: {
+    threadId: 'thread-1', turn: { id: 'turn-2', status: 'completed' },
+  } });
+  await operation;
+});
+
+test('Codex edit refuses an active thread after resume without writing rollback intent', async () => {
+  const { users, turns } = seedRollbackTurns();
+  const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'active' }, turns }),
+    undefined, false, undefined, false, false, false, undefined, 'active');
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const events: ServerMessage[] = [];
+  await execution.editMessage(wire(events), 'origin', { sessionId: 's', messageId: users[0]!, content: 'changed' });
+  expect(events.at(-1)).toMatchObject({ type: 'error', code: 'edit_error',
+    message: 'Codex edit stopped before rollback: Codex thread is not idle after resume.' });
+  expect(fake.sent.some(message => message.method === 'thread/read')).toBe(false);
+  expect(fake.sent.some(message => message.method === 'thread/revert')).toBe(false);
+  expect(getRollbackIntent('s')).toBeNull();
+});
+
+test('Codex edit retains the user ID and resubmits exactly one turn', async () => {
+  const { users, turns } = seedRollbackTurns();
+  const upstream = [...turns];
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns: upstream }),
+      undefined, false, undefined, false, false, false, before => {
+        upstream.splice(upstream.findIndex(turn => turn.id === before));
+      });
+    processes.push(fake);
+    return fake.connection;
+  } });
+  const events: ServerMessage[] = [];
+  const operation = execution.editMessage(wire(events), 'origin', { sessionId: 's', messageId: users[0]!, content: 'updated' });
+  await waitFor(() => processes.some(fake => fake.sent.some(entry => entry.method === 'turn/start')));
+  const sent = processes.flatMap(fake => fake.sent).find(entry => entry.method === 'turn/start');
+  expect(sent?.params).toMatchObject({ clientUserMessageId: users[0], input: [{ type: 'text', text: 'updated' }] });
+  expect(listMessagesWithParts('s').filter(entry => entry.message.role === 'user')).toHaveLength(1);
+  expect(listMessagesWithParts('s')[0]!.parts[0]).toMatchObject({ id: 'text-0', text: 'updated' });
+  const running = processes.at(-1)!;
+  running.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  running.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await operation;
+  expect(getRollbackIntent('s')).toBeNull();
+  expect(events.some(entry => entry.type === 'session.state')).toBe(true);
+});
+
+test('Codex edit keeps image parts and resends validated image inputs', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'codex-edit-images-'));
+  Paths.configure({ dataDir: dir });
+  try {
+    const { users, turns } = seedRollbackTurns(1);
+    const image = createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'photo.png',
+      mimeType: 'image/png', sizeBytes: 2, data: new Uint8Array([1, 2]).buffer });
+    createPart({ id: 'image-part', messageId: users[0]!, type: 'image', mimeType: 'image/png',
+      url: `/api/sessions/s/attachments/${image.id}/content?key=${image.accessKey}`, createdAt: 1 }, 's');
+    const upstream = [...turns];
+    const processes: ReturnType<typeof fakeCodex>[] = [];
+    const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+      const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns: upstream }),
+        undefined, false, undefined, false, false, false, before => {
+          upstream.splice(upstream.findIndex(turn => turn.id === before));
+        });
+      processes.push(fake);
+      return fake.connection;
+    } });
+    const operation = execution.editMessage(wire([]), 'origin', {
+      sessionId: 's', messageId: users[0]!, content: 'another question',
+    });
+    await waitFor(() => processes.some(fake => fake.sent.some(entry => entry.method === 'turn/start')));
+    expect(processes.flatMap(fake => fake.sent).find(entry => entry.method === 'turn/start')?.params)
+      .toMatchObject({ input: [{ type: 'text', text: 'another question' },
+        { type: 'localImage', path: realpathSync(image.absolutePath) }] });
+    expect(listMessagesWithParts('s')[0]!.parts.map(part => part.id).sort()).toEqual(['image-part', 'text-0']);
+    processes.at(-1)!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+    processes.at(-1)!.send({ method: 'turn/completed', params: {
+      threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' },
+    } });
+    await operation;
+  } finally {
+    Paths.reset();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Codex rollback refuses incomplete history and active turns without mutating the transcript', async () => {
+  const { users, turns } = seedRollbackTurns();
+  const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' },
+    turns: [{ ...turns[0], itemsView: 'partial' }, turns[1]] }));
+  let launches = 0;
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+    launches++;
+    return fake.connection;
+  } });
+  await expect(execution.revert({ sessionId: 's', targetMessageId: users[0]! })).rejects.toThrow('incomplete');
+  expect(fake.sent.some(entry => entry.method === 'thread/revert')).toBe(false);
+  expect(getRollbackIntent('s')).toBeNull();
+  expect(listMessagesWithParts('s')).toHaveLength(4);
+  getDatabase().run('UPDATE codex_session_bindings SET pending_turn = 1 WHERE session_id = ?', ['s']);
+  await expect(execution.revert({ sessionId: 's', targetMessageId: users[0]! })).rejects.toThrow('reconciliation');
+  expect(launches).toBe(1);
+});
+
+test('Codex edit reports safe preflight cause without creating a rollback intent', async () => {
+  const { users, turns } = seedRollbackTurns();
+  const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' },
+    turns: [{ ...turns[0], itemsView: 'summary' }, turns[1]] }));
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const events: ServerMessage[] = [];
+  await execution.editMessage(wire(events), 'origin', {
+    sessionId: 's', messageId: users[0]!, content: 'updated',
+  });
+  expect(events.at(-1)).toMatchObject({ type: 'error', code: 'edit_error',
+    message: 'Codex edit stopped before rollback: Codex turn identity is incomplete.' });
+  expect(getRollbackIntent('s')).toBeNull();
+  expect(fake.sent.some(entry => entry.method === 'thread/revert')).toBe(false);
+});
+
+test('Codex edit hides upstream RPC text and marks uncertain rollback as blocked', async () => {
+  const { users, turns } = seedRollbackTurns();
+  const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns }), 'thread/revert');
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const events: ServerMessage[] = [];
+  await execution.editMessage(wire(events), 'origin', {
+    sessionId: 's', messageId: users[0]!, content: 'updated',
+  });
+  expect(events.at(-1)).toMatchObject({ type: 'error', code: 'edit_error',
+    message: 'Codex edit blocked: Codex rollback request or history read failed. Rollback may have run; do not retry or send in this session.' });
+  expect(JSON.stringify(events)).not.toContain('secret upstream detail');
+  expect(getRollbackIntent('s')?.phase).toBe('rollback');
+});
+
+test('uncertain Codex rollback blocks sends and recovers only after upstream prefix is proven', async () => {
+  const { users, turns } = seedRollbackTurns();
+  const upstream = [...turns];
+  const connections: ReturnType<typeof fakeCodex>[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns: upstream }),
+      'thread/revert');
+    connections.push(fake);
+    return fake.connection;
+  } });
+  await expect(execution.revert({ sessionId: 's', targetMessageId: users[0]! })).rejects.toThrow();
+  expect(getRollbackIntent('s')?.phase).toBe('rollback');
+  const events: ServerMessage[] = [];
+  await execution.sendMessage(wire(events), 'origin', 's', 'must not run');
+  expect(events.at(-1)).toMatchObject({ type: 'error', code: 'invalid_session' });
+  expect(connections).toHaveLength(1);
+  await expect(execution.revert({ sessionId: 's', targetMessageId: users[0]! })).rejects.toThrow('uncertain');
+  expect(connections[1]!.sent.some(entry => entry.method === 'thread/revert')).toBe(false);
+  upstream.splice(0);
+  const restarted = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns: upstream }),
+      'thread/revert');
+    connections.push(fake);
+    return fake.connection;
+  } });
+  const result = await restarted.revert({ sessionId: 's', targetMessageId: users[0]! });
+  expect(connections[2]!.sent.some(entry => entry.method === 'thread/revert')).toBe(false);
+  expect(result.revertedTo.messageId).toBeNull();
+  expect(listMessagesWithParts('s')).toHaveLength(0);
 });

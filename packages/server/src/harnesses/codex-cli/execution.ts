@@ -4,7 +4,7 @@ import type { AssistantMessage, Session, TextPart } from '@prokopai/sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import type { SessionExecutionPort, InterruptExecutionResult } from '@/application/ports/execution';
 import { getSession, updateSession } from '@/infrastructure/sqlite/session-store';
-import { createMessage, createPart, getMessageWithParts, listMessagesWithParts, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
+import { createMessage, createPart, deleteMessage, getMessageWithParts, listMessagesWithParts, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { getDatabase } from '@/infrastructure/sqlite/database';
@@ -22,6 +22,7 @@ import { parseCodexGoal, publishCodexGoal, validGoalBudget } from './goal';
 import { parseCodexContextUsage, publishCodexContextUsage } from './usage';
 import { createCodexMemoryTools, type CodexMemoryBridge } from './memory-tools';
 import { createCodexSessionSearchTools, type CodexSessionSearchBridge } from './session-search-tools';
+import { applyRollback, clearRollbackIntent, getRollbackIntent, readRollbackHistory, readTurnIds, sameTurns, saveRollbackIntent, setRollbackPhase } from './rollback';
 
 interface ActiveTurn {
   client: CodexAppServer;
@@ -230,12 +231,108 @@ async function reconcileTurn<Origin>(
   }
 }
 
+const SAFE_EDIT_ERRORS = new Set([
+  'Codex session is unavailable or busy', 'Codex edit requires nonempty text',
+  'Codex thread binding is unavailable or changed', 'Codex goal requires recovery',
+  'Another Codex rollback requires recovery', 'Codex edit turn requires recovery',
+  'Codex turn requires reconciliation before rollback', 'Codex thread history is unavailable',
+  'Codex transcript does not match turn history', 'Codex turn identity is incomplete',
+  'Codex turn identity is ambiguous', 'Invalid Codex rollback target',
+  'Codex edit attachment is unavailable', 'Codex rollback target has no turn',
+  'Codex rollback history is unavailable', 'Codex rollback history is incomplete',
+  'Codex rollback history is ambiguous', 'Codex rollback outcome is uncertain',
+  'Codex thread is not idle after resume', 'Codex rollback is not pending', 'Codex rollback target disappeared',
+  'Codex edit text is unavailable', 'Codex transcript deletion failed',
+]);
+
 /** One CLI process per active turn. Codex owns thread history, Prokop owns its transcript. */
 export function createCodexExecution(deps: CodexExecutionDependencies): Pick<SessionExecutionPort,
-  'sendMessage' | 'interruptSession' | 'isSessionActive'> {
+  'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert'> {
   const active = new Map<string, ActiveTurn>();
   const starting = new Set<string>();
-  return {
+  const resubmitting = new Map<string, string>();
+  async function rollback<Origin>(sessionId: string, operation: 'edit' | 'revert', targetMessageId: string,
+    content: string | null, wire?: SessionWirePorts<Origin>): Promise<import('@/application/ports/execution').RevertExecutionResult | null> {
+    const session = getSession(sessionId);
+    if (!session || session.harness !== 'codex-cli' || session.status === 'closed'
+      || active.has(sessionId) || starting.has(sessionId)) throw new Error('Codex session is unavailable or busy');
+    if (operation === 'edit' && (!content?.trim() || content !== content.trim())) {
+      throw new Error('Codex edit requires nonempty text');
+    }
+    const root = workspaceRoot(session);
+    const version = deps.version();
+    const binding = getCodexBinding(sessionId);
+    if (!binding || binding.workspaceRoot !== root || binding.cliVersion !== version) {
+      throw new Error('Codex thread binding is unavailable or changed');
+    }
+    const metadata = codexObject(session.metadata);
+    if (codexObject(metadata?.codexGoal)?.status === 'active' || metadata?.codexGoalPending
+      || binding.goalRequested) throw new Error('Codex goal requires recovery');
+    let intent = getRollbackIntent(sessionId);
+    if (intent && (intent.operation !== operation || intent.targetMessageId !== targetMessageId
+      || intent.content !== content)) throw new Error('Another Codex rollback requires recovery');
+    if (intent?.phase === 'sent') {
+      if (binding.pendingTurn) {
+        if (!wire) throw new Error('Codex edit turn requires recovery');
+        await reconcileTurn(binding, deps, wire, sessionId);
+      }
+      clearRollbackIntent(sessionId);
+      return null;
+    }
+    if (binding.pendingTurn) throw new Error('Codex turn requires reconciliation before rollback');
+    if (intent?.phase === 'ready') return null;
+    starting.add(sessionId);
+    let client: CodexAppServer | undefined;
+    try {
+      client = new CodexAppServer(deps.connect(), () => {});
+      await client.initialize();
+      // A new app-server connection can read persisted history while the thread
+      // is notLoaded. Resume the bound thread before requiring idle history.
+      const resumed = codexObject(await client.request('thread/resume', {
+        threadId: binding.threadId, cwd: root, approvalPolicy: 'on-request', sandbox: 'workspace-write',
+      }));
+      const resumedThread = codexObject(resumed?.thread);
+      if (resumedThread?.id !== binding.threadId || codexObject(resumedThread.status)?.type !== 'idle') {
+        throw new Error('Codex thread is not idle after resume');
+      }
+      if (!intent) {
+        const ids = await readRollbackHistory(client, binding);
+        const local = listMessagesWithParts(sessionId);
+        const index = local.findIndex(entry => entry.message.id === targetMessageId);
+        const target = local[index];
+        if (!target || (operation === 'edit' && (target.message.role !== 'user'
+          || !target.parts.some(part => part.type === 'text')))) throw new Error('Invalid Codex rollback target');
+        if (operation === 'edit' && !resolveImages(session, target.parts.filter(part => part.type === 'image')
+          .map(part => ({ id: /\/attachments\/([^/]+)\/content/.exec(part.url ?? '')?.[1] ?? '', kind: 'image' })))) {
+          throw new Error('Codex edit attachment is unavailable');
+        }
+        const firstUser = operation === 'revert' && index === 0 && target.message.role === 'user';
+        const userIndex = operation === 'edit' || firstUser ? index / 2 : (index + 1) / 2;
+        if (!Number.isInteger(userIndex) || !ids[userIndex]
+          || operation === 'revert' && !firstUser && target.message.role !== 'assistant') {
+          throw new Error('Codex rollback target has no turn');
+        }
+        intent = { sessionId, operation, targetMessageId,
+          content, beforeTurnId: ids[userIndex]!, turnIds: ids, phase: 'rollback' };
+        saveRollbackIntent(intent);
+      } else {
+        const existing = await readTurnIds(client, binding.threadId);
+        const prefix = intent.turnIds.slice(0, intent.turnIds.indexOf(intent.beforeTurnId));
+        if (sameTurns(existing, prefix)) return applyRollback(intent);
+        // A request whose response was lost is never issued twice.
+        throw new Error('Codex rollback outcome is uncertain');
+      }
+      await client.request('thread/revert', { threadId: binding.threadId, beforeTurnId: intent.beforeTurnId });
+      const actual = await readTurnIds(client, binding.threadId);
+      const prefix = intent.turnIds.slice(0, intent.turnIds.indexOf(intent.beforeTurnId));
+      if (!sameTurns(actual, prefix)) throw new Error('Codex rollback outcome is uncertain');
+      return applyRollback(intent);
+    } finally {
+      starting.delete(sessionId);
+      if (client) await client.close();
+    }
+  }
+  const execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert'> = {
     isSessionActive: (sessionId) => active.has(sessionId) || starting.has(sessionId),
     async interruptSession(sessionId): Promise<InterruptExecutionResult> {
       const run = active.get(sessionId);
@@ -290,6 +387,14 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Codex turn already running', sessionId });
         return;
       }
+      const rollback = getRollbackIntent(sessionId);
+      const reuseId = resubmitting.get(sessionId);
+      if (rollback && (rollback.phase !== 'ready' || rollback.operation !== 'edit'
+        || rollback.targetMessageId !== reuseId)) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session',
+          message: 'Codex rollback requires reconciliation before another send', sessionId });
+        return;
+      }
       if (goalTokenBudget !== undefined && (!validGoalBudget(goalTokenBudget)
         || typeof goalCondition !== 'string' || !goalCondition.trim()
         || goalCondition.trim() !== content.trim() || goalMaxTurns !== undefined || attachments?.length)) {
@@ -302,7 +407,18 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Codex CLI supports text and image messages only', sessionId });
         return;
       }
-      const images = resolveImages(session, attachments ?? []);
+      const existingUser = reuseId ? getMessageWithParts(reuseId) : null;
+      if (reuseId && (!existingUser || existingUser.message.sessionId !== sessionId
+        || existingUser.message.role !== 'user' || !existingUser.parts.some(part => part.type === 'text'
+          && part.text === content))) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Codex edit target is unavailable', sessionId });
+        return;
+      }
+      const references = reuseId ? existingUser!.parts.filter(part => part.type === 'image').map(part => {
+        const id = /\/attachments\/([^/]+)\/content/.exec(part.url ?? '')?.[1] ?? '';
+        return { id, kind: 'image' };
+      }) : attachments ?? [];
+      const images = resolveImages(session, references);
       if (!images) {
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Codex image attachment is unavailable or unsupported', sessionId });
         return;
@@ -349,20 +465,21 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         }
         const persistedGoal = codexObject(codexObject(getSession(sessionId)?.metadata)?.codexGoal);
         if (binding?.pendingTurn) {
+          if (reuseId) throw new Error('Codex edit turn requires reconciliation');
           phase = 'previous turn reconciliation';
           await reconcileTurn(binding, deps, wire, sessionId);
         } else if (persistedGoal?.status === 'active' || binding?.goalRequested) {
           throw new Error('An active Codex goal requires recovery before another send');
         }
-        const user = createMessage({ id: crypto.randomUUID(), sessionId, role: 'user', createdAt: Date.now() });
-        wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: user });
-        if (content.trim()) {
+        const user = existingUser?.message ?? createMessage({ id: crypto.randomUUID(), sessionId, role: 'user', createdAt: Date.now() });
+        if (!reuseId) wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: user });
+        if (!reuseId && content.trim()) {
           const userPart = createPart({ id: crypto.randomUUID(), messageId: user.id,
             type: 'text', text: content, createdAt: Date.now() }, sessionId);
           wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part: userPart });
         }
         const imagePartStart = Date.now() + (content.trim() ? 1 : 0);
-        for (const [index, image] of images.entries()) {
+        for (const [index, image] of (reuseId ? [] : images).entries()) {
           const part = createPart({ id: crypto.randomUUID(), messageId: user.id, type: 'image',
             url: `/api/sessions/${sessionId}/attachments/${image.id}/content?key=${image.accessKey}`,
             mimeType: image.mimeType, createdAt: imagePartStart + index }, sessionId);
@@ -624,7 +741,10 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         // Record uncertainty before sending: a process exit or restart must not
         // cause a possibly executed turn to be silently replayed.
         phase = 'turn start';
-        markCodexTurnPending(sessionId, user.id, assistant.id);
+        getDatabase().transaction(() => {
+          markCodexTurnPending(sessionId, user.id, assistant!.id);
+          if (reuseId) setRollbackPhase(sessionId, 'sent');
+        })();
         const response = codexObject(await client.request('turn/start', {
           threadId, clientUserMessageId: user.id,
           input: [...(content.trim() ? [{ type: 'text', text: content }] : []),
@@ -682,7 +802,16 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         }
         phase = 'turn execution';
         await Promise.race([done, client.disconnected]);
+        if (reuseId && !getCodexBinding(sessionId)?.pendingTurn) clearRollbackIntent(sessionId);
       } catch (error: unknown) {
+        if (reuseId && !getCodexBinding(sessionId)?.pendingTurn
+          && getRollbackIntent(sessionId)?.phase === 'ready' && assistant) {
+          // A failed setup before turn/start must not leave an orphan assistant
+          // that would be duplicated by an explicit retry of the edit.
+          deleteMessage(assistant.id);
+          wire.delivery.broadcastToSession(sessionId, { type: 'session.state', sessionId,
+            messages: listMessagesWithParts(sessionId).slice(-50) });
+        }
         // Do not expose upstream messages, stderr, request payloads, or credentials.
         const rpcCode = error instanceof CodexRequestError && error.code !== null ? ` (RPC ${error.code})` : '';
         const currentAssistant = assistant ? getMessageWithParts(assistant.id)?.message : null;
@@ -699,6 +828,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         codexApprovals.cancelSession(sessionId);
         toolItems?.finish();
         starting.delete(sessionId);
+        if (reuseId) resubmitting.delete(sessionId);
         if (run) {
           run.resolveActivation();
           active.delete(sessionId);
@@ -707,5 +837,35 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         if (hookChannel) await hookChannel.close();
       }
     },
+    async revert(input) {
+      const result = await rollback(input.sessionId, 'revert', input.targetMessageId, null);
+      if (!result) throw new Error('Codex revert result is unavailable');
+      return result;
+    },
+    async editMessage(wire, origin, input) {
+      try {
+        const result = await rollback(input.sessionId, 'edit', input.messageId, input.content, wire);
+        if (result || !getRollbackIntent(input.sessionId)) {
+          wire.delivery.broadcastToSession(input.sessionId, { type: 'session.state', sessionId: input.sessionId,
+            messages: listMessagesWithParts(input.sessionId).slice(-50) });
+        }
+        if (getRollbackIntent(input.sessionId)?.phase === 'ready') {
+          resubmitting.set(input.sessionId, input.messageId);
+          await execution.sendMessage(wire, origin, input.sessionId, input.content);
+        }
+      } catch (error: unknown) {
+        // Never surface upstream RPC text, file paths, or database errors to the client.
+        // Only report a known local validation reason; an intent means the RPC may have run.
+        const reason = error instanceof Error && SAFE_EDIT_ERRORS.has(error.message)
+          ? error.message : 'Codex rollback request or history read failed';
+        const pending = getRollbackIntent(input.sessionId);
+        wire.delivery.send(origin, { type: 'error', code: 'edit_error',
+          message: pending?.phase === 'rollback'
+            ? `Codex edit blocked: ${reason}. Rollback may have run; do not retry or send in this session.`
+            : pending ? `Codex edit stopped after rollback: ${reason}. Do not retry or send in this session.`
+              : `Codex edit stopped before rollback: ${reason}.`, sessionId: input.sessionId });
+      }
+    },
   };
+  return execution;
 }
