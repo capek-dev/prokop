@@ -41,7 +41,7 @@ Use the list action to verify current entries before replacing or removing.`;
 
 export async function codexDeveloperInstructions(
   workspace: Workspace, root: string, preconfig: Preconfig, sources: CodexInstructionSources,
-  memoryTools: readonly string[] = [],
+  availableTools: readonly string[] = [],
 ): Promise<string> {
   const sections: string[] = [];
   const agentDir = await sources.getAgentDirectory(preconfig.id);
@@ -54,8 +54,8 @@ export async function codexDeveloperInstructions(
     const user = await sources.readAgentMemoryFile(preconfig.id, 'USER.md');
     if (memory) sections.push(`<agent_memory>\n${memory}\n</agent_memory>`);
     if (user) sections.push(`<agent_user_preferences>\n${user}\n</agent_user_preferences>`);
-    if (memoryTools.includes('agent_memory')) {
-      sections.push(agentMemoryGuidance(memoryTools.includes('memory')));
+    if (availableTools.includes('agent_memory')) {
+      sections.push(agentMemoryGuidance(availableTools.includes('memory')));
     }
   }
   if (preconfig.systemPrompt) sections.push(preconfig.systemPrompt);
@@ -64,8 +64,14 @@ export async function codexDeveloperInstructions(
     : ''}</workspace>`);
   const memory = await codexWorkspaceMemory(workspace, root);
   if (memory) sections.push(memory);
-  if (workspace.settings.memory?.enabled === true && memoryTools.includes('memory')) {
+  if (workspace.settings.memory?.enabled === true && availableTools.includes('memory')) {
     sections.push(WORKSPACE_MEMORY_GUIDANCE);
+  }
+  if (workspace.settings.sessionSearch?.enabled === true && availableTools.includes('session_search')) {
+    sections.push(`Use session_search to recall past conversations when earlier work or context matters.
+List recent sessions to find an ID, search by keywords, and read the relevant messages before drawing conclusions.
+Prefer current_session for this conversation and workspace for other sessions in this project.
+Use agent scope only for the selected agent's cross-workspace history.`);
   }
   return sections.join('\n\n');
 }

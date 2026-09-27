@@ -21,6 +21,7 @@ import { classifyCodexHook } from './hook-policy';
 import { parseCodexGoal, publishCodexGoal, validGoalBudget } from './goal';
 import { parseCodexContextUsage, publishCodexContextUsage } from './usage';
 import { createCodexMemoryTools, type CodexMemoryBridge } from './memory-tools';
+import { createCodexSessionSearchTools, type CodexSessionSearchBridge } from './session-search-tools';
 
 interface ActiveTurn {
   client: CodexAppServer;
@@ -43,6 +44,7 @@ export interface CodexExecutionDependencies {
   goalIdleTimeoutMs?: number;
   instructions: CodexInstructionSources;
   memoryTools?: CodexMemoryBridge;
+  sessionSearch?: CodexSessionSearchBridge;
 }
 
 export function codexCliVersion(): string {
@@ -328,7 +330,12 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
           definition.type === 'function' && (definition.name === 'memory'
             && workspace.settings.memory?.enabled === true || definition.name === 'agent_memory' && !!agentDir))
           .map(definition => definition.name);
-        const instructions = await codexDeveloperInstructions(workspace, root, preconfig, sources, memoryToolNames);
+        const searchDefinitions = deps.sessionSearch?.definitions() ?? [];
+        const searchToolNames = workspace.settings.sessionSearch?.enabled === true
+          ? searchDefinitions.filter(definition => definition.type === 'function'
+            && definition.name === 'session_search').map(definition => definition.name) : [];
+        const instructions = await codexDeveloperInstructions(workspace, root, preconfig, sources,
+          [...memoryToolNames, ...searchToolNames]);
         if (!session.preconfigId) {
           const updated = updateSession(sessionId, { preconfigId,
             agentId: agentDir ? preconfigId : null });
@@ -548,7 +555,20 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
           },
           ask: request => codexApprovals.requestMemory(request, sessionId, session.workspaceId, wire.delivery),
         });
-        const dynamicTools = memoryTools?.definitions ?? [];
+        const sessionSearch = deps.sessionSearch && createCodexSessionSearchTools({
+          bridge: deps.sessionSearch, definitions: searchDefinitions,
+          sessionId, workspaceId: session.workspaceId, preconfigId, agentDir,
+          isActive: turnId => !!run && active.get(sessionId) === run && run.turnId === turnId
+            && !completed && !run.stopRequested,
+          authorizeRoot: () => {
+            try {
+              const current = getSession(sessionId);
+              return !!current && current.preconfigId === preconfigId && workspaceRoot(current) === root;
+            } catch { return false; }
+          },
+          ask: request => codexApprovals.requestSessionSearch(request, sessionId, session.workspaceId, wire.delivery),
+        });
+        const dynamicTools = [...(memoryTools?.definitions ?? []), ...(sessionSearch?.definitions ?? [])];
         phase = 'Codex permission hook';
         hookChannel = await deps.prepareHook?.(async call => {
           if (!run?.turnId || completed || call.session_id !== run.threadId || call.turn_id !== run.turnId
@@ -568,10 +588,12 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
             sessionId, root, session.workspaceId, wire.delivery);
         }, async params => {
           const request = codexObject(params);
-          if (!memoryTools || !run || request?.threadId !== run.threadId) {
-            return { success: false, contentItems: [{ type: 'inputText', text: 'Memory tool unavailable' }] };
+          if (!run || request?.threadId !== run.threadId) {
+            return { success: false, contentItems: [{ type: 'inputText', text: 'Dynamic tool unavailable' }] };
           }
-          return memoryTools.call(params);
+          if (request.tool === 'session_search' && sessionSearch) return sessionSearch.call(params);
+          if (memoryTools) return memoryTools.call(params);
+          return { success: false, contentItems: [{ type: 'inputText', text: 'Dynamic tool unavailable' }] };
         }, dynamicTools.length > 0);
         await client.initialize();
         if (hookChannel) await verifyPretoolHook(client);

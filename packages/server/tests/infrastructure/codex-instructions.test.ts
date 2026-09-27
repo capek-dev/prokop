@@ -70,6 +70,25 @@ test('Codex includes Prokop memory guidance only for tools available in this ses
   expect(none).not.toContain('You can persist durable workspace knowledge using the memory tool.');
 });
 
+test('Codex session search guidance follows the advertised tool and workspace setting', async () => {
+  const sources = {
+    listPreconfigs: async () => [primary], getPreconfig: async () => primary,
+    getAgentDirectory: async () => null, readAgentMemoryFile: async () => null,
+  };
+  const enabled = { ...workspace, settings: { sessionSearch: {
+    enabled: true, permissionRisk: 'none' as const, includeToolResults: false,
+  } } };
+  const available = await codexDeveloperInstructions(enabled, '/projects/worktree', primary,
+    sources, ['session_search']);
+  expect(available).toContain('Use session_search to recall past conversations');
+  expect(available).toContain('Prefer current_session for this conversation');
+  expect(available).not.toContain('You can persist durable workspace knowledge using the memory tool.');
+  expect(await codexDeveloperInstructions(enabled, '/projects/worktree', primary, sources))
+    .not.toContain('Use session_search to recall past conversations');
+  expect(await codexDeveloperInstructions(workspace, '/projects/worktree', primary, sources, ['session_search']))
+    .not.toContain('Use session_search to recall past conversations');
+});
+
 test('a plain preconfig does not advertise an agent home or agent memory files', async () => {
   const text = await codexDeveloperInstructions(workspace, '/projects/worktree', primary, {
     listPreconfigs: async () => [primary],

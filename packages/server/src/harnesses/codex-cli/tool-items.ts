@@ -1,4 +1,4 @@
-import type { ToolPart } from '@prokopai/sdk';
+import { resolveToolSummary, type ToolPart } from '@prokopai/sdk';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { createPart, getToolPartByCallId, transitionToolToCompleted,
   transitionToolToError, transitionToolToInterrupted, updatePart } from '@/infrastructure/sqlite/message-store';
@@ -7,6 +7,7 @@ import { fileChangeVisualization } from './file-change-visualization';
 
 const MAX_PREVIEW = 8_000;
 const MAX_CHANGES = 50;
+const DOMAIN_TOOLS = new Set(['memory', 'agent_memory', 'session_search']);
 
 function preview(value: unknown): string {
   const text = typeof value === 'string' ? value : JSON.stringify(value ?? '');
@@ -22,21 +23,55 @@ function dynamicContent(item: Record<string, unknown>): string | null {
   return texts.length ? texts.join('\n') : null;
 }
 
-function memoryVisualization(item: Record<string, unknown>): Record<string, unknown> | null {
-  if (item.type !== 'dynamicToolCall' || !['memory', 'agent_memory'].includes(String(item.tool))) return null;
+function dynamicResult(item: Record<string, unknown>): Record<string, unknown> | null {
   const text = dynamicContent(item);
-  if (!text) return { type: 'none', message: 'Memory updated' };
-  let result: Record<string, unknown> | null;
-  try { result = codexObject(JSON.parse(text)); } catch { result = null; }
-  if (!result) return { type: 'none', message: 'Memory result unavailable' };
-  if (Array.isArray(result.entries) && result.entries.every(entry => typeof entry === 'string')) {
-    const entries = result.entries as string[];
-    return { type: 'code', path: result.target === 'user' ? 'USER.md' : 'MEMORY.md',
-      content: preview(entries.join('\n')), created: false, collapsed: true,
-      badge: `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}` };
+  try { return text ? codexObject(JSON.parse(text)) : null; } catch { return null; }
+}
+
+function memoryVisualization(item: Record<string, unknown>): Record<string, unknown> | null {
+  if (item.type !== 'dynamicToolCall' || item.namespace !== null
+    || !['memory', 'agent_memory'].includes(String(item.tool))) return null;
+  const result = dynamicResult(item);
+  if (!result) return { type: 'none', message: preview(dynamicContent(item) ?? 'Memory result unavailable') };
+  if (typeof result.error === 'string') return { type: 'none', message: preview(result.error) };
+  const agent = item.tool === 'agent_memory';
+  if (result.action === 'list') {
+    const count = Array.isArray(result.entries) ? result.entries.length : 0;
+    const usage = codexObject(result.usage);
+    const chars = typeof usage?.chars === 'number' ? usage.chars : 0;
+    const limit = typeof usage?.limit === 'number' ? usage.limit : 0;
+    return { type: 'none', badge: `${count} entr${count === 1 ? 'y' : 'ies'}`
+      + (!agent && usage ? ` · ${chars}/${limit} chars` : ''),
+    message: `${agent ? 'Agent memory' : 'Memory'} (${result.target ?? 'memory'})` };
   }
-  return { type: 'none', message: typeof result.error === 'string' ? preview(result.error)
-    : typeof result.action === 'string' ? `Memory ${result.action} complete` : 'Memory updated' };
+  return { type: 'none', message: typeof result.title === 'string' ? preview(result.title)
+    : agent ? 'Agent memory updated' : 'Memory updated' };
+}
+
+function sessionSearchVisualization(item: Record<string, unknown>): Record<string, unknown> | null {
+  if (item.type !== 'dynamicToolCall' || item.namespace !== null || item.tool !== 'session_search') return null;
+  const result = dynamicResult(item);
+  if (!result) return { type: 'none', message: preview(dynamicContent(item) ?? 'Session search result unavailable') };
+  if (typeof result.error === 'string') return { type: 'none', message: preview(result.error) };
+  const results = Array.isArray(result.results) ? result.results : null;
+  const sessions = Array.isArray(result.sessions) ? result.sessions : null;
+  if (results || sessions) {
+    const entries = (results ?? sessions)!;
+    const label = results ? 'result' : 'session';
+    return { type: 'file-list', badge: `${entries.length} ${label}${entries.length === 1 ? '' : 's'}`,
+      singularLabel: label, pluralLabel: `${label}s`,
+      ...(results && { title: typeof result.query === 'string' ? preview(result.query)
+        : typeof result.title === 'string' ? preview(result.title) : 'Search' }),
+      files: entries.slice(0, 20).map(entry => {
+        const row = codexObject(entry);
+        const title = results ? row?.sessionTitle ?? row?.sessionId : row?.title ?? row?.id;
+        return { path: preview(typeof title === 'string' ? title : '') };
+      }), total: entries.length };
+  }
+  if (Array.isArray(result.messages)) return { type: 'none',
+    badge: `${result.messages.length} message${result.messages.length === 1 ? '' : 's'}`,
+    message: typeof result.sessionTitle === 'string' ? preview(result.sessionTitle) : 'Session context' };
+  return { type: 'none', message: typeof result.title === 'string' ? preview(result.title) : 'Session search completed' };
 }
 
 function itemIdentity(item: Record<string, unknown>): { name: string; summary: string; input: Record<string, unknown> } | null {
@@ -57,6 +92,11 @@ function itemIdentity(item: Record<string, unknown>): { name: string; summary: s
         input: { server: preview(item.server), tool: preview(item.tool), arguments: preview(item.arguments) } };
     case 'dynamicToolCall':
       if (typeof item.tool !== 'string') return null;
+      if (item.namespace === null && DOMAIN_TOOLS.has(item.tool)) {
+        const input = codexObject(item.arguments) ?? {};
+        return { name: item.tool, summary: resolveToolSummary(input,
+          item.tool === 'session_search' ? '{action} {query}' : '{action} {target}'), input };
+      }
       return { name: 'Codex tool', summary: `${typeof item.namespace === 'string' ? `${item.namespace}: ` : ''}${item.tool}`.slice(0, 500),
         input: { tool: preview(item.tool), arguments: preview(item.arguments) } };
     case 'collabAgentToolCall':
@@ -127,7 +167,7 @@ export class CodexToolItems {
           ? { type: 'shell-output', command: preview(item.command), stdout: content,
             exitCode: typeof item.exitCode === 'number' ? item.exitCode : -1 }
           : item.type === 'fileChange' ? fileChangeVisualization(item.changes)
-            : memoryVisualization(item) ?? { type: 'markdown', content } });
+            : memoryVisualization(item) ?? sessionSearchVisualization(item) ?? { type: 'markdown', content } });
     }
     this.open.delete(part.id);
     if (updated) {
