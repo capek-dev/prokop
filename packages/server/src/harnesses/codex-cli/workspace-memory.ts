@@ -1,10 +1,10 @@
+import type { Workspace } from '@prokopai/sdk';
 import {
   formatMemorySection,
   loadMemoryFile,
   MEMORY_CHAR_LIMIT,
   USER_CHAR_LIMIT,
-} from '@capekai/core/hosts';
-import type { Workspace } from '@prokopai/sdk';
+} from '@/adapters/capek/codex-memory';
 import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';
 
 /** Format opted-in workspace memory for Codex without memory-tool guidance. */

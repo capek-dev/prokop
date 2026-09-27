@@ -72,6 +72,14 @@ export class CodexApprovals {
     return true;
   }
 
+  /** Memory writes use the same controller-gated, once-only ask as Codex file edits. */
+  async requestMemory(ask: PermissionAsk, sessionId: string, workspaceId: string,
+    delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
+    if (getSession(sessionId)?.harness !== 'codex-cli') return false;
+    return (await this.enqueue({ ...ask, allowedScopes: ['once'] }, 'codex-cli:memory',
+      null, sessionId, workspaceId, delivery)).decision === 'accept';
+  }
+
   private enqueue(ask: PermissionAsk, toolName: string, key: string | null,
     sessionId: string, workspaceId: string, delivery: ApplicationDeliveryPort<unknown>): Promise<Decision> {
     const requestId = crypto.randomUUID();

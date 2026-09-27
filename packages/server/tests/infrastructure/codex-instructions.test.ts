@@ -41,14 +41,44 @@ test('Codex developer instructions retain agent identity and workspace paths wit
   expect(text).not.toContain('Use the `cwd` parameter');
 });
 
+test('Codex includes Prokop memory guidance only for tools available in this session', async () => {
+  const sources = {
+    listPreconfigs: async () => [primary],
+    getPreconfig: async () => primary,
+    getAgentDirectory: async () => '/agents/primary',
+    readAgentMemoryFile: async () => null,
+  };
+  const enabled = { ...workspace, settings: { memory: { enabled: true, permissionRisk: 'none' as const } } };
+  const both = await codexDeveloperInstructions(enabled, '/projects/worktree', primary, sources,
+    ['memory', 'agent_memory']);
+  expect(both).toContain('You can persist durable workspace knowledge using the memory tool.');
+  expect(both).toContain('Character limits: user=1500, workspace=2500.');
+  expect(both).toContain('If memory is full, consolidate existing entries with replace before adding.');
+  expect(both).toContain('Use "agent_memory" (personal) for cross-project knowledge');
+  expect(both).toContain('Before saving, use list to check existing entries and avoid duplicates.');
+  expect(both).not.toContain('skill_manage');
+  const agentOnly = await codexDeveloperInstructions(enabled, '/projects/worktree', primary, sources,
+    ['agent_memory']);
+  expect(agentOnly).not.toContain('You can persist durable workspace knowledge using the memory tool.');
+  expect(agentOnly).not.toContain('Use "memory" (workspace)');
+  expect(agentOnly).toContain('Use "agent_memory" (personal)');
+  const disabled = await codexDeveloperInstructions(workspace, '/projects/worktree', primary, sources,
+    ['memory', 'agent_memory']);
+  expect(disabled).not.toContain('You can persist durable workspace knowledge using the memory tool.');
+  const none = await codexDeveloperInstructions(enabled, '/projects/worktree', primary, sources);
+  expect(none).not.toContain('Before saving, use list to check existing entries and avoid duplicates.');
+  expect(none).not.toContain('You can persist durable workspace knowledge using the memory tool.');
+});
+
 test('a plain preconfig does not advertise an agent home or agent memory files', async () => {
   const text = await codexDeveloperInstructions(workspace, '/projects/worktree', primary, {
     listPreconfigs: async () => [primary],
     getPreconfig: async () => primary,
     getAgentDirectory: async () => null,
     readAgentMemoryFile: async () => { throw new Error('No agent memory should be read'); },
-  });
+  }, ['agent_memory']);
   expect(text).toContain('Work carefully.');
+  expect(text).not.toContain('You have personal memory that travels with you across all workspaces.');
   expect(text).not.toContain('<agent_home>');
   expect(text).not.toContain('<agent_memory>');
   expect(text).not.toContain('USER.md');

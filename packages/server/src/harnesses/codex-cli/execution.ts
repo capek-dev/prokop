@@ -20,6 +20,7 @@ import { createPretoolChannel, verifyPretoolHook, type PretoolChannel } from './
 import { classifyCodexHook } from './hook-policy';
 import { parseCodexGoal, publishCodexGoal, validGoalBudget } from './goal';
 import { parseCodexContextUsage, publishCodexContextUsage } from './usage';
+import { createCodexMemoryTools, type CodexMemoryBridge } from './memory-tools';
 
 interface ActiveTurn {
   client: CodexAppServer;
@@ -41,6 +42,7 @@ export interface CodexExecutionDependencies {
   prepareHook?: typeof createPretoolChannel;
   goalIdleTimeoutMs?: number;
   instructions: CodexInstructionSources;
+  memoryTools?: CodexMemoryBridge;
 }
 
 export function codexCliVersion(): string {
@@ -320,10 +322,16 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         if (!preconfigId) throw new Error('Codex requires a preconfig');
         const preconfig = await sources.getPreconfig(preconfigId);
         if (!preconfig) throw new Error('Codex preconfig is unavailable');
-        const instructions = await codexDeveloperInstructions(workspace, root, preconfig, sources);
+        const agentDir = await sources.getAgentDirectory(preconfigId);
+        const memoryDefinitions = deps.memoryTools?.definitions() ?? [];
+        const memoryToolNames = memoryDefinitions.filter(definition =>
+          definition.type === 'function' && (definition.name === 'memory'
+            && workspace.settings.memory?.enabled === true || definition.name === 'agent_memory' && !!agentDir))
+          .map(definition => definition.name);
+        const instructions = await codexDeveloperInstructions(workspace, root, preconfig, sources, memoryToolNames);
         if (!session.preconfigId) {
           const updated = updateSession(sessionId, { preconfigId,
-            agentId: await sources.getAgentDirectory(preconfigId) ? preconfigId : null });
+            agentId: agentDir ? preconfigId : null });
           if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
         }
         phase = 'CLI version check';
@@ -527,6 +535,20 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
             }
           }
         };
+        const memoryTools = deps.memoryTools && createCodexMemoryTools({
+          bridge: deps.memoryTools, definitions: memoryDefinitions,
+          sessionId, workspaceId: session.workspaceId, root, agentDir,
+          isActive: turnId => !!run && active.get(sessionId) === run && run.turnId === turnId
+            && !completed && !run.stopRequested,
+          authorizeRoot: () => {
+            try {
+              const current = getSession(sessionId);
+              return !!current && current.preconfigId === preconfigId && workspaceRoot(current) === root;
+            } catch { return false; }
+          },
+          ask: request => codexApprovals.requestMemory(request, sessionId, session.workspaceId, wire.delivery),
+        });
+        const dynamicTools = memoryTools?.definitions ?? [];
         phase = 'Codex permission hook';
         hookChannel = await deps.prepareHook?.(async call => {
           if (!run?.turnId || completed || call.session_id !== run.threadId || call.turn_id !== run.turnId
@@ -544,7 +566,13 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
           if (!run?.turnId || completed) return Promise.resolve({ decision: 'decline' });
           return codexApprovals.request(method, params, run.threadId, run.turnId,
             sessionId, root, session.workspaceId, wire.delivery);
-        });
+        }, async params => {
+          const request = codexObject(params);
+          if (!memoryTools || !run || request?.threadId !== run.threadId) {
+            return { success: false, contentItems: [{ type: 'inputText', text: 'Memory tool unavailable' }] };
+          }
+          return memoryTools.call(params);
+        }, dynamicTools.length > 0);
         await client.initialize();
         if (hookChannel) await verifyPretoolHook(client);
         phase = binding ? 'thread resume' : 'thread creation';
@@ -554,6 +582,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
             ...(selection ? { model: selection.model } : {}), developerInstructions: instructions } : {
             cwd: root, approvalPolicy: 'on-request', sandbox: 'workspace-write',
             ...(selection ? { model: selection.model } : {}), developerInstructions: instructions,
+            ...(dynamicTools.length ? { dynamicTools } : {}),
           }));
         const threadId = id(codexObject(threadResponse?.thread)?.id);
         if (!threadId || (binding && binding.threadId !== threadId)) throw new Error('Invalid Codex thread');

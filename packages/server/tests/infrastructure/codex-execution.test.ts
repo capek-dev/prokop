@@ -61,7 +61,12 @@ function fakeCodex(readThread?: () => unknown, rejectMethod?: string, trustedHoo
         warnings: [], errors: [] }],
       } }));
       if (message.method === 'thread/start' || message.method === 'thread/resume') {
-        queueMicrotask(() => send({ id: message.id, result: { thread: { id: 'thread-1' }, model: 'gpt-5-codex' } }));
+        const tools = (message.params as { dynamicTools?: unknown })?.dynamicTools;
+        const init = sent.find(entry => entry.method === 'initialize');
+        const capabilities = (init?.params as { capabilities?: { experimentalApi?: boolean } })?.capabilities;
+        queueMicrotask(() => send(tools !== undefined && capabilities?.experimentalApi !== true
+          ? { id: message.id, error: { code: -32600, message: 'Experimental API is not enabled' } }
+          : { id: message.id, result: { thread: { id: 'thread-1' }, model: 'gpt-5-codex' } }));
       }
       if (message.method === 'thread/read' && readThread) {
         queueMicrotask(() => send({ id: message.id, result: { thread: readThread() } }));
@@ -212,6 +217,10 @@ test('Codex turn applies selected model and effort, streams, and resumes its thr
   expect(current.sent.find(message => message.method === 'thread/start')).toMatchObject({
     params: { cwd: process.cwd(), approvalPolicy: 'on-request', sandbox: 'workspace-write', model: 'gpt-5-codex' },
   });
+  expect((current.sent.find(message => message.method === 'thread/start')?.params as Record<string, unknown>))
+    .not.toHaveProperty('dynamicTools');
+  expect(current.sent.find(message => message.method === 'initialize')?.params)
+    .toMatchObject({ capabilities: null });
   expect(current.sent.find(message => message.method === 'turn/start')).toMatchObject({
     params: { model: 'gpt-5-codex', effort: 'low' },
   });
@@ -351,13 +360,23 @@ test('Codex tool items appear in the transcript and settle on completion or proc
   fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1', item: {
     type: 'dynamicToolCall', id: 'dynamic-1', tool: 'fetch', status: 'failed', arguments: {},
   } } });
-  await waitFor(() => listMessagesWithParts('s')[1]?.parts.filter(part => part.type === 'tool').length === 4);
+  fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1', item: {
+    type: 'dynamicToolCall', id: 'memory-1', tool: 'memory', status: 'completed', arguments: { action: 'list' },
+    contentItems: [{ type: 'inputText', text: JSON.stringify({ target: 'memory', action: 'list',
+      entries: ['[0] first fact', '[1] ![untrusted](https://example.com/image.png)'] }) }],
+  } } });
+  fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1', item: {
+    type: 'dynamicToolCall', id: 'other-1', tool: 'example', status: 'completed', arguments: {},
+    contentItems: [{ type: 'inputText', text: 'plain result' }],
+  } } });
+  await waitFor(() => listMessagesWithParts('s')[1]?.parts.filter(part => part.type === 'tool').length === 6);
   fake.connection.kill();
   await turn;
   const tools = listMessagesWithParts('s')[1]!.parts.filter(part => part.type === 'tool');
   expect(tools.map(part => [part.name, part.state.status]).sort()).toEqual([
     ['Codex command', 'completed'], ['Codex file change', 'completed'],
     ['Codex MCP', 'interrupted'], ['Codex tool', 'error'],
+    ['Codex tool', 'completed'], ['Codex tool', 'completed'],
   ].sort());
   expect(tools.find(part => part.name === 'Codex command')?.state)
     .toMatchObject({ output: { exitCode: 0, _visualization: { type: 'shell-output', stdout: 'clean' } } });
@@ -369,8 +388,15 @@ test('Codex tool items appear in the transcript and settle on completion or proc
       { type: 'removed', content: 'old line' }, { type: 'added', content: 'new line' },
     ] }],
   } } });
-  expect(messages.filter(message => message.type === 'part.created' && message.part.type === 'tool')).toHaveLength(4);
-  expect(messages.filter(message => message.type === 'part.updated' && message.part.type === 'tool')).toHaveLength(4);
+  expect(tools.find(part => part.callId === 'codex-item:turn-1:memory-1')?.state).toMatchObject({
+    output: { _visualization: { type: 'code', collapsed: true, badge: '2 entries',
+      content: '[0] first fact\n[1] ![untrusted](https://example.com/image.png)' } },
+  });
+  expect(tools.find(part => part.callId === 'codex-item:turn-1:other-1')?.state).toMatchObject({
+    output: { _visualization: { type: 'markdown', content: 'plain result' } },
+  });
+  expect(messages.filter(message => message.type === 'part.created' && message.part.type === 'tool')).toHaveLength(6);
+  expect(messages.filter(message => message.type === 'part.updated' && message.part.type === 'tool')).toHaveLength(6);
 });
 
 test('Codex command approval uses ask UI, exact session grants and one-time replies', async () => {
@@ -1248,6 +1274,107 @@ test('Codex usage accepts only active matching turns, including goal continuatio
   } } });
   await pending;
   expect((getSession('s')?.metadata?.codexUsage as { modelContextWindow: number | null }).modelContextWindow).toBeNull();
+});
+
+test('Codex advertises only memory tools and handles calls on start and resume', async () => {
+  create();
+  updateWorkspace('ws', { settings: { memory: { enabled: true, permissionRisk: 'none' } } });
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  const calls: Array<{ directory: string; input: Record<string, unknown> }> = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => { const fake = fakeCodex(); processes.push(fake); return fake.connection; },
+    memoryTools: {
+      definitions: () => ['memory', 'agent_memory', 'shell'].map(name => ({
+        type: 'function', name, description: name, inputSchema: { type: 'object' },
+      })),
+      execute: async (input, directory) => {
+        calls.push({ input, directory }); return { success: true, result: { action: input.action } };
+      },
+    },
+  });
+  const messages: ServerMessage[] = [];
+  const first = execution.sendMessage(wire(messages), 'origin', 's', 'hello');
+  await waitFor(() => processes[0]?.sent.some(message => message.method === 'turn/start') ?? false);
+  const initial = processes[0]!;
+  expect(initial.sent.find(message => message.method === 'initialize')?.params).toMatchObject({
+    capabilities: { experimentalApi: true, requestAttestation: false },
+  });
+  const threadStart = initial.sent.find(message => message.method === 'thread/start')?.params as Record<string, unknown>;
+  expect(threadStart.dynamicTools).toMatchObject([{ name: 'memory' }]);
+  expect(threadStart.developerInstructions).toContain('You can persist durable workspace knowledge using the memory tool.');
+  expect(threadStart.developerInstructions).not.toContain('Use "agent_memory" (personal)');
+  const sendCall = (fake: ReturnType<typeof fakeCodex>, id: number, turnId: string, tool = 'memory') => fake.send({
+    id, method: 'item/tool/call', params: { threadId: 'thread-1', turnId,
+      callId: `call-${id}`, namespace: null, tool, arguments: { action: 'list', target: 'memory' } },
+  });
+  sendCall(initial, 20, 'wrong');
+  initial.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  sendCall(initial, 21, 'turn-1');
+  sendCall(initial, 22, 'turn-1', 'shell');
+  await waitFor(() => initial.sent.some(message => message.id === 22));
+  expect(initial.sent.filter(message => [20, 21, 22].includes(message.id as number))
+    .map(message => [message.id, (message.result as { success: boolean }).success]))
+    .toEqual([[20, false], [21, true], [22, false]]);
+  expect(calls).toHaveLength(1);
+  initial.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await first;
+  const second = execution.sendMessage(wire(messages), 'origin', 's', 'again');
+  await waitFor(() => processes[1]?.sent.some(message => message.method === 'turn/start') ?? false);
+  const resumed = processes[1]!;
+  expect(resumed.sent.find(message => message.method === 'thread/resume')?.params).not.toHaveProperty('dynamicTools');
+  resumed.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  sendCall(resumed, 23, 'turn-1');
+  await waitFor(() => resumed.sent.some(message => message.id === 23));
+  expect(resumed.sent.find(message => message.id === 23)?.result).toMatchObject({ success: true });
+  expect(calls).toHaveLength(2);
+  resumed.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await second;
+});
+
+test('Codex workspace memory write asks the controller once and rejects broader grants', async () => {
+  create();
+  updateWorkspace('ws', { settings: { memory: { enabled: true, permissionRisk: 'high' } } });
+  const fake = fakeCodex();
+  let writes = 0;
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => fake.connection,
+    memoryTools: { definitions: () => [{ type: 'function', name: 'memory', description: 'Memory',
+      inputSchema: { type: 'object' } }],
+    execute: async (_input, _directory, risk, ask) => {
+      if (risk !== 'high' || !ask || !await ask({ type: 'permission', question: 'Allow memory write?',
+        description: 'Memory write', risk, resource: 'file', action: 'write', paths: ['MEMORY.md'] })) {
+        return { success: false, error: 'USER_REJECTION' };
+      }
+      writes++;
+      return { success: true, result: { action: 'add' } };
+    } },
+  });
+  const messages: ServerMessage[] = [];
+  const pending = execution.sendMessage(wire(messages), 'origin', 's', 'remember this');
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  const sendCall = (id: number) => fake.send({ id, method: 'item/tool/call', params: {
+    threadId: 'thread-1', turnId: 'turn-1', callId: `call-${id}`, namespace: null,
+    tool: 'memory', arguments: { action: 'add', target: 'memory', content: 'fact' },
+  } });
+  sendCall(40);
+  await waitFor(() => messages.some(message => message.type === 'ask.request'));
+  const firstAsk = messages.find(message => message.type === 'ask.request')!;
+  expect(firstAsk.ask).toMatchObject({ risk: 'high', allowedScopes: ['once'] });
+  expect(await codexApprovals.resolve(firstAsk.toolCallId,
+    { type: 'permission', grant: 'workspace' }, firstAsk.requestId)).toBe(true);
+  await waitFor(() => fake.sent.some(message => message.id === 40));
+  expect(fake.sent.find(message => message.id === 40)?.result).toMatchObject({ success: false });
+  sendCall(41);
+  await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 2);
+  const secondAsk = messages.filter(message => message.type === 'ask.request')[1]!;
+  expect(await codexApprovals.resolve(secondAsk.toolCallId,
+    { type: 'permission', grant: 'once' }, secondAsk.requestId)).toBe(true);
+  await waitFor(() => fake.sent.some(message => message.id === 41));
+  expect(fake.sent.find(message => message.id === 41)?.result).toMatchObject({ success: true });
+  expect(writes).toBe(1);
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await pending;
 });
 
 test('a Prokop session cannot spawn or route into Codex', async () => {

@@ -1,5 +1,5 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
-import type { NoneVisualization, MarkdownVisualization } from '@prokopai/sdk';
+import type { NoneVisualization } from '@prokopai/sdk';
 import { createWebfetchPermissionAsk } from '@prokopai/sdk';
 import TurndownService from 'turndown';
 
@@ -170,13 +170,14 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
       }
 
       let outputContent: string;
+      const format = input.format ?? 'markdown';
 
-      if (input.format === 'html') {
+      if (format === 'html') {
         outputContent = content;
-      } else if (input.format === 'markdown' && contentType.includes('text/html')) {
+      } else if (format === 'markdown' && contentType.includes('text/html')) {
         const turndown = new TurndownService();
         outputContent = turndown.turndown(content);
-      } else if (input.format === 'text') {
+      } else if (format === 'text') {
         outputContent = stripHtmlTags(content);
       } else {
         outputContent = content;
@@ -184,24 +185,13 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
       const displayUrl = input.url.length > 80 ? input.url.substring(0, 77) + '...' : input.url;
 
-      const contentIsRenderable =
-        (outputContent.length <= 20_000) &&
-        (contentType.includes('markdown') ||
-          contentType.includes('text/plain') ||
-          (input.format === 'markdown' && contentType.includes('text/html')));
-
-      const visualization = contentIsRenderable
-        ? ({
-            type: 'markdown',
-            badge: `${(outputContent.length / 1024).toFixed(1)} KB`,
-            content: outputContent.slice(0, 20_000),
-            sourceUrl: input.url,
-          } as MarkdownVisualization)
-        : ({
-            type: 'none',
-            badge: `${(outputContent.length / 1024).toFixed(1)} KB`,
-            message: `Fetched: ${displayUrl}`,
-          } as NoneVisualization);
+      // Fetched pages can contain extensive Markdown and remote images. Keep
+      // the converted content for the model and raw-data view, not inline chat.
+      const visualization: NoneVisualization = {
+        type: 'none',
+        badge: `${(outputContent.length / 1024).toFixed(1)} KB`,
+        message: `Fetched: ${displayUrl}`,
+      };
 
       return {
         success: true,

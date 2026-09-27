@@ -43,6 +43,7 @@ import {
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { listPreconfigs } from '@/infrastructure/config/preconfig';
 import { spawnCodexAppServer } from '@/harnesses/codex-cli/app-server';
+import { codexMemoryTools } from '@/adapters/capek/codex-memory';
 import { createPretoolChannel } from '@/harnesses/codex-cli/pretool-hook';
 import { selectEmptySessionHarnessModel } from '@/infrastructure/sqlite/session-store';
 import { getModelsConfigWithStatus } from '@/config/models';
@@ -170,6 +171,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     connect: spawnCodexAppServer,
     version: codexCliVersion,
     prepareHook: createPretoolChannel,
+    memoryTools: codexMemoryTools,
     instructions: {
       listPreconfigs,
       getPreconfig: id => agents.getPreconfigOrAgent(id),

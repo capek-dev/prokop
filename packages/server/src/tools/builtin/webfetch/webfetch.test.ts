@@ -152,11 +152,29 @@ describe('webfetch: response handling', () => {
     expect(res.content).toBeTruthy();
   });
 
-  test('returns markdown format by default', async () => {
-    const mdCtx = createMockContext(vfs);
-    // Mock fetch returns HTML, which gets converted to markdown
-    const result = await execute({ url: 'https://example.com' }, mdCtx);
+  test('converts HTML to markdown by default without putting the page inline in chat', async () => {
+    const page = '<html><title>Sample</title><body><h1>Title</h1><img src="https://example.com/p.png" alt="Photo"></body></html>';
+    ctx.fetch = mock(async () => new Response(page, {
+      headers: { 'content-type': 'text/html' },
+    })) as unknown as typeof ctx.fetch;
+    const result = await execute({ url: 'https://example.com' }, ctx);
     expect(result.success).toBe(true);
+    expect((result.result as { content: string }).content).toContain('Title\n=====');
+    expect((result.result as { content: string }).content).toContain('![Photo](https://example.com/p.png)');
+    expect(result.visualization).toMatchObject({ type: 'none', message: 'Fetched: https://example.com' });
+  });
+
+  test('explicit markdown and html retain their model output but never preview remote images', async () => {
+    const page = '<html><body><img src="https://example.com/p.png" alt="Photo"></body></html>';
+    ctx.fetch = mock(async () => new Response(page, {
+      headers: { 'content-type': 'text/html' },
+    })) as unknown as typeof ctx.fetch;
+    const markdown = await execute({ url: 'https://example.com', format: 'markdown' }, ctx);
+    const html = await execute({ url: 'https://example.com', format: 'html' }, ctx);
+    expect((markdown.result as { content: string }).content).toContain('![Photo]');
+    expect((html.result as { content: string }).content).toContain('<img');
+    expect(markdown.visualization?.type).toBe('none');
+    expect(html.visualization?.type).toBe('none');
   });
 
   test('returns html format when requested', async () => {

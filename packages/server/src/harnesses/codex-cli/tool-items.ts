@@ -13,6 +13,32 @@ function preview(value: unknown): string {
   return text.length > MAX_PREVIEW ? `${text.slice(0, MAX_PREVIEW)}\n[truncated]` : text;
 }
 
+function dynamicContent(item: Record<string, unknown>): string | null {
+  const items = Array.isArray(item.contentItems) ? item.contentItems
+    : Array.isArray(item.result) ? item.result : null;
+  if (!items) return null;
+  const texts = items.map(codexObject).filter(entry => entry?.type === 'inputText'
+    && typeof entry.text === 'string').map(entry => entry!.text as string);
+  return texts.length ? texts.join('\n') : null;
+}
+
+function memoryVisualization(item: Record<string, unknown>): Record<string, unknown> | null {
+  if (item.type !== 'dynamicToolCall' || !['memory', 'agent_memory'].includes(String(item.tool))) return null;
+  const text = dynamicContent(item);
+  if (!text) return { type: 'none', message: 'Memory updated' };
+  let result: Record<string, unknown> | null;
+  try { result = codexObject(JSON.parse(text)); } catch { result = null; }
+  if (!result) return { type: 'none', message: 'Memory result unavailable' };
+  if (Array.isArray(result.entries) && result.entries.every(entry => typeof entry === 'string')) {
+    const entries = result.entries as string[];
+    return { type: 'code', path: result.target === 'user' ? 'USER.md' : 'MEMORY.md',
+      content: preview(entries.join('\n')), created: false, collapsed: true,
+      badge: `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}` };
+  }
+  return { type: 'none', message: typeof result.error === 'string' ? preview(result.error)
+    : typeof result.action === 'string' ? `Memory ${result.action} complete` : 'Memory updated' };
+}
+
 function itemIdentity(item: Record<string, unknown>): { name: string; summary: string; input: Record<string, unknown> } | null {
   switch (item.type) {
     case 'commandExecution':
@@ -92,14 +118,16 @@ export class CodexToolItems {
       updated = transitionToolToError(part.id, 'Codex tool failed');
     } else {
       const content = item.type === 'commandExecution' ? preview(item.aggregatedOutput)
-        : preview(item.result ?? item.contentItems ?? item.action ?? item.status ?? 'Completed');
+        : preview(item.type === 'dynamicToolCall'
+          ? dynamicContent(item) ?? item.result ?? item.action ?? item.status ?? 'Completed'
+          : item.result ?? item.contentItems ?? item.action ?? item.status ?? 'Completed');
       updated = transitionToolToCompleted(part.id, { status: typeof status === 'string' ? status : 'completed',
         ...(typeof item.exitCode === 'number' ? { exitCode: item.exitCode } : {}),
         _visualization: item.type === 'commandExecution'
           ? { type: 'shell-output', command: preview(item.command), stdout: content,
             exitCode: typeof item.exitCode === 'number' ? item.exitCode : -1 }
           : item.type === 'fileChange' ? fileChangeVisualization(item.changes)
-            : { type: 'markdown', content } });
+            : memoryVisualization(item) ?? { type: 'markdown', content } });
     }
     this.open.delete(part.id);
     if (updated) {

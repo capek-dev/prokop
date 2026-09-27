@@ -70,6 +70,24 @@ test('server-initiated approvals deny by default and malformed traffic closes re
   await client.close();
 });
 
+test('dynamic tool calls receive bounded callback results and deny when no handler exists', async () => {
+  const f = fixture();
+  const client = new CodexAppServer(f.io, () => {}, undefined, async params => ({
+    success: true, contentItems: [{ type: 'inputText', text: String((params as { tool: string }).tool) }],
+  }));
+  f.send({ id: 40, method: 'item/tool/call', params: { tool: 'memory' } });
+  await f.waitFor(1);
+  expect(f.outgoing[0]).toEqual({ id: 40, result: { success: true,
+    contentItems: [{ type: 'inputText', text: 'memory' }] } });
+  await client.close();
+  const other = fixture();
+  const withoutHandler = new CodexAppServer(other.io, () => {});
+  other.send({ id: 41, method: 'item/tool/call', params: {} });
+  await other.waitFor(1);
+  expect(other.outgoing[0]).toMatchObject({ id: 41, result: { success: false } });
+  await withoutHandler.close();
+});
+
 test('request timeout removes its waiter without reusing a request id', async () => {
   const f = fixture();
   const client = new CodexAppServer(f.io, () => {});

@@ -86,6 +86,22 @@ describe('tool debug transcript projection', () => {
     expect(original[0].parts[0]).not.toBe(part);
   });
 
+  test('compacts old webfetch page previews on reload without changing stored raw output', async () => {
+    const original = makeTranscript();
+    const part = original[0].parts[0];
+    if (part.type !== 'tool' || part.state.status !== 'completed') throw new Error('Expected completed tool');
+    part.name = 'webfetch';
+    part.state.output = { content: '<img src="https://example.com/p.png">',
+      _visualization: { type: 'markdown', content: '![photo](https://example.com/p.png)', badge: '1 KB' } };
+    const projected = await projectMessagesForClient(original);
+    const visible = projected[0].parts[0];
+    if (visible.type !== 'tool') throw new Error('Expected tool');
+    expect(visible.presentation?.visualization).toEqual({ type: 'none', badge: '1 KB',
+      message: 'Fetched page (open raw data to inspect)' });
+    expect(JSON.stringify(projected)).not.toContain('example.com/p.png');
+    expect(part.state.output).toMatchObject({ content: '<img src="https://example.com/p.png">' });
+  });
+
   test('falls back to a bounded input summary when the catalog is unavailable', async () => {
     const projected = await projectMessagesForClient(makeTranscript());
     const part = projected[0].parts[0];

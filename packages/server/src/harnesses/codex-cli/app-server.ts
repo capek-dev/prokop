@@ -62,6 +62,8 @@ export class CodexAppServer {
     private readonly io: CodexConnection,
     private readonly onNotification: (notification: CodexNotification) => void,
     private readonly onApproval?: (method: string, params: unknown) => Promise<{ decision: 'accept' | 'decline' }>,
+    private readonly onToolCall?: (params: unknown) => Promise<{ contentItems: Array<{ type: 'inputText'; text: string }>; success: boolean }>,
+    private readonly dynamicToolsEnabled = false,
   ) {
     this.disconnected = new Promise<never>((_resolve, reject) => { this.rejectDisconnected = reject; });
     void this.disconnected.catch(() => {});
@@ -73,7 +75,9 @@ export class CodexAppServer {
   async initialize(): Promise<void> {
     await this.request('initialize', {
       clientInfo: { name: 'prokop', title: 'Prokop', version: '0.1.0' },
-      capabilities: null,
+      capabilities: this.dynamicToolsEnabled
+        ? { experimentalApi: true, requestAttestation: false }
+        : null,
     });
     await this.write({ method: 'initialized', params: {} });
   }
@@ -167,6 +171,13 @@ export class CodexAppServer {
         void (this.onApproval?.(message.method, message.params) ?? Promise.resolve({ decision: 'decline' as const }))
           .catch(() => ({ decision: 'decline' as const }))
           .then(result => { if (!this.closed) void this.write({ id, result }); });
+        return;
+      }
+      if (message.method === 'item/tool/call') {
+        const denied = { contentItems: [{ type: 'inputText' as const, text: 'Tool unavailable' }], success: false };
+        void (this.onToolCall?.(message.params) ?? Promise.resolve(denied))
+          .catch(() => denied)
+          .then(result => { if (!this.closed) void this.write({ id, result }).catch(() => {}); });
         return;
       }
       let result: unknown;

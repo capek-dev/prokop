@@ -110,9 +110,15 @@ export async function projectMessagesForClient(
     message,
     parts: parts.map((part) => {
       if (part.type !== 'tool') return part;
-      const visualization = part.state.status === 'completed'
+      const storedVisualization = part.state.status === 'completed'
         ? extractVisualization(part.state.output)
         : undefined;
+      // Old webfetch rows stored the entire fetched page as a Markdown preview.
+      // Preserve the original output for on-demand debug, but do not re-embed it.
+      const visualization = part.name === 'webfetch' && storedVisualization?.type === 'markdown'
+        ? { type: 'none' as const, badge: storedVisualization.badge,
+          message: 'Fetched page (open raw data to inspect)' }
+        : storedVisualization;
       return {
         ...part,
         state: projectState(part, visualization),
