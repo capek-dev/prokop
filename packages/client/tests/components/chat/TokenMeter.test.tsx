@@ -105,6 +105,23 @@ describe('TokenMeter', () => {
     expect(screen.queryByText('25%')).not.toBeInTheDocument();
   });
 
+  it('uses SDK-reported Claude context for percentage and click-to-counts, not query totals', async () => {
+    const { rerender } = render(<TokenMeter claude totalTokens={100000} claudeContext={{ used: 50000, window: 200000 }} claudeUsage={{
+      last: { prompt: 1200, completion: 100, cacheRead: 400, cacheWrite: 200 }, contextWindow: 200000,
+    }} />);
+    expect(screen.getByText('25%')).toBeInTheDocument();
+    const button = screen.getByRole('button', { name: 'Token usage: 25% of context window' });
+    await userEvent.click(button);
+    expect(screen.getByText('50.0k/200.0k')).toBeInTheDocument();
+    await userEvent.click(button);
+    expect(screen.getByText('25%')).toBeInTheDocument();
+    rerender(<TokenMeter claude claudeContext={{ used: -1, window: 200000 }} claudeUsage={{
+      last: { prompt: 1200, completion: 100, cacheRead: 400, cacheWrite: 200 }, contextWindow: 200000,
+    }} />);
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Claude context usage: unknown' })).toBeInTheDocument();
+  });
+
   it('renders SVG ring indicator', () => {
     const { container } = render(<TokenMeter />);
     const svg = container.querySelector('svg');

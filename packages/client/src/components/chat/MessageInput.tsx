@@ -278,8 +278,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   }, [activeWorkspace?.id, openFilePreview]);
 
   const addFiles = useCallback(async (files: FileList | File[]) => {
-    if (claudeSession) return;
-    const fileArray = Array.from(files).filter(file => !codexSession
+    const fileArray = Array.from(files).filter(file => !(codexSession || claudeSession)
       || ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type));
 
     for (const file of fileArray) {
@@ -316,7 +315,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const files = e.clipboardData?.files;
-    if (!claudeSession && files && Array.from(files).some(file => !codexSession
+    if (files && Array.from(files).some(file => !(codexSession || claudeSession)
       || ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type))) {
       e.preventDefault();
       void addFiles(files);
@@ -355,8 +354,10 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
     if ((!trimmed && pendingAttachments.length === 0) || effectiveDisabled
       || pendingAttachments.some(a => a.isUploading)) return;
     if (claudeSession) {
-      if (!trimmed || pendingAttachments.length) return;
-      onSendMessage(trimmed);
+      const images = pendingAttachments.filter(a => a.uploadedId && a.uploadedKind === 'image')
+        .map(a => ({ id: a.uploadedId!, kind: 'image' as const }));
+      if ((!trimmed && !images.length) || images.length !== pendingAttachments.length) return;
+      onSendMessage(trimmed, images.length ? images : undefined);
       cleanupPending();
       return;
     }
@@ -497,14 +498,13 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
 
   const trimmed = input.trim();
   const hasUploadingAttachment = pendingAttachments.some(a => a.isUploading);
-  const canSend = claudeSession ? trimmed && pendingAttachments.length === 0
-    : trimmed || pendingAttachments.length > 0;
+  const canSend = trimmed || pendingAttachments.length > 0;
   const isDisabled = !canSend || disabled || hasUploadingAttachment || goalActive
     || (!claudeSession && sendMode === 'goal' && (!trimmed || pendingAttachments.length > 0 || codexSession && !budgetValid))
     || ((codexSession || claudeSession) && isStreaming);
   const effectivePlaceholder = goalActive
     ? 'Goal active'
-    : claudeSession ? 'Message Claude CLI (text only)'
+    : claudeSession ? 'Message Claude CLI (text and images)'
       : codexSession && sendMode !== 'goal'
         ? 'Message Codex CLI (/ prompts, @ files)'
       : sendMode === 'goal'
@@ -651,7 +651,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
               type="button"
               className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none"
               onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || claudeSession}
+              disabled={disabled}
               aria-label="Attach file"
             >
               <Paperclip className="size-4" />
@@ -659,7 +659,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
             <input
               ref={fileInputRef}
               type="file"
-              accept={codexSession ? 'image/png,image/jpeg,image/webp,image/gif' : 'image/*,video/*,.pdf,.doc,.docx,.txt,.csv,.json,.xml,.md'}
+              accept={codexSession || claudeSession ? 'image/png,image/jpeg,image/webp,image/gif' : 'image/*,video/*,.pdf,.doc,.docx,.txt,.csv,.json,.xml,.md'}
               multiple
               className="hidden"
               onChange={(e) => {

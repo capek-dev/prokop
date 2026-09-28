@@ -77,6 +77,25 @@ test('the Claude controller sees pending approval in the chat panel, observers d
   expect(screen.queryByTestId('codex-ask')).not.toBeInTheDocument();
 });
 
+test('Claude child approval is visible from both timelines only to the parent controller', () => {
+  const claudeParent = { ...parent, harness: 'claude-cli' } as Session;
+  const claudeChild = { ...child, harness: 'claude-cli' } as Session;
+  const requests = [{ ...pendingAskRequests[0]!, toolCallId: 'claude-approval:1' }];
+  useClientIdentityStore.setState({ clientId: 'owner' });
+  useSessionControlStore.setState({ controlBySessionId: { parent: {
+    status: 'controlled', controllerClientId: 'owner', sessionId: 'parent',
+  } as never } });
+  const props = { messagesWithParts: [], queuedMessages: [], pendingAskRequests: requests,
+    onAskResponse: () => {}, onSendMessage: () => {}, onRemoveFromQueue: () => {} };
+  const parentView = render(<ChatView session={claudeParent} {...props} />);
+  expect(screen.getByTestId('codex-ask')).toBeInTheDocument();
+  parentView.unmount();
+  render(<ChatView session={claudeChild} {...props} />);
+  expect(screen.getByTestId('codex-ask')).toBeInTheDocument();
+  act(() => useClientIdentityStore.setState({ clientId: 'viewer' }));
+  expect(screen.queryByTestId('codex-ask')).not.toBeInTheDocument();
+});
+
 test('a viewer without parent control cannot answer from the child session', () => {
   useClientIdentityStore.setState({ clientId: 'viewer' });
   useSessionControlStore.setState({ controlBySessionId: { parent: {

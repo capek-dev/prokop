@@ -15,6 +15,9 @@ interface TokenMeterProps {
   /** Codex reports the latest response separately from cumulative thread usage. */
   codexUsage?: unknown;
   codex?: boolean;
+  claude?: boolean;
+  claudeUsage?: unknown;
+  claudeContext?: unknown;
 }
 
 const CODEX_FIELDS = ['totalTokens', 'inputTokens', 'cachedInputTokens', 'cacheWriteInputTokens',
@@ -33,6 +36,30 @@ function validCodexUsage(value: unknown): value is CodexContextUsage {
   return validBreakdown(usage.last) && validBreakdown(usage.total)
     && (usage.modelContextWindow === null || typeof usage.modelContextWindow === 'number'
       && Number.isSafeInteger(usage.modelContextWindow) && usage.modelContextWindow > 0);
+}
+
+interface ClaudeUsage {
+  last: { prompt: number; completion: number; cacheRead: number; cacheWrite: number };
+  contextWindow: number | null;
+}
+
+function validClaudeUsage(value: unknown): value is ClaudeUsage {
+  if (!value || typeof value !== 'object') return false;
+  const usage = value as Record<string, unknown>;
+  const last = usage.last;
+  return !!last && typeof last === 'object'
+    && ['prompt', 'completion', 'cacheRead', 'cacheWrite'].every(key => {
+      const count = (last as Record<string, unknown>)[key];
+      return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0;
+    }) && (usage.contextWindow === null || typeof usage.contextWindow === 'number'
+      && Number.isSafeInteger(usage.contextWindow) && usage.contextWindow > 0);
+}
+
+function validClaudeContext(value: unknown): value is { used: number; window: number } {
+  if (!value || typeof value !== 'object') return false;
+  const context = value as Record<string, unknown>;
+  return typeof context.used === 'number' && Number.isSafeInteger(context.used) && context.used >= 0
+    && typeof context.window === 'number' && Number.isSafeInteger(context.window) && context.window > 0;
 }
 
 function formatCompact(num: number): string {
@@ -60,11 +87,18 @@ export function TokenMeter({
   compact,
   codex = false,
   codexUsage,
+  claude = false,
+  claudeUsage,
+  claudeContext,
 }: TokenMeterProps) {
   const [showTokens, setShowTokens] = useState(false);
   const reported = codex && validCodexUsage(codexUsage) ? codexUsage : null;
-  const used = codex ? reported?.last.totalTokens ?? 0 : totalTokens;
-  const effectiveContext = codex ? reported?.modelContextWindow ?? 0 : totalTokens === 0 ? 0 : contextWindow;
+  const claudeReported = claude && validClaudeUsage(claudeUsage) ? claudeUsage : null;
+  const claudeReportedContext = claude && validClaudeContext(claudeContext) ? claudeContext : null;
+  const used = codex ? reported?.last.totalTokens ?? 0 : claude
+    ? claudeReportedContext?.used ?? 0 : totalTokens;
+  const effectiveContext = claude ? claudeReportedContext?.window ?? 0
+    : codex ? reported?.modelContextWindow ?? 0 : totalTokens === 0 ? 0 : contextWindow;
   const percentage = effectiveContext === 0
     ? 0
     : Math.min(100, Math.round((used / effectiveContext) * 100));
@@ -83,7 +117,18 @@ export function TokenMeter({
         ? 'text-warning'
         : 'text-primary';
 
-  const usageRows: Array<[string, number | string]> = codex
+  const usageRows: Array<[string, number | string]> = claude
+    ? claudeReported ? [
+      ['Latest input', claudeReported.last.prompt],
+      ['Latest output', claudeReported.last.completion],
+      ['Latest cached input', claudeReported.last.cacheRead],
+      ['Latest cache creation', claudeReported.last.cacheWrite],
+      ['Session total', totalTokens],
+      ['Model window', claudeReported.contextWindow ?? 'Not reported'],
+      ['Context occupancy', claudeReportedContext?.used ?? 'Not reported'],
+      ['Compaction window', claudeReportedContext?.window ?? 'Not reported'],
+    ] : [['Usage', 'Not reported']]
+    : codex
     ? reported ? [
       ['Latest input', reported.last.inputTokens],
       ['Latest output', reported.last.outputTokens],
@@ -111,7 +156,7 @@ export function TokenMeter({
             type="button"
             className="flex items-center gap-1.5 cursor-pointer select-none"
             onClick={() => setShowTokens((current) => !current)}
-            aria-label={codex && !effectiveContext ? 'Codex context usage: unknown'
+            aria-label={claude && !effectiveContext ? 'Claude context usage: unknown' : codex && !effectiveContext ? 'Codex context usage: unknown'
               : `Token usage: ${percentage}% of context window`}
           >
             <svg
@@ -142,8 +187,9 @@ export function TokenMeter({
               />
             </svg>
             <span className="text-xs font-mono text-muted-foreground">
-              {codex && !effectiveContext ? (reported ? `${formatCompact(used)}/?` : '—')
-                : showTokens ? `${formatCompact(used)}/${formatCompact(effectiveContext)}` : `${percentage}%`}
+              {claude && !effectiveContext ? '—'
+                : codex && !effectiveContext ? (reported ? `${formatCompact(used)}/?` : '—')
+                  : showTokens ? `${formatCompact(used)}/${formatCompact(effectiveContext)}` : `${percentage}%`}
             </span>
           </button>
         </TooltipTrigger>

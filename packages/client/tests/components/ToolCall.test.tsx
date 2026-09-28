@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 import type { GetToolDebugResponse, ProkopaiClient, ToolPart } from '@prokopai/sdk';
 import { ToolCall } from '@/components/chat/ToolCall';
+import type { PendingAskRequest } from '@/stores/askStore';
 import { ServerClientProvider } from '@/contexts/ServerClientContext';
 
 function makeProjectedPart(): ToolPart {
@@ -88,10 +89,35 @@ describe('ToolCall debug loading', () => {
     });
   });
 
-  test('opens a linked Codex child timeline from the agent row', async () => {
+  test('does not repeat harness child approvals inside the parent Agent tool row', () => {
+    const childId = '11111111-1111-4111-8111-111111111111';
+    const part: ToolPart = { ...makeProjectedPart(), name: 'Claude Agent',
+      state: { status: 'running', input: {}, startedAt: 1, childSessionId: childId },
+      presentation: { summary: 'explorer', debugAvailable: false } };
+    const ask = (toolCallId: string): PendingAskRequest => ({
+      sessionId: 'session-1', originSessionId: childId, toolCallId, requestId: toolCallId,
+      toolName: 'claude-cli:Bash', ask: { type: 'permission', question: toolCallId,
+        resource: 'shell-command', action: 'execute', risk: 'high' },
+    });
+    const sdkClient = { http: { tools: { list: async () => ({ tools: [] }) } } } as unknown as ProkopaiClient;
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ServerClientProvider value={{ sdkClient, serverUrl: 'http://localhost', apiToken: null, connected: true }}>
+          <ToolCall sessionId="session-1" part={part} pendingAskRequests={[
+            ask('claude-approval:1'), ask('codex-approval:1'), ask('ordinary-child-ask'),
+          ]} onAskResponse={() => {}} />
+        </ServerClientProvider>
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByText('claude-approval:1')).not.toBeInTheDocument();
+    expect(screen.queryByText('codex-approval:1')).not.toBeInTheDocument();
+    expect(screen.getByText('ordinary-child-ask')).toBeInTheDocument();
+  });
+
+  test.each(['Codex agent', 'Claude Agent'])('opens a linked %s child timeline from the agent row', (name) => {
     const childId = '11111111-1111-4111-8111-111111111111';
     const opened: string[] = [];
-    const part: ToolPart = { ...makeProjectedPart(), name: 'Codex agent',
+    const part: ToolPart = { ...makeProjectedPart(), name,
       state: { status: 'completed', input: {}, output: null, startedAt: 1, completedAt: 2,
         childSessionId: childId },
       presentation: { summary: 'explorer', debugAvailable: false } };

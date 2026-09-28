@@ -78,7 +78,7 @@ function getStatusIcon(status: string) {
 }
 
 function extractTaskSessionId(part: ToolPart): string | null {
-  if (part.name !== 'task' && part.name !== 'Codex agent') return null;
+  if (part.name !== 'task' && part.name !== 'Codex agent' && part.name !== 'Claude Agent') return null;
   const state = part.state;
   if ('childSessionId' in state && state.childSessionId) {
     return state.childSessionId as string;
@@ -214,7 +214,9 @@ export const ToolCall = memo(function ToolCall({
           const isChildOrDescendant = r.originSessionId && descendantIds.has(r.originSessionId);
           const isDirectChildSession = r.sessionId === taskSessionId;
           return (isChildOrDescendant || isDirectChildSession)
-            && r.toolCallId !== part.callId && !r.toolCallId.startsWith('codex-approval:');
+            && r.toolCallId !== part.callId
+            && !r.toolCallId.startsWith('codex-approval:')
+            && !r.toolCallId.startsWith('claude-approval:');
         },
       );
       allPendingAsks.push(...childAsks);

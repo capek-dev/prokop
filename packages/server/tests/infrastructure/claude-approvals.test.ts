@@ -60,6 +60,29 @@ test('approval is once-only and malformed or stale responses fail closed', async
   expect(await approvals.resolve(next.toolCallId, { type: 'permission', grant: 'once' }, next.requestId)).toBe(false);
 });
 
+test('child-owned approval reaches the parent controller and replays under the child', async () => {
+  createSession({ id: 'child', workspaceId: 'ws', title: 'Claude child', status: 'active',
+    autoApproveSeverity: 'off', preconfigId: null, metadata: null, parentId: 'session',
+    agentName: null, harness: 'claude-cli' });
+  const approvals = new ClaudeApprovals(() => 2000);
+  const { requests, notifications, delivery } = fixture();
+  const controller = new AbortController();
+  const wait = approvals.request('session', 'ws', root, delivery, controller.signal,
+    toolUseId => toolUseId === 'child-tool' ? 'child' : null)('Bash',
+    { command: 'echo test' }, { ...options(controller.signal), toolUseID: 'child-tool' });
+  const ask = requests[0] as { sessionId: string; ask: { _originSessionId: string };
+    toolCallId: string; requestId: string };
+  expect(ask).toMatchObject({ sessionId: 'session', ask: { _originSessionId: 'child' } });
+  expect(getPermissionRequestByRequestId(ask.requestId)).toMatchObject({
+    sessionId: 'child', rootSessionId: 'session', status: 'pending',
+  });
+  expect(approvals.getSessionId(ask.toolCallId, ask.requestId)).toBe('session');
+  expect(await approvals.resolve(ask.toolCallId, { type: 'permission', grant: 'once' }, ask.requestId)).toBe(true);
+  expect(await wait).toMatchObject({ behavior: 'allow' });
+  expect(notifications).toContainEqual({ type: 'ask.timeout', sessionId: 'session',
+    toolCallId: ask.toolCallId, requestId: ask.requestId });
+});
+
 test('Stop and timeout deny and clean live waiters', async () => {
   const approvals = new ClaudeApprovals(() => 10);
   const { requests, delivery } = fixture();

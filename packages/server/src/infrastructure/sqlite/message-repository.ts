@@ -578,6 +578,7 @@ export function createMessageRepository(
             ? toolPart.state.startedAt
             : now,
         failedAt: now,
+        ...('childSessionId' in toolPart.state && { childSessionId: toolPart.state.childSessionId }),
       },
     };
 

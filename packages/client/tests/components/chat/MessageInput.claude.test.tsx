@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
-import type { Session } from '@prokopai/sdk';
+import type { ProkopaiClient, Session } from '@prokopai/sdk';
 import { MessageInput } from '@/components/chat/MessageInput';
 import { clearDraft } from '@/config/draftStorage';
 
@@ -23,8 +23,34 @@ test('Claude composer sends a trimmed text message with no extra options', () =>
   render(<MessageInput session={session} sessionId={session.id} workspaceId="ws"
     onSendMessage={onSendMessage} />);
   expect(screen.getByRole('button', { name: `Auto-approve settings for ${session.id}` })).toBeInTheDocument();
-  fireEvent.change(screen.getByPlaceholderText('Message Claude CLI (text only)'),
+  fireEvent.change(screen.getByPlaceholderText('Message Claude CLI (text and images)'),
     { target: { value: '  Hello Claude  ' } });
   fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
-  expect(onSendMessage).toHaveBeenCalledExactlyOnceWith('Hello Claude');
+  expect(onSendMessage).toHaveBeenCalledExactlyOnceWith('Hello Claude', undefined);
+});
+test('Claude composer accepts only images and sends image-only input after upload', async () => {
+  const originalCreate = URL.createObjectURL;
+  const originalRevoke = URL.revokeObjectURL;
+  URL.createObjectURL = vi.fn(() => 'blob:image');
+  URL.revokeObjectURL = vi.fn();
+  try {
+    const upload = vi.fn(async (_sessionId: string, file: File) => ({
+      id: 'uploaded-image', kind: 'image', filename: file.name, size: file.size,
+    }));
+    const client = { http: { attachments: { upload } } } as unknown as ProkopaiClient;
+    const onSendMessage = vi.fn();
+    const view = render(<MessageInput session={session} sessionId={session.id} workspaceId="ws"
+      sdkClient={client} onSendMessage={onSendMessage} />);
+    const input = view.container.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input.accept).toBe('image/png,image/jpeg,image/webp,image/gif');
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [new File(['image'], 'photo.png', { type: 'image/png' })] } });
+    });
+    expect(upload).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    expect(onSendMessage).toHaveBeenCalledExactlyOnceWith('', [{ id: 'uploaded-image', kind: 'image' }]);
+  } finally {
+    URL.createObjectURL = originalCreate;
+    URL.revokeObjectURL = originalRevoke;
+  }
 });

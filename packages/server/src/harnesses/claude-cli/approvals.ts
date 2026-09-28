@@ -12,6 +12,7 @@ const denied = (message: string): PermissionResult => ({ behavior: 'deny', messa
 
 interface Pending {
   sessionId: string;
+  controllerSessionId: string;
   toolCallId: string;
   dbId: string;
   timer: ReturnType<typeof setTimeout>;
@@ -28,11 +29,12 @@ export class ClaudeApprovals {
   hasLiveRequest(requestId: string): boolean { return this.pending.has(requestId); }
   getSessionId(toolCallId: string, requestId?: string): string | null {
     if (!requestId || this.byTool.get(toolCallId) !== requestId) return null;
-    return this.pending.get(requestId)?.sessionId ?? null;
+    return this.pending.get(requestId)?.controllerSessionId ?? null;
   }
 
   request(sessionId: string, workspaceId: string, root: string,
-    delivery: ApplicationDeliveryPort<unknown>, signal: AbortSignal): CanUseTool {
+    delivery: ApplicationDeliveryPort<unknown>, signal: AbortSignal,
+    childForTool?: (toolUseId: string) => string | null): CanUseTool {
     return async (toolName, input, options) => {
       const session = getSession(sessionId);
       if (signal.aborted || options.signal.aborted || session?.harness !== 'claude-cli'
@@ -49,23 +51,30 @@ export class ClaudeApprovals {
       if (!isControlled(sessionId) || getControllerConnections(sessionId).length === 0) {
         return denied('Claude tool requires a connected controller');
       }
+      const childId = options.toolUseID ? childForTool?.(options.toolUseID) : null;
+      if (childId && (getSession(childId)?.parentId == null || getSession(childId)?.harness !== 'claude-cli')) {
+        return denied('Claude child tool identity is invalid');
+      }
       const requestId = crypto.randomUUID();
       const toolCallId = `claude-approval:${crypto.randomUUID()}`;
       const timeout = this.timeoutMs();
       const now = Date.now();
       const dbId = createPendingAsk({ requestId, toolCallId, toolName: `claude-cli:${toolName}`,
-        sessionId, rootSessionId: sessionId, workspaceId, ask, isPermission: true,
+        sessionId: childId ?? sessionId, rootSessionId: sessionId, workspaceId, ask, isPermission: true,
         status: 'pending', createdAt: now, expiresAt: now + timeout });
       return new Promise<PermissionResult>(resolve => {
         const timer = setTimeout(() => this.settle(requestId, denied('Claude permission timed out'), true), timeout);
-        this.pending.set(requestId, { sessionId, toolCallId, dbId, timer, finish: resolve, delivery });
+        this.pending.set(requestId, { sessionId: childId ?? sessionId, controllerSessionId: sessionId,
+          toolCallId, dbId, timer, finish: resolve, delivery });
         this.byTool.set(toolCallId, requestId);
         const abort = () => this.settle(requestId, denied('Claude turn interrupted'), true);
         signal.addEventListener('abort', abort, { once: true });
         options.signal.addEventListener('abort', abort, { once: true });
         try {
+          const deliveredAsk = childId ? { ...ask, _originSessionId: childId } : ask;
           delivery.sendToAskTargets(sessionId, AUTHORITY, { type: 'ask.request', sessionId,
-            toolCallId, toolName: `claude-cli:${toolName}`, requestId, authority: AUTHORITY, ask });
+            toolCallId, toolName: `claude-cli:${toolName}`, requestId, authority: AUTHORITY,
+            ask: deliveredAsk });
           if (signal.aborted || options.signal.aborted) abort();
         } catch { abort(); }
       });
@@ -78,8 +87,8 @@ export class ClaudeApprovals {
     if (!pending || pending.toolCallId !== toolCallId || getSession(pending.sessionId)?.harness !== 'claude-cli') return false;
     const value = response && typeof response === 'object' && !Array.isArray(response)
       ? response as Record<string, unknown> : null;
-    const allowed = isControlled(pending.sessionId)
-      && getControllerConnections(pending.sessionId).length > 0
+    const allowed = isControlled(pending.controllerSessionId)
+      && getControllerConnections(pending.controllerSessionId).length > 0
       && value?.type === 'permission' && value.grant === 'once'
       && value.scope === undefined && value.duration === undefined;
     if (!resolvePermissionRequestByRequestId(requestId, allowed ? 'approved' : 'denied', response)) {
@@ -92,7 +101,9 @@ export class ClaudeApprovals {
 
   cancelSession(sessionId: string): void {
     for (const [id, pending] of this.pending) {
-      if (pending.sessionId === sessionId) this.settle(id, denied('Claude turn interrupted'), true);
+      if (pending.controllerSessionId === sessionId || pending.sessionId === sessionId) {
+        this.settle(id, denied('Claude turn interrupted'), true);
+      }
     }
   }
 
@@ -103,8 +114,8 @@ export class ClaudeApprovals {
     this.byTool.delete(pending.toolCallId);
     clearTimeout(pending.timer);
     if (expired) expirePermissionRequest(pending.dbId);
-    pending.delivery.broadcastToSession(pending.sessionId, { type: 'ask.timeout',
-      sessionId: pending.sessionId, toolCallId: pending.toolCallId, requestId: id });
+    pending.delivery.broadcastToSession(pending.controllerSessionId, { type: 'ask.timeout',
+      sessionId: pending.controllerSessionId, toolCallId: pending.toolCallId, requestId: id });
     pending.finish(result);
   }
 }

@@ -249,6 +249,9 @@ export function ChatHeader({
             <TokenMeter
               codex={codexSession}
               codexUsage={session.metadata?.codexUsage}
+              claude={claudeSession}
+              claudeUsage={session.metadata?.claudeUsage}
+              claudeContext={session.metadata?.claudeContext}
               promptTokens={usage.promptTokens}
               completionTokens={usage.completionTokens}
               totalTokens={usage.totalTokens}
@@ -261,6 +264,12 @@ export function ChatHeader({
             />
             {codexCompactedAt !== null && (
               <span className="shrink-0 text-[11px] text-muted-foreground" title={`Context compacted ${new Date(codexCompactedAt).toLocaleString()}`}>
+                Compacted
+              </span>
+            )}
+            {claudeSession && typeof session.metadata?.claudeCompactedAt === 'number' && (
+              <span className="shrink-0 text-[11px] text-muted-foreground"
+                title={`Claude compacted context ${new Date(session.metadata.claudeCompactedAt).toLocaleString()}`}>
                 Compacted
               </span>
             )}
