@@ -24,10 +24,11 @@ function createPermissionHandler(): AskHandler {
 
     if (!isPermissionAsk) return undefined;
 
-    // Codex checks the current persisted session ceiling before sending an ask.
-    // A client with stale session state must not approve a Codex request.
+    // Native harnesses check the persisted session ceiling on the server.
+    // A client with stale session state must not approve their requests.
     const session = useSessionStore.getState().sessions.find((s) => s.id === request.sessionId);
-    if (session?.harness === 'codex-cli' || request.toolName.startsWith('codex-cli:')) return undefined;
+    if (session?.harness === 'codex-cli' || session?.harness === 'claude-cli'
+      || request.toolName.startsWith('codex-cli:') || request.toolName.startsWith('claude-cli:')) return undefined;
 
     // Check the per-session auto-approve severity setting
     const maxSeverity = getSessionAutoApproveSeverity(request.sessionId);

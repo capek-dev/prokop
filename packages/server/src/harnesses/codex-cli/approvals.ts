@@ -1,6 +1,7 @@
 import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, sep } from 'node:path';
-import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
+import type { PermissionAsk } from '@prokopai/sdk';
+import { canAutoApproveHarnessTool } from '../approval-policy';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { createPendingAsk, expirePermissionRequest,
@@ -14,15 +15,8 @@ const AUTHORITY = { visibilityScope: 'controller_only', resolutionMode: 'control
 const COMMAND_TOOL = 'codex-cli:command';
 const FILE_TOOL = 'codex-cli:file-change';
 const DECLINE = { decision: 'decline' } as const;
-const AUTO_APPROVE_RISKS: PermissionRiskLevel[] = ['none', 'low', 'medium', 'high'];
-
-/** Codex hook approvals follow the session risk ceiling, but never auto-approve critical or unknown risk. */
-export function canAutoApproveCodexHook(ask: PermissionAsk, severity: unknown): boolean {
-  if (ask.type !== 'permission' || typeof ask.risk !== 'string' || typeof severity !== 'string') return false;
-  const risk = AUTO_APPROVE_RISKS.indexOf(ask.risk as PermissionRiskLevel);
-  const ceiling = AUTO_APPROVE_RISKS.indexOf(severity as PermissionRiskLevel);
-  return risk !== -1 && ceiling !== -1 && risk <= ceiling;
-}
+/** Codex hook approvals follow the shared native harness risk ceiling. */
+export const canAutoApproveCodexHook = canAutoApproveHarnessTool;
 
 type Decision = { decision: 'accept' | 'decline' };
 interface Pending {

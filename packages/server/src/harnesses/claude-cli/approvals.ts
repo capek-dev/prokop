@@ -1,5 +1,6 @@
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
-import type { PermissionAsk } from '@prokopai/sdk';
+import { canAutoApproveHarnessTool } from '../approval-policy';
+import { classifyClaudeTool } from './tool-policy';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { createPendingAsk, expirePermissionRequest, resolvePermissionRequestByRequestId } from '@/infrastructure/sqlite/pending-asks';
@@ -30,33 +31,24 @@ export class ClaudeApprovals {
     return this.pending.get(requestId)?.sessionId ?? null;
   }
 
-  request(sessionId: string, workspaceId: string, delivery: ApplicationDeliveryPort<unknown>, signal: AbortSignal): CanUseTool {
+  request(sessionId: string, workspaceId: string, root: string,
+    delivery: ApplicationDeliveryPort<unknown>, signal: AbortSignal): CanUseTool {
     return async (toolName, input, options) => {
-      if (signal.aborted || options.signal.aborted || getSession(sessionId)?.harness !== 'claude-cli') {
-        return denied('Claude tool request is no longer active');
-      }
+      const session = getSession(sessionId);
+      if (signal.aborted || options.signal.aborted || session?.harness !== 'claude-cli'
+        || session.workspaceId !== workspaceId) return denied('Claude tool request is no longer active');
+      if (options.blockedPath) return denied('Claude tool path is blocked');
+      if (!input || typeof input !== 'object' || Array.isArray(input)) return denied('Unsupported Claude tool');
+      const ask = classifyClaudeTool(toolName, input as Record<string, unknown>, root);
+      if (!ask) return denied('Unsupported Claude tool');
+      if (canAutoApproveHarnessTool(ask, session.autoApproveSeverity)) return { behavior: 'allow' };
       if (!isControlled(sessionId) || getControllerConnections(sessionId).length === 0) {
         return denied('Claude tool requires a connected controller');
       }
-      if (options.blockedPath) return denied('Claude tool path is blocked');
-      // Never approve an unknown tool, an out-of-scope MCP tool, or a child agent through this adapter.
-      if (!['Bash', 'Read', 'Glob', 'Grep', 'Edit', 'Write', 'WebFetch', 'WebSearch'].includes(toolName)
-        || !input || typeof input !== 'object' || Array.isArray(input)) return denied('Unsupported Claude tool');
       const requestId = crypto.randomUUID();
       const toolCallId = `claude-approval:${crypto.randomUUID()}`;
       const timeout = this.timeoutMs();
       const now = Date.now();
-      const command = typeof input.command === 'string' ? input.command.slice(0, 1000) : undefined;
-      const path = typeof input.file_path === 'string' ? input.file_path.slice(0, 1000)
-        : typeof input.path === 'string' ? input.path.slice(0, 1000) : undefined;
-      const ask: PermissionAsk = {
-        type: 'permission', question: `Allow Claude to use ${toolName}?`,
-        description: (command ?? path ?? toolName).slice(0, 1000),
-        resource: toolName === 'Bash' ? 'shell-command' : 'file',
-        action: toolName === 'Bash' ? 'execute' : ['Edit', 'Write'].includes(toolName) ? 'write' : 'read',
-        risk: 'critical', allowedScopes: ['once'],
-        metadata: { toolName, ...(command ? { command } : {}), ...(path ? { path } : {}) },
-      };
       const dbId = createPendingAsk({ requestId, toolCallId, toolName: `claude-cli:${toolName}`,
         sessionId, rootSessionId: sessionId, workspaceId, ask, isPermission: true,
         status: 'pending', createdAt: now, expiresAt: now + timeout });

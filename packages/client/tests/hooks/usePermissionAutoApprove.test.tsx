@@ -9,10 +9,11 @@ import { useSessionStore } from '@/stores/sessionStore';
 const originalSessions = useSessionStore.getState().sessions;
 afterEach(() => { useSessionStore.setState({ sessions: originalSessions }); });
 
-test('Codex asks use server risk policy, while Prokop client auto-approval remains bounded', () => {
+test('native harness asks use server risk policy, while Prokop client auto-approval remains bounded', () => {
   const codex = { id: 'codex', harness: 'codex-cli', autoApproveSeverity: 'high' } as Session;
+  const claude = { id: 'claude', harness: 'claude-cli', autoApproveSeverity: 'high' } as Session;
   const prokop = { id: 'prokop', harness: 'prokop', autoApproveSeverity: 'medium' } as Session;
-  useSessionStore.setState({ sessions: [codex, prokop] });
+  useSessionStore.setState({ sessions: [codex, claude, prokop] });
   const { unmount } = renderHook(() => usePermissionAutoApprove());
   try {
     const handler = useAskStore.getState().getHandlers('permission').at(-1)!;
@@ -21,6 +22,8 @@ test('Codex asks use server risk policy, while Prokop client auto-approval remai
     });
     expect(handler(request('low', 'codex', 'codex-cli:command'))).toBeUndefined();
     expect(handler(request('low', 'missing', 'codex-cli:command'))).toBeUndefined();
+    expect(handler(request('low', 'claude', 'claude-cli:Read'))).toBeUndefined();
+    expect(handler(request('low', 'missing', 'claude-cli:Read'))).toBeUndefined();
     expect(handler(request('low'))).toEqual({ type: 'permission', grant: 'once' });
     expect(handler(request('high'))).toBeUndefined();
     expect(handler(request('unknown' as PermissionRiskLevel))).toBeUndefined();

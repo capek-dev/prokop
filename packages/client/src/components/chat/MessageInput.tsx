@@ -676,7 +676,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                     disabled={disabled || checkoutLocked}
                   />
                 )}
-                {!claudeSession && <AutoApproveSelector sessionId={sessionId} sdkClient={sdkClient ?? null} disabled={disabled} />}
+                <AutoApproveSelector sessionId={sessionId} sdkClient={sdkClient ?? null} disabled={disabled} />
                 {!codexSession && !claudeSession && <>
                   <ResponseFormatSelector
                     formats={responseFormats}

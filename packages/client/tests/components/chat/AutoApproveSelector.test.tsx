@@ -7,6 +7,24 @@ import { useSessionStore } from '@/stores/sessionStore';
 const originalSessions = useSessionStore.getState().sessions;
 afterEach(() => { useSessionStore.setState({ sessions: originalSessions }); });
 
+test('Claude session shield updates the persisted risk ceiling', async () => {
+  const session = { id: 'claude', harness: 'claude-cli', autoApproveSeverity: 'low' } as Session;
+  useSessionStore.setState({ sessions: [session] });
+  const update = vi.fn().mockResolvedValue({ session: { ...session, autoApproveSeverity: 'off' } });
+  const client = { http: { sessions: { update } } } as unknown as ProkopaiClient;
+  render(<AutoApproveSelector sessionId="claude" sdkClient={client} />);
+  await act(async () => {
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Auto-approve: low risk and below' }),
+      { button: 0, ctrlKey: false, pointerType: 'mouse' });
+  });
+  expect(await screen.findByText('Applies to Claude tool calls. Requests above this level still ask.')).toBeInTheDocument();
+  await act(async () => {
+    fireEvent.click(screen.getByText('Always ask for approval.'));
+  });
+  await waitFor(() => expect(update).toHaveBeenCalledWith('claude', { autoApproveSeverity: 'off' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Auto-approve: off' })).toBeInTheDocument());
+});
+
 test('Codex session shield updates the persisted risk ceiling and explains native approvals', async () => {
   const session = { id: 'codex', harness: 'codex-cli', autoApproveSeverity: 'low' } as Session;
   useSessionStore.setState({ sessions: [session] });

@@ -154,9 +154,11 @@ export function AutoApproveSelector({
       </TooltipProvider>
       <DropdownMenuContent align="end" sideOffset={4} className="w-56">
         <DropdownMenuLabel>{config.label}</DropdownMenuLabel>
-        {session?.harness === 'codex-cli' && (
+        {(session?.harness === 'codex-cli' || session?.harness === 'claude-cli') && (
           <div className="px-2 pb-1 text-xs text-muted-foreground">
-            Applies to Codex shell and patch asks. Critical native approvals still ask.
+            {session.harness === 'codex-cli'
+              ? 'Applies to Codex shell and patch asks. Critical native approvals still ask.'
+              : 'Applies to Claude tool calls. Requests above this level still ask.'}
           </div>
         )}
         <DropdownMenuSeparator />

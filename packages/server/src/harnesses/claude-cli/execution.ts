@@ -115,7 +115,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         };
         for await (const event of runClaudeTurn({ cwd: root, prompt: content,
           sessionId: nativeId, resume: !!binding, model: selection.model, effort: selection.effort,
-          controller, canUseTool: approvals.request(sessionId, session.workspaceId, wire.delivery, controller.signal),
+          controller, canUseTool: approvals.request(sessionId, session.workspaceId, root, wire.delivery, controller.signal),
           start: deps.start })) {
           if (event.type === 'text-delta' && event.text) {
             text += event.text;
