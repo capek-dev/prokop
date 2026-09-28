@@ -78,7 +78,7 @@ function getStatusIcon(status: string) {
 }
 
 function extractTaskSessionId(part: ToolPart): string | null {
-  if (part.name !== 'task') return null;
+  if (part.name !== 'task' && part.name !== 'Codex agent') return null;
   const state = part.state;
   if ('childSessionId' in state && state.childSessionId) {
     return state.childSessionId as string;
@@ -213,7 +213,8 @@ export const ToolCall = memo(function ToolCall({
         (r) => {
           const isChildOrDescendant = r.originSessionId && descendantIds.has(r.originSessionId);
           const isDirectChildSession = r.sessionId === taskSessionId;
-          return (isChildOrDescendant || isDirectChildSession) && r.toolCallId !== part.callId;
+          return (isChildOrDescendant || isDirectChildSession)
+            && r.toolCallId !== part.callId && !r.toolCallId.startsWith('codex-approval:');
         },
       );
       allPendingAsks.push(...childAsks);
@@ -343,7 +344,8 @@ export const ToolCall = memo(function ToolCall({
             )}
 
             {/* Subagent Navigation */}
-            {(status === 'running' || status === 'completed' || status === 'interrupted') && taskSessionId && onNavigateToSubagent && (
+            {(status === 'running' || status === 'completed' || status === 'interrupted' || status === 'error')
+              && taskSessionId && onNavigateToSubagent && (
               <Button
                 variant="outline"
                 className="w-full"

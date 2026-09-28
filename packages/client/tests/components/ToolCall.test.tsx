@@ -87,4 +87,24 @@ describe('ToolCall debug loading', () => {
       expect(screen.getByText(/secret-output/)).toBeInTheDocument();
     });
   });
+
+  test('opens a linked Codex child timeline from the agent row', async () => {
+    const childId = '11111111-1111-4111-8111-111111111111';
+    const opened: string[] = [];
+    const part: ToolPart = { ...makeProjectedPart(), name: 'Codex agent',
+      state: { status: 'completed', input: {}, output: null, startedAt: 1, completedAt: 2,
+        childSessionId: childId },
+      presentation: { summary: 'explorer', debugAvailable: false } };
+    const sdkClient = { http: { tools: { list: async () => ({ tools: [] }) } } } as unknown as ProkopaiClient;
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ServerClientProvider value={{ sdkClient, serverUrl: 'http://localhost', apiToken: null, connected: true }}>
+          <ToolCall sessionId="session-1" part={part} pendingAskRequests={[]}
+            onAskResponse={() => {}} onNavigateToSubagent={id => opened.push(id)} />
+        </ServerClientProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'View session' }));
+    expect(opened).toEqual([childId]);
+  });
 });

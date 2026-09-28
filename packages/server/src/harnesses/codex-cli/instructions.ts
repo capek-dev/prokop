@@ -65,6 +65,7 @@ export async function codexDeveloperInstructions(
     }
   }
   if (preconfig.systemPrompt) sections.push(preconfig.systemPrompt);
+  sections.push('When you spawn a subagent to answer the current user request, wait for its result within this turn before reporting the result. A completed parent turn is not automatically resumed by later child activity. Do not promise a later summary after ending the turn.');
   sections.push(`<workspace>\nWorking directory: ${root}\n${workspace.additionalPaths.length
     ? `Other project directories registered with this workspace:\n${workspace.additionalPaths.map(path => `- ${path}`).join('\n')}\nAccess to these directories remains subject to Codex sandbox and approvals.\n`
     : ''}</workspace>`);

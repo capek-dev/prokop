@@ -62,6 +62,7 @@ function projectState(part: ToolPart, visualization?: AnyVisualization): ToolSta
         error: state.error,
         startedAt: state.startedAt,
         failedAt: state.failedAt,
+        ...(childSessionId && { childSessionId }),
       };
     case 'interrupted':
       return {
@@ -121,12 +122,17 @@ export async function projectMessagesForClient(
         : part.callId.startsWith('codex-item:') && part.name === 'Codex tool'
           && part.state.input.tool === 'agent_skill_manage' && storedVisualization?.type === 'markdown'
           ? { type: 'none' as const, message: 'Agent skill operation completed' }
-          : storedVisualization;
+          : part.callId.startsWith('codex-item:') && part.name === 'Codex agent'
+            && storedVisualization?.type === 'markdown'
+            ? { type: 'none' as const, message: 'Codex agent task completed' }
+            : storedVisualization;
       return {
         ...part,
         state: projectState(part, visualization),
         presentation: {
-          summary: part.callId.startsWith('codex-item:') && part.name === 'Codex tool'
+          summary: part.callId.startsWith('codex-item:') && part.name === 'Codex agent'
+            ? part.presentation?.summary ?? 'Agent task'
+            : part.callId.startsWith('codex-item:') && part.name === 'Codex tool'
             && part.state.input.tool === 'agent_skill_manage' ? 'agent_skill_manage'
             : part.name === 'agent_skill_manage' && !templates.has(part.name)
               ? part.presentation?.summary ?? 'Agent skill management'

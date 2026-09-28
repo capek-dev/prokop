@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, unlinkSync, symlinkSync, realpathSync } from 'node:fs';
 import { createAttachment } from '@/infrastructure/sqlite/attachments';
 import { Paths } from '@/infrastructure/runtime/paths';
@@ -9,14 +9,16 @@ import { seedWorkspace } from '#tests/seed';
 import { createSession, getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { updateWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { createMessage, createPart, listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
+import { projectMessagesForClient } from '@/application/sessions/tool-debug';
 import { bindCodexThread, getCodexBinding } from '@/harnesses/codex-cli/bindings';
 import { getRollbackIntent } from '@/harnesses/codex-cli/rollback';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { CodexApprovals, canAutoApproveCodexHook, codexApprovals } from '@/harnesses/codex-cli/approvals';
-import { getPermissionRequestByRequestId, listPendingAsksBySession } from '@/infrastructure/sqlite/pending-asks';
+import { getPermissionRequestByRequestId, listPendingAsksBySession,
+  listPendingRequestsByRootSession } from '@/infrastructure/sqlite/pending-asks';
 import { saveCodexModelSelection } from '@/harnesses/codex-cli/models';
 import { createCodexExecution as createExecution, type CodexExecutionDependencies } from '@/harnesses/codex-cli/execution';
-import { hookCommand } from '@/harnesses/codex-cli/pretool-hook';
+import { hookCommand, type HookDecision } from '@/harnesses/codex-cli/pretool-hook';
 import type { CodexHookCall } from '@/harnesses/codex-cli/hook-policy';
 import type { CodexConnection } from '@/harnesses/codex-cli/app-server';
 import type { PermissionAsk, ServerMessage } from '@prokopai/sdk';
@@ -43,7 +45,7 @@ function createCodexExecution(deps: Omit<CodexExecutionDependencies, 'instructio
 function fakeCodex(readThread?: () => unknown, rejectMethod?: string, trustedHook = false,
   readGoal?: () => unknown, deferActiveGoal = false,
   deferTurnStart = false, deferPauseGoal = false, revertThread?: (beforeTurnId: string) => void,
-  resumeStatus: 'idle' | 'active' = 'idle'):
+  resumeStatus: 'idle' | 'active' = 'idle', uniqueTurnIds = false):
   { connection: CodexConnection; sent: Record<string, unknown>[]; send(message: unknown): void } {
   let controller!: ReadableStreamDefaultController<Uint8Array>;
   const sent: Record<string, unknown>[] = [];
@@ -87,7 +89,8 @@ function fakeCodex(readThread?: () => unknown, rejectMethod?: string, trustedHoo
           tokenBudget: 50000, tokensUsed: 0, timeUsedSeconds: 0, createdAt: 1, updatedAt: 1 },
       } }));
       if (message.method === 'turn/start' && !deferTurnStart) {
-        queueMicrotask(() => send({ id: message.id, result: { turn: { id: 'turn-1' } } }));
+        const turnId = uniqueTurnIds ? `turn-${sent.filter(entry => entry.method === 'turn/start').length}` : 'turn-1';
+        queueMicrotask(() => send({ id: message.id, result: { turn: { id: turnId } } }));
       }
       if (message.method === 'turn/interrupt') queueMicrotask(() => send({ id: message.id, result: {} }));
       if (message.method === 'thread/goal/set' && !(deferActiveGoal
@@ -472,7 +475,7 @@ test('trusted hook asks through the turn, denies invalid identity, and hands an 
   create();
   const fake = fakeCodex(undefined, undefined, true);
   const messages: ServerMessage[] = [];
-  let onCall!: (call: CodexHookCall) => Promise<boolean>;
+  let onCall!: (call: CodexHookCall) => Promise<HookDecision>;
   let closed = false;
   const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
     connect: () => { throw new Error('Protected turns must not use the bare connection'); },
@@ -487,14 +490,14 @@ test('trusted hook asks through the turn, denies invalid identity, and hands an 
   await waitFor(() => execution.isSessionActive('s'));
   const call: CodexHookCall = { session_id: 'thread-1', turn_id: 'turn-1', tool_use_id: 'item-1',
     hook_event_name: 'PreToolUse', tool_name: 'Bash', cwd: process.cwd(), tool_input: { command: 'rm -rf ./generated' } };
-  expect(await onCall({ ...call, turn_id: 'other' })).toBe(false);
+  expect(await onCall({ ...call, turn_id: 'other' })).toBe('no-active-turn');
   expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(0);
   const denied = onCall(call);
   await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 1);
   const firstAsk = messages.find(message => message.type === 'ask.request')!;
   expect(firstAsk.ask).toMatchObject({ allowedScopes: ['once'], action: 'delete' });
   expect(await codexApprovals.resolve(firstAsk.toolCallId, { type: 'permission', grant: 'denied' }, firstAsk.requestId)).toBe(true);
-  expect(await denied).toBe(false);
+  expect(await denied).toBe('permission-denied');
   const approved = onCall(call);
   await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 2);
   const secondAsk = messages.filter(message => message.type === 'ask.request')[1]!;
@@ -510,6 +513,281 @@ test('trusted hook asks through the turn, denies invalid identity, and hands an 
   fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
   await turn;
   expect(closed).toBe(true);
+});
+
+test('Codex hook accepts only spawned child threads in the selected root for the active turn', async () => {
+  create();
+  const fake = fakeCodex(undefined, undefined, true);
+  const messages: ServerMessage[] = [];
+  const askTargetSessions: string[] = [];
+  const childWire = wire(messages);
+  childWire.delivery.sendToAskTargets = (id, _authority, message) => {
+    askTargetSessions.push(id);
+    messages.push(message);
+  };
+  let onCall!: (call: CodexHookCall) => Promise<HookDecision>;
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => { throw new Error('Protected turns must not use the bare connection'); },
+    prepareHook: async callback => {
+      onCall = callback;
+      return { connect: () => fake.connection, close: async () => {} };
+    },
+  });
+  const turn = execution.sendMessage(childWire, 'origin', 's', 'explore');
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  const call: CodexHookCall = { session_id: 'child-1', turn_id: 'child-turn', tool_use_id: 'item-1',
+    hook_event_name: 'PreToolUse', tool_name: 'Bash', cwd: process.cwd(), tool_input: { command: 'ls' } };
+  expect(await onCall(call)).toBe('unknown-turn');
+  const activity = { id: 'activity-1', type: 'subAgentActivity', kind: 'started',
+    agentThreadId: 'child-1', agentPath: '/root/explorer' };
+  fake.send({ method: 'item/completed', params: { threadId: 'other', turnId: 'turn-1', item: activity } });
+  fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'other', item: activity } });
+  fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1',
+    item: { ...activity, agentPath: '/root' } } });
+  await Bun.sleep(5);
+  expect(await onCall(call)).toBe('unknown-turn');
+  fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1', item: activity } });
+  fake.send({ method: 'turn/started', params: { threadId: 'child-1', turn: { id: 'child-turn' } } });
+  fake.send({ id: 200, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'child-1', turnId: 'child-turn', itemId: 'before-hook',
+    cwd: process.cwd(), command: 'cat .env',
+  } });
+  await waitFor(() => messages.some(message => message.type === 'ask.request'));
+  const nativeAsk = messages.find(message => message.type === 'ask.request')!;
+  expect(askTargetSessions.at(-1)).toBe('s');
+  expect(nativeAsk.sessionId).toBe('s');
+  const childId = messages.find(message => message.type === 'session.created')!.session.id;
+  expect(nativeAsk.ask).toMatchObject({ allowedScopes: ['once'], _originSessionId: childId });
+  expect(await codexApprovals.resolve(nativeAsk.toolCallId,
+    { type: 'permission', grant: 'denied' }, nativeAsk.requestId)).toBe(true);
+  await waitFor(() => fake.sent.some(entry => entry.id === 200));
+  expect(fake.sent.find(entry => entry.id === 200)?.result).toEqual({ decision: 'decline' });
+  expect(await onCall(call)).toBe(true);
+  expect(await onCall({ ...call, cwd: join(process.cwd(), 'src'),
+    tool_input: { command: 'rg --files' } })).toBe(true);
+  expect(await onCall({ ...call, session_id: 'unrelated' })).toBe('unknown-turn');
+  expect(await onCall({ ...call, cwd: '/outside' })).toBe('working-directory');
+  const sensitive = onCall({ ...call, tool_input: { command: 'cat .env' }, tool_use_id: 'sensitive' });
+  await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 2);
+  const pendingAsk = messages.filter(message => message.type === 'ask.request')[1]!;
+  expect(askTargetSessions.at(-1)).toBe('s');
+  expect(pendingAsk.sessionId).toBe('s');
+  expect(codexApprovals.getSessionId(pendingAsk.toolCallId, pendingAsk.requestId)).toBe('s');
+  expect(pendingAsk.ask).toMatchObject({ _originSessionId: childId });
+  expect(listPendingAsksBySession(childId).find(entry => entry.requestId === pendingAsk.requestId))
+    .toMatchObject({ rootSessionId: 's', sessionId: childId });
+  expect(listPendingRequestsByRootSession('s').some(entry => entry.requestId === pendingAsk.requestId))
+    .toBe(true);
+  expect(await codexApprovals.resolve(pendingAsk.toolCallId,
+    { type: 'permission', grant: 'denied' }, pendingAsk.requestId)).toBe(true);
+  expect(await sensitive).toBe('permission-denied');
+  const permitted = onCall({ ...call, tool_input: { command: 'cat .env' }, tool_use_id: 'allowed' });
+  await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 3);
+  const approvedAsk = messages.filter(message => message.type === 'ask.request')[2]!;
+  expect(await codexApprovals.resolve(approvedAsk.toolCallId,
+    { type: 'permission', grant: 'once' }, approvedAsk.requestId)).toBe(true);
+  expect(await permitted).toBe(true);
+  fake.send({ id: 201, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'child-1', turnId: 'child-turn', itemId: 'allowed', cwd: process.cwd(), command: 'cat .env',
+  } });
+  await waitFor(() => fake.sent.some(entry => entry.id === 201));
+  expect(fake.sent.find(entry => entry.id === 201)?.result).toEqual({ decision: 'accept' });
+  fake.send({ id: 203, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'child-1', turnId: 'child-turn', itemId: 'nested',
+    cwd: join(process.cwd(), 'src'), command: 'rg --files',
+  } });
+  await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 4);
+  const nestedAsk = messages.filter(message => message.type === 'ask.request')[3]!;
+  expect(nestedAsk.ask).toMatchObject({ allowedScopes: ['once'] });
+  expect(await codexApprovals.resolve(nestedAsk.toolCallId,
+    { type: 'permission', grant: 'session' }, nestedAsk.requestId)).toBe(true);
+  await waitFor(() => fake.sent.some(entry => entry.id === 203));
+  expect(fake.sent.find(entry => entry.id === 203)?.result).toEqual({ decision: 'decline' });
+  fake.send({ id: 202, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'unrelated', turnId: 'child-turn', itemId: 'allowed', cwd: process.cwd(), command: 'cat .env',
+  } });
+  await waitFor(() => fake.sent.some(entry => entry.id === 202));
+  expect(fake.sent.find(entry => entry.id === 202)?.result).toEqual({ decision: 'decline' });
+  fake.send({ method: 'thread/started', params: { thread: { id: 'child-2',
+    source: { subAgent: { thread_spawn: { parentThreadId: 'other' } } } } } });
+  fake.send({ method: 'thread/started', params: { thread: { id: 'child-3',
+    source: { subAgent: { thread_spawn: { parentThreadId: 'thread-1' } } } } } });
+  fake.send({ method: 'turn/started', params: { threadId: 'child-3', turn: { id: 'child-turn-3' } } });
+  await Bun.sleep(5);
+  expect(await onCall({ ...call, session_id: 'child-2' })).toBe('unknown-turn');
+  expect(await onCall({ ...call, session_id: 'child-3', turn_id: 'child-turn-3' })).toBe(true);
+  fake.send({ method: 'thread/started', params: { thread: { id: 'child-4',
+    source: { subAgent: { thread_spawn: { parentThreadId: 'thread-1' } } } } } });
+  fake.send({ method: 'turn/started', params: { threadId: 'child-4', turn: { id: 'child-turn' } } });
+  await waitFor(() => messages.filter(message => message.type === 'session.created').length === 3);
+  expect(await onCall({ ...call, session_id: 'thread-1' })).toBe('no-active-turn');
+  fake.send({ method: 'thread/closed', params: { threadId: 'child-4' } });
+  fake.send({ method: 'thread/closed', params: { threadId: 'child-3' } });
+  await Bun.sleep(5);
+  expect(await onCall({ ...call, session_id: 'child-3', turn_id: 'child-turn-3' })).toBe('unknown-turn');
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await turn;
+  expect(await onCall({ ...call, session_id: 'thread-1', turn_id: 'turn-1' })).toBe('no-active-turn');
+  expect(await onCall(call)).toBe(true);
+  const aliased = { ...call, session_id: 'thread-1' };
+  expect(await onCall(aliased)).toBe(true);
+  const aliasedSensitive = onCall({ ...aliased, tool_use_id: 'aliased-sensitive',
+    tool_input: { command: 'cat .env' } });
+  await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 5);
+  const aliasedAsk = messages.filter(message => message.type === 'ask.request')[4]!;
+  expect(aliasedAsk.sessionId).toBe('s');
+  expect(await codexApprovals.resolve(aliasedAsk.toolCallId,
+    { type: 'permission', grant: 'once' }, aliasedAsk.requestId)).toBe(true);
+  expect(await aliasedSensitive).toBe(true);
+  fake.send({ id: 204, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'thread-1', turnId: 'child-turn', itemId: 'aliased-sensitive',
+    cwd: process.cwd(), command: 'cat .env',
+  } });
+  await waitFor(() => fake.sent.some(entry => entry.id === 204));
+  expect(fake.sent.find(entry => entry.id === 204)?.result).toEqual({ decision: 'accept' });
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(5);
+  const afterParent = onCall({ ...call, tool_use_id: 'after-parent', tool_input: { command: 'cat .env' } });
+  await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 6);
+  const lateAsk = messages.filter(message => message.type === 'ask.request')[5]!;
+  expect(lateAsk.sessionId).toBe('s');
+  expect(codexApprovals.getSessionId(lateAsk.toolCallId, lateAsk.requestId)).toBe('s');
+  expect(await codexApprovals.resolve(lateAsk.toolCallId,
+    { type: 'permission', grant: 'once' }, lateAsk.requestId)).toBe(true);
+  expect(await afterParent).toBe(true);
+  fake.send({ method: 'turn/completed', params: { threadId: 'child-1', turn: { id: 'child-turn', status: 'completed' } } });
+  await waitFor(() => !listMessagesWithParts(messages.find(message => message.type === 'session.created')!.session.id)
+    .some(entry => entry.message.role === 'assistant' && entry.message.status === 'streaming'));
+  expect(await onCall(call)).toBe('unknown-turn');
+  expect(await onCall({ ...call, session_id: 'thread-1' })).toBe('no-active-turn');
+});
+
+test('Codex child timeline keeps receiving isolated events after parent completion', async () => {
+  create();
+  const fake = fakeCodex(undefined, undefined, false, undefined, false, false, false, undefined, 'idle', true);
+  const messages: ServerMessage[] = [];
+  let connects = 0;
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => { connects++; return fake.connection; } });
+  const parent = execution.sendMessage(wire(messages), 'origin', 's', 'delegate');
+  await waitFor(() => fake.sent.some(entry => entry.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  // Codex can start a child turn before reporting the child's identity to its parent.
+  fake.send({ method: 'turn/started', params: { threadId: 'child-1', turn: { id: 'child-turn' } } });
+  fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1',
+    item: { id: 'spawn', type: 'subAgentActivity', kind: 'started', agentThreadId: 'child-1',
+      agentPath: '/root/explorer' } } });
+  await waitFor(() => messages.some(message => message.type === 'session.created'));
+  const child = messages.find(message => message.type === 'session.created')!.session;
+  expect(child).toMatchObject({ parentId: 's', harness: 'codex-cli', subagentStatus: 'running' });
+  expect(getCodexBinding(child.id)?.threadId).toBe('child-1');
+  expect(listMessagesWithParts(child.id).filter(entry => entry.message.role === 'assistant')).toHaveLength(1);
+  const parentPart = listMessagesWithParts('s').at(-1)!.parts.find(part => part.type === 'tool');
+  expect(parentPart?.state).toMatchObject({ childSessionId: child.id });
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1',
+    turn: { id: 'turn-1', status: 'completed' } } });
+  await parent;
+  expect(listMessagesWithParts('s').at(-1)!.parts.find(part => part.type === 'tool')?.state)
+    .toMatchObject({ childSessionId: child.id });
+  const projected = await projectMessagesForClient(listMessagesWithParts('s'));
+  expect(projected.at(-1)!.parts.find(part => part.type === 'tool')?.state)
+    .toMatchObject({ childSessionId: child.id });
+  expect(connects).toBe(1);
+  const followUp = execution.sendMessage(wire(messages), 'origin', 's', 'Continue');
+  await waitFor(() => fake.sent.filter(entry => entry.method === 'turn/start').length === 2);
+  expect(connects).toBe(1);
+  expect(fake.sent.filter(entry => entry.method === 'thread/resume')).toHaveLength(0);
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-2' } } });
+  fake.send({ method: 'item/agentMessage/delta', params: { threadId: 'child-1', turnId: 'child-turn',
+    itemId: 'reply', delta: 'Child result' } });
+  fake.send({ method: 'item/completed', params: { threadId: 'child-1', turnId: 'child-turn',
+    item: { id: 'reply', type: 'agentMessage', text: 'Child result' } } });
+  fake.send({ method: 'turn/completed', params: { threadId: 'child-1',
+    turn: { id: 'child-turn', status: 'completed' } } });
+  await waitFor(() => getSession(child.id)?.subagentStatus === 'completed');
+  expect(listMessagesWithParts(child.id).at(-1)?.parts).toMatchObject([{ type: 'text', text: 'Child result' }]);
+  expect(listMessagesWithParts('s').some(entry => entry.parts.some(part => part.type === 'text'
+    && part.text === 'Child result'))).toBe(false);
+  expect(messages.filter(message => message.type === 'session.created')).toHaveLength(1);
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1',
+    turn: { id: 'turn-2', status: 'completed' } } });
+  await followUp;
+});
+
+test('Codex child process loss marks its timeline as failed after the parent turn', async () => {
+  create();
+  const fake = fakeCodex();
+  const messages: ServerMessage[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const parent = execution.sendMessage(wire(messages), 'origin', 's', 'delegate');
+  await waitFor(() => fake.sent.some(entry => entry.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1',
+    item: { id: 'spawn', type: 'subAgentActivity', kind: 'started', agentThreadId: 'child-1',
+      agentPath: '/root/explorer' } } });
+  fake.send({ method: 'turn/started', params: { threadId: 'child-1', turn: { id: 'child-turn' } } });
+  await waitFor(() => messages.some(message => message.type === 'session.created'));
+  const child = messages.find(message => message.type === 'session.created')!.session;
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1',
+    turn: { id: 'turn-1', status: 'completed' } } });
+  await parent;
+  expect(execution.isSessionActive(child.id)).toBe(true);
+  fake.connection.kill();
+  await waitFor(() => getSession(child.id)?.subagentStatus === 'error');
+  expect(execution.isSessionActive(child.id)).toBe(false);
+  expect(listMessagesWithParts(child.id).at(-1)?.message).toMatchObject({ status: 'error' });
+});
+
+test('Stop after parent completion interrupts child turns on the same connection', async () => {
+  create();
+  const fake = fakeCodex();
+  const messages: ServerMessage[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const parent = execution.sendMessage(wire(messages), 'origin', 's', 'delegate');
+  await waitFor(() => fake.sent.some(entry => entry.method === 'turn/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-1',
+    item: { id: 'spawn', type: 'subAgentActivity', kind: 'started', agentThreadId: 'child-1',
+      agentPath: '/root/explorer' } } });
+  fake.send({ method: 'turn/started', params: { threadId: 'child-1', turn: { id: 'child-turn' } } });
+  await waitFor(() => messages.some(message => message.type === 'session.created'));
+  const child = messages.find(message => message.type === 'session.created')!.session;
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1',
+    turn: { id: 'turn-1', status: 'completed' } } });
+  await parent;
+  expect((await execution.interruptSession(child.id)).success).toBe(true);
+  const stopped = await execution.interruptSession('s');
+  expect(stopped.success).toBe(true);
+  expect(stopped.cascadedTo).toContain(child.id);
+  expect(fake.sent.find(entry => entry.method === 'turn/interrupt')?.params)
+    .toEqual({ threadId: 'child-1', turnId: 'child-turn' });
+  fake.send({ method: 'turn/completed', params: { threadId: 'child-1',
+    turn: { id: 'child-turn', status: 'interrupted' } } });
+  await waitFor(() => getSession(child.id)?.subagentStatus === 'interrupted');
+});
+
+test('native approval denials log fixed categories without request content', async () => {
+  create();
+  const warning = spyOn(console, 'warn').mockImplementation(() => {});
+  const approvals = new CodexApprovals();
+  const secret = 'private-command-value';
+  const request = { threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1',
+    cwd: process.cwd(), command: secret };
+  try {
+    const ask = (params: unknown) => approvals.request('item/commandExecution/requestApproval',
+      params, 'thread-1', 'turn-1', 's', process.cwd(), 'ws', wire([]).delivery);
+    expect(await ask({ ...request, cwd: '/other' })).toEqual({ decision: 'decline' });
+    expect(await ask({ ...request, additionalPermissions: { sensitive: secret } }))
+      .toEqual({ decision: 'decline' });
+    expect(await ask({ ...request, itemId: '' })).toEqual({ decision: 'decline' });
+    expect(warning.mock.calls.map(args => args.join(' '))).toEqual([
+      '[codex-permission] native denied: working-directory',
+      '[codex-permission] native denied: unsupported-permissions',
+      '[codex-permission] native denied: malformed-request',
+    ]);
+    expect(JSON.stringify(warning.mock.calls)).not.toContain(secret);
+    expect(JSON.stringify(warning.mock.calls)).not.toContain('/other');
+  } finally { warning.mockRestore(); }
 });
 
 test('Codex hook auto-approval follows the current session risk and remains once-only', async () => {

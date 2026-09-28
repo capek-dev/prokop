@@ -5,10 +5,11 @@ import { createServer, type Server, type Socket } from 'node:net';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { spawnCodexAppServer, CodexAppServer, codexObject, type CodexConnection } from './app-server';
 import { validHookCall, type CodexHookCall } from './hook-policy';
+import { logCodexPermissionDenial } from './permission-diagnostics';
 
 const MAX_INPUT = 128 * 1024;
 // The hook runs in Codex's shell. Keep its code inline for compiled Prokop binaries.
-const HOOK_SCRIPT = `const net=require('node:net');let data='';process.stdin.setEncoding('utf8');process.stdin.on('data',part=>{data+=part;if(data.length>131072)process.exit(2)});process.stdin.on('end',()=>{const socket=net.connect(process.env.PROKOPAI_CODEX_HOOK_SOCKET);socket.setTimeout(Number(process.env.PROKOPAI_CODEX_HOOK_TIMEOUT_MS));socket.on('connect',()=>socket.end(JSON.stringify({token:process.env.PROKOPAI_CODEX_HOOK_TOKEN,call:JSON.parse(data)})));let result='';socket.setEncoding('utf8');socket.on('data',part=>{result+=part;if(result.length>256)process.exit(2)});socket.on('end',()=>{if(result.trim()==='allow')process.exit(0);console.error('Denied by Prokop permission check');process.exit(2)});socket.on('error',()=>{console.error('Prokop permission check unavailable');process.exit(2)});socket.on('timeout',()=>{console.error('Prokop permission check timed out');process.exit(2)})})`;
+const HOOK_SCRIPT = `const net=require('node:net');let data='';process.stdin.setEncoding('utf8');process.stdin.on('data',part=>{data+=part;if(data.length>131072)process.exit(2)});process.stdin.on('end',()=>{const socket=net.connect(process.env.PROKOPAI_CODEX_HOOK_SOCKET);socket.setTimeout(Number(process.env.PROKOPAI_CODEX_HOOK_TIMEOUT_MS));socket.on('connect',()=>socket.end(JSON.stringify({token:process.env.PROKOPAI_CODEX_HOOK_TOKEN,call:JSON.parse(data)})));let result='';socket.setEncoding('utf8');socket.on('data',part=>{result+=part;if(result.length>256)process.exit(2)});socket.on('end',()=>{if(result.trim()==='allow')process.exit(0);const reasons={'working-directory':'working directory outside selected root','unknown-turn':'unknown or not-yet-started agent turn','workspace-changed':'workspace changed or connection closed','unsupported-command':'unsupported command payload','permission-denied':'permission not granted','no-active-turn':'no active parent turn'};const reason=reasons[result.trim().slice(5)];console.error('Denied by Prokop permission check'+(result.startsWith('deny:')&&reason?' ('+reason+')':''));process.exit(2)});socket.on('error',()=>{console.error('Prokop permission check unavailable');process.exit(2)});socket.on('timeout',()=>{console.error('Prokop permission check timed out');process.exit(2)})})`;
 
 function quote(value: string): string { return `'${value.replace(/'/g, "'\\''")}'`; }
 
@@ -48,6 +49,9 @@ export function selectProkopHook(response: unknown, expectedTrust: 'untrusted' |
   return hooks[0] as unknown as ListedHook;
 }
 
+export type HookDecision = boolean | 'working-directory' | 'unknown-turn' | 'workspace-changed'
+  | 'unsupported-command' | 'permission-denied' | 'no-active-turn';
+
 export interface PretoolChannel {
   connect(): CodexConnection;
   close(): Promise<void>;
@@ -55,7 +59,7 @@ export interface PretoolChannel {
 
 /** The only listener is a private per-turn Unix socket; a token is required on every connection. */
 export async function createPretoolChannel(
-  onCall: (call: CodexHookCall) => Promise<boolean>,
+  onCall: (call: CodexHookCall) => Promise<HookDecision>,
   spawn: typeof spawnCodexAppServer = spawnCodexAppServer,
 ): Promise<PretoolChannel> {
   if (process.platform === 'win32') throw new Error('Codex PreToolUse channel requires a Unix socket');
@@ -70,20 +74,38 @@ export async function createPretoolChannel(
     let buffer = '';
     socket.on('data', chunk => {
       buffer += chunk.toString();
-      if (buffer.length > MAX_INPUT) socket.destroy();
+      if (buffer.length > MAX_INPUT) {
+        logCodexPermissionDenial('hook', 'invalid-payload');
+        socket.destroy();
+      }
     });
     socket.on('end', () => {
       void (async () => {
         try {
-          const envelope = JSON.parse(buffer) as unknown;
+          let envelope: unknown;
+          try { envelope = JSON.parse(buffer) as unknown; }
+          catch {
+            logCodexPermissionDenial('hook', 'invalid-payload');
+            socket.end('deny');
+            return;
+          }
           const body = codexObject(envelope);
-          const allowed = body?.token === token && validHookCall(body.call) && await onCall(body.call);
-          socket.end(allowed ? 'allow' : 'deny');
-        } catch { socket.end('deny'); }
+          const reason = body?.token !== token ? 'invalid-token' as const
+            : !validHookCall(body.call) ? 'invalid-payload' as const : null;
+          const decision = reason ? false : await onCall(body!.call as CodexHookCall);
+          if (decision !== true) logCodexPermissionDenial('hook', reason
+            ?? (typeof decision === 'string' ? decision : 'permission-denied'));
+          socket.end(decision === true ? 'allow' : typeof decision === 'string'
+            && ['working-directory', 'unknown-turn', 'workspace-changed', 'unsupported-command',
+              'permission-denied', 'no-active-turn'].includes(decision) ? `deny:${decision}` : 'deny');
+        } catch {
+          logCodexPermissionDenial('hook', 'handler-error');
+          socket.end('deny');
+        }
       })();
     });
     socket.on('close', () => sockets.delete(socket));
-    socket.on('error', () => {});
+    socket.on('error', () => logCodexPermissionDenial('hook', 'socket-error'));
   });
   try {
     await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(socketPath, resolve); });

@@ -178,6 +178,7 @@ function ChatViewContent({
   const { loadOlder } = useTranscriptPagination({ sessionId: session.id, client: sdkClient ?? null });
 
   const controlState = useSessionControlStore((s) => s.controlBySessionId[session.id]);
+  const askControls = useSessionControlStore((s) => s.controlBySessionId);
   const myClientId = useClientIdentityStore((s) => s.clientId);
   const isObserver = controlState?.status === 'controlled' && controlState.controllerClientId !== myClientId;
   // Observers see a read-only transcript: mutation callbacks are withheld so
@@ -326,7 +327,10 @@ function ChatViewContent({
       </div>
 
       {session.harness === 'codex-cli' && pendingAskRequests.filter(request =>
-        request.sessionId === session.id && request.toolCallId.startsWith('codex-approval:')
+        request.toolCallId.startsWith('codex-approval:')
+          && (request.sessionId === session.id || request.originSessionId === session.id)
+          && myClientId !== null && askControls[request.sessionId]?.status === 'controlled'
+          && askControls[request.sessionId]?.controllerClientId === myClientId
       ).map(request => (
         <div key={request.requestId ?? request.toolCallId} className="mx-auto w-full max-w-3xl overflow-y-auto px-4 py-3">
           <AskQuestion request={request} onRespond={onAskResponse} />
@@ -378,6 +382,10 @@ function ChatViewContent({
         <div className="p-4 bg-muted/50 text-center flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <Lock className="size-4" />
           This is a subagent session (read-only)
+          {session.harness === 'codex-cli' && session.subagentStatus === 'running'
+            && !isObserver && onInterrupt && (
+            <Button variant="outline" size="sm" onClick={onInterrupt}>Stop agent</Button>
+          )}
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, spyOn, test } from 'bun:test';
 import { CodexAppServer, type CodexConnection } from '@/harnesses/codex-cli/app-server';
 
 function fixture() {
@@ -49,6 +49,7 @@ test('initialize waits for its response before the initialized notification', as
 
 test('server-initiated approvals deny by default and malformed traffic closes requests', async () => {
   const f = fixture();
+  const warning = spyOn(console, 'warn').mockImplementation(() => {});
   const client = new CodexAppServer(f.io, () => {});
   f.send({ id: 27, method: 'item/commandExecution/requestApproval', params: { threadId: 't', turnId: 'r' } });
   f.send({ id: 28, method: 'item/fileChange/requestApproval', params: { threadId: 't', turnId: 'r' } });
@@ -63,6 +64,8 @@ test('server-initiated approvals deny by default and malformed traffic closes re
     { id: 30, error: { code: -32601, message: 'Unsupported request' } },
     { id: 31, result: { action: 'decline', content: null, _meta: null } },
   ]);
+  expect(warning).toHaveBeenCalledWith('[codex-permission] native denied: unsupported-permissions');
+  warning.mockRestore();
   const request = client.request('thread/resume', { threadId: 't' });
   await f.waitFor(6);
   f.send({ bad: true });

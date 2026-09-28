@@ -91,6 +91,12 @@ function agentSkillVisualization(item: Record<string, unknown>): Record<string, 
   return { type: 'none', message: typeof result.title === 'string' ? preview(result.title) : 'Agent skill updated' };
 }
 
+function collabAgentVisualization(item: Record<string, unknown>): Record<string, unknown> | null {
+  if (item.type !== 'collabAgentToolCall' && item.type !== 'subAgentActivity') return null;
+  const action = typeof item.tool === 'string' ? item.tool : 'task';
+  return { type: 'none', message: `Codex agent ${action} completed` };
+}
+
 function itemIdentity(item: Record<string, unknown>): { name: string; summary: string; input: Record<string, unknown> } | null {
   switch (item.type) {
     case 'commandExecution':
@@ -123,6 +129,10 @@ function itemIdentity(item: Record<string, unknown>): { name: string; summary: s
     case 'collabAgentToolCall':
       return { name: 'Codex agent', summary: typeof item.tool === 'string' ? item.tool : 'Agent task',
         input: { tool: item.tool, prompt: typeof item.prompt === 'string' ? preview(item.prompt) : undefined } };
+    case 'subAgentActivity':
+      if (item.kind !== 'started' || typeof item.agentThreadId !== 'string') return null;
+      return { name: 'Codex agent', summary: typeof item.agentPath === 'string'
+        ? item.agentPath.split('/').at(-1) ?? 'Agent task' : 'Agent task', input: { tool: 'spawnAgent' } };
     case 'webSearch':
       return { name: 'Codex web search', summary: 'Web search', input: {} };
     case 'imageView':
@@ -143,6 +153,7 @@ export class CodexToolItems {
     private readonly messageId: string,
     private readonly turnId: string,
     private readonly delivery: ApplicationDeliveryPort<unknown>,
+    private readonly childSessionId?: (threadId: string) => string | null,
   ) {}
 
   private callId(item: Record<string, unknown>): string | null {
@@ -156,9 +167,15 @@ export class CodexToolItems {
     const identity = itemIdentity(item);
     const callId = this.callId(item);
     if (!identity || !callId || getToolPartByCallId(this.sessionId, callId)) return;
+    const threadId = item.type === 'subAgentActivity' ? item.agentThreadId
+      : item.type === 'collabAgentToolCall' && item.tool === 'spawnAgent'
+        && Array.isArray(item.receiverThreadIds) && item.receiverThreadIds.length === 1
+        ? item.receiverThreadIds[0] : null;
+    const childSessionId = typeof threadId === 'string' ? this.childSessionId?.(threadId) : null;
     const part: ToolPart = { id: crypto.randomUUID(), messageId: this.messageId,
       createdAt: Date.now(), type: 'tool', callId, name: identity.name,
-      state: { status: 'running', input: identity.input, startedAt: Date.now() },
+      state: { status: 'running', input: identity.input, startedAt: Date.now(),
+        ...(childSessionId ? { childSessionId } : {}) },
       presentation: { summary: identity.summary, debugAvailable: false } };
     createPart(part, this.sessionId);
     this.open.add(part.id);
@@ -189,7 +206,8 @@ export class CodexToolItems {
             exitCode: typeof item.exitCode === 'number' ? item.exitCode : -1 }
           : item.type === 'fileChange' ? fileChangeVisualization(item.changes)
             : memoryVisualization(item) ?? sessionSearchVisualization(item)
-              ?? agentSkillVisualization(item) ?? { type: 'markdown', content } });
+              ?? agentSkillVisualization(item) ?? collabAgentVisualization(item)
+              ?? { type: 'markdown', content } });
     }
     this.open.delete(part.id);
     if (updated) {

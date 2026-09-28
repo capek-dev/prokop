@@ -130,6 +130,48 @@ test('Codex agent skill management projects list, mutation and failure results w
   expect(JSON.stringify(projected)).not.toContain('{\\"success\\"');
 });
 
+test('Codex agent wait shows a status instead of raw JSON in live events and on reload', async () => {
+  const assistant = createMessage(createTestAssistantMessage('s'));
+  const sent: ServerMessage[] = [];
+  const items = new CodexToolItems('s', assistant.id, 'turn', {
+    send: (_origin, message) => { sent.push(message); },
+    broadcast: message => { sent.push(message); },
+    broadcastToSession: (_id, message) => { sent.push(message); },
+    sendToController: (_id, message) => { sent.push(message); },
+    sendToAskTargets: (_id, _authority, message) => { sent.push(message); },
+  });
+  items.completed({ id: 'wait', type: 'collabAgentToolCall', tool: 'wait', status: 'completed',
+    prompt: 'Explore privately', result: { status: 'completed', secret: 'private response' } });
+  const stored = listMessagesWithParts('s');
+  const part = stored[0]!.parts.find(entry => entry.type === 'tool') as ToolPart;
+  expect(part.presentation?.summary).toBe('wait');
+  expect(part.state).toMatchObject({ output: { _visualization: {
+    type: 'none', message: 'Codex agent wait completed',
+  } } });
+  expect(JSON.stringify(sent)).not.toContain('private response');
+  const projected = await projectMessagesForClient(stored);
+  expect((projected[0]!.parts.find(entry => entry.type === 'tool') as ToolPart).presentation)
+    .toMatchObject({ summary: 'wait', visualization: { type: 'none', message: 'Codex agent wait completed' } });
+  expect(JSON.stringify(projected)).not.toContain('private response');
+  expect(JSON.stringify(projected)).not.toContain('Explore privately');
+});
+
+test('previous Codex agent wait rows hide persisted JSON and prompt on reload', async () => {
+  const assistant = createMessage(createTestAssistantMessage('s'));
+  createPart({ id: crypto.randomUUID(), messageId: assistant.id, createdAt: Date.now(), type: 'tool',
+    callId: 'codex-item:turn:old-wait', name: 'Codex agent',
+    state: { status: 'completed', input: { tool: 'wait', prompt: 'private prompt' },
+      output: { _visualization: { type: 'markdown', content: '{"status":"completed","secret":"private"}' } },
+      startedAt: Date.now(), completedAt: Date.now() },
+    presentation: { summary: 'wait', debugAvailable: false } }, 's');
+  const projected = await projectMessagesForClient(listMessagesWithParts('s'));
+  const part = projected[0]!.parts.find(entry => entry.type === 'tool') as ToolPart;
+  expect(part.presentation).toMatchObject({ summary: 'wait',
+    visualization: { type: 'none', message: 'Codex agent task completed' } });
+  expect(JSON.stringify(projected)).not.toContain('private prompt');
+  expect(JSON.stringify(projected)).not.toContain('"secret"');
+});
+
 test('previous Codex agent skill rows do not expose stored JSON on reload', async () => {
   const assistant = createMessage(createTestAssistantMessage('s'));
   createPart({ id: crypto.randomUUID(), messageId: assistant.id, createdAt: Date.now(), type: 'tool',

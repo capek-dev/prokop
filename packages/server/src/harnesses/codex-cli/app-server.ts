@@ -1,3 +1,5 @@
+import { logCodexPermissionDenial } from './permission-diagnostics';
+
 /** Codex app-server stdio transport. Only the server spawns the installed CLI. */
 export interface CodexConnection {
   stdout: ReadableStream<Uint8Array>;
@@ -183,6 +185,8 @@ export class CodexAppServer {
       let result: unknown;
       switch (message.method) {
         case 'item/permissions/requestApproval':
+          // This request bypasses the command/file approval callback.
+          logCodexPermissionDenial('native', 'unsupported-permissions');
           result = { permissions: {}, scope: 'turn' };
           break;
         case 'mcpServer/elicitation/request':

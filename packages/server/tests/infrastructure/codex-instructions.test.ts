@@ -39,6 +39,8 @@ test('Codex developer instructions retain agent identity and workspace paths wit
   expect(text).toContain('subject to Codex sandbox and approvals');
   expect(text).not.toContain('AGENTS.md');
   expect(text).not.toContain('Use the `cwd` parameter');
+  expect(text).toContain('wait for its result within this turn');
+  expect(text).toContain('A completed parent turn is not automatically resumed');
 });
 
 test('Codex includes Prokop memory guidance only for tools available in this session', async () => {

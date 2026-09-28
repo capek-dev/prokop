@@ -16,7 +16,9 @@ import { getCodexModelSelection } from './models';
 import { codexDeveloperInstructions, defaultCodexPreconfigId, type CodexInstructionSources } from './instructions';
 import { codexApprovals } from './approvals';
 import { CodexToolItems } from './tool-items';
-import { createPretoolChannel, verifyPretoolHook, type PretoolChannel } from './pretool-hook';
+import { CodexChildTimelines } from './child-timelines';
+import { logCodexPermissionDenial } from './permission-diagnostics';
+import { createPretoolChannel, verifyPretoolHook, type PretoolChannel, type HookDecision } from './pretool-hook';
 import { classifyCodexHook } from './hook-policy';
 import { parseCodexGoal, publishCodexGoal, validGoalBudget } from './goal';
 import { parseCodexContextUsage, publishCodexContextUsage } from './usage';
@@ -28,6 +30,22 @@ import { forkCodexSession } from './fork';
 import { codexCliVersion } from './version';
 
 export { codexCliVersion } from './version';
+
+interface CodexSessionConnection {
+  client: CodexAppServer;
+  hookChannel?: PretoolChannel;
+  children: CodexChildTimelines | null;
+  parentTurnId: string | null;
+  root: string;
+  version: string;
+  preconfigId: string;
+  instructions: string;
+  parentNotify: ((event: CodexNotification) => void) | null;
+  parentHook: ((call: import('./hook-policy').CodexHookCall) => Promise<HookDecision>) | null;
+  parentApproval: ((method: string, params: unknown) => Promise<{ decision: 'accept' | 'decline' }>) | null;
+  parentTool: ((params: unknown) => Promise<{ contentItems: Array<{ type: 'inputText'; text: string }>; success: boolean }>) | null;
+  idleTimer?: ReturnType<typeof setTimeout>;
+}
 
 interface ActiveTurn {
   client: CodexAppServer;
@@ -251,11 +269,35 @@ const SAFE_FORK_ERRORS = new Set([
   'Codex fork requires a completed assistant response', 'Codex fork of image history is not supported',
 ]);
 
-/** One CLI process per active turn. Codex owns thread history, Prokop owns its transcript. */
+/** A parent-session connection owns native child threads across parent turns. */
 export function createCodexExecution(deps: CodexExecutionDependencies): Pick<SessionExecutionPort,
   'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork'> {
   const active = new Map<string, ActiveTurn>();
+  const connections = new Map<string, CodexSessionConnection>();
   const starting = new Set<string>();
+  async function closeConnection(sessionId: string, status: 'interrupted' | 'error'): Promise<void> {
+    const connection = connections.get(sessionId);
+    if (!connection) return;
+    connections.delete(sessionId);
+    clearTimeout(connection.idleTimer);
+    for (const child of connection.children?.liveTurns ?? []) {
+      const childId = connection.children?.childSessionId(child.threadId);
+      if (childId) codexApprovals.cancelSession(childId);
+    }
+    connection.children?.close(status);
+    await connection.client.close();
+    await connection.hookChannel?.close();
+  }
+  function scheduleIdleClose(sessionId: string, connection: CodexSessionConnection): void {
+    clearTimeout(connection.idleTimer);
+    if (active.has(sessionId) || starting.has(sessionId)) return;
+    connection.idleTimer = setTimeout(() => {
+      if (connections.get(sessionId) === connection && !active.has(sessionId)) {
+        void closeConnection(sessionId, 'interrupted');
+      }
+    }, connection.children?.hasLiveTurns ? 30 * 60_000 : 2 * 60_000);
+    connection.idleTimer.unref?.();
+  }
   const resubmitting = new Map<string, string>();
   async function rollback<Origin>(sessionId: string, operation: 'edit' | 'revert', targetMessageId: string,
     content: string | null, wire?: SessionWirePorts<Origin>): Promise<import('@/application/ports/execution').RevertExecutionResult | null> {
@@ -287,9 +329,11 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
     }
     if (binding.pendingTurn) throw new Error('Codex turn requires reconciliation before rollback');
     if (intent?.phase === 'ready') return null;
+    if (connections.get(sessionId)?.children?.hasLiveTurns) throw new Error('Codex children are still running');
     starting.add(sessionId);
     let client: CodexAppServer | undefined;
     try {
+      await closeConnection(sessionId, 'interrupted');
       client = new CodexAppServer(deps.connect(), () => {});
       await client.initialize();
       // A new app-server connection can read persisted history while the thread
@@ -339,18 +383,55 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
     }
   }
   const execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork'> = {
-    isSessionActive: (sessionId) => active.has(sessionId) || starting.has(sessionId),
+    isSessionActive: (sessionId) => active.has(sessionId) || starting.has(sessionId)
+      || [...connections.values()].some(connection => connection.children?.isLiveSession(sessionId)),
     async interruptSession(sessionId): Promise<InterruptExecutionResult> {
+      const childSession = getSession(sessionId);
+      if (childSession?.parentId && childSession.harness === 'codex-cli') {
+        let rootId = childSession.parentId;
+        for (let depth = 0; depth < 2 && getSession(rootId)?.parentId; depth++) {
+          rootId = getSession(rootId)!.parentId!;
+        }
+        const connection = connections.get(rootId);
+        const turns = connection?.children?.liveTurnsForSession(sessionId) ?? [];
+        if (!connection || !turns.length) return { sessionId, success: false,
+          cascadedTo: [], interruptedTools: [], rejectedAsks: [] };
+        codexApprovals.cancelSession(sessionId);
+        const results = await Promise.allSettled(turns.map(turn => connection.client.request('turn/interrupt', turn, 3_000)));
+        if (results.some(result => result.status === 'rejected')) {
+          await closeConnection(rootId, 'error');
+          return { sessionId, success: false, cascadedTo: [], interruptedTools: [], rejectedAsks: [] };
+        }
+        return { sessionId, success: true, cascadedTo: [], interruptedTools: [], rejectedAsks: [] };
+      }
       const run = active.get(sessionId);
-      if (!run) return { sessionId, success: false, cascadedTo: [], interruptedTools: [], rejectedAsks: [] };
+      if (!run) {
+        const connection = connections.get(sessionId);
+        if (!connection?.children?.hasLiveTurns) return { sessionId, success: false, cascadedTo: [], interruptedTools: [], rejectedAsks: [] };
+        const children = connection.children.liveTurns;
+        for (const child of children) {
+          const childId = connection.children.childSessionId(child.threadId);
+          if (childId) codexApprovals.cancelSession(childId);
+        }
+        await Promise.all(children.map(child => connection.client.request('turn/interrupt', child, 3_000).catch(() => {})));
+        return { sessionId, success: true, cascadedTo: children.map(child =>
+          connection.children!.childSessionId(child.threadId)!).filter(Boolean), interruptedTools: [], rejectedAsks: [] };
+      }
       if (run.stop) return run.stop;
       run.stopRequested = true;
       run.stop = (async (): Promise<InterruptExecutionResult> => {
         codexApprovals.cancelSession(sessionId);
+        const connection = connections.get(sessionId);
+        const children = connection?.children?.liveTurns ?? [];
+        for (const child of children) {
+          const childId = connection?.children?.childSessionId(child.threadId);
+          if (childId) codexApprovals.cancelSession(childId);
+        }
+        await Promise.all(children.map(child => run.client.request('turn/interrupt', child, 3_000).catch(() => {})));
         if (!run.turnId) {
           // The turn may already be running before turn/start responds.
           run.fail(new Error('Codex turn interrupted before its ID was received'));
-          await run.client.close();
+          await closeConnection(sessionId, 'interrupted');
           return { sessionId, success: true, cascadedTo: [], interruptedTools: [], rejectedAsks: [] };
         }
         try {
@@ -375,7 +456,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
           return { sessionId, success: true, cascadedTo: [], interruptedTools: [], rejectedAsks: [] };
         } catch {
           run.fail(new Error('Codex interruption could not be confirmed'));
-          await run.client.close();
+          await closeConnection(sessionId, 'error');
           return { sessionId, success: false, cascadedTo: [], interruptedTools: [], rejectedAsks: [] };
         }
       })();
@@ -385,7 +466,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
       content: string, attachments?: Array<{ id: string; kind: string }>, responseFormatId?: string,
       goalCondition?: string, goalMaxTurns?: number, goalTokenBudget?: number): Promise<void> {
       const session = getSession(sessionId);
-      if (!session || session.harness !== 'codex-cli') {
+      if (!session || session.harness !== 'codex-cli' || session.parentId) {
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Not a Codex CLI session', sessionId });
         return;
       }
@@ -432,11 +513,13 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
       starting.add(sessionId);
       let client: CodexAppServer | undefined;
       let hookChannel: PretoolChannel | undefined;
+      let connection: CodexSessionConnection | undefined;
       let assistant: AssistantMessage | undefined;
       let run: ActiveTurn | undefined;
       let toolItems: CodexToolItems | undefined;
       let idleTimer: ReturnType<typeof setTimeout> | undefined;
       let phase = 'workspace validation';
+      let succeeded = false;
       try {
         const root = workspaceRoot(session);
         const workspace = getWorkspace(session.workspaceId);
@@ -474,6 +557,14 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         if (binding && (binding.workspaceRoot !== root || binding.cliVersion !== version)) {
           throw new Error('Codex session root or CLI version changed; reopen with the original host');
         }
+        connection = connections.get(sessionId);
+        if (connection && (connection.root !== root || connection.version !== version
+          || connection.preconfigId !== preconfigId || connection.instructions !== instructions)) {
+          if (connection.children?.hasLiveTurns) throw new Error('Codex context changed while child agents are running');
+          await closeConnection(sessionId, 'interrupted');
+          connection = undefined;
+        }
+        if (connection) clearTimeout(connection.idleTimer);
         const persistedGoal = codexObject(codexObject(getSession(sessionId)?.metadata)?.codexGoal);
         if (binding?.pendingTurn) {
           if (reuseId) throw new Error('Codex edit turn requires reconciliation');
@@ -600,6 +691,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
               turnIdentityRecorded = true;
             }
             run.turnId = eventTurnId;
+            if (connection) connection.parentTurnId = eventTurnId;
             started = true;
             resolveStarted();
             return;
@@ -607,7 +699,8 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
           if (!run.turnId || eventTurnId !== run.turnId || completed) return;
           if (event.method === 'item/started' || event.method === 'item/completed') {
             if (assistant) {
-              toolItems ??= new CodexToolItems(sessionId, assistant.id, run.turnId, wire.delivery);
+              toolItems ??= new CodexToolItems(sessionId, assistant.id, run.turnId, wire.delivery,
+                threadId => connection?.children?.childSessionId(threadId) ?? null);
               if (event.method === 'item/started') toolItems.started(params.item);
               else toolItems.completed(params.item);
             }
@@ -711,46 +804,150 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         const dynamicTools = [...(memoryTools?.definitions ?? []), ...(sessionSearch?.definitions ?? []),
           ...(agentSkills?.definitions ?? [])];
         phase = 'Codex permission hook';
-        hookChannel = await deps.prepareHook?.(async call => {
-          if (!run?.turnId || completed || call.session_id !== run.threadId || call.turn_id !== run.turnId
-            || call.cwd !== root) return false;
+        if (!connection) {
+          connection = { client: undefined as unknown as CodexAppServer, children: null, parentTurnId: null,
+            root, version, preconfigId, instructions,
+            parentNotify: null, parentHook: null, parentApproval: null, parentTool: null };
+          const current = connection;
+          const rootStillSelected = (): boolean => {
+            try {
+              const latest = getSession(sessionId);
+              return !!latest && latest.status === 'active' && latest.preconfigId === preconfigId
+                && workspaceRoot(latest) === root;
+            } catch { return false; }
+          };
+          hookChannel = await deps.prepareHook?.(async call => {
+            if (connections.get(sessionId) !== current || !rootStillSelected()) return 'workspace-changed';
+            const children = current.children;
+            const parentThreadId = getCodexBinding(sessionId)?.threadId;
+            const alias = call.session_id === parentThreadId && call.turn_id !== current.parentTurnId
+              ? children?.uniqueLiveTurn(call.turn_id) : null;
+            const childThreadId = alias?.threadId ?? call.session_id;
+            if (children?.accepts(childThreadId, call.turn_id)) {
+              try {
+                const cwd = realpathSync(call.cwd);
+                const offset = relative(root, cwd);
+                if (offset === '..' || offset.startsWith(`..${sep}`) || isAbsolute(offset)) return 'working-directory';
+              } catch { return 'working-directory'; }
+              const childId = children.childSessionId(childThreadId);
+              if (!childId) return 'unknown-turn';
+              const ask = classifyCodexHook(call, root);
+              if (ask === undefined) return 'unsupported-command';
+              if (ask === null) return true;
+              const input = codexObject(call.tool_input);
+              const approved = await codexApprovals.requestHook({ ...ask, allowedScopes: ['once'] },
+                call.tool_name as 'Bash' | 'apply_patch', input?.command as string, call.tool_use_id,
+                childThreadId, call.turn_id, childId, root, session.workspaceId, wire.delivery, sessionId);
+              return approved && connections.get(sessionId) === current && rootStillSelected()
+                && children.accepts(childThreadId, call.turn_id) ? true : 'permission-denied';
+            }
+            if (call.session_id === getCodexBinding(sessionId)?.threadId) {
+              if (call.cwd !== root) return 'working-directory';
+              return await current.parentHook?.(call) ?? 'no-active-turn';
+            }
+            return 'unknown-turn';
+          });
+          current.hookChannel = hookChannel;
+          phase = 'app-server initialization';
+          client = new CodexAppServer(hookChannel ? hookChannel.connect() : deps.connect(), event => {
+            const parent = getSession(sessionId);
+            if (!parent || parent.status === 'closed') {
+              void closeConnection(sessionId, 'interrupted');
+              return;
+            }
+            current.children?.receive(event);
+            current.parentNotify?.(event);
+            if (!active.has(sessionId) && !starting.has(sessionId)) scheduleIdleClose(sessionId, current);
+          }, (method, params) => {
+            const request = codexObject(params);
+            const threadId = request?.threadId;
+            const turnId = request?.turnId;
+            if (typeof threadId === 'string' && typeof turnId === 'string') {
+              const parentThreadId = getCodexBinding(sessionId)?.threadId;
+              const alias = threadId === parentThreadId && turnId !== current.parentTurnId
+                ? current.children?.uniqueLiveTurn(turnId) : null;
+              const childThreadId = alias?.threadId ?? threadId;
+              if (current.children?.accepts(childThreadId, turnId)) {
+                const childId = current.children.childSessionId(childThreadId);
+                if (childId && rootStillSelected()) return codexApprovals.request(method,
+                  alias ? { ...request, threadId: childThreadId } : params, childThreadId, turnId,
+                  childId, root, session.workspaceId, wire.delivery, true, sessionId).then(decision =>
+                  rootStillSelected() && connections.get(sessionId) === current
+                    && current.children?.accepts(childThreadId, turnId) ? decision : { decision: 'decline' });
+              }
+            }
+            if (threadId === getCodexBinding(sessionId)?.threadId) {
+              if (current.parentApproval) return current.parentApproval(method, params);
+              logCodexPermissionDenial('native', 'no-active-turn');
+            } else {
+              logCodexPermissionDenial('native', 'unknown-turn');
+            }
+            return Promise.resolve({ decision: 'decline' });
+          }, params => current.parentTool?.(params) ?? Promise.resolve({
+            success: false, contentItems: [{ type: 'inputText', text: 'Dynamic tool unavailable' }],
+          }), dynamicTools.length > 0);
+          current.client = client;
+          connections.set(sessionId, current);
+          void client.disconnected.catch(() => {
+            if (connections.get(sessionId) === current) void closeConnection(sessionId, 'error');
+          });
+          await client.initialize();
+          if (hookChannel) await verifyPretoolHook(client);
+        } else {
+          client = connection.client;
+        }
+        connection.parentNotify = notify;
+        connection.parentHook = async call => {
+          if (!run?.turnId || completed || run.stopRequested || call.cwd !== root
+            || call.session_id !== run.threadId || call.turn_id !== run.turnId) return 'no-active-turn';
           const ask = classifyCodexHook(call, root);
-          if (ask === undefined) return false;
+          if (ask === undefined) return 'unsupported-command';
           if (ask === null) return true;
           const input = codexObject(call.tool_input);
-          return codexApprovals.requestHook({ ...ask, allowedScopes: ['once'] },
+          const approved = await codexApprovals.requestHook({ ...ask, allowedScopes: ['once'] },
             call.tool_name as 'Bash' | 'apply_patch', input?.command as string, call.tool_use_id,
-            run.threadId, run.turnId, sessionId, root, session.workspaceId, wire.delivery);
-        });
-        phase = 'app-server initialization';
-        client = new CodexAppServer(hookChannel ? hookChannel.connect() : deps.connect(), notify, (method, params) => {
-          if (!run?.turnId || completed) return Promise.resolve({ decision: 'decline' });
+            call.session_id, call.turn_id, sessionId, root, session.workspaceId, wire.delivery);
+          return approved && !!run && !completed && !run.stopRequested
+            && active.get(sessionId) === run && call.turn_id === run.turnId ? true : 'permission-denied';
+        };
+        connection.parentApproval = (method, params) => {
+          const request = codexObject(params);
+          if (!run?.turnId || completed || run.stopRequested
+            || request?.threadId !== run.threadId || request?.turnId !== run.turnId) {
+            logCodexPermissionDenial('native', 'no-active-turn');
+            return Promise.resolve({ decision: 'decline' });
+          }
           return codexApprovals.request(method, params, run.threadId, run.turnId,
             sessionId, root, session.workspaceId, wire.delivery);
-        }, async params => {
+        };
+        connection.parentTool = async params => {
           const request = codexObject(params);
-          if (!run || request?.threadId !== run.threadId) {
+          if (!run || completed || run.stopRequested || active.get(sessionId) !== run
+            || request?.threadId !== run.threadId) {
             return { success: false, contentItems: [{ type: 'inputText', text: 'Dynamic tool unavailable' }] };
           }
           if (request.tool === 'session_search' && sessionSearch) return sessionSearch.call(params);
           if (request.tool === 'agent_skill_manage' && agentSkills) return agentSkills.call(params);
           if (memoryTools) return memoryTools.call(params);
           return { success: false, contentItems: [{ type: 'inputText', text: 'Dynamic tool unavailable' }] };
-        }, dynamicTools.length > 0);
-        await client.initialize();
-        if (hookChannel) await verifyPretoolHook(client);
+        };
         phase = binding ? 'thread resume' : 'thread creation';
         const selection = getCodexModelSelection(sessionId);
-        const threadResponse = codexObject(await client.request(binding ? 'thread/resume' : 'thread/start',
-          binding ? { threadId: binding.threadId, cwd: root, approvalPolicy: 'on-request', sandbox: 'workspace-write',
-            ...(selection ? { model: selection.model } : {}), developerInstructions: instructions } : {
-            cwd: root, approvalPolicy: 'on-request', sandbox: 'workspace-write',
-            ...(selection ? { model: selection.model } : {}), developerInstructions: instructions,
-            ...(dynamicTools.length ? { dynamicTools } : {}),
-          }));
+        const threadResponse = connection.children && binding ? { thread: { id: binding.threadId } }
+          : codexObject(await client.request(binding ? 'thread/resume' : 'thread/start',
+            binding ? { threadId: binding.threadId, cwd: root, approvalPolicy: 'on-request', sandbox: 'workspace-write',
+              ...(selection ? { model: selection.model } : {}), developerInstructions: instructions } : {
+              cwd: root, approvalPolicy: 'on-request', sandbox: 'workspace-write',
+              ...(selection ? { model: selection.model } : {}), developerInstructions: instructions,
+              ...(dynamicTools.length ? { dynamicTools } : {}),
+            }));
         const threadId = id(codexObject(threadResponse?.thread)?.id);
         if (!threadId || (binding && binding.threadId !== threadId)) throw new Error('Invalid Codex thread');
         if (!binding) bindCodexThread({ sessionId, threadId, cliVersion: version, workspaceRoot: root });
+        if (!connection.children) connection.children = new CodexChildTimelines(session, threadId, root, version,
+          wire.delivery, turnId => active.get(sessionId)?.turnId === turnId
+            && active.get(sessionId)?.stopRequested === false,
+          childId => codexApprovals.cancelSession(childId));
         reportModel(threadResponse?.model ?? codexObject(threadResponse?.thread)?.model);
         let resolveActivation!: () => void;
         const activationSettled = new Promise<void>(resolve => { resolveActivation = resolve; });
@@ -780,6 +977,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         const turnId = id(codexObject(response?.turn)?.id);
         if (!turnId || (run.turnId && run.turnId !== turnId)) throw new Error('Invalid Codex turn');
         run.turnId = turnId;
+        connection.parentTurnId = turnId;
         if (!turnIdentityRecorded) {
           markCodexTurnStarted(sessionId, turnId, assistant.id, false);
           turnIdentityRecorded = true;
@@ -828,6 +1026,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         phase = 'turn execution';
         await Promise.race([done, client.disconnected]);
         if (reuseId && !getCodexBinding(sessionId)?.pendingTurn) clearRollbackIntent(sessionId);
+        succeeded = true;
       } catch (error: unknown) {
         if (reuseId && !getCodexBinding(sessionId)?.pendingTurn
           && getRollbackIntent(sessionId)?.phase === 'ready' && assistant) {
@@ -858,14 +1057,25 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
           run.resolveActivation();
           active.delete(sessionId);
         }
-        if (client) await client.close();
-        if (hookChannel) await hookChannel.close();
+        if (connection && connections.get(sessionId) === connection) {
+          connection.parentNotify = null;
+          connection.parentHook = null;
+          connection.parentApproval = null;
+          connection.parentTool = null;
+          if (succeeded && connection.children?.hasChildren) scheduleIdleClose(sessionId, connection);
+          else await closeConnection(sessionId, succeeded ? 'interrupted' : 'error');
+        } else {
+          if (client) await client.close();
+          if (hookChannel) await hookChannel.close();
+        }
       }
     },
     async fork(input) {
-      if (active.has(input.sessionId) || starting.has(input.sessionId)) throw new Error('Codex session is busy');
+      if (active.has(input.sessionId) || starting.has(input.sessionId)
+        || connections.get(input.sessionId)?.children?.hasLiveTurns) throw new Error('Codex session is busy');
       starting.add(input.sessionId);
       try {
+        await closeConnection(input.sessionId, 'interrupted');
         return await forkCodexSession(input, { connect: deps.connect, version: deps.version,
           root: id => workspaceRoot(getSession(id)!), busy: id => active.has(id), });
       } catch (error: unknown) {

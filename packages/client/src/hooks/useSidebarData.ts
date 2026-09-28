@@ -111,16 +111,26 @@ export const useSidebarData = (): UseSidebarDataReturn => {
       }
     }
 
+    const runningCodexAncestors = new Set<string>();
+    for (const session of allSessions) {
+      if (session.harness !== 'codex-cli' || session.subagentStatus !== 'running') continue;
+      let parent = parentMap.get(session.id);
+      while (parent) {
+        runningCodexAncestors.add(parent);
+        parent = parentMap.get(parent);
+      }
+    }
+
     const derived = new Map<string, { isStreaming: boolean; hasPendingPermission: boolean; isRunning: boolean }>();
     for (const session of allSessions) {
       const isStreaming = streamingSessionIds.has(session.id);
       const hasPendingPermission = pendingPermissionSessionIds.has(session.id);
-      const isCurrentSession = session.id === currentSessionId;
-      const isRunning = (isCurrentSession && isStreaming) || session.subagentStatus === 'running' || !!session.runningAt;
+      const isRunning = isStreaming || session.subagentStatus === 'running' || !!session.runningAt
+        || (session.harness === 'codex-cli' && runningCodexAncestors.has(session.id));
       derived.set(session.id, { isStreaming, hasPendingPermission, isRunning });
     }
     return derived;
-  }, [allSessions, streamingSessionIds, pendingAskRequests, currentSessionId]);
+  }, [allSessions, streamingSessionIds, pendingAskRequests]);
 
   // Separate active, archived, and scheduled sessions (only root sessions, no parent)
   const { activeSessions, archivedSessions, scheduledSessionsByJob } = useMemo(() => {
