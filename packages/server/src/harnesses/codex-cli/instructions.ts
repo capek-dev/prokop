@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import type { Preconfig, Workspace } from '@prokopai/sdk';
+import { formatCodexAgentSkills, listCodexAgentSkills } from './agent-skills';
 import { codexWorkspaceMemory } from './workspace-memory';
 
 export interface CodexInstructionSources {
@@ -56,6 +57,11 @@ export async function codexDeveloperInstructions(
     if (user) sections.push(`<agent_user_preferences>\n${user}\n</agent_user_preferences>`);
     if (availableTools.includes('agent_memory')) {
       sections.push(agentMemoryGuidance(availableTools.includes('memory')));
+    }
+    const skillList = formatCodexAgentSkills(await listCodexAgentSkills(agentDir, root, preconfig.skills));
+    if (skillList) sections.push(skillList);
+    if (availableTools.includes('agent_skill_manage')) {
+      sections.push('Use agent_skill_manage to list or maintain skills in the selected agent home. It does not manage workspace skills.');
     }
   }
   if (preconfig.systemPrompt) sections.push(preconfig.systemPrompt);

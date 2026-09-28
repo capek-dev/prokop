@@ -118,12 +118,19 @@ export async function projectMessagesForClient(
       const visualization = part.name === 'webfetch' && storedVisualization?.type === 'markdown'
         ? { type: 'none' as const, badge: storedVisualization.badge,
           message: 'Fetched page (open raw data to inspect)' }
-        : storedVisualization;
+        : part.callId.startsWith('codex-item:') && part.name === 'Codex tool'
+          && part.state.input.tool === 'agent_skill_manage' && storedVisualization?.type === 'markdown'
+          ? { type: 'none' as const, message: 'Agent skill operation completed' }
+          : storedVisualization;
       return {
         ...part,
         state: projectState(part, visualization),
         presentation: {
-          summary: resolveToolSummary(part.state.input, templates.get(part.name)),
+          summary: part.callId.startsWith('codex-item:') && part.name === 'Codex tool'
+            && part.state.input.tool === 'agent_skill_manage' ? 'agent_skill_manage'
+            : part.name === 'agent_skill_manage' && !templates.has(part.name)
+              ? part.presentation?.summary ?? 'Agent skill management'
+              : resolveToolSummary(part.state.input, templates.get(part.name)),
           ...(visualization && { visualization }),
           debugAvailable: true,
         },

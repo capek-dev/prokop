@@ -1,12 +1,7 @@
 import type { CodexModel, CodexModelSelection } from '@prokopai/sdk';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { CodexAppServer, codexObject, spawnCodexAppServer, type CodexConnection } from './app-server';
-function codexCliVersion(): string {
-  const result = Bun.spawnSync(['codex', '--version'], { stdout: 'pipe', stderr: 'ignore' });
-  const version = result.stdout.toString().trim();
-  if (result.exitCode !== 0 || !/^codex-cli 0\.156\./.test(version)) throw new Error('Codex CLI 0.156.x required');
-  return version;
-}
+import { codexCliVersion } from './version';
 
 export interface CodexModelDependencies {
   connect(): CodexConnection;

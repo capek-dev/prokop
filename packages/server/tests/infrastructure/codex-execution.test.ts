@@ -1775,3 +1775,47 @@ test('uncertain Codex rollback blocks sends and recovers only after upstream pre
   expect(result.revertedTo.messageId).toBeNull();
   expect(listMessagesWithParts('s')).toHaveLength(0);
 });
+
+test('Codex advertises and routes only selected agent skill management on start and resume', async () => {
+  create();
+  updateSession('s', { agentId: 'test' });
+  const dir = mkdtempSync(join(tmpdir(), 'codex-agent-execution-'));
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  const calls: string[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => { const fake = fakeCodex(); processes.push(fake); return fake.connection; },
+    instructions: {
+      listPreconfigs: async () => [], getPreconfig: async () => ({ id: 'test', skills: null }) as import('@prokopai/sdk').Preconfig,
+      getAgentDirectory: async () => dir, readAgentMemoryFile: async () => null,
+    },
+    agentSkills: { definitions: () => ['agent_skill_manage', 'skill_manage'].map(name => ({
+      type: 'function', name, description: name, inputSchema: { type: 'object' },
+    })), execute: async (input, directory) => {
+      calls.push(directory);
+      return { success: true, action: 'list', skills: [], summary: String(input.action) };
+    } },
+  });
+  try {
+    const messages: ServerMessage[] = [];
+    for (let index = 0; index < 2; index++) {
+      const pending = execution.sendMessage(wire(messages), 'origin', 's', 'skills');
+      await waitFor(() => processes[index]?.sent.some(message => message.method === 'turn/start') ?? false);
+      const fake = processes[index]!;
+      const thread = fake.sent.find(message => message.method === (index ? 'thread/resume' : 'thread/start'))?.params as Record<string, unknown>;
+      if (!index) expect(thread.dynamicTools).toMatchObject([{ name: 'agent_skill_manage' }]);
+      else expect(thread).not.toHaveProperty('dynamicTools');
+      expect(thread.developerInstructions).toContain('Use agent_skill_manage');
+      fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+      for (const [offset, tool] of ['agent_skill_manage', 'skill_manage'].entries()) {
+        const id = 110 + index * 2 + offset;
+        fake.send({ id, method: 'item/tool/call', params: { threadId: 'thread-1', turnId: 'turn-1',
+          callId: `call-${id}`, namespace: null, tool, arguments: { action: 'list' } } });
+        await waitFor(() => fake.sent.some(message => message.id === id));
+        expect(fake.sent.find(message => message.id === id)?.result).toMatchObject({ success: !offset });
+      }
+      fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+      await pending;
+    }
+    expect(calls).toEqual([join(dir, 'skills'), join(dir, 'skills')]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

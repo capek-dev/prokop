@@ -22,8 +22,12 @@ import { parseCodexGoal, publishCodexGoal, validGoalBudget } from './goal';
 import { parseCodexContextUsage, publishCodexContextUsage } from './usage';
 import { createCodexMemoryTools, type CodexMemoryBridge } from './memory-tools';
 import { createCodexSessionSearchTools, type CodexSessionSearchBridge } from './session-search-tools';
+import { createCodexAgentSkillTools, type CodexAgentSkillBridge } from './agent-skill-tools';
 import { applyRollback, clearRollbackIntent, getRollbackIntent, readRollbackHistory, readTurnIds, sameTurns, saveRollbackIntent, setRollbackPhase } from './rollback';
 import { forkCodexSession } from './fork';
+import { codexCliVersion } from './version';
+
+export { codexCliVersion } from './version';
 
 interface ActiveTurn {
   client: CodexAppServer;
@@ -47,15 +51,7 @@ export interface CodexExecutionDependencies {
   instructions: CodexInstructionSources;
   memoryTools?: CodexMemoryBridge;
   sessionSearch?: CodexSessionSearchBridge;
-}
-
-export function codexCliVersion(): string {
-  const result = Bun.spawnSync(['codex', '--version'], { stdout: 'pipe', stderr: 'ignore' });
-  const version = result.stdout.toString().trim();
-  if (result.exitCode !== 0 || !/^codex-cli 0\.156\./.test(version)) {
-    throw new Error('Codex CLI 0.156.x is required on the host');
-  }
-  return version;
+  agentSkills?: CodexAgentSkillBridge;
 }
 
 export function codexCliAvailable(): boolean {
@@ -450,7 +446,8 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         if (!preconfigId) throw new Error('Codex requires a preconfig');
         const preconfig = await sources.getPreconfig(preconfigId);
         if (!preconfig) throw new Error('Codex preconfig is unavailable');
-        const agentDir = await sources.getAgentDirectory(preconfigId);
+        const agentDir = session.agentId && session.agentId !== preconfigId
+          ? null : await sources.getAgentDirectory(preconfigId);
         const memoryDefinitions = deps.memoryTools?.definitions() ?? [];
         const memoryToolNames = memoryDefinitions.filter(definition =>
           definition.type === 'function' && (definition.name === 'memory'
@@ -460,8 +457,12 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         const searchToolNames = workspace.settings.sessionSearch?.enabled === true
           ? searchDefinitions.filter(definition => definition.type === 'function'
             && definition.name === 'session_search').map(definition => definition.name) : [];
-        const instructions = await codexDeveloperInstructions(workspace, root, preconfig, sources,
-          [...memoryToolNames, ...searchToolNames]);
+        const skillDefinitions = agentDir ? deps.agentSkills?.definitions() ?? [] : [];
+        const skillToolNames = skillDefinitions.filter(definition =>
+          definition.type === 'function' && definition.name === 'agent_skill_manage').map(definition => definition.name);
+        const instructions = await codexDeveloperInstructions(workspace, root, preconfig, {
+          ...sources, getAgentDirectory: async () => agentDir,
+        }, [...memoryToolNames, ...searchToolNames, ...skillToolNames]);
         if (!session.preconfigId) {
           const updated = updateSession(sessionId, { preconfigId,
             agentId: agentDir ? preconfigId : null });
@@ -695,7 +696,20 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
           },
           ask: request => codexApprovals.requestSessionSearch(request, sessionId, session.workspaceId, wire.delivery),
         });
-        const dynamicTools = [...(memoryTools?.definitions ?? []), ...(sessionSearch?.definitions ?? [])];
+        const agentSkills = deps.agentSkills && createCodexAgentSkillTools({
+          bridge: deps.agentSkills, definitions: skillDefinitions,
+          sessionId, workspaceId: session.workspaceId, preconfigId, agentDir,
+          isActive: turnId => !!run && active.get(sessionId) === run && run.turnId === turnId
+            && !completed && !run.stopRequested,
+          authorizeRoot: () => {
+            try {
+              const current = getSession(sessionId);
+              return !!current && current.preconfigId === preconfigId && workspaceRoot(current) === root;
+            } catch { return false; }
+          },
+        });
+        const dynamicTools = [...(memoryTools?.definitions ?? []), ...(sessionSearch?.definitions ?? []),
+          ...(agentSkills?.definitions ?? [])];
         phase = 'Codex permission hook';
         hookChannel = await deps.prepareHook?.(async call => {
           if (!run?.turnId || completed || call.session_id !== run.threadId || call.turn_id !== run.turnId
@@ -719,6 +733,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
             return { success: false, contentItems: [{ type: 'inputText', text: 'Dynamic tool unavailable' }] };
           }
           if (request.tool === 'session_search' && sessionSearch) return sessionSearch.call(params);
+          if (request.tool === 'agent_skill_manage' && agentSkills) return agentSkills.call(params);
           if (memoryTools) return memoryTools.call(params);
           return { success: false, contentItems: [{ type: 'inputText', text: 'Dynamic tool unavailable' }] };
         }, dynamicTools.length > 0);

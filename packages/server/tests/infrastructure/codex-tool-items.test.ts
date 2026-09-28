@@ -3,7 +3,7 @@ import type { ServerMessage, ToolPart } from '@prokopai/sdk';
 import type { ToolCatalogEntry } from '@/application/ports/tool-catalog';
 import { projectMessagesForClient } from '@/application/sessions/tool-debug';
 import { CodexToolItems } from '@/harnesses/codex-cli/tool-items';
-import { createMessage, listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
+import { createMessage, createPart, listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
 import { createSession } from '@/infrastructure/sqlite/session-store';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { createTestAssistantMessage } from '#tests/factories';
@@ -76,4 +76,71 @@ test('Codex memory and session search use the Prokop row shapes on live events a
   expect(JSON.stringify(projected)).not.toContain('private entry');
   expect(JSON.stringify(projected)).not.toContain('external.png');
   expect(sent.filter(message => message.type === 'part.updated')).toHaveLength(6);
+});
+
+test('Codex agent skill management projects list, mutation and failure results without raw JSON', async () => {
+  const assistant = createMessage(createTestAssistantMessage('s'));
+  const sent: ServerMessage[] = [];
+  const items = new CodexToolItems('s', assistant.id, 'turn', {
+    send: (_origin, message) => { sent.push(message); },
+    broadcast: message => { sent.push(message); },
+    broadcastToSession: (_id, message) => { sent.push(message); },
+    sendToController: (_id, message) => { sent.push(message); },
+    sendToAskTargets: (_id, _authority, message) => { sent.push(message); },
+  });
+  const complete = (id: string, args: Record<string, unknown>, result: unknown) =>
+    items.completed({ id, type: 'dynamicToolCall', namespace: null, tool: 'agent_skill_manage',
+      status: 'completed', arguments: args,
+      contentItems: [{ type: 'inputText', text: typeof result === 'string' ? result : JSON.stringify(result) }] });
+  complete('list', { action: 'list' }, { success: true, action: 'list', skills: [
+    { name: 'review', description: 'Review changes' }, { name: 'build', description: 'Build project' },
+  ] });
+  complete('create', { action: 'create', name: 'review', content: 'Sensitive skill body' },
+    { success: true, action: 'create', title: 'Skill created: review',
+      path: 'review/SKILL.md', summary: 'Created workspace skill.' });
+  complete('denied', { action: 'patch', name: 'review' }, { error: 'Skill not found' });
+  complete('malformed', { action: 'update', name: 'review' }, '{"invalid":');
+  const stored = listMessagesWithParts('s');
+  const parts = stored[0]!.parts.filter((part): part is ToolPart => part.type === 'tool');
+  const viz = (id: string) => {
+    const part = parts.find(part => part.callId === `codex-item:turn:${id}`)!;
+    return part.state.status === 'completed'
+      ? (part.state.output as { _visualization: unknown })._visualization : null;
+  };
+  expect(viz('list')).toEqual({ type: 'file-list', badge: '2 skills', singularLabel: 'skill',
+    pluralLabel: 'skills', title: 'Agent skills', files: [
+      { path: 'review', content: 'Review changes' }, { path: 'build', content: 'Build project' },
+    ], total: 2 });
+  expect(viz('create')).toEqual({ type: 'none', message: 'Skill created: review' });
+  expect(viz('denied')).toEqual({ type: 'none', message: 'Skill not found' });
+  expect(viz('malformed')).toEqual({ type: 'none', message: 'Agent skill result unavailable' });
+  expect(parts.map(part => [part.name, part.presentation?.summary]).sort()).toEqual([
+    ['agent_skill_manage', 'list'], ['agent_skill_manage', 'create review'],
+    ['agent_skill_manage', 'patch review'], ['agent_skill_manage', 'update review'],
+  ].sort());
+  const projected = await projectMessagesForClient(stored);
+  const visible = projected[0]!.parts.filter((part): part is ToolPart => part.type === 'tool');
+  expect(visible.find(part => part.callId === 'codex-item:turn:create')?.presentation)
+    .toMatchObject({ summary: 'create review', visualization: { type: 'none', message: 'Skill created: review' } });
+  expect(visible.find(part => part.callId === 'codex-item:turn:list')?.presentation)
+    .toMatchObject({ summary: 'list', visualization: { type: 'file-list', badge: '2 skills' } });
+  expect(JSON.stringify(sent)).not.toContain('Sensitive skill body');
+  expect(JSON.stringify(projected)).not.toContain('Sensitive skill body');
+  expect(JSON.stringify(projected)).not.toContain('Created workspace skill.');
+  expect(JSON.stringify(projected)).not.toContain('{\\"success\\"');
+});
+
+test('previous Codex agent skill rows do not expose stored JSON on reload', async () => {
+  const assistant = createMessage(createTestAssistantMessage('s'));
+  createPart({ id: crypto.randomUUID(), messageId: assistant.id, createdAt: Date.now(), type: 'tool',
+    callId: 'codex-item:turn:old', name: 'Codex tool',
+    state: { status: 'completed', input: { tool: 'agent_skill_manage', arguments: '{"action":"create"}' },
+      output: { _visualization: { type: 'markdown', content: '{"success":true,"title":"Skill created"}' } },
+      startedAt: Date.now(), completedAt: Date.now() },
+    presentation: { summary: 'agent_skill_manage', debugAvailable: false } }, 's');
+  const projected = await projectMessagesForClient(listMessagesWithParts('s'));
+  const part = projected[0]!.parts.find(part => part.type === 'tool') as ToolPart;
+  expect(part.presentation).toMatchObject({ summary: 'agent_skill_manage',
+    visualization: { type: 'none', message: 'Agent skill operation completed' } });
+  expect(JSON.stringify(projected)).not.toContain('"success":true');
 });

@@ -30,7 +30,7 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
 
   app.get('/api/harnesses/codex-cli/models', async c => {
     const catalog = application.codexCatalog();
-    if (!catalog) throw new BadRequestError('Codex CLI 0.156.x is unavailable on this host');
+    if (!catalog) throw new BadRequestError('Codex CLI 0.156.0 or newer is required on this host');
     try {
       return c.json({ models: await catalog });
     } catch {

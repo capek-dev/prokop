@@ -1,5 +1,8 @@
 ### Changed
 
+- Accept Codex CLI 0.156.0 and newer instead of requiring the 0.156.x series.
+- List selected-agent home skill metadata and `SKILL.md` paths in Codex developer instructions, subject to the preconfig allowlist and workspace-skill precedence. Route only `agent_skill_manage` through Čapek's skill manager for selected agents; workspace skill management and native Codex skill discovery remain unchanged. Show skill lists and mutation status in Codex tool rows instead of raw JSON, including previously saved rows, and require an explicit raw-data action for structured previews.
+
 - Expand saved slash prompts in Codex CLI chat messages, including arguments and uploaded images. Leave goal conditions and unknown slash commands unchanged.
 
 - Fork a completed Codex CLI response into a new native Codex thread and session with matching retained history. Keep the original thread intact; reject in-flight, goal, image-bearing, or uncertain histories. User-message cutoffs remain unavailable for Codex because they cannot preserve Prokop's user-only cutoff on a native turn boundary.

@@ -9,7 +9,7 @@ import { AskQuestion } from './AskQuestion';
 import type { PendingAskRequest } from '@/stores/askStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { RENDER_BUDGETS } from '@/lib/renderBudgets';
-import { getToolRowInfo } from '@/lib/toolSummaries';
+import { getToolRowInfo, showToolRawData } from '@/lib/toolSummaries';
 import type { ToolRowChip } from '@/lib/toolSummaries';
 import { useSdkClient, useServerUrl } from '@/contexts/ServerClientContext';
 import { useToolDebugQuery, useToolDisplayCatalog } from '@/hooks/queries';
@@ -158,8 +158,7 @@ export const ToolCall = memo(function ToolCall({
     ?? (status === 'completed' && 'output' in state
       ? extractVisualization(state.output)
       : undefined);
-  const hasPreview = !!visualization && visualization.type !== 'none';
-  const debugOpen = isOpen && (!hasPreview || debugExpanded);
+  const debugOpen = showToolRawData(isOpen, visualization, debugExpanded);
   const sdkClient = useSdkClient();
   const shouldLoadDebug = part.presentation?.debugAvailable === true;
   const debugQuery = useToolDebugQuery(
@@ -289,6 +288,9 @@ export const ToolCall = memo(function ToolCall({
 
         {isOpen && <CollapsibleContent>
           <div className="pl-5 pb-2 flex flex-col gap-2">
+            {visualization?.type === 'none' && visualization.message && (
+              <div className="text-xs text-muted-foreground">{visualization.message}</div>
+            )}
             {/* Pretty body for collapsed visualizations (chip-only while collapsed) */}
             {visualization && (visualization.collapsed || collapsePreview) && visualization.type !== 'none' && (
               <div>
@@ -297,7 +299,7 @@ export const ToolCall = memo(function ToolCall({
               </div>
             )}
 
-            {hasPreview && (
+            {visualization && (
               <Button
                 variant="link"
                 size="xs"

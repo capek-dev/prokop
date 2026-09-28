@@ -33,6 +33,12 @@ function formatBytes(n: number): string {
 
 export const resolveSummaryTemplate = resolveToolSummaryTemplate;
 
+/** Structured rows must not expose raw JSON merely because the row was expanded. */
+export function showToolRawData(isOpen: boolean, visualization: AnyVisualization | undefined,
+  debugExpanded: boolean): boolean {
+  return isOpen && (!visualization || debugExpanded);
+}
+
 /**
  * Structural chips derived only from typed visualization fields, plus
  * the tool-declared `badge` string. No tool-name knowledge here.

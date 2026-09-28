@@ -4,6 +4,7 @@ import {
   chipsFromVisualization,
   getToolRowInfo,
   resolveSummaryTemplate,
+  showToolRawData,
 } from '@/lib/toolSummaries';
 
 function makeProjectedPart(): ToolPart {
@@ -46,6 +47,16 @@ describe('tool summaries', () => {
 
   test('keeps dotted summary template resolution', () => {
     expect(resolveSummaryTemplate('{todos.length} items', { todos: { length: 3 } })).toBe('3 items');
+  });
+
+  test('requires explicit raw-data expansion for chip-only and list visualizations', () => {
+    const chip = { type: 'none' as const, message: 'Skill created: review' };
+    const list = { type: 'file-list' as const, files: [{ path: 'review' }] };
+    expect(showToolRawData(true, chip, false)).toBe(false);
+    expect(showToolRawData(true, list, false)).toBe(false);
+    expect(showToolRawData(true, chip, true)).toBe(true);
+    expect(showToolRawData(false, chip, true)).toBe(false);
+    expect(showToolRawData(true, undefined, false)).toBe(true);
   });
 
   test('uses file-list entity labels for generated chips', () => {

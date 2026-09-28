@@ -7,7 +7,7 @@ import { fileChangeVisualization } from './file-change-visualization';
 
 const MAX_PREVIEW = 8_000;
 const MAX_CHANGES = 50;
-const DOMAIN_TOOLS = new Set(['memory', 'agent_memory', 'session_search']);
+const DOMAIN_TOOLS = new Set(['memory', 'agent_memory', 'session_search', 'agent_skill_manage']);
 
 function preview(value: unknown): string {
   const text = typeof value === 'string' ? value : JSON.stringify(value ?? '');
@@ -74,6 +74,23 @@ function sessionSearchVisualization(item: Record<string, unknown>): Record<strin
   return { type: 'none', message: typeof result.title === 'string' ? preview(result.title) : 'Session search completed' };
 }
 
+function agentSkillVisualization(item: Record<string, unknown>): Record<string, unknown> | null {
+  if (item.type !== 'dynamicToolCall' || item.namespace !== null || item.tool !== 'agent_skill_manage') return null;
+  const result = dynamicResult(item);
+  if (!result) return { type: 'none', message: 'Agent skill result unavailable' };
+  if (typeof result.error === 'string') return { type: 'none', message: preview(result.error) };
+  if (result.action === 'list' && Array.isArray(result.skills)) {
+    return { type: 'file-list', badge: `${result.skills.length} skill${result.skills.length === 1 ? '' : 's'}`,
+      singularLabel: 'skill', pluralLabel: 'skills', title: 'Agent skills',
+      files: result.skills.slice(0, 20).map(skill => {
+        const entry = codexObject(skill);
+        return { path: typeof entry?.name === 'string' ? preview(entry.name) : '',
+          content: typeof entry?.description === 'string' ? preview(entry.description) : '' };
+      }), total: result.skills.length };
+  }
+  return { type: 'none', message: typeof result.title === 'string' ? preview(result.title) : 'Agent skill updated' };
+}
+
 function itemIdentity(item: Record<string, unknown>): { name: string; summary: string; input: Record<string, unknown> } | null {
   switch (item.type) {
     case 'commandExecution':
@@ -93,9 +110,13 @@ function itemIdentity(item: Record<string, unknown>): { name: string; summary: s
     case 'dynamicToolCall':
       if (typeof item.tool !== 'string') return null;
       if (item.namespace === null && DOMAIN_TOOLS.has(item.tool)) {
-        const input = codexObject(item.arguments) ?? {};
+        const args = codexObject(item.arguments) ?? {};
+        // Skill bodies stay in the Codex tool exchange, not the transcript or live part events.
+        const input = item.tool === 'agent_skill_manage'
+          ? { action: args.action, name: args.name } : args;
         return { name: item.tool, summary: resolveToolSummary(input,
-          item.tool === 'session_search' ? '{action} {query}' : '{action} {target}'), input };
+          item.tool === 'session_search' ? '{action} {query}'
+            : item.tool === 'agent_skill_manage' ? '{action} {name}' : '{action} {target}'), input };
       }
       return { name: 'Codex tool', summary: `${typeof item.namespace === 'string' ? `${item.namespace}: ` : ''}${item.tool}`.slice(0, 500),
         input: { tool: preview(item.tool), arguments: preview(item.arguments) } };
@@ -167,7 +188,8 @@ export class CodexToolItems {
           ? { type: 'shell-output', command: preview(item.command), stdout: content,
             exitCode: typeof item.exitCode === 'number' ? item.exitCode : -1 }
           : item.type === 'fileChange' ? fileChangeVisualization(item.changes)
-            : memoryVisualization(item) ?? sessionSearchVisualization(item) ?? { type: 'markdown', content } });
+            : memoryVisualization(item) ?? sessionSearchVisualization(item)
+              ?? agentSkillVisualization(item) ?? { type: 'markdown', content } });
     }
     this.open.delete(part.id);
     if (updated) {
