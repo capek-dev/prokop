@@ -29,7 +29,7 @@ export const createSessionSchema = z.object({
   workspaceRootId: z.string().min(1).optional(),
   preconfigId: z.string().nullable().optional(),
   title: z.string().optional(),
-  harness: z.enum(['prokop', 'codex-cli']).optional(),
+  harness: z.enum(['prokop', 'codex-cli', 'claude-cli']).optional(),
   metadata: clientSessionMetadata,
 }).loose();
 

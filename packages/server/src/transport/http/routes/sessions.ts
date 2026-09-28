@@ -25,8 +25,19 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
     harnesses: [
       { id: 'prokop', available: true },
       { id: 'codex-cli', available: application.codexAvailable(), approvals: false },
+      { id: 'claude-cli', available: application.claudeAvailable(), approvals: false },
     ],
   }));
+
+  app.get('/api/harnesses/claude-cli/models', async c => {
+    const catalog = application.claudeCatalog();
+    if (!catalog) throw new BadRequestError('Claude CLI is unavailable on this host');
+    try {
+      return c.json({ models: await catalog });
+    } catch {
+      throw new BadRequestError('Claude model catalog is unavailable on this host');
+    }
+  });
 
   app.get('/api/harnesses/codex-cli/models', async c => {
     const catalog = application.codexCatalog();
@@ -104,6 +115,29 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
     }
     const tags = application.listTagsByWorkspace(workspaceId);
     return c.json({ tags });
+  });
+
+  app.get('/api/sessions/:id/claude-models', async c => {
+    const result = application.claudeModels(c.req.param('id'));
+    if (!result) throw new NotFoundError('Claude session not found');
+    try {
+      return c.json(await result);
+    } catch {
+      throw new BadRequestError('Claude model catalog is unavailable on this host');
+    }
+  });
+
+  app.put('/api/sessions/:id/claude-model', validate('json', codexModelSelectionSchema), async c => {
+    let result: Awaited<ReturnType<SessionHttpApplication['setClaudeModel']>>;
+    try {
+      result = await application.setClaudeModel(c.req.param('id'), c.req.valid('json'));
+    } catch {
+      throw new BadRequestError('Claude model catalog is unavailable on this host');
+    }
+    if (result === 'not_found') throw new NotFoundError('Claude session not found');
+    if (result === 'active') throw new BadRequestError('Wait for the Claude turn to finish');
+    if (result === 'invalid') throw new BadRequestError('Invalid Claude model or effort');
+    return c.json({ selection: c.req.valid('json') });
   });
 
   app.get('/api/sessions/:id/codex-models', async c => {

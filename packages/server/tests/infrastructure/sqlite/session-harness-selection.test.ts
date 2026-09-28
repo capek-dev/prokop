@@ -34,6 +34,18 @@ test('switches a root session both ways, clearing the other harness selection', 
   expect(getDatabase().query('SELECT model FROM codex_session_models WHERE session_id = ?').get('root')).toBeNull();
 });
 
+test('selects Claude model and effort only on an empty root, then clears them on switch', () => {
+  const initial = makeSession('claude');
+  const choice = { harness: 'claude-cli', modelId: 'sonnet', effort: 'medium' } as const;
+  const selected = selectEmptySessionHarnessModel(initial.id, 'prokop', initial.updatedAt, choice);
+  expect(selected).toMatchObject({ harness: 'claude-cli', selectedModel: 'sonnet' });
+  expect(getDatabase().query('SELECT model, effort FROM claude_session_models WHERE session_id = ?').get(initial.id))
+    .toEqual({ model: 'sonnet', effort: 'medium' });
+  const returned = selectEmptySessionHarnessModel(initial.id, 'claude-cli', selected!.updatedAt, prokop);
+  expect(returned?.harness).toBe('prokop');
+  expect(getDatabase().query('SELECT model FROM claude_session_models WHERE session_id = ?').get(initial.id)).toBeNull();
+});
+
 test('rejects stale selections, messages, queued work, and native Codex bindings', () => {
   const first = makeSession('stale');
   expect(selectEmptySessionHarnessModel(first.id, 'prokop', 'older', codex)).toBeNull();

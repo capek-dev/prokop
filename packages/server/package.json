@@ -27,6 +27,7 @@
     "test:coverage": "bun test --coverage"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.274",
     "@capekai/core": "1.0.13",
     "@capekai/tool": "^1.0.3",
     "@capekai/types": "^1.0.3",

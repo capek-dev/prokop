@@ -1259,7 +1259,7 @@ describe('server layer boundaries', () => {
       const imports = parseImports(file!.sourceText, file!.path);
       const specifiers = [...new Set(imports.map((imp) => imp.specifier))].sort();
       if (path.endsWith('session-message-schema.ts')) {
-        expect(specifiers).toEqual(['bun:sqlite']);
+        expect(specifiers).toEqual(['./claude-harness-migration', 'bun:sqlite']);
       } else {
         expect(specifiers).toEqual([
           '@/application/ports/session-message',
@@ -2042,18 +2042,21 @@ describe('server layer boundaries', () => {
     for (const path of [
       'codex-cli/app-server.ts', 'codex-cli/bindings.ts', 'codex-cli/execution.ts',
       'codex-cli/index.ts', 'codex-cli/models.ts', 'prokop/execution.ts', 'prokop/index.ts',
+      'claude-cli/command.ts', 'claude-cli/runner.ts', 'claude-cli/stream.ts',
+      'claude-cli/execution.ts', 'claude-cli/index.ts', 'claude-cli/models.ts',
     ]) expect(paths).toContain(path);
     const bootstrap = files.find(file => file.path === resolve(bootstrapDir, 'application.ts'))!;
     const imports = parseImports(bootstrap.sourceText, bootstrap.path).map(imp => imp.specifier);
     expect(imports).toContain('@/harnesses/prokop');
     expect(imports).toContain('@/harnesses/codex-cli');
+    expect(imports).toContain('@/harnesses/claude-cli');
     expect(imports.some(specifier => specifier.startsWith('@/infrastructure/codex/'))).toBe(false);
     const dispatch = files.find(file => file.path === resolve(applicationDir, 'sessions/harness-execution.ts'))!;
     expect(parseImports(dispatch.sourceText, dispatch.path).some(imp => imp.specifier.startsWith('@/harnesses/'))).toBe(false);
     for (const file of named) {
       const path = relative(harnessesDir, file.path);
       const specifiers = parseImports(file.sourceText, file.path).map(imp => imp.specifier);
-      if (path.startsWith('codex-cli/')) {
+      if (path.startsWith('codex-cli/') || path.startsWith('claude-cli/')) {
         expect(specifiers.some(specifier => specifier.startsWith('@capekai/core'))).toBe(false);
         expect(specifiers.some(specifier => specifier.startsWith('@/infrastructure/providers/'))).toBe(false);
       }

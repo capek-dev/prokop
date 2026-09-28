@@ -194,6 +194,8 @@ export function handlePartUpdated(
   const { setPartsBySession, partIdIndexRef, clearCompletion } = ctx;
 
   clearCompletion(sessionId);
+  // The full snapshot supersedes any deltas still waiting for the UI flush.
+  ctx.pendingPartAppendsRef.current.delete(part.id);
 
   // Write to any session that has content loaded (multi-pane safe)
   const hasContent = useSessionStore.getState().partsBySession[sessionId] !== undefined;

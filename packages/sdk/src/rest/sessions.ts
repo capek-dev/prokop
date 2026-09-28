@@ -57,8 +57,20 @@ interface ListByWorkspaceOptions extends SessionListFilter {
 export class SessionsRestNamespace {
   constructor(private http: HttpClient) {}
 
-  async harnesses(): Promise<{ harnesses: Array<{ id: 'prokop' | 'codex-cli'; available: boolean; approvals?: boolean }> }> {
+  async harnesses(): Promise<{ harnesses: Array<{ id: SessionHarness; available: boolean; approvals?: boolean }> }> {
     return this.http.get('/harnesses');
+  }
+
+  async claudeCatalog(): Promise<{ models: CodexModel[] }> {
+    return this.http.get('/harnesses/claude-cli/models');
+  }
+
+  async claudeModels(id: string): Promise<{ models: CodexModel[]; selection: CodexModelSelection | null }> {
+    return this.http.get(`/sessions/${encodeURIComponent(id)}/claude-models`);
+  }
+
+  async setClaudeModel(id: string, selection: CodexModelSelection): Promise<{ selection: CodexModelSelection }> {
+    return this.http.put(`/sessions/${encodeURIComponent(id)}/claude-model`, selection);
   }
 
   async codexCatalog(): Promise<{ models: CodexModel[] }> {

@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import type { Session } from '@prokopai/sdk';
 import { ChatView } from '@/components/chat/ChatView';
@@ -9,8 +9,11 @@ import type { PendingAskRequest } from '@/stores/askStore';
 vi.mock('@/components/chat/VirtualizedTranscript', () => ({ VirtualizedTranscript: () => null }));
 vi.mock('@/components/chat/MessageInput', () => ({ MessageInput: () => null }));
 vi.mock('@/components/chat/DeferredConversation', () => ({ DeferredConversation: ({ children }: { children: React.ReactNode }) => children }));
-vi.mock('@/components/chat/AskQuestion', () => ({ AskQuestion: ({ request }: { request: PendingAskRequest }) =>
-  <span data-testid="codex-ask">{request.toolCallId}</span> }));
+vi.mock('@/components/chat/AskQuestion', () => ({ AskQuestion: ({ request, onRespond }: {
+  request: PendingAskRequest;
+  onRespond: (toolCallId: string, response: { type: 'permission'; grant: 'once' }, requestId?: string) => void;
+}) => <button data-testid="codex-ask" onClick={() => onRespond(request.toolCallId,
+  { type: 'permission', grant: 'once' }, request.requestId)}>{request.toolCallId}</button> }));
 vi.mock('@/hooks/useTranscriptPagination', () => ({ useTranscriptPagination: () => ({ loadOlder: () => {} }) }));
 
 const parent = { id: 'parent', workspaceId: 'ws', harness: 'codex-cli', status: 'active',
@@ -45,6 +48,33 @@ test('the parent controller can see a child approval while viewing either sessio
   parentView.unmount();
   view(child);
   expect(screen.getAllByTestId('codex-ask')).toHaveLength(1);
+});
+
+test('the Claude controller sees pending approval in the chat panel, observers do not', () => {
+  const claude = { ...parent, id: 'claude', harness: 'claude-cli' } as Session;
+  const approval: PendingAskRequest = {
+    sessionId: 'claude', requestId: 'claude-ask-1', toolCallId: 'claude-approval:1',
+    toolName: 'claude-cli:Bash', ask: { type: 'permission', question: 'Allow Claude to use Bash?',
+      resource: 'shell-command', action: 'execute', risk: 'critical', allowedScopes: ['once'] },
+  };
+  useClientIdentityStore.setState({ clientId: 'owner' });
+  useSessionControlStore.setState({ controlBySessionId: { claude: {
+    status: 'controlled', controllerClientId: 'owner', sessionId: 'claude',
+  } as never } });
+  const onAskResponse = vi.fn();
+  const owner = render(<ChatView session={claude} messagesWithParts={[]} queuedMessages={[]}
+    pendingAskRequests={[approval]} onAskResponse={onAskResponse}
+    onSendMessage={() => {}} onRemoveFromQueue={() => {}} />);
+  expect(screen.getByTestId('codex-ask')).toHaveTextContent('claude-approval:1');
+  fireEvent.click(screen.getByTestId('codex-ask'));
+  expect(onAskResponse).toHaveBeenCalledWith('claude-approval:1',
+    { type: 'permission', grant: 'once' }, 'claude-ask-1');
+  owner.unmount();
+  act(() => useClientIdentityStore.setState({ clientId: 'viewer' }));
+  render(<ChatView session={claude} messagesWithParts={[]} queuedMessages={[]}
+    pendingAskRequests={[approval]} onAskResponse={() => {}}
+    onSendMessage={() => {}} onRemoveFromQueue={() => {}} />);
+  expect(screen.queryByTestId('codex-ask')).not.toBeInTheDocument();
 });
 
 test('a viewer without parent control cannot answer from the child session', () => {

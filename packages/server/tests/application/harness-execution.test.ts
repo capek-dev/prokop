@@ -46,6 +46,11 @@ function fixture() {
   };
   const execution = createHarnessExecution({ getSession: id => sessions[id] ?? null }, {
     prokop: { execution: prokop }, 'codex-cli': codex,
+    'claude-cli': { execution: {
+      sendMessage: async () => { calls.push('claude:send'); },
+      interruptSession: codexBase.interruptSession,
+      isSessionActive: codexBase.isSessionActive,
+    } },
   });
   return { execution, calls, messages, wire };
 }

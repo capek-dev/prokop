@@ -91,6 +91,8 @@ import { codexAccounts } from '@/infrastructure/providers/codex-accounts';
 import { createProkopHarness } from '@/harnesses/prokop';
 import { codexApprovals } from '@/harnesses/codex-cli/approvals';
 import { installCodexApprovalPort } from '@/application/ports/codex-approval';
+import { claudeApprovals } from '@/harnesses/claude-cli/approvals';
+import { installClaudeApprovalPort } from '@/application/ports/claude-approval';
 import {
   codexCliAvailable,
   codexCliVersion,
@@ -101,6 +103,8 @@ import {
   saveCodexModelSelection,
 } from '@/harnesses/codex-cli';
 import { createHarnessExecution } from '@/application/sessions/harness-execution';
+import { claudeCliAvailable, createClaudeCliHarness, createClaudeExecution,
+  getClaudeModelSelection, listClaudeModels, saveClaudeModelSelection } from '@/harnesses/claude-cli';
 
 import { createWiredLearning } from './learning';
 
@@ -169,6 +173,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     changed: (worktreeId: string): void => refreshWorktreeAttachments?.(worktreeId),
   };
   installCodexApprovalPort(codexApprovals);
+  installClaudeApprovalPort(claudeApprovals);
   const codexExecution = createCodexExecution({
     connect: spawnCodexAppServer,
     version: codexCliVersion,
@@ -183,6 +188,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
       readAgentMemoryFile: (id, filename) => agents.readAgentMemoryFile(id, filename),
     },
   });
+  const claudeExecution = createClaudeExecution();
   const execution = createHarnessExecution(repository, {
     prokop: createProkopHarness({
       onSessionChanged: (changedSession) => {
@@ -192,6 +198,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
       },
     }),
     'codex-cli': createCodexCliHarness(codexExecution),
+    'claude-cli': createClaudeCliHarness(claudeExecution),
   });
   const askAuthority = createJean2AskAuthorityPort();
   const pendingAsks = createJean2PendingAskPort();
@@ -232,6 +239,9 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     worktreeAttachments,
     codexAvailable: codexCliAvailable,
     codexWorkspaceAvailable,
+    claudeAvailable: claudeCliAvailable,
+    claudeWorkspaceAvailable: codexWorkspaceAvailable,
+    claudeModels: listClaudeModels,
     codexModels: listCodexModels,
     prokopModelAvailable: (modelId, providerId) => getModelsConfigWithStatus().providers
       .some(provider => provider.id === providerId && provider.models.some(model => model.id === modelId && model.runtimeStatus.usable)),
@@ -251,6 +261,10 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     codexWorkspaceAvailable,
     { list: listCodexModels, get: getCodexModelSelection, save: saveCodexModelSelection,
       isActive: codexExecution.isSessionActive },
+    claudeCliAvailable,
+    { list: listClaudeModels, get: getClaudeModelSelection, save: saveClaudeModelSelection,
+      isActive: claudeExecution.isSessionActive },
+    codexWorkspaceAvailable,
   );
 
   const schedulingRepository = createJean2ScheduledJobRepository();

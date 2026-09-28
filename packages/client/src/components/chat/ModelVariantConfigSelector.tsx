@@ -47,6 +47,11 @@ interface ModelVariantConfigSelectorProps {
   fallbackModelName?: string;
   onChangeModel: (modelId: string, providerId: string) => void;
   codexModels?: CodexModel[];
+  claudeModels?: CodexModel[];
+  claudeSession?: boolean;
+  claudeSelectedModel?: string | null;
+  claudeEffort?: string | null;
+  onChangeClaude?: (modelId: string, effort: string) => void;
   codexSelectedModel?: string | null;
   codexEffort?: string | null;
   codexSession?: boolean;
@@ -96,6 +101,11 @@ export function ModelVariantConfigSelector({
   fallbackModelName,
   onChangeModel,
   codexModels = [],
+  claudeModels = [],
+  claudeSession = false,
+  claudeSelectedModel,
+  claudeEffort,
+  onChangeClaude,
   codexSelectedModel,
   codexEffort,
   codexSession = false,
@@ -143,21 +153,27 @@ export function ModelVariantConfigSelector({
   const selectedPreconfig = preconfigs.find((p) => p.id === selectedPreconfigId);
   const selectedCodex = codexModels.find(model => model.model === codexSelectedModel)
     ?? (codexSession ? codexModels.find(model => model.isDefault) : undefined);
-  const modelDisplayName = codexSession
-    ? `Codex · ${selectedCodex?.name ?? codexSelectedModel ?? 'Select model'}`
-    : selectedModel?.name || fallbackModelName || 'Select model';
-  const variantDisplayName = codexSession ? codexEffort ?? selectedCodex?.defaultEffort ?? null
-    : selectedVariant ? capitalizeVariant(selectedVariant) : null;
+  const selectedClaude = claudeModels.find(model => model.model === claudeSelectedModel)
+    ?? (claudeSession ? claudeModels.find(model => model.isDefault) : undefined);
+  const modelDisplayName = claudeSession
+    ? `Claude · ${selectedClaude?.name ?? claudeSelectedModel ?? 'Select model'}`
+    : codexSession ? `Codex · ${selectedCodex?.name ?? codexSelectedModel ?? 'Select model'}`
+      : selectedModel?.name || fallbackModelName || 'Select model';
+  const variantDisplayName = claudeSession ? claudeEffort ?? selectedClaude?.defaultEffort ?? null
+    : codexSession ? codexEffort ?? selectedCodex?.defaultEffort ?? null
+      : selectedVariant ? capitalizeVariant(selectedVariant) : null;
   const fullSelectionLabel = [
     modelDisplayName,
     variantDisplayName,
     selectedPreconfig && !lockPreconfig ? selectedPreconfig.name : null,
   ].filter(Boolean).join(', ');
 
-  const hasVariants = codexSession ? !!selectedCodex?.supportedEfforts.length
-    : !!variants && Object.keys(variants).length > 0;
-  const variantKeys = codexSession ? selectedCodex?.supportedEfforts ?? []
-    : hasVariants ? Object.keys(variants!) : [];
+  const hasVariants = claudeSession ? !!selectedClaude?.supportedEfforts.length
+    : codexSession ? !!selectedCodex?.supportedEfforts.length
+      : !!variants && Object.keys(variants).length > 0;
+  const variantKeys = claudeSession ? selectedClaude?.supportedEfforts ?? []
+    : codexSession ? selectedCodex?.supportedEfforts ?? []
+      : hasVariants ? Object.keys(variants!) : [];
 
   const handleSelectModel = (composite: string) => {
     const colonIdx = composite.indexOf(':');
@@ -168,7 +184,8 @@ export function ModelVariantConfigSelector({
   };
 
   const handleSelectVariant = (value: string) => {
-    if (codexSession && selectedCodex) onChangeCodex?.(selectedCodex.model, value);
+    if (claudeSession && selectedClaude) onChangeClaude?.(selectedClaude.model, value);
+    else if (codexSession && selectedCodex) onChangeCodex?.(selectedCodex.model, value);
     else onChangeVariant(value === NONE_VALUE ? null : value);
     setOpenSection(null);
   };
@@ -237,6 +254,19 @@ export function ModelVariantConfigSelector({
           })}
         </CommandGroup>
       ))}
+      {claudeModels.length > 0 && <CommandGroup heading="Claude CLI">
+        {claudeModels.map(model => (
+          <CommandItem key={model.model} value={`claude-cli ${model.name} ${model.model}`}
+            showCheck={false} onSelect={() => {
+              onChangeClaude?.(model.model, model.model === selectedClaude?.model
+                ? claudeEffort ?? model.defaultEffort : model.defaultEffort);
+              setOpenSection(null);
+            }}>
+            <span>{model.name}</span>
+            <Check className={cn('ml-auto size-4', claudeSession && selectedClaude?.model === model.model ? 'opacity-100' : 'opacity-0')} />
+          </CommandItem>
+        ))}
+      </CommandGroup>}
       {codexModels.length > 0 && <CommandGroup heading="Codex CLI">
         {codexModels.map(model => (
           <CommandItem key={model.model} value={`codex-cli ${model.name} ${model.model}`}
@@ -255,7 +285,7 @@ export function ModelVariantConfigSelector({
 
   const variantItems = (
     <>
-      {!codexSession && <CommandItem
+      {!codexSession && !claudeSession && <CommandItem
         value="default none"
         showCheck={false}
         onSelect={() => handleSelectVariant(NONE_VALUE)}
@@ -279,7 +309,7 @@ export function ModelVariantConfigSelector({
           <Check
             className={cn(
               'ml-auto size-4',
-              (codexSession ? variantDisplayName : selectedVariant) === key ? 'opacity-100' : 'opacity-0',
+              (codexSession || claudeSession ? variantDisplayName : selectedVariant) === key ? 'opacity-100' : 'opacity-0',
             )}
           />
         </CommandItem>
@@ -389,7 +419,7 @@ export function ModelVariantConfigSelector({
   const sections: { icon: ReactNode; label: string; value: string; section: Section }[] = [
     { icon: <Cpu className="size-3.5" />, label: 'Model', value: modelDisplayName, section: 'model' },
     ...(hasVariants
-      ? [{ icon: <Brain className="size-3.5" />, label: codexSession ? 'Effort' : 'Variant', value: variantDisplayName ? capitalizeVariant(variantDisplayName) : 'Default', section: 'variant' as const }]
+      ? [{ icon: <Brain className="size-3.5" />, label: codexSession || claudeSession ? 'Effort' : 'Variant', value: variantDisplayName ? capitalizeVariant(variantDisplayName) : 'Default', section: 'variant' as const }]
       : []),
     ...(preconfigs.length > 0 && !lockPreconfig
       ? [{ icon: (() => {

@@ -59,6 +59,10 @@ export interface CodexModelPort {
 
 export interface SessionHttpApplication {
   codexAvailable(): boolean;
+  claudeAvailable(): boolean;
+  claudeCatalog(): Promise<CodexModel[]> | null;
+  claudeModels(sessionId: string): Promise<{ models: CodexModel[]; selection: CodexModelSelection | null }> | null;
+  setClaudeModel(sessionId: string, selection: CodexModelSelection): Promise<'ok' | 'not_found' | 'invalid' | 'active'>;
   codexCatalog(): Promise<CodexModel[]> | null;
   createSessionError(input: SessionHttpCreateInput): string | null;
   codexModels(sessionId: string): Promise<{ models: CodexModel[]; selection: CodexModelSelection | null }> | null;
@@ -114,9 +118,30 @@ export function createSessionHttpApplication(
   codexAvailable: () => boolean = () => false,
   codexWorkspaceAvailable: (workspaceId: string) => boolean = () => false,
   codexModels?: CodexModelPort,
+  claudeAvailable: () => boolean = () => false,
+  claudeModels?: CodexModelPort,
+  claudeWorkspaceAvailable: (workspaceId: string) => boolean = () => false,
 ): SessionHttpApplication {
   return {
     codexAvailable,
+    claudeAvailable,
+    claudeCatalog() {
+      return claudeAvailable() && claudeModels ? claudeModels.list() : null;
+    },
+    claudeModels(sessionId) {
+      if (repository.getSession(sessionId)?.harness !== 'claude-cli' || !claudeModels) return null;
+      return claudeModels.list().then(models => ({ models, selection: claudeModels.get(sessionId) }));
+    },
+    async setClaudeModel(sessionId, selection) {
+      if (repository.getSession(sessionId)?.harness !== 'claude-cli' || !claudeModels) return 'not_found';
+      if (claudeModels.isActive(sessionId)) return 'active';
+      const models = await claudeModels.list();
+      if (!models.some(model => model.model === selection.model && model.supportedEfforts.includes(selection.effort))) return 'invalid';
+      if (claudeModels.isActive(sessionId)) return 'active';
+      if (repository.getSession(sessionId)?.harness !== 'claude-cli') return 'not_found';
+      claudeModels.save(sessionId, selection);
+      return 'ok';
+    },
     codexCatalog() {
       return codexAvailable() && codexModels ? codexModels.list() : null;
     },
@@ -140,11 +165,13 @@ export function createSessionHttpApplication(
     },
 
     createSessionError(input) {
-      const decision = checkHarnessCreate(input, { codexAvailable, codexWorkspaceAvailable, workspaceRoots });
+      const decision = checkHarnessCreate(input, { codexAvailable, codexWorkspaceAvailable,
+        claudeAvailable, claudeWorkspaceAvailable, workspaceRoots });
       return decision.ok ? null : decision.message;
     },
     createSession(input) {
-      const decision = checkHarnessCreate(input, { codexAvailable, codexWorkspaceAvailable, workspaceRoots });
+      const decision = checkHarnessCreate(input, { codexAvailable, codexWorkspaceAvailable,
+        claudeAvailable, claudeWorkspaceAvailable, workspaceRoots });
       if (!decision.ok) return null;
       const workspaceId = input.workspaceId || '';
       const session = repository.createSession({

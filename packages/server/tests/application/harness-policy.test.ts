@@ -39,6 +39,16 @@ test('Codex availability and physical workspace fail closed while preconfigs are
   });
 });
 
+test('Claude creation requires the local CLI and a physical workspace', () => {
+  const request = { harness: 'claude-cli', workspaceId: 'physical' };
+  expect(checkHarnessCreate(request, policy)).toMatchObject({ ok: false, message: 'Claude CLI is unavailable on this host' });
+  const available = { ...policy, claudeAvailable: () => true,
+    claudeWorkspaceAvailable: (id: string) => id === 'physical' };
+  expect(checkHarnessCreate({ ...request, workspaceId: 'virtual' }, available))
+    .toMatchObject({ ok: false, message: 'Claude CLI requires a physical workspace' });
+  expect(checkHarnessCreate(request, available)).toEqual({ ok: true, harness: 'claude-cli' });
+});
+
 test('Čapek-only operations deny unknown owners and retain Codex refusal messages', () => {
   for (const owner of [undefined, 'prokop', 'codex-cli']) expect(unknownHarnessError(owner)).toBeNull();
   for (const owner of [null, '', 'other', 12, '__proto__']) {

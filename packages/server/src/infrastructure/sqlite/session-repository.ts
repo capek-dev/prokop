@@ -71,7 +71,7 @@ const MAX_PAGE_SIZE = 100;
 const MIN_PAGE_SIZE = 1;
 
 function mapRowToSession(row: SessionRow): Session {
-  if (row.harness !== 'prokop' && row.harness !== 'codex-cli') {
+  if (row.harness !== 'prokop' && row.harness !== 'codex-cli' && row.harness !== 'claude-cli') {
     throw new Error('Unknown session harness');
   }
   return {

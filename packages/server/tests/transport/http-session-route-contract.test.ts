@@ -163,6 +163,49 @@ describe('HTTP session route contract', () => {
     expect(saved).toEqual([{ model: 'codex-one', effort: 'low' }]);
   });
 
+  test('Claude catalog and effort selection reject wrong owners, invalid values and active turns', async () => {
+    let active = false;
+    const saved: unknown[] = [];
+    const application = createSessionHttpApplication(makeRepository({
+      getSession: id => id === 'claude' ? makeSession({ id, harness: 'claude-cli' }) : null,
+    }), undefined, undefined, undefined, () => false, () => false, undefined,
+    () => true, { list: async () => [{ model: 'sonnet', name: 'Sonnet', supportedEfforts: ['low', 'high'],
+      defaultEffort: 'high', isDefault: true }], get: () => null,
+    save: (_id, selection) => { saved.push(selection); }, isActive: () => active });
+    const app = new Hono();
+    app.onError((err, c) => err instanceof HttpError
+      ? c.json({ message: err.message }, err.status as never) : c.json({ message: 'error' }, 500));
+    registerSessionRoutes(app, application);
+    expect((await app.request('/api/harnesses/claude-cli/models')).status).toBe(200);
+    expect((await app.request('/api/sessions/claude/claude-models')).status).toBe(200);
+    const put = (id: string, body: unknown) => app.request(`/api/sessions/${id}/claude-model`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    expect((await put('other', { model: 'sonnet', effort: 'high' })).status).toBe(404);
+    expect((await put('claude', { model: 'opus', effort: 'high' })).status).toBe(400);
+    expect((await put('claude', { model: 'sonnet', effort: 'medium' })).status).toBe(400);
+    active = true;
+    expect((await put('claude', { model: 'sonnet', effort: 'low' })).status).toBe(400);
+    active = false;
+    expect((await put('claude', { model: 'sonnet', effort: 'low' })).status).toBe(200);
+    expect(saved).toEqual([{ model: 'sonnet', effort: 'low' }]);
+    const failed = createSessionHttpApplication(makeRepository({
+      getSession: () => makeSession({ harness: 'claude-cli' }),
+    }), undefined, undefined, undefined, () => false, () => false, undefined,
+    () => true, { list: async () => { throw new Error('probe failed'); }, get: () => null,
+      save: () => {}, isActive: () => false });
+    const failedApp = new Hono();
+    failedApp.onError((err, c) => err instanceof HttpError
+      ? c.json({ message: err.message }, err.status as never) : c.json({ message: 'error' }, 500));
+    registerSessionRoutes(failedApp, failed);
+    expect((await failedApp.request('/api/harnesses/claude-cli/models')).status).toBe(400);
+    expect((await failedApp.request('/api/sessions/claude/claude-models')).status).toBe(400);
+    expect((await failedApp.request('/api/sessions/claude/claude-model', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'sonnet', effort: 'high' }),
+    })).status).toBe(400);
+  });
+
   test('catalog is unavailable when the host has no Codex CLI', async () => {
     const { app } = makeApp();
     expect((await app.request('/api/harnesses/codex-cli/models')).status).toBe(400);

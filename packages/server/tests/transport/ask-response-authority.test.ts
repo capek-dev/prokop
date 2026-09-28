@@ -183,6 +183,28 @@ describe('transport ask.response authority routing', () => {
     expect(askState.resolveCalls).toHaveLength(1);
   });
 
+  test('Claude approvals require a live request identity and controller authority', async () => {
+    const controllerId = registerClient('controller');
+    const otherId = registerClient('other');
+    const { ctx, sent } = makeContext();
+    handleClaim('session-1', controllerId);
+    const toolCallId = 'claude-approval:call-1';
+    const dependencies: AskResponseDependencies = {
+      ...askDependencies,
+      getSessionIdForPendingAsk: async (_toolCallId, requestId) => requestId === 'live-1' ? 'session-1' : null,
+    };
+    const response: ClientMessage = { type: 'ask.response', toolCallId,
+      response: { type: 'permission', grant: 'once' }, requestId: 'live-1' };
+    await handleAskResponseWithDependencies(ctx, otherId, response, dependencies);
+    expect(askState.resolveCalls).toEqual([]);
+    expect(rejection(sent).code).toBe('not_controller');
+    await handleAskResponseWithDependencies(ctx, controllerId, { ...response, requestId: undefined }, dependencies);
+    await handleAskResponseWithDependencies(ctx, controllerId, { ...response, requestId: 'stale-1' }, dependencies);
+    expect(askState.resolveCalls).toEqual([]);
+    await handleAskResponseWithDependencies(ctx, controllerId, response, dependencies);
+    expect(askState.resolveCalls).toHaveLength(1);
+  });
+
   test('an eligible designated participant resolves an ask where authority permits it', async () => {
     const controllerId = registerClient('controller');
     const designatedId = registerClient('designated', ['browser_tabs']);

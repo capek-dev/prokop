@@ -53,6 +53,7 @@ import {
 } from '@/infrastructure/sqlite/pending-asks';
 import { existsSync, readFileSync } from 'fs';
 import { getCodexApprovalPort } from '@/application/ports/codex-approval';
+import { getClaudeApprovalPort } from '@/application/ports/claude-approval';
 import type {
   AttachmentRecord,
   GroupedSessionPage,
@@ -334,8 +335,12 @@ export function createJean2SessionRepository(
 
 function livePendingAsks(records: ReturnType<typeof listAllPendingAsks>): ReturnType<typeof listAllPendingAsks> {
   return records.filter(record => {
-    if (!record.toolCallId.startsWith('codex-approval:') || record.status !== 'pending') return true;
-    if (getCodexApprovalPort()?.hasLiveRequest(record.requestId)) return true;
+    if (record.status !== 'pending') return true;
+    const port = record.toolCallId.startsWith('codex-approval:') ? getCodexApprovalPort()
+      : record.toolCallId.startsWith('claude-approval:') ? getClaudeApprovalPort() : null;
+    if (!record.toolCallId.startsWith('codex-approval:')
+      && !record.toolCallId.startsWith('claude-approval:')) return true;
+    if (port?.hasLiveRequest(record.requestId)) return true;
     expirePermissionRequest(record.id);
     return false;
   });

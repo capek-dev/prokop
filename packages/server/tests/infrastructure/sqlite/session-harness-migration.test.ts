@@ -3,6 +3,28 @@ import { expect, test } from 'bun:test';
 import { initializeSchema } from '@/infrastructure/sqlite/database';
 import { initializeSessionMessageSchema } from '@/infrastructure/sqlite/session-message-schema';
 import { createSessionRepository } from '@/infrastructure/sqlite/session-repository';
+import { widenSessionHarnessConstraint } from '@/infrastructure/sqlite/claude-harness-migration';
+
+test('widens an existing harness CHECK without losing child rows, indexes or FK enforcement', () => {
+  const db = new Database(':memory:');
+  try {
+    db.run('PRAGMA foreign_keys = ON');
+    db.run(`CREATE TABLE sessions (id TEXT PRIMARY KEY, harness TEXT NOT NULL DEFAULT 'prokop'
+      CHECK (harness IN ('prokop', 'codex-cli')))`);
+    db.run('CREATE INDEX idx_sessions_harness_test ON sessions(harness)');
+    db.run('CREATE TABLE children (id TEXT PRIMARY KEY, session_id TEXT REFERENCES sessions(id) ON DELETE CASCADE)');
+    db.run("INSERT INTO sessions (id, harness) VALUES ('old', 'codex-cli')");
+    db.run("INSERT INTO children (id, session_id) VALUES ('child', 'old')");
+    widenSessionHarnessConstraint(db);
+    widenSessionHarnessConstraint(db);
+    db.run("INSERT INTO sessions (id, harness) VALUES ('new', 'claude-cli')");
+    expect(db.query('SELECT * FROM children').all()).toEqual([{ id: 'child', session_id: 'old' }]);
+    expect(db.query('PRAGMA foreign_key_check').all()).toEqual([]);
+    expect(() => db.run("INSERT INTO sessions (id, harness) VALUES ('bad', 'unknown')")).toThrow();
+    db.run("DELETE FROM sessions WHERE id = 'old'");
+    expect(db.query('SELECT * FROM children').all()).toEqual([]);
+  } finally { db.close(); }
+});
 
 test('existing session rows acquire the Prokop harness without replacing their data', () => {
   const db = new Database(':memory:');

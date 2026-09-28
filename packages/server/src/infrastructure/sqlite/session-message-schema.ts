@@ -10,6 +10,7 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import { widenSessionHarnessConstraint } from './claude-harness-migration';
 
 export interface SessionMessageSchemaOptions {
   /** Passed by the composition root; the infrastructure layer owns no
@@ -35,7 +36,7 @@ export function initializeSessionMessageSchema(
       selected_model TEXT,
       selected_provider TEXT,
       selected_variant TEXT,
-      harness TEXT NOT NULL DEFAULT 'prokop' CHECK (harness IN ('prokop', 'codex-cli')),
+      harness TEXT NOT NULL DEFAULT 'prokop' CHECK (harness IN ('prokop', 'codex-cli', 'claude-cli')),
       prompt_tokens INTEGER DEFAULT 0,
       completion_tokens INTEGER DEFAULT 0,
       total_tokens INTEGER DEFAULT 0,
@@ -54,8 +55,10 @@ export function initializeSessionMessageSchema(
 
   // Existing databases were created before harness became a session property.
   if (!db.query<{ name: string }, []>('PRAGMA table_info(sessions)').all().some(column => column.name === 'harness')) {
-    db.run("ALTER TABLE sessions ADD COLUMN harness TEXT NOT NULL DEFAULT 'prokop' CHECK (harness IN ('prokop', 'codex-cli'))");
+    db.run("ALTER TABLE sessions ADD COLUMN harness TEXT NOT NULL DEFAULT 'prokop' CHECK (harness IN ('prokop', 'codex-cli', 'claude-cli'))");
   }
+
+  widenSessionHarnessConstraint(db);
 
   db.run(`CREATE TABLE IF NOT EXISTS codex_session_bindings (
     session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
@@ -107,6 +110,18 @@ export function initializeSessionMessageSchema(
     session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
     model TEXT NOT NULL,
     effort TEXT NOT NULL
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS claude_session_models (
+    session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    model TEXT NOT NULL,
+    effort TEXT NOT NULL
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS claude_session_bindings (
+    session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    native_session_id TEXT NOT NULL UNIQUE,
+    workspace_root TEXT NOT NULL,
+    cli_version TEXT NOT NULL,
+    pending INTEGER NOT NULL DEFAULT 0
   )`);
 
   db.run('CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)');

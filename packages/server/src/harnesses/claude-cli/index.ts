@@ -1,0 +1,18 @@
+import type { HarnessRegistration } from '@/application/sessions/harness-execution';
+import type { SessionExecutionPort } from '@/application/ports/execution';
+
+export { createClaudeExecution } from './execution';
+export { claudeCliAvailable } from './version';
+export { listClaudeModels, getClaudeModelSelection, saveClaudeModelSelection } from './models';
+
+export function createClaudeCliHarness(
+  execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive'>,
+): HarnessRegistration {
+  return { execution, unsupportedMessages: {
+    editMessage: 'Editing Claude CLI messages is not supported',
+    regenerateTitle: 'Claude CLI title generation is not supported',
+    compact: 'Claude CLI compaction is not supported',
+    revert: 'Claude CLI revert is not supported',
+    fork: 'Claude CLI fork is not supported',
+  } };
+}

@@ -32,6 +32,9 @@ export interface SessionLifecycleDeps<Origin> {
   codexAvailable?: () => boolean;
   codexWorkspaceAvailable?: (workspaceId: string) => boolean;
   codexModels?: () => Promise<CodexModel[]>;
+  claudeAvailable?: () => boolean;
+  claudeWorkspaceAvailable?: (workspaceId: string) => boolean;
+  claudeModels?: () => Promise<CodexModel[]>;
   prokopModelAvailable?: (modelId: string, providerId: string) => boolean;
   selectEmptySessionHarnessModel?: (id: string, expected: SessionHarness, updatedAt: string, choice: HarnessModelChoice) => Session | null;
 }
@@ -123,6 +126,8 @@ export function createSessionLifecycleApplication<Origin>(
       const decision = checkHarnessCreate(input, {
         codexAvailable: deps.codexAvailable ?? (() => false),
         codexWorkspaceAvailable: deps.codexWorkspaceAvailable ?? (() => false),
+        claudeAvailable: deps.claudeAvailable,
+        claudeWorkspaceAvailable: deps.claudeWorkspaceAvailable,
         workspaceRoots: deps.workspaceRoots,
       });
       if (!decision.ok) {
@@ -319,7 +324,7 @@ export function createSessionLifecycleApplication<Origin>(
       const invalid = (message: string): void => wire.delivery.send(origin,
         { type: 'error', code: 'invalid_session', message, sessionId });
       if (unknownHarnessError(session.harness)) return invalid('Unknown session harness');
-      if (!choice || (choice.harness !== 'codex-cli' && choice.harness !== 'prokop')
+      if (!choice || (choice.harness !== 'codex-cli' && choice.harness !== 'prokop' && choice.harness !== 'claude-cli')
         || typeof choice.modelId !== 'string' || !choice.modelId.trim() || choice.modelId.length > 200) {
         return invalid('Invalid harness model selection');
       }
@@ -354,6 +359,25 @@ export function createSessionLifecycleApplication<Origin>(
           }
         } catch {
           return invalid('Codex model catalog is unavailable on this host');
+        }
+      } else if (choice.harness === 'claude-cli') {
+        const decision = checkHarnessCreate({ harness: 'claude-cli', workspaceId: session.workspaceId,
+          workspaceRootId: session.workspaceRootId ?? undefined }, {
+          codexAvailable: deps.codexAvailable ?? (() => false),
+          codexWorkspaceAvailable: deps.codexWorkspaceAvailable ?? (() => false),
+          claudeAvailable: deps.claudeAvailable,
+          claudeWorkspaceAvailable: deps.claudeWorkspaceAvailable,
+          workspaceRoots: deps.workspaceRoots,
+        });
+        if (!decision.ok) return invalid(decision.message);
+        if (typeof choice.effort !== 'string' || !deps.claudeModels) return invalid('Invalid Claude model selection');
+        try {
+          const models = await deps.claudeModels();
+          if (!models.some(model => model.model === choice.modelId && model.supportedEfforts.includes(choice.effort))) {
+            return invalid('Model and effort must be supported by this host Claude CLI');
+          }
+        } catch {
+          return invalid('Claude model catalog is unavailable on this host');
         }
       } else if (typeof choice.providerId !== 'string' || !choice.providerId.trim() || choice.providerId.length > 200
         || !deps.prokopModelAvailable?.(choice.modelId, choice.providerId)) {

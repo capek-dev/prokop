@@ -328,8 +328,10 @@ function ChatViewContent({
         </button>
       </div>
 
-      {session.harness === 'codex-cli' && pendingAskRequests.filter(request =>
-        request.toolCallId.startsWith('codex-approval:')
+      {(session.harness === 'codex-cli' || session.harness === 'claude-cli') && pendingAskRequests.filter(request =>
+        (session.harness === 'codex-cli'
+          ? request.toolCallId.startsWith('codex-approval:')
+          : request.toolCallId.startsWith('claude-approval:'))
           && (request.sessionId === session.id || request.originSessionId === session.id)
           && myClientId !== null && askControls[request.sessionId]?.status === 'controlled'
           && askControls[request.sessionId]?.controllerClientId === myClientId

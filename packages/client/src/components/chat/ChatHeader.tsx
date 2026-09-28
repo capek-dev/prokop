@@ -84,6 +84,40 @@ export function ChatHeader({
     && !isStreaming && contentMeta?.status === 'ready' && !contentMeta.hasOlder
     && messages?.length === 0 && !queued?.length;
   const codexSession = session.harness === 'codex-cli';
+  const claudeSession = session.harness === 'claude-cli';
+  const claudeCatalog = useQuery({
+    queryKey: ['claude-catalog', serverUrl],
+    queryFn: () => sdkClient!.http.sessions.claudeCatalog(),
+    enabled: !!sdkClient && !!serverUrl && emptyRoot && !claudeSession
+      && !!workspace && !workspace.isVirtual && !!workspace.path,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const claudeKey = ['claude-models', serverUrl, session.id, session.updatedAt];
+  const claudeSelection = useQuery({
+    queryKey: claudeKey,
+    queryFn: () => sdkClient!.http.sessions.claudeModels(session.id),
+    enabled: !!sdkClient && !!serverUrl && claudeSession,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const claudeModels = claudeSession ? claudeSelection.data?.models ?? []
+    : emptyRoot && workspace && !workspace.isVirtual ? claudeCatalog.data?.models ?? [] : [];
+  const claudeModel = claudeSelection.data?.selection?.model ?? session.selectedModel;
+  const claudeEffort = claudeSelection.data?.selection?.effort ?? null;
+  const selectClaude = async (modelId: string, effort: string) => {
+    if (!sdkClient || isObserver || isStreaming) return;
+    if (!claudeSession) {
+      sdkClient.sessions.selectHarnessModel(session.id, { harness: 'claude-cli', modelId, effort });
+      return;
+    }
+    try {
+      const response = await sdkClient.http.sessions.setClaudeModel(session.id, { model: modelId, effort });
+      queryClient.setQueryData(claudeKey, (old: typeof claudeSelection.data) => old && { ...old, selection: response.selection });
+    } catch {
+      toast.error('Could not change the Claude model or effort. Check the host and try again.');
+    }
+  };
   const catalog = useQuery({
     queryKey: ['codex-catalog', serverUrl],
     queryFn: () => sdkClient!.http.sessions.codexCatalog(),
@@ -118,7 +152,7 @@ export function ChatHeader({
     }
   };
   const selectProkop = (modelId: string, providerId: string) => {
-    if (codexSession) sdkClient?.sessions.selectHarnessModel(session.id, { harness: 'prokop', modelId, providerId });
+    if (codexSession || claudeSession) sdkClient?.sessions.selectHarnessModel(session.id, { harness: 'prokop', modelId, providerId });
     else onChangeModel(modelId, providerId);
   };
   const isMobile = useIsMobile();
@@ -241,7 +275,12 @@ export function ChatHeader({
 
           <div className="flex items-center gap-1 flex-wrap md:flex-nowrap shrink-0">
             <ModelVariantConfigSelector
-              models={codexSession && !emptyRoot ? [] : models}
+              models={(codexSession || claudeSession) && !emptyRoot ? [] : models}
+              claudeModels={claudeModels}
+              claudeSession={claudeSession}
+              claudeSelectedModel={claudeModel}
+              claudeEffort={claudeEffort}
+              onChangeClaude={(modelId, effort) => void selectClaude(modelId, effort)}
               codexModels={codexModels}
               codexSession={codexSession}
               codexSelectedModel={codexModel}
@@ -257,7 +296,7 @@ export function ChatHeader({
               preconfigs={preconfigs}
               selectedPreconfigId={session.preconfigId}
               onChangePreconfig={onChangePreconfig}
-              disabled={session.status === 'closed' || !!session.parentId || isObserver || (codexSession && !!isStreaming)}
+              disabled={session.status === 'closed' || !!session.parentId || isObserver || ((codexSession || claudeSession) && !!isStreaming)}
               lockPreconfig={lockPreconfig}
               iconOnly={showFullModelSelector}
               compact={isCompact}

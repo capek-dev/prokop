@@ -93,6 +93,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   codexGoal,
 }: MessageInputProps, ref) {
   const codexSession = session?.harness === 'codex-cli';
+  const claudeSession = session?.harness === 'claude-cli';
   const { input, setInput, clearInput } = useSessionDraft(sessionId);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [autocompleteFiles, setAutocompleteFiles] = useState<FileEntry[]>([]);
@@ -277,6 +278,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   }, [activeWorkspace?.id, openFilePreview]);
 
   const addFiles = useCallback(async (files: FileList | File[]) => {
+    if (claudeSession) return;
     const fileArray = Array.from(files).filter(file => !codexSession
       || ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type));
 
@@ -310,16 +312,16 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
         setPendingAttachments(prev => prev.filter(a => a.id !== previewItem.id));
       }
     }
-  }, [uploadAttachment, codexSession]);
+  }, [uploadAttachment, codexSession, claudeSession]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const files = e.clipboardData?.files;
-    if (files && Array.from(files).some(file => !codexSession
+    if (!claudeSession && files && Array.from(files).some(file => !codexSession
       || ['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type))) {
       e.preventDefault();
       void addFiles(files);
     }
-  }, [addFiles, codexSession]);
+  }, [addFiles, codexSession, claudeSession]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -345,13 +347,19 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
 
   const goalActive = goalState?.status === 'active' || codexSession && codexGoal?.status === 'active';
   const budgetValid = Number.isSafeInteger(goalTokenBudget) && goalTokenBudget > 0 && goalTokenBudget <= 1_000_000;
-  const effectiveDisabled = disabled || goalActive || (codexSession && isStreaming);
+  const effectiveDisabled = disabled || goalActive || ((codexSession || claudeSession) && isStreaming);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const trimmed = input.trim();
     if ((!trimmed && pendingAttachments.length === 0) || effectiveDisabled
       || pendingAttachments.some(a => a.isUploading)) return;
+    if (claudeSession) {
+      if (!trimmed || pendingAttachments.length) return;
+      onSendMessage(trimmed);
+      cleanupPending();
+      return;
+    }
     if (codexSession) {
       if (sendMode === 'goal') {
         if (!trimmed || pendingAttachments.length > 0 || !budgetValid) return;
@@ -489,14 +497,16 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
 
   const trimmed = input.trim();
   const hasUploadingAttachment = pendingAttachments.some(a => a.isUploading);
-  const canSend = trimmed || pendingAttachments.length > 0;
+  const canSend = claudeSession ? trimmed && pendingAttachments.length === 0
+    : trimmed || pendingAttachments.length > 0;
   const isDisabled = !canSend || disabled || hasUploadingAttachment || goalActive
-    || (sendMode === 'goal' && (!trimmed || pendingAttachments.length > 0 || codexSession && !budgetValid))
-    || (codexSession && isStreaming);
+    || (!claudeSession && sendMode === 'goal' && (!trimmed || pendingAttachments.length > 0 || codexSession && !budgetValid))
+    || ((codexSession || claudeSession) && isStreaming);
   const effectivePlaceholder = goalActive
     ? 'Goal active'
-    : codexSession && sendMode !== 'goal'
-      ? 'Message Codex CLI (/ prompts, @ files)'
+    : claudeSession ? 'Message Claude CLI (text only)'
+      : codexSession && sendMode !== 'goal'
+        ? 'Message Codex CLI (/ prompts, @ files)'
       : sendMode === 'goal'
         ? 'Type the completion condition...'
         : `${placeholder}  (/ prompts, @ files)`;
@@ -537,7 +547,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
             ))}
           </div>
         )}
-        {!codexSession && pendingAttachments.length > 0 && modelSupportsImage === false && (
+        {!codexSession && !claudeSession && pendingAttachments.length > 0 && modelSupportsImage === false && (
           <div className="flex items-center gap-1.5 px-3 pt-2 text-xs text-warning">
             <AlertTriangle className="size-3 shrink-0" />
             <span>This model will not inspect images directly. They will be sent as file paths instead.</span>
@@ -641,7 +651,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
               type="button"
               className="flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none"
               onClick={() => fileInputRef.current?.click()}
-              disabled={disabled}
+              disabled={disabled || claudeSession}
               aria-label="Attach file"
             >
               <Paperclip className="size-4" />
@@ -666,8 +676,8 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                     disabled={disabled || checkoutLocked}
                   />
                 )}
-                <AutoApproveSelector sessionId={sessionId} sdkClient={sdkClient ?? null} disabled={disabled} />
-                {!codexSession && <>
+                {!claudeSession && <AutoApproveSelector sessionId={sessionId} sdkClient={sdkClient ?? null} disabled={disabled} />}
+                {!codexSession && !claudeSession && <>
                   <ResponseFormatSelector
                     formats={responseFormats}
                     selectedId={selectedResponseFormatId}
@@ -691,9 +701,9 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                       ? 'bg-warning/15 text-warning'
                       : 'bg-muted text-muted-foreground hover:bg-accent',
                   )}
-                  aria-label={`Send mode: ${sendMode}`}
+                  aria-label={`Send mode: ${claudeSession ? 'chat' : sendMode}`}
                 >
-                  <span className="capitalize">{sendMode}</span>
+                  <span className="capitalize">{claudeSession ? 'chat' : sendMode}</span>
                   <ChevronDown className="size-2.5 opacity-60" />
                 </button>
               </DropdownMenuTrigger>
@@ -706,17 +716,18 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                 >
                   <ArrowUp className="size-4 mr-2" />
                   <span>Chat</span>
-                  {sendMode === 'chat' && <span className="ml-auto text-xs">✓</span>}
+                  {(sendMode === 'chat' || claudeSession) && <span className="ml-auto text-xs">✓</span>}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={(e) => e.preventDefault()}
                   onClick={() => setSendMode('goal')}
+                  disabled={claudeSession}
                 >
                   <Target className="size-4 mr-2" />
                   <span>Goal</span>
-                  {sendMode === 'goal' && <span className="ml-auto text-xs">✓</span>}
+                  {sendMode === 'goal' && !claudeSession && <span className="ml-auto text-xs">✓</span>}
                 </DropdownMenuItem>
-                {sendMode === 'goal' && (
+                {sendMode === 'goal' && !claudeSession && (
                   <>
                     <DropdownMenuSeparator />
                     {codexSession ? <div className="px-2 py-1.5 flex items-center justify-between gap-2">
@@ -749,7 +760,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {isStreaming && onStopStreaming && (codexSession || !canSend) ? (
+            {isStreaming && onStopStreaming && (codexSession || claudeSession || !canSend) ? (
               <button
                 type="button"
                 onClick={onStopStreaming}
@@ -771,7 +782,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                       ? 'text-warning'
                       : 'text-primary',
                 )}
-                aria-label={isStreaming ? 'Queue message' : sendMode === 'goal' ? 'Set goal' : 'Send message'}
+                aria-label={isStreaming && !claudeSession ? 'Queue message' : sendMode === 'goal' && !claudeSession ? 'Set goal' : 'Send message'}
                 title={isStreaming ? 'Queue message' : undefined}
               >
                 <ArrowUp className="size-4" />
