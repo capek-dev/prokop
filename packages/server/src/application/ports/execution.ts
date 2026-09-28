@@ -74,7 +74,7 @@ export interface SessionExecutionPort {
   ): Promise<void>;
   interruptSession(sessionId: string, reason?: string): Promise<InterruptExecutionResult>;
   isSessionActive(sessionId: string): boolean;
-  compact(sessionId: string, reason: 'manual'): Promise<CompactionExecutionOutcome>;
+  compact(sessionId: string, reason: 'manual', delivery?: SessionWirePorts<unknown>['delivery']): Promise<CompactionExecutionOutcome>;
   revert(input: { sessionId: string; targetMessageId: string }): Promise<RevertExecutionResult>;
   fork(input: { sessionId: string; targetMessageId: string; title?: string }): Promise<ForkExecutionResult>;
 }

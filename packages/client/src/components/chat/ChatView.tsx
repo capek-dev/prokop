@@ -187,7 +187,7 @@ function ChatViewContent({
   const onRevertForMode = readOnlyTranscript ? undefined : _onRevert;
   const onForkForMode = readOnlyTranscript ? undefined : _onFork;
   const onEditMessageForMode = readOnlyTranscript ? undefined : _onEditMessage;
-  const onCompactForMode = readOnlyTranscript || session.harness === 'codex-cli' ? undefined : onCompact;
+  const onCompactForMode = readOnlyTranscript ? undefined : onCompact;
   const onRemoveFromQueueForMode = readOnlyTranscript || session.harness === 'codex-cli' ? undefined : onRemoveFromQueue;
 
   const [rejectionNotice, setRejectionNotice] = useState<string | null>(null);
@@ -274,7 +274,9 @@ function ChatViewContent({
           sessionId={session.id}
           sessionStatus={session.status}
           pendingAskRequests={pendingAskRequests}
-          isCompacting={isCompacting}
+          isCompacting={isCompacting || (session.harness === 'codex-cli' && session.metadata?.codexCompactPending === true)}
+          compactedAfterMessageId={session.harness === 'codex-cli' && typeof session.metadata?.codexCompactedAfterMessageId === 'string'
+            ? session.metadata.codexCompactedAfterMessageId : undefined}
           compactionSuccess={compactionSuccess}
           onClearCompactionSuccess={onClearCompactionSuccess}
           onAskResponse={onAskResponse}

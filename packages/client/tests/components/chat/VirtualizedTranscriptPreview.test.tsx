@@ -44,6 +44,19 @@ function transcript(items: DisplayItem[]) {
     pendingAskRequests={pendingAskRequests} onAskResponse={onAskResponse} autoFollow={false} />;
 }
 
+test('Codex compaction divider remains anchored after its message as later turns arrive', () => {
+  const items = [user('before'), user('after')];
+  const view = render(<VirtualizedTranscript displayItems={items} messagesWithParts={items} sessionId="s"
+    compactedAfterMessageId="before" pendingAskRequests={pendingAskRequests}
+    onAskResponse={onAskResponse} autoFollow={false} />);
+  expect(screen.getByText('Context compacted')).toBeInTheDocument();
+  expect(screen.getAllByRole('status')).toHaveLength(1);
+  view.rerender(<VirtualizedTranscript displayItems={[...items, user('later')]} messagesWithParts={items}
+    sessionId="s" compactedAfterMessageId="before" pendingAskRequests={pendingAskRequests}
+    onAskResponse={onAskResponse} autoFollow={false} />);
+  expect(screen.getAllByRole('status')).toHaveLength(1);
+});
+
 test('cutoff changes reach mounted memoized rows, while queued prompts and running tools are unaffected', () => {
   const items = [user('u1'), assistant('a1'), assistant('running', true), user('u2'), assistant('a2')];
   const view = render(transcript(items));

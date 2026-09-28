@@ -52,7 +52,7 @@ export function createSessionTranscriptApplication<Origin>(
         return;
       }
 
-      const execResult = await deps.execution.compact(sessionId, 'manual');
+      const execResult = await deps.execution.compact(sessionId, 'manual', wire.delivery);
 
       if (execResult.ok) {
         wire.delivery.send(origin, {

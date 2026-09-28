@@ -271,7 +271,7 @@ const SAFE_FORK_ERRORS = new Set([
 
 /** A parent-session connection owns native child threads across parent turns. */
 export function createCodexExecution(deps: CodexExecutionDependencies): Pick<SessionExecutionPort,
-  'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork'> {
+  'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork' | 'compact'> {
   const active = new Map<string, ActiveTurn>();
   const connections = new Map<string, CodexSessionConnection>();
   const starting = new Set<string>();
@@ -303,6 +303,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
     content: string | null, wire?: SessionWirePorts<Origin>): Promise<import('@/application/ports/execution').RevertExecutionResult | null> {
     const session = getSession(sessionId);
     if (!session || session.harness !== 'codex-cli' || session.status === 'closed'
+      || codexObject(session.metadata)?.codexCompactPending
       || active.has(sessionId) || starting.has(sessionId)) throw new Error('Codex session is unavailable or busy');
     if (operation === 'edit' && (!content?.trim() || content !== content.trim())) {
       throw new Error('Codex edit requires nonempty text');
@@ -382,7 +383,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
       if (client) await client.close();
     }
   }
-  const execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork'> = {
+  const execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork' | 'compact'> = {
     isSessionActive: (sessionId) => active.has(sessionId) || starting.has(sessionId)
       || [...connections.values()].some(connection => connection.children?.isLiveSession(sessionId)),
     async interruptSession(sessionId): Promise<InterruptExecutionResult> {
@@ -472,6 +473,11 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
       }
       if (active.has(sessionId) || starting.has(sessionId)) {
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Codex turn already running', sessionId });
+        return;
+      }
+      if (codexObject(session.metadata)?.codexCompactPending) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session',
+          message: 'Codex compaction outcome is uncertain; do not send in this session', sessionId });
         return;
       }
       const rollback = getRollbackIntent(sessionId);
@@ -633,7 +639,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
           const turn = codexObject(params.turn);
           const eventTurnId = id(params.turnId) ?? id(turn?.id);
           if (event.method === 'thread/tokenUsage/updated') {
-            if (!run.turnId || eventTurnId !== run.turnId || completed) return;
+            if (!run.turnId || eventTurnId !== run.turnId) return;
             const usage = parseCodexContextUsage(params.tokenUsage);
             if (usage) publishCodexContextUsage(sessionId, usage, wire.delivery);
             return;
@@ -1070,7 +1076,123 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         }
       }
     },
+    async compact(sessionId, _reason, delivery) {
+      const session = getSession(sessionId);
+      if (!session || session.harness !== 'codex-cli' || session.status !== 'active' || session.parentId
+        || active.has(sessionId) || starting.has(sessionId)
+        || connections.get(sessionId)?.children?.hasLiveTurns) {
+        return { ok: false, skipped: true, error: 'Codex session is unavailable or busy' };
+      }
+      if (codexObject(session.metadata)?.codexCompactPending) {
+        return { ok: false, skipped: true, error: 'Codex compaction outcome is uncertain; do not retry in this session' };
+      }
+      if (getRollbackIntent(sessionId)) return { ok: false, skipped: true, error: 'Codex rollback requires recovery' };
+      let client: CodexAppServer | undefined;
+      let sent = false;
+      let confirmedFailure = false;
+      starting.add(sessionId);
+      try {
+        const root = workspaceRoot(session);
+        const version = deps.version();
+        const binding = getCodexBinding(sessionId);
+        if (!binding || binding.workspaceRoot !== root || binding.cliVersion !== version) {
+          return { ok: false, skipped: true, error: 'Codex thread binding is unavailable or changed' };
+        }
+        if (binding.pendingTurn || binding.goalRequested || codexObject(session.metadata)?.codexGoalPending
+          || codexObject(codexObject(session.metadata)?.codexGoal)?.status === 'active') {
+          return { ok: false, skipped: true, error: 'Codex turn requires recovery before compaction' };
+        }
+        await closeConnection(sessionId, 'interrupted');
+        let resolveDone!: () => void;
+        let rejectDone!: (error: Error) => void;
+        const done = new Promise<void>((resolve, reject) => { resolveDone = resolve; rejectDone = reject; });
+        void done.catch(() => {});
+        let compactTurn: string | null = null;
+        let compacted = false;
+        let terminal = false;
+        let compactUsage: ReturnType<typeof parseCodexContextUsage> = null;
+        const onNotification = (event: CodexNotification): void => {
+          const params = codexObject(event.params);
+          if (params?.threadId !== binding.threadId) return;
+          if (event.method === 'turn/started') {
+            const turnId = id(codexObject(params.turn)?.id);
+            if (turnId && !compactTurn) compactTurn = turnId;
+          }
+          const turnId = id(params.turnId);
+          if (event.method === 'thread/tokenUsage/updated' && turnId === compactTurn) {
+            compactUsage = parseCodexContextUsage(params.tokenUsage) ?? compactUsage;
+          }
+          if (event.method === 'thread/compacted' && turnId && turnId === compactTurn) compacted = true;
+          if (event.method === 'item/completed' && turnId === compactTurn
+            && codexObject(params.item)?.type === 'contextCompaction') compacted = true;
+          if (event.method === 'turn/completed' && id(codexObject(params.turn)?.id) === compactTurn) {
+            terminal = true;
+            if (codexObject(params.turn)?.status !== 'completed') {
+              confirmedFailure = ['failed', 'interrupted'].includes(String(codexObject(params.turn)?.status));
+              rejectDone(new Error('Codex compaction turn did not complete'));
+              return;
+            }
+          }
+          if (terminal && compacted) resolveDone();
+        };
+        client = new CodexAppServer(deps.connect(), onNotification);
+        await client.initialize();
+        const response = codexObject(await client.request('thread/resume', {
+          threadId: binding.threadId, cwd: root, approvalPolicy: 'on-request', sandbox: 'workspace-write',
+        }));
+        const thread = codexObject(response?.thread);
+        if (thread?.id !== binding.threadId || codexObject(thread.status)?.type !== 'idle') {
+          return { ok: false, skipped: true, error: 'Codex thread is not idle after resume' };
+        }
+        // Persist uncertainty before the RPC. A lost response cannot justify replaying compaction.
+        const latest = getSession(sessionId);
+        if (!latest || latest.status !== 'active') throw new Error('Codex session disappeared');
+        const pendingSession = updateSession(sessionId, { metadata: {
+          ...(codexObject(latest.metadata) ?? {}), codexCompactPending: true,
+        } });
+        if (!pendingSession) throw new Error('Codex compaction state could not be saved');
+        delivery?.broadcastToSession(sessionId, { type: 'session.updated', session: pendingSession });
+        sent = true;
+        await client.request('thread/compact/start', { threadId: binding.threadId });
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([done, client.disconnected, new Promise<never>((_resolve, reject) => {
+            timeout = setTimeout(() => reject(new Error('Codex compaction timed out')), 120_000);
+          })]);
+        } finally { clearTimeout(timeout); }
+        const finished = getSession(sessionId);
+        if (!finished) throw new Error('Codex session disappeared');
+        const { codexCompactPending: _pending, codexUsage: _usage, ...metadata } = codexObject(finished.metadata) ?? {};
+        const updated = updateSession(sessionId, { metadata: {
+          ...metadata, codexCompactedAt: Date.now(),
+          codexCompactedAfterMessageId: listMessagesWithParts(sessionId).at(-1)?.message.id ?? null,
+          ...(compactUsage ? { codexUsage: compactUsage } : {}),
+        } });
+        if (!updated) throw new Error('Codex compaction state could not be saved');
+        delivery?.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
+        // Codex does not return per-compaction token counts.
+        return { ok: true, result: { tokensUsed: { prompt: 0, completion: 0 } } };
+      } catch {
+        if (confirmedFailure || !sent) {
+          const latest = getSession(sessionId);
+          if (latest && codexObject(latest.metadata)?.codexCompactPending) {
+            const { codexCompactPending: _pending, ...metadata } = codexObject(latest.metadata) ?? {};
+            const updated = updateSession(sessionId, { metadata });
+            if (updated) delivery?.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
+          }
+        }
+        return { ok: false, error: sent && !confirmedFailure
+          ? 'Codex compaction outcome is uncertain; do not retry or send in this session'
+          : 'Codex compaction could not be completed' };
+      } finally {
+        starting.delete(sessionId);
+        if (client) await client.close();
+      }
+    },
     async fork(input) {
+      if (codexObject(getSession(input.sessionId)?.metadata)?.codexCompactPending) {
+        throw new Error('Codex compaction outcome is uncertain; do not fork this session');
+      }
       if (active.has(input.sessionId) || starting.has(input.sessionId)
         || connections.get(input.sessionId)?.children?.hasLiveTurns) throw new Error('Codex session is busy');
       starting.add(input.sessionId);

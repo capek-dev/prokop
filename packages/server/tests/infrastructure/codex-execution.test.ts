@@ -92,6 +92,7 @@ function fakeCodex(readThread?: () => unknown, rejectMethod?: string, trustedHoo
         const turnId = uniqueTurnIds ? `turn-${sent.filter(entry => entry.method === 'turn/start').length}` : 'turn-1';
         queueMicrotask(() => send({ id: message.id, result: { turn: { id: turnId } } }));
       }
+      if (message.method === 'thread/compact/start') queueMicrotask(() => send({ id: message.id, result: {} }));
       if (message.method === 'turn/interrupt') queueMicrotask(() => send({ id: message.id, result: {} }));
       if (message.method === 'thread/goal/set' && !(deferActiveGoal
         && (message.params as { status: string }).status === 'active') && !(deferPauseGoal
@@ -1619,7 +1620,8 @@ test('Codex usage accepts only active matching turns, including goal continuatio
   expect(messages.some(message => message.type === 'session.updated'
     && (message.session.metadata?.codexUsage as { last?: { totalTokens: number } } | undefined)?.last?.totalTokens === 1000)).toBe(true);
   fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
-  notify('thread-1', 'turn-1', { ...usage, modelContextWindow: 1 });
+  notify('thread-1', 'turn-1', { ...usage, last: { ...usage.last, totalTokens: 500 }, modelContextWindow: 10000 });
+  await waitFor(() => (getSession('s')?.metadata?.codexUsage as { last: { totalTokens: number } })?.last.totalTokens === 500);
   fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-2' } } });
   await waitFor(() => getCodexBinding('s')?.pendingTurnId === 'turn-2');
   notify('thread-1', 'turn-1', { ...usage, modelContextWindow: 2 });
@@ -2096,4 +2098,117 @@ test('Codex advertises and routes only selected agent skill management on start 
     }
     expect(calls).toEqual([join(dir, 'skills'), join(dir, 'skills')]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('Codex manual compaction waits for its native turn and never sends a chat turn', async () => {
+  create();
+  bindCodexThread({ sessionId: 's', threadId: 'thread-1', cliVersion: 'codex-cli 0.156.1',
+    workspaceRoot: realpathSync(process.cwd()) });
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const events: ServerMessage[] = [];
+  const pending = execution.compact('s', 'manual', wire(events).delivery);
+  await waitFor(() => fake.sent.some(message => message.method === 'thread/compact/start'));
+  expect(events).toContainEqual(expect.objectContaining({ type: 'session.updated',
+    session: expect.objectContaining({ metadata: expect.objectContaining({ codexCompactPending: true }) }) }));
+  expect(fake.sent.filter(message => message.method === 'thread/compact/start')).toMatchObject([
+    { params: { threadId: 'thread-1' } },
+  ]);
+  expect(fake.sent.some(message => message.method === 'turn/start')).toBe(false);
+  expect(getSession('s')?.metadata).toMatchObject({ codexCompactPending: true });
+  expect(await execution.compact('s', 'manual')).toMatchObject({ ok: false, skipped: true });
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'compact-1' } } });
+  fake.send({ method: 'thread/compacted', params: { threadId: 'other', turnId: 'compact-1' } });
+  fake.send({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'compact-1',
+    item: { type: 'contextCompaction', id: 'item-1' } } });
+  const usage = { last: { totalTokens: 500, inputTokens: 400, cachedInputTokens: 0,
+    cacheWriteInputTokens: 0, outputTokens: 100, reasoningOutputTokens: 0 },
+  total: { totalTokens: 3000, inputTokens: 2500, cachedInputTokens: 0,
+    cacheWriteInputTokens: 0, outputTokens: 500, reasoningOutputTokens: 0 }, modelContextWindow: 10000 };
+  fake.send({ method: 'thread/tokenUsage/updated', params: { threadId: 'thread-1',
+    turnId: 'compact-1', tokenUsage: usage } });
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1',
+    turn: { id: 'compact-1', status: 'completed' } } });
+  expect(await pending).toEqual({ ok: true, result: { tokensUsed: { prompt: 0, completion: 0 } } });
+  expect(getSession('s')?.metadata).not.toHaveProperty('codexCompactPending');
+  expect(getSession('s')?.metadata).toMatchObject({ codexUsage: usage, codexCompactedAt: expect.any(Number) });
+  expect(events).toContainEqual(expect.objectContaining({ type: 'session.updated', session: expect.objectContaining({
+    metadata: expect.objectContaining({ codexUsage: usage, codexCompactedAt: expect.any(Number) }),
+  }) }));
+  expect(listMessagesWithParts('s')).toHaveLength(0);
+});
+
+test('Codex compaction clears stale usage when no new reading arrives, then accepts next-turn usage', async () => {
+  create();
+  updateSession('s', { metadata: { codexUsage: { last: { totalTokens: 900 }, modelContextWindow: 10000 } } });
+  bindCodexThread({ sessionId: 's', threadId: 'thread-1', cliVersion: 'codex-cli 0.156.1',
+    workspaceRoot: realpathSync(process.cwd()) });
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(); processes.push(fake); return fake.connection;
+  } });
+  const events: ServerMessage[] = [];
+  const pending = execution.compact('s', 'manual', wire(events).delivery);
+  await waitFor(() => processes[0]?.sent.some(message => message.method === 'thread/compact/start') ?? false);
+  processes[0]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'compact-1' } } });
+  processes[0]!.send({ method: 'thread/compacted', params: { threadId: 'thread-1', turnId: 'compact-1' } });
+  processes[0]!.send({ method: 'turn/completed', params: { threadId: 'thread-1',
+    turn: { id: 'compact-1', status: 'completed' } } });
+  expect((await pending).ok).toBe(true);
+  expect(getSession('s')?.metadata).not.toHaveProperty('codexUsage');
+  expect(events.at(-1)).toMatchObject({ type: 'session.updated', session: { metadata: {
+    codexCompactedAt: expect.any(Number), codexCompactedAfterMessageId: null,
+  } } });
+  const next = execution.sendMessage(wire(events), 'origin', 's', 'what happened?');
+  await waitFor(() => processes[1]?.sent.some(message => message.method === 'turn/start') ?? false);
+  processes[1]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  processes[1]!.send({ method: 'turn/completed', params: { threadId: 'thread-1',
+    turn: { id: 'turn-1', status: 'completed' } } });
+  const usage = { last: { totalTokens: 500, inputTokens: 400, cachedInputTokens: 0,
+    cacheWriteInputTokens: 0, outputTokens: 100, reasoningOutputTokens: 0 },
+  total: { totalTokens: 3000, inputTokens: 2500, cachedInputTokens: 0,
+    cacheWriteInputTokens: 0, outputTokens: 500, reasoningOutputTokens: 0 }, modelContextWindow: 10000 };
+  processes[1]!.send({ method: 'thread/tokenUsage/updated', params: {
+    threadId: 'thread-1', turnId: 'turn-1', tokenUsage: usage,
+  } });
+  await next;
+  expect(getSession('s')?.metadata?.codexUsage).toEqual(usage);
+  expect(events.some(event => event.type === 'session.updated'
+    && (event.session.metadata?.codexUsage as { last?: { totalTokens: number } } | undefined)?.last?.totalTokens === 500)).toBe(true);
+});
+
+test('Codex manual compaction clears a confirmed failed turn', async () => {
+  create();
+  bindCodexThread({ sessionId: 's', threadId: 'thread-1', cliVersion: 'codex-cli 0.156.1',
+    workspaceRoot: realpathSync(process.cwd()) });
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const pending = execution.compact('s', 'manual');
+  await waitFor(() => fake.sent.some(message => message.method === 'thread/compact/start'));
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'compact-1' } } });
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1',
+    turn: { id: 'compact-1', status: 'failed' } } });
+  expect(await pending).toMatchObject({ ok: false, error: 'Codex compaction could not be completed' });
+  expect(getSession('s')?.metadata).not.toHaveProperty('codexCompactPending');
+});
+
+test('Codex manual compaction rejects busy and uncertain sessions without replay', async () => {
+  create();
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(undefined, 'thread/compact/start'); processes.push(fake); return fake.connection;
+  } });
+  expect(await execution.compact('s', 'manual')).toMatchObject({ ok: false, skipped: true });
+  expect(processes).toHaveLength(0);
+  bindCodexThread({ sessionId: 's', threadId: 'thread-1', cliVersion: 'codex-cli 0.156.1',
+    workspaceRoot: realpathSync(process.cwd()) });
+  const pending = execution.compact('s', 'manual');
+  await waitFor(() => processes[0]?.sent.some(message => message.method === 'thread/compact/start') ?? false);
+  expect(await pending).toMatchObject({ ok: false, error: expect.stringContaining('uncertain') });
+  expect(getSession('s')?.metadata).toMatchObject({ codexCompactPending: true });
+  expect(await execution.compact('s', 'manual')).toMatchObject({ ok: false, skipped: true });
+  const messages: ServerMessage[] = [];
+  await execution.sendMessage(wire(messages), 'origin', 's', 'hello');
+  expect(messages).toContainEqual(expect.objectContaining({ type: 'error', message: expect.stringContaining('uncertain') }));
+  expect(processes).toHaveLength(1);
 });

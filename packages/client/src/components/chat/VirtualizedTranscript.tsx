@@ -54,6 +54,7 @@ interface VirtualizedTranscriptProps {
   onCompact?: () => void;
   isMainActiveSession?: boolean;
   isCompacting?: boolean;
+  compactedAfterMessageId?: string;
   compactionSuccess?: boolean;
   onClearCompactionSuccess?: () => void;
   autoFollow?: boolean;
@@ -665,6 +666,7 @@ export function VirtualizedTranscript({
   sessionStatus,
   pendingAskRequests,
   isCompacting = false,
+  compactedAfterMessageId,
   compactionSuccess = false,
   onClearCompactionSuccess,
   onAskResponse,
@@ -987,6 +989,14 @@ export function VirtualizedTranscript({
         }
         isPinningMessage={isPinningMessage}
       />
+      {item.message.id === compactedAfterMessageId && (
+        <div className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground" role="status">
+          <span className="h-px w-8 bg-border" />
+          <Minimize2 className="size-3" />
+          Context compacted
+          <span className="h-px w-8 bg-border" />
+        </div>
+      )}
     </div>
   ), [
     revertMessageIds,
@@ -1001,6 +1011,7 @@ export function VirtualizedTranscript({
     onEditMessage,
     isMainActiveSession,
     isCompacting,
+    compactedAfterMessageId,
     onCompact,
     serverUrl,
     pinnedMessageIds,
@@ -1021,6 +1032,7 @@ export function VirtualizedTranscript({
     onFork,
     onEditMessage,
     onCompact,
+    compactedAfterMessageId,
   }), [
     pendingAskRequests,
     pinnedMessageIds,
@@ -1030,6 +1042,7 @@ export function VirtualizedTranscript({
     onFork,
     onEditMessage,
     onCompact,
+    compactedAfterMessageId,
   ]);
 
   const header = (

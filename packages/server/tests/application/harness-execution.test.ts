@@ -35,12 +35,12 @@ function fixture() {
       sendMessage: codexBase.sendMessage,
       interruptSession: codexBase.interruptSession,
       isSessionActive: codexBase.isSessionActive,
+      compact: codexBase.compact,
       fork: codexBase.fork,
     },
     unsupportedMessages: {
       editMessage: 'Editing is not supported for Codex CLI sessions',
       regenerateTitle: 'Title generation is not supported for Codex CLI sessions',
-      compact: 'Compaction is not supported for Codex CLI sessions',
       revert: 'Revert is not supported for Codex CLI sessions',
     },
   };
@@ -85,7 +85,7 @@ test('Codex token budgets reject ambiguous and non-Codex sends before dispatch',
   expect(calls).toEqual(['codex:send']);
 });
 
-test('unsupported Codex operations preserve refusal shapes and never reach Prokop', async () => {
+test('Codex compact dispatches while unsupported operations still refuse without reaching Prokop', async () => {
   const { execution, calls, wire, messages } = fixture();
   await execution.editMessage(wire, 'origin', { sessionId: 'codex', messageId: 'm', content: 'edit' });
   await execution.regenerateTitle(wire, 'origin', 'codex');
@@ -93,10 +93,10 @@ test('unsupported Codex operations preserve refusal shapes and never reach Proko
     { type: 'error', code: 'invalid_session', sessionId: 'codex', message: 'Editing is not supported for Codex CLI sessions' },
     { type: 'error', code: 'invalid_session', sessionId: 'codex', message: 'Title generation is not supported for Codex CLI sessions' },
   ]);
-  expect(await execution.compact('codex', 'manual')).toEqual({ ok: false, skipped: true, error: 'Compaction is not supported for Codex CLI sessions' });
+  expect(await execution.compact('codex', 'manual')).toEqual({ ok: false, error: 'test' });
   expect(execution.revert({ sessionId: 'codex', targetMessageId: 'm' })).rejects.toThrow('Revert is not supported for Codex CLI sessions');
   await execution.fork({ sessionId: 'codex', targetMessageId: 'm' });
-  expect(calls).toEqual(['codex:fork']);
+  expect(calls).toEqual(['codex:compact', 'codex:fork']);
 });
 
 test('missing or unknown owners fail closed for every execution route', async () => {

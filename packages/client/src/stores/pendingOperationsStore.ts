@@ -90,7 +90,8 @@ export const usePendingOperationsStore = create<PendingOperationsState>((set, ge
   cleanupStaleOperations: () => {
     const now = Date.now();
     const stale = get().operations.filter(
-      (op) => op.acknowledgedAt === undefined && now - op.startedAt > OPERATION_TIMEOUT_MS,
+      (op) => op.acknowledgedAt === undefined && now - op.startedAt >
+        (op.type === 'compact' ? 150_000 : OPERATION_TIMEOUT_MS),
     );
     if (stale.length > 0) {
       for (const op of stale) {

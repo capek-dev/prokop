@@ -77,12 +77,12 @@ export function createHarnessExecution(
       }
       await target.adapter.execution.regenerateTitle(wire, origin, id, options);
     },
-    async compact(id, reason) {
+    async compact(id, reason, delivery) {
       const target = resolve(id);
       if (!target.adapter?.execution.compact) {
         return { ok: false, skipped: true, error: unsupported(target, 'compact') };
       }
-      return target.adapter.execution.compact(id, reason);
+      return target.adapter.execution.compact(id, reason, delivery);
     },
     async revert(input) {
       const target = resolve(input.sessionId);

@@ -12,6 +12,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useSessionControlStore } from '@/stores/sessionControlStore';
+import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import type { SessionUsage } from '@/stores/sessionStore';
 
 import { useClientIdentityStore } from '@/stores/clientIdentityStore';
@@ -129,6 +130,12 @@ export function ChatHeader({
   const myClientId = useClientIdentityStore((s) => s.clientId);
 
   const isObserver = controlState?.status === 'controlled' && controlState.controllerClientId !== myClientId;
+  const compactPending = usePendingOperationsStore(s => s.operations.some(op =>
+    op.sessionId === session.id && op.type === 'compact'));
+  const compactBusy = isCompacting || compactPending || (codexSession && session.metadata?.codexCompactPending === true);
+  const codexCompactedAt = codexSession && typeof session.metadata?.codexCompactedAt === 'number'
+    && Number.isFinite(session.metadata.codexCompactedAt) && session.metadata.codexCompactedAt > 0
+    ? session.metadata.codexCompactedAt : null;
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -218,6 +225,11 @@ export function ChatHeader({
               modelName={modelName}
               compact={isMobile}
             />
+            {codexCompactedAt !== null && (
+              <span className="shrink-0 text-[11px] text-muted-foreground" title={`Context compacted ${new Date(codexCompactedAt).toLocaleString()}`}>
+                Compacted
+              </span>
+            )}
 
             {session.status === 'closed' && (
               <Badge variant="secondary">
@@ -251,16 +263,16 @@ export function ChatHeader({
               compact={isCompact}
             />
 
-            {onCompact && !isObserver && session.harness !== 'codex-cli' && (
+            {onCompact && !isObserver && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={onCompact}
-                    disabled={isStreaming || isCompacting || !canCompact}
+                    disabled={isStreaming || compactBusy || !canCompact}
                   >
-                    {isCompacting ? (
+                    {compactBusy ? (
                       <Loader2 className="size-4 animate-spin" />
                     ) : (
                       <Minimize2 className="size-4" />
@@ -268,7 +280,7 @@ export function ChatHeader({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {isCompacting ? 'Compacting...' : 'Compact older messages'}
+                  {compactBusy ? 'Compacting...' : 'Compact older messages'}
                 </TooltipContent>
               </Tooltip>
             )}
