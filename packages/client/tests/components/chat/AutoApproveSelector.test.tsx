@@ -17,9 +17,9 @@ test('Claude session shield updates the persisted risk ceiling', async () => {
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Auto-approve: low risk and below' }),
       { button: 0, ctrlKey: false, pointerType: 'mouse' });
   });
-  expect(await screen.findByText('Applies to Claude tool calls. Requests above this level still ask.')).toBeInTheDocument();
+  expect(await screen.findByText('Classified tools above this level ask. Other Claude built-in tools run without a Prokop risk check.')).toBeInTheDocument();
   await act(async () => {
-    fireEvent.click(screen.getByText('Always ask for approval.'));
+    fireEvent.click(screen.getByText('Ask for classified tools.'));
   });
   await waitFor(() => expect(update).toHaveBeenCalledWith('claude', { autoApproveSeverity: 'off' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Auto-approve: off' })).toBeInTheDocument());

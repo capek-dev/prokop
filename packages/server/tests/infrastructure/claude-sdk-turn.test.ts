@@ -39,10 +39,57 @@ test('SDK hook gates even native auto-approved tools and preserves tool lifecycl
   for await (const item of messages) collected.push(item);
   expect(approvals).toEqual(['Read']);
   expect(options).toMatchObject({ persistSession: true, sessionId: base.sessionId,
-    model: 'claude-sonnet-5', effort: 'medium', allowedTools: [], settingSources: [] });
+    model: 'claude-sonnet-5', effort: 'medium', allowedTools: [], settingSources: [],
+    tools: { type: 'preset', preset: 'claude_code' } });
   expect(collected).toEqual([
     { type: 'tool-start', id: 'tool-1', name: 'Read', input: { file_path: 'README.md' } },
     { type: 'tool-end', id: 'tool-1', output: 'file body', failed: false },
+    { type: 'result', text: 'done', success: true },
+  ]);
+});
+
+test('default Agent and future tools keep parent tool rows while child events stay out of parent text', async () => {
+  const approved: string[] = [];
+  const collected = [];
+  for await (const item of runClaudeTurn({ ...base,
+    canUseTool: async name => { approved.push(name); return { behavior: 'allow' }; },
+    start: (_prompt, options) => {
+      async function* stream(): AsyncGenerator<SDKMessage> {
+        const hook = options.hooks?.PreToolUse?.[0]?.hooks[0];
+        const decision = await hook!({ hook_event_name: 'PreToolUse', tool_name: 'Agent',
+          tool_input: { prompt: 'inspect' }, tool_use_id: 'agent-1' } as never, 'agent-1',
+        { signal: base.controller.signal });
+        expect(decision).toMatchObject({ hookSpecificOutput: { permissionDecision: 'allow' } });
+        expect(await options.canUseTool!('Agent', { prompt: 'inspect' }, {
+          signal: base.controller.signal, toolUseID: 'agent-1', requestId: crypto.randomUUID(),
+        })).toMatchObject({ behavior: 'allow' });
+        yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+        yield event({ type: 'assistant', session_id: base.sessionId, parent_tool_use_id: null,
+          message: { content: [{ type: 'tool_use', name: 'Agent', id: 'agent-1', input: { prompt: 'inspect' } }] } });
+        yield event({ type: 'stream_event', session_id: base.sessionId, parent_tool_use_id: 'agent-1',
+          event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'child only' } } });
+        yield event({ type: 'assistant', session_id: base.sessionId, parent_tool_use_id: 'agent-1',
+          message: { content: [{ type: 'tool_use', name: 'Read', id: 'child-read', input: {} },
+            { type: 'text', text: 'child text' }] } });
+        yield event({ type: 'user', session_id: base.sessionId, parent_tool_use_id: 'agent-1',
+          message: { content: [{ type: 'tool_result', tool_use_id: 'child-read', content: 'child result' }] } });
+        yield event({ type: 'user', session_id: base.sessionId, parent_tool_use_id: null,
+          message: { content: [{ type: 'tool_result', tool_use_id: 'agent-1', content: 'summary' }] } });
+        yield event({ type: 'assistant', session_id: base.sessionId, parent_tool_use_id: null,
+          message: { content: [{ type: 'tool_use', name: 'FutureBuiltin', id: 'future-1', input: {} }] } });
+        yield event({ type: 'user', session_id: base.sessionId, parent_tool_use_id: null,
+          message: { content: [{ type: 'tool_result', tool_use_id: 'future-1', content: 'done' }] } });
+        yield event({ type: 'result', subtype: 'success', is_error: false, session_id: base.sessionId, result: 'done' });
+      }
+      return stream();
+    },
+  })) collected.push(item);
+  expect(approved).toEqual(['Agent']);
+  expect(collected).toEqual([
+    { type: 'tool-start', id: 'agent-1', name: 'Agent', input: { prompt: 'inspect' } },
+    { type: 'tool-end', id: 'agent-1', output: 'summary', failed: false },
+    { type: 'tool-start', id: 'future-1', name: 'FutureBuiltin', input: {} },
+    { type: 'tool-end', id: 'future-1', output: 'done', failed: false },
     { type: 'result', text: 'done', success: true },
   ]);
 });

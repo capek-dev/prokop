@@ -136,7 +136,9 @@ export async function projectMessagesForClient(
             && part.state.input.tool === 'agent_skill_manage' ? 'agent_skill_manage'
             : part.name === 'agent_skill_manage' && !templates.has(part.name)
               ? part.presentation?.summary ?? 'Agent skill management'
-              : resolveToolSummary(part.state.input, templates.get(part.name)),
+              : part.callId.startsWith('codex-item:') && part.name === 'Codex tool'
+                ? part.presentation?.summary ?? resolveToolSummary(part.state.input, templates.get(part.name))
+                : resolveToolSummary(part.state.input, templates.get(part.name)),
           ...(visualization && { visualization }),
           debugAvailable: true,
         },

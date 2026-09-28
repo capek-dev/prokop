@@ -21,7 +21,6 @@ export interface ClaudeTurnInput {
   start?: (prompt: string, options: Options) => AsyncIterable<SDKMessage>;
 }
 
-const TOOLS = ['Read', 'Glob', 'Grep', 'Bash', 'Edit', 'Write', 'WebFetch', 'WebSearch'];
 const MAX_OUTPUT = 8_000;
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -68,7 +67,7 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
         ...(decision?.behavior === 'deny' ? { permissionDecisionReason: decision.message } : {}),
       } };
     }] }] },
-    tools: TOOLS,
+    tools: { type: 'preset', preset: 'claude_code' },
     allowedTools: [],
     settingSources: [],
     strictMcpConfig: true,
@@ -81,6 +80,8 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
   let streamedText = '';
   for await (const message of messages) {
     if (input.controller.signal.aborted) throw new Error('Claude turn interrupted');
+    // Agent owns its child messages. Keep the parent tool row, not the child's text or nested tool rows.
+    if ('parent_tool_use_id' in message && message.parent_tool_use_id !== null) continue;
     if ('session_id' in message && message.session_id !== input.sessionId) throw new Error('Claude CLI session identity changed');
     if (message.type === 'system' && message.subtype === 'init') {
       if (initialized) throw new Error('Duplicate Claude CLI initialization');
@@ -89,13 +90,11 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
     }
     if (!initialized || finished) throw new Error('Claude CLI event outside turn');
     if (message.type === 'stream_event') {
-      if (message.parent_tool_use_id !== null) throw new Error('Claude child activity is not supported');
       if (message.event.type === 'content_block_delta' && message.event.delta.type === 'text_delta') {
         streamedText += message.event.delta.text;
         yield { type: 'text-delta', text: message.event.delta.text };
       }
     } else if (message.type === 'assistant') {
-      if (message.parent_tool_use_id !== null) throw new Error('Claude child activity is not supported');
       const completedText = message.message.content.filter(block => block.type === 'text')
         .map(block => block.text).join('');
       if (completedText || streamedText) yield { type: 'text-final', text: completedText, streamed: streamedText };
@@ -103,14 +102,13 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
       for (const block of message.message.content) {
         if (block.type === 'text') continue;
         else if (block.type === 'tool_use') {
-          if (!TOOLS.includes(block.name) || !record(block.input) || !block.id) throw new Error('Unsupported Claude tool event');
+          if (!block.name || !block.id || !record(block.input)) throw new Error('Malformed Claude tool event');
           yield { type: 'tool-start', id: block.id, name: block.name, input: record(block.input)! };
         } else if (block.type !== 'thinking' && block.type !== 'redacted_thinking') {
           throw new Error('Unknown Claude content block');
         }
       }
     } else if (message.type === 'user') {
-      if (message.parent_tool_use_id !== null) throw new Error('Claude child activity is not supported');
       const blocks = Array.isArray(message.message.content) ? message.message.content : [];
       for (const block of blocks) {
         if (block.type !== 'tool_result') continue;

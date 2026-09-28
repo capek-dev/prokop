@@ -126,24 +126,32 @@ test('blocked paths, malformed tools and aborted calls cannot auto-approve', asy
   const use = approvals.request('session', 'ws', root, delivery, signal);
   for (const [tool, input] of [
     ['Read', {}], ['Bash', { command: '' }], ['WebFetch', { url: 'file:///etc/passwd' }],
-    ['Task', {}], ['Grep', { pattern: 'hello', path: null }],
+    ['Grep', { pattern: 'hello', path: null }],
   ] as const) expect(await use(tool, input, options(signal))).toMatchObject({ behavior: 'deny' });
+  expect(await use('Task', [] as never, options(signal))).toMatchObject({ behavior: 'deny' });
+  expect(await use('Agent', null as never, options(signal))).toMatchObject({ behavior: 'deny' });
   expect(await use('Read', { file_path: 'README.md' }, { ...options(signal), blockedPath: '/etc' }))
+    .toMatchObject({ behavior: 'deny' });
+  expect(await use('Agent', { prompt: 'inspect' }, { ...options(signal), blockedPath: '/etc' }))
     .toMatchObject({ behavior: 'deny' });
   const aborted = new AbortController();
   aborted.abort();
   expect(await use('Read', { file_path: 'README.md' }, options(aborted.signal))).toMatchObject({ behavior: 'deny' });
+  expect(await use('Agent', { prompt: 'inspect' }, options(aborted.signal))).toMatchObject({ behavior: 'deny' });
   expect(requests).toHaveLength(0);
 });
 
-test('no controller and unsupported tools cannot request approval', async () => {
-  const approvals = new ClaudeApprovals(() => 100);
+test('unclassified SDK tools run without a risk ask, including when auto-approval is off', async () => {
+  const approvals = new ClaudeApprovals();
   const { requests, delivery } = fixture();
   const signal = new AbortController().signal;
-  expect(await approvals.request('session', 'ws', root, delivery, signal)('Task', {}, options(signal)))
-    .toMatchObject({ behavior: 'deny' });
+  const use = approvals.request('session', 'ws', root, delivery, signal);
+  for (const name of ['Agent', 'Task', 'NotebookEdit', 'FutureBuiltin']) {
+    expect(await use(name, { prompt: 'inspect workspace' }, options(signal))).toMatchObject({ behavior: 'allow' });
+  }
+  expect(requests).toHaveLength(0);
   removeSessionControl('session');
-  expect(await approvals.request('session', 'ws', root, delivery, signal)('Read', { file_path: 'README.md' }, options(signal)))
-    .toMatchObject({ behavior: 'deny' });
+  expect(await use('Agent', { prompt: 'inspect workspace' }, options(signal))).toMatchObject({ behavior: 'allow' });
+  expect(await use('Read', { file_path: 'README.md' }, options(signal))).toMatchObject({ behavior: 'deny' });
   expect(requests).toHaveLength(0);
 });

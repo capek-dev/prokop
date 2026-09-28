@@ -38,9 +38,13 @@ export class ClaudeApprovals {
       if (signal.aborted || options.signal.aborted || session?.harness !== 'claude-cli'
         || session.workspaceId !== workspaceId) return denied('Claude tool request is no longer active');
       if (options.blockedPath) return denied('Claude tool path is blocked');
-      if (!input || typeof input !== 'object' || Array.isArray(input)) return denied('Unsupported Claude tool');
+      if (!toolName || toolName.length > 256 || !input || typeof input !== 'object' || Array.isArray(input)) {
+        return denied('Malformed Claude tool');
+      }
       const ask = classifyClaudeTool(toolName, input as Record<string, unknown>, root);
-      if (!ask) return denied('Unsupported Claude tool');
+      if (ask === null) return denied('Malformed Claude tool');
+      // Tools without a Prokop risk rule use the SDK's native behavior, regardless of the session ceiling.
+      if (ask === undefined) return { behavior: 'allow' };
       if (canAutoApproveHarnessTool(ask, session.autoApproveSeverity)) return { behavior: 'allow' };
       if (!isControlled(sessionId) || getControllerConnections(sessionId).length === 0) {
         return denied('Claude tool requires a connected controller');

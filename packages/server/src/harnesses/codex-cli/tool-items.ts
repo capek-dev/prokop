@@ -139,8 +139,18 @@ function itemIdentity(item: Record<string, unknown>): { name: string; summary: s
       return { name: 'Codex image view', summary: typeof item.path === 'string' ? preview(item.path).slice(0, 500) : 'Image', input: {} };
     case 'imageGeneration':
       return { name: 'Codex image generation', summary: 'Generate image', input: {} };
-    default:
-      return null;
+    default: {
+      // Native Codex or user-provided integrations can add tool item kinds without a Prokop renderer.
+      // Do not turn message, reasoning or control items into tool rows.
+      if (typeof item.type !== 'string' || !item.type.trim()
+        || typeof item.tool !== 'string' || !item.tool.trim()) return null;
+      const label = typeof item.server === 'string' ? `${item.server}: ${item.tool}`
+        : typeof item.namespace === 'string' ? `${item.namespace}: ${item.tool}` : item.tool;
+      return { name: 'Codex tool', summary: label.slice(0, 500),
+        input: { tool: preview(item.tool),
+          ...(item.server !== undefined ? { server: preview(item.server) } : {}),
+          ...(item.arguments !== undefined ? { arguments: preview(item.arguments) } : {}) } };
+    }
   }
 }
 

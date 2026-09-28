@@ -153,12 +153,13 @@ export function AutoApproveSelector({
         </Tooltip>
       </TooltipProvider>
       <DropdownMenuContent align="end" sideOffset={4} className="w-56">
-        <DropdownMenuLabel>{config.label}</DropdownMenuLabel>
+        <DropdownMenuLabel>{session?.harness === 'claude-cli' && currentLevel === 'off'
+          ? 'Ask for classified tools.' : config.label}</DropdownMenuLabel>
         {(session?.harness === 'codex-cli' || session?.harness === 'claude-cli') && (
           <div className="px-2 pb-1 text-xs text-muted-foreground">
             {session.harness === 'codex-cli'
               ? 'Applies to Codex shell and patch asks. Critical native approvals still ask.'
-              : 'Applies to Claude tool calls. Requests above this level still ask.'}
+              : 'Classified tools above this level ask. Other Claude built-in tools run without a Prokop risk check.'}
           </div>
         )}
         <DropdownMenuSeparator />
@@ -173,7 +174,8 @@ export function AutoApproveSelector({
               className={isActive ? 'bg-accent' : ''}
             >
               <LevelIcon className={`size-4 ${getMenuItemIconClass(level)}`} />
-              <span className="ml-2">{levelConfig.label}</span>
+              <span className="ml-2">{session?.harness === 'claude-cli' && level === 'off'
+                ? 'Ask for classified tools.' : levelConfig.label}</span>
             </DropdownMenuItem>
           );
         })}

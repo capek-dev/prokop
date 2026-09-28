@@ -27,8 +27,8 @@ function effectivePath(path: string): string {
   }
 }
 
-/** Unknown or malformed tool inputs are denied, not sent to the approval UI or auto-approved. */
-export function classifyClaudeTool(toolName: string, input: Record<string, unknown>, root: string): PermissionAsk | null {
+/** Undefined means no local classification; null means a known tool has invalid input. */
+export function classifyClaudeTool(toolName: string, input: Record<string, unknown>, root: string): PermissionAsk | null | undefined {
   let risk: PermissionRiskLevel;
   let resource = 'file';
   let action = 'read';
@@ -78,7 +78,7 @@ export function classifyClaudeTool(toolName: string, input: Record<string, unkno
     action = 'search';
     risk = 'medium';
     description = input.query;
-  } else return null;
+  } else return undefined;
 
   return { type: 'permission', question: `Allow Claude to use ${toolName}?`,
     description: description.slice(0, 1000), resource, action, risk, allowedScopes: ['once'],

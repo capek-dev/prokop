@@ -17,6 +17,42 @@ beforeEach(() => {
 });
 afterEach(() => resetTestDatabase());
 
+test('unclassified native tool items get bounded generic rows on live events and reload', async () => {
+  const assistant = createMessage(createTestAssistantMessage('s'));
+  const sent: ServerMessage[] = [];
+  const items = new CodexToolItems('s', assistant.id, 'turn', {
+    send: (_origin, message) => { sent.push(message); },
+    broadcast: message => { sent.push(message); },
+    broadcastToSession: (_id, message) => { sent.push(message); },
+    sendToController: (_id, message) => { sent.push(message); },
+    sendToAskTargets: (_id, _authority, message) => { sent.push(message); },
+  });
+  const long = 'a'.repeat(12_000);
+  const call = { id: 'external-1', type: 'extensionToolCall', server: 'user-plugin',
+    tool: 'lookup', arguments: { query: long }, status: 'inProgress' };
+  items.started(call);
+  items.started(call);
+  items.completed({ ...call, status: 'completed', result: long });
+  items.completed({ id: 'external-2', type: 'pluginInvocation', tool: 'search', status: 'failed' });
+  items.started({ id: 'not-a-tool', type: 'agentMessage', text: 'Do not show as a tool' });
+  items.started({ id: 'missing-tool', type: 'extensionToolCall', arguments: {} });
+  items.started({ id: '', type: 'extensionToolCall', tool: 'search' });
+  const stored = listMessagesWithParts('s');
+  const parts = stored[0]!.parts.filter((part): part is ToolPart => part.type === 'tool');
+  expect(parts).toHaveLength(2);
+  expect(parts[0]).toMatchObject({ name: 'Codex tool',
+    presentation: { summary: 'user-plugin: lookup' }, state: { status: 'completed' } });
+  expect(parts[1]).toMatchObject({ presentation: { summary: 'search' }, state: { status: 'error' } });
+  expect(JSON.stringify(parts[0])).not.toContain(long);
+  expect(JSON.stringify(sent)).not.toContain(long);
+  expect(sent.filter(message => message.type === 'part.created')).toHaveLength(2);
+  expect(sent.filter(message => message.type === 'part.updated')).toHaveLength(2);
+  const visible = await projectMessagesForClient(stored);
+  expect((visible[0]!.parts[0] as ToolPart).presentation).toMatchObject({
+    summary: 'user-plugin: lookup', visualization: { type: 'markdown' },
+  });
+});
+
 test('Codex memory and session search use the Prokop row shapes on live events and reload', async () => {
   const assistant = createMessage(createTestAssistantMessage('s'));
   const sent: ServerMessage[] = [];
