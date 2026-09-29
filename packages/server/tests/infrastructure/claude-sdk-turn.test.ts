@@ -49,6 +49,40 @@ test('Claude chat ignores command_lifecycle frames around a uuid-stamped turn', 
   ]);
 });
 
+test('Claude chat appends developer instructions to the Claude Code system prompt', async () => {
+  let seen: Options | undefined;
+  for await (const _item of runClaudeTurn({ ...base, instructions: 'Work carefully.',
+    canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
+    start: (_prompt, options) => {
+      seen = options;
+      async function* stream(): AsyncGenerator<SDKMessage> {
+        yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+        yield event({ type: 'result', subtype: 'success', session_id: base.sessionId, result: 'done' });
+      }
+      return stream();
+    },
+  })) { /* Consume the fake turn. */ }
+  expect(seen?.systemPrompt).toEqual({ type: 'preset', preset: 'claude_code', append: 'Work carefully.' });
+});
+
+test('dynamic tools register on the in-process prokop MCP server', async () => {
+  const fakeTool = { name: 'memory', description: 'Persist workspace knowledge',
+    inputSchema: {}, handler: async () => ({ content: [] }) };
+  let seen: Options | undefined;
+  for await (const _item of runClaudeTurn({ ...base, dynamicTools: [fakeTool],
+    canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
+    start: (_prompt, options) => {
+      seen = options;
+      async function* stream(): AsyncGenerator<SDKMessage> {
+        yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+        yield event({ type: 'result', subtype: 'success', session_id: base.sessionId, result: 'done' });
+      }
+      return stream();
+    },
+  })) { /* Consume the fake turn. */ }
+  expect(Object.keys(seen?.mcpServers ?? {})).toEqual(['prokop']);
+});
+
 test('Claude Goal submits a native slash command and retains the ordinary permission gate', async () => {
   const condition = 'tests pass';
   const collected = [];

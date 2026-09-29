@@ -1,10 +1,12 @@
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import type { PermissionAsk } from '@prokopai/sdk';
 import { canAutoApproveHarnessTool } from '../approval-policy';
 import { classifyClaudeTool } from './tool-policy';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { createPendingAsk, expirePermissionRequest, resolvePermissionRequestByRequestId } from '@/infrastructure/sqlite/pending-asks';
 import { getSession } from '@/infrastructure/sqlite/session-store';
+import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { getControllerConnections, isControlled } from '@/transport/websocket/control-registry';
 
 const AUTHORITY = { visibilityScope: 'controller_only', resolutionMode: 'controller_only' } as const;
@@ -42,6 +44,15 @@ export class ClaudeApprovals {
       if (options.blockedPath) return denied('Claude tool path is blocked');
       if (!toolName || toolName.length > 256 || !input || typeof input !== 'object' || Array.isArray(input)) {
         return denied('Malformed Claude tool');
+      }
+      // The in-process Prokop tools carry their own per-action ask inside their
+      // handler; the SDK gate only re-checks registration-time availability.
+      if (toolName === 'mcp__prokop__memory' || toolName === 'mcp__prokop__agent_memory') {
+        if (toolName === 'mcp__prokop__memory'
+          && getWorkspace(workspaceId)?.settings.memory?.enabled !== true) {
+          return denied('Workspace memory is disabled');
+        }
+        return { behavior: 'allow' };
       }
       const ask = classifyClaudeTool(toolName, input as Record<string, unknown>, root);
       if (ask === null) return denied('Malformed Claude tool');
@@ -97,6 +108,36 @@ export class ClaudeApprovals {
     }
     this.settle(requestId, allowed ? { behavior: 'allow' } : denied('Claude permission denied'), false);
     return true;
+  }
+
+  /**
+   * Memory writes follow the session risk ceiling; otherwise one
+   * controller-only ask, resolved once through the same ask flow as SDK tools.
+   */
+  async requestMemory(ask: PermissionAsk, sessionId: string, workspaceId: string,
+    delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
+    const session = getSession(sessionId);
+    if (session?.harness !== 'claude-cli' || session.workspaceId !== workspaceId) return false;
+    if (canAutoApproveHarnessTool(ask, session.autoApproveSeverity)) return true;
+    if (!isControlled(sessionId) || getControllerConnections(sessionId).length === 0) return false;
+    const askOnce: PermissionAsk = { ...ask, allowedScopes: ['once'] };
+    const requestId = crypto.randomUUID();
+    const toolCallId = `claude-approval:${crypto.randomUUID()}`;
+    const timeout = this.timeoutMs();
+    const now = Date.now();
+    const dbId = createPendingAsk({ requestId, toolCallId, toolName: 'claude-cli:memory',
+      sessionId, rootSessionId: sessionId, workspaceId, ask: askOnce, isPermission: true,
+      status: 'pending', createdAt: now, expiresAt: now + timeout });
+    return new Promise<boolean>(resolve => {
+      const timer = setTimeout(() => this.settle(requestId, denied('Claude permission timed out'), true), timeout);
+      this.pending.set(requestId, { sessionId, controllerSessionId: sessionId,
+        toolCallId, dbId, timer, finish: result => resolve(result.behavior === 'allow'), delivery });
+      this.byTool.set(toolCallId, requestId);
+      try {
+        delivery.sendToAskTargets(sessionId, AUTHORITY, { type: 'ask.request', sessionId,
+          toolCallId, toolName: 'claude-cli:memory', requestId, authority: AUTHORITY, ask: askOnce });
+      } catch { this.settle(requestId, denied('Claude turn interrupted'), true); }
+    });
   }
 
   cancelSession(sessionId: string): void {

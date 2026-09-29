@@ -1,6 +1,6 @@
 import { existsSync, realpathSync } from 'node:fs';
 import type { AssistantMessage, TextPart, ToolPart } from '@prokopai/sdk';
-import { forkSession, getSessionMessages, type SDKMessage, type SDKUserMessage, type Options } from '@anthropic-ai/claude-agent-sdk';
+import { forkSession, getSessionMessages, type SDKMessage, type SDKUserMessage, type Options, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import type { SessionExecutionPort } from '@/application/ports/execution';
 import { getDatabase } from '@/infrastructure/sqlite/database';
@@ -20,6 +20,9 @@ import { resolveClaudeImages } from './images';
 import type { ClaudeTurnUsage } from './usage';
 import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistory, type ClaudeRollbackDependencies } from './rollback';
 import { forkClaudeSession } from './fork';
+import { claudeDeveloperInstructions, defaultClaudePreconfigId, type ClaudeInstructionSources } from './instructions';
+import { createClaudeMemoryTools, claudeMcpToolDisplayName } from './dynamic-tools';
+import type { CodexMemoryBridge } from '../codex-cli/memory-tools';
 
 interface Binding {
   native_session_id: string;
@@ -33,6 +36,8 @@ export interface ClaudeExecutionDependencies extends ClaudeRollbackDependencies 
   approvals?: ClaudeApprovals;
   version?: () => string;
   readGoalVerdict?: typeof readClaudeGoalVerdict;
+  instructions?: ClaudeInstructionSources;
+  memoryTools?: CodexMemoryBridge;
 }
 
 export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
@@ -179,6 +184,35 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         const version = (deps.version ?? claudeCliVersion)();
         const selection = getClaudeModelSelection(sessionId);
         if (!selection) throw new Error('Choose a Claude model and effort before sending');
+        // Mirror Codex's developer instructions: agent identity, workspace
+        // context, and opted-in memory appended to Claude Code's own prompt.
+        let developerInstructions: string | undefined;
+        let dynamicTools: SdkMcpToolDefinition[] = [];
+        const sources = deps.instructions;
+        if (sources) {
+          const preconfigId = session.preconfigId || defaultClaudePreconfigId(workspace, await sources.listPreconfigs());
+          if (!preconfigId) throw new Error('Claude requires a preconfig');
+          const preconfig = await sources.getPreconfig(preconfigId);
+          if (!preconfig) throw new Error('Claude preconfig is unavailable');
+          const agentDir = session.agentId && session.agentId !== preconfigId
+            ? null : await sources.getAgentDirectory(preconfigId);
+          if (deps.memoryTools) {
+            // Per-turn registration mirrors Codex: workspace setting plus the selected agent home.
+            dynamicTools = createClaudeMemoryTools({ bridge: deps.memoryTools,
+              sessionId, workspaceId: session.workspaceId, root, agentDir, preconfigId,
+              signal: controller.signal,
+              ask: request => (deps.approvals ?? claudeApprovals)
+                .requestMemory(request, sessionId, session.workspaceId, wire.delivery) });
+          }
+          developerInstructions = await claudeDeveloperInstructions(workspace, root, preconfig, {
+            ...sources, getAgentDirectory: async () => agentDir,
+          }, dynamicTools.map(item => item.name));
+          if (!session.preconfigId) {
+            const updated = updateSession(sessionId, { preconfigId,
+              agentId: agentDir ? preconfigId : null });
+            if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
+          }
+        }
         const db = getDatabase();
         const binding = db.query<Binding, [string]>(`SELECT native_session_id, workspace_root, cli_version, pending
           FROM claude_session_bindings WHERE session_id = ?`).get(sessionId);
@@ -247,7 +281,8 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           textPart = { ...textPart, text: next };
         };
         for await (const event of runClaudeTurn({ cwd: root, prompt: content, images,
-          userMessageId: user.id, goalCondition, sessionId: nativeId, resume: !!binding,
+          userMessageId: user.id, instructions: developerInstructions, dynamicTools,
+          goalCondition, sessionId: nativeId, resume: !!binding,
           model: selection.model, effort: selection.effort,
           controller, canUseTool: approvals.request(sessionId, session.workspaceId, root, wire.delivery,
             controller.signal, id => children?.childSessionId(toolOwners.get(id) ?? '') ?? null),
@@ -315,12 +350,17 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
             const input = Object.fromEntries(Object.entries(event.input).slice(0, 16).map(([key, value]) => [key.slice(0, 80),
               typeof value === 'string' ? value.slice(0, 1000) : typeof value === 'number' || typeof value === 'boolean' ? value : '[omitted]']));
             const childId = event.name === 'Agent' ? children.start(event.id) : null;
+            const displayName = claudeMcpToolDisplayName(event.name);
+            const memorySummary = displayName
+              ? [input.action, input.target].filter(value => typeof value === 'string').join(' ').slice(0, 200)
+              : null;
             const part: ToolPart = { id: crypto.randomUUID(), messageId: assistant.id, type: 'tool',
-              callId, name: `Claude ${event.name}`, createdAt: Date.now(),
+              callId, name: displayName ?? `Claude ${event.name}`, createdAt: Date.now(),
               state: { status: 'running', input, startedAt: Date.now(),
                 ...(childId ? { childSessionId: childId } : {}) },
-              presentation: { summary: typeof input.command === 'string' ? input.command.slice(0, 200)
-                : typeof input.file_path === 'string' ? input.file_path.slice(0, 200) : event.name,
+              presentation: { summary: memorySummary
+                ?? (typeof input.command === 'string' ? input.command.slice(0, 200)
+                : typeof input.file_path === 'string' ? input.file_path.slice(0, 200) : event.name),
               debugAvailable: false } };
             createPart(part, sessionId);
             openTools.add(part.id);

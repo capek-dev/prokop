@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
 import { createSession, updateSession } from '@/infrastructure/sqlite/session-store';
+import { updateWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { getPermissionRequestByRequestId } from '@/infrastructure/sqlite/pending-asks';
 import { ClaudeApprovals } from '@/harnesses/claude-cli/approvals';
 import { handleClientRegistration, registerConnection, unregisterConnection } from '@/transport/websocket/connection-registry';
@@ -58,6 +59,42 @@ test('approval is once-only and malformed or stale responses fail closed', async
   expect(await allowed).toMatchObject({ behavior: 'allow' });
   expect(getPermissionRequestByRequestId(next.requestId)).toMatchObject({ status: 'approved' });
   expect(await approvals.resolve(next.toolCallId, { type: 'permission', grant: 'once' }, next.requestId)).toBe(false);
+});
+
+test('prokop mcp tools pass the SDK gate while memory availability is enforced', async () => {
+  const approvals = new ClaudeApprovals(() => 2000);
+  const { delivery } = fixture();
+  const controller = new AbortController();
+  const gate = approvals.request('session', 'ws', root, delivery, controller.signal);
+  expect(await gate('mcp__prokop__memory', { action: 'list', target: 'user' }, options(controller.signal)))
+    .toMatchObject({ behavior: 'deny', message: 'Workspace memory is disabled' });
+  updateWorkspace('ws', { settings: { memory: { enabled: true, permissionRisk: 'high' } } });
+  expect(await gate('mcp__prokop__memory', { action: 'add', target: 'memory', content: 'fact' },
+    options(controller.signal))).toMatchObject({ behavior: 'allow' });
+  expect(await gate('mcp__prokop__agent_memory', { action: 'list', target: 'user' },
+    options(controller.signal))).toMatchObject({ behavior: 'allow' });
+});
+
+test('memory asks follow the session ceiling and resolve once through the controller', async () => {
+  const approvals = new ClaudeApprovals(() => 2000);
+  const { requests, delivery } = fixture();
+  const ask = { type: 'permission' as const, risk: 'medium' as const, question: 'Allow memory add on memory?',
+    description: 'Action: add', resource: 'file', action: 'write' as const };
+  updateSession('session', { autoApproveSeverity: 'high' });
+  expect(await approvals.requestMemory(ask, 'session', 'ws', delivery)).toBe(true);
+  expect(requests).toHaveLength(0);
+  updateSession('session', { autoApproveSeverity: 'off' });
+  const wait = approvals.requestMemory(ask, 'session', 'ws', delivery);
+  const first = requests[0] as { toolCallId: string; requestId: string; toolName: string };
+  expect(first.toolName).toBe('claude-cli:memory');
+  expect(getPermissionRequestByRequestId(first.requestId)).toMatchObject({ status: 'pending' });
+  expect(await approvals.resolve(first.toolCallId, { type: 'permission', grant: 'once' }, first.requestId)).toBe(true);
+  expect(await wait).toBe(true);
+  expect(await approvals.resolve(first.toolCallId, { type: 'permission', grant: 'once' }, first.requestId)).toBe(false);
+  const denied = approvals.requestMemory(ask, 'session', 'ws', delivery);
+  const second = requests[1] as { toolCallId: string; requestId: string };
+  expect(await approvals.resolve(second.toolCallId, { type: 'permission', grant: 'workspace' }, second.requestId)).toBe(true);
+  expect(await denied).toBe(false);
 });
 
 test('child-owned approval reaches the parent controller and replays under the child', async () => {

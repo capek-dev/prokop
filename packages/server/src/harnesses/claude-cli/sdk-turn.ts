@@ -1,4 +1,4 @@
-import { query, type CanUseTool, type Options, type SDKActiveGoalMessage, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import { createSdkMcpServer, query, type CanUseTool, type Options, type SDKActiveGoalMessage, type SDKMessage, type SDKUserMessage, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import type { ClaudeImage } from './images';
 import { claudeCliVersion } from './version';
 import { parseClaudeUsage, type ClaudeTurnUsage } from './usage';
@@ -21,6 +21,10 @@ export interface ClaudeTurnInput {
   prompt: string;
   /** Stable host ID for a new user turn, used to verify native history before undo. */
   userMessageId?: string;
+  /** Appended to Claude Code's own system prompt: agent identity, workspace paths, and memory context. */
+  instructions?: string;
+  /** In-process Prokop tools (memory) registered under the prokop MCP server for this turn. */
+  dynamicTools?: SdkMcpToolDefinition[];
   goalCondition?: string;
   images?: ClaudeImage[];
   sessionId: string;
@@ -76,6 +80,8 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
     forwardSubagentText: true,
     permissionMode: 'default',
     permissionPrompts: 'host',
+    ...(input.instructions ? { systemPrompt: { type: 'preset' as const, preset: 'claude_code' as const,
+      append: input.instructions } } : {}),
     canUseTool: async (name, value, context) => {
       if (streamClosed) return { behavior: 'deny', message: 'Claude stream has ended' };
       const approved = context.toolUseID ? approvedToolIds.get(context.toolUseID) : undefined;
@@ -105,7 +111,11 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
     allowedTools: [],
     settingSources: [],
     strictMcpConfig: true,
-    mcpServers: {},
+    // The in-process server hosts per-turn dynamic tools (memory); strict config
+    // keeps every other external MCP server out.
+    mcpServers: input.dynamicTools?.length
+      ? { prokop: createSdkMcpServer({ name: 'prokop', tools: input.dynamicTools, alwaysLoad: true }) }
+      : {},
     env: { ...env, ENABLE_CLAUDEAI_MCP_SERVERS: 'false', CLAUDE_CODE_AUTO_CONNECT_IDE: '0' },
   };
   let releaseInput!: () => void;

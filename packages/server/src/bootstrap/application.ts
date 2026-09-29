@@ -188,7 +188,15 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
       readAgentMemoryFile: (id, filename) => agents.readAgentMemoryFile(id, filename),
     },
   });
-  const claudeExecution = createClaudeExecution();
+  const claudeExecution = createClaudeExecution({
+    instructions: {
+      listPreconfigs,
+      getPreconfig: id => agents.getPreconfigOrAgent(id),
+      getAgentDirectory: id => agents.getAgentDirectory(id),
+      readAgentMemoryFile: (id, filename) => agents.readAgentMemoryFile(id, filename),
+    },
+    memoryTools: codexMemoryTools,
+  });
   const execution = createHarnessExecution(repository, {
     prokop: createProkopHarness({
       onSessionChanged: (changedSession) => {
