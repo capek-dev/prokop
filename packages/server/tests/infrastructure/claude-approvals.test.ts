@@ -73,6 +73,12 @@ test('prokop mcp tools pass the SDK gate while memory availability is enforced',
     options(controller.signal))).toMatchObject({ behavior: 'allow' });
   expect(await gate('mcp__prokop__agent_memory', { action: 'list', target: 'user' },
     options(controller.signal))).toMatchObject({ behavior: 'allow' });
+  expect(await gate('mcp__prokop__session_search', { action: 'list' }, options(controller.signal)))
+    .toMatchObject({ behavior: 'deny', message: 'Session search is disabled' });
+  updateWorkspace('ws', { settings: { memory: { enabled: true, permissionRisk: 'high' },
+    sessionSearch: { enabled: true, permissionRisk: 'low', includeToolResults: false } } });
+  expect(await gate('mcp__prokop__session_search', { query: 'deploy' }, options(controller.signal)))
+    .toMatchObject({ behavior: 'allow' });
 });
 
 test('memory asks follow the session ceiling and resolve once through the controller', async () => {
@@ -95,6 +101,26 @@ test('memory asks follow the session ceiling and resolve once through the contro
   const second = requests[1] as { toolCallId: string; requestId: string };
   expect(await approvals.resolve(second.toolCallId, { type: 'permission', grant: 'workspace' }, second.requestId)).toBe(true);
   expect(await denied).toBe(false);
+});
+
+test('session search asks follow the session ceiling and resolve once through the controller', async () => {
+  const approvals = new ClaudeApprovals(() => 2000);
+  const { requests, delivery } = fixture();
+  const ask = { type: 'permission' as const, risk: 'medium' as const,
+    question: 'Allow searching workspace sessions for "deploy"?',
+    description: 'Tool: session_search', resource: 'session', action: 'read' as const };
+  updateSession('session', { autoApproveSeverity: 'medium' });
+  expect(await approvals.requestSessionSearch(ask, 'session', 'ws', delivery)).toBe(true);
+  expect(requests).toHaveLength(0);
+  updateSession('session', { autoApproveSeverity: 'off' });
+  const wait = approvals.requestSessionSearch(ask, 'session', 'ws', delivery);
+  const first = requests[0] as { toolCallId: string; requestId: string; toolName: string;
+    ask: { allowedScopes: string[] } };
+  expect(first.toolName).toBe('claude-cli:session_search');
+  expect(first.ask.allowedScopes).toEqual(['once']);
+  expect(await approvals.resolve(first.toolCallId, { type: 'permission', grant: 'once' }, first.requestId)).toBe(true);
+  expect(await wait).toBe(true);
+  expect(await approvals.resolve(first.toolCallId, { type: 'permission', grant: 'once' }, first.requestId)).toBe(false);
 });
 
 test('child-owned approval reaches the parent controller and replays under the child', async () => {

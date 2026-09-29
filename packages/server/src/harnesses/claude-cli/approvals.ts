@@ -45,12 +45,17 @@ export class ClaudeApprovals {
       if (!toolName || toolName.length > 256 || !input || typeof input !== 'object' || Array.isArray(input)) {
         return denied('Malformed Claude tool');
       }
-      // The in-process Prokop tools carry their own per-action ask inside their
+      // The in-process Prokop tools carry their own per-mode ask inside their
       // handler; the SDK gate only re-checks registration-time availability.
-      if (toolName === 'mcp__prokop__memory' || toolName === 'mcp__prokop__agent_memory') {
+      if (toolName === 'mcp__prokop__memory' || toolName === 'mcp__prokop__agent_memory'
+        || toolName === 'mcp__prokop__session_search') {
         if (toolName === 'mcp__prokop__memory'
           && getWorkspace(workspaceId)?.settings.memory?.enabled !== true) {
           return denied('Workspace memory is disabled');
+        }
+        if (toolName === 'mcp__prokop__session_search'
+          && getWorkspace(workspaceId)?.settings.sessionSearch?.enabled !== true) {
+          return denied('Session search is disabled');
         }
         return { behavior: 'allow' };
       }
@@ -111,11 +116,12 @@ export class ClaudeApprovals {
   }
 
   /**
-   * Memory writes follow the session risk ceiling; otherwise one
-   * controller-only ask, resolved once through the same ask flow as SDK tools.
+   * Controller-only, once-only ask shared by the in-process Prokop tools,
+   * resolved through the same ask flow as SDK tools. Writes and reads follow
+   * the session risk ceiling first.
    */
-  async requestMemory(ask: PermissionAsk, sessionId: string, workspaceId: string,
-    delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
+  private async requestDynamicTool(ask: PermissionAsk, toolName: string, sessionId: string,
+    workspaceId: string, delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
     const session = getSession(sessionId);
     if (session?.harness !== 'claude-cli' || session.workspaceId !== workspaceId) return false;
     if (canAutoApproveHarnessTool(ask, session.autoApproveSeverity)) return true;
@@ -125,7 +131,7 @@ export class ClaudeApprovals {
     const toolCallId = `claude-approval:${crypto.randomUUID()}`;
     const timeout = this.timeoutMs();
     const now = Date.now();
-    const dbId = createPendingAsk({ requestId, toolCallId, toolName: 'claude-cli:memory',
+    const dbId = createPendingAsk({ requestId, toolCallId, toolName,
       sessionId, rootSessionId: sessionId, workspaceId, ask: askOnce, isPermission: true,
       status: 'pending', createdAt: now, expiresAt: now + timeout });
     return new Promise<boolean>(resolve => {
@@ -135,9 +141,21 @@ export class ClaudeApprovals {
       this.byTool.set(toolCallId, requestId);
       try {
         delivery.sendToAskTargets(sessionId, AUTHORITY, { type: 'ask.request', sessionId,
-          toolCallId, toolName: 'claude-cli:memory', requestId, authority: AUTHORITY, ask: askOnce });
+          toolCallId, toolName, requestId, authority: AUTHORITY, ask: askOnce });
       } catch { this.settle(requestId, denied('Claude turn interrupted'), true); }
     });
+  }
+
+  /** Memory writes follow the session risk ceiling; otherwise one controller-only ask. */
+  async requestMemory(ask: PermissionAsk, sessionId: string, workspaceId: string,
+    delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
+    return this.requestDynamicTool(ask, 'claude-cli:memory', sessionId, workspaceId, delivery);
+  }
+
+  /** Session search reads follow the same ceiling and once-only fallback. */
+  async requestSessionSearch(ask: PermissionAsk, sessionId: string, workspaceId: string,
+    delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
+    return this.requestDynamicTool(ask, 'claude-cli:session_search', sessionId, workspaceId, delivery);
   }
 
   cancelSession(sessionId: string): void {

@@ -21,8 +21,9 @@ import type { ClaudeTurnUsage } from './usage';
 import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistory, type ClaudeRollbackDependencies } from './rollback';
 import { forkClaudeSession } from './fork';
 import { claudeDeveloperInstructions, defaultClaudePreconfigId, type ClaudeInstructionSources } from './instructions';
-import { createClaudeMemoryTools, claudeMcpToolDisplayName } from './dynamic-tools';
+import { createClaudeMemoryTools, createClaudeSessionSearchTools, claudeMcpToolDisplayName } from './dynamic-tools';
 import type { CodexMemoryBridge } from '../codex-cli/memory-tools';
+import type { CodexSessionSearchBridge } from '../codex-cli/session-search-tools';
 
 interface Binding {
   native_session_id: string;
@@ -38,6 +39,7 @@ export interface ClaudeExecutionDependencies extends ClaudeRollbackDependencies 
   readGoalVerdict?: typeof readClaudeGoalVerdict;
   instructions?: ClaudeInstructionSources;
   memoryTools?: CodexMemoryBridge;
+  sessionSearch?: CodexSessionSearchBridge;
 }
 
 export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
@@ -204,6 +206,14 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
               ask: request => (deps.approvals ?? claudeApprovals)
                 .requestMemory(request, sessionId, session.workspaceId, wire.delivery) });
           }
+          if (deps.sessionSearch && workspace.settings.sessionSearch?.enabled === true) {
+            // Same in-process server; gated on the workspace session-search setting.
+            dynamicTools = [...dynamicTools, ...createClaudeSessionSearchTools({
+              bridge: deps.sessionSearch, sessionId, workspaceId: session.workspaceId,
+              preconfigId, agentDir, signal: controller.signal,
+              ask: request => (deps.approvals ?? claudeApprovals)
+                .requestSessionSearch(request, sessionId, session.workspaceId, wire.delivery) })];
+          }
           developerInstructions = await claudeDeveloperInstructions(workspace, root, preconfig, {
             ...sources, getAgentDirectory: async () => agentDir,
           }, dynamicTools.map(item => item.name));
@@ -351,14 +361,16 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
               typeof value === 'string' ? value.slice(0, 1000) : typeof value === 'number' || typeof value === 'boolean' ? value : '[omitted]']));
             const childId = event.name === 'Agent' ? children.start(event.id) : null;
             const displayName = claudeMcpToolDisplayName(event.name);
-            const memorySummary = displayName
-              ? [input.action, input.target].filter(value => typeof value === 'string').join(' ').slice(0, 200)
+            const dynamicSummary = displayName
+              ? (typeof input.query === 'string' && input.query ? `search: ${input.query}`
+                : [input.action, input.target].filter(value => typeof value === 'string').join(' '))
+                .slice(0, 200) || displayName
               : null;
             const part: ToolPart = { id: crypto.randomUUID(), messageId: assistant.id, type: 'tool',
               callId, name: displayName ?? `Claude ${event.name}`, createdAt: Date.now(),
               state: { status: 'running', input, startedAt: Date.now(),
                 ...(childId ? { childSessionId: childId } : {}) },
-              presentation: { summary: memorySummary
+              presentation: { summary: dynamicSummary
                 ?? (typeof input.command === 'string' ? input.command.slice(0, 200)
                 : typeof input.file_path === 'string' ? input.file_path.slice(0, 200) : event.name),
               debugAvailable: false } };

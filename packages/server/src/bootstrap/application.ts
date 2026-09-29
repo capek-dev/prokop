@@ -196,6 +196,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
       readAgentMemoryFile: (id, filename) => agents.readAgentMemoryFile(id, filename),
     },
     memoryTools: codexMemoryTools,
+    sessionSearch: codexSessionSearch,
   });
   const execution = createHarnessExecution(repository, {
     prokop: createProkopHarness({

@@ -7,9 +7,11 @@ import type { Options, SDKMessage, SdkMcpToolDefinition } from '@anthropic-ai/cl
 
 type ToolResult = Awaited<ReturnType<SdkMcpToolDefinition['handler']>>;
 import type { PermissionAsk } from '@prokopai/sdk';
-import { installMemoryToolFallback } from '@capekai/core/hosts';
+import { installMemoryToolFallback, installSessionSearchToolFallback } from '@capekai/core/hosts';
 import { codexMemoryTools } from '@/adapters/capek/codex-memory';
-import { claudeMemoryShape, claudeMcpToolDisplayName, createClaudeMemoryTools } from '@/harnesses/claude-cli/dynamic-tools';
+import { codexSessionSearch } from '@/adapters/capek/codex-session-search';
+import { claudeMemoryShape, claudeSessionSearchShape, claudeMcpToolDisplayName,
+  createClaudeMemoryTools, createClaudeSessionSearchTools } from '@/harnesses/claude-cli/dynamic-tools';
 import { createClaudeExecution } from '@/harnesses/claude-cli/execution';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
@@ -27,6 +29,18 @@ const fakeDefs = ['memory', 'agent_memory', 'shell'].map(name => ({
   type: 'function' as const, name, description: `description for ${name}`, inputSchema: { type: 'object' },
 }));
 const fakeBridge = { definitions: () => fakeDefs, execute: codexMemoryTools.execute };
+const fakeSearchDefs = [{ type: 'function' as const, name: 'session_search',
+  description: 'Search prior conversation messages', inputSchema: { type: 'object' } }];
+const fakeSearchBridge = { definitions: () => fakeSearchDefs,
+  execute: codexSessionSearch.execute };
+
+// zod v4 toJSONSchema adds standard-schema metadata, a $schema header, and
+// additionalProperties:false; compare the meaningful schema parts on both sides.
+const boilerplate = new Set(['~standard', '$schema', 'additionalProperties']);
+const clean = (value: unknown): unknown => value && typeof value === 'object' && !Array.isArray(value)
+  ? Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .filter(([key]) => !boilerplate.has(key)).map(([key, item]) => [key, clean(item)]))
+  : value;
 
 beforeEach(() => {
   setupTestDatabase();
@@ -43,21 +57,76 @@ function tools(overrides: Partial<Parameters<typeof createClaudeMemoryTools>[0]>
     ask: async () => false, ...overrides });
 }
 
+function searchTools(overrides: Partial<Parameters<typeof createClaudeSessionSearchTools>[0]> = {}) {
+  return createClaudeSessionSearchTools({ bridge: fakeSearchBridge, sessionId: 's', workspaceId: 'ws',
+    agentDir, preconfigId: 'agent', signal: new AbortController().signal,
+    ask: async () => false, ...overrides });
+}
+
 test('zod schema matches the live Capek memory definitions', () => {
   installMemoryToolFallback();
   const definitions = codexMemoryTools.definitions();
   expect(definitions.map(definition => definition.name).sort()).toEqual(['agent_memory', 'memory']);
   const schema = z.toJSONSchema(z.object(claudeMemoryShape));
-  // zod v4 toJSONSchema adds standard-schema metadata, a $schema header, and
-  // additionalProperties:false; compare the meaningful schema parts on both sides.
-  const boilerplate = new Set(['~standard', '$schema', 'additionalProperties']);
-  const clean = (value: unknown): unknown => value && typeof value === 'object' && !Array.isArray(value)
-    ? Object.fromEntries(Object.entries(value as Record<string, unknown>)
-      .filter(([key]) => !boilerplate.has(key)).map(([key, item]) => [key, clean(item)]))
-    : value;
   for (const definition of definitions) {
     expect(clean(definition.inputSchema)).toEqual(clean(schema));
   }
+});
+
+test('zod schema matches the live Capek session search definition', () => {
+  installSessionSearchToolFallback();
+  const definitions = codexSessionSearch.definitions();
+  expect(definitions.map(definition => definition.name)).toEqual(['session_search']);
+  const schema = z.toJSONSchema(z.object(claudeSessionSearchShape));
+  for (const definition of definitions) {
+    expect(clean(definition.inputSchema)).toEqual(clean(schema));
+  }
+});
+
+test('session search registers only when the workspace enables it', () => {
+  expect(searchTools().map(item => item.name)).toEqual([]);
+  updateWorkspace('ws', { settings: { sessionSearch: {
+    enabled: true, permissionRisk: 'low', includeToolResults: false } } });
+  expect(searchTools().map(item => item.name)).toEqual(['session_search']);
+});
+
+test('session search routes settings, agent scope, and the once-only ask', async () => {
+  updateWorkspace('ws', { settings: { sessionSearch: {
+    enabled: true, permissionRisk: 'medium', includeToolResults: false } } });
+  updateSession('s', { agentId: 'agent' });
+  const seen: Array<{ input: unknown; includeToolResults: boolean; risk: string; asked: boolean;
+    agentId: string | null }> = [];
+  const asks: PermissionAsk[] = [];
+  const bridge = { definitions: () => fakeSearchDefs,
+    execute: async (input: Record<string, unknown>, _ws: string, _session: string,
+      includeToolResults: boolean, risk: string, ask?: (request: PermissionAsk) => Promise<boolean>,
+      agentId?: string | null) => {
+      seen.push({ input, includeToolResults, risk, asked: ask !== undefined, agentId: agentId ?? null });
+      const approved = ask ? await ask({ type: 'permission', risk: 'medium', question: 'Allow search?',
+        description: 'Tool: session_search', resource: 'session', action: 'read' }) : true;
+      return approved ? { success: true, mode: 'search', title: 'ok', results: [] }
+        : { success: false, mode: 'search', title: 'denied', error: 'USER_REJECTION' };
+    } };
+  const registered = searchTools({ bridge, ask: async request => { asks.push(request); return true; } });
+  const handler = registered.find(item => item.name === 'session_search')!.handler;
+  const result = await handler({ query: 'deploy steps', scope: 'workspace' } as never, {});
+  expect(result.isError).toBeFalsy();
+  expect(seen[0]).toMatchObject({ includeToolResults: false, risk: 'medium', asked: true, agentId: 'agent' });
+  expect(asks[0]).toMatchObject({ risk: 'medium', resource: 'session', action: 'read' });
+  // Agent scope without an agent home refuses before reaching the bridge.
+  const noAgent = searchTools({ bridge, agentDir: null });
+  const refused = await noAgent.find(item => item.name === 'session_search')!
+    .handler({ action: 'list', scope: 'agent' } as never, {});
+  expect(refused.isError).toBe(true);
+  expect(refused.content[0]).toMatchObject({ type: 'text', text: 'Agent scope requires an agent session' });
+  expect(seen).toHaveLength(1);
+  // Disabled mid-flight settings refuse without an ask.
+  updateWorkspace('ws', { settings: { sessionSearch: {
+    enabled: false, permissionRisk: 'medium', includeToolResults: false } } });
+  const off = await handler({ action: 'list' } as never, {});
+  expect(off.isError).toBe(true);
+  expect(off.content[0]).toMatchObject({ type: 'text', text: 'Session search is disabled or permission risk is unavailable' });
+  expect(asks).toHaveLength(1);
 });
 
 test('registration follows the workspace memory setting and the agent home', () => {
@@ -176,8 +245,55 @@ test('Claude turns register memory tools and guidance when the workspace enables
   }
 });
 
+test('Claude turns register session search and its guidance when the workspace enables it', async () => {
+  const dataDir = mkdtempSync(join(process.cwd(), '.claude-search-exec-'));
+  mkdirSync(join(dataDir, 'tools'));
+  Paths.configure({ dataDir });
+  try {
+    updateWorkspace('ws', { settings: { sessionSearch: {
+      enabled: true, permissionRisk: 'low', includeToolResults: false } } });
+    createSession({ id: 'turn2', workspaceId: 'ws', title: 'Claude', status: 'active',
+      preconfigId: null, metadata: null, parentId: null, agentName: null, harness: 'claude-cli' });
+    saveClaudeModelSelection('turn2', { model: 'claude-sonnet-5', effort: 'medium' });
+    const events: unknown[] = [];
+    const wire = { actor: { attachOriginToSession: () => {} }, delivery: {
+      send: (_origin: string, value: unknown) => events.push(value),
+      broadcastToSession: (_id: string, value: unknown) => events.push(value),
+      broadcast: (value: unknown) => events.push(value),
+    } } as unknown as SessionWirePorts<string>;
+    let seen: Options | undefined;
+    const exec = createClaudeExecution({ version: () => '2.1.274', sessionSearch: fakeSearchBridge,
+      instructions: {
+        listPreconfigs: async () => [{ id: 'agent', mode: 'primary', systemPrompt: 'Work carefully.' }] as never,
+        getPreconfig: async id => ({ id, mode: 'primary', systemPrompt: 'Work carefully.' }) as never,
+        getAgentDirectory: async () => agentDir,
+        readAgentMemoryFile: async () => null,
+      },
+      start: (_prompt, options) => {
+        seen = options;
+        const sessionId = options.sessionId ?? crypto.randomUUID();
+        async function* messages(): AsyncGenerator<SDKMessage> {
+          yield { type: 'system', subtype: 'init', session_id: sessionId } as SDKMessage;
+          yield { type: 'result', subtype: 'success', session_id: sessionId, result: 'reply' } as SDKMessage;
+        }
+        return messages();
+      } });
+    await exec.sendMessage(wire, 'origin', 'turn2', 'hello');
+    expect(Object.keys(seen?.mcpServers ?? {})).toEqual(['prokop']);
+    const append = (seen?.systemPrompt as { append?: string } | undefined)?.append ?? '';
+    expect(append).toContain('Use session_search to recall past conversations');
+    expect(append).toContain('Prefer current_session for this conversation');
+    // Memory stays unregistered and unadvertised in this workspace.
+    expect(append).not.toContain('You can persist durable workspace knowledge using the memory tool.');
+  } finally {
+    Paths.reset();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
 test('MCP tool names map to friendly transcript labels', () => {
   expect(claudeMcpToolDisplayName('mcp__prokop__memory')).toBe('Claude Memory');
   expect(claudeMcpToolDisplayName('mcp__prokop__agent_memory')).toBe('Claude Agent memory');
+  expect(claudeMcpToolDisplayName('mcp__prokop__session_search')).toBe('Claude Session search');
   expect(claudeMcpToolDisplayName('Read')).toBeNull();
 });
