@@ -85,6 +85,24 @@ test('selected Claude model and effort deliver a persisted reply through the fak
   ).get(initial.id)?.pending).toBe(0);
 });
 
+test('a new ordinary Claude turn uses its persisted local user ID as the native prompt ID', async () => {
+  const { wire } = wireFixture();
+  let nativePromptId: string | undefined;
+  const exec = createClaudeExecution({ version: () => '2.1.274', start: (prompt, options) => {
+    async function* stream(): AsyncGenerator<SDKMessage> {
+      expect(typeof prompt).not.toBe('string');
+      const message = (await (prompt as AsyncIterable<SDKUserMessage>)[Symbol.asyncIterator]().next()).value;
+      nativePromptId = message?.uuid;
+      const session_id = options.sessionId ?? options.resume;
+      yield { type: 'system', subtype: 'init', session_id } as SDKMessage;
+      yield { type: 'result', subtype: 'success', session_id, result: 'done' } as SDKMessage;
+    }
+    return stream();
+  } });
+  await exec.sendMessage(wire, 'origin', 'session', 'hello Claude');
+  expect(nativePromptId).toBe(listMessagesWithParts('session')[0]?.message.id);
+});
+
 test('Claude Goal uses native transcript verdict to complete and then permits ordinary chat', async () => {
   const { wire } = wireFixture();
   const calls: Options[] = [];

@@ -19,6 +19,8 @@ export type ClaudeTurnEvent = (
 export interface ClaudeTurnInput {
   cwd: string;
   prompt: string;
+  /** Stable host ID for a new user turn, used to verify native history before undo. */
+  userMessageId?: string;
   goalCondition?: string;
   images?: ClaudeImage[];
   sessionId: string;
@@ -47,6 +49,9 @@ function outsideTurn(message: SDKMessage): Error {
 /** The SDK drives the installed executable's native tool loop; Prokop never executes its tools. */
 export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<ClaudeTurnEvent> {
   if (!input.prompt.trim() && !input.images?.length) throw new Error('Claude CLI requires a nonempty prompt');
+  if (input.userMessageId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.userMessageId)) {
+    throw new Error('Invalid Claude user message identity');
+  }
   if (input.goalCondition !== undefined && (input.goalCondition !== input.prompt || input.images?.length
     || !input.goalCondition.trim() || input.goalCondition.length > 4000 || /[\r\n]/.test(input.goalCondition))) {
     throw new Error('Invalid Claude goal condition');
@@ -109,7 +114,9 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
   // Keep it open until the terminal result and every observed background Agent settles.
   const prompt = (async function* (): AsyncGenerator<SDKUserMessage> {
     try {
-      yield { type: 'user', parent_tool_use_id: null, message: { role: 'user', content: [
+      yield { type: 'user', parent_tool_use_id: null,
+        ...(input.userMessageId ? { uuid: input.userMessageId as SDKUserMessage['uuid'] } : {}),
+        message: { role: 'user', content: [
         ...(input.prompt.trim() ? [{ type: 'text' as const, text: input.prompt }] : []),
         ...(input.images ?? []).map(image => ({ type: 'image' as const,
           source: { type: 'base64' as const, media_type: image.mimeType as 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif', data: image.data } })),
@@ -156,6 +163,10 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
     }
     if (input.controller.signal.aborted) throw new Error('Claude turn interrupted');
     if ('session_id' in message && message.session_id !== input.sessionId) throw new Error('Claude CLI session identity changed');
+    // UUID-stamped streaming prompts get command_lifecycle queue bookkeeping
+    // (queued before system/init, completed after the result). Carry no turn
+    // content; ignore at any point in the stream.
+    if ((message as { type: string }).type === 'command_lifecycle') continue;
     // The SDK forwards active_goal but omits it from the public SDKMessage union.
     if (input.goalCondition !== undefined && (message as { type: string }).type === 'active_goal') {
       if (!initialized) throw new Error('Claude goal status arrived before init');

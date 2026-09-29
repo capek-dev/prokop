@@ -7,6 +7,48 @@ function event(value: unknown): SDKMessage { return value as SDKMessage; }
 const base = { cwd: process.cwd(), prompt: 'read a file', sessionId: crypto.randomUUID(),
   resume: false, model: 'claude-sonnet-5', effort: 'medium', controller: new AbortController() };
 
+test('Claude chat sends its local user UUID as the native prompt UUID', async () => {
+  const userMessageId = crypto.randomUUID();
+  for await (const _item of runClaudeTurn({ ...base, userMessageId,
+    canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
+    start: (prompt) => {
+      expect(typeof prompt).not.toBe('string');
+      async function* stream(): AsyncGenerator<SDKMessage> {
+        const input = (await (prompt as AsyncIterable<SDKUserMessage>)[Symbol.asyncIterator]().next()).value;
+        expect(input).toMatchObject({ type: 'user', uuid: userMessageId,
+          message: { role: 'user', content: [{ type: 'text', text: base.prompt }] } });
+        yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+        yield event({ type: 'result', subtype: 'success', session_id: base.sessionId, result: 'done' });
+      }
+      return stream();
+    },
+  })) { /* Consume the fake turn. */ }
+});
+
+test('Claude chat ignores command_lifecycle frames around a uuid-stamped turn', async () => {
+  const collected = [];
+  for await (const item of runClaudeTurn({ ...base, userMessageId: crypto.randomUUID(),
+    canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
+    start: () => {
+      async function* stream(): AsyncGenerator<SDKMessage> {
+        yield event({ type: 'command_lifecycle', command_uuid: base.sessionId,
+          state: 'queued', session_id: base.sessionId });
+        yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+        yield event({ type: 'assistant', session_id: base.sessionId, parent_tool_use_id: null,
+          message: { content: [{ type: 'text', text: 'answer' }] } });
+        yield event({ type: 'result', subtype: 'success', session_id: base.sessionId, result: 'done' });
+        yield event({ type: 'command_lifecycle', command_uuid: base.sessionId,
+          state: 'completed', session_id: base.sessionId });
+      }
+      return stream();
+    },
+  })) collected.push(item);
+  expect(collected).toEqual([
+    { type: 'text-final', text: 'answer', streamed: '' },
+    { type: 'result', text: 'done', success: true, usage: null },
+  ]);
+});
+
 test('Claude Goal submits a native slash command and retains the ordinary permission gate', async () => {
   const condition = 'tests pass';
   const collected = [];

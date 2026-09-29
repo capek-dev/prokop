@@ -123,6 +123,16 @@ export function initializeSessionMessageSchema(
     cli_version TEXT NOT NULL,
     pending INTEGER NOT NULL DEFAULT 0
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS claude_rollback_intents (
+    session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    operation TEXT NOT NULL CHECK (operation IN ('edit', 'revert')),
+    target_message_id TEXT NOT NULL,
+    phase TEXT NOT NULL CHECK (phase IN ('fork', 'ready', 'sent'))
+  )`);
+  db.run(`CREATE TABLE IF NOT EXISTS claude_inherited_user_ids (
+    message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+    native_user_id TEXT NOT NULL
+  )`);
 
   db.run('CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)');
   db.run('CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_id)');

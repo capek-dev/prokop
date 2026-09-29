@@ -3,6 +3,7 @@ import type { Session } from '@prokopai/sdk';
 import type { SessionExecutionPort } from '@/application/ports/execution';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import { createHarnessExecution, type HarnessRegistration } from '@/application/sessions/harness-execution';
+import { createClaudeCliHarness } from '@/harnesses/claude-cli';
 
 function fixture() {
   const calls: string[] = [];
@@ -47,11 +48,15 @@ function fixture() {
   };
   const execution = createHarnessExecution({ getSession: id => sessions[id] ?? null }, {
     prokop: { execution: prokop }, 'codex-cli': codex,
-    'claude-cli': { execution: {
+    'claude-cli': createClaudeCliHarness({
       sendMessage: async () => { calls.push('claude:send'); },
       interruptSession: codexBase.interruptSession,
       isSessionActive: codexBase.isSessionActive,
-    } },
+      compact: codexBase.compact,
+      editMessage: async () => { calls.push('claude:edit'); },
+      revert: async () => { calls.push('claude:revert'); return { revertedTo: { messageId: null, messageCount: 0 },
+        removed: { messageIds: [], partCount: 0 } }; },
+    }),
   });
   return { execution, calls, messages, wire };
 }
@@ -74,6 +79,14 @@ test('dispatches each operation by stored harness, including legacy Prokop ident
     'codex:send', 'codex:interrupt', 'codex:active',
     'prokop:edit', 'prokop:title', 'prokop:compact', 'prokop:revert', 'prokop:fork',
   ]);
+});
+
+test('Claude Edit and Undo route to its harness without enabling fork or title', async () => {
+  const { execution, calls, wire } = fixture();
+  await execution.editMessage(wire, 'origin', { sessionId: 'claude', messageId: 'u', content: 'new text' });
+  await execution.revert({ sessionId: 'claude', targetMessageId: 'a' });
+  expect(execution.fork({ sessionId: 'claude', targetMessageId: 'a' })).rejects.toThrow('not supported');
+  expect(calls).toEqual(['claude:edit', 'claude:revert']);
 });
 
 test('Codex token budgets reject ambiguous and non-Codex sends before dispatch', async () => {

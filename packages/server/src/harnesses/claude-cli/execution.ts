@@ -1,6 +1,6 @@
 import { existsSync, realpathSync } from 'node:fs';
 import type { AssistantMessage, TextPart, ToolPart } from '@prokopai/sdk';
-import type { SDKMessage, SDKUserMessage, Options } from '@anthropic-ai/claude-agent-sdk';
+import { forkSession, getSessionMessages, type SDKMessage, type SDKUserMessage, type Options } from '@anthropic-ai/claude-agent-sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import type { SessionExecutionPort } from '@/application/ports/execution';
 import { getDatabase } from '@/infrastructure/sqlite/database';
@@ -18,6 +18,7 @@ import { claudeApprovals, type ClaudeApprovals } from './approvals';
 import { ClaudeChildTimelines } from './child-timelines';
 import { resolveClaudeImages } from './images';
 import type { ClaudeTurnUsage } from './usage';
+import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistory, type ClaudeRollbackDependencies } from './rollback';
 
 interface Binding {
   native_session_id: string;
@@ -26,7 +27,7 @@ interface Binding {
   pending: number;
 }
 
-export interface ClaudeExecutionDependencies {
+export interface ClaudeExecutionDependencies extends ClaudeRollbackDependencies {
   start?: (prompt: string | AsyncIterable<SDKUserMessage>, options: Options) => AsyncIterable<SDKMessage>;
   approvals?: ClaudeApprovals;
   version?: () => string;
@@ -34,10 +35,87 @@ export interface ClaudeExecutionDependencies {
 }
 
 export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
-  Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'compact'> {
+  Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'compact' | 'editMessage' | 'revert'> {
   const active = new Map<string, AbortController>();
+  const rollingBack = new Set<string>();
+  const resubmitting = new Map<string, string>();
+  const intent = (id: string): { phase: string; target_message_id: string } | null => getDatabase()
+    .query<{ phase: string; target_message_id: string }, [string]>(
+      'SELECT phase, target_message_id FROM claude_rollback_intents WHERE session_id = ?',
+    ).get(id) ?? null;
+
+  async function rollback(sessionId: string, operation: 'edit' | 'revert', targetId: string,
+    content: string | null): Promise<import('@/application/ports/execution').RevertExecutionResult> {
+    const session = getSession(sessionId);
+    if (!session || session.harness !== 'claude-cli' || session.parentId || session.status !== 'active'
+      || active.has(sessionId) || rollingBack.has(sessionId)) throw new Error('Claude session is unavailable or busy');
+    if (session.metadata?.claudeCompactPending || session.metadata?.claudeGoal
+      || session.metadata?.claudeCompactedAt) throw new Error('Claude Goal or Compact history cannot be edited');
+    if (intent(sessionId)) throw new Error('Claude history change requires recovery; do not retry');
+    if (operation === 'edit' && (!content?.trim() || content !== content.trim() || content.length > 4000)) {
+      throw new Error('Claude edit requires nonempty text');
+    }
+    rollingBack.add(sessionId);
+    try {
+      const workspace = getWorkspace(session.workspaceId);
+      if (!workspace?.path || workspace.isVirtual) throw new Error('Claude workspace is unavailable');
+      const worktree = session.workspaceRootId
+        ? createManagedWorktreeRepository(getDatabase).get(session.workspaceRootId) : null;
+      if (session.workspaceRootId && (!worktree || worktree.workspaceId !== session.workspaceId
+        || worktree.state !== 'available')) throw new Error('Claude workspace is unavailable');
+      const root = realpathSync(worktree?.path ?? workspace.path);
+      const version = (deps.version ?? claudeCliVersion)();
+      const binding = getDatabase().query<Binding, [string]>(`SELECT native_session_id, workspace_root, cli_version, pending
+        FROM claude_session_bindings WHERE session_id = ?`).get(sessionId);
+      if (!binding || binding.pending || binding.workspace_root !== root || binding.cli_version !== version) {
+        throw new Error('Claude native history is unavailable');
+      }
+      const local = listMessagesWithParts(sessionId);
+      const targetIndex = local.findIndex(entry => entry.message.id === targetId);
+      const firstRemoved = operation === 'edit' || targetIndex === 0 ? targetIndex : targetIndex + 1;
+      if (targetIndex < 0 || firstRemoved >= local.length || firstRemoved % 2 !== 0
+        || local[firstRemoved]?.message.role !== 'user'
+        || operation === 'revert' && targetIndex !== 0 && local[targetIndex]?.message.role !== 'assistant') {
+        throw new Error('Invalid Claude history target');
+      }
+      const history = await (deps.readHistory ?? getSessionMessages)(binding.native_session_id, { dir: root });
+      const turns = matchClaudeHistory(local, history, binding.native_session_id);
+      const turnCount = firstRemoved / 2;
+      const cutoff = turnCount === 0 ? null : turns[turnCount - 1]!.assistantId;
+      // The intent survives a lost fork response. Do not issue this fork a second time.
+      getDatabase().run(`INSERT INTO claude_rollback_intents
+        (session_id, operation, target_message_id, phase) VALUES (?, ?, ?, 'fork')`,
+      [sessionId, operation, targetId]);
+      let forkedId: string | null = null;
+      let inheritedUsers: Array<{ messageId: string; nativeId: string }> = [];
+      if (cutoff) {
+        const forked = await (deps.forkHistory ?? forkSession)(binding.native_session_id,
+          { dir: root, upToMessageId: cutoff });
+        forkedId = forked.sessionId;
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(forkedId)
+          || forkedId === binding.native_session_id || getDatabase().query(
+            'SELECT 1 FROM claude_session_bindings WHERE native_session_id = ?').get(forkedId)) {
+          throw new Error('Claude fork identity is invalid');
+        }
+        const forkedHistory = await (deps.readHistory ?? getSessionMessages)(forkedId, { dir: root });
+        let forkedTurns;
+        try { forkedTurns = groupClaudeTurns(forkedHistory, forkedId); }
+        catch { throw new Error('Claude fork history cannot be verified'); }
+        if (forkedTurns.length !== turnCount || forkedTurns.some((turn, index) =>
+          turn.length !== turns[index]!.length || turn.userText !== turns[index]!.userText
+          || turn.assistantText !== turns[index]!.assistantText)) {
+          throw new Error('Claude fork history cannot be verified');
+        }
+        inheritedUsers = forkedTurns.map((turn, index) => ({
+          messageId: local[index * 2]!.message.id, nativeId: turn.userId,
+        }));
+      }
+      return applyClaudeRollback({ sessionId, operation, targetId, content,
+        originalNativeId: binding.native_session_id, newNativeId: forkedId, firstRemoved, inheritedUsers });
+    } finally { rollingBack.delete(sessionId); }
+  }
   return {
-    isSessionActive: id => active.has(id),
+    isSessionActive: id => active.has(id) || rollingBack.has(id),
     async interruptSession(id) {
       const controller = active.get(id);
       controller?.abort();
@@ -67,7 +145,13 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
       if (priorGoal?.status === 'active' || priorGoal?.status === 'uncertain') {
         return reject('Claude goal requires reconciliation; do not send in this session');
       }
-      if (active.has(sessionId)) return reject('Claude CLI turn already running');
+      const resubmit = resubmitting.get(sessionId);
+      if (rollingBack.has(sessionId) || active.has(sessionId)) return reject('Claude CLI turn already running');
+      const pendingEdit = intent(sessionId);
+      if (pendingEdit && (pendingEdit.phase !== 'ready' || pendingEdit.target_message_id !== resubmit)
+        || resubmit && !pendingEdit) {
+        return reject('Claude history change requires recovery; do not send in this session');
+      }
       const controller = new AbortController();
       active.set(sessionId, controller);
       let assistant: AssistantMessage | null = null;
@@ -100,19 +184,24 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         const goalStartedAt = Date.now();
         children = new ClaudeChildTimelines(session, nativeId, wire.delivery);
         // Lock the native identity before writing to the process. A lost result never triggers replay.
-        if (binding) db.run('UPDATE claude_session_bindings SET pending = 1 WHERE session_id = ?', [sessionId]);
-        else db.run(`INSERT INTO claude_session_bindings
-          (session_id, native_session_id, workspace_root, cli_version, pending) VALUES (?, ?, ?, ?, 1)`,
-        [sessionId, nativeId, root, version]);
+        db.transaction(() => {
+          if (binding) db.run('UPDATE claude_session_bindings SET pending = 1 WHERE session_id = ?', [sessionId]);
+          else db.run(`INSERT INTO claude_session_bindings
+            (session_id, native_session_id, workspace_root, cli_version, pending) VALUES (?, ?, ?, ?, 1)`,
+          [sessionId, nativeId, root, version]);
+          if (resubmit) db.run("UPDATE claude_rollback_intents SET phase = 'sent' WHERE session_id = ? AND phase = 'ready'", [sessionId]);
+        })();
         if (goalCondition !== undefined) {
           const updated = updateSession(sessionId, { metadata: { ...(session.metadata ?? {}),
             claudeGoal: { condition: goalCondition, status: 'active', iterations: 0 } } });
           if (!updated) throw new Error('Claude goal state could not be saved');
           wire.delivery.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
         }
-        const user = createMessage({ id: crypto.randomUUID(), sessionId, role: 'user', createdAt: Date.now() });
-        wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: user });
-        if (content.trim()) {
+        const user = resubmit ? listMessagesWithParts(sessionId).find(entry => entry.message.id === resubmit)?.message
+          : createMessage({ id: crypto.randomUUID(), sessionId, role: 'user', createdAt: Date.now() });
+        if (!user || user.role !== 'user') throw new Error('Claude edit message is unavailable');
+        if (!resubmit) wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: user });
+        if (content.trim() && !resubmit) {
           const inputPart = createPart({ id: crypto.randomUUID(), messageId: user.id, type: 'text',
             text: content, createdAt: Date.now() }, sessionId);
           wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part: inputPart });
@@ -153,7 +242,8 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           textPart = { ...textPart, text: next };
         };
         for await (const event of runClaudeTurn({ cwd: root, prompt: content, images,
-          goalCondition, sessionId: nativeId, resume: !!binding, model: selection.model, effort: selection.effort,
+          userMessageId: user.id, goalCondition, sessionId: nativeId, resume: !!binding,
+          model: selection.model, effort: selection.effort,
           controller, canUseTool: approvals.request(sessionId, session.workspaceId, root, wire.delivery,
             controller.signal, id => children?.childSessionId(toolOwners.get(id) ?? '') ?? null),
           onToolOwner: (id, owner) => { if (owner) toolOwners.set(id, owner); },
@@ -306,7 +396,10 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
             if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
           }
         }
-        db.run('UPDATE claude_session_bindings SET pending = 0 WHERE session_id = ?', [sessionId]);
+        db.transaction(() => {
+          db.run('UPDATE claude_session_bindings SET pending = 0 WHERE session_id = ?', [sessionId]);
+          if (resubmit) db.run('DELETE FROM claude_rollback_intents WHERE session_id = ?', [sessionId]);
+        })();
       } catch (error) {
         if (goalCondition !== undefined && assistant) {
           const previous = getSession(sessionId);
@@ -332,12 +425,38 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           if (part) wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part });
         }
         active.delete(sessionId);
+        if (resubmit) resubmitting.delete(sessionId);
       }
+    },
+    async revert(input) {
+      try {
+        return await rollback(input.sessionId, 'revert', input.targetMessageId, null);
+      } catch (error) {
+        if (intent(input.sessionId)) throw new Error('Claude Undo outcome requires recovery; do not retry or send in this session', { cause: error });
+        const safe = new Set(['Claude session is unavailable or busy', 'Claude Goal or Compact history cannot be edited',
+          'Claude native history is unavailable', 'Invalid Claude history target',
+          'Claude conversation history is not available for Edit or Undo']);
+        throw new Error(error instanceof Error && safe.has(error.message)
+          ? error.message : 'Claude conversation cannot be undone at this point', { cause: error });
+      }
+    },
+    async editMessage(wire, origin, input) {
+      try {
+        await rollback(input.sessionId, 'edit', input.messageId, input.content);
+        wire.delivery.broadcastToSession(input.sessionId, { type: 'session.state', sessionId: input.sessionId,
+          messages: listMessagesWithParts(input.sessionId).slice(-50) });
+        resubmitting.set(input.sessionId, input.messageId);
+        await this.sendMessage(wire, origin, input.sessionId, input.content);
+      } catch {
+        wire.delivery.send(origin, { type: 'error', code: 'edit_error', sessionId: input.sessionId,
+          message: intent(input.sessionId) ? 'Claude edit outcome requires recovery; do not retry or send in this session'
+            : 'Claude conversation cannot be edited at this point' });
+      } finally { resubmitting.delete(input.sessionId); }
     },
     async compact(sessionId, _reason, delivery) {
       const session = getSession(sessionId);
       if (!session || session.harness !== 'claude-cli' || session.status !== 'active'
-        || session.parentId || active.has(sessionId)) {
+        || session.parentId || active.has(sessionId) || rollingBack.has(sessionId) || intent(sessionId)) {
         return { ok: false, skipped: true, error: 'Claude session is unavailable or busy' };
       }
       if (session.metadata?.claudeCompactPending) {
