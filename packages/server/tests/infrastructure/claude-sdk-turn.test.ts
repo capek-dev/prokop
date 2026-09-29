@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, spyOn, test } from 'bun:test';
 import type { Options, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { runClaudeTurn } from '@/harnesses/claude-cli/sdk-turn';
 
@@ -6,6 +6,92 @@ function event(value: unknown): SDKMessage { return value as SDKMessage; }
 
 const base = { cwd: process.cwd(), prompt: 'read a file', sessionId: crypto.randomUUID(),
   resume: false, model: 'claude-sonnet-5', effort: 'medium', controller: new AbortController() };
+
+test('Claude Goal submits a native slash command and retains the ordinary permission gate', async () => {
+  const condition = 'tests pass';
+  const collected = [];
+  for await (const item of runClaudeTurn({ ...base, prompt: condition, goalCondition: condition,
+    canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
+    start: (prompt, options) => {
+      expect(prompt).toBe('/goal tests pass');
+      expect(options.hooks?.PreToolUse).toHaveLength(1);
+      async function* stream(): AsyncGenerator<SDKMessage> {
+        yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+        yield event({ type: 'active_goal', session_id: base.sessionId,
+          value: { condition, iterations: 0, set_at: 1, tokens_at_start: 0 } });
+        yield event({ type: 'assistant', session_id: base.sessionId, parent_tool_use_id: null,
+          message: { content: [{ type: 'text', text: 'working' }] } });
+        yield event({ type: 'active_goal', session_id: base.sessionId,
+          value: { condition, iterations: 1, set_at: 1, tokens_at_start: 0 } });
+        yield event({ type: 'active_goal', session_id: base.sessionId, value: null });
+        yield event({ type: 'result', subtype: 'success', session_id: base.sessionId, result: 'done' });
+      }
+      return stream();
+    },
+  })) collected.push(item);
+  expect(collected).toEqual([
+    { type: 'goal-state', active: true, iterations: 0 },
+    { type: 'text-final', text: 'working', streamed: '' },
+    { type: 'goal-state', active: true, iterations: 1 },
+    { type: 'goal-state', active: false, iterations: null },
+    { type: 'result', text: 'done', success: true, usage: null },
+  ]);
+});
+
+test('Goal diagnostics expose only bounded event labels when native status is absent', async () => {
+  const warn = spyOn(console, 'warn').mockImplementation(() => {});
+  const secret = 'private-goal-condition-and-file-path';
+  try {
+    for await (const _item of runClaudeTurn({ ...base, prompt: secret, goalCondition: secret,
+      canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
+      start: () => {
+        async function* stream(): AsyncGenerator<SDKMessage> {
+          yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+          yield event({ type: 'system', subtype: 'status', status: 'secret-status', session_id: base.sessionId });
+          for (let index = 0; index < 20; index++) {
+            yield event({ type: 'assistant', session_id: base.sessionId, parent_tool_use_id: null,
+              message: { content: [{ type: 'text', text: secret }] } });
+          }
+          yield event({ type: 'result', subtype: 'success', session_id: base.sessionId, result: secret });
+        }
+        return stream();
+      },
+    })) { /* Consume the fake stream. */ }
+    expect(warn).toHaveBeenCalledTimes(1);
+    const [label, summary] = warn.mock.calls[0]!;
+    expect(label).toBe('[claude-cli] goal stream summary');
+    expect(summary).toMatchObject({ initialized: true, sawResult: true, activations: 0,
+      clears: 0, streamFailed: false, eventCount: 23 });
+    expect((summary as { recentEvents: string[] }).recentEvents).toHaveLength(16);
+    expect(JSON.stringify(summary)).not.toContain(secret);
+    expect(JSON.stringify(summary)).not.toContain('secret-status');
+  } finally { warn.mockRestore(); }
+});
+
+test('Goal diagnostics distinguish a clear signal from an SDK stream failure', async () => {
+  const warn = spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    await expect(async () => {
+      for await (const _item of runClaudeTurn({ ...base, prompt: 'tests pass', goalCondition: 'tests pass',
+        canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
+        start: () => {
+          async function* stream(): AsyncGenerator<SDKMessage> {
+            yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+            yield event({ type: 'active_goal', session_id: base.sessionId,
+              value: { condition: 'tests pass', iterations: 1 } });
+            yield event({ type: 'active_goal', session_id: base.sessionId, value: null });
+            throw new Error('secret SDK error');
+          }
+          return stream();
+        },
+      })) { /* Consume the fake stream. */ }
+    }).toThrow('secret SDK error');
+    const summary = warn.mock.calls[0]?.[1];
+    expect(summary).toMatchObject({ activations: 1, clears: 1, streamFailed: true,
+      sawResult: false, recentEvents: ['system:init:pre-init', 'active_goal:active', 'active_goal:clear'] });
+    expect(JSON.stringify(summary)).not.toContain('secret SDK error');
+  } finally { warn.mockRestore(); }
+});
 
 test('SDK hook gates even native auto-approved tools and preserves tool lifecycle', async () => {
   const approvals: string[] = [];

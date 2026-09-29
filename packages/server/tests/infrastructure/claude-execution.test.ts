@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
 import { Paths } from '@/infrastructure/runtime/paths';
-import { createSession, getSession, selectEmptySessionHarnessModel } from '@/infrastructure/sqlite/session-store';
+import { createSession, getSession, selectEmptySessionHarnessModel, updateSession } from '@/infrastructure/sqlite/session-store';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
 import { createClaudeExecution } from '@/harnesses/claude-cli/execution';
@@ -83,6 +83,73 @@ test('selected Claude model and effort deliver a persisted reply through the fak
   expect(getDatabase().query<{ pending: number }, [string]>(
     'SELECT pending FROM claude_session_bindings WHERE session_id = ?',
   ).get(initial.id)?.pending).toBe(0);
+});
+
+test('Claude Goal uses native transcript verdict to complete and then permits ordinary chat', async () => {
+  const { wire } = wireFixture();
+  const calls: Options[] = [];
+  const exec = createClaudeExecution({ version: () => '2.1.274',
+    start: (prompt, options) => fakeTurn(prompt, options, calls),
+    readGoalVerdict: async () => 2 });
+  await exec.sendMessage(wire, 'origin', 'session', 'tests pass', undefined, undefined, 'tests pass');
+  expect(getSession('session')?.metadata?.claudeGoal).toEqual({ condition: 'tests pass', status: 'ended', iterations: 2 });
+  expect(getDatabase().query<{ pending: number }, []>('SELECT pending FROM claude_session_bindings').get()?.pending).toBe(0);
+  expect(listMessagesWithParts('session')[1]?.message).toMatchObject({ status: 'completed' });
+  await exec.sendMessage(wire, 'origin', 'session', 'ordinary chat');
+  expect(calls).toHaveLength(2);
+});
+
+test.each([false, true])('Claude Goal without a native verdict remains locked despite SDK clear: %s', async sdkClear => {
+  const { wire, events } = wireFixture();
+  const exec = createClaudeExecution({ version: () => '2.1.274',
+    start: (_prompt, options) => {
+      const id = options.sessionId!;
+      async function* stream(): AsyncGenerator<SDKMessage> {
+        yield { type: 'system', subtype: 'init', session_id: id } as SDKMessage;
+        if (sdkClear) {
+          yield { type: 'active_goal', session_id: id, value: { condition: 'tests pass', iterations: 1 } } as unknown as SDKMessage;
+          yield { type: 'active_goal', session_id: id, value: null } as unknown as SDKMessage;
+        }
+        yield { type: 'result', subtype: 'success', session_id: id, result: 'done' } as SDKMessage;
+      }
+      return stream();
+    }, readGoalVerdict: async () => {
+      if (sdkClear) expect(getSession('session')?.metadata?.claudeGoal).toMatchObject({ status: 'active', iterations: 1 });
+      return null;
+    } });
+  await exec.sendMessage(wire, 'origin', 'session', 'tests pass', undefined, undefined, 'tests pass');
+  expect(getSession('session')?.metadata?.claudeGoal).toMatchObject({ status: 'uncertain' });
+  expect(events).toContainEqual(expect.objectContaining({ type: 'error', message: 'Claude goal outcome is uncertain' }));
+  expect(getDatabase().query<{ pending: number }, []>('SELECT pending FROM claude_session_bindings').get()?.pending).toBe(1);
+});
+
+test.each(['active', 'uncertain'] as const)(
+  'previously %s Claude Goal remains locked across a new executor', async status => {
+    updateSession('session', { metadata: { claudeGoal: { condition: 'tests pass', status, iterations: 0 } } });
+    getDatabase().run(`INSERT INTO claude_session_bindings
+      (session_id, native_session_id, workspace_root, cli_version, pending) VALUES (?, ?, ?, ?, 1)`,
+    ['session', crypto.randomUUID(), process.cwd(), '2.1.274']);
+    const { wire, events } = wireFixture();
+    const exec = createClaudeExecution({ version: () => '2.1.274', start: () => { throw new Error('must not launch'); } });
+    await exec.sendMessage(wire, 'origin', 'session', 'retry');
+    await exec.sendMessage(wire, 'origin', 'session', 'tests pass', undefined, undefined, 'tests pass');
+    expect(events).toEqual(Array.from({ length: 2 }, () => ({ type: 'error', code: 'invalid_session',
+      sessionId: 'session', message: 'Claude goal requires reconciliation; do not send in this session' })));
+    expect((await exec.compact('session', 'manual', wire.delivery)).ok).toBe(false);
+    expect(getSession('session')?.metadata?.claudeGoal).toMatchObject({ status });
+    expect(getDatabase().query<{ pending: number }, []>('SELECT pending FROM claude_session_bindings').get()?.pending).toBe(1);
+    expect(listMessagesWithParts('session')).toHaveLength(0);
+  },
+);
+
+test('rejects malformed Claude Goal inputs before creating a native binding', async () => {
+  const { wire, events } = wireFixture();
+  const exec = createClaudeExecution({ version: () => '2.1.274', start: () => { throw new Error('must not launch'); } });
+  await exec.sendMessage(wire, 'origin', 'session', 'tests pass', undefined, undefined, 'different');
+  await exec.sendMessage(wire, 'origin', 'session', 'tests pass', undefined, undefined, 'tests pass', 4);
+  await exec.sendMessage(wire, 'origin', 'session', 'a\nb', undefined, undefined, 'a\nb');
+  expect(events).toHaveLength(3);
+  expect(getDatabase().query('SELECT session_id FROM claude_session_bindings').all()).toHaveLength(0);
 });
 
 test('persists SDK context occupancy separately from cumulative usage', async () => {

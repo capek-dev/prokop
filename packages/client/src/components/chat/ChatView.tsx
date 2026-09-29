@@ -179,7 +179,9 @@ function ChatViewContent({
   const compactUncertain = session.harness === 'claude-cli' && session.metadata?.claudeCompactPending === true
     && !compactPending && !isCompacting;
   const compactBusy = isCompacting || compactPending || (session.harness === 'codex-cli' && session.metadata?.codexCompactPending === true);
-  const inputLocked = compactBusy || compactUncertain;
+  const goalUncertain = session.harness === 'claude-cli'
+    && (session.metadata?.claudeGoal as { status?: string } | undefined)?.status === 'uncertain';
+  const inputLocked = compactBusy || compactUncertain || goalUncertain;
 
   const contentMeta = useSessionStore((state) => state.contentMetaBySession[session.id]);
   const { loadOlder } = useTranscriptPagination({ sessionId: session.id, client: sdkClient ?? null });
@@ -357,6 +359,11 @@ function ChatViewContent({
           Claude compaction outcome unknown. This session is locked to avoid replay. Start a new session to continue.
         </div>
       )}
+      {goalUncertain && (
+        <div role="alert" className="px-4 py-2 text-center text-xs text-warning bg-warning/10">
+          Claude Goal outcome unknown. This session is locked to avoid replay. Start a new session to continue.
+        </div>
+      )}
 
       {session.status === 'active' && !session.parentId && !isObserver && (
         <MessageInput
@@ -370,6 +377,7 @@ function ChatViewContent({
           modelSupportsImage={modelSupportsImage}
           goalState={(session.metadata as Record<string, unknown> | null)?.goal as import('@prokopai/sdk').GoalState | null ?? null}
           codexGoal={(session.metadata as Record<string, unknown> | null)?.codexGoal as import('@prokopai/sdk').CodexGoalState | null ?? null}
+          claudeGoal={(session.metadata as Record<string, unknown> | null)?.claudeGoal as import('@prokopai/sdk').ClaudeGoalState | null ?? null}
           isStreaming={isStreaming}
           onStopStreaming={onInterrupt}
           session={session}

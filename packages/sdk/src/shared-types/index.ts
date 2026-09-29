@@ -28,6 +28,7 @@ export * from './oauth';
 export * from './workflow';
 export * from './goal';
 export * from './codex-goal';
+export * from './claude-goal';
 export * from './codex-usage';
 export * from './scheduled-job';
 export * from './notification';

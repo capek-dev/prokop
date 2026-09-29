@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
-import type { ProkopaiClient, Session, CodexGoalState } from '@prokopai/sdk';
+import type { ProkopaiClient, Session, CodexGoalState, ClaudeGoalState } from '@prokopai/sdk';
 import { ArrowUp, Square, Paperclip, AlertTriangle, Target, ChevronDown } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -39,6 +39,7 @@ interface MessageInputProps {
   modelSupportsImage?: boolean;
   goalState?: import('@prokopai/sdk').GoalState | null;
   codexGoal?: CodexGoalState | null;
+  claudeGoal?: ClaudeGoalState | null;
 }
 
 interface PendingAttachmentData {
@@ -91,6 +92,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   modelSupportsImage,
   goalState,
   codexGoal,
+  claudeGoal,
 }: MessageInputProps, ref) {
   const codexSession = session?.harness === 'codex-cli';
   const claudeSession = session?.harness === 'claude-cli';
@@ -104,7 +106,8 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachmentData[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedResponseFormatId, setSelectedResponseFormatId] = useState<string | undefined>(undefined);
-  const [sendMode, setSendMode] = useState<'chat' | 'goal'>('chat');
+  const [selectedSendMode, setSendMode] = useState<'chat' | 'goal'>('chat');
+  const sendMode = selectedSendMode;
   const [goalMaxTurns, setGoalMaxTurns] = useState(5);
   const [goalTokenBudget, setGoalTokenBudget] = useState(50_000);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -344,7 +347,8 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
     }
   }, [addFiles]);
 
-  const goalActive = goalState?.status === 'active' || codexSession && codexGoal?.status === 'active';
+  const goalActive = goalState?.status === 'active' || codexSession && codexGoal?.status === 'active'
+    || claudeSession && claudeGoal?.status === 'active';
   const budgetValid = Number.isSafeInteger(goalTokenBudget) && goalTokenBudget > 0 && goalTokenBudget <= 1_000_000;
   const effectiveDisabled = disabled || goalActive || ((codexSession || claudeSession) && isStreaming);
 
@@ -354,6 +358,13 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
     if ((!trimmed && pendingAttachments.length === 0) || effectiveDisabled
       || pendingAttachments.some(a => a.isUploading)) return;
     if (claudeSession) {
+      if (sendMode === 'goal') {
+        if (!trimmed || trimmed.length > 4000 || /[\r\n]/.test(trimmed) || pendingAttachments.length) return;
+        onSendMessage(trimmed, undefined, undefined, { condition: trimmed });
+        cleanupPending();
+        setSendMode('chat');
+        return;
+      }
       const images = pendingAttachments.filter(a => a.uploadedId && a.uploadedKind === 'image')
         .map(a => ({ id: a.uploadedId!, kind: 'image' as const }));
       if ((!trimmed && !images.length) || images.length !== pendingAttachments.length) return;
@@ -500,11 +511,12 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const hasUploadingAttachment = pendingAttachments.some(a => a.isUploading);
   const canSend = trimmed || pendingAttachments.length > 0;
   const isDisabled = !canSend || disabled || hasUploadingAttachment || goalActive
-    || (!claudeSession && sendMode === 'goal' && (!trimmed || pendingAttachments.length > 0 || codexSession && !budgetValid))
+    || (sendMode === 'goal' && (!trimmed || pendingAttachments.length > 0
+      || claudeSession && (trimmed.length > 4000 || /[\r\n]/.test(trimmed)) || codexSession && !budgetValid))
     || ((codexSession || claudeSession) && isStreaming);
   const effectivePlaceholder = goalActive
     ? 'Goal active'
-    : claudeSession ? 'Message Claude CLI (text and images)'
+    : claudeSession && sendMode !== 'goal' ? 'Message Claude CLI (text and images)'
       : codexSession && sendMode !== 'goal'
         ? 'Message Codex CLI (/ prompts, @ files)'
       : sendMode === 'goal'
@@ -572,7 +584,14 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
             <span className="ml-auto shrink-0 tabular-nums">{codexGoal.status} · {codexGoal.tokensUsed.toLocaleString()}/{codexGoal.tokenBudget?.toLocaleString() ?? 'unlimited'} tokens</span>
           </div>
         )}
-        {!codexSession && goalActive && (
+        {claudeSession && claudeGoal?.status === 'active' && (
+          <div className="flex items-center gap-2 px-3 pt-3 text-xs text-muted-foreground">
+            <Target className="size-3 shrink-0" />
+            <span className="min-w-0 truncate" title={claudeGoal.condition}>{claudeGoal.condition}</span>
+            <span className="ml-auto shrink-0 tabular-nums">{claudeGoal.status} · {claudeGoal.iterations} checks</span>
+          </div>
+        )}
+        {!codexSession && !claudeSession && goalActive && (
           <div className="flex items-center gap-2 px-3 pt-3 text-xs">
             <Target className="size-3 shrink-0 text-warning" />
             <span className="min-w-0 truncate text-warning" title={goalState?.condition ?? ''}>
@@ -701,9 +720,9 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                       ? 'bg-warning/15 text-warning'
                       : 'bg-muted text-muted-foreground hover:bg-accent',
                   )}
-                  aria-label={`Send mode: ${claudeSession ? 'chat' : sendMode}`}
+                  aria-label={`Send mode: ${sendMode}`}
                 >
-                  <span className="capitalize">{claudeSession ? 'chat' : sendMode}</span>
+                  <span className="capitalize">{sendMode}</span>
                   <ChevronDown className="size-2.5 opacity-60" />
                 </button>
               </DropdownMenuTrigger>
@@ -716,16 +735,15 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                 >
                   <ArrowUp className="size-4 mr-2" />
                   <span>Chat</span>
-                  {(sendMode === 'chat' || claudeSession) && <span className="ml-auto text-xs">✓</span>}
+                  {sendMode === 'chat' && <span className="ml-auto text-xs">✓</span>}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={(e) => e.preventDefault()}
                   onClick={() => setSendMode('goal')}
-                  disabled={claudeSession}
                 >
                   <Target className="size-4 mr-2" />
                   <span>Goal</span>
-                  {sendMode === 'goal' && !claudeSession && <span className="ml-auto text-xs">✓</span>}
+                  {sendMode === 'goal' && <span className="ml-auto text-xs">✓</span>}
                 </DropdownMenuItem>
                 {sendMode === 'goal' && !claudeSession && (
                   <>
@@ -782,7 +800,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                       ? 'text-warning'
                       : 'text-primary',
                 )}
-                aria-label={isStreaming && !claudeSession ? 'Queue message' : sendMode === 'goal' && !claudeSession ? 'Set goal' : 'Send message'}
+                aria-label={isStreaming && !claudeSession ? 'Queue message' : sendMode === 'goal' ? 'Set goal' : 'Send message'}
                 title={isStreaming ? 'Queue message' : undefined}
               >
                 <ArrowUp className="size-4" />

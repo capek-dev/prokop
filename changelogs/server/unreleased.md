@@ -1,5 +1,7 @@
 ### Changed
 
+- Enable Claude Code's native `/goal` from the session composer without Codex token or turn limits. Only a fresh, same-session native transcript verdict marked met ends the Goal and permits normal chat; a successful SDK result or goal-clear event alone does not unlock it. Keep uncertain turns locked across reloads, and hide the Goal indicator after completion. User-operated disposable-session validation confirmed completion and follow-up chat.
+
 - Keep Codex's own MCP and user-configured tools available without adding Prokop risk classifications. Show unfamiliar Codex tool-call item kinds as bounded generic transcript rows, including their completion and reload summaries; do not treat unrelated message/control items as tools. Unknown native permission requests still decline rather than silently granting permissions.
 
 - Expose Claude Code's default built-in tools, including native Agent subagents, instead of the eight-tool SDK list. Keep session risk checks for recognized tools; unclassified built-ins run without a Prokop risk check, even when session auto-approval is off. Invalid known-tool input and blocked paths remain denied. Persist the parent Agent call and result without mixing child output into the parent transcript; child activity is now saved in linked sessions.

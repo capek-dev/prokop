@@ -12,6 +12,7 @@ function fixture() {
     prokop: { id: 'prokop', harness: 'prokop' } as Session,
     legacy: { id: 'legacy' } as Session,
     codex: { id: 'codex', harness: 'codex-cli' } as Session,
+    claude: { id: 'claude', harness: 'claude-cli' } as Session,
     unknown: { id: 'unknown', harness: 'other' } as unknown as Session,
     malformed: { id: 'malformed', harness: null } as unknown as Session,
   };
@@ -88,6 +89,14 @@ test('Codex token budgets reject ambiguous and non-Codex sends before dispatch',
   ]);
   await execution.sendMessage(wire, 'origin', 'codex', 'goal', undefined, undefined, 'goal', undefined, 100);
   expect(calls).toEqual(['codex:send']);
+});
+
+test('Claude Goal dispatches its condition without Codex limits', async () => {
+  const { execution, calls, wire, messages } = fixture();
+  await execution.sendMessage(wire, 'origin', 'claude', 'tests pass', undefined, undefined, 'tests pass');
+  await execution.sendMessage(wire, 'origin', 'claude', 'tests pass', undefined, undefined, 'tests pass', undefined, 100);
+  expect(calls).toEqual(['claude:send']);
+  expect(messages).toMatchObject([{ type: 'error', code: 'invalid_session', sessionId: 'claude' }]);
 });
 
 test('Codex compact dispatches while unsupported operations still refuse without reaching Prokop', async () => {

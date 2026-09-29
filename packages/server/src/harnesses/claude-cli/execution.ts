@@ -12,6 +12,7 @@ import { createMessage, createPart, getToolPartByCallId, listMessagesWithParts, 
 import { getClaudeModelSelection } from './models';
 import { claudeCliVersion } from './version';
 import { runClaudeTurn } from './sdk-turn';
+import { readClaudeGoalVerdict } from './goal-transcript';
 import { runClaudeCompact } from './compact';
 import { claudeApprovals, type ClaudeApprovals } from './approvals';
 import { ClaudeChildTimelines } from './child-timelines';
@@ -29,6 +30,7 @@ export interface ClaudeExecutionDependencies {
   start?: (prompt: string | AsyncIterable<SDKUserMessage>, options: Options) => AsyncIterable<SDKMessage>;
   approvals?: ClaudeApprovals;
   version?: () => string;
+  readGoalVerdict?: typeof readClaudeGoalVerdict;
 }
 
 export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
@@ -51,13 +53,20 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
       if (!session || session.harness !== 'claude-cli' || session.parentId || session.status !== 'active') {
         return reject('Not an active Claude CLI session');
       }
-      if ((!content.trim() && !attachments?.length) || responseFormatId || goalCondition !== undefined
+      if ((!content.trim() && !attachments?.length) || responseFormatId
         || goalMaxTurns !== undefined || goalTokenBudget !== undefined) {
         return reject('Claude CLI supports text and image messages only');
       }
+      if (goalCondition !== undefined && (goalCondition !== content || !content.trim()
+        || content !== content.trim() || content.length > 4000 || /[\r\n]/.test(content)
+        || attachments?.length)) return reject('Invalid Claude goal condition');
       const images = resolveClaudeImages(session, attachments ?? []);
       if (!images) return reject('Claude image attachment is unavailable or unsupported');
       if (session.metadata?.claudeCompactPending) return reject('Claude compaction outcome is uncertain; do not send in this session');
+      const priorGoal = session.metadata?.claudeGoal as { status?: string } | undefined;
+      if (priorGoal?.status === 'active' || priorGoal?.status === 'uncertain') {
+        return reject('Claude goal requires reconciliation; do not send in this session');
+      }
       if (active.has(sessionId)) return reject('Claude CLI turn already running');
       const controller = new AbortController();
       active.set(sessionId, controller);
@@ -88,12 +97,19 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           throw new Error('Claude turn requires reconciliation or its workspace/CLI changed');
         }
         const nativeId = binding?.native_session_id ?? crypto.randomUUID();
+        const goalStartedAt = Date.now();
         children = new ClaudeChildTimelines(session, nativeId, wire.delivery);
         // Lock the native identity before writing to the process. A lost result never triggers replay.
         if (binding) db.run('UPDATE claude_session_bindings SET pending = 1 WHERE session_id = ?', [sessionId]);
         else db.run(`INSERT INTO claude_session_bindings
           (session_id, native_session_id, workspace_root, cli_version, pending) VALUES (?, ?, ?, ?, 1)`,
         [sessionId, nativeId, root, version]);
+        if (goalCondition !== undefined) {
+          const updated = updateSession(sessionId, { metadata: { ...(session.metadata ?? {}),
+            claudeGoal: { condition: goalCondition, status: 'active', iterations: 0 } } });
+          if (!updated) throw new Error('Claude goal state could not be saved');
+          wire.delivery.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
+        }
         const user = createMessage({ id: crypto.randomUUID(), sessionId, role: 'user', createdAt: Date.now() });
         wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: user });
         if (content.trim()) {
@@ -113,6 +129,8 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           cost: 0, createdAt: Date.now() }) as AssistantMessage;
         wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: assistant });
         let result: string | null = null;
+        let goalActivated = false;
+        let goalCleared = false;
         let usage: ClaudeTurnUsage | null = null;
         let contextUsage: { used: number; window: number } | null = null;
         const toolOwners = new Map<string, string>();
@@ -135,11 +153,28 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           textPart = { ...textPart, text: next };
         };
         for await (const event of runClaudeTurn({ cwd: root, prompt: content, images,
-          sessionId: nativeId, resume: !!binding, model: selection.model, effort: selection.effort,
+          goalCondition, sessionId: nativeId, resume: !!binding, model: selection.model, effort: selection.effort,
           controller, canUseTool: approvals.request(sessionId, session.workspaceId, root, wire.delivery,
             controller.signal, id => children?.childSessionId(toolOwners.get(id) ?? '') ?? null),
           onToolOwner: (id, owner) => { if (owner) toolOwners.set(id, owner); },
           start: deps.start })) {
+          if (event.type === 'goal-state') {
+            if (event.active) {
+              if (goalCleared) throw new Error('Claude goal state changed after completion');
+              goalActivated = true;
+            } else {
+              if (!goalActivated) throw new Error('Claude goal cleared without activation');
+              goalCleared = true;
+            }
+            const previous = getSession(sessionId);
+            if (!previous) throw new Error('Claude goal session disappeared');
+            const updated = updateSession(sessionId, { metadata: { ...(previous.metadata ?? {}),
+              claudeGoal: { condition: goalCondition, status: 'active',
+                iterations: event.iterations ?? ((previous.metadata?.claudeGoal as { iterations?: number } | undefined)?.iterations ?? 0) } } });
+            if (!updated) throw new Error('Claude goal state could not be saved');
+            wire.delivery.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
+            continue;
+          }
           if (event.type === 'child-start') {
             if (event.background) backgroundAgents.add(event.id);
             continue;
@@ -224,6 +259,26 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           }
         }
         if (result === null) throw new Error('Claude CLI turn result is missing');
+        if (goalCondition !== undefined && !controller.signal.aborted) {
+          // CLI 2.1.274 persists evaluator verdicts as goal_status attachments, but
+          // does not send active_goal through this SDK stream. Never use a reply as a verdict.
+          const iterations = await (deps.readGoalVerdict ?? readClaudeGoalVerdict)({
+            root, nativeId, condition: goalCondition, startedAt: goalStartedAt,
+          });
+          if (iterations === null) {
+            console.warn('[claude-cli] goal outcome unconfirmed', { activated: goalActivated,
+              cleared: goalCleared, resultSeen: result !== null, aborted: controller.signal.aborted });
+            throw new Error('Claude goal outcome is uncertain');
+          }
+          const previous = getSession(sessionId);
+          if (!previous) throw new Error('Claude goal session disappeared');
+          const updated = updateSession(sessionId, { metadata: { ...(previous.metadata ?? {}),
+            claudeGoal: { condition: goalCondition, status: 'ended',
+              iterations: iterations ?? (previous.metadata?.claudeGoal as { iterations?: number } | undefined)?.iterations ?? 0 } } });
+          if (!updated) throw new Error('Claude goal state could not be saved');
+          wire.delivery.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
+        }
+        if (controller.signal.aborted) throw new Error('Claude turn interrupted');
         if (!text && result) saveText(result);
         children.close('interrupted');
         const contextSession = getSession(sessionId);
@@ -253,6 +308,15 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         }
         db.run('UPDATE claude_session_bindings SET pending = 0 WHERE session_id = ?', [sessionId]);
       } catch (error) {
+        if (goalCondition !== undefined && assistant) {
+          const previous = getSession(sessionId);
+          if (previous) {
+            const updated = updateSession(sessionId, { metadata: { ...(previous.metadata ?? {}),
+              claudeGoal: { condition: goalCondition, status: 'uncertain',
+                iterations: (previous.metadata?.claudeGoal as { iterations?: number } | undefined)?.iterations ?? 0 } } });
+            if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
+          }
+        }
         if (assistant) {
           const updated = updateMessage(assistant.id, { status: controller.signal.aborted ? 'interrupted' : 'error',
             ...(controller.signal.aborted ? {} : { error: error instanceof Error ? error.message : 'Claude CLI turn failed' }),
@@ -278,6 +342,10 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
       }
       if (session.metadata?.claudeCompactPending) {
         return { ok: false, skipped: true, error: 'Claude compaction outcome is uncertain; do not retry in this session' };
+      }
+      const goalStatus = (session.metadata?.claudeGoal as { status?: string } | undefined)?.status;
+      if (goalStatus === 'active' || goalStatus === 'uncertain') {
+        return { ok: false, skipped: true, error: 'Claude goal requires reconciliation before compaction' };
       }
       const controller = new AbortController();
       active.set(sessionId, controller);

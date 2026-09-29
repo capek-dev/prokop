@@ -1,4 +1,4 @@
-import { query, type CanUseTool, type Options, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import { query, type CanUseTool, type Options, type SDKActiveGoalMessage, type SDKMessage, type SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { ClaudeImage } from './images';
 import { claudeCliVersion } from './version';
 import { parseClaudeUsage, type ClaudeTurnUsage } from './usage';
@@ -13,11 +13,13 @@ export type ClaudeTurnEvent = (
   | { type: 'result'; text: string; success: boolean; usage: ClaudeTurnUsage | null }
   | { type: 'context-usage'; used: number; window: number }
   | { type: 'compact-boundary'; trigger: 'auto' | 'manual'; preTokens: number; postTokens: number | null }
+  | { type: 'goal-state'; active: boolean; iterations: number | null }
 ) & { parentToolUseId?: string };
 
 export interface ClaudeTurnInput {
   cwd: string;
   prompt: string;
+  goalCondition?: string;
   images?: ClaudeImage[];
   sessionId: string;
   resume: boolean;
@@ -45,6 +47,10 @@ function outsideTurn(message: SDKMessage): Error {
 /** The SDK drives the installed executable's native tool loop; Prokop never executes its tools. */
 export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<ClaudeTurnEvent> {
   if (!input.prompt.trim() && !input.images?.length) throw new Error('Claude CLI requires a nonempty prompt');
+  if (input.goalCondition !== undefined && (input.goalCondition !== input.prompt || input.images?.length
+    || !input.goalCondition.trim() || input.goalCondition.length > 4000 || /[\r\n]/.test(input.goalCondition))) {
+    throw new Error('Invalid Claude goal condition');
+  }
   const executable = input.start ? 'claude' : Bun.which('claude');
   if (!executable) throw new Error('Claude CLI is unavailable on this host');
   if (!input.start) claudeCliVersion();
@@ -111,7 +117,10 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
       await inputReleased;
     } finally { releaseInput(); }
   })();
-  const messages = input.start ? input.start(prompt, options) : query({ prompt, options });
+  // Native /goal needs a one-shot slash command. Ordinary turns use streaming
+  // input to keep background child work alive after the parent result.
+  const sdkPrompt = input.goalCondition === undefined ? prompt : `/goal ${input.goalCondition}`;
+  const messages = input.start ? input.start(sdkPrompt, options) : query({ prompt: sdkPrompt, options });
   let initialized = false;
   let finished = false;
   let sawResult = false;
@@ -121,10 +130,48 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
   const releaseIfSettled = (): void => {
     if (finished && backgroundAgents.size === 0) releaseInput();
   };
+  // Keep only fixed event labels and comparisons. SDK payloads may contain secrets.
+  const goalEvents: string[] = [];
+  let goalEventCount = 0;
+  let goalActivations = 0;
+  let goalClears = 0;
+  let goalStreamFailed = false;
+  const goalSystemLabels = new Set(['init', 'status', 'compact_boundary', 'task_started',
+    'task_updated', 'task_notification', 'local_command_output', 'api_retry']);
+  const goalTypeLabels = new Set(['assistant', 'user', 'stream_event', 'result', 'active_goal',
+    'rate_limit_event', 'autocompact_state']);
   try {
     for await (const message of messages) {
+    if (input.goalCondition !== undefined) {
+      goalEventCount++;
+      const label = message.type === 'system'
+        ? `system:${goalSystemLabels.has(message.subtype) ? message.subtype : 'other'}`
+        : goalTypeLabels.has(message.type) ? message.type : 'other';
+      const state = (message as { type: string }).type === 'active_goal'
+        ? (message as unknown as SDKActiveGoalMessage).value === null ? ':clear' : ':active'
+        : message.type === 'result' ? message.subtype === 'success' && !message.is_error ? ':success' : ':failure'
+          : '';
+      goalEvents.push(`${label}${state}${initialized ? '' : ':pre-init'}`);
+      if (goalEvents.length > 16) goalEvents.shift();
+    }
     if (input.controller.signal.aborted) throw new Error('Claude turn interrupted');
     if ('session_id' in message && message.session_id !== input.sessionId) throw new Error('Claude CLI session identity changed');
+    // The SDK forwards active_goal but omits it from the public SDKMessage union.
+    if (input.goalCondition !== undefined && (message as { type: string }).type === 'active_goal') {
+      if (!initialized) throw new Error('Claude goal status arrived before init');
+      const value: unknown = (message as unknown as SDKActiveGoalMessage).value;
+      if (value === null) {
+        goalClears++;
+        yield { type: 'goal-state', active: false, iterations: null };
+      } else {
+        const state = record(value);
+        if (state?.condition !== input.goalCondition || !Number.isSafeInteger(state.iterations)
+          || (state.iterations as number) < 0) throw new Error('Invalid Claude goal status');
+        goalActivations++;
+        yield { type: 'goal-state', active: true, iterations: state.iterations as number };
+      }
+      continue;
+    }
     if ('parent_tool_use_id' in message && message.parent_tool_use_id !== null
       && (typeof message.parent_tool_use_id !== 'string' || !message.parent_tool_use_id
         || message.parent_tool_use_id.length > 256)) throw new Error('Invalid Claude child identity');
@@ -232,7 +279,15 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
     }
     }
     if (!sawResult || !finished) throw new Error('Claude CLI exited without a terminal result');
+  } catch (error) {
+    goalStreamFailed = true;
+    throw error;
   } finally {
+    if (input.goalCondition !== undefined) {
+      console.warn('[claude-cli] goal stream summary', { initialized, sawResult, finished,
+        activations: goalActivations, clears: goalClears, streamFailed: goalStreamFailed,
+        aborted: input.controller.signal.aborted, eventCount: goalEventCount, recentEvents: goalEvents });
+    }
     releaseInput();
     streamClosed = true;
     approvedToolIds.clear();

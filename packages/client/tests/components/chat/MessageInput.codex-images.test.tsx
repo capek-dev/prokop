@@ -34,6 +34,30 @@ function setup(prompts?: PromptInfo[]) {
   return { fileInput, upload, onSendMessage, view };
 }
 
+test('Claude Goal sends a condition without Codex limits and shows native checks', async () => {
+  const { onSendMessage, view } = setup();
+  const claude = { ...session, harness: 'claude-cli', id: 'claude-goal-test' } as Session;
+  view.rerender(<MessageInput session={claude} sessionId={session.id} workspaceId="ws"
+    onSendMessage={onSendMessage} />);
+  fireEvent.pointerDown(screen.getByRole('button', { name: 'Send mode: chat' }), { button: 0, ctrlKey: false });
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Goal' }));
+  expect(screen.queryByLabelText('Token budget')).not.toBeInTheDocument();
+  expect(screen.queryByText('Max turns')).not.toBeInTheDocument();
+  fireEvent.change(screen.getByPlaceholderText('Type the completion condition...'),
+    { target: { value: 'Tests pass' } });
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+  fireEvent.click(screen.getByRole('button', { name: 'Set goal' }));
+  expect(onSendMessage).toHaveBeenCalledWith('Tests pass', undefined, undefined, { condition: 'Tests pass' });
+  view.rerender(<MessageInput session={claude} sessionId={session.id} workspaceId="ws"
+    onSendMessage={onSendMessage} claudeGoal={{ condition: 'Tests pass', status: 'active', iterations: 1 }} />);
+  expect(screen.getByText('active · 1 checks')).toBeInTheDocument();
+  view.rerender(<MessageInput session={claude} sessionId={session.id} workspaceId="ws"
+    onSendMessage={onSendMessage} claudeGoal={{ condition: 'Tests pass', status: 'ended', iterations: 2 }} />);
+  expect(screen.queryByText('ended · 2 checks')).not.toBeInTheDocument();
+  expect(screen.queryByText('Tests pass')).not.toBeInTheDocument();
+  expect(screen.getByPlaceholderText('Message Claude CLI (text and images)')).not.toBeDisabled();
+});
+
 test('Codex Goal sends a token budget separately from max turns', async () => {
   const { onSendMessage } = setup();
   fireEvent.pointerDown(screen.getByRole('button', { name: 'Send mode: chat' }), { button: 0, ctrlKey: false });
