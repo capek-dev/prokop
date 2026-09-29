@@ -5,14 +5,14 @@ import type {
   ProviderStatus,
   ProviderAccountStatus,
 } from '@prokopai/sdk';
-import { NotFoundError } from '../http-errors';
+import { NotFoundError } from '@/application/http-errors';
 import type {
   OAuthFlowPort,
   OAuthServerCallbackResult,
   ProviderCredentialPort,
   ProviderRegistryPort,
   SubscriptionAccountsPort,
-} from '../ports/provider-accounts';
+} from '@/application/ports/provider-accounts';
 
 /**
  * Provider-account use cases (S4). Own the route-level orchestration for

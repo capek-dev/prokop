@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { chmod, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { commitGitFiles, getGitRepository, previewGitPush, pushGitBranch, revertModifiedGitFile } from '../../../src/infrastructure/filesystem/git-operations';
-import { getGitStatus } from '../../../src/infrastructure/filesystem/git-status';
+import { commitGitFiles, getGitRepository, previewGitPush, pushGitBranch, revertModifiedGitFile } from '@/infrastructure/filesystem/git-operations';
+import { getGitStatus } from '@/infrastructure/filesystem/git-status';
 
 let root: string;
 let base: string;

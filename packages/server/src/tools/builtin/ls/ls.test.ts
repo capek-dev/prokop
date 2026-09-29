@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import { definition, execute } from './tool';
-import { createMockContext, getAskCall, VirtualFS, WORKSPACE } from '../test-utils';
+import { createMockContext, getAskCall, VirtualFS, WORKSPACE } from '@/tools/builtin/test-utils';
 
 let vfs: VirtualFS;
 let ctx: ReturnType<typeof createMockContext>;

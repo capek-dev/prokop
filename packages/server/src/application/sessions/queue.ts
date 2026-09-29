@@ -1,6 +1,6 @@
-import type { SessionWirePorts } from '../ports/delivery';
-import type { ControllerGatePort } from '../ports/control';
-import type { SessionRepositoryPort } from '../ports/session';
+import type { SessionWirePorts } from '@/application/ports/delivery';
+import type { ControllerGatePort } from '@/application/ports/control';
+import type { SessionRepositoryPort } from '@/application/ports/session';
 import { sendGateRejection } from './chat';
 import { prokopFeatureError } from './harness-policy';
 

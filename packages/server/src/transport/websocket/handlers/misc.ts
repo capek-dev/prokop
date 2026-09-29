@@ -1,9 +1,9 @@
-import type { RouterContext } from '../router-context';
-import type { ConnectionId } from '../connection-id';
-import { handleClientRegistration, getClientByClientId, getClientIdForConnection, getConnectionById } from '../connection-registry';
-import { resolveAsk, getSessionIdForPendingAsk, getAuthorityForPendingAsk, sandboxController, type SandboxRespondMessage } from '@/adapters/capek/contracts';
-import { getControlState } from '../control-registry';
-import { requireWireApplication } from '../application';
+import type { RouterContext } from '@/transport/websocket/router-context';
+import type { ConnectionId } from '@/transport/websocket/connection-id';
+import { handleClientRegistration, getClientByClientId, getClientIdForConnection, getConnectionById } from '@/transport/websocket/connection-registry';
+import { resolveAsk, getSessionIdForPendingAsk, getAuthorityForPendingAsk, sandboxController, type SandboxRespondMessage } from '@/harnesses/prokop/composition/contracts';
+import { getControlState } from '@/transport/websocket/control-registry';
+import { requireWireApplication } from '@/transport/websocket/application';
 import { checkAskResponseEligibility } from '@/application/ports/control';
 import { getCodexApprovalPort } from '@/application/ports/codex-approval';
 import { getClaudeApprovalPort } from '@/application/ports/claude-approval';

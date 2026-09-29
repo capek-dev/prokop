@@ -7,7 +7,7 @@ import type {
   ScheduledJobExecutionPort,
   ScheduledJobRepositoryPort,
   ScheduledJobWorkspacePort,
-} from '../ports/scheduling';
+} from '@/application/ports/scheduling';
 
 export type SchedulingCreateResult =
   | { kind: 'created'; job: ScheduledJob }

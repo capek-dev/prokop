@@ -6,10 +6,10 @@ import { handleConnectionDisconnect } from './control-registry';
 import { createDeliveryPort, participantConnectionIdsFor, controllerConnectionIdsFor, type DeliveryPort } from './delivery';
 import type { ClientEntry, RouterContext } from './router-context';
 import { handleClientMessage } from './message-router';
-import type { TerminalManager } from '../terminal/manager';
+import type { TerminalManager } from '@/transport/terminal/manager';
 import { readEnvInt } from '@/infrastructure/runtime/env-compat';
-import type { TerminalEventManager } from '../terminal/event-manager';
-import { encodeFrame, OPCODES } from '../terminal/frames';
+import type { TerminalEventManager } from '@/transport/terminal/event-manager';
+import { encodeFrame, OPCODES } from '@/transport/terminal/frames';
 
 export interface WsData {
   path: string;

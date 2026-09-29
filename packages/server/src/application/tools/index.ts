@@ -4,7 +4,7 @@ import type {
   ToolCatalogPort,
   ToolEnvironmentPort,
   ToolEnvStatus,
-} from '../ports/tool-catalog';
+} from '@/application/ports/tool-catalog';
 
 /**
  * Tool HTTP use cases (S4). Owns the route-level behavior for the tools

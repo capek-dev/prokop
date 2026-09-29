@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, realpath, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Workspace } from '@prokopai/sdk';
-import { createLearningDirectoryResolver } from '@/adapters/capek/learning-directories';
+import { createLearningDirectoryResolver } from '@/harnesses/prokop/learning/learning-directories';
 
 let root: string | undefined;
 afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); root = undefined; });

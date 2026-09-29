@@ -21,7 +21,7 @@ import {
   getParticipantClientIds,
   getParticipantConnections,
 } from '@/transport/websocket/control-registry';
-import { scanTools } from '@/adapters/capek/contracts';
+import { scanTools } from '@/harnesses/prokop/composition/contracts';
 import { closeDatabase, getDatabase } from '@/infrastructure/sqlite/database';
 import { backfillFts } from '@/infrastructure/session-search/fts';
 import type { ServerMessage, AskAuthority } from '@prokopai/sdk';
@@ -33,7 +33,7 @@ import { readEnv } from '@/infrastructure/runtime/env-compat';
 import {
   disposeJean2ExecutionScope,
   initializeJean2ExecutionScope,
-} from '@/adapters/capek/execution-scope';
+} from '@/harnesses/prokop/composition/execution-scope';
 import { reconcileAllOrphanedToolCalls } from '@/infrastructure/sqlite/message-store';
 import { cleanupAllPendingAsks } from '@/infrastructure/sqlite/pending-asks';
 import { cleanupOrphanedData } from '@/infrastructure/sqlite/cleanup';

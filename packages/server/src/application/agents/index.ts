@@ -3,7 +3,7 @@ import type {
   AgentDirectoryPort,
   AgentPreconfigPort,
   AgentWorkspacePort,
-} from '../ports/agents';
+} from '@/application/ports/agents';
 import {
   AGENT_MEMORY_MEMORY_FILENAME,
   AGENT_MEMORY_USER_FILENAME,

@@ -4,9 +4,9 @@ import { broadcastEvent, broadcastSessionUpdated } from '@/transport/websocket/b
 import { createLearningService } from '@/application/learning/service';
 import { createLearningReviewRunner } from '@/application/learning/review-runner';
 import { createLearningRecovery } from '@/application/learning/recovery';
-import { createLearningExecution, type LearningExecutionDependencies } from '@/adapters/capek/learning-execution';
-import { createLearningDirectoryResolver } from '@/adapters/capek/learning-directories';
-import { createLearningHistory } from '@/adapters/capek/learning-history';
+import { createLearningExecution, type LearningExecutionDependencies } from '@/harnesses/prokop/learning/learning-execution';
+import { createLearningDirectoryResolver } from '@/harnesses/prokop/learning/learning-directories';
+import { createLearningHistory } from '@/harnesses/prokop/learning/learning-history';
 import { createJean2SessionRepository } from '@/adapters/jean2/session-repository';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { getWorkspace, listWorkspaces } from '@/infrastructure/sqlite/workspaces';

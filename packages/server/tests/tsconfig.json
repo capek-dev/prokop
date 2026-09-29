@@ -10,7 +10,9 @@
     "types": ["bun-types", "node"],
     "baseUrl": "..",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "#tests/*": ["./tests/*"],
+      "#package": ["./package.json"]
     }
   },
   "include": ["../src/**/*", "./**/*"]

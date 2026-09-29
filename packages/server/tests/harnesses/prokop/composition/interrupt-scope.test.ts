@@ -6,7 +6,7 @@ import {
 } from '@capekai/core/storage';
 import type { AskRequestMessage, AskTimedOutMessage } from '@prokopai/sdk';
 import { createJean2SessionExecution } from '@/harnesses/prokop/execution';
-import { configureJean2Bindings } from '@/adapters/capek/bindings';
+import { configureJean2Bindings } from '@/harnesses/prokop/composition/bindings';
 import { configureJean2RuntimeConfiguration } from '@/adapters/capek/runtime-configuration';
 import { configureJean2Storage } from '@/adapters/capek/storage';
 import { configureJean2WorkspaceToolDiscovery } from '@/adapters/capek/tool-source';
@@ -15,7 +15,7 @@ import {
   initializeJean2ExecutionScope,
   resetJean2ExecutionCompositionFactoryForTests,
   withJean2ExecutionScope,
-} from '@/adapters/capek/execution-scope';
+} from '@/harnesses/prokop/composition/execution-scope';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
 

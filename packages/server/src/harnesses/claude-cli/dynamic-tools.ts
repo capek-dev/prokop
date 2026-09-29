@@ -5,10 +5,10 @@ import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';
-import type { CodexMemoryBridge } from '../codex-cli/memory-tools';
-import type { CodexSessionSearchBridge } from '../codex-cli/session-search-tools';
-import type { CodexAgentSkillBridge } from '../codex-cli/agent-skill-tools';
-import { safeSkillDirectory } from '../codex-cli/agent-skill-tools';
+import type { CodexMemoryBridge } from '@/harnesses/codex-cli/memory-tools';
+import type { CodexSessionSearchBridge } from '@/harnesses/codex-cli/session-search-tools';
+import type { CodexAgentSkillBridge } from '@/harnesses/codex-cli/agent-skill-tools';
+import { safeSkillDirectory } from '@/harnesses/codex-cli/agent-skill-tools';
 
 /** The in-process server name; the SDK reports its tools as mcp__prokop__<name>. */
 export const PROKOP_MCP_SERVER = 'prokop';

@@ -25,7 +25,7 @@ import type {
 import type {
   FilesApplicationPort,
   GitStatusResult,
-} from '../ports/files';
+} from '@/application/ports/files';
 
 export interface FilesListResult {
   files: FileEntry[];

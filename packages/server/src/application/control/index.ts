@@ -1,5 +1,5 @@
-import type { ApplicationDeliveryPort } from '../ports/delivery';
-import type { SessionControlPort } from '../ports/control';
+import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
+import type { SessionControlPort } from '@/application/ports/control';
 
 export interface SessionControlDeps<Origin> {
   control: SessionControlPort<Origin>;

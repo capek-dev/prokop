@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, test, expect, beforeEach, mock } from 'bun:test';
 import { definition, execute } from './tool';
-import { createMockContext, VirtualFS, WORKSPACE, getAskCall } from '../test-utils';
+import { createMockContext, VirtualFS, WORKSPACE, getAskCall } from '@/tools/builtin/test-utils';
 
 let vfs: VirtualFS;
 let ctx: ReturnType<typeof createMockContext>;

@@ -8,7 +8,7 @@ import {
   registerProvider,
   type ConnectableProvider,
   type TokenResponse,
-} from '@/adapters/capek/contracts';
+} from '@/harnesses/prokop/composition/contracts';
 import { codexAccounts } from './codex-accounts';
 import { CodexAccountRuntime } from './codex-account-runtime';
 import {
@@ -16,7 +16,7 @@ import {
   initiateOAuthFlow,
   refreshTokens,
   getDefaultRedirectUri,
-} from '../oauth/oauth-manager';
+} from '@/infrastructure/oauth/oauth-manager';
 import { CODEX_OAUTH_DUMMY_KEY } from '@/domains/provider-accounts';
 const OAUTH_DUMMY_KEY = CODEX_OAUTH_DUMMY_KEY;
 

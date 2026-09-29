@@ -23,9 +23,9 @@ import { forkClaudeSession } from './fork';
 import { claudeDeveloperInstructions, defaultClaudePreconfigId, type ClaudeInstructionSources } from './instructions';
 import { createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools,
   claudeMcpToolDisplayName } from './dynamic-tools';
-import type { CodexMemoryBridge } from '../codex-cli/memory-tools';
-import type { CodexSessionSearchBridge } from '../codex-cli/session-search-tools';
-import type { CodexAgentSkillBridge } from '../codex-cli/agent-skill-tools';
+import type { CodexMemoryBridge } from '@/harnesses/codex-cli/memory-tools';
+import type { CodexSessionSearchBridge } from '@/harnesses/codex-cli/session-search-tools';
+import type { CodexAgentSkillBridge } from '@/harnesses/codex-cli/agent-skill-tools';
 
 interface Binding {
   native_session_id: string;

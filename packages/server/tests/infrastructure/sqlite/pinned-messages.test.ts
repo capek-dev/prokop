@@ -1,11 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { setupTestDatabase, resetTestDatabase } from '../../helpers/db';
-import { seedWorkspaceWithSession, seedSession } from '../../helpers/seed';
+import { setupTestDatabase, resetTestDatabase } from '#tests/helpers/db';
+import { seedWorkspaceWithSession, seedSession } from '#tests/helpers/seed';
 import {
   createTestUserMessage,
   createTestAssistantMessage,
   createTestTextPart,
-} from '../../helpers/factories';
+} from '#tests/helpers/factories';
 import {
   createMessage,
   createPart,

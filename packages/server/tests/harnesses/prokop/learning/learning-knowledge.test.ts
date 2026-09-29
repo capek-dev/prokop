@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createLearningKnowledgeExecutor, type LearningKnowledgeBoundary } from '@/adapters/capek/learning-knowledge';
+import { createLearningKnowledgeExecutor, type LearningKnowledgeBoundary } from '@/harnesses/prokop/learning/learning-knowledge';
 
 let root: string;
 beforeEach(async () => { root = await mkdtemp(join(tmpdir(), 'learning-public-api-')); });

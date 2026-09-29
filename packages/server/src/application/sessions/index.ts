@@ -1,8 +1,8 @@
-import type { SessionExecutionPort } from '../ports/execution';
-import type { ControllerGatePort, SessionControlPort } from '../ports/control';
-import type { AskAuthorityPort, PendingAskPort, SessionRepositoryPort } from '../ports/session';
-import type { ToolCatalogPort } from '../ports/tool-catalog';
-import type { WorktreeAttachmentRefreshPort } from '../ports/worktree';
+import type { SessionExecutionPort } from '@/application/ports/execution';
+import type { ControllerGatePort, SessionControlPort } from '@/application/ports/control';
+import type { AskAuthorityPort, PendingAskPort, SessionRepositoryPort } from '@/application/ports/session';
+import type { ToolCatalogPort } from '@/application/ports/tool-catalog';
+import type { WorktreeAttachmentRefreshPort } from '@/application/ports/worktree';
 import {
   createSessionChatApplication,
   type SessionChatApplication,
@@ -80,4 +80,4 @@ export {
   type SessionTranscriptApplication,
 };
 
-export type { SessionWirePorts } from '../ports/delivery';
+export type { SessionWirePorts } from '@/application/ports/delivery';

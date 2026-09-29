@@ -2,9 +2,9 @@ import { join } from 'node:path';
 import type { Preconfig, Workspace } from '@prokopai/sdk';
 // Generic formatters shared with the Codex harness: SKILL.md scanning and
 // opted-in workspace memory rendering are harness-independent.
-import { defaultCodexPreconfigId } from '../codex-cli/instructions';
-import { formatCodexAgentSkills, listCodexAgentSkills } from '../codex-cli/agent-skills';
-import { codexWorkspaceMemory } from '../codex-cli/workspace-memory';
+import { defaultCodexPreconfigId } from '@/harnesses/codex-cli/instructions';
+import { formatCodexAgentSkills, listCodexAgentSkills } from '@/harnesses/codex-cli/agent-skills';
+import { codexWorkspaceMemory } from '@/harnesses/codex-cli/workspace-memory';
 
 export interface ClaudeInstructionSources {
   listPreconfigs(): Promise<Preconfig[]>;

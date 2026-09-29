@@ -7,7 +7,7 @@
  */
 import type { OAuthProviderConfig, OAuthRedirectStrategy } from '@prokopai/sdk';
 import { broadcastEvent } from '@/transport/websocket/broadcast';
-import { getProvider, getProviderStatus, type TokenResponse } from '@/adapters/capek/contracts';
+import { getProvider, getProviderStatus, type TokenResponse } from '@/harnesses/prokop/composition/contracts';
 import {
   buildAuthorizationUrl,
   buildTokenExchangeParams,

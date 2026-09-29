@@ -1,6 +1,6 @@
 # Session harness implementations
 
-`prokop/` adapts the Čapek execution loop to the host's `SessionExecutionPort`. Čapek runtime composition, scoped storage, permissions and shared host adapters remain in `src/adapters/capek/`.
+`prokop/` adapts the Čapek execution loop to the host's `SessionExecutionPort`. Its composed runtime lives in `prokop/composition/` (bindings, profile, composition, contracts, execution-scope) and its learning runtime in `prokop/learning/`; shared host-contract adapters (storage, delivery, sandbox, events, scheduler, session-search, titles, workspace) remain in `src/adapters/capek/`. Only `adapters/capek/**` and `harnesses/prokop/**` may import `@capekai/core` (S11 boundary rule).
 
 `codex-cli/` owns the Codex app-server protocol, per-session thread binding, lost-turn recovery and model catalog. It does not use Čapek's provider credentials. The Codex OAuth *model provider* is separate and remains in `src/infrastructure/providers/`.
 

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { gitCommitSchema } from '../../../src/transport/http/routes/schemas';
+import { gitCommitSchema } from '@/transport/http/routes/schemas';
 
 const input = { paths: ['a'], message: 'Commit', expectedBranch: 'main', expectedHead: null };
 

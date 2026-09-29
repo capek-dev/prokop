@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { gitBranchActionSchema } from '../../../src/transport/http/routes/git-branch-schemas';
+import { gitBranchActionSchema } from '@/transport/http/routes/git-branch-schemas';
 
 const input = { action: 'pull-branch', name: 'main', expectedHead: 'a'.repeat(40), root: '/tree' } as const;
 

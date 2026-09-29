@@ -9,7 +9,7 @@ import type {
   McpRemoteServerConfig,
   McpStatus,
 } from '@prokopai/sdk';
-import type { CapabilityTool as Tool } from '@/adapters/capek/contracts';
+import type { CapabilityTool as Tool } from '@/harnesses/prokop/composition/contracts';
 import { convertMcpTool } from './converter';
 import { McpOAuthProvider } from './oauth-provider';
 import { getMcpServers } from './config';

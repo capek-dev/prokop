@@ -13,12 +13,12 @@ import {
   type RuntimeHost,
 } from '@capekai/core/hosts';
 import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';
-import { jean2DeliveryBindings } from './delivery';
-import { jean2InteractionBindings } from './interaction';
-import { jean2SandboxBindings } from './sandbox';
-import { jean2TitleBindings } from './titles';
-import { jean2ToolPolicy } from './tool-policy';
-import { jean2WorkspaceBindings } from './workspace';
+import { jean2DeliveryBindings } from '@/adapters/capek/delivery';
+import { jean2InteractionBindings } from '@/adapters/capek/interaction';
+import { jean2SandboxBindings } from '@/adapters/capek/sandbox';
+import { jean2TitleBindings } from '@/adapters/capek/titles';
+import { jean2ToolPolicy } from '@/adapters/capek/tool-policy';
+import { jean2WorkspaceBindings } from '@/adapters/capek/workspace';
 
 export type { RuntimeHost as Jean2CompatibilityBindings } from '@capekai/core/hosts';
 

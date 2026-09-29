@@ -13,7 +13,7 @@ import {
   createInMemoryStorageBundle,
   getStorage,
 } from '@capekai/core/storage';
-import { configureJean2Bindings } from '@/adapters/capek/bindings';
+import { configureJean2Bindings } from '@/harnesses/prokop/composition/bindings';
 import { configureJean2RuntimeConfiguration } from '@/adapters/capek/runtime-configuration';
 import { configureJean2Storage, jean2StorageBundle } from '@/adapters/capek/storage';
 import { configureJean2WorkspaceToolDiscovery } from '@/adapters/capek/tool-source';
@@ -29,7 +29,7 @@ import {
   resetJean2ExecutionCompositionFactoryForTests,
   setJean2ExecutionCompositionFactoryForTests,
   withJean2ExecutionScope,
-} from '@/adapters/capek/execution-scope';
+} from '@/harnesses/prokop/composition/execution-scope';
 
 describe('Jean2 composed execution scope', () => {
   afterEach(async () => {

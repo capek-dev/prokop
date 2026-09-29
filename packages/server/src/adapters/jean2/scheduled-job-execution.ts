@@ -1,4 +1,4 @@
-import { withJean2ExecutionScope } from '@/adapters/capek/execution-scope';
+import { withJean2ExecutionScope } from '@/harnesses/prokop/composition/execution-scope';
 import { getModelsConfig } from '@/config';
 import type { ScheduledJob } from '@prokopai/sdk';
 import { getDefaultPreconfig, getPreconfig } from '@/infrastructure/config/preconfig';

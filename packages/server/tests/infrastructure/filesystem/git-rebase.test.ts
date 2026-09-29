@@ -2,8 +2,8 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { git } from '../../../src/infrastructure/filesystem/git-operations';
-import { controlGitRebase, getGitRebaseState, startGitRebase } from '../../../src/infrastructure/filesystem/git-rebase';
+import { git } from '@/infrastructure/filesystem/git-operations';
+import { controlGitRebase, getGitRebaseState, startGitRebase } from '@/infrastructure/filesystem/git-rebase';
 
 let root: string;
 let featureHead: string;

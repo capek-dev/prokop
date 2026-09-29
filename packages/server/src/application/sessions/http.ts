@@ -14,9 +14,9 @@ import type {
   SessionRepositoryPort,
   ToolOutputArtifactPage,
   TranscriptPage,
-} from '../ports/session';
-import type { ToolCatalogPort } from '../ports/tool-catalog';
-import type { WorktreeAttachmentRefreshPort } from '../ports/worktree';
+} from '@/application/ports/session';
+import type { ToolCatalogPort } from '@/application/ports/tool-catalog';
+import type { WorktreeAttachmentRefreshPort } from '@/application/ports/worktree';
 import {
   getToolDebugData,
   projectMessagesForClient,

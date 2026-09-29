@@ -1,5 +1,5 @@
 import type { McpStatus } from '@prokopai/sdk';
-import type { McpLifecyclePort, McpWorkspacePort } from '../ports/mcp';
+import type { McpLifecyclePort, McpWorkspacePort } from '@/application/ports/mcp';
 
 /**
  * MCP HTTP use cases (S5). Owns the route-level MCP lifecycle orchestration

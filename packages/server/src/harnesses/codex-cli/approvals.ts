@@ -1,7 +1,7 @@
 import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, sep } from 'node:path';
 import type { PermissionAsk } from '@prokopai/sdk';
-import { canAutoApproveHarnessTool } from '../approval-policy';
+import { canAutoApproveHarnessTool } from '@/harnesses/approval-policy';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { createPendingAsk, expirePermissionRequest,

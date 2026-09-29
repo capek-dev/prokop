@@ -81,4 +81,4 @@ export function createRuntime(existingAgents?: AgentsApplication): AgentsApplica
   return agents;
 }
 
-export { createJean2RuntimeComposition } from '@/adapters/capek/composition';
+export { createJean2RuntimeComposition } from '@/harnesses/prokop/composition/composition';

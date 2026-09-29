@@ -10,7 +10,7 @@ import type {
   WorktreeSessionPort,
   WorktreeTerminalPort,
   WorktreeWorkspacePort,
-} from './ports/worktree';
+} from '@/application/ports/worktree';
 
 export type WorktreeFailureCode =
   | 'workspace_not_found'

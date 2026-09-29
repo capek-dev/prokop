@@ -1,6 +1,6 @@
-import type { RouterContext } from '../router-context';
-import type { ConnectionId } from '../connection-id';
-import { requireWireApplication } from '../application';
+import type { RouterContext } from '@/transport/websocket/router-context';
+import type { ConnectionId } from '@/transport/websocket/connection-id';
+import { requireWireApplication } from '@/transport/websocket/application';
 import type { ProviderConnectMessage, ProviderDisconnectMessage } from '@prokopai/sdk';
 
 /**

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Preconfig } from '@prokopai/sdk';
-import { createLearningExecution } from '@/adapters/capek/learning-execution';
+import { createLearningExecution } from '@/harnesses/prokop/learning/learning-execution';
 import { createLearningRepository } from '@/infrastructure/sqlite/learning-repository';
 import { createLearningReviewRunner } from '@/application/learning/review-runner';
 import { createLearningEvidenceReader } from '@/infrastructure/sqlite/learning-evidence';

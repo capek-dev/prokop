@@ -44,8 +44,8 @@ import {
   CURRENT_SUBAGENT_DOMAIN_PLUGIN_ID,
   CURRENT_WORKFLOW_DOMAIN_PLUGIN_ID,
 } from '@capekai/core/plugins';
-import { builtinToolsAgentPlugins } from './tool-resolver';
-import { jean2WorkspacePolicyOptions } from './workspace-policy';
+import { builtinToolsAgentPlugins } from '@/adapters/capek/tool-resolver';
+import { jean2WorkspacePolicyOptions } from '@/adapters/capek/workspace-policy';
 
 export const JEAN2_PROCESS_PLUGIN_IDS = [
   'current.provider-registry',

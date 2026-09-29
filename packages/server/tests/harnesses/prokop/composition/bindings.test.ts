@@ -3,7 +3,7 @@ import { getRuntimeHost as getJean2CompatibilityBindings } from '@capekai/core/h
 import {
   configureJean2Bindings,
   jean2CompatibilityBindings,
-} from '@/adapters/capek/bindings';
+} from '@/harnesses/prokop/composition/bindings';
 import { deliverCapekEvent } from '@/adapters/capek/events';
 import { jean2DeliveryBindings } from '@/adapters/capek/delivery';
 import { jean2InteractionBindings } from '@/adapters/capek/interaction';

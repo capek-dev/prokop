@@ -1,4 +1,4 @@
-import type { MaintenanceApplication } from '../ports/maintenance';
+import type { MaintenanceApplication } from '@/application/ports/maintenance';
 
 export function createMaintenanceApplication(
   maintenance: MaintenanceApplication,

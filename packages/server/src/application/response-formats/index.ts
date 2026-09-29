@@ -1,4 +1,4 @@
-import type { ResponseFormatsApplication } from '../ports/response-formats';
+import type { ResponseFormatsApplication } from '@/application/ports/response-formats';
 
 export function createResponseFormatsApplication(
   responseFormats: ResponseFormatsApplication,

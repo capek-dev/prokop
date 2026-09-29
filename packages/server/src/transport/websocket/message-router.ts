@@ -4,7 +4,7 @@ import type { RouterContext } from './router-context';
 import { handleChat, handleSessionEditMessage } from './chat-handler';
 import { handleSessionCompact, handleSessionRevert, handleSessionFork } from './session-handler';
 
-import { handleClaimMessage, handleReleaseMessage } from './handlers/control';
+import { handleClaimMessage, handleReleaseMessage } from '@/transport/websocket/handlers/control';
 import {
   handleCreateSession,
   handleResumeSession,
@@ -17,17 +17,17 @@ import {
   handleRenameSession,
   handleGenerateTitleSession,
   handleInterruptSession,
-} from './handlers/session-lifecycle';
-import { handleQueueAdd, handleQueueRemove } from './handlers/queue';
-import { handlePermissionList, handlePermissionRevoke, handlePermissionRevokeAll } from './handlers/permissions';
-import { handleProviderConnect, handleProviderDisconnect } from './handlers/providers';
+} from '@/transport/websocket/handlers/session-lifecycle';
+import { handleQueueAdd, handleQueueRemove } from '@/transport/websocket/handlers/queue';
+import { handlePermissionList, handlePermissionRevoke, handlePermissionRevokeAll } from '@/transport/websocket/handlers/permissions';
+import { handleProviderConnect, handleProviderDisconnect } from '@/transport/websocket/handlers/providers';
 import {
   handleClientRegister,
   handlePong,
   handleNotificationAcknowledge,
   handleAskResponse,
   handleSandboxRespond,
-} from './handlers/misc';
+} from '@/transport/websocket/handlers/misc';
 
 // Re-export for external consumers
 export type { RouterContext, ClientEntry } from './router-context';

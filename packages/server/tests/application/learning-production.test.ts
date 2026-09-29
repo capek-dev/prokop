@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Preconfig, LearningRunSummary, LearningRunDetail } from '@prokopai/sdk';
 import { createWiredLearning } from '@/bootstrap/learning';
-import type { LearningExecutionDependencies } from '@/adapters/capek/learning-execution';
+import type { LearningExecutionDependencies } from '@/harnesses/prokop/learning/learning-execution';
 import { createSessionSchema, updateSessionSchema } from '@/transport/http/routes/schemas';
 import { registerLearningRoutes } from '@/transport/http/routes/learning';
 import { getSession, updateSession, createSession } from '@/infrastructure/sqlite/session-store';

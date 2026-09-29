@@ -1,5 +1,5 @@
 import './codex';
-import { disposeOAuthFlows } from '../oauth/oauth-manager';
+import { disposeOAuthFlows } from '@/infrastructure/oauth/oauth-manager';
 
 export {
   registerOAuthConfig,
@@ -7,7 +7,7 @@ export {
   completeOAuthFlow,
   handleServerCallback,
   refreshTokens,
-} from '../oauth/oauth-manager';
+} from '@/infrastructure/oauth/oauth-manager';
 
 export function stopProviderAccountLifecycle(): void {
   disposeOAuthFlows();

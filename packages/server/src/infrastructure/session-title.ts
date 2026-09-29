@@ -1,5 +1,5 @@
 import type { MessageWithParts } from '@prokopai/sdk';
-import { runTextModel } from '@/adapters/capek/contracts';
+import { runTextModel } from '@/harnesses/prokop/composition/contracts';
 import { getModelsConfig, findModel } from '@/config';
 
 const DEFAULT_SESSION_TITLES = new Set(['new session', 'new']);

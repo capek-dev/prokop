@@ -1,7 +1,7 @@
 import { atomicWriteFile, readFileSafe } from './files';
 import { getEnvFilePath } from '@/infrastructure/runtime/paths';
 import { getJean2EnvValue, getAllJean2EnvKeys, reloadJean2Env } from '@/infrastructure/runtime/environment';
-import { listTools } from '@/adapters/capek/contracts';
+import { listTools } from '@/harnesses/prokop/composition/contracts';
 import { ENV_PRESETS, getPreset, isPresetKey } from './env-presets';
 import { ConfigurationPersistenceError, ConfigurationValidationError } from './errors';
 

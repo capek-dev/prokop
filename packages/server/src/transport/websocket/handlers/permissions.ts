@@ -1,6 +1,6 @@
-import type { RouterContext } from '../router-context';
-import type { ConnectionId } from '../connection-id';
-import { requireWireApplication } from '../application';
+import type { RouterContext } from '@/transport/websocket/router-context';
+import type { ConnectionId } from '@/transport/websocket/connection-id';
+import { requireWireApplication } from '@/transport/websocket/application';
 import type { PermissionListRequestMessage, PermissionRevokeMessage, PermissionRevokeAllMessage } from '@prokopai/sdk';
 
 export function handlePermissionList(

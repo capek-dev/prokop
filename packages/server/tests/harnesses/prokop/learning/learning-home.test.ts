@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'bun:test';
 import { mkdtemp, mkdir, realpath, rm, symlink, link, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createLearningHomeTool } from '@/adapters/capek/learning-home';
+import { createLearningHomeTool } from '@/harnesses/prokop/learning/learning-home';
 import { createLearningKnowledgeFiles } from '@/infrastructure/filesystem/learning-knowledge';
 
 let root: string;

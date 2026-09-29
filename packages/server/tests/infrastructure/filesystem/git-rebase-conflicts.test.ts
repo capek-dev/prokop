@@ -2,9 +2,9 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { git } from '../../../src/infrastructure/filesystem/git-operations';
-import { startGitRebase, controlGitRebase, getGitRebaseState } from '../../../src/infrastructure/filesystem/git-rebase';
-import { getGitRebaseConflict, resolveGitRebaseConflict } from '../../../src/infrastructure/filesystem/git-rebase-conflicts';
+import { git } from '@/infrastructure/filesystem/git-operations';
+import { startGitRebase, controlGitRebase, getGitRebaseState } from '@/infrastructure/filesystem/git-rebase';
+import { getGitRebaseConflict, resolveGitRebaseConflict } from '@/infrastructure/filesystem/git-rebase-conflicts';
 let root: string;
 const sha = async (ref = 'HEAD') => (await git(root, ['rev-parse', ref])).stdout.trim();
 async function commit(value: string | Buffer) {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { relative, resolve } from 'node:path';
+import { relative, resolve, dirname } from 'node:path';
 import {
   evaluateRules,
   parseImports,
@@ -8,7 +8,7 @@ import {
   type DependencyRule,
   type ScannedFile,
   type SpecifierMatcher,
-} from '../helpers/import-scan';
+} from '#tests/helpers/import-scan';
 
 const repositoryRoot = resolve(import.meta.dir, '../../../../');
 const serverSourceRoot = resolve(repositoryRoot, 'packages/server/src');
@@ -21,6 +21,7 @@ const infrastructureDir = resolve(serverSourceRoot, 'infrastructure');
 const adaptersDir = resolve(serverSourceRoot, 'adapters');
 const adaptersCapekDir = resolve(adaptersDir, 'capek');
 const harnessesDir = resolve(serverSourceRoot, 'harnesses');
+const prokopHarnessDir = resolve(harnessesDir, 'prokop');
 const routesDir = resolve(serverSourceRoot, 'transport/http/routes');
 const utilsDir = resolve(serverSourceRoot, 'utils');
 const layerDirs = [bootstrapDir, transportDir, applicationDir, domainsDir, infrastructureDir, adaptersDir, harnessesDir];
@@ -72,9 +73,6 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
   ],
   'packages/server/src/adapters/capek/workspace.ts': [
     '@/infrastructure/sqlite/workspaces', '@/infrastructure/runtime/environment', '@/infrastructure/runtime/paths',
-  ],
-  'packages/server/src/adapters/capek/bindings.ts': [
-    '@/infrastructure/runtime/workspace-dirs',
   ],
   'packages/server/src/adapters/jean2/session-repository.ts': [
     '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/queued-messages', '@/infrastructure/sqlite/tool-output-artifacts', '@/infrastructure/sqlite/attachments', '@/infrastructure/sqlite/pending-asks', '@/infrastructure/sqlite/workspaces', '@/adapters/capek/compaction-recovery', '@/infrastructure/session-title',
@@ -187,7 +185,7 @@ const layerHttpRoutesLegacyExceptions: Record<string, string[]> = {};
 // here until the route is migrated onto a sandbox application port.
 const layerHttpRoutesSandboxExceptions: Record<string, string[]> = {
   'packages/server/src/transport/http/routes/sandbox.ts': [
-    '@/adapters/capek/contracts', '@/infrastructure/sandbox',
+    '@/harnesses/prokop/composition/contracts', '@/infrastructure/sandbox',
   ],
 };
 
@@ -287,7 +285,7 @@ const layerRules: DependencyRule[] = [
       { prefix: '@ai-sdk/' },
       { prefix: '@capekai/core' },
     ],
-    allowedResolvedDirs: [transportDir, applicationDir, adaptersCapekDir],
+    allowedResolvedDirs: [transportDir, applicationDir, adaptersCapekDir, prokopHarnessDir],
     exceptions: {
       ...layerTransportLegacyExceptions,
       ...layerTransportRenameCompatExceptions,
@@ -321,22 +319,22 @@ const layerRules: DependencyRule[] = [
     name: 'layer-infrastructure',
     rationale: 'Infrastructure implements ports. It may import domains and application ports but not transport route handlers. The built-in tools catalog is a server-internal asset leaf (installer collision guard).',
     appliesTo: [infrastructureDir],
-    allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir, adaptersCapekDir, builtinToolsDir],
+    allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir, adaptersCapekDir, prokopHarnessDir, builtinToolsDir],
     exceptions: layerInfrastructureExceptions,
   },
   {
     name: 'layer-adapters',
     rationale: 'Adapters translate Capek contracts and Jean2 ports. Transport-owned implementation exceptions are explicit and documented; the built-in tools catalog is a server-internal asset leaf (resolver and catalog seam).',
     appliesTo: [adaptersDir],
-    allowedResolvedDirs: [adaptersDir, applicationDir, domainsDir, builtinToolsDir],
+    allowedResolvedDirs: [adaptersDir, applicationDir, domainsDir, prokopHarnessDir, builtinToolsDir],
     exceptions: layerAdaptersLegacyExceptions,
   },
   {
     name: 'layer-adapters-capek-only',
-    rationale: 'Only the Capek adapter directory translates Capek contracts. SDK and client-event adapters must not import @capekai/core.',
-    appliesTo: [adaptersDir],
+    rationale: 'Only the Capek adapter directory and the Prokop harness (its composed runtime) translate Capek contracts. SDK, client-event, and non-Prokop harness files must not import @capekai/core.',
+    appliesTo: [adaptersDir, harnessesDir],
     forbiddenSpecifiers: [{ prefix: '@capekai/core' }],
-    allowedInDirs: [adaptersCapekDir],
+    allowedInDirs: [adaptersCapekDir, prokopHarnessDir],
   },
   {
     name: 'layer-http-routes',
@@ -539,7 +537,7 @@ describe('server layer boundaries', () => {
           "import { startApp } from '../transport/http/app';",
           "import { createApplication } from '../application';",
           "import { openDatabase } from '../infrastructure/sqlite/connection';",
-          "import { profile } from '../adapters/capek/profile';",
+          "import { profile } from '../harnesses/prokop/composition/profile';",
           "import { legacyStore } from '../store';",
         ].join('\n'),
       },
@@ -594,10 +592,18 @@ describe('server layer boundaries', () => {
     ]);
   });
 
-  test('only adapters/capek may import @capekai/core', () => {
+  test('only adapters/capek and the Prokop harness may import @capekai/core', () => {
     const files: ScannedFile[] = [
       {
         path: resolve(adaptersCapekDir, 'storage.ts'),
+        sourceText: "import { createAgent } from '@capekai/core';\n",
+      },
+      {
+        path: resolve(prokopHarnessDir, 'composition/profile.ts'),
+        sourceText: "import { createAgent } from '@capekai/core';\n",
+      },
+      {
+        path: resolve(harnessesDir, 'codex-cli/execution.ts'),
         sourceText: "import { createAgent } from '@capekai/core';\n",
       },
       {
@@ -613,6 +619,7 @@ describe('server layer boundaries', () => {
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
 
     expect(result.violations).toEqual([
+      'packages/server/src/harnesses/codex-cli/execution.ts imports @capekai/core (value) [rule: layer-adapters-capek-only]',
       'packages/server/src/adapters/sdk/events.ts imports @capekai/core (value) [rule: layer-adapters-capek-only]',
       'packages/server/src/adapters/client-events/presenter.ts imports @capekai/core/storage (value) [rule: layer-adapters-capek-only]',
     ]);
@@ -736,9 +743,9 @@ describe('server layer boundaries', () => {
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '../application',
-      '../connection-id',
-      '../router-context',
+      '@/transport/websocket/application',
+      '@/transport/websocket/connection-id',
+      '@/transport/websocket/router-context',
       '@prokopai/sdk',
     ].sort());
     expect(imports.some((imp) => imp.specifier === '@/store/permissions')).toBe(false);
@@ -1196,7 +1203,7 @@ describe('server layer boundaries', () => {
     expect(file).toBeDefined();
 
     expect(parseImports(file!.sourceText, file!.path).map((imp) => imp.specifier).sort()).toEqual([
-      '@/adapters/capek/contracts',
+      '@/harnesses/prokop/composition/contracts',
       './database',
       'node:crypto',
     ].sort());
@@ -1495,7 +1502,7 @@ describe('server layer boundaries', () => {
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
       '@prokopai/sdk',
-      '../ports/files',
+      '@/application/ports/files',
       'path',
     ].sort());
     expect(file!.sourceText).not.toContain("@/store");
@@ -1726,7 +1733,7 @@ describe('server layer boundaries', () => {
     const runner = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === runnerPath);
     expect(runner).toBeDefined();
     expect(parseImports(runner!.sourceText, runner!.path).map((imp) => imp.specifier).sort()).toEqual([
-      '@/adapters/capek/contracts',
+      '@/harnesses/prokop/composition/contracts',
       '@/application/ports/scheduling',
       '@prokopai/sdk',
       'crypto',
@@ -1736,7 +1743,7 @@ describe('server layer boundaries', () => {
     const adapter = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(adapter).toBeDefined();
     expect(parseImports(adapter!.sourceText, adapter!.path).map((imp) => imp.specifier).sort()).toEqual([
-      '@/adapters/capek/execution-scope',
+      '@/harnesses/prokop/composition/execution-scope',
       '@/application/ports/scheduling',
       '@/config',
       '@/infrastructure/config/preconfig',
@@ -1753,10 +1760,10 @@ describe('server layer boundaries', () => {
     const executionPath = resolve(harnessesDir, 'prokop/execution.ts');
     const execution = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === executionPath);
     expect(execution).toBeDefined();
-    expect(parseImports(execution!.sourceText, execution!.path).map((imp) => imp.specifier)).toContain('@/adapters/capek/execution-scope');
+    expect(parseImports(execution!.sourceText, execution!.path).map((imp) => imp.specifier)).toContain('@/harnesses/prokop/composition/execution-scope');
     expect(execution!.sourceText).toContain('withJean2ExecutionScope');
 
-    const scopePath = resolve(adaptersCapekDir, 'execution-scope.ts');
+    const scopePath = resolve(prokopHarnessDir, 'composition/execution-scope.ts');
     const scope = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === scopePath);
     expect(scope).toBeDefined();
     expect(parseImports(scope!.sourceText, scope!.path).map((imp) => imp.specifier)).toContain('./composition');
@@ -1774,12 +1781,31 @@ describe('server layer boundaries', () => {
     }
   });
 
+  test('S11.1 gate: cross-directory imports use aliases instead of relative paths', () => {
+    const violations: string[] = [];
+    for (const file of [...scanDirectory(serverSourceRoot), ...scanDirectory(serverTestsRoot)]) {
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        if (!imp.specifier.startsWith('.')) continue;
+        // '../' always escapes the importing file's directory; './a/b' escapes
+        // when the resolved target sits in another directory. Same-directory
+        // './x' imports move with their file and stay allowed.
+        const resolved = resolveLocalSpecifier(imp.specifier, imp.file, serverSourceRoot);
+        if (imp.specifier.startsWith('..') || resolved === null || dirname(resolved) !== dirname(imp.file)) {
+          violations.push(
+            `${relative(repositoryRoot, imp.file)} imports ${imp.specifier} [rule: no-cross-directory-relative-imports]`,
+          );
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
   test('S10 gate: startup owns execution composition creation and disposal', () => {
     const startupPath = resolve(serverSourceRoot, 'index.ts');
     const startup = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === startupPath);
     expect(startup).toBeDefined();
     expect(parseImports(startup!.sourceText, startup!.path).map((imp) => imp.specifier)).toContain(
-      '@/adapters/capek/execution-scope',
+      '@/harnesses/prokop/composition/execution-scope',
     );
 
     const source = startup!.sourceText;
@@ -1946,9 +1972,9 @@ describe('server layer boundaries', () => {
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
       '@prokopai/sdk',
-      '../application',
-      '../connection-id',
-      '../router-context',
+      '@/transport/websocket/application',
+      '@/transport/websocket/connection-id',
+      '@/transport/websocket/router-context',
     ].sort());
 
     expect(Object.keys(layerTransportLegacyExceptions)).not.toContain(
@@ -2176,7 +2202,7 @@ describe('server layer boundaries', () => {
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(
-      imports.some((imp) => imp.specifier === '../application'),
+      imports.some((imp) => imp.specifier === '@/transport/websocket/application'),
     ).toBe(true);
     expect(
       imports.some((imp) => imp.specifier === '@/services/web-push/dispatch'),

@@ -2,7 +2,7 @@ import { capekContextAssemblerKey, createAgentScope, createProcessScope, enterAg
 import { getRuntimeHost, runtimeHostValuePlugin } from '@capekai/core/plugins';
 import { executeChildSession } from '@capekai/core/providers';
 import type { Preconfig } from '@prokopai/sdk';
-import { jean2AgentPlugins, jean2ProcessPlugins } from './profile';
+import { jean2AgentPlugins, jean2ProcessPlugins } from '@/harnesses/prokop/composition/profile';
 import { createLearningToolsPlugins, type LearningToolsOptions } from './learning-tools';
 
 const OMITTED = new Set([

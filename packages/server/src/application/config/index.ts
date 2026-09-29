@@ -2,7 +2,7 @@ import type {
   ModelsConfigurationPort,
   PreconfigsConfigurationPort,
   PromptsConfigurationPort,
-} from '../ports/configuration';
+} from '@/application/ports/configuration';
 
 export interface ConfigurationApplication {
   models: ModelsConfigurationPort;

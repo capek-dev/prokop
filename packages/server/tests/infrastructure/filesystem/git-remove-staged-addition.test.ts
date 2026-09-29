@@ -2,8 +2,8 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { git, removeGitStagedAddition } from '../../../src/infrastructure/filesystem/git-operations';
-import { getGitStatus } from '../../../src/infrastructure/filesystem/git-status';
+import { git, removeGitStagedAddition } from '@/infrastructure/filesystem/git-operations';
+import { getGitStatus } from '@/infrastructure/filesystem/git-status';
 let root: string;
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'git-unstage-'));

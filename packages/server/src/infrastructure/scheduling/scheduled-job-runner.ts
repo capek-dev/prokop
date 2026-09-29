@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { Preconfig, ScheduledJob, Session } from '@prokopai/sdk';
-import { executeChildSession, findProviderFromModel } from '@/adapters/capek/contracts';
+import { executeChildSession, findProviderFromModel } from '@/harnesses/prokop/composition/contracts';
 import type {
   ScheduledJobRepositoryPort,
   ScheduledRunModelsConfigPort,

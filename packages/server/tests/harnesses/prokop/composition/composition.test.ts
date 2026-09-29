@@ -33,16 +33,16 @@ import {
 } from '@capekai/core/composition';
 import * as focused from '@/adapters/capek';
 import { configureJean2SessionSearchHost } from '@/adapters/capek/session-search';
-import { JEAN2_AGENT_PLUGIN_IDS, JEAN2_PROCESS_PLUGIN_IDS } from '@/adapters/capek/profile';
+import { JEAN2_AGENT_PLUGIN_IDS, JEAN2_PROCESS_PLUGIN_IDS } from '@/harnesses/prokop/composition/profile';
 import { createWiredApplication } from '@/bootstrap/application';
 import { createJean2RuntimeComposition, createRuntime } from '@/bootstrap/create-runtime';
 import { createMessage, createPart } from '@/infrastructure/sqlite/message-store';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { createTestTextPart, createTestUserMessage } from '#tests/factories';
 import { seedSession, seedWorkspace } from '#tests/seed';
-import { parseImports } from '../../helpers/import-scan';
+import { parseImports } from '#tests/helpers/import-scan';
 
-const repositoryRoot = resolve(import.meta.dir, '../../../../../');
+const repositoryRoot = resolve(import.meta.dir, '../../../../../../');
 const serverSourceRoot = resolve(repositoryRoot, 'packages/server/src');
 const compositionRootPath = resolve(serverSourceRoot, 'bootstrap/create-runtime.ts');
 
@@ -118,7 +118,7 @@ describe('Čapek composition root', () => {
       '@/adapters/capek/storage',
       '@/adapters/capek/session-search',
       '@/adapters/capek/scheduler',
-      '@/adapters/capek/composition',
+      '@/harnesses/prokop/composition/composition',
       '@/adapters/capek/tool-resolver',
       '@/bootstrap/application',
       '@/application/agents',

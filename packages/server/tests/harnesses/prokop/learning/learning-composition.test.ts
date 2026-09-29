@@ -3,7 +3,7 @@ import { buildAiSdkTools } from '@capekai/core/execution';
 import { getRuntimeHost } from '@capekai/core/hosts';
 import { listDomainToolFallbackDefinitions } from '@capekai/core/tools';
 import type { Preconfig } from '@prokopai/sdk';
-import { executeLearningComposition } from '@/adapters/capek/learning-composition';
+import { executeLearningComposition } from '@/harnesses/prokop/learning/learning-composition';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedSession, seedWorkspace } from '#tests/seed';
 

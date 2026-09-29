@@ -1,5 +1,5 @@
 import { ASK_TIMEOUT } from '@capekai/core/ask-authority';
-import { getAuthorityForPendingAsk } from './contracts';
+import { getAuthorityForPendingAsk } from '@/harnesses/prokop/composition/contracts';
 import type { AskAuthorityPort } from '@/application/ports/session';
 
 /**

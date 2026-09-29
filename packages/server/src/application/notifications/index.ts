@@ -20,7 +20,7 @@ import {
   RETRY_NEXT_ATTEMPT_MS,
   shouldExhaustRetries,
 } from '@/domains/notifications';
-import type { NotificationsApplicationDeps } from '../ports/notifications';
+import type { NotificationsApplicationDeps } from '@/application/ports/notifications';
 
 /**
  * Notification use cases (S4/S5). Own the route-level subscription flows and

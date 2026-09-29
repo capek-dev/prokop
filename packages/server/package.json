@@ -60,7 +60,9 @@
     "#tests/seed": "./tests/helpers/seed.ts",
     "#tests/test-dir": "./tests/helpers/test-dir.ts",
     "#tests/mock-ws": "./tests/helpers/mock-ws.ts",
-    "#tests/wire-application": "./tests/helpers/wire-application.ts"
+    "#tests/wire-application": "./tests/helpers/wire-application.ts",
+    "#tests/*": "./tests/*",
+    "#package": "./package.json"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

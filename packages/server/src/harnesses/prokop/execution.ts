@@ -18,7 +18,7 @@ import type {
 } from '@/application/ports/execution';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import { createJean2RuntimeContext } from '@/adapters/capek/events';
-import { withJean2ComposedScopeSync, withJean2ExecutionScope } from '@/adapters/capek/execution-scope';
+import { withJean2ComposedScopeSync, withJean2ExecutionScope } from '@/harnesses/prokop/composition/execution-scope';
 
 export interface Jean2SessionExecutionDependencies {
   handleChat?: typeof handleCapekChat;

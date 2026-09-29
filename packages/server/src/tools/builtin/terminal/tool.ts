@@ -17,7 +17,7 @@ import {
   createShellPermissionAskStructured,
   createWorkspaceModificationAsk,
 } from '@prokopai/sdk';
-import { analyzeRisk, resolveCommandPath, stripRedundantCd } from '../shell/risk';
+import { analyzeRisk, resolveCommandPath, stripRedundantCd } from '@/tools/builtin/shell/risk';
 import { getTerminalManager } from '@/transport/terminal';
 
 interface TerminalInput {

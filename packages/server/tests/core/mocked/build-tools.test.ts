@@ -9,7 +9,7 @@ import {
   configureStorage,
   type StorageBundle,
 } from '@capekai/core/storage';
-import { configureJean2Bindings } from '@/adapters/capek/bindings';
+import { configureJean2Bindings } from '@/harnesses/prokop/composition/bindings';
 import { jean2CompatibilityBindings, jean2StorageBundle } from '@/adapters/capek';
 import { buildAiSdkTools, type BuildToolsOptions } from '@capekai/core/execution';
 import { clearCache, scanTools } from '@capekai/core/tools';

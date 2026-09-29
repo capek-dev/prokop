@@ -18,7 +18,7 @@ import type {
   WorkspaceSessionListingPort,
   WorkspaceTerminalPort,
   WorkspaceTerminalSession,
-} from '../ports/workspace';
+} from '@/application/ports/workspace';
 import {
   workspaceNameOrDefault,
 } from '@/domains/workspaces';

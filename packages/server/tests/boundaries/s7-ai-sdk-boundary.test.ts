@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { resolve } from 'node:path';
-import { parseImports, scanDirectory } from '../helpers/import-scan';
-import serverPackage from '../../package.json';
+import { parseImports, scanDirectory } from '#tests/helpers/import-scan';
+import serverPackage from '#package';
 
 const serverSourceRoot = resolve(import.meta.dir, '../../src');
 const forbiddenPackages = [

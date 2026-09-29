@@ -2,7 +2,7 @@ import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep, dirname } from 'node:path';
 import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
 import { SENSITIVE_FILE_PATTERNS } from '@prokopai/sdk';
-import { classifyCodexHook } from '../codex-cli/hook-policy';
+import { classifyCodexHook } from '@/harnesses/codex-cli/hook-policy';
 
 const sensitive = (path: string): boolean => SENSITIVE_FILE_PATTERNS.some(pattern => path.toLowerCase().includes(pattern));
 const valid = (value: unknown): value is string => typeof value === 'string'

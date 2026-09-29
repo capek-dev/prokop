@@ -1,6 +1,6 @@
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import type { PermissionAsk } from '@prokopai/sdk';
-import { canAutoApproveHarnessTool } from '../approval-policy';
+import { canAutoApproveHarnessTool } from '@/harnesses/approval-policy';
 import { classifyClaudeTool } from './tool-policy';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';

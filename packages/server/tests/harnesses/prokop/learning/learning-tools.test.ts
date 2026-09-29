@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { capekToolResolverKey, createAgentScope, createProcessScope } from '@capekai/core/composition';
 import { loadedToolsPlugin } from '@capekai/core/plugins';
 import type { ToolContext, ToolDefinition } from '@capekai/tool';
-import { createLearningToolsPlugins, type LearningToolsOptions } from '@/adapters/capek/learning-tools';
+import { createLearningToolsPlugins, type LearningToolsOptions } from '@/harnesses/prokop/learning/learning-tools';
 
 const definitions: ToolDefinition[] = ['memory', 'agent_memory', 'skill_manage', 'agent_skill_manage', 'session_search'].map(name => ({
   name, description: name, inputSchema: { type: 'object', properties: {} },

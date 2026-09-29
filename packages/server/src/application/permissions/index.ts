@@ -1,5 +1,5 @@
 import type { PermissionGrant } from '@prokopai/sdk';
-import type { PermissionGrantRepositoryPort } from '../ports/permissions';
+import type { PermissionGrantRepositoryPort } from '@/application/ports/permissions';
 
 export interface PermissionsApplication {
   list(workspaceId: string, options?: { includeRevoked?: boolean }): PermissionGrant[];

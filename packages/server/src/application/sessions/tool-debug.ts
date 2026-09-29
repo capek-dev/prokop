@@ -5,7 +5,7 @@ import {
   type ToolPart,
   type ToolState,
 } from '@prokopai/sdk';
-import type { ToolCatalogPort } from '../ports/tool-catalog';
+import type { ToolCatalogPort } from '@/application/ports/tool-catalog';
 
 export interface ToolDebugData {
   input: Record<string, unknown>;

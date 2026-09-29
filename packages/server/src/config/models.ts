@@ -3,7 +3,7 @@ import { atomicWriteFile } from '@/config/files';
 import { existsSync, readFileSync } from 'fs';
 import { ConfigurationNotFoundError, ConfigurationValidationError, ConfigurationConflictError } from '@/config/errors';
 import { getJean2EnvValue } from '@/infrastructure/runtime/environment';
-import { getProviderStatus } from '@/adapters/capek/contracts';
+import { getProviderStatus } from '@/harnesses/prokop/composition/contracts';
 import type {
   ModelsConfigResponse,
   ModelRuntimeStatus,

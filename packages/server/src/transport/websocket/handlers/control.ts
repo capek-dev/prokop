@@ -1,6 +1,6 @@
-import type { RouterContext } from '../router-context';
-import type { ConnectionId } from '../connection-id';
-import { createWirePorts, requireWireApplication } from '../application';
+import type { RouterContext } from '@/transport/websocket/router-context';
+import type { ConnectionId } from '@/transport/websocket/connection-id';
+import { createWirePorts, requireWireApplication } from '@/transport/websocket/application';
 import type {
   SessionControlClaimMessage,
   SessionControlReleaseMessage,
@@ -34,5 +34,5 @@ export function handleReleaseMessage(
 // check and rejection delivery. The gate policy lives in the controller
 // domain (`@/domains/controllers`), applied by the control registry; the
 // application uses the same functions through the gate port.
-export { checkControllerGate } from '../control-registry';
-export { sendGateRejection } from '../router-context';
+export { checkControllerGate } from '@/transport/websocket/control-registry';
+export { sendGateRejection } from '@/transport/websocket/router-context';

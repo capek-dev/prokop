@@ -1,9 +1,9 @@
-import type { SessionWirePorts } from '../ports/delivery';
-import type { SessionExecutionPort } from '../ports/execution';
-import type { ControllerGatePort } from '../ports/control';
-import type { SessionRepositoryPort } from '../ports/session';
-import type { ToolCatalogPort } from '../ports/tool-catalog';
-import type { WorktreeAttachmentRefreshPort } from '../ports/worktree';
+import type { SessionWirePorts } from '@/application/ports/delivery';
+import type { SessionExecutionPort } from '@/application/ports/execution';
+import type { ControllerGatePort } from '@/application/ports/control';
+import type { SessionRepositoryPort } from '@/application/ports/session';
+import type { ToolCatalogPort } from '@/application/ports/tool-catalog';
+import type { WorktreeAttachmentRefreshPort } from '@/application/ports/worktree';
 import { sendGateRejection } from './chat';
 import { unknownHarnessError } from './harness-policy';
 import { projectMessagesForClient } from './tool-debug';

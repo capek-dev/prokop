@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'bun:test';
-import { collectSourceFiles, parseImports } from '../helpers/import-scan';
+import { collectSourceFiles, parseImports } from '#tests/helpers/import-scan';
 import { handleNotificationAcknowledge } from '@/transport/websocket/handlers/misc';
 import type { ServerMessage } from '@prokopai/sdk';
 

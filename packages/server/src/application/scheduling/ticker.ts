@@ -1,7 +1,7 @@
 import type {
   ScheduledJobExecutionPort,
   ScheduledJobRepositoryPort,
-} from '../ports/scheduling';
+} from '@/application/ports/scheduling';
 
 export const SCHEDULER_TICK_INTERVAL_MS = 60_000;
 
