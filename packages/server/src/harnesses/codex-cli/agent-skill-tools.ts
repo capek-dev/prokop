@@ -20,7 +20,8 @@ const FIELDS = ['name', 'description', 'content', 'oldString', 'newString'];
 
 // The core manager follows SKILL.md symlinks on update/patch. Reject unsafe trees
 // before delegating so this bridge cannot write through an existing link.
-async function safeSkillDirectory(agentDir: string): Promise<boolean> {
+// Shared with the Claude harness's in-process skill tool.
+export async function safeSkillDirectory(agentDir: string): Promise<boolean> {
   if (!isAbsolute(agentDir)) return false;
   try {
     if (!(await lstat(agentDir)).isDirectory()) return false;
@@ -86,9 +87,15 @@ export function createCodexAgentSkillTools(options: {
         if (!await safeSkillDirectory(options.agentDir!) || !authorized(params.turnId)) {
           return fail('Agent skill directory unavailable');
         }
-        const result = await options.bridge.execute(input, join(options.agentDir!, 'skills'));
+        const skillsDir = join(options.agentDir!, 'skills');
+        const result = await options.bridge.execute(input, skillsDir);
         if (!authorized(params.turnId)) return fail('Agent skill management unavailable');
-        const text = JSON.stringify(result.success ? result : { error: result.error ?? 'Agent skill operation failed' });
+        // The executor returns skill-relative paths; make them absolute so the
+        // model never has to guess the on-disk skills location.
+        const payload = result.success && typeof result.path === 'string' && result.path
+          && !isAbsolute(result.path) ? { ...result, path: join(skillsDir, result.path) } : result;
+        const text = JSON.stringify(result.success ? payload
+          : { error: result.error ?? 'Agent skill operation failed' });
         if (text.length > 32_000) return fail('Agent skill result exceeds response limit');
         return { success: result.success, contentItems: [{ type: 'inputText', text }] };
       } catch { return fail('Agent skill operation failed'); }

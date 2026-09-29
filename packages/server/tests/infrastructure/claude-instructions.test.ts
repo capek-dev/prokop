@@ -44,6 +44,7 @@ test('Claude developer instructions retain agent identity, skills, and workspace
     const text = await claudeDeveloperInstructions(plainWorkspace, '/projects/worktree',
       { ...agent, skills: ['deploy'] } as Preconfig, plainSources(dir));
     expect(text).toContain(`Home directory: ${join(dir, 'home')}`);
+    expect(text).toContain(`Agent skills directory: ${join(dir, 'skills')}`);
     expect(text).toContain(`- ${join(dir, 'MEMORY.md')}`);
     expect(text.indexOf('Agent fact')).toBeLessThan(text.indexOf('Agent preference'));
     expect(text.indexOf('Agent preference')).toBeLessThan(text.indexOf('Work carefully.'));

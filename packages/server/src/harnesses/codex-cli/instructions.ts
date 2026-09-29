@@ -50,7 +50,7 @@ export async function codexDeveloperInstructions(
     const home = join(agentDir, 'home');
     const memoryPath = join(agentDir, 'MEMORY.md');
     const userPath = join(agentDir, 'USER.md');
-    sections.push(`<agent_home>\nHome directory: ${home}\nAgent memory files (when present):\n- ${memoryPath}\n- ${userPath}\nAccess outside the working directory remains subject to Codex sandbox and approvals.\n</agent_home>`);
+    sections.push(`<agent_home>\nHome directory: ${home}\nAgent skills directory: ${join(agentDir, 'skills')}\nAgent memory files (when present):\n- ${memoryPath}\n- ${userPath}\nAccess outside the working directory remains subject to Codex sandbox and approvals.\n</agent_home>`);
     const memory = await sources.readAgentMemoryFile(preconfig.id, 'MEMORY.md');
     const user = await sources.readAgentMemoryFile(preconfig.id, 'USER.md');
     if (memory) sections.push(`<agent_memory>\n${memory}\n</agent_memory>`);

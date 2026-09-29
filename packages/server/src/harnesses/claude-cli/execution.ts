@@ -21,9 +21,11 @@ import type { ClaudeTurnUsage } from './usage';
 import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistory, type ClaudeRollbackDependencies } from './rollback';
 import { forkClaudeSession } from './fork';
 import { claudeDeveloperInstructions, defaultClaudePreconfigId, type ClaudeInstructionSources } from './instructions';
-import { createClaudeMemoryTools, createClaudeSessionSearchTools, claudeMcpToolDisplayName } from './dynamic-tools';
+import { createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools,
+  claudeMcpToolDisplayName } from './dynamic-tools';
 import type { CodexMemoryBridge } from '../codex-cli/memory-tools';
 import type { CodexSessionSearchBridge } from '../codex-cli/session-search-tools';
+import type { CodexAgentSkillBridge } from '../codex-cli/agent-skill-tools';
 
 interface Binding {
   native_session_id: string;
@@ -40,6 +42,7 @@ export interface ClaudeExecutionDependencies extends ClaudeRollbackDependencies 
   instructions?: ClaudeInstructionSources;
   memoryTools?: CodexMemoryBridge;
   sessionSearch?: CodexSessionSearchBridge;
+  agentSkills?: CodexAgentSkillBridge;
 }
 
 export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
@@ -213,6 +216,12 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
               preconfigId, agentDir, signal: controller.signal,
               ask: request => (deps.approvals ?? claudeApprovals)
                 .requestSessionSearch(request, sessionId, session.workspaceId, wire.delivery) })];
+          }
+          if (deps.agentSkills && agentDir) {
+            // The agent's own skill directory is writable; no workspace setting or ask applies.
+            dynamicTools = [...dynamicTools, ...createClaudeSkillManageTools({
+              bridge: deps.agentSkills, sessionId, workspaceId: session.workspaceId,
+              preconfigId, agentDir, signal: controller.signal })];
           }
           developerInstructions = await claudeDeveloperInstructions(workspace, root, preconfig, {
             ...sources, getAgentDirectory: async () => agentDir,

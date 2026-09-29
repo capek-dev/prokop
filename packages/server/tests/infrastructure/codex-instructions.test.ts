@@ -29,6 +29,7 @@ test('Codex developer instructions retain agent identity and workspace paths wit
   };
   const text = await codexDeveloperInstructions(workspace, '/projects/worktree', primary, sources);
   expect(text).toContain('Home directory: /agents/primary/home');
+  expect(text).toContain('Agent skills directory: /agents/primary/skills');
   expect(text).toContain('- /agents/primary/MEMORY.md');
   expect(text).toContain('- /agents/primary/USER.md');
   expect(text.indexOf('Home directory:')).toBeLessThan(text.indexOf('Agent fact'));

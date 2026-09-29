@@ -197,6 +197,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     },
     memoryTools: codexMemoryTools,
     sessionSearch: codexSessionSearch,
+    agentSkills: codexAgentSkillTools,
   });
   const execution = createHarnessExecution(repository, {
     prokop: createProkopHarness({

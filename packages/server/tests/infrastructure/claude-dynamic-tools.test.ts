@@ -7,11 +7,12 @@ import type { Options, SDKMessage, SdkMcpToolDefinition } from '@anthropic-ai/cl
 
 type ToolResult = Awaited<ReturnType<SdkMcpToolDefinition['handler']>>;
 import type { PermissionAsk } from '@prokopai/sdk';
-import { installMemoryToolFallback, installSessionSearchToolFallback } from '@capekai/core/hosts';
+import { installMemoryToolFallback, installSessionSearchToolFallback, installSkillsToolFallback } from '@capekai/core/hosts';
 import { codexMemoryTools } from '@/adapters/capek/codex-memory';
 import { codexSessionSearch } from '@/adapters/capek/codex-session-search';
-import { claudeMemoryShape, claudeSessionSearchShape, claudeMcpToolDisplayName,
-  createClaudeMemoryTools, createClaudeSessionSearchTools } from '@/harnesses/claude-cli/dynamic-tools';
+import { codexAgentSkillTools } from '@/adapters/capek/codex-agent-skills';
+import { claudeMemoryShape, claudeSessionSearchShape, claudeSkillManageShape, claudeMcpToolDisplayName,
+  createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools } from '@/harnesses/claude-cli/dynamic-tools';
 import { createClaudeExecution } from '@/harnesses/claude-cli/execution';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
@@ -33,6 +34,9 @@ const fakeSearchDefs = [{ type: 'function' as const, name: 'session_search',
   description: 'Search prior conversation messages', inputSchema: { type: 'object' } }];
 const fakeSearchBridge = { definitions: () => fakeSearchDefs,
   execute: codexSessionSearch.execute };
+const fakeSkillDefs = [{ type: 'function' as const, name: 'agent_skill_manage',
+  description: 'Manage agent skills', inputSchema: { type: 'object' } }];
+const fakeSkillBridge = { definitions: () => fakeSkillDefs, execute: codexAgentSkillTools.execute };
 
 // zod v4 toJSONSchema adds standard-schema metadata, a $schema header, and
 // additionalProperties:false; compare the meaningful schema parts on both sides.
@@ -63,6 +67,11 @@ function searchTools(overrides: Partial<Parameters<typeof createClaudeSessionSea
     ask: async () => false, ...overrides });
 }
 
+function skillTools(overrides: Partial<Parameters<typeof createClaudeSkillManageTools>[0]> = {}) {
+  return createClaudeSkillManageTools({ bridge: fakeSkillBridge, sessionId: 's', workspaceId: 'ws',
+    preconfigId: 'agent', agentDir, signal: new AbortController().signal, ...overrides });
+}
+
 test('zod schema matches the live Capek memory definitions', () => {
   installMemoryToolFallback();
   const definitions = codexMemoryTools.definitions();
@@ -81,6 +90,59 @@ test('zod schema matches the live Capek session search definition', () => {
   for (const definition of definitions) {
     expect(clean(definition.inputSchema)).toEqual(clean(schema));
   }
+});
+
+test('zod schema matches the live Capek agent skill definition', () => {
+  installSkillsToolFallback();
+  const definitions = codexAgentSkillTools.definitions();
+  expect(definitions.map(definition => definition.name)).toEqual(['agent_skill_manage']);
+  const schema = z.toJSONSchema(z.object(claudeSkillManageShape));
+  for (const definition of definitions) {
+    expect(clean(definition.inputSchema)).toEqual(clean(schema));
+  }
+});
+
+test('agent skill manage registers only with a selected agent home', () => {
+  expect(skillTools({ agentDir: null })).toEqual([]);
+  expect(skillTools().map(item => item.name)).toEqual(['agent_skill_manage']);
+});
+
+test('agent skill writes stay in the selected agent home without any ask', async () => {
+  mkdirSync(join(agentDir, 'skills'), { recursive: true });
+  updateSession('s', { agentId: 'agent' });
+  const seen: string[] = [];
+  const bridge = { definitions: () => fakeSkillDefs,
+    execute: async (input: Record<string, unknown>, directory: string) => {
+      seen.push(directory);
+      return codexAgentSkillTools.execute(input, directory);
+    } };
+  const registered = skillTools({ bridge });
+  const result = await registered.find(item => item.name === 'agent_skill_manage')!.handler(
+    { action: 'create', name: 'Deploy Helper', description: 'Ship the app', content: 'Steps.' } as never, {});
+  expect(result.isError).toBeFalsy();
+  expect(seen).toEqual([join(agentDir, 'skills')]);
+  // The result carries an absolute path so the model never guesses the location.
+  expect(result.content[0]).toMatchObject({ type: 'text',
+    text: expect.stringContaining(join(agentDir, 'skills', 'deploy-helper', 'SKILL.md')) });
+  expect(readFileSync(join(agentDir, 'skills', 'deploy-helper', 'SKILL.md'), 'utf8'))
+    .toContain('Ship the app');
+});
+
+test('a stale turn, unbound agent, or changed preconfig refuses skill calls', async () => {
+  mkdirSync(join(agentDir, 'skills'), { recursive: true });
+  const controller = new AbortController();
+  const registered = skillTools({ signal: controller.signal });
+  const handler = registered.find(item => item.name === 'agent_skill_manage')!.handler;
+  controller.abort();
+  expect((await handler({ action: 'list' } as never, {})).isError).toBe(true);
+  const fresh = skillTools();
+  const call = fresh.find(item => item.name === 'agent_skill_manage')!.handler;
+  // The session has not bound its agent identity to the preconfig yet.
+  expect((await call({ action: 'list' } as never, {})).isError).toBe(true);
+  updateSession('s', { agentId: 'agent' });
+  expect((await call({ action: 'list' } as never, {})).isError).toBeFalsy();
+  updateSession('s', { preconfigId: 'other' });
+  expect((await call({ action: 'list' } as never, {})).isError).toBe(true);
 });
 
 test('session search registers only when the workspace enables it', () => {
@@ -291,9 +353,52 @@ test('Claude turns register session search and its guidance when the workspace e
   }
 });
 
+test('Claude turns register the agent skill manager and its guidance for agent sessions', async () => {
+  const dataDir = mkdtempSync(join(process.cwd(), '.claude-skills-exec-'));
+  mkdirSync(join(dataDir, 'tools'));
+  Paths.configure({ dataDir });
+  try {
+    createSession({ id: 'turn3', workspaceId: 'ws', title: 'Claude', status: 'active',
+      preconfigId: null, metadata: null, parentId: null, agentName: null, harness: 'claude-cli' });
+    saveClaudeModelSelection('turn3', { model: 'claude-sonnet-5', effort: 'medium' });
+    const events: unknown[] = [];
+    const wire = { actor: { attachOriginToSession: () => {} }, delivery: {
+      send: (_origin: string, value: unknown) => events.push(value),
+      broadcastToSession: (_id: string, value: unknown) => events.push(value),
+      broadcast: (value: unknown) => events.push(value),
+    } } as unknown as SessionWirePorts<string>;
+    let seen: Options | undefined;
+    const exec = createClaudeExecution({ version: () => '2.1.274', agentSkills: fakeSkillBridge,
+      instructions: {
+        listPreconfigs: async () => [{ id: 'agent', mode: 'primary', systemPrompt: 'Work carefully.' }] as never,
+        getPreconfig: async id => ({ id, mode: 'primary', systemPrompt: 'Work carefully.' }) as never,
+        getAgentDirectory: async () => agentDir,
+        readAgentMemoryFile: async () => null,
+      },
+      start: (_prompt, options) => {
+        seen = options;
+        const sessionId = options.sessionId ?? crypto.randomUUID();
+        async function* messages(): AsyncGenerator<SDKMessage> {
+          yield { type: 'system', subtype: 'init', session_id: sessionId } as SDKMessage;
+          yield { type: 'result', subtype: 'success', session_id: sessionId, result: 'reply' } as SDKMessage;
+        }
+        return messages();
+      } });
+    await exec.sendMessage(wire, 'origin', 'turn3', 'hello');
+    expect(Object.keys(seen?.mcpServers ?? {})).toEqual(['prokop']);
+    const append = (seen?.systemPrompt as { append?: string } | undefined)?.append ?? '';
+    expect(append).toContain('Use agent_skill_manage to list or maintain skills in the selected agent home.');
+    expect(getSession('turn3')?.agentId).toBe('agent');
+  } finally {
+    Paths.reset();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
 test('MCP tool names map to friendly transcript labels', () => {
   expect(claudeMcpToolDisplayName('mcp__prokop__memory')).toBe('Claude Memory');
   expect(claudeMcpToolDisplayName('mcp__prokop__agent_memory')).toBe('Claude Agent memory');
   expect(claudeMcpToolDisplayName('mcp__prokop__session_search')).toBe('Claude Session search');
+  expect(claudeMcpToolDisplayName('mcp__prokop__agent_skill_manage')).toBe('Claude Agent skills');
   expect(claudeMcpToolDisplayName('Read')).toBeNull();
 });

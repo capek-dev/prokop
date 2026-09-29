@@ -48,7 +48,7 @@ export class ClaudeApprovals {
       // The in-process Prokop tools carry their own per-mode ask inside their
       // handler; the SDK gate only re-checks registration-time availability.
       if (toolName === 'mcp__prokop__memory' || toolName === 'mcp__prokop__agent_memory'
-        || toolName === 'mcp__prokop__session_search') {
+        || toolName === 'mcp__prokop__session_search' || toolName === 'mcp__prokop__agent_skill_manage') {
         if (toolName === 'mcp__prokop__memory'
           && getWorkspace(workspaceId)?.settings.memory?.enabled !== true) {
           return denied('Workspace memory is disabled');

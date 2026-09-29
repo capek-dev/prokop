@@ -1,11 +1,14 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
+import { isAbsolute, join } from 'node:path';
 import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';
 import type { CodexMemoryBridge } from '../codex-cli/memory-tools';
 import type { CodexSessionSearchBridge } from '../codex-cli/session-search-tools';
+import type { CodexAgentSkillBridge } from '../codex-cli/agent-skill-tools';
+import { safeSkillDirectory } from '../codex-cli/agent-skill-tools';
 
 /** The in-process server name; the SDK reports its tools as mcp__prokop__<name>. */
 export const PROKOP_MCP_SERVER = 'prokop';
@@ -34,6 +37,16 @@ export const claudeSessionSearchShape = {
   window: z.number().optional().describe('Number of messages to return around the anchor in read-around mode. Default 8, max 25.'),
   roleFilter: z.array(z.enum(['user', 'assistant', 'tool'])).optional().describe('Roles to include in results. Defaults to ["user", "assistant"] unless workspace includes tool results.'),
   sort: z.enum(['relevance', 'newest', 'oldest']).optional().describe('Sort order for search results. Defaults to "relevance".'),
+};
+
+/** Mirrors the Capek skill manage input schema; a test pins it to the live definition. */
+export const claudeSkillManageShape = {
+  action: z.enum(['list', 'create', 'update', 'patch', 'delete']).describe('The action to perform.'),
+  name: z.string().optional().describe('Skill name (will be normalized to a safe slug). Matched case-insensitively against existing skills.'),
+  description: z.string().optional().describe('Concise trigger/use description for the skill. Required for create. Optional for update/patch.'),
+  content: z.string().optional().describe('Markdown body for create/update actions. Not full frontmatter — just the body.'),
+  oldString: z.string().optional().describe('Exact text to find for patch action. Must match exactly once. Load the skill first to see the exact content.'),
+  newString: z.string().optional().describe('Replacement text for patch action.'),
 };
 
 const fail = (message: string): { content: Array<{ type: 'text'; text: string }>; isError: boolean } => ({
@@ -165,10 +178,62 @@ export function createClaudeSessionSearchTools(options: {
     { alwaysLoad: true })) as unknown as SdkMcpToolDefinition[];
 }
 
+/** Register the agent skill manager for one Claude turn; writes stay in the selected agent home. */
+export function createClaudeSkillManageTools(options: {
+  bridge: CodexAgentSkillBridge;
+  definitions?: ReturnType<CodexAgentSkillBridge['definitions']>;
+  sessionId: string;
+  workspaceId: string;
+  preconfigId: string | null;
+  agentDir: string | null;
+  signal: AbortSignal;
+}): SdkMcpToolDefinition[] {
+  const definitions = options.agentDir
+    ? (options.definitions ?? options.bridge.definitions()).filter(definition =>
+      definition.type === 'function' && definition.name === 'agent_skill_manage') : [];
+  // The turn, its preconfig, and the bound agent home must still own the call when it runs.
+  const authorized = (): boolean => {
+    if (options.signal.aborted) return false;
+    try {
+      const current = getSession(options.sessionId);
+      return !!options.agentDir && !!current && current.harness === 'claude-cli'
+        && current.status === 'active' && current.workspaceId === options.workspaceId
+        && current.preconfigId === options.preconfigId && current.agentId === options.preconfigId;
+    } catch { return false; }
+  };
+  // Widen the specific zod shape to the SDK's open tool type, as with the memory tools.
+  return definitions.map(definition => tool(definition.name, definition.description, claudeSkillManageShape,
+    async input => {
+      if (!authorized()) return fail('Agent skill management unavailable');
+      if (JSON.stringify(input).length > MAX_ARGUMENTS
+        || input.action !== 'list' && (typeof input.name !== 'string' || !input.name)) {
+        return fail('Invalid agent skill arguments');
+      }
+      try {
+        if (!await safeSkillDirectory(options.agentDir!) || !authorized()) {
+          return fail('Agent skill directory unavailable');
+        }
+        const skillsDir = join(options.agentDir!, 'skills');
+        const result = await options.bridge.execute(input as Record<string, unknown>, skillsDir);
+        if (!authorized()) return fail('Agent skill management unavailable');
+        // The executor returns skill-relative paths; make them absolute so the
+        // model never has to guess the on-disk skills location.
+        const payload = result.success && typeof result.path === 'string' && result.path
+          && !isAbsolute(result.path) ? { ...result, path: join(skillsDir, result.path) } : result;
+        const text = JSON.stringify(result.success ? payload
+          : { error: result.error ?? 'Agent skill operation failed' });
+        if (text.length > MAX_RESULT) return fail('Agent skill result exceeds response limit');
+        return { content: [{ type: 'text', text }], isError: !result.success };
+      } catch { return fail('Agent skill operation failed'); }
+    },
+    { alwaysLoad: true })) as unknown as SdkMcpToolDefinition[];
+}
+
 /** Transcript-friendly names for the Prokop MCP tools the SDK reports. */
 export function claudeMcpToolDisplayName(name: string): string | null {
   if (name === `mcp__${PROKOP_MCP_SERVER}__memory`) return 'Claude Memory';
   if (name === `mcp__${PROKOP_MCP_SERVER}__agent_memory`) return 'Claude Agent memory';
   if (name === `mcp__${PROKOP_MCP_SERVER}__session_search`) return 'Claude Session search';
+  if (name === `mcp__${PROKOP_MCP_SERVER}__agent_skill_manage`) return 'Claude Agent skills';
   return null;
 }
