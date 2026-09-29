@@ -14,8 +14,8 @@ const UNAVAILABLE = 'Claude conversation history is not available for Edit or Un
 /** One native turn: a user message plus every consecutive assistant message it triggered. */
 export interface NativeTurn {
   userId: string;
-  /** UUID of the turn's final native message; the inclusive fork cutoff. */
-  assistantId: string;
+  /** UUID of the turn's final native message (the inclusive fork cutoff); null for a trailing user-only turn. */
+  assistantId: string | null;
   /** Native message count consumed by this turn. */
   length: number;
   userText: string;
@@ -54,7 +54,8 @@ function entryInvalid(entry: SessionMessage, nativeId: string, seen: Set<string>
 }
 
 /** Groups native history into user→assistant turns. Refuses anything but main-thread plain text/thinking messages. */
-export function groupClaudeTurns(native: SessionMessage[], nativeId: string): NativeTurn[] {
+export function groupClaudeTurns(native: SessionMessage[], nativeId: string,
+  options?: { allowTrailingUser?: boolean }): NativeTurn[] {
   const turns: NativeTurn[] = [];
   const seen = new Set<string>();
   let index = 0;
@@ -74,8 +75,15 @@ export function groupClaudeTurns(native: SessionMessage[], nativeId: string): Na
       assistantText += text;
       index++;
     }
-    // A user message with no assistant reply, or a non-assistant entry mid-turn, is unverifiable.
-    if (index === start) throw new Error(UNAVAILABLE);
+    if (index === start) {
+      // A fork cutoff may keep a final user message without its reply; only ever the last turn.
+      if (options?.allowTrailingUser && index === native.length) {
+        turns.push({ userId: user.uuid, assistantId: null, length: 1, userText, assistantText: '' });
+        break;
+      }
+      // A user message with no assistant reply, or a non-assistant entry mid-turn, is unverifiable.
+      throw new Error(UNAVAILABLE);
+    }
     turns.push({ userId: user.uuid, assistantId: native[index - 1]!.uuid, length: index - start + 1,
       userText, assistantText });
   }

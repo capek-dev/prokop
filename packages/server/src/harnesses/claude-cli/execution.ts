@@ -19,6 +19,7 @@ import { ClaudeChildTimelines } from './child-timelines';
 import { resolveClaudeImages } from './images';
 import type { ClaudeTurnUsage } from './usage';
 import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistory, type ClaudeRollbackDependencies } from './rollback';
+import { forkClaudeSession } from './fork';
 
 interface Binding {
   native_session_id: string;
@@ -35,7 +36,7 @@ export interface ClaudeExecutionDependencies extends ClaudeRollbackDependencies 
 }
 
 export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
-  Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'compact' | 'editMessage' | 'revert'> {
+  Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'compact' | 'editMessage' | 'revert' | 'fork'> {
   const active = new Map<string, AbortController>();
   const rollingBack = new Set<string>();
   const resubmitting = new Map<string, string>();
@@ -81,7 +82,11 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
       const history = await (deps.readHistory ?? getSessionMessages)(binding.native_session_id, { dir: root });
       const turns = matchClaudeHistory(local, history, binding.native_session_id);
       const turnCount = firstRemoved / 2;
-      const cutoff = turnCount === 0 ? null : turns[turnCount - 1]!.assistantId;
+      const cutoffTurn = turnCount === 0 ? null : turns[turnCount - 1]!;
+      if (cutoffTurn && cutoffTurn.assistantId === null) {
+        throw new Error('Claude conversation history is not available for Edit or Undo');
+      }
+      const cutoff = cutoffTurn?.assistantId ?? null;
       // The intent survives a lost fork response. Do not issue this fork a second time.
       getDatabase().run(`INSERT INTO claude_rollback_intents
         (session_id, operation, target_message_id, phase) VALUES (?, ?, ?, 'fork')`,
@@ -438,6 +443,36 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           'Claude conversation history is not available for Edit or Undo']);
         throw new Error(error instanceof Error && safe.has(error.message)
           ? error.message : 'Claude conversation cannot be undone at this point', { cause: error });
+      }
+    },
+    async fork(input) {
+      try {
+        const session = getSession(input.sessionId);
+        if (!session || session.harness !== 'claude-cli' || session.parentId || session.status !== 'active'
+          || active.has(input.sessionId) || rollingBack.has(input.sessionId)) {
+          throw new Error('Claude session is unavailable or busy');
+        }
+        const workspace = getWorkspace(session.workspaceId);
+        if (!workspace?.path || workspace.isVirtual) throw new Error('Claude workspace is unavailable');
+        const worktree = session.workspaceRootId
+          ? createManagedWorktreeRepository(getDatabase).get(session.workspaceRootId) : null;
+        if (session.workspaceRootId && (!worktree || worktree.workspaceId !== session.workspaceId
+          || worktree.state !== 'available')) throw new Error('Claude workspace is unavailable');
+        return await forkClaudeSession(input, { root: realpathSync(worktree?.path ?? workspace.path),
+          version: deps.version ?? claudeCliVersion,
+          busy: id => active.has(id) || rollingBack.has(id),
+          readHistory: deps.readHistory, forkHistory: deps.forkHistory });
+      } catch (error) {
+        if (getDatabase().query('SELECT 1 FROM claude_fork_intents WHERE source_session_id = ?').get(input.sessionId)) {
+          throw new Error('Claude fork outcome is uncertain; do not retry in this session', { cause: error });
+        }
+        const safe = new Set(['Claude session is unavailable or busy', 'Claude workspace is unavailable',
+          'Claude native history is unavailable', 'Claude Goal or Compact history cannot be forked',
+          'Claude history requires recovery before fork', 'A Claude fork has an uncertain outcome; do not retry it',
+          'Claude fork requires a completed assistant response or a user message', 'Claude fork of image history is not supported',
+          'Claude conversation history is not available for fork']);
+        throw new Error(error instanceof Error && safe.has(error.message)
+          ? error.message : 'Claude conversation cannot be forked at this point', { cause: error });
       }
     },
     async editMessage(wire, origin, input) {

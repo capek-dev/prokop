@@ -50,6 +50,7 @@ interface VirtualizedTranscriptProps {
   onRevert?: (sessionId: string, stepPartId: string) => void;
   onFork?: (sessionId: string, messageId: string) => void;
   assistantOnlyFork?: boolean;
+  forkUnavailableReason?: string;
   onEditMessage?: (sessionId: string, messageId: string, content: string) => void;
   onCompact?: () => void;
   isMainActiveSession?: boolean;
@@ -495,6 +496,7 @@ interface MessageRowProps {
   onRevert?: (sessionId: string, stepPartId: string) => void;
   onFork?: (sessionId: string, messageId: string) => void;
   assistantOnlyFork?: boolean;
+  forkUnavailableReason?: string;
   isMainActiveSession?: boolean;
   isCompacting?: boolean;
   onCompact?: () => void;
@@ -517,6 +519,7 @@ const MessageRow = memo(function MessageRow({
   onRevert,
   onFork,
   assistantOnlyFork = false,
+  forkUnavailableReason,
   onEditMessage,
   isMainActiveSession = false,
   isCompacting = false,
@@ -575,6 +578,7 @@ const MessageRow = memo(function MessageRow({
         canRevert={canRevert && revertMessageId !== null}
         onRevert={revertMessageId && onRevert ? () => onRevert(sessionId, revertMessageId) : undefined}
         canFork={canFork}
+        forkUnavailableReason={forkUnavailableReason}
         onFork={canFork && onFork ? () => onFork(sessionId, item.message.id) : undefined}
         canEdit={canRevert && !item.isQueued}
         onEdit={onEditMessage ? (content) => onEditMessage(sessionId, item.message.id, content) : undefined}
@@ -634,6 +638,7 @@ function areMessageRowPropsEqual(prev: MessageRowProps, next: MessageRowProps): 
     prev.onRevert === next.onRevert &&
     prev.onFork === next.onFork &&
     prev.assistantOnlyFork === next.assistantOnlyFork &&
+    prev.forkUnavailableReason === next.forkUnavailableReason &&
     prev.onEditMessage === next.onEditMessage &&
     prev.isMainActiveSession === next.isMainActiveSession &&
     prev.isCompacting === next.isCompacting &&
@@ -675,6 +680,7 @@ export function VirtualizedTranscript({
   onRevert,
   onFork,
   assistantOnlyFork = false,
+  forkUnavailableReason,
   onEditMessage,
   onCompact,
   isMainActiveSession = false,
@@ -975,6 +981,7 @@ export function VirtualizedTranscript({
         onRevert={onRevert}
         onFork={onFork}
         assistantOnlyFork={assistantOnlyFork}
+        forkUnavailableReason={forkUnavailableReason}
         onEditMessage={onEditMessage}
         isMainActiveSession={isMainActiveSession}
         isCompacting={isCompacting}
@@ -1008,6 +1015,7 @@ export function VirtualizedTranscript({
     onRevert,
     onFork,
     assistantOnlyFork,
+    forkUnavailableReason,
     onEditMessage,
     isMainActiveSession,
     isCompacting,

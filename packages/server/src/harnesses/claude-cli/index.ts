@@ -6,10 +6,9 @@ export { claudeCliAvailable } from './version';
 export { listClaudeModels, getClaudeModelSelection, saveClaudeModelSelection } from './models';
 
 export function createClaudeCliHarness(
-  execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'compact' | 'editMessage' | 'revert'>,
+  execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'compact' | 'editMessage' | 'revert' | 'fork'>,
 ): HarnessRegistration {
   return { execution, unsupportedMessages: {
     regenerateTitle: 'Claude CLI title generation is not supported',
-    fork: 'Claude CLI fork is not supported',
   } };
 }

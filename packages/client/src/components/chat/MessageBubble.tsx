@@ -17,6 +17,7 @@ interface MessageBubbleProps {
   canRevert?: boolean;
   onFork?: () => void;
   canFork?: boolean;
+  forkUnavailableReason?: string;
   onEdit?: (content: string) => void;
   canEdit?: boolean;
   isClearAll?: boolean;
@@ -36,6 +37,7 @@ export function MessageBubble({
   canRevert = false,
   onFork,
   canFork = false,
+  forkUnavailableReason,
   onEdit,
   canEdit = false,
   isClearAll = false,
@@ -124,26 +126,29 @@ export function MessageBubble({
 
   const showPinButton = canPin && onTogglePin && !isQueued;
   const showEditButton = canEdit && onEdit && !isQueued && isUser;
-  const showAssistantFork = message.role === 'assistant' && canFork && Boolean(onFork);
+  const forkDisabled = Boolean(forkUnavailableReason);
+  const showAssistantFork = message.role === 'assistant' && canFork && (Boolean(onFork) || forkDisabled);
   const hoverActionClass = 'opacity-0 transition-opacity group-hover/msg:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
 
   const renderAssistantActions = () => (
     <>
       {showAssistantFork && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setShowForkConfirm(true)}
-          disabled={isForking}
-          className={cn('size-5 text-muted-foreground hover:text-foreground', hoverActionClass)}
-          title="Fork from this response"
-        >
-          {isForking ? (
-            <Loader2 className="size-3 animate-spin" />
-          ) : (
-            <GitBranch className="size-3" />
-          )}
-        </Button>
+        <span title={forkDisabled ? forkUnavailableReason : undefined}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowForkConfirm(true)}
+            disabled={isForking || forkDisabled}
+            className={cn('size-5 text-muted-foreground hover:text-foreground', hoverActionClass)}
+            title={forkDisabled ? undefined : 'Fork from this response'}
+          >
+            {isForking ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <GitBranch className="size-3" />
+            )}
+          </Button>
+        </span>
       )}
       {showPinButton && (
         <Button
@@ -212,16 +217,19 @@ export function MessageBubble({
                       <Undo2 className="size-3" />
                     </Button>
                   )}
-                  {canFork && onFork && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowForkConfirm(true)}
-                      className="size-5 text-muted-foreground hover:text-foreground"
-                      title="Fork from this point"
-                    >
-                      <GitBranch className="size-3" />
-                    </Button>
+                  {canFork && (onFork || forkDisabled) && (
+                    <span title={forkDisabled ? forkUnavailableReason : undefined}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowForkConfirm(true)}
+                        disabled={forkDisabled}
+                        className="size-5 text-muted-foreground hover:text-foreground"
+                        title={forkDisabled ? undefined : 'Fork from this point'}
+                      >
+                        <GitBranch className="size-3" />
+                      </Button>
+                    </span>
                   )}
                   {showEditButton && !isEditing && (
                     <Button

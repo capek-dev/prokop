@@ -198,6 +198,16 @@ function ChatViewContent({
   const onEditMessageForMode = readOnlyTranscript ? undefined : _onEditMessage;
   const onCompactForMode = readOnlyTranscript ? undefined : onCompact;
   const onRemoveFromQueueForMode = readOnlyTranscript || session.harness === 'codex-cli' ? undefined : onRemoveFromQueue;
+  // The Claude harness only verifies plain text-only native histories, so
+  // sessions that ran Goal or Compact refuse fork server-side. Show the
+  // affordance disabled with the reason instead of failing the click.
+  const forkUnavailableReason = session.harness === 'claude-cli' && !readOnlyTranscript
+    ? session.metadata?.claudeCompactPending === true
+      ? 'Fork unavailable: compaction outcome uncertain'
+      : session.metadata?.claudeGoal || session.metadata?.claudeCompactedAt
+        ? 'Fork unavailable after Goal or Compact'
+        : undefined
+    : undefined;
 
   const [rejectionNotice, setRejectionNotice] = useState<string | null>(null);
   const rejectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -296,6 +306,7 @@ function ChatViewContent({
           onRevert={onRevertForMode}
           onFork={onForkForMode}
           assistantOnlyFork={session.harness === 'codex-cli'}
+          forkUnavailableReason={forkUnavailableReason}
           onEditMessage={onEditMessageForMode}
           onCompact={onCompactForMode}
           isMainActiveSession={isMainActiveSession}

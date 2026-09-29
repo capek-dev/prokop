@@ -133,6 +133,11 @@ export function initializeSessionMessageSchema(
     message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
     native_user_id TEXT NOT NULL
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS claude_fork_intents (
+    source_session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    target_message_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`);
 
   db.run('CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)');
   db.run('CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_id)');
