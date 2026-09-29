@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, Archive, Minimize2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Archive, Minimize2, Loader2, AlertTriangle } from 'lucide-react';
 import type { Session, Preconfig, ProkopaiClient } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -166,10 +166,10 @@ export function ChatHeader({
   const isObserver = controlState?.status === 'controlled' && controlState.controllerClientId !== myClientId;
   const compactPending = usePendingOperationsStore(s => s.operations.some(op =>
     op.sessionId === session.id && op.type === 'compact'));
-  const compactBusy = isCompacting || compactPending || (codexSession && session.metadata?.codexCompactPending === true);
-  const codexCompactedAt = codexSession && typeof session.metadata?.codexCompactedAt === 'number'
-    && Number.isFinite(session.metadata.codexCompactedAt) && session.metadata.codexCompactedAt > 0
-    ? session.metadata.codexCompactedAt : null;
+  const compactUncertain = claudeSession && session.metadata?.claudeCompactPending === true
+    && !compactPending && !isCompacting;
+  const compactBusy = isCompacting || compactPending
+    || (codexSession && session.metadata?.codexCompactPending === true);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -262,18 +262,6 @@ export function ChatHeader({
               modelName={modelName}
               compact={isMobile}
             />
-            {codexCompactedAt !== null && (
-              <span className="shrink-0 text-[11px] text-muted-foreground" title={`Context compacted ${new Date(codexCompactedAt).toLocaleString()}`}>
-                Compacted
-              </span>
-            )}
-            {claudeSession && typeof session.metadata?.claudeCompactedAt === 'number' && (
-              <span className="shrink-0 text-[11px] text-muted-foreground"
-                title={`Claude compacted context ${new Date(session.metadata.claudeCompactedAt).toLocaleString()}`}>
-                Compacted
-              </span>
-            )}
-
             {session.status === 'closed' && (
               <Badge variant="secondary">
                 <Archive className="size-3" data-icon="inline-start" />
@@ -318,17 +306,17 @@ export function ChatHeader({
                     variant="ghost"
                     size="icon"
                     onClick={onCompact}
-                    disabled={isStreaming || compactBusy || !canCompact}
+                    disabled={isStreaming || compactBusy || compactUncertain || !canCompact}
+                    aria-label={compactUncertain ? 'Compaction outcome unknown' : 'Compact older messages'}
                   >
-                    {compactBusy ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Minimize2 className="size-4" />
-                    )}
+                    {compactUncertain ? <AlertTriangle className="size-4 text-warning" />
+                      : compactBusy ? <Loader2 className="size-4 animate-spin" />
+                        : <Minimize2 className="size-4" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {compactBusy ? 'Compacting...' : 'Compact older messages'}
+                  {compactUncertain ? 'Compaction outcome unknown. This session is locked to avoid replay.'
+                    : compactBusy ? 'Compacting...' : 'Compact older messages'}
                 </TooltipContent>
               </Tooltip>
             )}

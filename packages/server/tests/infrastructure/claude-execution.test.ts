@@ -1,4 +1,4 @@
-import { beforeEach, afterEach, expect, test } from 'bun:test';
+import { beforeEach, afterEach, expect, spyOn, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
@@ -8,6 +8,7 @@ import { createSession, getSession, selectEmptySessionHarnessModel } from '@/inf
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
 import { createClaudeExecution } from '@/harnesses/claude-cli/execution';
+import { runClaudeCompact } from '@/harnesses/claude-cli/compact';
 import { saveClaudeModelSelection } from '@/harnesses/claude-cli/models';
 import type { Options, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
@@ -450,6 +451,400 @@ test('records only native compaction boundaries, not a fabricated manual compact
     trigger: 'auto', preTokens: 150000, postTokens: 30000 } });
   expect(events.some(event => (event as { type?: string }).type === 'session.updated')).toBe(true);
 });
+test('manual Claude compaction uses the SDK command, waits for its boundary and never saves a chat turn', async () => {
+  const { wire, events } = wireFixture();
+  const calls: Array<string | AsyncIterable<SDKUserMessage>> = [];
+  const exec = createClaudeExecution({ version: () => '2.1.278', start: (prompt, options) => {
+    calls.push(prompt);
+    const id = options.sessionId ?? options.resume;
+    async function* stream(): AsyncGenerator<SDKMessage> {
+      if (typeof prompt === 'string') yield { type: 'system', subtype: 'status', status: 'compacting',
+        session_id: id } as SDKMessage;
+      yield { type: 'system', subtype: 'init', session_id: id } as SDKMessage;
+      if (typeof prompt === 'string') {
+        expect(prompt).toBe('/compact');
+        expect(options.resume).toBe(id);
+        yield { type: 'system', subtype: 'compact_boundary', session_id: id,
+          compact_metadata: { trigger: 'manual', pre_tokens: 10000, post_tokens: 3000 } } as SDKMessage;
+        yield { type: 'result', subtype: 'success', session_id: id, result: '' } as SDKMessage;
+      } else yield { type: 'result', subtype: 'success', session_id: id, result: 'hello' } as SDKMessage;
+    }
+    return stream();
+  } });
+  await exec.sendMessage(wire, 'origin', 'session', 'hello');
+  const before = listMessagesWithParts('session');
+  const outcome = await exec.compact('session', 'manual', wire.delivery);
+  expect(outcome).toMatchObject({ ok: true });
+  expect(calls).toHaveLength(2);
+  expect(listMessagesWithParts('session')).toEqual(before);
+  expect(getSession('session')?.metadata).toMatchObject({ claudeCompaction: {
+    trigger: 'manual', preTokens: 10000, postTokens: 3000 },
+    claudeCompactedAfterMessageId: before.at(-1)?.message.id });
+  expect(getSession('session')?.metadata?.claudeCompactPending).toBeUndefined();
+  expect(events.some(event => (event as { type?: string }).type === 'session.updated')).toBe(true);
+});
+
+test('compact with no native boundary is not reported as completed', async () => {
+  const { wire } = wireFixture();
+  const exec = createClaudeExecution({ version: () => '2.1.278', start: (prompt, options) => {
+    const id = options.sessionId ?? options.resume;
+    async function* stream(): AsyncGenerator<SDKMessage> {
+      yield { type: 'system', subtype: 'init', session_id: id } as SDKMessage;
+      yield { type: 'result', subtype: 'success', session_id: id,
+        result: typeof prompt === 'string' ? 'Not enough messages to compact.' : 'hello' } as SDKMessage;
+    }
+    return stream();
+  } });
+  await exec.sendMessage(wire, 'origin', 'session', 'hello');
+  expect(await exec.compact('session', 'manual', wire.delivery)).toMatchObject({ ok: false, skipped: true });
+  expect(getSession('session')?.metadata?.claudeCompactPending).toBeUndefined();
+  expect(getSession('session')?.metadata?.claudeCompactedAt).toBeUndefined();
+});
+
+test('failed compact result with no boundary settles without claiming success', async () => {
+  const { wire } = wireFixture();
+  const exec = createClaudeExecution({ version: () => '2.1.278', start: (prompt, options) => {
+    const id = options.sessionId ?? options.resume;
+    async function* stream(): AsyncGenerator<SDKMessage> {
+      yield { type: 'system', subtype: 'init', session_id: id } as SDKMessage;
+      yield { type: 'result', subtype: typeof prompt === 'string' ? 'error_during_execution' : 'success',
+        is_error: typeof prompt === 'string', session_id: id, result: 'done' } as SDKMessage;
+      if (typeof prompt === 'string') throw new Error('SDK throws after error result');
+    }
+    return stream();
+  } });
+  await exec.sendMessage(wire, 'origin', 'session', 'hello');
+  expect(await exec.compact('session', 'manual', wire.delivery)).toMatchObject({ ok: false, skipped: true });
+  expect(getSession('session')?.metadata?.claudeCompactPending).toBeUndefined();
+});
+
+test.each(['failed-after-boundary', 'wrong-session', 'boundary-after-result'] as const)(
+  'uncertain compact stream %s blocks retry', async (scenario) => {
+    const { wire } = wireFixture();
+    const exec = createClaudeExecution({ version: () => '2.1.278', start: (prompt, options) => {
+      const id = options.sessionId ?? options.resume;
+      async function* stream(): AsyncGenerator<SDKMessage> {
+        yield { type: 'system', subtype: 'init', session_id: id } as SDKMessage;
+        if (typeof prompt === 'string') {
+          if (scenario === 'wrong-session') {
+            yield { type: 'system', subtype: 'compact_boundary', session_id: 'other',
+              compact_metadata: { trigger: 'manual', pre_tokens: 10000 } } as SDKMessage;
+          } else {
+            if (scenario === 'failed-after-boundary') yield { type: 'system', subtype: 'compact_boundary', session_id: id,
+              compact_metadata: { trigger: 'manual', pre_tokens: 10000 } } as SDKMessage;
+            yield { type: 'result', subtype: scenario === 'failed-after-boundary' ? 'error_during_execution' : 'success',
+              is_error: scenario === 'failed-after-boundary', session_id: id } as SDKMessage;
+            if (scenario === 'boundary-after-result') yield { type: 'system', subtype: 'compact_boundary', session_id: id,
+              compact_metadata: { trigger: 'manual', pre_tokens: 10000 } } as SDKMessage;
+          }
+        } else yield { type: 'result', subtype: 'success', session_id: id, result: 'hello' } as SDKMessage;
+      }
+      return stream();
+    } });
+    await exec.sendMessage(wire, 'origin', 'session', 'hello');
+    expect(await exec.compact('session', 'manual', wire.delivery)).toMatchObject({ ok: false });
+    expect(getSession('session')?.metadata?.claudeCompactPending).toBe(true);
+  },
+);
+
+test.each([
+  ['status', 'requesting', 'system:status'],
+  ['secret_payload_123', undefined, 'system:unknown'],
+] as const)(
+  'unexpected pre-init compact event %s remains locked and logs only its known subtype', async (subtype, status, label) => {
+    const log = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const stream = async function* (): AsyncGenerator<SDKMessage> {
+        yield { type: 'system', subtype, status, session_id: 'native', content: 'private text' } as unknown as SDKMessage;
+        yield { type: 'system', subtype: 'init', session_id: 'native' } as SDKMessage;
+        yield { type: 'result', subtype: 'success', session_id: 'native' } as SDKMessage;
+      };
+      await expect(runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+        effort: 'medium', controller: new AbortController(), start: () => stream() })).rejects.toThrow();
+      expect(log).toHaveBeenCalledWith('[claude-cli] compact stream error', expect.objectContaining({
+        initialized: false, lastEvent: label, invalidStream: true, boundarySeen: false,
+      }));
+      expect(JSON.stringify(log.mock.calls)).not.toContain('private text');
+      expect(JSON.stringify(log.mock.calls)).not.toContain('secret_payload_123');
+    } finally { log.mockRestore(); }
+  },
+);
+
+test.each(['assistant', 'user', 'stream_event', 'autocompact_state', 'active_goal',
+  'private_type_123'] as const)(
+  'unexpected %s event after compacting progress is logged without payload', async type => {
+    const log = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const stream = async function* (): AsyncGenerator<SDKMessage> {
+        yield { type: 'system', subtype: 'status', status: 'compacting', session_id: 'native' } as SDKMessage;
+        yield { type, session_id: 'native', message: 'private text', content: 'private text' } as unknown as SDKMessage;
+      };
+      await expect(runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+        effort: 'medium', controller: new AbortController(), start: () => stream() })).rejects.toThrow();
+      expect(log).toHaveBeenCalledWith('[claude-cli] compact stream error', expect.objectContaining({
+        initialized: false, lastEvent: type === 'private_type_123' ? 'unknown' : type,
+        lastStatus: 'compacting', invalidStream: true, boundarySeen: false, eventCount: 2,
+        recentEvents: [
+          { event: 'system:status', session: 'match', status: 'compacting',
+            compactResult: 'absent', compactError: false },
+          { event: type === 'private_type_123' ? 'unknown' : type, session: 'match' },
+        ],
+      }));
+      expect(JSON.stringify(log.mock.calls)).not.toContain('private text');
+      expect(JSON.stringify(log.mock.calls)).not.toContain('private_type_123');
+    } finally { log.mockRestore(); }
+  },
+);
+
+test.each([true, false])('same-session rate-limit telemetry is ignored with init: %s', async withInit => {
+  const stream = async function* (): AsyncGenerator<SDKMessage> {
+    yield { type: 'system', subtype: 'status', status: 'compacting', session_id: 'native' } as SDKMessage;
+    yield { type: 'rate_limit_event', session_id: 'native',
+      rate_limit_info: { status: 'allowed_warning' } } as SDKMessage;
+    if (withInit) yield { type: 'system', subtype: 'init', session_id: 'native' } as SDKMessage;
+    yield { type: 'system', subtype: 'compact_boundary', session_id: 'native',
+      compact_metadata: { trigger: 'manual', pre_tokens: 10000, post_tokens: 3000 } } as SDKMessage;
+    yield { type: 'rate_limit_event', session_id: 'native', rate_limit_info: { status: 'allowed' } } as SDKMessage;
+    yield { type: 'result', subtype: 'success', session_id: 'native' } as SDKMessage;
+  };
+  expect(await runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+    effort: 'medium', controller: new AbortController(), start: () => stream() })).toEqual({
+    confirmed: true, boundary: { preTokens: 10000, postTokens: 3000 },
+  });
+});
+
+test.each(['no-progress', 'wrong-session', 'too-many', 'after-result', 'no-boundary'] as const)(
+  'rate-limit telemetry %s does not bypass compact validation', async scenario => {
+    const log = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const stream = async function* (): AsyncGenerator<SDKMessage> {
+        if (scenario !== 'no-progress') yield { type: 'system', subtype: 'status', status: 'compacting',
+          session_id: 'native' } as SDKMessage;
+        const count = scenario === 'too-many' ? 17 : 1;
+        for (let i = 0; i < count; i++) yield { type: 'rate_limit_event',
+          session_id: scenario === 'wrong-session' ? 'other' : 'native',
+          rate_limit_info: { status: 'allowed' } } as SDKMessage;
+        if (scenario !== 'no-boundary') yield { type: 'system', subtype: 'compact_boundary', session_id: 'native',
+          compact_metadata: { trigger: 'manual', pre_tokens: 10000 } } as SDKMessage;
+        yield { type: 'result', subtype: 'success', session_id: 'native' } as SDKMessage;
+        if (scenario === 'after-result') yield { type: 'rate_limit_event', session_id: 'native',
+          rate_limit_info: { status: 'allowed' } } as SDKMessage;
+      };
+      await expect(runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+        effort: 'medium', controller: new AbortController(), start: () => stream() })).rejects.toThrow();
+    } finally { log.mockRestore(); }
+  },
+);
+
+test.each([
+  { compactResult: undefined, compactError: undefined, label: 'absent', hasError: false },
+  { compactResult: 'success', compactError: undefined, label: 'success', hasError: false },
+  { compactResult: 'failed', compactError: 'private compact error', label: 'failed', hasError: true },
+  { compactResult: 'private compact error', compactError: undefined, label: 'unknown', hasError: false },
+] as const)('pre-init idle status with compact_result $label remains locked and logs only safe fields',
+  async ({ compactResult, compactError, label, hasError }) => {
+    const log = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const stream = async function* (): AsyncGenerator<SDKMessage> {
+        yield { type: 'system', subtype: 'status', status: 'compacting', session_id: 'native' } as SDKMessage;
+        yield { type: 'rate_limit_event', session_id: 'native',
+          rate_limit_info: { status: 'allowed' } } as SDKMessage;
+        yield { type: 'system', subtype: 'status', status: null, session_id: 'native',
+          compact_result: compactResult, compact_error: compactError } as SDKMessage;
+      };
+      await expect(runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+        effort: 'medium', controller: new AbortController(), start: () => stream() })).rejects.toThrow();
+      const invalidStream = label !== 'absent' && label !== 'success';
+      expect(log).toHaveBeenCalledWith(invalidStream
+        ? '[claude-cli] compact stream error' : '[claude-cli] compact stream incomplete', expect.objectContaining({
+        initialized: false, lastEvent: 'system:status', lastStatus: 'idle',
+        boundarySeen: false, terminalResult: null, eventCount: 3,
+        ...(invalidStream ? { invalidStream: true } : {}),
+        recentEvents: [
+          { event: 'system:status', session: 'match', status: 'compacting',
+            compactResult: 'absent', compactError: false },
+          { event: 'rate_limit_event', session: 'match' },
+          { event: 'system:status', session: 'match', status: 'idle',
+            compactResult: label, compactError: hasError },
+        ],
+      }));
+      expect(JSON.stringify(log.mock.calls)).not.toContain('private compact error');
+      expect(JSON.stringify(log.mock.calls)).not.toContain('native');
+    } finally { log.mockRestore(); }
+  },
+);
+
+test.each([
+  { withInit: false, compactResult: undefined },
+  { withInit: true, compactResult: 'success' },
+] as const)('idle status before init can precede a confirmed manual boundary: $withInit / $compactResult',
+  async ({ withInit, compactResult }) => {
+    const stream = async function* (): AsyncGenerator<SDKMessage> {
+      yield { type: 'system', subtype: 'status', status: 'compacting', session_id: 'native' } as SDKMessage;
+      yield { type: 'rate_limit_event', session_id: 'native',
+        rate_limit_info: { status: 'allowed' } } as SDKMessage;
+      yield { type: 'system', subtype: 'status', status: null, session_id: 'native',
+        compact_result: compactResult } as SDKMessage;
+      if (withInit) yield { type: 'system', subtype: 'init', session_id: 'native' } as SDKMessage;
+      yield { type: 'system', subtype: 'compact_boundary', session_id: 'native',
+        compact_metadata: { trigger: 'manual', pre_tokens: 10000, post_tokens: 3000 } } as SDKMessage;
+      yield { type: 'result', subtype: 'success', is_error: false, session_id: 'native' } as SDKMessage;
+    };
+    expect(await runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+      effort: 'medium', controller: new AbortController(), start: () => stream() })).toEqual({
+      confirmed: true, boundary: { preTokens: 10000, postTokens: 3000 },
+    });
+  },
+);
+
+test.each([
+  { name: 'without progress', events: [{ status: null }] },
+  { name: 'with an error', events: [{ status: 'compacting' },
+    { status: null, compact_result: 'success', compact_error: 'private error' }] },
+  { name: 'past the status limit', events: [{ status: 'compacting' },
+    ...Array.from({ length: 8 }, () => ({ status: null }))] },
+] as const)('pre-init idle status $name cannot bypass validation', async ({ events }) => {
+  const log = spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const stream = async function* (): AsyncGenerator<SDKMessage> {
+      for (const event of events) yield { type: 'system', subtype: 'status',
+        session_id: 'native', ...event } as SDKMessage;
+      yield { type: 'system', subtype: 'compact_boundary', session_id: 'native',
+        compact_metadata: { trigger: 'manual', pre_tokens: 10000 } } as SDKMessage;
+      yield { type: 'result', subtype: 'success', session_id: 'native' } as SDKMessage;
+    };
+    await expect(runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+      effort: 'medium', controller: new AbortController(), start: () => stream() })).rejects.toThrow();
+    expect(log).toHaveBeenCalledWith('[claude-cli] compact stream error', expect.objectContaining({
+      invalidStream: true, boundarySeen: false,
+    }));
+    expect(JSON.stringify(log.mock.calls)).not.toContain('private error');
+  } finally { log.mockRestore(); }
+});
+
+test('compact diagnostic keeps only twelve event discriminants, not native IDs or content', async () => {
+  const log = spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const stream = async function* (): AsyncGenerator<SDKMessage> {
+      yield { type: 'system', subtype: 'init', session_id: 'native' } as SDKMessage;
+      for (let i = 0; i < 14; i++) yield { type: 'system', subtype: 'status',
+        status: 'compacting', session_id: 'native', content: 'private text' } as unknown as SDKMessage;
+      yield { type: 'autocompact_state', session_id: 'native', content: 'private text' } as unknown as SDKMessage;
+    };
+    await expect(runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+      effort: 'medium', controller: new AbortController(), start: () => stream() })).rejects.toThrow();
+    expect(log).toHaveBeenCalledWith('[claude-cli] compact stream incomplete', expect.objectContaining({
+      eventCount: 16, lastEvent: 'autocompact_state', recentEvents: [
+        ...Array.from({ length: 11 }, () => ({ event: 'system:status', session: 'match',
+          status: 'compacting', compactResult: 'absent', compactError: false })),
+        { event: 'autocompact_state', session: 'match' },
+      ],
+    }));
+    expect(JSON.stringify(log.mock.calls)).not.toContain('private text');
+    expect(JSON.stringify(log.mock.calls)).not.toContain('native');
+  } finally { log.mockRestore(); }
+});
+
+test.each([
+  { name: 'wrong native session', statuses: [{ status: 'compacting', session_id: 'other' }] },
+  { name: 'pre-init completion claim', statuses: [{ status: 'compacting', compact_result: 'success' }] },
+  { name: 'pre-init failure', statuses: [{ status: 'compacting', compact_result: 'failed' }] },
+  { name: 'too many progress events', statuses: Array.from({ length: 9 }, () => ({ status: 'compacting' })) },
+] as const)('compact rejects $name without reporting completion', async ({ statuses }) => {
+  const log = spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const stream = async function* (): AsyncGenerator<SDKMessage> {
+      for (const status of statuses) yield { type: 'system', subtype: 'status', session_id: 'native',
+        ...status } as SDKMessage;
+      yield { type: 'system', subtype: 'init', session_id: 'native' } as SDKMessage;
+      yield { type: 'system', subtype: 'compact_boundary', session_id: 'native',
+        compact_metadata: { trigger: 'manual', pre_tokens: 10000 } } as SDKMessage;
+      yield { type: 'result', subtype: 'success', session_id: 'native' } as SDKMessage;
+    };
+    await expect(runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+      effort: 'medium', controller: new AbortController(), start: () => stream() })).rejects.toThrow();
+  } finally { log.mockRestore(); }
+});
+
+test('local slash compact can confirm from progress, manual boundary and result without init', async () => {
+  const stream = async function* (): AsyncGenerator<SDKMessage> {
+    yield { type: 'system', subtype: 'status', status: 'compacting', session_id: 'native' } as SDKMessage;
+    yield { type: 'system', subtype: 'compact_boundary', session_id: 'native',
+      compact_metadata: { trigger: 'manual', pre_tokens: 10000, post_tokens: 3000 } } as SDKMessage;
+    yield { type: 'result', subtype: 'success', session_id: 'native' } as SDKMessage;
+  };
+  expect(await runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+    effort: 'medium', controller: new AbortController(), start: () => stream() })).toEqual({
+    confirmed: true, boundary: { preTokens: 10000, postTokens: 3000 },
+  });
+});
+
+test.each(['auto-boundary', 'result-without-boundary', 'failed-result'] as const)(
+  'local slash compact %s cannot be reported as success', async scenario => {
+    const log = spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const stream = async function* (): AsyncGenerator<SDKMessage> {
+        yield { type: 'system', subtype: 'status', status: 'compacting', session_id: 'native' } as SDKMessage;
+        if (scenario !== 'result-without-boundary') yield { type: 'system', subtype: 'compact_boundary',
+          session_id: 'native', compact_metadata: { trigger: scenario === 'auto-boundary' ? 'auto' : 'manual',
+            pre_tokens: 10000 } } as SDKMessage;
+        yield { type: 'result', subtype: scenario === 'failed-result' ? 'error_during_execution' : 'success',
+          is_error: scenario === 'failed-result', session_id: 'native' } as SDKMessage;
+      };
+      await expect(runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+        effort: 'medium', controller: new AbortController(), start: () => stream() })).rejects.toThrow();
+    } finally { log.mockRestore(); }
+  },
+);
+
+test('failed compact status cannot be overridden by a later success result', async () => {
+  const log = spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const stream = async function* (): AsyncGenerator<SDKMessage> {
+      yield { type: 'system', subtype: 'init', session_id: 'native' } as SDKMessage;
+      yield { type: 'system', subtype: 'status', status: null, compact_result: 'failed',
+        session_id: 'native' } as SDKMessage;
+      yield { type: 'system', subtype: 'compact_boundary', session_id: 'native',
+        compact_metadata: { trigger: 'manual', pre_tokens: 10000 } } as SDKMessage;
+      yield { type: 'result', subtype: 'success', session_id: 'native' } as SDKMessage;
+    };
+    await expect(runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+      effort: 'medium', controller: new AbortController(), start: () => stream() })).rejects.toThrow();
+  } finally { log.mockRestore(); }
+});
+
+test('pre-init progress without init or result is uncertain, not a confirmed compact', async () => {
+  const log = spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const stream = async function* (): AsyncGenerator<SDKMessage> {
+      yield { type: 'system', subtype: 'status', status: 'compacting', session_id: 'native' } as SDKMessage;
+    };
+    await expect(runClaudeCompact({ cwd: process.cwd(), nativeId: 'native', model: 'claude-sonnet-5',
+      effort: 'medium', controller: new AbortController(), start: () => stream() })).rejects.toThrow();
+  } finally { log.mockRestore(); }
+});
+
+test('lost compact result blocks retry and subsequent Claude messages', async () => {
+  const { wire, events } = wireFixture();
+  const exec = createClaudeExecution({ version: () => '2.1.278', start: (prompt, options) => {
+    const id = options.sessionId ?? options.resume;
+    async function* stream(): AsyncGenerator<SDKMessage> {
+      yield { type: 'system', subtype: 'init', session_id: id } as SDKMessage;
+      if (typeof prompt === 'string') throw new Error('lost compact response');
+      yield { type: 'result', subtype: 'success', session_id: id, result: 'hello' } as SDKMessage;
+    }
+    return stream();
+  } });
+  await exec.sendMessage(wire, 'origin', 'session', 'hello');
+  expect(await exec.compact('session', 'manual', wire.delivery)).toMatchObject({ ok: false });
+  expect(getSession('session')?.metadata?.claudeCompactPending).toBe(true);
+  expect(await exec.compact('session', 'manual', wire.delivery)).toMatchObject({ ok: false, skipped: true });
+  const before = listMessagesWithParts('session').length;
+  await exec.sendMessage(wire, 'origin', 'session', 'retry');
+  expect(listMessagesWithParts('session')).toHaveLength(before);
+  expect(events.at(-1)).toMatchObject({ type: 'error', code: 'invalid_session' });
+});
+
 test('early child events attach only to their Agent, and Stop closes the child transcript', async () => {
   const { wire } = wireFixture();
   let childStarted!: () => void;

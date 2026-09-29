@@ -11,6 +11,7 @@ import type { PendingAskRequest } from '@/stores/askStore';
 import { useSessionControlStore, type ActionRejection } from '@/stores/sessionControlStore';
 import { useClientIdentityStore } from '@/stores/clientIdentityStore';
 import { useSessionStore, type SessionNavigationIntent } from '@/stores/sessionStore';
+import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import { useTranscriptPagination } from '@/hooks/useTranscriptPagination';
 import { RetryStatus } from './RetryStatus';
 import { UserPromptMap } from './UserPromptMap';
@@ -173,6 +174,12 @@ function ChatViewContent({
 }: ChatViewProps) {
   const isPrimarySession = !session.parentId;
   const isMainActiveSession = isPrimarySession && session.status === 'active';
+  const compactPending = usePendingOperationsStore(s => s.operations.some(op =>
+    op.sessionId === session.id && op.type === 'compact'));
+  const compactUncertain = session.harness === 'claude-cli' && session.metadata?.claudeCompactPending === true
+    && !compactPending && !isCompacting;
+  const compactBusy = isCompacting || compactPending || (session.harness === 'codex-cli' && session.metadata?.codexCompactPending === true);
+  const inputLocked = compactBusy || compactUncertain;
 
   const contentMeta = useSessionStore((state) => state.contentMetaBySession[session.id]);
   const { loadOlder } = useTranscriptPagination({ sessionId: session.id, client: sdkClient ?? null });
@@ -274,9 +281,11 @@ function ChatViewContent({
           sessionId={session.id}
           sessionStatus={session.status}
           pendingAskRequests={pendingAskRequests}
-          isCompacting={isCompacting || (session.harness === 'codex-cli' && session.metadata?.codexCompactPending === true)}
+          isCompacting={compactBusy}
           compactedAfterMessageId={session.harness === 'codex-cli' && typeof session.metadata?.codexCompactedAfterMessageId === 'string'
-            ? session.metadata.codexCompactedAfterMessageId : undefined}
+            ? session.metadata.codexCompactedAfterMessageId
+            : session.harness === 'claude-cli' && typeof session.metadata?.claudeCompactedAfterMessageId === 'string'
+              ? session.metadata.claudeCompactedAfterMessageId : undefined}
           compactionSuccess={compactionSuccess}
           onClearCompactionSuccess={onClearCompactionSuccess}
           onAskResponse={onAskResponse}
@@ -343,11 +352,17 @@ function ChatViewContent({
 
       {session.status === 'active' && <RetryStatus sessionId={session.id} />}
 
+      {compactUncertain && (
+        <div role="alert" className="px-4 py-2 text-center text-xs text-warning bg-warning/10">
+          Claude compaction outcome unknown. This session is locked to avoid replay. Start a new session to continue.
+        </div>
+      )}
+
       {session.status === 'active' && !session.parentId && !isObserver && (
         <MessageInput
           ref={inputRef}
           onSendMessage={onSendMessage}
-          disabled={isCompacting}
+          disabled={inputLocked}
           workspaceId={session.workspaceId}
           sdkClient={sdkClient}
           prompts={prompts}

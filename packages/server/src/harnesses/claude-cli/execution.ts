@@ -7,11 +7,12 @@ import { getDatabase } from '@/infrastructure/sqlite/database';
 import { getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
-import { createMessage, createPart, getToolPartByCallId, transitionToolToCompleted,
+import { createMessage, createPart, getToolPartByCallId, listMessagesWithParts, transitionToolToCompleted,
   transitionToolToError, transitionToolToInterrupted, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
 import { getClaudeModelSelection } from './models';
 import { claudeCliVersion } from './version';
 import { runClaudeTurn } from './sdk-turn';
+import { runClaudeCompact } from './compact';
 import { claudeApprovals, type ClaudeApprovals } from './approvals';
 import { ClaudeChildTimelines } from './child-timelines';
 import { resolveClaudeImages } from './images';
@@ -31,7 +32,7 @@ export interface ClaudeExecutionDependencies {
 }
 
 export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
-  Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive'> {
+  Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'compact'> {
   const active = new Map<string, AbortController>();
   return {
     isSessionActive: id => active.has(id),
@@ -56,6 +57,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
       }
       const images = resolveClaudeImages(session, attachments ?? []);
       if (!images) return reject('Claude image attachment is unavailable or unsupported');
+      if (session.metadata?.claudeCompactPending) return reject('Claude compaction outcome is uncertain; do not send in this session');
       if (active.has(sessionId)) return reject('Claude CLI turn already running');
       const controller = new AbortController();
       active.set(sessionId, controller);
@@ -265,6 +267,79 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           const part = transitionToolToInterrupted(id, 'error');
           if (part) wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part });
         }
+        active.delete(sessionId);
+      }
+    },
+    async compact(sessionId, _reason, delivery) {
+      const session = getSession(sessionId);
+      if (!session || session.harness !== 'claude-cli' || session.status !== 'active'
+        || session.parentId || active.has(sessionId)) {
+        return { ok: false, skipped: true, error: 'Claude session is unavailable or busy' };
+      }
+      if (session.metadata?.claudeCompactPending) {
+        return { ok: false, skipped: true, error: 'Claude compaction outcome is uncertain; do not retry in this session' };
+      }
+      const controller = new AbortController();
+      active.set(sessionId, controller);
+      let submitted = false;
+      let confirmed = false;
+      try {
+        const workspace = getWorkspace(session.workspaceId);
+        if (!workspace || workspace.isVirtual || !workspace.path) throw new Error('Claude workspace unavailable');
+        const worktree = session.workspaceRootId
+          ? createManagedWorktreeRepository(getDatabase).get(session.workspaceRootId) : null;
+        if (session.workspaceRootId && (!worktree || worktree.workspaceId !== session.workspaceId
+          || worktree.state !== 'available')) throw new Error('Selected worktree unavailable');
+        const root = realpathSync(worktree?.path ?? workspace.path);
+        const version = (deps.version ?? claudeCliVersion)();
+        const selection = getClaudeModelSelection(sessionId);
+        const binding = getDatabase().query<Binding, [string]>(`SELECT native_session_id, workspace_root, cli_version, pending
+          FROM claude_session_bindings WHERE session_id = ?`).get(sessionId);
+        if (!binding || binding.pending || binding.workspace_root !== root || binding.cli_version !== version
+          || !selection) return { ok: false, skipped: true, error: 'Claude turn requires reconciliation before compaction' };
+        if (!deps.start && !Bun.which('claude')) {
+          return { ok: false, skipped: true, error: 'Claude CLI is unavailable on this host' };
+        }
+        const pending = updateSession(sessionId, { metadata: { ...(session.metadata ?? {}), claudeCompactPending: true } });
+        if (!pending) throw new Error('Claude compaction state could not be saved');
+        delivery?.broadcastToSession(sessionId, { type: 'session.updated', session: pending });
+        submitted = true;
+        const timeout = setTimeout(() => controller.abort(), 120_000);
+        let outcome: Awaited<ReturnType<typeof runClaudeCompact>>;
+        try {
+          outcome = await runClaudeCompact({ cwd: root, nativeId: binding.native_session_id,
+            model: selection.model, effort: selection.effort, controller, start: deps.start });
+        } finally { clearTimeout(timeout); }
+        confirmed = outcome.confirmed;
+        const latest = getSession(sessionId);
+        if (!latest) throw new Error('Claude session disappeared');
+        const { claudeCompactPending: _pending, claudeContext: _context, ...metadata } = latest.metadata ?? {};
+        const updated = updateSession(sessionId, { metadata: {
+          ...metadata,
+          ...(outcome.boundary ? { claudeCompactedAt: Date.now(),
+            claudeCompactedAfterMessageId: listMessagesWithParts(sessionId).at(-1)?.message.id ?? null,
+            claudeCompaction: { trigger: 'manual', ...outcome.boundary } } : {}),
+        } });
+        if (!updated) throw new Error('Claude compaction state could not be saved');
+        delivery?.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
+        if (!outcome.boundary) return { ok: false, skipped: true, error: 'Claude did not compact this conversation' };
+        return { ok: true, result: { tokensUsed: { prompt: 0, completion: 0 } } };
+      } catch (error) {
+        // SDK error text can contain prompt data or credentials. Log only the state and error class.
+        console.warn('[claude-cli] compact failed', { submitted, confirmed, aborted: controller.signal.aborted,
+          errorType: error instanceof Error ? error.name : 'unknown' });
+        if (!submitted || confirmed) {
+          const latest = getSession(sessionId);
+          if (latest?.metadata?.claudeCompactPending) {
+            const { claudeCompactPending: _pending, ...metadata } = latest.metadata;
+            const updated = updateSession(sessionId, { metadata });
+            if (updated) delivery?.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
+          }
+        }
+        return { ok: false, error: submitted && !confirmed
+          ? 'Claude compaction outcome is uncertain; do not retry or send in this session'
+          : 'Claude compaction could not be completed' };
+      } finally {
         active.delete(sessionId);
       }
     },
