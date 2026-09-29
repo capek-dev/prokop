@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeEach, expect, test } from 'bun:test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { codexMemoryTools } from '@/adapters/capek/codex-memory';
+import { memoryDomainTools } from '@/adapters/capek/domain-tools';
 import { createCodexMemoryTools } from '@/harnesses/codex-cli/memory-tools';
 import { createSession } from '@/infrastructure/sqlite/session-store';
 import { updateWorkspace } from '@/infrastructure/sqlite/workspaces';
@@ -14,7 +14,7 @@ const agentDir = join(root, 'agent');
 const defs = ['memory', 'agent_memory', 'shell'].map(name => ({
   type: 'function' as const, name, description: name, inputSchema: { type: 'object' },
 }));
-const bridge = { definitions: () => defs, execute: codexMemoryTools.execute };
+const bridge = { definitions: () => defs, execute: memoryDomainTools.execute };
 
 beforeEach(() => {
   setupTestDatabase(); seedWorkspace({ id: 'ws', path: root });

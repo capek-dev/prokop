@@ -23,9 +23,7 @@ import { forkClaudeSession } from './fork';
 import { claudeDeveloperInstructions, defaultClaudePreconfigId, type ClaudeInstructionSources } from './instructions';
 import { createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools,
   claudeMcpToolDisplayName } from './dynamic-tools';
-import type { CodexMemoryBridge } from '@/harnesses/codex-cli/memory-tools';
-import type { CodexSessionSearchBridge } from '@/harnesses/codex-cli/session-search-tools';
-import type { CodexAgentSkillBridge } from '@/harnesses/codex-cli/agent-skill-tools';
+import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
 
 interface Binding {
   native_session_id: string;
@@ -40,9 +38,9 @@ export interface ClaudeExecutionDependencies extends ClaudeRollbackDependencies 
   version?: () => string;
   readGoalVerdict?: typeof readClaudeGoalVerdict;
   instructions?: ClaudeInstructionSources;
-  memoryTools?: CodexMemoryBridge;
-  sessionSearch?: CodexSessionSearchBridge;
-  agentSkills?: CodexAgentSkillBridge;
+  memoryTools?: MemoryDomainBridge;
+  sessionSearch?: SessionSearchDomainBridge;
+  agentSkills?: AgentSkillsDomainBridge;
 }
 
 export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):

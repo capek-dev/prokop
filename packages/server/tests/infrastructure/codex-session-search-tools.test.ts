@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
-import { codexSessionSearch } from '@/adapters/capek/codex-session-search';
+import { sessionSearchDomainTools } from '@/adapters/capek/domain-tools';
 import { createCodexSessionSearchTools } from '@/harnesses/codex-cli/session-search-tools';
 import { createSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { updateWorkspace } from '@/infrastructure/sqlite/workspaces';
@@ -26,8 +26,8 @@ beforeEach(() => {
 afterEach(() => resetTestDatabase());
 
 test('session search uses the Prokop definition and stays hidden when disabled', async () => {
-  expect(codexSessionSearch.definitions().map(def => def.name)).toEqual(['session_search']);
-  const tools = createCodexSessionSearchTools({ bridge: codexSessionSearch, sessionId: 's', workspaceId: 'ws',
+  expect(sessionSearchDomainTools.definitions().map(def => def.name)).toEqual(['session_search']);
+  const tools = createCodexSessionSearchTools({ bridge: sessionSearchDomainTools, sessionId: 's', workspaceId: 'ws',
     preconfigId: 'agent', agentDir: null, isActive: () => true, authorizeRoot: () => true, ask: async () => true });
   expect(tools.definitions).toEqual([]);
   expect((await tools.call(call('disabled', { action: 'list' }))).success).toBe(false);

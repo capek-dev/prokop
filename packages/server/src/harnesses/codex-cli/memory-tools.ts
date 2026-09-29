@@ -1,14 +1,9 @@
 import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
+import type { MemoryDomainBridge } from '@/adapters/capek/domain-tools';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';
 import { codexObject } from './app-server';
-
-export interface CodexMemoryBridge {
-  definitions(): Array<{ type: 'function'; name: string; description: string; inputSchema: unknown }>;
-  execute(input: Record<string, unknown>, directory: string, risk: PermissionRiskLevel,
-    ask?: (request: PermissionAsk) => Promise<boolean>): Promise<{ success: boolean; error?: string; result?: unknown }>;
-}
 
 export interface CodexMemoryCallResult {
   contentItems: Array<{ type: 'inputText'; text: string }>;
@@ -22,8 +17,8 @@ const MAX_RESULT = 16_000;
 
 /** A per-turn allowlist, never the full Prokop tool catalog. */
 export function createCodexMemoryTools(options: {
-  bridge: CodexMemoryBridge;
-  definitions?: ReturnType<CodexMemoryBridge['definitions']>;
+  bridge: MemoryDomainBridge;
+  definitions?: ReturnType<MemoryDomainBridge['definitions']>;
   sessionId: string;
   workspaceId: string;
   root: string;
@@ -31,7 +26,7 @@ export function createCodexMemoryTools(options: {
   isActive(turnId: string): boolean;
   authorizeRoot(): boolean;
   ask(request: PermissionAsk): Promise<boolean>;
-}): { definitions: ReturnType<CodexMemoryBridge['definitions']>; call(raw: unknown): Promise<CodexMemoryCallResult> } {
+}): { definitions: ReturnType<MemoryDomainBridge['definitions']>; call(raw: unknown): Promise<CodexMemoryCallResult> } {
   const definitions = (options.definitions ?? options.bridge.definitions()).filter(definition => definition.type === 'function'
     && (definition.name === 'memory' || definition.name === 'agent_memory')
     && (definition.name !== 'agent_memory' || options.agentDir !== null)

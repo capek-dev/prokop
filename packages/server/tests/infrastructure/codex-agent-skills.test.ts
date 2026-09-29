@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Preconfig } from '@prokopai/sdk';
-import { codexAgentSkillTools } from '@/adapters/capek/codex-agent-skills';
+import { agentSkillsDomainTools } from '@/adapters/capek/domain-tools';
 import { createCodexAgentSkillTools } from '@/harnesses/codex-cli/agent-skill-tools';
 import { formatCodexAgentSkills, listCodexAgentSkills } from '@/harnesses/codex-cli/agent-skills';
 import { codexDeveloperInstructions } from '@/harnesses/codex-cli/instructions';
@@ -18,7 +18,7 @@ const workspaceRoot = join(root, 'workspace');
 const def = { type: 'function' as const, name: 'agent_skill_manage',
   description: 'Agent skill management', inputSchema: { type: 'object' } };
 const bridge = { definitions: () => [def, { ...def, name: 'skill_manage' }],
-  execute: codexAgentSkillTools.execute };
+  execute: agentSkillsDomainTools.execute };
 const call = (callId: string, args: unknown, overrides: Record<string, unknown> = {}): unknown => ({
   threadId: 'thread', turnId: 'turn', callId, namespace: null,
   tool: 'agent_skill_manage', arguments: args, ...overrides,
@@ -88,7 +88,7 @@ test('instructions include agent skills only for the selected agent, not plain p
 });
 
 test('manager uses published executor and rejects malformed, duplicate, switched or stale calls', async () => {
-  expect(codexAgentSkillTools.definitions().map(item => item.name)).toEqual(['agent_skill_manage']);
+  expect(agentSkillsDomainTools.definitions().map(item => item.name)).toEqual(['agent_skill_manage']);
   let active = true;
   let validRoot = true;
   const tools = createCodexAgentSkillTools({ bridge, sessionId: 's', workspaceId: 'ws',

@@ -1,16 +1,9 @@
 import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
+import type { SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { codexObject } from './app-server';
 import type { CodexMemoryCallResult } from './memory-tools';
-
-export interface CodexSessionSearchBridge {
-  definitions(): Array<{ type: 'function'; name: string; description: string; inputSchema: unknown }>;
-  execute(input: Record<string, unknown>, workspaceId: string, sessionId: string,
-    includeToolResults: boolean, risk: PermissionRiskLevel,
-    ask: (request: PermissionAsk) => Promise<boolean>, agentId: string | null):
-    Promise<{ success: boolean; error?: string }>;
-}
 
 const fail = (message: string): CodexMemoryCallResult => ({ success: false,
   contentItems: [{ type: 'inputText', text: message }] });
@@ -20,8 +13,8 @@ const RISKS = ['none', 'low', 'medium', 'high', 'critical'];
 
 /** Restrict Codex calls to the configured workspace and the active turn. */
 export function createCodexSessionSearchTools(options: {
-  bridge: CodexSessionSearchBridge;
-  definitions?: ReturnType<CodexSessionSearchBridge['definitions']>;
+  bridge: SessionSearchDomainBridge;
+  definitions?: ReturnType<SessionSearchDomainBridge['definitions']>;
   workspaceId: string;
   sessionId: string;
   preconfigId: string;
@@ -29,7 +22,7 @@ export function createCodexSessionSearchTools(options: {
   isActive(turnId: string): boolean;
   authorizeRoot(): boolean;
   ask(request: PermissionAsk): Promise<boolean>;
-}): { definitions: ReturnType<CodexSessionSearchBridge['definitions']>; call(raw: unknown): Promise<CodexMemoryCallResult> } {
+}): { definitions: ReturnType<SessionSearchDomainBridge['definitions']>; call(raw: unknown): Promise<CodexMemoryCallResult> } {
   const definitions = (options.definitions ?? options.bridge.definitions()).filter(definition =>
     definition.type === 'function' && definition.name === 'session_search'
     && getWorkspace(options.workspaceId)?.settings.sessionSearch?.enabled === true);

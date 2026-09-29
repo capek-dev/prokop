@@ -43,9 +43,7 @@ import {
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { listPreconfigs } from '@/infrastructure/config/preconfig';
 import { spawnCodexAppServer } from '@/harnesses/codex-cli/app-server';
-import { codexMemoryTools } from '@/adapters/capek/codex-memory';
-import { codexAgentSkillTools } from '@/adapters/capek/codex-agent-skills';
-import { codexSessionSearch } from '@/adapters/capek/codex-session-search';
+import { agentSkillsDomainTools, memoryDomainTools, sessionSearchDomainTools } from '@/adapters/capek/domain-tools';
 import { createPretoolChannel } from '@/harnesses/codex-cli/pretool-hook';
 import { selectEmptySessionHarnessModel } from '@/infrastructure/sqlite/session-store';
 import { getModelsConfigWithStatus } from '@/config/models';
@@ -178,9 +176,9 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     connect: spawnCodexAppServer,
     version: codexCliVersion,
     prepareHook: createPretoolChannel,
-    memoryTools: codexMemoryTools,
-    sessionSearch: codexSessionSearch,
-    agentSkills: codexAgentSkillTools,
+    memoryTools: memoryDomainTools,
+    sessionSearch: sessionSearchDomainTools,
+    agentSkills: agentSkillsDomainTools,
     instructions: {
       listPreconfigs,
       getPreconfig: id => agents.getPreconfigOrAgent(id),
@@ -195,9 +193,9 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
       getAgentDirectory: id => agents.getAgentDirectory(id),
       readAgentMemoryFile: (id, filename) => agents.readAgentMemoryFile(id, filename),
     },
-    memoryTools: codexMemoryTools,
-    sessionSearch: codexSessionSearch,
-    agentSkills: codexAgentSkillTools,
+    memoryTools: memoryDomainTools,
+    sessionSearch: sessionSearchDomainTools,
+    agentSkills: agentSkillsDomainTools,
   });
   const execution = createHarnessExecution(repository, {
     prokop: createProkopHarness({

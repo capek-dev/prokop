@@ -1,60 +1,25 @@
-import { lstat, readdir } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
+import { safeSkillDirectory, type AgentSkillsDomainBridge } from '@/adapters/capek/domain-tools';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { codexObject } from './app-server';
 import type { CodexMemoryCallResult } from './memory-tools';
-
-export interface CodexAgentSkillBridge {
-  definitions(): Array<{ type: 'function'; name: string; description: string; inputSchema: unknown }>;
-  execute(input: Record<string, unknown>, directory: string): Promise<{
-    success: boolean; error?: string; title?: string; action?: string; name?: string;
-    description?: string; path?: string; summary?: string;
-    skills?: Array<{ name: string; description: string }>;
-  }>;
-}
 
 const fail = (message: string): CodexMemoryCallResult => ({ success: false,
   contentItems: [{ type: 'inputText', text: message }] });
 const ACTIONS = ['list', 'create', 'update', 'patch', 'delete'];
 const FIELDS = ['name', 'description', 'content', 'oldString', 'newString'];
 
-// The core manager follows SKILL.md symlinks on update/patch. Reject unsafe trees
-// before delegating so this bridge cannot write through an existing link.
-// Shared with the Claude harness's in-process skill tool.
-export async function safeSkillDirectory(agentDir: string): Promise<boolean> {
-  if (!isAbsolute(agentDir)) return false;
-  try {
-    if (!(await lstat(agentDir)).isDirectory()) return false;
-    const root = join(agentDir, 'skills');
-    let entries;
-    try { entries = await readdir(root, { withFileTypes: true }); }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
-      return false;
-    }
-    if (!(await lstat(root)).isDirectory()) return false;
-    for (const entry of entries) {
-      if (entry.isSymbolicLink()) return false;
-      if (!entry.isDirectory()) continue;
-      const path = join(root, entry.name, 'SKILL.md');
-      try { if (!(await lstat(path)).isFile()) return false; }
-      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return false; }
-    }
-    return true;
-  } catch { return false; }
-}
-
 /** Only the bound agent's skill directory is writable through this tool. */
 export function createCodexAgentSkillTools(options: {
-  bridge: CodexAgentSkillBridge;
-  definitions?: ReturnType<CodexAgentSkillBridge['definitions']>;
+  bridge: AgentSkillsDomainBridge;
+  definitions?: ReturnType<AgentSkillsDomainBridge['definitions']>;
   sessionId: string;
   workspaceId: string;
   preconfigId: string;
   agentDir: string | null;
   isActive(turnId: string): boolean;
   authorizeRoot(): boolean;
-}): { definitions: ReturnType<CodexAgentSkillBridge['definitions']>;
+}): { definitions: ReturnType<AgentSkillsDomainBridge['definitions']>;
   call(raw: unknown): Promise<CodexMemoryCallResult> } {
   const definitions = options.agentDir
     ? (options.definitions ?? options.bridge.definitions()).filter(definition =>

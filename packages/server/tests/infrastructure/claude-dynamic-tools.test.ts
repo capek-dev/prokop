@@ -8,9 +8,7 @@ import type { Options, SDKMessage, SdkMcpToolDefinition } from '@anthropic-ai/cl
 type ToolResult = Awaited<ReturnType<SdkMcpToolDefinition['handler']>>;
 import type { PermissionAsk } from '@prokopai/sdk';
 import { installMemoryToolFallback, installSessionSearchToolFallback, installSkillsToolFallback } from '@capekai/core/hosts';
-import { codexMemoryTools } from '@/adapters/capek/codex-memory';
-import { codexSessionSearch } from '@/adapters/capek/codex-session-search';
-import { codexAgentSkillTools } from '@/adapters/capek/codex-agent-skills';
+import { agentSkillsDomainTools, memoryDomainTools, sessionSearchDomainTools } from '@/adapters/capek/domain-tools';
 import { claudeMemoryShape, claudeSessionSearchShape, claudeSkillManageShape, claudeMcpToolDisplayName,
   createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools } from '@/harnesses/claude-cli/dynamic-tools';
 import { createClaudeExecution } from '@/harnesses/claude-cli/execution';
@@ -29,14 +27,14 @@ const agentDir = join(root, 'agent');
 const fakeDefs = ['memory', 'agent_memory', 'shell'].map(name => ({
   type: 'function' as const, name, description: `description for ${name}`, inputSchema: { type: 'object' },
 }));
-const fakeBridge = { definitions: () => fakeDefs, execute: codexMemoryTools.execute };
+const fakeBridge = { definitions: () => fakeDefs, execute: memoryDomainTools.execute };
 const fakeSearchDefs = [{ type: 'function' as const, name: 'session_search',
   description: 'Search prior conversation messages', inputSchema: { type: 'object' } }];
 const fakeSearchBridge = { definitions: () => fakeSearchDefs,
-  execute: codexSessionSearch.execute };
+  execute: sessionSearchDomainTools.execute };
 const fakeSkillDefs = [{ type: 'function' as const, name: 'agent_skill_manage',
   description: 'Manage agent skills', inputSchema: { type: 'object' } }];
-const fakeSkillBridge = { definitions: () => fakeSkillDefs, execute: codexAgentSkillTools.execute };
+const fakeSkillBridge = { definitions: () => fakeSkillDefs, execute: agentSkillsDomainTools.execute };
 
 // zod v4 toJSONSchema adds standard-schema metadata, a $schema header, and
 // additionalProperties:false; compare the meaningful schema parts on both sides.
@@ -74,7 +72,7 @@ function skillTools(overrides: Partial<Parameters<typeof createClaudeSkillManage
 
 test('zod schema matches the live Capek memory definitions', () => {
   installMemoryToolFallback();
-  const definitions = codexMemoryTools.definitions();
+  const definitions = memoryDomainTools.definitions();
   expect(definitions.map(definition => definition.name).sort()).toEqual(['agent_memory', 'memory']);
   const schema = z.toJSONSchema(z.object(claudeMemoryShape));
   for (const definition of definitions) {
@@ -84,7 +82,7 @@ test('zod schema matches the live Capek memory definitions', () => {
 
 test('zod schema matches the live Capek session search definition', () => {
   installSessionSearchToolFallback();
-  const definitions = codexSessionSearch.definitions();
+  const definitions = sessionSearchDomainTools.definitions();
   expect(definitions.map(definition => definition.name)).toEqual(['session_search']);
   const schema = z.toJSONSchema(z.object(claudeSessionSearchShape));
   for (const definition of definitions) {
@@ -94,7 +92,7 @@ test('zod schema matches the live Capek session search definition', () => {
 
 test('zod schema matches the live Capek agent skill definition', () => {
   installSkillsToolFallback();
-  const definitions = codexAgentSkillTools.definitions();
+  const definitions = agentSkillsDomainTools.definitions();
   expect(definitions.map(definition => definition.name)).toEqual(['agent_skill_manage']);
   const schema = z.toJSONSchema(z.object(claudeSkillManageShape));
   for (const definition of definitions) {
@@ -114,7 +112,7 @@ test('agent skill writes stay in the selected agent home without any ask', async
   const bridge = { definitions: () => fakeSkillDefs,
     execute: async (input: Record<string, unknown>, directory: string) => {
       seen.push(directory);
-      return codexAgentSkillTools.execute(input, directory);
+      return agentSkillsDomainTools.execute(input, directory);
     } };
   const registered = skillTools({ bridge });
   const result = await registered.find(item => item.name === 'agent_skill_manage')!.handler(

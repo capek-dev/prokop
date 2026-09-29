@@ -5,10 +5,8 @@ import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';
-import type { CodexMemoryBridge } from '@/harnesses/codex-cli/memory-tools';
-import type { CodexSessionSearchBridge } from '@/harnesses/codex-cli/session-search-tools';
-import type { CodexAgentSkillBridge } from '@/harnesses/codex-cli/agent-skill-tools';
-import { safeSkillDirectory } from '@/harnesses/codex-cli/agent-skill-tools';
+import { safeSkillDirectory,
+  type AgentSkillsDomainBridge, type MemoryDomainBridge, type SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
 
 /** The in-process server name; the SDK reports its tools as mcp__prokop__<name>. */
 export const PROKOP_MCP_SERVER = 'prokop';
@@ -55,8 +53,8 @@ const fail = (message: string): { content: Array<{ type: 'text'; text: string }>
 
 /** Register the Prokop memory tools for one Claude turn on the in-process MCP server. */
 export function createClaudeMemoryTools(options: {
-  bridge: CodexMemoryBridge;
-  definitions?: ReturnType<CodexMemoryBridge['definitions']>;
+  bridge: MemoryDomainBridge;
+  definitions?: ReturnType<MemoryDomainBridge['definitions']>;
   sessionId: string;
   workspaceId: string;
   root: string;
@@ -114,8 +112,8 @@ export function createClaudeMemoryTools(options: {
 
 /** Register the Prokop session search tool for one Claude turn on the in-process MCP server. */
 export function createClaudeSessionSearchTools(options: {
-  bridge: CodexSessionSearchBridge;
-  definitions?: ReturnType<CodexSessionSearchBridge['definitions']>;
+  bridge: SessionSearchDomainBridge;
+  definitions?: ReturnType<SessionSearchDomainBridge['definitions']>;
   sessionId: string;
   workspaceId: string;
   preconfigId: string | null;
@@ -180,8 +178,8 @@ export function createClaudeSessionSearchTools(options: {
 
 /** Register the agent skill manager for one Claude turn; writes stay in the selected agent home. */
 export function createClaudeSkillManageTools(options: {
-  bridge: CodexAgentSkillBridge;
-  definitions?: ReturnType<CodexAgentSkillBridge['definitions']>;
+  bridge: AgentSkillsDomainBridge;
+  definitions?: ReturnType<AgentSkillsDomainBridge['definitions']>;
   sessionId: string;
   workspaceId: string;
   preconfigId: string | null;

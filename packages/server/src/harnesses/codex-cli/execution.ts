@@ -22,9 +22,10 @@ import { createPretoolChannel, verifyPretoolHook, type PretoolChannel, type Hook
 import { classifyCodexHook } from './hook-policy';
 import { parseCodexGoal, publishCodexGoal, validGoalBudget } from './goal';
 import { parseCodexContextUsage, publishCodexContextUsage } from './usage';
-import { createCodexMemoryTools, type CodexMemoryBridge } from './memory-tools';
-import { createCodexSessionSearchTools, type CodexSessionSearchBridge } from './session-search-tools';
-import { createCodexAgentSkillTools, type CodexAgentSkillBridge } from './agent-skill-tools';
+import { createCodexMemoryTools } from './memory-tools';
+import { createCodexSessionSearchTools } from './session-search-tools';
+import { createCodexAgentSkillTools } from './agent-skill-tools';
+import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
 import { applyRollback, clearRollbackIntent, getRollbackIntent, readRollbackHistory, readTurnIds, sameTurns, saveRollbackIntent, setRollbackPhase } from './rollback';
 import { forkCodexSession } from './fork';
 import { codexCliVersion } from './version';
@@ -67,9 +68,9 @@ export interface CodexExecutionDependencies {
   prepareHook?: typeof createPretoolChannel;
   goalIdleTimeoutMs?: number;
   instructions: CodexInstructionSources;
-  memoryTools?: CodexMemoryBridge;
-  sessionSearch?: CodexSessionSearchBridge;
-  agentSkills?: CodexAgentSkillBridge;
+  memoryTools?: MemoryDomainBridge;
+  sessionSearch?: SessionSearchDomainBridge;
+  agentSkills?: AgentSkillsDomainBridge;
 }
 
 export function codexCliAvailable(): boolean {
