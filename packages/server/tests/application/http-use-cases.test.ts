@@ -40,7 +40,7 @@ function makeRepository(overrides: Partial<SessionRepositoryPort> = {}): Session
     getQueuedMessage: () => null,
     deleteQueuedMessage: () => true,
     markManualSessionTitle: (metadata) => ({ ...(metadata ?? {}), titleManuallyRenamed: true }),
-    getWorkspaceAutoApproveSeverity: () => 'low',
+    getWorkspacePermissionMode: () => 'standard',
     getPreconfigOrAgent: async () => null,
     isAgentSync: () => false,
     toolOutput: {
@@ -107,8 +107,8 @@ describe('session HTTP application', () => {
     app.updateSession('sess-1', { status: 'closed', metadata: { kept: true } });
 
     expect(updateInputs).toEqual([
-      { title: 'New', status: undefined, metadata: { old: true, titleManuallyRenamed: true }, tags: undefined, autoApproveSeverity: undefined },
-      { title: undefined, status: 'closed', metadata: { kept: true }, tags: undefined, autoApproveSeverity: undefined },
+      { title: 'New', status: undefined, metadata: { old: true, titleManuallyRenamed: true }, tags: undefined, permissionMode: undefined },
+      { title: undefined, status: 'closed', metadata: { kept: true }, tags: undefined, permissionMode: undefined },
     ]);
   });
 

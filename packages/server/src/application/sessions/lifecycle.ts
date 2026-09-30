@@ -141,7 +141,6 @@ export function createSessionLifecycleApplication<Origin>(
         return;
       }
       const sessionId = crypto.randomUUID();
-      const workspaceAutoApprove = deps.repository.getWorkspaceAutoApproveSeverity(input.workspaceId || '');
       const session = deps.repository.createSession({
         id: sessionId,
         workspaceId,
@@ -153,7 +152,6 @@ export function createSessionLifecycleApplication<Origin>(
         metadata: null,
         parentId: null,
         agentName: null,
-        autoApproveSeverity: workspaceAutoApprove,
       });
       wire.actor.attachOriginToSession(origin, session.id);
 

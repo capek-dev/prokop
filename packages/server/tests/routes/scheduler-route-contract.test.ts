@@ -26,6 +26,7 @@ function makeJob(overrides: Partial<ScheduledJob> = {}): ScheduledJob {
     includeHistory: false,
     preconfigId: null,
     originSessionId: null,
+    permissionMode: null,
     autoApproveSeverity: null,
     notificationsEnabled: false,
     createdAt: new Date().toISOString(),
@@ -123,7 +124,7 @@ describe('scheduler route contract', () => {
         originSessionId: undefined,
         reuseSession: undefined,
         includeHistory: undefined,
-        autoApproveSeverity: undefined,
+        permissionMode: undefined,
         notificationsEnabled: undefined,
       },
     });

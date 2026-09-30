@@ -43,7 +43,7 @@ export const updateSessionSchema = z.object({
   status: z.enum(['active', 'closed']).optional(),
   metadata: clientSessionMetadata,
   tags: z.array(z.string()).optional(),
-  autoApproveSeverity: z.enum(['off', 'none', 'low', 'medium', 'high']).nullable().optional(),
+  permissionMode: z.enum(['standard', 'extended', 'full']).nullable().optional(),
 }).loose();
 
 // ── Response format schemas ────────────────────────────────────
@@ -87,7 +87,7 @@ export const createScheduledJobSchema = z.object({
   originSessionId: z.string().nullable().optional(),
   reuseSession: z.boolean().optional(),
   includeHistory: z.boolean().optional(),
-  autoApproveSeverity: z.enum(['off', 'none', 'low', 'medium', 'high']).nullable().optional(),
+  permissionMode: z.enum(['standard', 'extended', 'full']).nullable().optional(),
   notificationsEnabled: z.boolean().optional(),
   harness: z.enum(['prokop', 'codex-cli', 'claude-cli']).optional(),
 }).loose();
@@ -102,7 +102,7 @@ export const updateScheduledJobSchema = z.object({
   originSessionId: z.string().nullable().optional(),
   reuseSession: z.boolean().optional(),
   includeHistory: z.boolean().optional(),
-  autoApproveSeverity: z.enum(['off', 'none', 'low', 'medium', 'high']).nullable().optional(),
+  permissionMode: z.enum(['standard', 'extended', 'full']).nullable().optional(),
   enabled: z.boolean().optional(),
   notificationsEnabled: z.boolean().optional(),
 }).loose();
@@ -256,10 +256,9 @@ export const providerCredentialsSchema = z.object({
 
 // ── Workspace settings schemas ─────────────────────────────────
 
-const riskLevel = z.enum(['none', 'low', 'medium', 'high', 'critical']);
-const severity = z.enum(['off', 'none', 'low', 'medium', 'high']);
+  const riskLevel = z.enum(['none', 'low', 'medium', 'high', 'critical']);
 
-export const workspaceSettingsSchema = z.object({
+  export const workspaceSettingsSchema = z.object({
   sessionTagOrder: z.enum(['tagged-first', 'untagged-first']).optional(),
   learning: learningSettingsSchema.optional(),
   allowPersonalLearning: z.boolean().optional(),
@@ -280,7 +279,7 @@ export const workspaceSettingsSchema = z.object({
     enabled: z.boolean(),
     permissionRisk: riskLevel,
   }).partial().optional(),
-  autoApproveSeverity: severity.nullable().optional(),
+  autoApproveSeverity: z.enum(['standard', 'extended', 'full']).optional(),
   preconfigs: z.object({
     selectedIds: z.array(z.string()).nullable().optional(),
     defaultId: z.string().nullable().optional(),

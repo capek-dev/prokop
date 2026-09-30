@@ -9,6 +9,15 @@ export type {
   SubagentStatus,
 } from '@capekai/types/session';
 
+/**
+ * Permissions v2 product mode (docs/plans/unified-permissions.md). The
+ * server-normalized effective mode: a stored null inherits the workspace
+ * default, and the repository resolves that at read time so the wire always
+ * carries a concrete value. Replaces the capek `autoApproveSeverity` ladder
+ * (kept only as an inherited, unused field until the capek contract drops it).
+ */
+export type PermissionMode = 'standard' | 'extended' | 'full';
+
 export type SessionCategory = 'active' | 'archived' | 'scheduled';
 
 export type SessionCategoryCounts = Record<SessionCategory, number>;
@@ -108,6 +117,9 @@ export interface SessionHarnessState {
 export interface Session extends CapekSession {
   /** Persisted execution owner; missing values from older hosts mean Prokop. */
   harness?: SessionHarness;
+  /** Effective permission mode; the repository resolves the workspace
+   * default when the session stores none. Treat missing as 'standard'. */
+  permissionMode?: PermissionMode | null;
   /** Server-normalized harness state derived from the persisted harness and
    * its metadata; clients read these fields instead of per-harness metadata
    * keys or identity checks. */

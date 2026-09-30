@@ -3,7 +3,7 @@ import type { ScheduledJob } from '@prokopai/sdk';
 import { getDefaultPreconfig, getPreconfig } from '@/infrastructure/config/preconfig';
 import { createScheduledJobRunner } from '@/infrastructure/scheduling/scheduled-job-runner';
 import { createSession, getSession } from '@/infrastructure/sqlite/session-store';
-import { getWorkspace, getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
+import { getWorkspace, getWorkspacePermissionMode } from '@/infrastructure/sqlite/workspaces';
 import { markScheduledJobError, markScheduledJobRun } from '@/infrastructure/sqlite/scheduled-job-store';
 import type { ScheduledJobExecutionPort } from '@/application/ports/scheduling';
 
@@ -20,7 +20,7 @@ export function createJean2ScheduledJobExecution(
       markError: markScheduledJobError,
     },
     sessions: { createSession, getSession },
-    workspaces: { getWorkspace, getAutoApproveSeverity: getWorkspaceAutoApproveSeverity },
+    workspaces: { getWorkspace, permissionMode: getWorkspacePermissionMode },
     preconfigs: { getPreconfig, getDefaultPreconfig },
     modelsConfig: { getModelsConfig },
   }),

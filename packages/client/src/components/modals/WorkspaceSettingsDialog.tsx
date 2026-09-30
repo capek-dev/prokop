@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { Brain, GraduationCap, Wrench, Search, Server, Shield, FolderSymlink, Clock, ShieldCheck, Cog, Loader2 } from 'lucide-react';
-import type { Workspace, WorkspaceSettings, PermissionRiskLevel, PermissionGrant, ProkopaiClient, AutoApproveSeverity } from '@prokopai/sdk';
+import type { Workspace, WorkspaceSettings, PermissionRiskLevel, PermissionGrant, ProkopaiClient, PermissionMode } from '@prokopai/sdk';
 import { getSessionTagOrder } from '@/lib/sessionTagOrder';
 import { WorkspaceSessionsPanel } from './configuration/WorkspaceSessionsPanel';
 import { learningValidationError } from '@/lib/learningValidation';
@@ -88,7 +88,7 @@ function snapshot(workspace: Workspace) {
     learning: s?.learning,
     allowPersonalLearning: s?.allowPersonalLearning !== false,
     scheduling: { enabled: s?.scheduling?.enabled ?? false, permissionRisk: s?.scheduling?.permissionRisk ?? 'medium' as PermissionRiskLevel },
-    autoApprove: s?.autoApproveSeverity ?? 'low' as AutoApproveSeverity,
+    autoApprove: s?.permissionMode ?? 'standard' as PermissionMode,
     sessionTagOrder: getSessionTagOrder(s?.sessionTagOrder),
     preconfigSettings: s?.preconfigs ?? { selectedIds: null, defaultId: null },
   };
@@ -150,7 +150,7 @@ export function WorkspaceSettingsDialog({
       learning: draft.learning ? { ...draft.learning, enabled: draft.learning.enabled && draft.memory.enabled && draft.search.enabled } : undefined,
       allowPersonalLearning: draft.allowPersonalLearning,
       scheduling: { enabled: draft.scheduling.enabled, permissionRisk: draft.scheduling.permissionRisk },
-      autoApproveSeverity: draft.autoApprove,
+      permissionMode: draft.autoApprove,
       preconfigs: draft.preconfigSettings,
       sessionTagOrder: draft.sessionTagOrder,
     });
@@ -187,7 +187,7 @@ export function WorkspaceSettingsDialog({
             />;
           case 'autoApprove':
             return <AutoApprovePanel
-              severity={draft.autoApprove}
+              mode={draft.autoApprove}
               onChange={(v) => setDraft((d) => ({ ...d, autoApprove: v }))}
             />;
           case 'learning':

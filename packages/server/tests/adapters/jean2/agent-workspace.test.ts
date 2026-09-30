@@ -50,7 +50,7 @@ describe('jean2 agents adapters over the real store and filesystem', () => {
     expect(workspace).not.toBeNull();
     expect(workspace!.path).toBe(join(getDataDir(), 'agents', 'coder', 'home'));
     expect(workspace!.isVirtual).toBe(true);
-    expect(workspace!.settings).toEqual({ ...agentHomeWorkspaceSettings('coder'), autoApproveSeverity: 'low' });
+    expect(workspace!.settings).toEqual({ ...agentHomeWorkspaceSettings('coder'), permissionMode: 'standard' });
 
     await application.demoteAgent('coder');
     expect(getWorkspace('coder-home')).toBeNull();

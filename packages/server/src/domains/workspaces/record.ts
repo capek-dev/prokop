@@ -1,18 +1,18 @@
-import type { AutoApproveSeverity, Workspace, WorkspaceSettings } from '@prokopai/sdk';
+import type { PermissionMode, Workspace, WorkspaceSettings } from '@prokopai/sdk';
 
 /**
  * Workspace domain: workspace record policy.
  *
  * Owns what a workspace record looks like: the default settings merge
- * (`autoApproveSeverity: 'low'`), the raw-row mapping, the agent-home
- * classification used by the listing filters, the auto-approve severity
- * fallback, and the record name default. The SQLite repository
+ * (`permissionMode: 'standard'`), the raw-row mapping, the agent-home
+ * classification used by the listing filters, the permission-mode fallback,
+ * and the record name default. The SQLite repository
  * (`store/workspaces.ts`) applies these rules; the HTTP use cases apply the
  * route-level input rules (path expansion and existence validation).
  */
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
-  autoApproveSeverity: 'low',
+  permissionMode: 'standard',
 };
 
 /** Merge raw stored settings over the defaults; malformed JSON falls back to
@@ -60,12 +60,12 @@ export function isAgentHomeWorkspace(settings: WorkspaceSettings): boolean {
   return settings?.isAgentHome === true;
 }
 
-/** Auto-approve severity fallback: 'low' when the workspace or its setting
+/** Permission-mode fallback: 'standard' when the workspace or its setting
  * is missing. */
-export function autoApproveSeverityOf(
+export function permissionModeOf(
   workspace: { settings?: WorkspaceSettings } | null | undefined,
-): AutoApproveSeverity {
-  return workspace?.settings?.autoApproveSeverity ?? 'low';
+): PermissionMode {
+  return workspace?.settings?.permissionMode ?? 'standard';
 }
 
 /** Route-level default for the workspace name. */

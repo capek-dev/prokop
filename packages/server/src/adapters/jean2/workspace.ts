@@ -4,7 +4,7 @@ import {
   createWorkspace,
   deleteWorkspace,
   getWorkspace,
-  getWorkspaceAutoApproveSeverity,
+  getWorkspacePermissionMode,
   listAgentHomeWorkspaces,
   listWorkspaces,
   removeWorkspaceAdditionalPath,
@@ -58,7 +58,7 @@ export function createJean2WorkspaceRepositoryPort(): WorkspaceRepositoryPort {
     delete: deleteWorkspace,
     addAdditionalPath: addWorkspaceAdditionalPath,
     removeAdditionalPath: removeWorkspaceAdditionalPath,
-    autoApproveSeverity: getWorkspaceAutoApproveSeverity,
+    permissionMode: getWorkspacePermissionMode,
   };
 }
 

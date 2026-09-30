@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { Database } from 'bun:sqlite';
 import type {
+  PermissionMode,
   ScheduleConfig,
   ScheduleKind,
   ScheduledJob,
@@ -12,6 +13,7 @@ import {
   decideNextRunOnUpdate,
 } from '@/domains/scheduling/job-lifecycle';
 import { computeNextRun, scheduleDisplay } from '@/domains/scheduling/schedule';
+import { severityFromMode } from '@/domains/permissions';
 
 /** Database accessor injected by the composition root or the S5 compat
  * module. No module-global connection state exists in this layer. */
@@ -37,7 +39,7 @@ interface ScheduledJobRow {
   include_history: number;
   preconfig_id: string | null;
   origin_session_id: string | null;
-  auto_approve_severity: string | null;
+  permission_mode: string | null;
   notifications_enabled: number;
   created_at: number;
   updated_at: number;
@@ -64,7 +66,12 @@ function rowToScheduledJob(row: ScheduledJobRow): ScheduledJob {
     includeHistory: row.include_history === 1,
     preconfigId: row.preconfig_id,
     originSessionId: row.origin_session_id,
-    autoApproveSeverity: row.auto_approve_severity as ScheduledJob['autoApproveSeverity'],
+    permissionMode: row.permission_mode as ScheduledJob['permissionMode'],
+    // Capek's ScheduledJob contract still carries the legacy severity field
+    // as required; keep it derived from the mode until the contract drops it.
+    autoApproveSeverity: row.permission_mode
+      ? severityFromMode(row.permission_mode as PermissionMode)
+      : null,
     notificationsEnabled: row.notifications_enabled === 1,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
@@ -97,7 +104,7 @@ export function createScheduledJobRepository(
 
       db.run(
         `INSERT INTO scheduled_jobs
-          (id, workspace_id, harness, name, prompt, schedule_kind, schedule_config, schedule_display, state, repeat_limit, run_count, next_run_at, last_run_at, last_run_session_id, last_error, reuse_session, include_history, preconfig_id, origin_session_id, auto_approve_severity, notifications_enabled, created_at, updated_at)
+          (id, workspace_id, harness, name, prompt, schedule_kind, schedule_config, schedule_display, state, repeat_limit, run_count, next_run_at, last_run_at, last_run_session_id, last_error, reuse_session, include_history, preconfig_id, origin_session_id, permission_mode, notifications_enabled, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, 0, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
@@ -114,7 +121,7 @@ export function createScheduledJobRepository(
           input.includeHistory ? 1 : 0,
           input.preconfigId ?? null,
           input.originSessionId ?? null,
-          input.autoApproveSeverity ?? null,
+          input.permissionMode ?? null,
           input.notificationsEnabled ? 1 : 0,
           now,
           now,
@@ -166,9 +173,9 @@ export function createScheduledJobRepository(
         setClauses.push('include_history = ?');
         values.push(updates.includeHistory ? 1 : 0);
       }
-      if (updates.autoApproveSeverity !== undefined) {
-        setClauses.push('auto_approve_severity = ?');
-        values.push(updates.autoApproveSeverity);
+      if (updates.permissionMode !== undefined) {
+        setClauses.push('permission_mode = ?');
+        values.push(updates.permissionMode ?? null);
       }
       if (updates.notificationsEnabled !== undefined) {
         setClauses.push('notifications_enabled = ?');

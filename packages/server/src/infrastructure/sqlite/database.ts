@@ -305,6 +305,49 @@ export function initializeSchema(db: Database): void {
   ]) {
     try { db.run(sql); } catch { /* existing column */ }
   }
+
+  // Permissions v2 epoch (docs/plans/unified-permissions.md), one transaction,
+  // runs once: job mode column + backfill, workspace settings rewrite, and a
+  // full grants wipe. Stored grants encode severity-ladder semantics the new
+  // policy contradicts (destructive commands are once-only now), and a grant
+  // costs one click to rebuild, so they are cleared rather than re-classified.
+  const jobColumns = db
+    .query<{ name: string }, []>('PRAGMA table_info(scheduled_jobs)')
+    .all();
+  if (!jobColumns.some(column => column.name === 'permission_mode')) {
+    db.transaction(() => {
+      db.run('ALTER TABLE scheduled_jobs ADD COLUMN permission_mode TEXT');
+      db.run(`UPDATE scheduled_jobs SET permission_mode = CASE auto_approve_severity
+        WHEN 'high' THEN 'full'
+        WHEN 'medium' THEN 'extended'
+        WHEN 'low' THEN 'standard'
+        WHEN 'none' THEN 'standard'
+        WHEN 'off' THEN 'standard'
+        ELSE NULL
+      END`);
+      const workspaces = db
+        .query('SELECT id, settings FROM workspaces')
+        .all() as { id: string; settings: string | null }[];
+      for (const workspace of workspaces) {
+        let settings: Record<string, unknown>;
+        try {
+          settings = JSON.parse(workspace.settings ?? '{}') as Record<string, unknown>;
+        } catch {
+          continue;
+        }
+        if (!('autoApproveSeverity' in settings)) continue;
+        const severity = settings.autoApproveSeverity;
+        settings.permissionMode = severity === 'high' ? 'full'
+          : severity === 'medium' ? 'extended' : 'standard';
+        delete settings.autoApproveSeverity;
+        db.run('UPDATE workspaces SET settings = ? WHERE id = ?', [
+          JSON.stringify(settings), workspace.id,
+        ]);
+      }
+      db.run('DELETE FROM permission_grants');
+    })();
+  }
+
   db.run('CREATE INDEX IF NOT EXISTS idx_terminal_sessions_worktree ON terminal_sessions(managed_worktree_id, status)');
 
   db.run(`CREATE TABLE IF NOT EXISTS push_subscriptions (

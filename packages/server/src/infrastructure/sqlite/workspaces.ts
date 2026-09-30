@@ -1,10 +1,11 @@
 import { getDatabase } from './database';
-import type { Workspace, WorkspaceSettings, AutoApproveSeverity } from '@prokopai/sdk';
+import type { Workspace, WorkspaceSettings, PermissionMode } from '@prokopai/sdk';
 import {
-  autoApproveSeverityOf,
   DEFAULT_WORKSPACE_SETTINGS,
   isAgentHomeWorkspace,
   mapWorkspaceRecord,
+  parseWorkspaceSettings,
+  permissionModeOf,
 } from '@/domains/workspaces';
 
 interface WorkspaceRow {
@@ -28,10 +29,20 @@ export interface CreateWorkspaceInput {
 
 const DEFAULT_SETTINGS = DEFAULT_WORKSPACE_SETTINGS;
 
-/** Resolve the auto-approve severity for a workspace, defaulting to 'low'. */
-export function getWorkspaceAutoApproveSeverity(workspaceId: string): AutoApproveSeverity {
-  const workspace = getWorkspace(workspaceId);
-  return autoApproveSeverityOf(workspace);
+const workspacePermissionModes = new Map<string, PermissionMode>();
+
+/** Resolve the workspace permission mode, defaulting to 'standard'. Read
+ * paths hit this for every session row without a stored mode, so the value is
+ * cached per workspace and invalidated on settings writes. */
+export function getWorkspacePermissionMode(workspaceId: string): PermissionMode {
+  const cached = workspacePermissionModes.get(workspaceId);
+  if (cached) return cached;
+  const row = getDatabase()
+    .query('SELECT settings FROM workspaces WHERE id = ?')
+    .get(workspaceId) as { settings: string | null } | undefined;
+  const mode = permissionModeOf(row ? { settings: parseWorkspaceSettings(row.settings) } : null);
+  workspacePermissionModes.set(workspaceId, mode);
+  return mode;
 }
 
 /** Each session lookup walks its existing time index from the newest message. */
@@ -100,6 +111,8 @@ export function createWorkspace(input: CreateWorkspaceInput): Workspace {
       workspace.createdAt,
       workspace.updatedAt,
     ]);
+
+    workspacePermissionModes.delete(workspace.id);
 
     for (const p of input.additionalPaths ?? []) {
       db.run(
@@ -173,6 +186,7 @@ export function updateWorkspace(
       db.run('UPDATE workspaces SET settings = ?, updated_at = ? WHERE id = ?', [
         JSON.stringify(updates.settings), now, id,
       ]);
+      workspacePermissionModes.delete(id);
     }
   })();
 
@@ -223,6 +237,7 @@ export function removeWorkspaceAdditionalPath(workspaceId: string, path: string)
 
 export function deleteWorkspace(id: string): boolean {
   const db = getDatabase();
+  workspacePermissionModes.delete(id);
   const result = db.run('DELETE FROM workspaces WHERE id = ?', [id]);
   if (result.changes > 0) notifyLearningActivity();
   return result.changes > 0;

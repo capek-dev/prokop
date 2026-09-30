@@ -33,7 +33,7 @@ export class ClaudeChildTimelines {
       workspaceRootId: this.parent.workspaceRootId, harness: 'claude-cli', parentId,
       preconfigId: this.parent.preconfigId, agentId: this.parent.agentId,
       selectedModel: this.parent.selectedModel, selectedProvider: this.parent.selectedProvider,
-      autoApproveSeverity: this.parent.autoApproveSeverity, title: 'Claude agent (subagent)',
+      permissionMode: this.parent.permissionMode, title: 'Claude agent (subagent)',
       status: 'active', metadata: null, agentName: 'Claude agent', subagentStatus: 'running' });
     const assistant = createMessage({ id: crypto.randomUUID(), sessionId: session.id, role: 'assistant',
       status: 'streaming', providerId: 'claude-cli', modelId: this.parent.selectedModel ?? 'claude-cli',

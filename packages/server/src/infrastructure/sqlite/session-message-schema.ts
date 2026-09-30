@@ -259,6 +259,28 @@ export function initializeSessionMessageSchema(
     // Column already exists
   }
 
+  // Permissions v2 (docs/plans/unified-permissions.md): one-shot epoch that
+  // renames the severity ladder to the three-level permission mode. Null
+  // keeps inheriting the workspace default (resolved at read time by the
+  // repository); explicit severities map high->full, medium->extended,
+  // everything else -> standard.
+  const sessionColumns = db
+    .query<{ name: string }, []>('PRAGMA table_info(sessions)')
+    .all();
+  if (!sessionColumns.some(column => column.name === 'permission_mode')) {
+    db.transaction(() => {
+      db.run('ALTER TABLE sessions ADD COLUMN permission_mode TEXT');
+      db.run(`UPDATE sessions SET permission_mode = CASE auto_approve_severity
+        WHEN 'high' THEN 'full'
+        WHEN 'medium' THEN 'extended'
+        WHEN 'low' THEN 'standard'
+        WHEN 'none' THEN 'standard'
+        WHEN 'off' THEN 'standard'
+        ELSE NULL
+      END`);
+    })();
+  }
+
   // Migrate: add agent_id column to sessions if missing
   try {
     db.run('ALTER TABLE sessions ADD COLUMN agent_id TEXT');

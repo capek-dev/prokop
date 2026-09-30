@@ -35,6 +35,7 @@ function makeJob(overrides: Partial<ScheduledJob> = {}): ScheduledJob {
     includeHistory: false,
     preconfigId: null,
     originSessionId: null,
+    permissionMode: null,
     autoApproveSeverity: null,
     notificationsEnabled: false,
     createdAt: new Date().toISOString(),
@@ -228,7 +229,7 @@ describe('scheduling HTTP use cases', () => {
       includeHistory: false,
       preconfigId: null,
       originSessionId: null,
-      autoApproveSeverity: null,
+      permissionMode: null,
       notificationsEnabled: false,
     });
   });

@@ -1,65 +1,56 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  autoApproveSeverityOf,
   DEFAULT_WORKSPACE_SETTINGS,
   isAgentHomeWorkspace,
   mapWorkspaceRecord,
   parseWorkspaceSettings,
-  workspaceNameOrDefault,
+  permissionModeOf,
+  type WorkspaceRecordRow,
 } from '@/domains/workspaces';
 
-// C6 step 4 moved the file-access containment policy into the Capek
-// workspace domain; the server consumes it through the path policy adapter
-// pinned by `tests/adapters/capek/workspace-paths.test.ts`.
-
-describe('workspace domain: record policy', () => {
-  test('pins the default settings and the malformed-JSON fallback', () => {
-    expect(DEFAULT_WORKSPACE_SETTINGS).toEqual({ autoApproveSeverity: 'low' });
-    expect(parseWorkspaceSettings(null)).toEqual({ autoApproveSeverity: 'low' });
-    expect(parseWorkspaceSettings('{"memory":{"enabled":true}}')).toMatchObject({
-      autoApproveSeverity: 'low',
-      memory: { enabled: true },
+describe('workspace record policy', () => {
+  test('default settings are the standard permission mode', () => {
+    expect(DEFAULT_WORKSPACE_SETTINGS).toEqual({ permissionMode: 'standard' });
+    expect(parseWorkspaceSettings(null)).toEqual({ permissionMode: 'standard' });
+    expect(parseWorkspaceSettings('{}')).toEqual({
+      ...DEFAULT_WORKSPACE_SETTINGS,
+      permissionMode: 'standard',
     });
-    expect(parseWorkspaceSettings('not json')).toEqual({ autoApproveSeverity: 'low' });
+    expect(parseWorkspaceSettings('not json')).toEqual({ permissionMode: 'standard' });
   });
 
-  test('maps raw rows with the exact record shape', () => {
-    expect(mapWorkspaceRecord({
+  test('parseWorkspaceSettings merges stored settings over defaults', () => {
+    expect(parseWorkspaceSettings(JSON.stringify({ permissionMode: 'full' }))).toEqual({
+      permissionMode: 'full',
+    });
+  });
+
+  test('mapWorkspaceRecord maps rows and keeps virtual flag', () => {
+    const row: WorkspaceRecordRow = {
       id: 'ws1',
-      name: 'Main',
-      path: '/main',
+      name: 'Workspace',
+      path: '/tmp/ws',
       is_virtual: 1,
-      settings: '{"scheduling":{"enabled":true}}',
-      created_at: 'c',
-      updated_at: 'u',
-    }, ['/extra'])).toMatchObject({
-      id: 'ws1',
-      name: 'Main',
-      path: '/main',
-      isVirtual: true,
-      additionalPaths: ['/extra'],
-      settings: { autoApproveSeverity: 'low', scheduling: { enabled: true } },
-      createdAt: 'c',
-      updatedAt: 'u',
-    });
-    expect(mapWorkspaceRecord({
-      id: 'ws2',
-      name: 'P',
-      path: '/p',
-      is_virtual: 0,
       settings: null,
-      created_at: 'c',
-      updated_at: 'u',
-    }).additionalPaths).toEqual([]);
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+    };
+    const workspace = mapWorkspaceRecord(row);
+    expect(workspace.isVirtual).toBe(true);
+    expect(workspace.settings).toEqual({ permissionMode: 'standard' });
+    expect(mapWorkspaceRecord(row, ['/extra'])).toMatchObject({ additionalPaths: ['/extra'] });
   });
 
-  test('classifies agent homes, resolves auto-approve fallbacks, and defaults names', () => {
-    expect(isAgentHomeWorkspace({ autoApproveSeverity: 'low' })).toBe(false);
-    expect(isAgentHomeWorkspace({ isAgentHome: true })).toBe(true);
-    expect(autoApproveSeverityOf(null)).toBe('low');
-    expect(autoApproveSeverityOf(undefined)).toBe('low');
-    expect(autoApproveSeverityOf({ settings: { autoApproveSeverity: 'medium' } })).toBe('medium');
-    expect(workspaceNameOrDefault(undefined)).toBe('New Workspace');
-    expect(workspaceNameOrDefault('Named')).toBe('Named');
+  test('agent-home classification reads the settings flag', () => {
+    expect(isAgentHomeWorkspace({ permissionMode: 'standard' })).toBe(false);
+    expect(isAgentHomeWorkspace({ permissionMode: 'standard', isAgentHome: true })).toBe(true);
+  });
+
+  test('permission mode falls back to standard when workspace or setting is missing', () => {
+    expect(permissionModeOf(null)).toBe('standard');
+    expect(permissionModeOf(undefined)).toBe('standard');
+    expect(permissionModeOf({ settings: {} })).toBe('standard');
+    expect(permissionModeOf({ settings: { permissionMode: 'extended' } })).toBe('extended');
+    expect(permissionModeOf({ settings: { permissionMode: 'full' } })).toBe('full');
   });
 });

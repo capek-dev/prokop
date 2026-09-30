@@ -101,7 +101,7 @@ export class CodexChildTimelines {
           workspaceRootId: this.parent.workspaceRootId, harness: 'codex-cli',
           preconfigId: this.parent.preconfigId, agentId: this.parent.agentId,
           selectedModel: this.parent.selectedModel, selectedProvider: this.parent.selectedProvider,
-          autoApproveSeverity: this.parent.autoApproveSeverity, title: childTitle(path, role),
+          permissionMode: this.parent.permissionMode, title: childTitle(path, role),
           status: 'active', metadata: null, parentId,
           agentName: typeof role === 'string' && /^[\w-]{1,64}$/.test(role) ? role : null,
           subagentStatus: 'running' });

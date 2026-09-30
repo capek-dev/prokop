@@ -4,6 +4,7 @@ export type {
   SessionStatus,
   SubagentStatus,
   AutoApproveSeverity,
+  PermissionMode,
 } from '../shared';
 
 export type {

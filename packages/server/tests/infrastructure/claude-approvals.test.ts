@@ -15,7 +15,7 @@ beforeEach(() => {
   setupTestDatabase();
   seedWorkspace({ id: 'ws', path: process.cwd() });
   createSession({ id: 'session', workspaceId: 'ws', title: 'Claude', status: 'active',
-    autoApproveSeverity: 'off', preconfigId: null, metadata: null, parentId: null, agentName: null, harness: 'claude-cli' });
+    permissionMode: 'standard', preconfigId: null, metadata: null, parentId: null, agentName: null, harness: 'claude-cli' });
   socket = {};
   connection = registerConnection(socket);
   handleClientRegistration(connection, { type: 'client.register', client: { clientId: 'controller',
@@ -45,7 +45,7 @@ test('approval is once-only and malformed or stale responses fail closed', async
   const { requests, delivery } = fixture();
   const controller = new AbortController();
   const wait = approvals.request('session', 'ws', root, delivery, controller.signal)('Read',
-    { file_path: 'README.md' }, options(controller.signal));
+    { file_path: '.env' }, options(controller.signal));
   const { toolCallId, requestId } = requests[0]!;
   expect(approvals.hasLiveRequest(requestId)).toBe(true);
   expect(await approvals.resolve(toolCallId, { type: 'permission', grant: 'once' }, 'stale')).toBe(false);
@@ -53,7 +53,7 @@ test('approval is once-only and malformed or stale responses fail closed', async
   expect(await wait).toMatchObject({ behavior: 'deny' });
   expect(getPermissionRequestByRequestId(requestId)).toMatchObject({ status: 'denied' });
   const allowed = approvals.request('session', 'ws', root, delivery, controller.signal)('Read',
-    { file_path: 'README.md' }, options(controller.signal));
+    { file_path: '.env' }, options(controller.signal));
   const next = requests[1]!;
   expect(await approvals.resolve(next.toolCallId, { type: 'permission', grant: 'once' }, next.requestId)).toBe(true);
   expect(await allowed).toMatchObject({ behavior: 'allow' });
@@ -88,10 +88,10 @@ test('memory asks follow the session ceiling and resolve once through the contro
   const { requests, delivery } = fixture();
   const ask = { type: 'permission' as const, risk: 'medium' as const, question: 'Allow memory add on memory?',
     description: 'Action: add', resource: 'file', action: 'write' as const };
-  updateSession('session', { autoApproveSeverity: 'high' });
+  updateSession('session', { permissionMode: 'full' });
   expect(await approvals.requestMemory(ask, 'session', 'ws', delivery)).toBe(true);
   expect(requests).toHaveLength(0);
-  updateSession('session', { autoApproveSeverity: 'off' });
+  updateSession('session', { permissionMode: 'standard' });
   const wait = approvals.requestMemory(ask, 'session', 'ws', delivery);
   const first = requests[0] as { toolCallId: string; requestId: string; toolName: string };
   expect(first.toolName).toBe('claude-cli:memory');
@@ -111,10 +111,10 @@ test('session search asks follow the session ceiling and resolve once through th
   const ask = { type: 'permission' as const, risk: 'medium' as const,
     question: 'Allow searching workspace sessions for "deploy"?',
     description: 'Tool: session_search', resource: 'session', action: 'read' as const };
-  updateSession('session', { autoApproveSeverity: 'medium' });
+  updateSession('session', { permissionMode: 'extended' });
   expect(await approvals.requestSessionSearch(ask, 'session', 'ws', delivery)).toBe(true);
   expect(requests).toHaveLength(0);
-  updateSession('session', { autoApproveSeverity: 'off' });
+  updateSession('session', { permissionMode: 'standard' });
   const wait = approvals.requestSessionSearch(ask, 'session', 'ws', delivery);
   const first = requests[0] as { toolCallId: string; requestId: string; toolName: string;
     ask: { allowedScopes: string[] } };
@@ -127,14 +127,14 @@ test('session search asks follow the session ceiling and resolve once through th
 
 test('child-owned approval reaches the parent controller and replays under the child', async () => {
   createSession({ id: 'child', workspaceId: 'ws', title: 'Claude child', status: 'active',
-    autoApproveSeverity: 'off', preconfigId: null, metadata: null, parentId: 'session',
+    permissionMode: 'standard', preconfigId: null, metadata: null, parentId: 'session',
     agentName: null, harness: 'claude-cli' });
   const approvals = new ClaudeApprovals(() => 2000);
   const { requests, notifications, delivery } = fixture();
   const controller = new AbortController();
   const wait = approvals.request('session', 'ws', root, delivery, controller.signal,
     toolUseId => toolUseId === 'child-tool' ? 'child' : null)('Bash',
-    { command: 'echo test' }, { ...options(controller.signal), toolUseID: 'child-tool' });
+    { command: 'rm notes.txt' }, { ...options(controller.signal), toolUseID: 'child-tool' });
   const ask = requests[0] as { sessionId: string; ask: { _originSessionId: string };
     toolCallId: string; requestId: string };
   expect(ask).toMatchObject({ sessionId: 'session', ask: { _originSessionId: 'child' } });
@@ -153,7 +153,7 @@ test('Stop and timeout deny and clean live waiters', async () => {
   const { requests, delivery } = fixture();
   const controller = new AbortController();
   const wait = approvals.request('session', 'ws', root, delivery, controller.signal)('Bash',
-    { command: 'echo test' }, options(controller.signal));
+    { command: 'rm notes.txt' }, options(controller.signal));
   const requestId = requests[0]!.requestId;
   controller.abort();
   expect(await wait).toMatchObject({ behavior: 'deny' });
@@ -161,7 +161,7 @@ test('Stop and timeout deny and clean live waiters', async () => {
   expect(getPermissionRequestByRequestId(requestId)).toMatchObject({ status: 'expired' });
   const nextController = new AbortController();
   const timed = approvals.request('session', 'ws', root, delivery, nextController.signal)('Bash',
-    { command: 'echo test' }, options(nextController.signal));
+    { command: 'rm notes.txt' }, options(nextController.signal));
   expect(await timed).toMatchObject({ behavior: 'deny' });
   expect(getPermissionRequestByRequestId(requests[1]!.requestId)).toMatchObject({ status: 'expired' });
 });
@@ -171,26 +171,25 @@ test('Claude tool risks follow the persisted session ceiling with once-only manu
   const { requests, delivery } = fixture();
   const signal = new AbortController().signal;
   const use = approvals.request('session', 'ws', root, delivery, signal);
-  const cases: Array<{ ceiling: 'off' | 'low' | 'medium' | 'high'; tool: string;
+  const cases: Array<{ ceiling: 'standard' | 'extended' | 'full'; tool: string;
     input: Record<string, unknown>; risk: string; automatic: boolean }> = [
-    { ceiling: 'low', tool: 'Read', input: { file_path: 'README.md' }, risk: 'low', automatic: true },
-    { ceiling: 'low', tool: 'Glob', input: { pattern: '*.ts' }, risk: 'low', automatic: true },
-    { ceiling: 'low', tool: 'Grep', input: { pattern: 'hello' }, risk: 'low', automatic: true },
-    { ceiling: 'low', tool: 'Bash', input: { command: 'pwd' }, risk: 'low', automatic: true },
-    { ceiling: 'low', tool: 'Write', input: { file_path: 'new.txt', content: 'hi' }, risk: 'medium', automatic: false },
-    { ceiling: 'medium', tool: 'Edit', input: { file_path: 'README.md', old_string: 'one', new_string: 'two' }, risk: 'medium', automatic: true },
-    { ceiling: 'medium', tool: 'WebSearch', input: { query: 'docs' }, risk: 'medium', automatic: true },
-    { ceiling: 'medium', tool: 'Bash', input: { command: 'mkdir new-dir' }, risk: 'medium', automatic: true },
-    { ceiling: 'medium', tool: 'WebFetch', input: { url: 'https://example.com' }, risk: 'high', automatic: false },
-    { ceiling: 'medium', tool: 'Read', input: { file_path: '.env' }, risk: 'high', automatic: false },
-    { ceiling: 'medium', tool: 'Grep', input: { pattern: '.pem' }, risk: 'high', automatic: false },
-    { ceiling: 'high', tool: 'WebFetch', input: { url: 'https://example.com' }, risk: 'high', automatic: true },
-    { ceiling: 'high', tool: 'Read', input: { file_path: '../outside.txt' }, risk: 'high', automatic: true },
-    { ceiling: 'high', tool: 'Bash', input: { command: 'rm file.txt' }, risk: 'high', automatic: true },
-    { ceiling: 'off', tool: 'Read', input: { file_path: 'README.md' }, risk: 'low', automatic: false },
+    { ceiling: 'standard', tool: 'Read', input: { file_path: 'README.md' }, risk: 'low', automatic: true },
+    { ceiling: 'standard', tool: 'Glob', input: { pattern: '*.ts' }, risk: 'low', automatic: true },
+    { ceiling: 'standard', tool: 'Grep', input: { pattern: 'hello' }, risk: 'low', automatic: true },
+    { ceiling: 'standard', tool: 'Bash', input: { command: 'pwd' }, risk: 'low', automatic: true },
+    { ceiling: 'standard', tool: 'Write', input: { file_path: 'new.txt', content: 'hi' }, risk: 'medium', automatic: false },
+    { ceiling: 'extended', tool: 'Edit', input: { file_path: 'README.md', old_string: 'one', new_string: 'two' }, risk: 'medium', automatic: true },
+    { ceiling: 'extended', tool: 'WebSearch', input: { query: 'docs' }, risk: 'medium', automatic: true },
+    { ceiling: 'extended', tool: 'Bash', input: { command: 'mkdir new-dir' }, risk: 'medium', automatic: true },
+    { ceiling: 'extended', tool: 'WebFetch', input: { url: 'https://example.com' }, risk: 'high', automatic: false },
+    { ceiling: 'extended', tool: 'Read', input: { file_path: '.env' }, risk: 'high', automatic: false },
+    { ceiling: 'extended', tool: 'Grep', input: { pattern: '.pem' }, risk: 'high', automatic: false },
+    { ceiling: 'full', tool: 'WebFetch', input: { url: 'https://example.com' }, risk: 'high', automatic: true },
+    { ceiling: 'full', tool: 'Read', input: { file_path: '../outside.txt' }, risk: 'high', automatic: true },
+    { ceiling: 'full', tool: 'Bash', input: { command: 'rm file.txt' }, risk: 'high', automatic: true },
   ];
   for (const item of cases) {
-    updateSession('session', { autoApproveSeverity: item.ceiling });
+    updateSession('session', { permissionMode: item.ceiling });
     const previous = requests.length;
     const result = use(item.tool, item.input, options(signal));
     if (item.automatic) {
@@ -207,7 +206,7 @@ test('Claude tool risks follow the persisted session ceiling with once-only manu
 });
 
 test('blocked paths, malformed tools and aborted calls cannot auto-approve', async () => {
-  updateSession('session', { autoApproveSeverity: 'high' });
+  updateSession('session', { permissionMode: 'full' });
   const approvals = new ClaudeApprovals();
   const { requests, delivery } = fixture();
   const signal = new AbortController().signal;
@@ -229,7 +228,7 @@ test('blocked paths, malformed tools and aborted calls cannot auto-approve', asy
   expect(requests).toHaveLength(0);
 });
 
-test('unclassified SDK tools run without a risk ask, including when auto-approval is off', async () => {
+test('unclassified SDK tools run without a risk ask, with or without a controller', async () => {
   const approvals = new ClaudeApprovals();
   const { requests, delivery } = fixture();
   const signal = new AbortController().signal;
@@ -240,6 +239,8 @@ test('unclassified SDK tools run without a risk ask, including when auto-approva
   expect(requests).toHaveLength(0);
   removeSessionControl('session');
   expect(await use('Agent', { prompt: 'inspect workspace' }, options(signal))).toMatchObject({ behavior: 'allow' });
-  expect(await use('Read', { file_path: 'README.md' }, options(signal))).toMatchObject({ behavior: 'deny' });
+  // Asking-risk reads without a controller fail closed; the standard-mode
+  // low-risk floor needs no controller by design.
+  expect(await use('Read', { file_path: '.env' }, options(signal))).toMatchObject({ behavior: 'deny' });
   expect(requests).toHaveLength(0);
 });

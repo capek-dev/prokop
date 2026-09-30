@@ -26,7 +26,7 @@ function makeWorkspace(overrides: Partial<Workspace> = {}): Workspace {
     path: '/data/workspaces/ws-1',
     isVirtual: false,
     additionalPaths: [],
-    settings: { autoApproveSeverity: 'low' },
+    settings: { permissionMode: 'standard' },
     createdAt: 'c',
     updatedAt: 'u',
     ...overrides,
@@ -51,7 +51,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     metadata: null,
     parentId: null,
     agentName: null,
-    autoApproveSeverity: 'low',
+    permissionMode: 'standard',
     createdAt: 'c',
     updatedAt: 'u',
     ...overrides,
@@ -80,7 +80,7 @@ function makeFakes(state: FakeState) {
         path: input.path,
         isVirtual: input.isVirtual,
         additionalPaths: input.additionalPaths ?? [],
-        settings: input.settings ?? { autoApproveSeverity: 'low' },
+        settings: input.settings ?? { permissionMode: 'standard' },
       });
       state.workspaces.set(workspace.id, workspace);
       state.log.push(`create:${input.id}:${input.name}`);
@@ -112,7 +112,7 @@ function makeFakes(state: FakeState) {
       state.log.push(`removePath:${id}:${path}`);
       return true;
     },
-    autoApproveSeverity: () => 'low',
+    permissionMode: () => 'standard',
   };
 
   const sessions: WorkspaceSessionListingPort = {

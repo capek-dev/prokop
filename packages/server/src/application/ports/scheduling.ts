@@ -1,6 +1,6 @@
 import type {
-  AutoApproveSeverity,
   CreateScheduledJobInput,
+  PermissionMode,
   Preconfig,
   ScheduledJob,
   Session,
@@ -52,7 +52,7 @@ export interface ScheduledRunSessionPort {
 
 export interface ScheduledRunWorkspacePort {
   getWorkspace(id: string): Workspace | null;
-  getAutoApproveSeverity(id: string): AutoApproveSeverity;
+  permissionMode(id: string): PermissionMode;
 }
 
 export interface ScheduledRunPreconfigPort {

@@ -35,7 +35,7 @@ const job = {
   reuseSession: false,
   includeHistory: false,
   lastRunSessionId: null,
-  autoApproveSeverity: null,
+  permissionMode: null,
 } as ScheduledJob;
 
 function dependencies(events: string[], runs: HeadlessSessionRunInput[]): ScheduledJobRunnerDeps {
@@ -48,7 +48,7 @@ function dependencies(events: string[], runs: HeadlessSessionRunInput[]): Schedu
   };
   const workspaces: ScheduledRunWorkspacePort = {
     getWorkspace: () => ({ path: '/workspace' } as never),
-    getAutoApproveSeverity: () => 'medium',
+    permissionMode: () => 'extended',
   };
   return {
     repository: {

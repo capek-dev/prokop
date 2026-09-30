@@ -99,7 +99,7 @@ export async function forkClaudeSession(
       title: input.title || `${session.title || 'Untitled'} (fork)`, status: 'active',
       metadata: { ...(session.metadata ?? {}), forkedFrom: session.id }, parentId: null, agentName: null,
       agentId: session.agentId, selectedModel: session.selectedModel,
-      selectedProvider: session.selectedProvider, autoApproveSeverity: session.autoApproveSeverity,
+      selectedProvider: session.selectedProvider, permissionMode: session.permissionMode,
     });
     getDatabase().run(`INSERT INTO claude_session_bindings
       (session_id, native_session_id, workspace_root, cli_version, pending) VALUES (?, ?, ?, ?, 0)`,

@@ -183,7 +183,7 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
         status: body.status,
         metadata: body.metadata,
         tags: body.tags,
-        autoApproveSeverity: body.autoApproveSeverity,
+        permissionMode: body.permissionMode,
       });
       if (!session) {
         throw new NotFoundError('Session not found');

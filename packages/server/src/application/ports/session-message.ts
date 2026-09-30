@@ -86,7 +86,7 @@ export type SessionUpdateInput = Partial<
     | 'runningAt'
     | 'compacting'
     | 'tags'
-    | 'autoApproveSeverity'
+    | 'permissionMode'
     | 'agentId'
     | 'workspaceRootId'
   >

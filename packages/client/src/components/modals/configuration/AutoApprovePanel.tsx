@@ -1,51 +1,57 @@
-import { ShieldOff, Shield, ShieldCheck, ShieldAlert } from 'lucide-react';
-import type { AutoApproveSeverity } from '@prokopai/sdk';
+import { ShieldCheck, Shield, ShieldAlert } from 'lucide-react';
+import type { PermissionMode } from '@prokopai/sdk';
 import { Label } from '@/components/ui/label';
 
-type SeverityLevel = Exclude<AutoApproveSeverity, null>;
-
-interface SeverityOption {
-  value: SeverityLevel;
+interface ModeOption {
+  value: PermissionMode;
   label: string;
   description: string;
 }
 
-const SEVERITY_OPTIONS: SeverityOption[] = [
-  { value: 'off', label: 'Off', description: 'Always ask for approval' },
-  { value: 'none', label: 'None', description: 'Auto-approve none-risk permissions only' },
-  { value: 'low', label: 'Low', description: 'Auto-approve low risk and below' },
-  { value: 'medium', label: 'Medium', description: 'Auto-approve medium risk and below' },
-  { value: 'high', label: 'High', description: 'Auto-approve high risk and below' },
+const MODE_OPTIONS: ModeOption[] = [
+  {
+    value: 'standard',
+    label: 'Standard',
+    description: 'Ordinary commands and workspace edits run automatically. Force/recursive deletes, secrets, and outside-workspace paths ask first.',
+  },
+  {
+    value: 'extended',
+    label: 'Extended',
+    description: 'Also reads and writes files anywhere on this machine. Secrets and destructive actions still ask.',
+  },
+  {
+    value: 'full',
+    label: 'Full access',
+    description: 'Everything runs automatically except commands that can damage the system (rm -rf /, dd to a device, shutdown).',
+  },
 ];
 
-const SEVERITY_ICONS: Record<SeverityLevel, typeof Shield> = {
-  off: ShieldOff,
-  none: Shield,
-  low: ShieldCheck,
-  medium: ShieldCheck,
-  high: ShieldAlert,
+const MODE_ICONS: Record<PermissionMode, typeof Shield> = {
+  standard: ShieldCheck,
+  extended: Shield,
+  full: ShieldAlert,
 };
 
 interface AutoApprovePanelProps {
-  severity: SeverityLevel;
-  onChange: (severity: SeverityLevel) => void;
+  mode: PermissionMode;
+  onChange: (mode: PermissionMode) => void;
 }
 
-export function AutoApprovePanel({ severity, onChange }: AutoApprovePanelProps) {
+export function AutoApprovePanel({ mode, onChange }: AutoApprovePanelProps) {
   return (
     <div className="p-3 sm:p-4 space-y-6">
       <div className="space-y-0.5">
-        <Label>Default auto-approve level for new sessions</Label>
+        <Label>Default permission mode for new sessions</Label>
         <p className="text-xs text-muted-foreground">
-          New sessions in this workspace will start with this auto-approve setting.
+          New sessions in this workspace will start with this permission mode.
           You can still override it per session via the shield icon in the chat header.
         </p>
       </div>
 
       <div className="grid gap-2">
-        {SEVERITY_OPTIONS.map((option) => {
-          const Icon = SEVERITY_ICONS[option.value];
-          const isActive = severity === option.value;
+        {MODE_OPTIONS.map((option) => {
+          const Icon = MODE_ICONS[option.value];
+          const isActive = mode === option.value;
           return (
             <button
               key={option.value}

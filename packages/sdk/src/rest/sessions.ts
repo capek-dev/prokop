@@ -11,7 +11,7 @@ import type {
   GetToolDebugResponse,
   SessionWorktreeResponse,
 } from '../types/rest-responses';
-import type { SessionStatus, SessionListFilter, SessionCategoryCounts, SessionHarness, CodexModel, CodexModelSelection } from '../shared-types/session';
+import type { SessionStatus, SessionListFilter, SessionCategoryCounts, SessionHarness, CodexModel, CodexModelSelection, PermissionMode } from '../shared-types/session';
 
 interface ListOptions {
   status?: SessionStatus;
@@ -34,7 +34,7 @@ interface UpdateOptions {
   status?: SessionStatus;
   metadata?: Record<string, unknown>;
   tags?: string[];
-  autoApproveSeverity?: string | null;
+  permissionMode?: PermissionMode | null;
 }
 
 interface ListGroupedOptions extends SessionListFilter {

@@ -43,7 +43,7 @@ function makeRepository(overrides: Partial<SessionRepositoryPort> = {}): Session
     getQueuedMessage: () => null,
     deleteQueuedMessage: () => true,
     markManualSessionTitle: (metadata) => ({ ...(metadata ?? {}), titleManuallyRenamed: true }),
-    getWorkspaceAutoApproveSeverity: () => 'low',
+    getWorkspacePermissionMode: () => 'standard',
     getPreconfigOrAgent: async () => null,
     isAgentSync: () => false,
     toolOutput: {

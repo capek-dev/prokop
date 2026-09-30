@@ -14,6 +14,7 @@ import {
   resolvePermissionRequestByRequestId,
 } from '@/infrastructure/sqlite/pending-asks';
 import { createGrantFromOptions, matchGrant } from '@/infrastructure/sqlite/permissions';
+import { severityFromMode } from '@/domains/permissions';
 import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
 import type { Jean2CompatibilityBindings } from './types';
 
@@ -36,7 +37,12 @@ export const jean2InteractionBindings: Jean2CompatibilityBindings['interaction']
   listPendingRequestsByRootSession: async (rootSessionId) => listPendingRequestsByRootSession(rootSessionId),
   matchGrant: async (params) => matchGrant(params),
   createGrantFromOptions: async (params) => createGrantFromOptions(params),
-  getSessionAutoApproveSeverity: async (sessionId) => getSession(sessionId)?.autoApproveSeverity ?? undefined,
+  getSessionAutoApproveSeverity: async (sessionId) => {
+    // Permissions v2 slice-2 shim: the capek runtime still consumes the
+    // legacy severity ladder; decide() replaces it in slice 4.
+    const session = getSession(sessionId);
+    return session ? severityFromMode(session.permissionMode ?? 'standard') : undefined;
+  },
   getPermissionTimeoutMs,
   notifyPermissionRequired: async (requestId: string, rootSessionId: string) => {
     getJean2NotificationsApplication().notifyPermissionRequired(requestId, rootSessionId);

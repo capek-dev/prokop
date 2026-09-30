@@ -1,6 +1,6 @@
 import type {
-  AutoApproveSeverity,
   Message,
+  PermissionMode,
   Session,
   SessionHarness,
   CodexModel,
@@ -39,7 +39,7 @@ export interface SessionHttpUpdateInput {
   status?: SessionStatus;
   metadata?: Record<string, unknown> | null;
   tags?: string[];
-  autoApproveSeverity?: AutoApproveSeverity | null;
+  permissionMode?: PermissionMode | null;
 }
 
 export interface SessionHttpAttachmentCreateInput {
@@ -215,7 +215,7 @@ export function createSessionHttpApplication(
           ? repository.markManualSessionTitle(input.metadata ?? existing?.metadata)
           : input.metadata,
         tags: input.tags,
-        autoApproveSeverity: input.autoApproveSeverity,
+        permissionMode: input.permissionMode,
       });
       if (updated?.workspaceRootId) worktreeAttachments?.changed(updated.workspaceRootId);
       return updated;

@@ -2,9 +2,9 @@ import type {
   Ask,
   AskAuthority,
   AttachmentKind,
-  AutoApproveSeverity,
   Message,
   MessageWithParts,
+  PermissionMode,
   Preconfig,
   QueuedMessage,
   Session,
@@ -67,7 +67,7 @@ export interface SessionRecordCreateInput {
   metadata: Record<string, unknown> | null;
   parentId: string | null;
   agentName: string | null;
-  autoApproveSeverity?: AutoApproveSeverity;
+  permissionMode?: PermissionMode | null;
 }
 
 export type SessionUpdateInput = Partial<
@@ -85,7 +85,7 @@ export type SessionUpdateInput = Partial<
     | 'subagentStatus'
     | 'runningAt'
     | 'tags'
-    | 'autoApproveSeverity'
+    | 'permissionMode'
     | 'agentId'
     | 'workspaceRootId'
   >
@@ -178,7 +178,7 @@ export interface SessionRepositoryPort {
   deleteQueuedMessage(id: string): boolean;
 
   markManualSessionTitle(metadata: Record<string, unknown> | null | undefined): Record<string, unknown>;
-  getWorkspaceAutoApproveSeverity(workspaceId: string): AutoApproveSeverity;
+  getWorkspacePermissionMode(workspaceId: string): PermissionMode;
   getPreconfigOrAgent(id: string): Promise<Preconfig | null>;
   isAgentSync(id: string): boolean;
 

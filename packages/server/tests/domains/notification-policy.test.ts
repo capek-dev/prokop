@@ -31,7 +31,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     metadata: null,
     parentId: null,
     agentName: null,
-    autoApproveSeverity: 'low',
+    permissionMode: 'standard',
     createdAt: 'c',
     updatedAt: 'u',
     ...overrides,

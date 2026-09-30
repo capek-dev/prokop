@@ -800,37 +800,36 @@ test('Codex hook auto-approval follows the current session risk and remains once
     type: 'permission', question: 'Allow access?', resource: 'file', action: 'read',
     risk, allowedScopes: ['once'],
   }, 'Bash', 'cat .env', itemId, 'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
-  const missing = request('low', 'missing-setting');
-  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(1);
-  approvals.cancelSession('s');
-  expect(await missing).toBe(false);
-  updateSession('s', { autoApproveSeverity: 'low' });
-  const low = await request('low', 'item-1');
-  expect(low).toBe(true);
-  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(1);
+  const asks = () => messages.filter(message => message.type === 'ask.request').length;
+
+  // Sessions without a stored mode inherit the workspace default
+  // ('standard'): low risk runs without an ask.
+  expect(await request('low', 'inherit-1')).toBe(true);
+  expect(asks()).toBe(0);
+
+  updateSession('s', { permissionMode: 'standard' });
+  expect(await request('low', 'item-1')).toBe(true);
+  expect(asks()).toBe(0);
   const native = { threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command: 'cat .env', cwd: process.cwd() };
   expect(await approvals.request('item/commandExecution/requestApproval', native,
     'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery)).toEqual({ decision: 'accept' });
   const repeat = request('medium', 'item-2');
-  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(2);
+  expect(asks()).toBe(1);
   approvals.cancelSession('s');
   expect(await repeat).toBe(false);
 
-  updateSession('s', { autoApproveSeverity: 'high' });
+  updateSession('s', { permissionMode: 'full' });
   expect(await request('high', 'item-3')).toBe(true);
   const nativeCritical = approvals.request('item/commandExecution/requestApproval', { ...native, itemId: 'other' },
     'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
-  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(3);
+  expect(asks()).toBe(2);
   approvals.cancelSession('s');
   expect(await nativeCritical).toEqual({ decision: 'decline' });
-  updateSession('s', { autoApproveSeverity: 'off' });
-  const disabled = request('none', 'item-4');
-  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(4);
-  approvals.cancelSession('s');
-  expect(await disabled).toBe(false);
-  updateSession('s', { autoApproveSeverity: 'high' });
+  updateSession('s', { permissionMode: 'standard' });
+  expect(await request('none', 'item-4')).toBe(true);
+  updateSession('s', { permissionMode: 'full' });
   const critical = request('critical', 'item-5');
-  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(5);
+  expect(asks()).toBe(3);
   approvals.cancelSession('s');
   expect(await critical).toBe(false);
 });
@@ -848,12 +847,11 @@ test('Codex dynamic tool asks honor the current session ceiling and keep manual 
   };
   expect(await request('session_search', 'low', 'other')).toBe(false);
   expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(0);
-  const unset = request('memory', 'low');
-  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(1);
-  approvals.cancelSession('s');
-  expect(await unset).toBe(false);
+  // The inherited default (standard) auto-approves low-risk dynamic tools.
+  expect(await request('memory', 'low')).toBe(true);
+  expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(0);
   messages.length = 0;
-  updateSession('s', { autoApproveSeverity: 'low' });
+  updateSession('s', { permissionMode: 'standard' });
   expect(await request('session_search', 'low')).toBe(true);
   expect(await request('memory', 'none')).toBe(true);
   expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(0);
@@ -861,7 +859,7 @@ test('Codex dynamic tool asks honor the current session ceiling and keep manual 
   expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(1);
   approvals.cancelSession('s');
   expect(await above).toBe(false);
-  updateSession('s', { autoApproveSeverity: 'high' });
+  updateSession('s', { permissionMode: 'full' });
   expect(await request('memory', 'high')).toBe(true);
   expect(await request('session_search', 'medium')).toBe(true);
   const critical = request('memory', 'critical');
@@ -872,14 +870,14 @@ test('Codex dynamic tool asks honor the current session ceiling and keep manual 
   expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(3);
   approvals.cancelSession('s');
   expect(await unknown).toBe(false);
-  updateSession('s', { autoApproveSeverity: 'off' });
-  const off = request('session_search', 'low');
+  updateSession('s', { permissionMode: 'standard' });
+  const off = request('session_search', 'medium');
   const lastAsk = messages.filter(message => message.type === 'ask.request').at(-1)!;
   expect(lastAsk).toMatchObject({ toolName: 'codex-cli:session_search', ask: { allowedScopes: ['once'] } });
   expect(await approvals.resolve(lastAsk.toolCallId,
     { type: 'permission', grant: 'workspace' }, lastAsk.requestId)).toBe(true);
   expect(await off).toBe(false);
-  const manual = request('memory', 'low');
+  const manual = request('memory', 'medium');
   const memoryAsk = messages.filter(message => message.type === 'ask.request').at(-1)!;
   expect(memoryAsk).toMatchObject({ toolName: 'codex-cli:memory', ask: { allowedScopes: ['once'] } });
   expect(await approvals.resolve(memoryAsk.toolCallId,
@@ -1733,7 +1731,7 @@ test('Codex workspace memory write asks the controller once and rejects broader 
   await waitFor(() => fake.sent.some(message => message.id === 41));
   expect(fake.sent.find(message => message.id === 41)?.result).toMatchObject({ success: true });
   expect(writes).toBe(1);
-  updateSession('s', { autoApproveSeverity: 'high' });
+  updateSession('s', { permissionMode: 'full' });
   sendCall(42);
   await waitFor(() => fake.sent.some(message => message.id === 42));
   expect(fake.sent.find(message => message.id === 42)?.result).toMatchObject({ success: true });
@@ -1788,7 +1786,7 @@ test('Codex advertises session search, routes approved reads, and handles resume
     { type: 'permission', grant: 'once' }, ask.requestId)).toBe(true);
   await waitFor(() => initial.sent.some(message => message.id === 91));
   expect(initial.sent.find(message => message.id === 91)?.result).toMatchObject({ success: true });
-  updateSession('s', { autoApproveSeverity: 'high' });
+  updateSession('s', { permissionMode: 'full' });
   sendCall(initial, 93, { sessionId: 's' });
   await waitFor(() => initial.sent.some(message => message.id === 93));
   expect(initial.sent.find(message => message.id === 93)?.result).toMatchObject({ success: true });

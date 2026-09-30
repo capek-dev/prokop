@@ -52,15 +52,15 @@ describe('Čapek binding group adapters', () => {
     expect(getJean2NotificationsApplication().notifyPermissionRequired).toBeDefined();
   });
 
-  test('interaction auto-approve severity reads the session record and falls back to undefined', async () => {
+  test('interaction auto-approve severity reads the session record, inheriting the standard default', async () => {
     seedWorkspace({ id: 'ws1' });
-    const withSeverity = seedSession('ws1', { autoApproveSeverity: 'medium' });
+    const withSeverity = seedSession('ws1', { permissionMode: 'extended' });
     const withoutSeverity = seedSession('ws1');
 
     expect(await jean2InteractionBindings.getSessionAutoApproveSeverity(withSeverity.id)).toBe('medium');
-    expect(await jean2InteractionBindings.getSessionAutoApproveSeverity(withoutSeverity.id)).toBeUndefined();
+    expect(await jean2InteractionBindings.getSessionAutoApproveSeverity(withoutSeverity.id)).toBe('low');
     expect(await jean2InteractionBindings.getSessionAutoApproveSeverity('missing')).toBeUndefined();
-    expect(getSession(withSeverity.id)?.autoApproveSeverity).toBe('medium');
+    expect(getSession(withSeverity.id)?.permissionMode).toBe('extended');
   });
 
   test('title, sandbox, and delivery groups keep the exact operations', () => {

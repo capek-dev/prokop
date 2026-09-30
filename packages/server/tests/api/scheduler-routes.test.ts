@@ -204,7 +204,7 @@ describe('Scheduler Routes', () => {
       expect(body.error).toBe('not_found');
     });
 
-    test('returns 400 for invalid autoApproveSeverity', async () => {
+    test('returns 400 for invalid permissionMode', async () => {
       seedWorkspace({ id: 'ws1' });
 
       const res = await app.request('/api/workspaces/ws1/scheduled-jobs', {
@@ -215,7 +215,7 @@ describe('Scheduler Routes', () => {
           prompt: 'test',
           scheduleKind: 'daily',
           scheduleConfig: { type: 'daily', time: '09:00' },
-          autoApproveSeverity: 'invalid-level',
+          permissionMode: 'invalid-level',
         }),
       });
 

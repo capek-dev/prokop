@@ -2,6 +2,7 @@ import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, sep } from 'node:path';
 import type { PermissionAsk } from '@prokopai/sdk';
 import { canAutoApproveHarnessTool } from '@/harnesses/approval-policy';
+import { severityFromMode } from '@/domains/permissions';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { createPendingAsk, expirePermissionRequest,
@@ -57,7 +58,7 @@ export class CodexApprovals {
   ): Promise<boolean> {
     const session = getSession(sessionId);
     if (session?.harness !== 'codex-cli') return false;
-    if (!canAutoApproveCodexHook(ask, session.autoApproveSeverity)) {
+    if (!canAutoApproveCodexHook(ask, severityFromMode(session.permissionMode ?? 'standard'))) {
       const decision = await this.enqueue(ask, toolName === 'Bash' ? COMMAND_TOOL : FILE_TOOL,
         null, sessionId, workspaceId, delivery, controllerSessionId);
       if (decision.decision !== 'accept') return false;
@@ -74,7 +75,7 @@ export class CodexApprovals {
     workspaceId: string, delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
     const session = getSession(sessionId);
     if (session?.harness !== 'codex-cli' || session.workspaceId !== workspaceId) return false;
-    if (canAutoApproveCodexHook(ask, session.autoApproveSeverity)) return true;
+    if (canAutoApproveCodexHook(ask, severityFromMode(session.permissionMode ?? 'standard'))) return true;
     return (await this.enqueue({ ...ask, allowedScopes: ['once'] }, toolName,
       null, sessionId, workspaceId, delivery)).decision === 'accept';
   }

@@ -79,7 +79,7 @@ export function createSchedulingHttpApplication(
           includeHistory: input.includeHistory ?? false,
           preconfigId: input.preconfigId ?? null,
           originSessionId: input.originSessionId ?? null,
-          autoApproveSeverity: input.autoApproveSeverity ?? null,
+          permissionMode: input.permissionMode ?? null,
           notificationsEnabled: input.notificationsEnabled ?? false,
         }),
       };

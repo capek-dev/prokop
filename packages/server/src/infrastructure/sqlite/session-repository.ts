@@ -9,8 +9,9 @@
  */
 
 import type { Database } from 'bun:sqlite';
-import type { Session, SessionStatus, SubagentStatus, SessionListFilter, SessionCategory, SessionCategoryCounts } from '@prokopai/sdk';
+import type { Session, SessionStatus, SubagentStatus, SessionListFilter, SessionCategory, SessionCategoryCounts, PermissionMode } from '@prokopai/sdk';
 import { withDerivedHarnessState } from '@/domains/sessions/harness-state';
+import { getWorkspacePermissionMode } from './workspaces';
 import type {
   ListSessionPageOptions,
   SessionCreateInput,
@@ -63,7 +64,7 @@ interface SessionRow {
   running_at: string | null;
   compacting: number;
   tags: string;
-  auto_approve_severity: string | null;
+  permission_mode: string | null;
   agent_id: string | null;
 }
 
@@ -101,7 +102,8 @@ function mapRowToSession(row: SessionRow): Session {
     runningAt: row.running_at ?? null,
     compacting: !!row.compacting,
     tags: row.tags ? JSON.parse(row.tags) : [],
-    autoApproveSeverity: (row.auto_approve_severity as Session['autoApproveSeverity']) ?? null,
+    permissionMode: (row.permission_mode as PermissionMode | null)
+      ?? getWorkspacePermissionMode(row.workspace_id || ''),
     agentId: row.agent_id ?? null,
   });
 }
@@ -159,7 +161,7 @@ export function createSessionRepository(
     };
 
     db.run(`
-      INSERT INTO sessions (id, workspace_id, workspace_root_id, harness, preconfig_id, title, status, created_at, updated_at, metadata, selected_model, selected_provider, selected_variant, prompt_tokens, completion_tokens, total_tokens, parent_id, agent_name, subagent_status, running_at, compacting, tags, auto_approve_severity, agent_id)
+      INSERT INTO sessions (id, workspace_id, workspace_root_id, harness, preconfig_id, title, status, created_at, updated_at, metadata, selected_model, selected_provider, selected_variant, prompt_tokens, completion_tokens, total_tokens, parent_id, agent_name, subagent_status, running_at, compacting, tags, permission_mode, agent_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       s.id,
@@ -181,7 +183,7 @@ export function createSessionRepository(
       s.runningAt ?? null,
       s.compacting ?? false,
       JSON.stringify(s.tags ?? []),
-      s.autoApproveSeverity ?? null,
+      s.permissionMode ?? null,
       s.agentId ?? null,
     ]);
 
@@ -294,9 +296,9 @@ export function createSessionRepository(
       setClauses.push('tags = ?');
       values.push(JSON.stringify(updates.tags));
     }
-    if (updates.autoApproveSeverity !== undefined) {
-      setClauses.push('auto_approve_severity = ?');
-      values.push(updates.autoApproveSeverity ?? null);
+    if (updates.permissionMode !== undefined) {
+      setClauses.push('permission_mode = ?');
+      values.push(updates.permissionMode ?? null);
     }
     if (updates.agentId !== undefined) {
       setClauses.push('agent_id = ?');

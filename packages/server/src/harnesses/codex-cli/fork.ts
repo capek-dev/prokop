@@ -115,7 +115,7 @@ export async function forkCodexSession(
         title: input.title || `${session.title || 'Untitled'} (fork)`, status: 'active',
         metadata: { ...sourceMetadata, forkedFrom: session.id }, parentId: null, agentName: null,
         agentId: session.agentId, selectedModel: session.selectedModel,
-        selectedProvider: session.selectedProvider, autoApproveSeverity: session.autoApproveSeverity,
+        selectedProvider: session.selectedProvider, permissionMode: session.permissionMode,
       });
       bindCodexThread({ sessionId: forkedSession.id, threadId: newThreadId, cliVersion: version, workspaceRoot: root });
       const selection = getCodexModelSelection(session.id);

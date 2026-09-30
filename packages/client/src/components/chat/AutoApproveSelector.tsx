@@ -1,4 +1,4 @@
-import { Shield, ShieldOff, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Shield, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,7 +15,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import type { AutoApproveSeverity } from '@prokopai/sdk';
+import type { PermissionMode } from '@prokopai/sdk';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { useSessionStore } from '@/stores/sessionStore';
 
@@ -25,9 +25,7 @@ interface AutoApproveSelectorProps {
   disabled?: boolean;
 }
 
-type SeverityLevel = 'off' | 'none' | 'low' | 'medium' | 'high';
-
-interface SeverityConfig {
+interface ModeConfig {
   icon: typeof Shield;
   iconClass: string;
   tooltip: string;
@@ -35,53 +33,37 @@ interface SeverityConfig {
   ariaLabel: string;
 }
 
-const SEVERITY_CONFIGS: Record<SeverityLevel, SeverityConfig> = {
-  off: {
-    icon: ShieldOff,
-    iconClass: 'text-muted-foreground/60',
-    tooltip: 'Auto-approve: Off',
-    label: 'Always ask for approval.',
-    ariaLabel: 'Auto-approve: off',
-  },
-  none: {
-    icon: Shield,
-    iconClass: 'text-muted-foreground',
-    tooltip: 'Auto-approve: None',
-    label: 'Auto-approve permissions with none risk.',
-    ariaLabel: 'Auto-approve: none risk',
-  },
-  low: {
+const MODE_CONFIGS: Record<PermissionMode, ModeConfig> = {
+  standard: {
     icon: ShieldCheck,
     iconClass: 'text-success',
-    tooltip: 'Auto-approve: Low',
-    label: 'Auto-approve permissions with low risk and below.',
-    ariaLabel: 'Auto-approve: low risk and below',
+    tooltip: 'Permissions: Standard',
+    label: 'Ordinary commands and workspace edits run automatically. Force/recursive deletes, secrets, and outside-workspace paths ask first.',
+    ariaLabel: 'Permissions: standard',
   },
-  medium: {
-    icon: ShieldCheck,
-    iconClass: 'text-warning',
-    tooltip: 'Auto-approve: Medium',
-    label: 'Auto-approve permissions with medium risk and below.',
-    ariaLabel: 'Auto-approve: medium risk and below',
+  extended: {
+    icon: Shield,
+    iconClass: 'text-success',
+    tooltip: 'Permissions: Extended',
+    label: 'Also reads and writes files anywhere on this machine. Secrets and destructive actions still ask.',
+    ariaLabel: 'Permissions: extended',
   },
-  high: {
+  full: {
     icon: ShieldAlert,
-    iconClass: 'text-destructive',
-    tooltip: 'Auto-approve: High',
-    label: 'Auto-approve permissions with high risk and below.',
-    ariaLabel: 'Auto-approve: high risk and below',
+    iconClass: 'text-warning',
+    tooltip: 'Permissions: Full access',
+    label: 'Everything runs automatically except commands that can damage the system (rm -rf /, dd to a device, shutdown).',
+    ariaLabel: 'Permissions: full access',
   },
 };
 
-const SEVERITY_ORDER: SeverityLevel[] = ['off', 'none', 'low', 'medium', 'high'];
+const MODE_ORDER: PermissionMode[] = ['standard', 'extended', 'full'];
 
-function getMenuItemIconClass(level: SeverityLevel): string {
-  switch (level) {
-    case 'off': return '';
-    case 'none': return 'text-muted-foreground';
-    case 'low': return 'text-success';
-    case 'medium': return 'text-warning';
-    case 'high': return 'text-destructive';
+function getMenuItemIconClass(mode: PermissionMode): string {
+  switch (mode) {
+    case 'standard': return 'text-success';
+    case 'extended': return 'text-success';
+    case 'full': return 'text-warning';
   }
 }
 
@@ -94,21 +76,21 @@ export function AutoApproveSelector({
   const updateSession = useSessionStore((s) => s.updateSession);
 
   const session = sessions.find((s) => s.id === sessionId);
-  const currentLevel = (session?.autoApproveSeverity ?? 'low') as SeverityLevel;
-  const config = SEVERITY_CONFIGS[currentLevel];
+  const currentMode: PermissionMode = session?.permissionMode ?? 'standard';
+  const config = MODE_CONFIGS[currentMode];
   const Icon = config.icon;
 
-  const handleSeverityChange = useCallback(async (level: SeverityLevel) => {
+  const handleModeChange = useCallback(async (mode: PermissionMode) => {
     if (!sdkClient) return;
 
     try {
       const result = await sdkClient.http.sessions.update(sessionId, {
-        autoApproveSeverity: level as AutoApproveSeverity,
+        permissionMode: mode,
       });
 
       updateSession(result.session);
     } catch (err) {
-      console.error('Failed to update auto-approve setting:', err);
+      console.error('Failed to update permission mode:', err);
     }
   }, [sdkClient, sessionId, updateSession]);
 
@@ -153,29 +135,20 @@ export function AutoApproveSelector({
         </Tooltip>
       </TooltipProvider>
       <DropdownMenuContent align="end" sideOffset={4} className="w-56">
-        <DropdownMenuLabel>{session?.harness === 'claude-cli' && currentLevel === 'off'
-          ? 'Ask for classified tools.' : config.label}</DropdownMenuLabel>
-        {(session?.harness === 'codex-cli' || session?.harness === 'claude-cli') && (
-          <div className="px-2 pb-1 text-xs text-muted-foreground">
-            {session.harness === 'codex-cli'
-              ? 'Applies to Codex shell and patch asks. Critical native approvals still ask.'
-              : 'Classified tools above this level ask. Other Claude built-in tools run without a Prokop risk check.'}
-          </div>
-        )}
+        <DropdownMenuLabel>{config.label}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {SEVERITY_ORDER.map((level) => {
-          const levelConfig = SEVERITY_CONFIGS[level];
-          const LevelIcon = levelConfig.icon;
-          const isActive = level === currentLevel;
+        {MODE_ORDER.map((mode) => {
+          const modeConfig = MODE_CONFIGS[mode];
+          const ModeIcon = modeConfig.icon;
+          const isActive = mode === currentMode;
           return (
             <DropdownMenuItem
-              key={level}
-              onClick={() => handleSeverityChange(level)}
+              key={mode}
+              onClick={() => handleModeChange(mode)}
               className={isActive ? 'bg-accent' : ''}
             >
-              <LevelIcon className={`size-4 ${getMenuItemIconClass(level)}`} />
-              <span className="ml-2">{session?.harness === 'claude-cli' && level === 'off'
-                ? 'Ask for classified tools.' : levelConfig.label}</span>
+              <ModeIcon className={`size-4 ${getMenuItemIconClass(mode)}`} />
+              <span className="ml-2">{modeConfig.tooltip}</span>
             </DropdownMenuItem>
           );
         })}

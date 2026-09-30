@@ -93,13 +93,13 @@ describe('learning configuration', () => {
     const original: WorkspaceSettings = {
       memory: { enabled: false, permissionRisk: 'critical' },
       skills: { managementEnabled: true, permissionRisk: 'high' },
-      autoApproveSeverity: 'off',
+      permissionMode: 'standard',
     };
     const enabled = enableLearning(original, 'developer', 'reviewer-1');
     expect(enabled.memory).toEqual({ enabled: true, permissionRisk: 'critical' });
     expect(enabled.sessionSearch?.enabled).toBe(true);
     expect(enabled.learning?.improveSkills).toBe(true);
-    expect(enabled.autoApproveSeverity).toBe('off');
+    expect(enabled.permissionMode).toBe('standard');
     expect(original.memory?.enabled).toBe(false);
     expect(enforceLearningDependencies(enabled)).toBe(enabled);
     const disabled = enforceLearningDependencies({ ...enabled, sessionSearch: { ...enabled.sessionSearch!, enabled: false } });
@@ -108,7 +108,7 @@ describe('learning configuration', () => {
   });
 
   test('legacy settings remain off and re-enabling preserves existing reviewer identities', () => {
-    const legacy: WorkspaceSettings = { autoApproveSeverity: 'low' };
+    const legacy: WorkspaceSettings = { permissionMode: 'standard' };
     expect(enforceLearningDependencies(legacy)).toBe(legacy);
     expect(legacy.learning).toBeUndefined();
     const first = enableLearning(legacy, 'developer', 'original-id');

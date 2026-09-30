@@ -40,7 +40,7 @@ import {
   validateImageMime,
   type Attachment,
 } from '@/infrastructure/sqlite/attachments';
-import { getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
+import { getWorkspacePermissionMode } from '@/infrastructure/sqlite/workspaces';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import type { AgentsApplication } from '@/application/agents';
@@ -130,8 +130,8 @@ function toCreateInput(input: SessionRecordCreateInput) {
     metadata: input.metadata,
     parentId: input.parentId,
     agentName: input.agentName,
-    ...(input.autoApproveSeverity !== undefined
-      ? { autoApproveSeverity: input.autoApproveSeverity }
+    ...(input.permissionMode !== undefined
+      ? { permissionMode: input.permissionMode }
       : {}),
   };
 }
@@ -279,8 +279,8 @@ export function createJean2SessionRepository(
       return markManualSessionTitle(metadata);
     },
 
-    getWorkspaceAutoApproveSeverity(workspaceId: string) {
-      return getWorkspaceAutoApproveSeverity(workspaceId);
+    getWorkspacePermissionMode(workspaceId: string) {
+      return getWorkspacePermissionMode(workspaceId);
     },
 
     async getPreconfigOrAgent(id: string): Promise<Preconfig | null> {

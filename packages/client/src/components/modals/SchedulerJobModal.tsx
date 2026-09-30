@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { ProkopaiClient, ScheduledJob, ScheduleKind, ScheduleConfig, AutoApproveSeverity } from '@prokopai/sdk';
+import type { ProkopaiClient, ScheduledJob, ScheduleKind, ScheduleConfig, PermissionMode } from '@prokopai/sdk';
 import {
   Dialog,
   DialogContent,
@@ -70,7 +70,7 @@ export function SchedulerJobModal({
   const [preconfigId, setPreconfigId] = useState<string>('__default__');
   const [reuseSession, setReuseSession] = useState(false);
   const [includeHistory, setIncludeHistory] = useState(false);
-  const [autoApproveSeverity, setAutoApproveSeverity] = useState<AutoApproveSeverity | null>(null);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,7 +100,7 @@ export function SchedulerJobModal({
       setPreconfigId(editingJob.preconfigId ?? '__default__');
       setReuseSession(editingJob.reuseSession);
       setIncludeHistory(editingJob.includeHistory);
-      setAutoApproveSeverity(editingJob.autoApproveSeverity);
+      setPermissionMode(editingJob.permissionMode ?? null);
       setNotificationsEnabled(editingJob.notificationsEnabled === true);
     } else {
       setName('');
@@ -116,7 +116,7 @@ export function SchedulerJobModal({
       setPreconfigId('__default__');
       setReuseSession(false);
       setIncludeHistory(false);
-      setAutoApproveSeverity(null);
+      setPermissionMode(null);
       setNotificationsEnabled(false);
     }
   }, [open, editingJob]);
@@ -158,7 +158,7 @@ export function SchedulerJobModal({
             preconfigId: preconfigValue,
             reuseSession,
             includeHistory,
-            autoApproveSeverity,
+            permissionMode,
             notificationsEnabled,
           },
         });
@@ -172,7 +172,7 @@ export function SchedulerJobModal({
           preconfigId: preconfigValue,
           reuseSession,
           includeHistory,
-          autoApproveSeverity,
+          permissionMode,
           notificationsEnabled,
         });
       }
@@ -180,7 +180,7 @@ export function SchedulerJobModal({
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save scheduled job');
     }
-  }, [workspaceId, name, prompt, buildScheduleConfig, repeatLimit, preconfigId, editingJob, scheduleKind, createMutation, updateMutation, onOpenChange, autoApproveSeverity, notificationsEnabled, reuseSession, includeHistory]);
+  }, [workspaceId, name, prompt, buildScheduleConfig, repeatLimit, preconfigId, editingJob, scheduleKind, createMutation, updateMutation, onOpenChange, permissionMode, notificationsEnabled, reuseSession, includeHistory]);
 
   const toggleDay = (day: number) => {
     setWeeklyDays(prev =>
@@ -375,24 +375,22 @@ export function SchedulerJobModal({
           </div>
 
           <div className="space-y-2">
-            <Label>Auto-approve permissions</Label>
+            <Label>Permission mode</Label>
             <p className="text-xs text-muted-foreground">
-              Controls what permissions are auto-approved for sessions created by this job. "Use workspace default" inherits from workspace settings.
+              Controls which permissions run automatically for sessions created by this job. "Use workspace default" inherits from workspace settings.
             </p>
             <Select
-              value={autoApproveSeverity ?? '__workspace__'}
-              onValueChange={(v) => setAutoApproveSeverity(v === '__workspace__' ? null : v as AutoApproveSeverity)}
+              value={permissionMode ?? '__workspace__'}
+              onValueChange={(v) => setPermissionMode(v === '__workspace__' ? null : v as PermissionMode)}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__workspace__">Use workspace default</SelectItem>
-                <SelectItem value="off">Off</SelectItem>
-                <SelectItem value="none">None</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="standard">Standard</SelectItem>
+                <SelectItem value="extended">Extended</SelectItem>
+                <SelectItem value="full">Full access</SelectItem>
               </SelectContent>
             </Select>
           </div>

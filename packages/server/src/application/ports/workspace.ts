@@ -1,6 +1,6 @@
 import type {
-  AutoApproveSeverity,
   PinnedMessage,
+  PermissionMode,
   Session,
   SessionStatus,
   SessionListFilter,
@@ -39,7 +39,7 @@ export interface WorkspaceRepositoryPort {
   delete(id: string): boolean;
   addAdditionalPath(id: string, path: string): boolean;
   removeAdditionalPath(id: string, path: string): boolean;
-  autoApproveSeverity(id: string): AutoApproveSeverity;
+  permissionMode(id: string): PermissionMode;
 }
 
 /** Opaque cursor payload carried by the session listing port. */

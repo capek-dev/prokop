@@ -33,7 +33,7 @@ describe('scheduled-job SQLite repository', () => {
         includeHistory: false,
         preconfigId: 'agent-1',
         originSessionId: 'session-1',
-        autoApproveSeverity: 'low',
+        permissionMode: 'standard',
         notificationsEnabled: true,
       });
 
@@ -55,7 +55,7 @@ describe('scheduled-job SQLite repository', () => {
       expect(job.includeHistory).toBe(false);
       expect(job.preconfigId).toBe('agent-1');
       expect(job.originSessionId).toBe('session-1');
-      expect(job.autoApproveSeverity).toBe('low');
+      expect(job.permissionMode).toBe('standard');
       expect(job.notificationsEnabled).toBe(true);
       expect(job.createdAt).toBeDefined();
       expect(job.updatedAt).toBeDefined();
@@ -75,7 +75,7 @@ describe('scheduled-job SQLite repository', () => {
       expect(job.includeHistory).toBe(false);
       expect(job.preconfigId).toBeNull();
       expect(job.originSessionId).toBeNull();
-      expect(job.autoApproveSeverity).toBeNull();
+      expect(job.permissionMode).toBeNull();
       expect(job.notificationsEnabled).toBe(false);
     });
 

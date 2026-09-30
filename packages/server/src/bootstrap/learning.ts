@@ -42,7 +42,7 @@ export function createWiredLearning(
       return db.transaction(() => {
         const id = crypto.randomUUID();
         sessions.createSession({ id, workspaceId: workspace.id, harness: runtime.harness, preconfigId, title: '[Learning]', status: 'active',
-          metadata: { learningRunId: runId }, parentId: null, agentName: null, autoApproveSeverity: 'off' });
+          metadata: { learningRunId: runId }, parentId: null, agentName: null, permissionMode: 'standard' });
         db.run('INSERT INTO learning_session_origins (session_id, run_id) VALUES (?, ?)', [id, runId]);
         return id;
       })();

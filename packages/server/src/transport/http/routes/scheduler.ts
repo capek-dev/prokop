@@ -44,7 +44,7 @@ export function registerSchedulerRoutes(app: Hono, application: SchedulingHttpAp
         originSessionId: body.originSessionId,
         reuseSession: body.reuseSession,
         includeHistory: body.includeHistory,
-        autoApproveSeverity: body.autoApproveSeverity,
+        permissionMode: body.permissionMode,
         notificationsEnabled: body.notificationsEnabled,
         harness: body.harness,
       });

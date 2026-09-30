@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { AskHandler } from '@/stores/askStore';
-import type { AskPermissionResponse, PermissionRiskLevel } from '@prokopai/sdk';
+import type { AskPermissionResponse, PermissionMode, PermissionRiskLevel } from '@prokopai/sdk';
 import { useAskStore } from '@/stores/askStore';
 import { useSessionStore } from '@/stores/sessionStore';
 
@@ -12,9 +12,15 @@ function isAtOrBelow(risk: PermissionRiskLevel, max: PermissionRiskLevel): boole
   return riskIndex !== -1 && maxIndex !== -1 && riskIndex <= maxIndex;
 }
 
-function getSessionAutoApproveSeverity(sessionId: string): PermissionRiskLevel | 'off' | null {
+/** Permissions v2 slice-2 shim: the ask wire still carries risk levels while
+ * the server classifier is reworked (slice 4 maps Findings to modes). */
+function severityFromMode(mode: PermissionMode): PermissionRiskLevel {
+  return mode === 'full' ? 'high' : mode === 'extended' ? 'medium' : 'low';
+}
+
+function getSessionPermissionMode(sessionId: string): PermissionMode {
   const session = useSessionStore.getState().sessions.find((s) => s.id === sessionId);
-  return session?.autoApproveSeverity ?? null;
+  return session?.permissionMode ?? 'standard';
 }
 
 function createPermissionHandler(): AskHandler {
@@ -30,13 +36,9 @@ function createPermissionHandler(): AskHandler {
     if (session?.harnessState?.nativeApprovalPrefix
       || request.toolName.startsWith('codex-cli:') || request.toolName.startsWith('claude-cli:')) return undefined;
 
-    // Check the per-session auto-approve severity setting
-    const maxSeverity = getSessionAutoApproveSeverity(request.sessionId);
-
-    // If no session setting, default to 'low' (backward compatible)
-    // If explicitly 'off', skip auto-approve entirely
-    if (maxSeverity === 'off') return undefined;
-    const effectiveMax = maxSeverity ?? 'low';
+    // Check the per-session permission mode; there is no ask-everything
+    // level anymore, so the floor is 'standard' (= legacy 'low').
+    const effectiveMax = severityFromMode(getSessionPermissionMode(request.sessionId));
 
     // Check risk level
     const risk = ('risk' in ask ? ask.risk : undefined) as PermissionRiskLevel | undefined;

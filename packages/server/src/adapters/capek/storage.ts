@@ -34,7 +34,8 @@ import {
 } from '@/infrastructure/sqlite/queued-messages';
 import { getAttachment } from '@/infrastructure/sqlite/attachments';
 import { getResponseFormat } from '@/infrastructure/sqlite/response-formats';
-import { getWorkspace, getWorkspaceAutoApproveSeverity } from '@/infrastructure/sqlite/workspaces';
+import { getWorkspace, getWorkspacePermissionMode } from '@/infrastructure/sqlite/workspaces';
+import { severityFromMode } from '@/domains/permissions';
 import { jean2ToolOutputArtifactStore } from '@/infrastructure/sqlite/tool-output-artifacts';
 
 export const jean2StorageBundle: StorageBundle = {
@@ -69,7 +70,8 @@ export const jean2StorageBundle: StorageBundle = {
   attachments: { get: async (...args) => getAttachment(...args) },
   workspaces: {
     get: async (...args) => getWorkspace(...args),
-    getAutoApproveSeverity: async (...args) => getWorkspaceAutoApproveSeverity(...args),
+    // Capek contract still speaks severity; slice 4 replaces the consumer.
+    getAutoApproveSeverity: async (workspaceId: string) => severityFromMode(getWorkspacePermissionMode(workspaceId)),
   },
   responseFormats: { get: async (...args) => getResponseFormat(...args) },
   index: { syncMessage: async (...args) => syncMessageFts(...args) },

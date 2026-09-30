@@ -190,7 +190,7 @@ describe('workspaces store', () => {
       const ws = getWorkspace('ws1');
 
       expect(ws).not.toBeNull();
-      expect(ws!.settings).toEqual({ autoApproveSeverity: 'low' });
+      expect(ws!.settings).toEqual({ permissionMode: 'standard' });
     });
 
     test('creates workspace with memory settings', () => {

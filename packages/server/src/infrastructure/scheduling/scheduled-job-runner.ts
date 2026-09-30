@@ -40,8 +40,8 @@ export function createScheduledJobRunner(deps: ScheduledJobRunnerDeps): {
         preconfig.provider ||
         findProviderFromModel(modelId) ||
         config.defaultProvider;
-      const autoApproveSeverity =
-        job.autoApproveSeverity ?? deps.workspaces.getAutoApproveSeverity(job.workspaceId);
+      const permissionMode =
+        job.permissionMode ?? deps.workspaces.permissionMode(job.workspaceId);
       const jobHarness = job.harness ?? 'prokop';
 
       let sessionId: string;
@@ -56,10 +56,10 @@ export function createScheduledJobRunner(deps: ScheduledJobRunnerDeps): {
             `[scheduler] Reusing session ${sessionId} for job '${job.name}' (history: ${resumeFromHistory})`,
           );
         } else {
-          sessionId = createScheduledSession(deps.sessions, job, preconfig, jobHarness, modelId, providerId, autoApproveSeverity);
+          sessionId = createScheduledSession(deps.sessions, job, preconfig, jobHarness, modelId, providerId, permissionMode);
         }
       } else {
-        sessionId = createScheduledSession(deps.sessions, job, preconfig, jobHarness, modelId, providerId, autoApproveSeverity);
+        sessionId = createScheduledSession(deps.sessions, job, preconfig, jobHarness, modelId, providerId, permissionMode);
       }
 
       const safePreconfig: Preconfig = {
@@ -103,7 +103,7 @@ function createScheduledSession(
   harness: Session['harness'],
   modelId: string,
   providerId: string,
-  autoApproveSeverity: Session['autoApproveSeverity'],
+  permissionMode: Session['permissionMode'],
 ): string {
   const sessionId = randomUUID();
   sessions.createSession({
@@ -119,7 +119,7 @@ function createScheduledSession(
     selectedModel: modelId,
     selectedProvider: providerId,
     selectedVariant: preconfig.variant ?? null,
-    autoApproveSeverity,
+    permissionMode,
   });
   return sessionId;
 }

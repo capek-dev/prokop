@@ -1,6 +1,7 @@
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import type { PermissionAsk } from '@prokopai/sdk';
 import { canAutoApproveHarnessTool } from '@/harnesses/approval-policy';
+import { severityFromMode } from '@/domains/permissions';
 import { classifyClaudeTool } from './tool-policy';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
@@ -63,7 +64,7 @@ export class ClaudeApprovals {
       if (ask === null) return denied('Malformed Claude tool');
       // Tools without a Prokop risk rule use the SDK's native behavior, regardless of the session ceiling.
       if (ask === undefined) return { behavior: 'allow' };
-      if (canAutoApproveHarnessTool(ask, session.autoApproveSeverity)) return { behavior: 'allow' };
+      if (canAutoApproveHarnessTool(ask, severityFromMode(session.permissionMode ?? 'standard'))) return { behavior: 'allow' };
       if (!isControlled(sessionId) || getControllerConnections(sessionId).length === 0) {
         return denied('Claude tool requires a connected controller');
       }
@@ -124,7 +125,7 @@ export class ClaudeApprovals {
     workspaceId: string, delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
     const session = getSession(sessionId);
     if (session?.harness !== 'claude-cli' || session.workspaceId !== workspaceId) return false;
-    if (canAutoApproveHarnessTool(ask, session.autoApproveSeverity)) return true;
+    if (canAutoApproveHarnessTool(ask, severityFromMode(session.permissionMode ?? 'standard'))) return true;
     if (!isControlled(sessionId) || getControllerConnections(sessionId).length === 0) return false;
     const askOnce: PermissionAsk = { ...ask, allowedScopes: ['once'] };
     const requestId = crypto.randomUUID();

@@ -31,6 +31,7 @@ function makeJob(overrides: Partial<ScheduledJob> = {}): ScheduledJob {
     includeHistory: false,
     preconfigId: null,
     originSessionId: null,
+    permissionMode: null,
     autoApproveSeverity: null,
     notificationsEnabled: false,
     createdAt: new Date().toISOString(),

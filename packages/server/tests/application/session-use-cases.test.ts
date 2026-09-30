@@ -131,7 +131,7 @@ function makeRepository(overrides: Partial<SessionRepositoryPort> = {}): Session
     getQueuedMessage: () => null,
     deleteQueuedMessage: () => true,
     markManualSessionTitle: (metadata) => ({ ...(metadata ?? {}), titleManuallyRenamed: true }),
-    getWorkspaceAutoApproveSeverity: () => 'low',
+    getWorkspacePermissionMode: () => 'standard',
     getPreconfigOrAgent: async () => null,
     isAgentSync: () => false,
     toolOutput: {
@@ -675,15 +675,10 @@ describe('application session use cases', () => {
   });
 
   describe('lifecycle', () => {
-    test('create uses the workspace auto-approve severity, attaches the origin, and sends then broadcasts', async () => {
+    test('create lets the session inherit the workspace permission mode, attaches the origin, and sends then broadcasts', async () => {
       const session = makeSession({ id: 'created-1' });
-      const autoApproveCalls: string[] = [];
       const createInputs: unknown[] = [];
       const repository = makeRepository({
-        getWorkspaceAutoApproveSeverity: (workspaceId: string) => {
-          autoApproveCalls.push(workspaceId);
-          return 'medium';
-        },
         createSession: (input) => {
           createInputs.push(input);
           return session;
@@ -695,8 +690,10 @@ describe('application session use cases', () => {
 
       await app.create(wire, origin, { workspaceId: 'ws-9', preconfigId: undefined, title: 'Custom' });
 
-      expect(autoApproveCalls).toEqual(['ws-9']);
-      expect(createInputs[0]).toMatchObject({ workspaceId: 'ws-9', title: 'Custom', autoApproveSeverity: 'medium', status: 'active' });
+      // No mode is materialized at creation: the repository resolves the
+      // workspace default at read time, so later workspace changes propagate.
+      expect(createInputs[0]).toMatchObject({ workspaceId: 'ws-9', title: 'Custom', status: 'active' });
+      expect(createInputs[0]).not.toHaveProperty('permissionMode');
       expect(spy.attached).toEqual([{ origin, sessionId: 'created-1' }]);
       expect(spy.sent).toEqual([{ type: 'session.created', session }]);
       expect(spy.broadcast).toEqual([{ message: { type: 'session.created', session }, exclude: origin }]);
