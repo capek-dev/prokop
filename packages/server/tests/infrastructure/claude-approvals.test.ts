@@ -134,7 +134,7 @@ test('child-owned approval reaches the parent controller and replays under the c
   const controller = new AbortController();
   const wait = approvals.request('session', 'ws', root, delivery, controller.signal,
     toolUseId => toolUseId === 'child-tool' ? 'child' : null)('Bash',
-    { command: 'rm notes.txt' }, { ...options(controller.signal), toolUseID: 'child-tool' });
+    { command: 'rm -rf notes.txt' }, { ...options(controller.signal), toolUseID: 'child-tool' });
   const ask = requests[0] as { sessionId: string; ask: { _originSessionId: string };
     toolCallId: string; requestId: string };
   expect(ask).toMatchObject({ sessionId: 'session', ask: { _originSessionId: 'child' } });
@@ -153,7 +153,7 @@ test('Stop and timeout deny and clean live waiters', async () => {
   const { requests, delivery } = fixture();
   const controller = new AbortController();
   const wait = approvals.request('session', 'ws', root, delivery, controller.signal)('Bash',
-    { command: 'rm notes.txt' }, options(controller.signal));
+    { command: 'rm -rf notes.txt' }, options(controller.signal));
   const requestId = requests[0]!.requestId;
   controller.abort();
   expect(await wait).toMatchObject({ behavior: 'deny' });
@@ -161,32 +161,38 @@ test('Stop and timeout deny and clean live waiters', async () => {
   expect(getPermissionRequestByRequestId(requestId)).toMatchObject({ status: 'expired' });
   const nextController = new AbortController();
   const timed = approvals.request('session', 'ws', root, delivery, nextController.signal)('Bash',
-    { command: 'rm notes.txt' }, options(nextController.signal));
+    { command: 'rm -rf notes.txt' }, options(nextController.signal));
   expect(await timed).toMatchObject({ behavior: 'deny' });
   expect(getPermissionRequestByRequestId(requests[1]!.requestId)).toMatchObject({ status: 'expired' });
 });
 
-test('Claude tool risks follow the persisted session ceiling with once-only manual fallback', async () => {
+test('Claude tool concerns follow the session mode with once-only destructive fallback', async () => {
   const approvals = new ClaudeApprovals(() => 2000);
   const { requests, delivery } = fixture();
   const signal = new AbortController().signal;
   const use = approvals.request('session', 'ws', root, delivery, signal);
   const cases: Array<{ ceiling: 'standard' | 'extended' | 'full'; tool: string;
-    input: Record<string, unknown>; risk: string; automatic: boolean }> = [
-    { ceiling: 'standard', tool: 'Read', input: { file_path: 'README.md' }, risk: 'low', automatic: true },
-    { ceiling: 'standard', tool: 'Glob', input: { pattern: '*.ts' }, risk: 'low', automatic: true },
-    { ceiling: 'standard', tool: 'Grep', input: { pattern: 'hello' }, risk: 'low', automatic: true },
-    { ceiling: 'standard', tool: 'Bash', input: { command: 'pwd' }, risk: 'low', automatic: true },
-    { ceiling: 'standard', tool: 'Write', input: { file_path: 'new.txt', content: 'hi' }, risk: 'medium', automatic: false },
-    { ceiling: 'extended', tool: 'Edit', input: { file_path: 'README.md', old_string: 'one', new_string: 'two' }, risk: 'medium', automatic: true },
-    { ceiling: 'extended', tool: 'WebSearch', input: { query: 'docs' }, risk: 'medium', automatic: true },
-    { ceiling: 'extended', tool: 'Bash', input: { command: 'mkdir new-dir' }, risk: 'medium', automatic: true },
-    { ceiling: 'extended', tool: 'WebFetch', input: { url: 'https://example.com' }, risk: 'high', automatic: false },
-    { ceiling: 'extended', tool: 'Read', input: { file_path: '.env' }, risk: 'high', automatic: false },
-    { ceiling: 'extended', tool: 'Grep', input: { pattern: '.pem' }, risk: 'high', automatic: false },
-    { ceiling: 'full', tool: 'WebFetch', input: { url: 'https://example.com' }, risk: 'high', automatic: true },
-    { ceiling: 'full', tool: 'Read', input: { file_path: '../outside.txt' }, risk: 'high', automatic: true },
-    { ceiling: 'full', tool: 'Bash', input: { command: 'rm file.txt' }, risk: 'high', automatic: true },
+    input: Record<string, unknown>; risk?: string; scopes?: string[]; automatic: boolean }> = [
+    // Clean workspace operations and plain fetches auto-run at every mode.
+    { ceiling: 'standard', tool: 'Read', input: { file_path: 'README.md' }, automatic: true },
+    { ceiling: 'standard', tool: 'Glob', input: { pattern: '*.ts' }, automatic: true },
+    { ceiling: 'standard', tool: 'Grep', input: { pattern: 'hello' }, automatic: true },
+    { ceiling: 'standard', tool: 'Bash', input: { command: 'pwd' }, automatic: true },
+    { ceiling: 'standard', tool: 'Write', input: { file_path: 'new.txt', content: 'hi' }, automatic: true },
+    { ceiling: 'standard', tool: 'Edit', input: { file_path: 'README.md', old_string: 'one', new_string: 'two' }, automatic: true },
+    { ceiling: 'standard', tool: 'WebSearch', input: { query: 'docs' }, automatic: true },
+    { ceiling: 'standard', tool: 'WebFetch', input: { url: 'https://example.com' }, automatic: true },
+    { ceiling: 'standard', tool: 'Bash', input: { command: 'rm file.txt' }, automatic: true },
+    // Sensitive targets ask below full; the ask may be remembered.
+    { ceiling: 'standard', tool: 'Read', input: { file_path: '.env' }, risk: 'high', scopes: ['once', 'session', 'workspace'], automatic: false },
+    { ceiling: 'extended', tool: 'Grep', input: { pattern: '.pem' }, risk: 'high', scopes: ['once', 'session', 'workspace'], automatic: false },
+    { ceiling: 'full', tool: 'Read', input: { file_path: '.env' }, automatic: true },
+    // Escape asks at standard and unlocks at extended.
+    { ceiling: 'standard', tool: 'Read', input: { file_path: '../outside.txt' }, risk: 'medium', scopes: ['once', 'session', 'workspace'], automatic: false },
+    { ceiling: 'extended', tool: 'Read', input: { file_path: '../outside.txt' }, automatic: true },
+    // Destructive shell asks below full and is once-only.
+    { ceiling: 'standard', tool: 'Bash', input: { command: 'rm -rf build' }, risk: 'high', scopes: ['once'], automatic: false },
+    { ceiling: 'full', tool: 'Bash', input: { command: 'rm -rf build' }, automatic: true },
   ];
   for (const item of cases) {
     updateSession('session', { permissionMode: item.ceiling });
@@ -198,11 +204,33 @@ test('Claude tool risks follow the persisted session ceiling with once-only manu
     } else {
       expect(requests).toHaveLength(previous + 1);
       const ask = requests[previous] as { ask: { risk: string; allowedScopes: string[] }; toolCallId: string; requestId: string };
-      expect(ask.ask).toMatchObject({ risk: item.risk, allowedScopes: ['once'] });
+      expect(ask.ask).toMatchObject({ risk: item.risk, allowedScopes: item.scopes });
       expect(await approvals.resolve(ask.toolCallId, { type: 'permission', grant: 'once' }, ask.requestId)).toBe(true);
       expect(await result).toMatchObject({ behavior: 'allow' });
     }
   }
+});
+
+test('remembered Bash grants persist and replay without asking', async () => {
+  const approvals = new ClaudeApprovals(() => 2000);
+  const { requests, delivery } = fixture();
+  const controller = new AbortController();
+  const use = approvals.request('session', 'ws', root, delivery, controller.signal);
+  const first = use('Bash', { command: 'cat /etc/release' }, options(controller.signal));
+  const ask = requests[0]! as { ask: { concerns: string[]; allowedScopes: string[] };
+    toolCallId: string; requestId: string };
+  expect(ask.ask).toMatchObject({ concerns: ['escape'], allowedScopes: ['once', 'session', 'workspace'] });
+  expect(await approvals.resolve(ask.toolCallId, { type: 'permission', grant: 'session' }, ask.requestId)).toBe(true);
+  expect(await first).toMatchObject({ behavior: 'allow' });
+  // The same command replays through the remembered grant, no new ask.
+  expect(await use('Bash', { command: 'cat /etc/release' }, options(controller.signal))).toMatchObject({ behavior: 'allow' });
+  expect(requests).toHaveLength(1);
+  // A different command still asks; its workspace grant also persists.
+  const second = use('Bash', { command: 'cat /etc/issue' }, options(controller.signal));
+  expect(requests).toHaveLength(2);
+  const secondAsk = requests[1]! as { toolCallId: string; requestId: string };
+  expect(await approvals.resolve(secondAsk.toolCallId, { type: 'permission', grant: 'workspace' }, secondAsk.requestId)).toBe(true);
+  expect(await second).toMatchObject({ behavior: 'allow' });
 });
 
 test('blocked paths, malformed tools and aborted calls cannot auto-approve', async () => {

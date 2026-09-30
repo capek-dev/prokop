@@ -3,11 +3,12 @@ import type { ShellOutputVisualization } from '@prokopai/sdk';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import {
-  createShellPermissionAskStructured,
-  createOutsideWorkspaceAsk,
-  createWorkspaceModificationAsk,
-} from '@prokopai/sdk';
-import { analyzeRisk, resolveCommandPath, stripRedundantCd } from '@/domains/permissions';
+  classifyShellCommand,
+  requiresHumanReview,
+  resolveCommandPath,
+  stripRedundantCd,
+  type ShellRiskContext,
+} from '@/domains/permissions';
 
 interface Input {
   command: string;
@@ -74,56 +75,19 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
     }
 
     const resolvedCwd = input.cwd ? ctx.resolvePath(input.cwd) : ctx.workspacePath;
-    const resolveFromCwd = (path: string): string => resolveCommandPath(path, resolvedCwd, ctx);
+    const riskCtx: ShellRiskContext = ctx as unknown as ShellRiskContext;
+    const resolveFromCwd = (path: string): string => resolveCommandPath(path, resolvedCwd, riskCtx);
     const effectiveCommand = stripRedundantCd(commandInput, resolvedCwd, resolveFromCwd);
-    const risk = analyzeRisk(effectiveCommand, ctx, resolvedCwd);
 
-    const outsideWorkspaceCwd = input.cwd && !ctx.isWithinWorkspace(resolvedCwd);
+    // Permissions v2: classify, then ask only when a real concern exists.
+    // Clean and opaque-only findings skip the ask flow entirely; the mode
+    // ceiling (server-side) decides the rest through the ask's derived risk.
+    const outsideWorkspaceCwd = !!input.cwd && !ctx.isWithinWorkspace(resolvedCwd);
+    const classification = classifyShellCommand(effectiveCommand,
+      [ctx.workspacePath, ctx.fs.tempDir], resolvedCwd, { cwdOutsideRoots: outsideWorkspaceCwd });
 
-    if (risk.requiresAsk) {
-      let permAsk;
-
-      if (outsideWorkspaceCwd) {
-        permAsk = createOutsideWorkspaceAsk({
-          command: effectiveCommand,
-          cwd: resolvedCwd,
-          resolvedPaths: risk.resolvedPaths,
-          hasOperators: risk.hasOperators,
-        });
-      } else if (risk.riskCategory === 'outside-workspace') {
-        permAsk = createShellPermissionAskStructured({
-          command: effectiveCommand,
-          baseCommand: risk.baseCommand,
-          flags: risk.flags,
-          risk: risk.risk,
-          riskCategory: risk.riskCategory,
-          reason: risk.reason,
-          resolvedPaths: risk.resolvedPaths,
-          workspaceBound: risk.workspaceBound,
-          hasOperators: risk.hasOperators,
-        });
-      } else if (risk.riskCategory === 'workspace-modification') {
-        permAsk = createWorkspaceModificationAsk({
-          command: effectiveCommand,
-          baseCommand: risk.baseCommand,
-          resolvedPaths: risk.resolvedPaths,
-          hasOperators: risk.hasOperators,
-        });
-      } else {
-        permAsk = createShellPermissionAskStructured({
-          command: effectiveCommand,
-          baseCommand: risk.baseCommand,
-          flags: risk.flags,
-          risk: risk.risk,
-          riskCategory: risk.riskCategory,
-          reason: risk.reason,
-          resolvedPaths: risk.resolvedPaths,
-          workspaceBound: risk.workspaceBound,
-          hasOperators: risk.hasOperators,
-        });
-      }
-
-      const approved = await ctx.ask(permAsk);
+    if (classification && requiresHumanReview(classification.finding)) {
+      const approved = await ctx.ask(classification.ask);
       if (!approved) return { success: false, error: 'USER_REJECTION' };
     }
 

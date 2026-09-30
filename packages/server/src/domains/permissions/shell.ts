@@ -1,5 +1,6 @@
 /**
- * Shared shell command risk classification (S11.5a).
+ * Shared shell command classification (S11.5a, rebuilt on the permissions v2
+ * pipeline in slice 4).
  *
  * One policy definition point for shell operations, consumed identically by
  * the Prokop shell and terminal tools and by the native-harness permission
@@ -7,27 +8,23 @@
  * sensitive files, potentially dangerous or destructive actions, and
  * workspace locking are decided here; per-harness adapters only translate
  * the classification into their own wire formats.
+ *
+ * classifyShellCommand runs the v2 analyzer and returns the Finding plus the
+ * ask to show when the mode ceiling says ask. Decision authority:
+ * shouldAutoApproveAsk (domains/permissions/ask.ts) — the ask's legacy risk
+ * is derived from the Finding, so severity consumers and decide() agree.
  */
 
+import { homedir } from 'node:os';
 import { isAbsolute, resolve } from 'node:path';
-import type { PermissionAsk } from '@prokopai/sdk';
+import { analyzeCommand } from './command/analyze';
+import type { Concern, Finding } from './concerns';
 import {
-  SHELL_DANGEROUS_COMMANDS,
-  SHELL_FILESYSTEM_COMMANDS,
-  SHELL_SHELL_OPERATORS,
-  createShellPermissionAskStructured,
-  createWorkspaceModificationAsk,
-  getEffectiveShellCommandIdentity,
-  type ShellRiskCategory,
-} from '@prokopai/sdk';
-import { isSensitivePath, isWithinRoot } from './paths';
+  concernRisk,
+  grantScopesForFinding,
+  type ConcernsPermissionAsk,
+} from './ask';
 
-/**
- * Neutral classification context. Structural subset of the tool runtime
- * context the Prokop shell and terminal tools already carry, so real tool
- * contexts satisfy it without casts and native harnesses can supply their
- * own root-bound implementations.
- */
 export interface ShellRiskContext {
   workspacePath: string;
   fs: { tempDir: string };
@@ -54,7 +51,7 @@ export function parseCommand(cmd: string): ParsedCommand {
 
 export function stripRedundantCd(command: string, cwd: string, resolvePath: (p: string) => string): string {
   const trimmed = command.trimStart();
-  const cdMatch = trimmed.match(/^cd\s+(\S+)\s*&&\s*(.+)/i);
+  const cdMatch = trimmed.match(/^cd\s+(\S+)\s*&&\s+(.+)/i);
   if (!cdMatch) return command;
 
   const cdTarget = cdMatch[1];
@@ -68,66 +65,6 @@ export function stripRedundantCd(command: string, cwd: string, resolvePath: (p: 
   return command;
 }
 
-const FILE_ORIENTED_COMMANDS = new Set([
-  'cat', 'head', 'tail', 'less', 'more', 'wc', 'file', 'stat',
-  'ls', 'find', 'grep', 'awk', 'sed', 'sort', 'uniq', 'diff',
-  'comm', 'cut', 'tr', 'tee',
-  'touch', 'mkdir',
-  'rm', 'rmdir', 'del', 'erase',
-  'mv', 'cp', 'ln',
-]);
-
-function isLikelyUrl(arg: string): boolean {
-  return /^[a-z][a-z0-9+.-]*:\/\//i.test(arg);
-}
-
-function extractPathArguments(cmd: string): string[] {
-  const paths: string[] = [];
-  const parts = cmd.split(/\s+/);
-  const baseCommand = parts[0]?.replace(/.*\//, '') || '';
-  const isFileCommand = FILE_ORIENTED_COMMANDS.has(baseCommand);
-
-  // For file-oriented commands, all non-flag args are path candidates
-  if (isFileCommand) {
-    for (let i = 1; i < parts.length; i++) {
-      const part = parts[i];
-      if (!part) continue;
-      if (part.startsWith('-')) continue;
-      if (isLikelyUrl(part)) continue;
-      paths.push(part);
-    }
-    return paths;
-  }
-
-  // For non-file commands, only recognize explicit path prefixes
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i];
-    if (!part) continue;
-    if (part.startsWith('-')) continue;
-
-    const isUnixPath = part.startsWith('/') || part.startsWith('~') || part.startsWith('./') || part.startsWith('../');
-    const isWindowsPath = /^[A-Za-z]:[\\/]/.test(part) || /^\\\\/.test(part);
-
-    if (isUnixPath || isWindowsPath) {
-      paths.push(part);
-    }
-  }
-
-  return paths;
-}
-
-export interface RiskAnalysis {
-  requiresAsk: boolean;
-  riskCategory: ShellRiskCategory;
-  risk: 'low' | 'medium' | 'high';
-  reason: string;
-  hasOperators: boolean;
-  workspaceBound: boolean;
-  resolvedPaths: string[];
-  baseCommand: string;
-  flags: string[];
-}
-
 export function resolveCommandPath(path: string, executionCwd: string, ctx: ShellRiskContext): string {
   if (ctx.resolvePathFrom) {
     return ctx.resolvePathFrom(path, executionCwd);
@@ -138,160 +75,58 @@ export function resolveCommandPath(path: string, executionCwd: string, ctx: Shel
   return resolve(executionCwd, path);
 }
 
-export function analyzeRisk(
-  cmd: string,
-  ctx: ShellRiskContext,
-  executionCwd: string = ctx.workspacePath,
-): RiskAnalysis {
-  const effectiveCommand = getEffectiveShellCommandIdentity(cmd);
-  const { flags } = parseCommand(cmd);
-  const lowerEffective = effectiveCommand.toLowerCase();
-  const paths = extractPathArguments(cmd);
-  const resolvedPaths: string[] = [];
-  let workspaceBound = true;
-
-  for (const p of paths) {
-    const resolved = resolveCommandPath(p, executionCwd, ctx);
-    resolvedPaths.push(resolved);
-    if (!ctx.isWithinWorkspace(resolved) && !resolved.startsWith(ctx.fs.tempDir)) {
-      workspaceBound = false;
-    }
-  }
-
-  const hasOperators = SHELL_SHELL_OPERATORS.some(op => cmd.includes(op));
-
-  const isDangerous = SHELL_DANGEROUS_COMMANDS.some(dangerous =>
-    effectiveCommand === dangerous || lowerEffective.startsWith(dangerous + ' '),
-  );
-
-  if (isDangerous) {
-    let riskCategory: ShellRiskCategory = 'side-effect';
-
-    if (['rm', 'rmdir', 'del', 'erase', 'dd', 'mkfs', 'format'].includes(effectiveCommand)) {
-      riskCategory = 'destructive';
-    } else if (['curl', 'wget', 'nc', 'netcat'].includes(effectiveCommand)) {
-      riskCategory = 'network';
-    } else if (['sudo', 'su', 'doas', 'chmod', 'chown', 'shutdown', 'reboot', 'halt', 'iptables'].includes(effectiveCommand)) {
-      riskCategory = 'destructive';
-    }
-
-    return {
-      requiresAsk: true,
-      riskCategory,
-      risk: 'high',
-      reason: `contains dangerous command "${effectiveCommand}"`,
-      hasOperators,
-      workspaceBound,
-      resolvedPaths,
-      baseCommand: effectiveCommand,
-      flags,
-    };
-  }
-
-  const isFilesystem = SHELL_FILESYSTEM_COMMANDS.some(fs => lowerEffective === fs || lowerEffective.startsWith(fs + ' '));
-
-  if (isFilesystem) {
-    return {
-      requiresAsk: true,
-      riskCategory: 'workspace-modification',
-      risk: workspaceBound ? 'medium' : 'high',
-      reason: `contains filesystem command "${effectiveCommand}"`,
-      hasOperators,
-      workspaceBound,
-      resolvedPaths,
-      baseCommand: effectiveCommand,
-      flags,
-    };
-  }
-
-  if (hasOperators) {
-    return {
-      requiresAsk: true,
-      riskCategory: 'side-effect',
-      risk: 'medium',
-      reason: 'contains shell operators (|, >, &&, etc.)',
-      hasOperators,
-      workspaceBound,
-      resolvedPaths,
-      baseCommand: effectiveCommand,
-      flags,
-    };
-  }
-
-  if (!workspaceBound) {
-    return {
-      requiresAsk: true,
-      riskCategory: 'outside-workspace',
-      risk: 'medium',
-      reason: 'references paths outside the workspace',
-      hasOperators: false,
-      workspaceBound,
-      resolvedPaths,
-      baseCommand: effectiveCommand,
-      flags,
-    };
-  }
-
-  const args = parseCommand(cmd).args;
-  const nonFlagArgs = args.filter(a => !a.startsWith('-'));
-  const hasSensitivePath = nonFlagArgs.some(a => ctx.isSensitivePath(a));
-
-  if (hasSensitivePath) {
-    return {
-      requiresAsk: true,
-      riskCategory: 'sensitive-files',
-      risk: 'high',
-      reason: 'references sensitive files (.env, .key, .pem, etc.)',
-      hasOperators,
-      workspaceBound: true,
-      resolvedPaths,
-      baseCommand: effectiveCommand,
-      flags,
-    };
-  }
-
-  return {
-    requiresAsk: false,
-    riskCategory: 'side-effect',
-    risk: 'low',
-    reason: '',
-    hasOperators: false,
-    workspaceBound: true,
-    resolvedPaths: [],
-    baseCommand: effectiveCommand,
-    flags,
-  };
+/** The classification result: the analyzer's Finding plus the ask to show
+ * when the permission mode requires a human. */
+export interface ShellClassification {
+  finding: Finding;
+  ask: ConcernsPermissionAsk;
 }
 
-/** Native harnesses have no Prokop temp-dir exception: a temp path outside
- * the root stays outside for classification. */
-const NATIVE_HARNESS_TEMP_DIR = '/__prokop_no_temp_exception__';
-
 /**
- * Classify a native-harness Bash command into its permission ask. Shared by
- * the Codex pre-tool hook and the Claude pre-tool hook so both harnesses
- * apply identical shell policy. Undefined means malformed input; null means
- * an ordinary command that needs no ask.
+ * Classify a shell command. Undefined means malformed input (the caller
+ * denies); a ShellClassification is returned for every valid command — the
+ * CALLER decides auto vs ask (shouldAutoApproveAsk / requiresHumanReview),
+ * because the mode lives on the session, not here.
+ *
+ * `cwdOutsideRoots` lets execution contexts whose working directory already
+ * sits outside the allowed roots (the tools' `cwd` parameter) union an escape
+ * concern in, so bare commands like `bun test` still escape correctly.
  */
-export function classifyShellCommand(command: string, root: string, cwd: string): PermissionAsk | null | undefined {
+export function classifyShellCommand(
+  command: string,
+  root: string | readonly string[],
+  cwd: string,
+  options?: { cwdOutsideRoots?: boolean },
+): ShellClassification | undefined {
   if (typeof command !== 'string' || !command.trim() || command.length > 64 * 1024) return undefined;
   // Native harnesses wrap unified exec in a login shell; inspect the inner command if present.
   const match = command.match(/^\/(?:bin\/)?(?:zsh|bash|sh)\s+-lc\s+'([\s\S]*)'$/);
   const effective = match ? match[1]!.replace(/'\\''/g, "'") : command;
-  const risk = analyzeRisk(effective, {
-    workspacePath: root,
-    fs: { tempDir: NATIVE_HARNESS_TEMP_DIR },
-    resolvePath: path => resolve(cwd, path),
-    isWithinWorkspace: path => isWithinRoot(path, root),
-    isSensitivePath,
-  }, cwd);
-  if (!risk.requiresAsk) return null;
-  if (risk.riskCategory === 'workspace-modification') {
-    return createWorkspaceModificationAsk({
-      command: effective, baseCommand: risk.baseCommand, resolvedPaths: risk.resolvedPaths, hasOperators: risk.hasOperators,
-    });
-  }
-  return createShellPermissionAskStructured({ command: effective, baseCommand: risk.baseCommand,
-    flags: risk.flags, risk: risk.risk, riskCategory: risk.riskCategory, reason: risk.reason,
-    resolvedPaths: risk.resolvedPaths, workspaceBound: risk.workspaceBound, hasOperators: risk.hasOperators });
+
+  const roots = typeof root === 'string' ? [root] : root;
+  const analyzed = analyzeCommand(effective, { roots, cwd, home: homedir() });
+  const finding: Finding = options?.cwdOutsideRoots && !analyzed.concerns.includes('escape')
+    ? {
+        ...analyzed,
+        concerns: [...analyzed.concerns, 'escape'] as Concern[],
+        evidence: [...analyzed.evidence, 'working directory is outside the allowed roots'],
+      }
+    : analyzed;
+  const { baseCommand } = parseCommand(effective);
+
+  const ask: ConcernsPermissionAsk = {
+    type: 'permission',
+    question: 'Allow this command to run?',
+    description: (finding.evidence[0] ?? effective).slice(0, 1000),
+    resource: 'shell-command',
+    action: 'execute',
+    risk: concernRisk(finding),
+    concerns: finding.concerns,
+    evidence: finding.evidence,
+    catastrophic: finding.catastrophic,
+    allowedScopes: grantScopesForFinding(finding),
+    metadata: { command: effective, cwd, baseCommand, resolvedPaths: finding.resolvedPaths },
+  };
+
+  return { finding, ask };
 }

@@ -1,8 +1,11 @@
 import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, sep } from 'node:path';
 import type { PermissionAsk } from '@prokopai/sdk';
-import { canAutoApproveHarnessTool } from '@/harnesses/approval-policy';
-import { severityFromMode } from '@/domains/permissions';
+import {
+  classifyShellCommand,
+  grantScopesForFinding,
+  shouldAutoApproveAsk,
+} from '@/domains/permissions';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { createPendingAsk, expirePermissionRequest,
@@ -16,8 +19,6 @@ const AUTHORITY = { visibilityScope: 'controller_only', resolutionMode: 'control
 const COMMAND_TOOL = 'codex-cli:command';
 const FILE_TOOL = 'codex-cli:file-change';
 const DECLINE = { decision: 'decline' } as const;
-/** Codex hook approvals follow the shared native harness risk ceiling. */
-export const canAutoApproveCodexHook = canAutoApproveHarnessTool;
 
 type Decision = { decision: 'accept' | 'decline' };
 interface Pending {
@@ -30,6 +31,8 @@ interface Pending {
   finish(decision: Decision): void;
   delivery: ApplicationDeliveryPort<unknown>;
   key: string | null;
+  /** Grant scopes the ask offered; responses outside them fail closed. */
+  scopes: readonly string[];
   workspaceId: string;
 }
 
@@ -58,7 +61,7 @@ export class CodexApprovals {
   ): Promise<boolean> {
     const session = getSession(sessionId);
     if (session?.harness !== 'codex-cli') return false;
-    if (!canAutoApproveCodexHook(ask, severityFromMode(session.permissionMode ?? 'standard'))) {
+    if (!shouldAutoApproveAsk(ask, session.permissionMode ?? 'standard')) {
       const decision = await this.enqueue(ask, toolName === 'Bash' ? COMMAND_TOOL : FILE_TOOL,
         null, sessionId, workspaceId, delivery, controllerSessionId);
       if (decision.decision !== 'accept') return false;
@@ -75,7 +78,7 @@ export class CodexApprovals {
     workspaceId: string, delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
     const session = getSession(sessionId);
     if (session?.harness !== 'codex-cli' || session.workspaceId !== workspaceId) return false;
-    if (canAutoApproveCodexHook(ask, severityFromMode(session.permissionMode ?? 'standard'))) return true;
+    if (shouldAutoApproveAsk(ask, session.permissionMode ?? 'standard')) return true;
     return (await this.enqueue({ ...ask, allowedScopes: ['once'] }, toolName,
       null, sessionId, workspaceId, delivery)).decision === 'accept';
   }
@@ -105,7 +108,7 @@ export class CodexApprovals {
     return new Promise<Decision>(resolve => {
       const timer = setTimeout(() => this.settle(requestId, DECLINE, 'expired'), timeoutMs);
       this.pending.set(requestId, { requestId, toolCallId, sessionId, controllerSessionId, dbId, timer,
-        finish: resolve, delivery, key, workspaceId });
+        finish: resolve, delivery, key, scopes: ask.allowedScopes ?? ['once'], workspaceId });
       this.byTool.set(toolCallId, requestId);
       try {
         const deliveredAsk: PermissionAsk & { _originSessionId?: string } = controllerSessionId === sessionId
@@ -173,13 +176,22 @@ export class CodexApprovals {
       }
     }
 
-    const ask: PermissionAsk = command ? {
-      type: 'permission', question: 'Allow Codex to run this command?',
-      description: typeof params.reason === 'string' ? params.reason : `Working directory: ${root}`,
-      resource: 'shell-command', action: 'execute', risk: 'critical',
-      metadata: { command: params.command, cwd: params.cwd },
-      allowedScopes: childOnceOnly ? ['once'] : ['once', 'session', 'workspace'],
-    } : {
+    const ask: PermissionAsk = command ? (() => {
+      // Permissions v2: the native approval ask carries the classified
+      // concerns, so the mode ceiling decides exactly like the hook path.
+      const classification = classifyShellCommand(params.command as string, root, params.cwd as string);
+      return classification ? { ...classification.ask,
+        question: 'Allow Codex to run this command?',
+        description: typeof params.reason === 'string' ? params.reason : `Working directory: ${root}`,
+        allowedScopes: childOnceOnly ? ['once'] : classification.ask.allowedScopes ?? grantScopesForFinding(classification.finding),
+      } : {
+        type: 'permission', question: 'Allow Codex to run this command?',
+        description: typeof params.reason === 'string' ? params.reason : `Working directory: ${root}`,
+        resource: 'shell-command', action: 'execute', risk: 'critical',
+        metadata: { command: params.command, cwd: params.cwd },
+        allowedScopes: childOnceOnly ? ['once'] : ['once', 'session', 'workspace'],
+      };
+    })() : {
       type: 'permission', question: 'Allow Codex to change files?',
       description: typeof params.reason === 'string' ? params.reason : 'Codex did not provide file paths for this request.',
       resource: 'file', action: 'write', risk: 'critical', allowedScopes: ['once'],
@@ -196,7 +208,7 @@ export class CodexApprovals {
     if (!pending || pending.toolCallId !== toolCallId || getSession(pending.sessionId)?.harness !== 'codex-cli') return false;
     const value = object(response);
     const grant = value?.type === 'permission' ? value.grant : undefined;
-    const allowed = pending.key ? ['once', 'session', 'workspace'] : ['once'];
+    const allowed = pending.key ? pending.scopes : ['once'];
     const approved = typeof grant === 'string' && allowed.includes(grant)
       && value?.scope === undefined && value?.duration === undefined;
     const decision = approved ? { decision: 'accept' } as const : DECLINE;

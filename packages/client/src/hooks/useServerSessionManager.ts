@@ -35,7 +35,6 @@ import { useConnectionLifecycle } from '@/hooks/useConnectionLifecycle';
 import { useSessionCommands } from '@/hooks/useSessionCommands';
 import type { CreateSessionOptions } from '@/lib/sessionCreate';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
-import { usePermissionAutoApprove } from '@/hooks/usePermissionAutoApprove';
 
 export interface UseServerSessionManagerParams {
   serverId: string;
@@ -363,9 +362,6 @@ export function useServerSessionManager({
   );
 
   const { playChatFinishSound, playPermissionSound } = useNotificationSound();
-
-  // Register permission auto-approve handler
-  usePermissionAutoApprove();
 
   const flushPendingPartAppends = useCallback(() => {
     if (partAppendRafRef.current !== null) {

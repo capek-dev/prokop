@@ -1,16 +1,18 @@
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import type { PermissionAsk } from '@prokopai/sdk';
-import { canAutoApproveHarnessTool } from '@/harnesses/approval-policy';
-import { severityFromMode } from '@/domains/permissions';
+import { shouldAutoApproveAsk } from '@/domains/permissions';
 import { classifyClaudeTool } from './tool-policy';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { createPendingAsk, expirePermissionRequest, resolvePermissionRequestByRequestId } from '@/infrastructure/sqlite/pending-asks';
+import { createGrantFromOptions, matchGrant } from '@/infrastructure/sqlite/permissions';
+import { getDatabase } from '@/infrastructure/sqlite/database';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { getControllerConnections, isControlled } from '@/transport/websocket/control-registry';
 
 const AUTHORITY = { visibilityScope: 'controller_only', resolutionMode: 'controller_only' } as const;
+const BASH_TOOL = 'claude-cli:Bash';
 const denied = (message: string): PermissionResult => ({ behavior: 'deny', message });
 
 interface Pending {
@@ -21,6 +23,11 @@ interface Pending {
   timer: ReturnType<typeof setTimeout>;
   finish(result: PermissionResult): void;
   delivery: ApplicationDeliveryPort<unknown>;
+  /** Remembered-grant key (exact [root, command]); null when the ask is once-only. */
+  key: string | null;
+  /** Grant scopes the ask offered; responses outside them fail closed. */
+  scopes: readonly string[];
+  workspaceId: string;
 }
 
 /** Live approval waiters are never restored from SQLite after a process restart. */
@@ -64,7 +71,19 @@ export class ClaudeApprovals {
       if (ask === null) return denied('Malformed Claude tool');
       // Tools without a Prokop risk rule use the SDK's native behavior, regardless of the session ceiling.
       if (ask === undefined) return { behavior: 'allow' };
-      if (canAutoApproveHarnessTool(ask, severityFromMode(session.permissionMode ?? 'standard'))) return { behavior: 'allow' };
+      // Remembered command grants (permissions v2): consult before the mode.
+      let grantKey: string | null = null;
+      const grantScopes: readonly string[] = ask.allowedScopes ?? ['once'];
+      if (toolName === 'Bash' && typeof input.command === 'string') {
+        grantKey = JSON.stringify([root, input.command]);
+        const matched = matchGrant({ workspaceId, toolName: BASH_TOOL, resource: 'shell-command',
+          action: 'execute', permissionKey: grantKey, rootSessionId: sessionId });
+        if (matched.matched && matched.grant && (matched.grant.scope === 'workspace'
+          || matched.grant.scope === 'session' && matched.grant.boundRootSessionId === sessionId)) {
+          return { behavior: 'allow' };
+        }
+      }
+      if (shouldAutoApproveAsk(ask, session.permissionMode ?? 'standard')) return { behavior: 'allow' };
       if (!isControlled(sessionId) || getControllerConnections(sessionId).length === 0) {
         return denied('Claude tool requires a connected controller');
       }
@@ -82,7 +101,8 @@ export class ClaudeApprovals {
       return new Promise<PermissionResult>(resolve => {
         const timer = setTimeout(() => this.settle(requestId, denied('Claude permission timed out'), true), timeout);
         this.pending.set(requestId, { sessionId: childId ?? sessionId, controllerSessionId: sessionId,
-          toolCallId, dbId, timer, finish: resolve, delivery });
+          toolCallId, dbId, timer, finish: resolve, delivery,
+          key: grantKey, scopes: grantScopes, workspaceId });
         this.byTool.set(toolCallId, requestId);
         const abort = () => this.settle(requestId, denied('Claude turn interrupted'), true);
         signal.addEventListener('abort', abort, { once: true });
@@ -106,13 +126,31 @@ export class ClaudeApprovals {
       ? response as Record<string, unknown> : null;
     const allowed = isControlled(pending.controllerSessionId)
       && getControllerConnections(pending.controllerSessionId).length > 0
-      && value?.type === 'permission' && value.grant === 'once'
+      && value?.type === 'permission' && typeof value.grant === 'string'
+      && (pending.key ? pending.scopes : ['once']).includes(value.grant)
       && value.scope === undefined && value.duration === undefined;
-    if (!resolvePermissionRequestByRequestId(requestId, allowed ? 'approved' : 'denied', response)) {
+    // Remembered grants persist atomically with the resolution; a grant
+    // failure denies the approval (never accept without its requested scope).
+    let granted = true;
+    if (allowed && pending.key && (value.grant === 'session' || value.grant === 'workspace')) {
+      try {
+        getDatabase().transaction(() => {
+          createGrantFromOptions({ workspaceId: pending.workspaceId, toolName: BASH_TOOL,
+            resource: 'shell-command', action: 'execute', permissionKey: pending.key!,
+            grantOptions: { scope: value.grant as 'session' | 'workspace',
+              matcher: 'exact', action: 'execute', patterns: [pending.key!],
+              ...(value.grant === 'session' ? { boundRootSessionId: pending.controllerSessionId } : {}) } });
+        })();
+      } catch {
+        granted = false;
+      }
+    }
+    if (!resolvePermissionRequestByRequestId(requestId, allowed && granted ? 'approved' : 'denied', response)) {
       this.settle(requestId, denied('Claude permission expired'), true);
       return false;
     }
-    this.settle(requestId, allowed ? { behavior: 'allow' } : denied('Claude permission denied'), false);
+    this.settle(requestId, allowed && granted
+      ? { behavior: 'allow' } : denied('Claude permission denied'), false);
     return true;
   }
 
@@ -125,7 +163,7 @@ export class ClaudeApprovals {
     workspaceId: string, delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
     const session = getSession(sessionId);
     if (session?.harness !== 'claude-cli' || session.workspaceId !== workspaceId) return false;
-    if (canAutoApproveHarnessTool(ask, severityFromMode(session.permissionMode ?? 'standard'))) return true;
+    if (shouldAutoApproveAsk(ask, session.permissionMode ?? 'standard')) return true;
     if (!isControlled(sessionId) || getControllerConnections(sessionId).length === 0) return false;
     const askOnce: PermissionAsk = { ...ask, allowedScopes: ['once'] };
     const requestId = crypto.randomUUID();
@@ -138,7 +176,8 @@ export class ClaudeApprovals {
     return new Promise<boolean>(resolve => {
       const timer = setTimeout(() => this.settle(requestId, denied('Claude permission timed out'), true), timeout);
       this.pending.set(requestId, { sessionId, controllerSessionId: sessionId,
-        toolCallId, dbId, timer, finish: result => resolve(result.behavior === 'allow'), delivery });
+        toolCallId, dbId, timer, finish: result => resolve(result.behavior === 'allow'), delivery,
+        key: null, scopes: ['once'], workspaceId });
       this.byTool.set(toolCallId, requestId);
       try {
         delivery.sendToAskTargets(sessionId, AUTHORITY, { type: 'ask.request', sessionId,

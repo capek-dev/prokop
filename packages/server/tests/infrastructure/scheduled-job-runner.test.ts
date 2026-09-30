@@ -1,9 +1,10 @@
-import { describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 import type { Preconfig, ScheduledJob } from '@prokopai/sdk';
 import type {
   ScheduledRunSessionPort,
   ScheduledRunWorkspacePort,
 } from '@/application/ports/scheduling';
+import { installHeadlessExecutionPort } from '@/application/ports/headless-execution';
 import type { HeadlessSessionRunInput } from '@/application/ports/headless-execution';
 import type { ScheduledJobRunnerDeps } from '@/infrastructure/scheduling/scheduled-job-runner';
 
@@ -62,7 +63,7 @@ function dependencies(events: string[], runs: HeadlessSessionRunInput[]): Schedu
       getDefaultPreconfig: async () => preconfig,
     },
     modelsConfig: {
-      getModelsConfig: () => ({ defaultModel: 'default-model', defaultProvider: 'default-provider' }),
+      getModelsConfig: () => ({ defaultModel: 'definitely-not-a-registered-model', defaultProvider: 'default-provider' }),
     },
     headless: {
       async run(input) {
@@ -74,6 +75,12 @@ function dependencies(events: string[], runs: HeadlessSessionRunInput[]): Schedu
 }
 
 describe('scheduled job runner', () => {
+  beforeEach(() => {
+    // Other suites in the same process install a global headless port; reset
+    // it so the fallback paths here test the real "no port installed" state.
+    installHeadlessExecutionPort(null);
+  });
+
   test('filters recursive scheduling and records run before the result error', async () => {
     const events: string[] = [];
     const runs: HeadlessSessionRunInput[] = [];
@@ -88,7 +95,7 @@ describe('scheduled job runner', () => {
     await createScheduledJobRunner(deps).run(job);
 
     expect(runs).toHaveLength(1);
-    expect(runs[0].modelId).toBe('default-model');
+    expect(runs[0].modelId).toBe('definitely-not-a-registered-model');
     // Unknown model id: the neutral provider lookup misses and the models
     // config default provider applies.
     expect(runs[0].providerId).toBe('default-provider');

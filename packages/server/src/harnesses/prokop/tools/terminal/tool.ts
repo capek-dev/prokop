@@ -12,12 +12,15 @@
  */
 
 import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
+import { createOutsideWorkspaceAsk, createShellPermissionAskStructured } from '@prokopai/sdk';
 import {
-  createOutsideWorkspaceAsk,
-  createShellPermissionAskStructured,
-  createWorkspaceModificationAsk,
-} from '@prokopai/sdk';
-import { analyzeRisk, resolveCommandPath, stripRedundantCd } from '@/domains/permissions';
+  classifyShellCommand,
+  requiresHumanReview,
+  resolveCommandPath,
+  stripRedundantCd,
+  type ConcernsPermissionAsk,
+  type ShellRiskContext,
+} from '@/domains/permissions';
 import { getTerminalManager } from '@/transport/terminal';
 
 interface TerminalInput {
@@ -95,41 +98,17 @@ async function requestPermission(
   executionCwd: string,
   ctx: ToolContext,
 ): Promise<boolean> {
-  const resolveFromCwd = (path: string): string => resolveCommandPath(path, executionCwd, ctx);
+  const riskCtx = ctx as unknown as ShellRiskContext;
+  const resolveFromCwd = (path: string): string => resolveCommandPath(path, executionCwd, riskCtx);
   const effectiveCommand = stripRedundantCd(command, executionCwd, resolveFromCwd);
-  const risk = analyzeRisk(effectiveCommand, ctx, executionCwd);
-  if (!risk.requiresAsk) return true;
 
-  let permAsk;
-  if (risk.riskCategory === 'outside-workspace') {
-    permAsk = createOutsideWorkspaceAsk({
-      command: effectiveCommand,
-      cwd: executionCwd,
-      resolvedPaths: risk.resolvedPaths,
-      hasOperators: risk.hasOperators,
-    });
-  } else if (risk.riskCategory === 'workspace-modification') {
-    permAsk = createWorkspaceModificationAsk({
-      command: effectiveCommand,
-      baseCommand: risk.baseCommand,
-      resolvedPaths: risk.resolvedPaths,
-      hasOperators: risk.hasOperators,
-    });
-  } else {
-    permAsk = createShellPermissionAskStructured({
-      command: effectiveCommand,
-      baseCommand: risk.baseCommand,
-      flags: risk.flags,
-      risk: risk.risk,
-      riskCategory: risk.riskCategory,
-      reason: risk.reason,
-      resolvedPaths: risk.resolvedPaths,
-      workspaceBound: risk.workspaceBound,
-      hasOperators: risk.hasOperators,
-    });
-  }
+  // Permissions v2: ask only when a real concern exists; the mode ceiling
+  // decides through the ask's risk (derived from the Finding).
+  const classification = classifyShellCommand(effectiveCommand,
+    [ctx.workspacePath, ctx.fs.tempDir], executionCwd);
+  if (!classification || !requiresHumanReview(classification.finding)) return true;
 
-  return (await ctx.ask(permAsk)) === true;
+  return (await ctx.ask(classification.ask)) === true;
 }
 
 type MarkerOutcome =
@@ -271,12 +250,17 @@ async function handleCreate(input: TerminalInput, ctx: ToolContext): Promise<Too
   const resolvedCwd = input.cwd ? ctx.resolvePath(input.cwd) : ctx.workspacePath;
 
   if (input.cwd && !ctx.isWithinWorkspace(resolvedCwd)) {
-    const approved = await ctx.ask(createOutsideWorkspaceAsk({
-      command: `terminal create ${input.cwd}`,
-      cwd: resolvedCwd,
-      resolvedPaths: [resolvedCwd],
-      hasOperators: false,
-    }));
+    const ask: ConcernsPermissionAsk = {
+      ...createOutsideWorkspaceAsk({
+        command: `terminal create ${input.cwd}`,
+        cwd: resolvedCwd,
+        resolvedPaths: [resolvedCwd],
+        hasOperators: false,
+      }),
+      concerns: ['escape'],
+      catastrophic: false,
+    };
+    const approved = await ctx.ask(ask);
     if (approved !== true) return { success: false, error: 'USER_REJECTION' };
   }
 

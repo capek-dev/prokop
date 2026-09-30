@@ -33,12 +33,19 @@ export {
   type CommandAnalyzeContext,
 } from './command/analyze';
 export {
-  analyzeRisk,
   classifyShellCommand,
   parseCommand,
   resolveCommandPath,
   stripRedundantCd,
   type ParsedCommand,
-  type RiskAnalysis,
+  type ShellClassification,
   type ShellRiskContext,
 } from './shell';
+export {
+  concernRisk,
+  grantScopesForFinding,
+  readAskConcerns,
+  requiresHumanReview,
+  shouldAutoApproveAsk,
+  type ConcernsPermissionAsk,
+} from './ask';

@@ -13,7 +13,8 @@ import { projectMessagesForClient } from '@/application/sessions/tool-debug';
 import { bindCodexThread, getCodexBinding } from '@/harnesses/codex-cli/bindings';
 import { getRollbackIntent } from '@/harnesses/codex-cli/rollback';
 import { getDatabase } from '@/infrastructure/sqlite/database';
-import { CodexApprovals, canAutoApproveCodexHook, codexApprovals } from '@/harnesses/codex-cli/approvals';
+import { CodexApprovals, codexApprovals } from '@/harnesses/codex-cli/approvals';
+import { shouldAutoApproveAsk } from '@/domains/permissions';
 import { getPermissionRequestByRequestId, listPendingAsksBySession,
   listPendingRequestsByRootSession } from '@/infrastructure/sqlite/pending-asks';
 import { saveCodexModelSelection } from '@/harnesses/codex-cli/models';
@@ -447,7 +448,7 @@ test('Codex command approval uses ask UI, exact session grants and one-time repl
   } });
   await waitFor(() => messages.some(message => message.type === 'ask.request'));
   const ask = messages.find(message => message.type === 'ask.request')!;
-  expect(ask.ask).toMatchObject({ risk: 'critical', allowedScopes: ['once', 'session', 'workspace'],
+  expect(ask.ask).toMatchObject({ risk: 'low', concerns: [], allowedScopes: ['once', 'session', 'workspace'],
     metadata: { command: 'git status' } });
   expect(codexApprovals.getSessionId(ask.toolCallId, ask.requestId)).toBe('s');
   expect(codexApprovals.getSessionId(ask.toolCallId, 'wrong')).toBeNull();
@@ -496,7 +497,7 @@ test('trusted hook asks through the turn, denies invalid identity, and hands an 
   const denied = onCall(call);
   await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 1);
   const firstAsk = messages.find(message => message.type === 'ask.request')!;
-  expect(firstAsk.ask).toMatchObject({ allowedScopes: ['once'], action: 'delete' });
+  expect(firstAsk.ask).toMatchObject({ allowedScopes: ['once'], action: 'execute', concerns: ['destructive'] });
   expect(await codexApprovals.resolve(firstAsk.toolCallId, { type: 'permission', grant: 'denied' }, firstAsk.requestId)).toBe(true);
   expect(await denied).toBe('permission-denied');
   const approved = onCall(call);
@@ -885,18 +886,26 @@ test('Codex dynamic tool asks honor the current session ceiling and keep manual 
   expect(await manual).toBe(true);
 });
 
-test('Codex risk auto-approval rejects missing, unknown and critical risks', () => {
-  const ask = (risk?: PermissionAsk['risk']): PermissionAsk => ({
-    type: 'permission', question: 'Allow?', resource: 'file', action: 'read', risk,
-  });
-  expect(canAutoApproveCodexHook(ask('none'), 'none')).toBe(true);
-  expect(canAutoApproveCodexHook(ask('medium'), 'low')).toBe(false);
-  expect(canAutoApproveCodexHook(ask('critical'), 'high')).toBe(false);
-  expect(canAutoApproveCodexHook(ask(undefined), 'high')).toBe(false);
-  expect(canAutoApproveCodexHook(ask('unrecognized' as PermissionAsk['risk']), 'high')).toBe(false);
-  expect(canAutoApproveCodexHook(ask('low'), 'off')).toBe(false);
-  expect(canAutoApproveCodexHook(ask('low'), undefined)).toBe(false);
-  expect(canAutoApproveCodexHook(ask('low'), 'unknown')).toBe(false);
+test('shouldAutoApproveAsk follows concerns first and the legacy ceiling otherwise', () => {
+  const ask = (extra: Record<string, unknown>): PermissionAsk => ({
+    type: 'permission', question: 'Allow?', resource: 'file', action: 'read', ...extra,
+  }) as PermissionAsk;
+  // Legacy ceiling for asks without concern fields (feature-risk asks).
+  expect(shouldAutoApproveAsk(ask({ risk: 'none' }), 'standard')).toBe(true);
+  expect(shouldAutoApproveAsk(ask({ risk: 'low' }), 'standard')).toBe(true);
+  expect(shouldAutoApproveAsk(ask({ risk: 'medium' }), 'standard')).toBe(false);
+  expect(shouldAutoApproveAsk(ask({ risk: 'medium' }), 'extended')).toBe(true);
+  expect(shouldAutoApproveAsk(ask({ risk: 'high' }), 'full')).toBe(true);
+  expect(shouldAutoApproveAsk(ask({ risk: 'critical' }), 'full')).toBe(false);
+  expect(shouldAutoApproveAsk(ask({ risk: undefined }), 'full')).toBe(false);
+  expect(shouldAutoApproveAsk(ask({ risk: 'unrecognized' }), 'full')).toBe(false);
+  // Concerns-bearing asks go through decide(): the risk field is ignored.
+  expect(shouldAutoApproveAsk(ask({ concerns: ['escape'], risk: 'medium' }), 'extended')).toBe(true);
+  expect(shouldAutoApproveAsk(ask({ concerns: ['escape'], risk: 'medium' }), 'standard')).toBe(false);
+  expect(shouldAutoApproveAsk(ask({ concerns: ['destructive'], risk: 'high' }), 'full')).toBe(true);
+  expect(shouldAutoApproveAsk(ask({ concerns: ['destructive'], risk: 'high' }), 'extended')).toBe(false);
+  expect(shouldAutoApproveAsk(ask({ concerns: ['opaque'] }), 'standard')).toBe(true);
+  expect(shouldAutoApproveAsk(ask({ concerns: [], catastrophic: true }), 'full')).toBe(false);
 });
 
 test('hook ask timeout and interruption deny and expire pending requests', async () => {

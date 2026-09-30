@@ -3,79 +3,59 @@ import { mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
-  analyzeRisk,
   classifyShellCommand,
   effectivePath,
   isOutsideRoot,
   isSensitivePath,
   isWithinRoot,
-  type ShellRiskContext,
+  requiresHumanReview,
 } from '@/domains/permissions';
 
 const root = resolve('/workspace/project');
 
-function context(overrides: Partial<ShellRiskContext> = {}): ShellRiskContext {
-  return {
-    workspacePath: root,
-    fs: { tempDir: resolve('/workspace/project/.tmp') },
-    resolvePath: path => resolve(root, path),
-    isWithinWorkspace: path => isWithinRoot(path, root),
-    isSensitivePath,
-    ...overrides,
-  };
-}
-
-describe('shell risk classification', () => {
-  test('ordinary commands need no ask', () => {
-    const result = analyzeRisk('git status', context());
-    expect(result).toMatchObject({ requiresAsk: false, risk: 'low' });
-  });
-
-  test('dangerous commands are high risk with destructive or network categories', () => {
-    expect(analyzeRisk('rm -rf build', context())).toMatchObject({ requiresAsk: true, risk: 'high', riskCategory: 'destructive' });
-    expect(analyzeRisk('curl https://example.com', context())).toMatchObject({ requiresAsk: true, risk: 'high', riskCategory: 'network' });
-  });
-
-  test('filesystem commands are medium inside the workspace and high outside', () => {
-    expect(analyzeRisk('mkdir docs', context())).toMatchObject({ requiresAsk: true, risk: 'medium', riskCategory: 'workspace-modification' });
-    expect(analyzeRisk('mkdir /etc/thing', context())).toMatchObject({ requiresAsk: true, risk: 'high', workspaceBound: false });
-  });
-
-  test('operators and sensitive files raise their own categories', () => {
-    expect(analyzeRisk('cat foo | grep bar', context())).toMatchObject({ requiresAsk: true, riskCategory: 'side-effect', hasOperators: true });
-    expect(analyzeRisk('cat .env', context())).toMatchObject({ requiresAsk: true, risk: 'high', riskCategory: 'sensitive-files' });
-  });
-
-  test('the temp directory exception keeps temp paths workspace-bound', () => {
-    const result = analyzeRisk(`cat ${resolve('/workspace/project/.tmp')}/out.txt`, context());
-    expect(result.workspaceBound).toBe(true);
-  });
-});
-
-describe('native-harness shell ask building', () => {
-  test('ordinary commands classify to null and malformed input to undefined', () => {
-    expect(classifyShellCommand('git status', root, root)).toBeNull();
+describe('shell classification (permissions v2)', () => {
+  test('malformed input classifies to undefined', () => {
     expect(classifyShellCommand('   ', root, root)).toBeUndefined();
     expect(classifyShellCommand('x'.repeat(64 * 1024 + 1), root, root)).toBeUndefined();
   });
 
-  test('login-shell wrapping is unwrapped before classification', () => {
-    const ask = classifyShellCommand(`/bin/zsh -lc 'touch ${root}/newfile'`, root, root);
-    // touch is a workspace-bound filesystem command: medium-risk ask whose
-    // command identity is the unwrapped inner command.
-    expect(ask).toMatchObject({ type: 'permission', risk: 'medium' });
-    expect(JSON.stringify(ask)).toContain('touch');
+  test('every valid command returns a finding; the caller decides review', () => {
+    const clean = classifyShellCommand('git status', root, root)!;
+    expect(clean.finding.concerns).toEqual([]);
+    expect(requiresHumanReview(clean.finding)).toBe(false);
+    expect(clean.ask.risk).toBe('low');
+
+    const wrapped = classifyShellCommand(`/bin/zsh -lc 'rm -rf ${root}/build'`, root, root)!;
+    expect(wrapped.finding.concerns).toContain('destructive');
+    expect(JSON.stringify(wrapped.ask)).toContain('rm -rf');
   });
 
-  test('workspace modification builds the structured modification ask', () => {
-    const ask = classifyShellCommand('mv a b', root, root);
-    expect(ask).toMatchObject({ type: 'permission', risk: 'medium' });
-    expect(ask?.allowedScopes).toContain('once');
+  test('the ask carries the concern fields and the derived risk', () => {
+    const escape = classifyShellCommand('cat /etc/passwd', root, root)!;
+    expect(escape.ask.concerns).toContain('escape');
+    expect(escape.ask.risk).toBe('medium');
+
+    const sensitive = classifyShellCommand('cat .env', root, root)!;
+    expect(sensitive.ask.concerns).toContain('sensitive');
+    expect(sensitive.ask.risk).toBe('high');
+
+    const destructive = classifyShellCommand('rm -rf build', root, root)!;
+    expect(destructive.ask.risk).toBe('high');
+    // Destructive findings are once-only.
+    expect(destructive.ask.allowedScopes).toEqual(['once']);
   });
 
-  test('dangerous commands stay high risk through the ask path', () => {
-    const ask = classifyShellCommand('sudo rm /etc/hosts', root, root);
-    expect(ask).toMatchObject({ risk: 'high' });
+  test('escape-only asks may be remembered; workspace writes stay clean', () => {
+    const escape = classifyShellCommand('cat /etc/passwd', root, root)!;
+    expect(escape.ask.allowedScopes).toEqual(['once', 'session', 'workspace']);
+    const plain = classifyShellCommand('mv a b', root, root)!;
+    expect(plain.finding.concerns).toEqual([]);
+  });
+
+  test('cwdOutsideRoots unions escape in for bare commands', () => {
+    const bare = classifyShellCommand('bun test', [root], '/elsewhere', { cwdOutsideRoots: true })!;
+    expect(bare.finding.concerns).toContain('escape');
+    expect(bare.ask.risk).toBe('medium');
   });
 });
 

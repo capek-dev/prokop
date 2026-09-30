@@ -1,7 +1,12 @@
 import { isAbsolute, resolve } from 'node:path';
-import type { PermissionAsk } from '@prokopai/sdk';
 import { createFilePermissionAsk } from '@prokopai/sdk';
-import { classifyShellCommand, isSensitivePath, isWithinRoot } from '@/domains/permissions';
+import {
+  classifyShellCommand,
+  isSensitivePath,
+  isWithinRoot,
+  requiresHumanReview,
+  type ConcernsPermissionAsk,
+} from '@/domains/permissions';
 
 export interface CodexHookCall {
   session_id: string;
@@ -22,10 +27,11 @@ export function validHookCall(value: unknown): value is CodexHookCall {
     && (call.tool_name === 'Bash' || call.tool_name === 'apply_patch');
 }
 
-/** Return null for ordinary operations, undefined for unsupported/malformed input.
- * Shell policy comes from the shared permissions domain; only the native
- * apply_patch format is Codex-specific. */
-export function classifyCodexHook(call: CodexHookCall, root: string): PermissionAsk | null | undefined {
+/** Return null for ordinary operations (auto-run), undefined for unsupported/
+ * malformed input. The ask carries the permissions-v2 concern fields, so the
+ * approval decision (shouldAutoApproveAsk) follows the session mode. Only the
+ * native apply_patch format is Codex-specific. */
+export function classifyCodexHook(call: CodexHookCall, root: string): ConcernsPermissionAsk | null | undefined {
   const input = call.tool_input;
   if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined;
   const command = (input as Record<string, unknown>).command;
@@ -40,11 +46,27 @@ export function classifyCodexHook(call: CodexHookCall, root: string): Permission
     const deleting = /^\*\*\* Delete File:/m.test(command);
     if (outside || isSensitiveFile || deleting) {
       const path = resolved.find(candidate => !isWithinRoot(candidate, root) || isSensitivePath(candidate)) ?? resolved[0]!;
+      const concerns = [
+        ...(outside ? ['escape'] as const : []),
+        ...(isSensitiveFile ? ['sensitive'] as const : []),
+        ...(deleting ? ['destructive'] as const : []),
+      ];
       return { ...createFilePermissionAsk({ path, operation: 'edit', risk: 'high',
         isOutsideWorkspace: outside, isSensitiveFile, reason: deleting ? 'Codex is deleting a file.' : undefined }),
-      paths: resolved, question: `Allow Codex to ${deleting ? 'delete or change' : 'change'} ${resolved.length} file(s)?` };
+      paths: resolved, question: `Allow Codex to ${deleting ? 'delete or change' : 'change'} ${resolved.length} file(s)?`,
+      concerns, catastrophic: false,
+      evidence: [
+        ...(outside ? ['patch touches files outside the workspace'] : []),
+        ...(isSensitiveFile ? ['patch touches sensitive files'] : []),
+        ...(deleting ? ['patch deletes files'] : []),
+      ] };
     }
     return null;
   }
-  return classifyShellCommand(command, root, call.cwd);
+  const classification = classifyShellCommand(command, root, call.cwd);
+  if (!classification) return undefined;
+  if (!requiresHumanReview(classification.finding)) return null;
+  return { ...classification.ask,
+    question: 'Allow Codex to run this command?',
+    description: command.slice(0, 1000) };
 }
