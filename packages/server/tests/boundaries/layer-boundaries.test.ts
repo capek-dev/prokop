@@ -1267,6 +1267,19 @@ describe('server layer boundaries', () => {
       const specifiers = [...new Set(imports.map((imp) => imp.specifier))].sort();
       if (path.endsWith('session-message-schema.ts')) {
         expect(specifiers).toEqual(['./claude-harness-migration', 'bun:sqlite']);
+      } else if (path.endsWith('session-repository.ts')) {
+        // S11.6: the session repository also attaches the server-derived
+        // harness state from the sessions domain.
+        expect(specifiers).toEqual([
+          '@/application/ports/session-message',
+          '@/domains/sessions/harness-state',
+          '@prokopai/sdk',
+          'bun:sqlite',
+        ]);
+        // The Database import is type-only; no runtime SQLite API leaks
+        // beyond the injected accessor.
+        const sqliteImports = imports.filter((imp) => imp.specifier === 'bun:sqlite');
+        expect(sqliteImports.every((imp) => imp.kind === 'type')).toBe(true);
       } else {
         expect(specifiers).toEqual([
           '@/application/ports/session-message',

@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
-import type { Session } from '@prokopai/sdk';
+import type { Session, SessionHarnessState } from '@prokopai/sdk';
 import { useSidebarData } from '@/hooks/useSidebarData';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useConnectionStore } from '@/stores/connectionStore';
@@ -10,9 +10,19 @@ const route = vi.hoisted(() => ({ sessionId: 'parent' }));
 vi.mock('@tanstack/react-router', () => ({ useParams: () => ({ sessionId: route.sessionId }) }));
 vi.mock('@/contexts/ServerContext', () => ({ useServerContext: () => ({ servers: [], quickConnections: [] }) }));
 
+// Codex wire shape: the server derives this state from the persisted
+// harness; fixtures mirror it so the hook reads what production sends.
+const codexHarnessState: SessionHarnessState = {
+  compaction: { pending: false, uncertain: false, boundaryMessageId: null },
+  fork: { mode: 'assistant-only' },
+  goalUncertain: false,
+  nativeApprovalPrefix: 'codex-approval:',
+  capabilities: { canRemoveQueuedMessages: false, canInterruptSubagent: true, subagentActivityPropagates: true },
+};
+
 function session(id: string, overrides: Partial<Session> = {}): Session {
   return { id, workspaceId: 'ws', title: id, status: 'active', parentId: null,
-    harness: 'codex-cli', metadata: null, tags: [], ...overrides } as Session;
+    harness: 'codex-cli', harnessState: codexHarnessState, metadata: null, tags: [], ...overrides } as Session;
 }
 
 afterEach(() => {

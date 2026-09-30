@@ -176,11 +176,12 @@ function ChatViewContent({
   const isMainActiveSession = isPrimarySession && session.status === 'active';
   const compactPending = usePendingOperationsStore(s => s.operations.some(op =>
     op.sessionId === session.id && op.type === 'compact'));
-  const compactUncertain = session.harness === 'claude-cli' && session.metadata?.claudeCompactPending === true
+  const harnessState = session.harnessState;
+  const nativeApprovalPrefix = harnessState?.nativeApprovalPrefix;
+  const compactUncertain = harnessState?.compaction.uncertain === true
     && !compactPending && !isCompacting;
-  const compactBusy = isCompacting || compactPending || (session.harness === 'codex-cli' && session.metadata?.codexCompactPending === true);
-  const goalUncertain = session.harness === 'claude-cli'
-    && (session.metadata?.claudeGoal as { status?: string } | undefined)?.status === 'uncertain';
+  const compactBusy = isCompacting || compactPending || harnessState?.compaction.pending === true;
+  const goalUncertain = harnessState?.goalUncertain === true;
   const inputLocked = compactBusy || compactUncertain || goalUncertain;
 
   const contentMeta = useSessionStore((state) => state.contentMetaBySession[session.id]);
@@ -197,16 +198,13 @@ function ChatViewContent({
   const onForkForMode = readOnlyTranscript ? undefined : _onFork;
   const onEditMessageForMode = readOnlyTranscript ? undefined : _onEditMessage;
   const onCompactForMode = readOnlyTranscript ? undefined : onCompact;
-  const onRemoveFromQueueForMode = readOnlyTranscript || session.harness === 'codex-cli' ? undefined : onRemoveFromQueue;
-  // The Claude harness only verifies plain text-only native histories, so
-  // sessions that ran Goal or Compact refuse fork server-side. Show the
-  // affordance disabled with the reason instead of failing the click.
-  const forkUnavailableReason = session.harness === 'claude-cli' && !readOnlyTranscript
-    ? session.metadata?.claudeCompactPending === true
-      ? 'Fork unavailable: compaction outcome uncertain'
-      : session.metadata?.claudeGoal || session.metadata?.claudeCompactedAt
-        ? 'Fork unavailable after Goal or Compact'
-        : undefined
+  const onRemoveFromQueueForMode = readOnlyTranscript || harnessState?.capabilities.canRemoveQueuedMessages === false
+    ? undefined : onRemoveFromQueue;
+  // The server derives the fork state from the harness and its metadata:
+  // restricted modes carry the reason, so the affordance renders disabled
+  // instead of failing the click.
+  const forkUnavailableReason = harnessState?.fork.mode === 'restricted' && !readOnlyTranscript
+    ? harnessState.fork.reason
     : undefined;
 
   const [rejectionNotice, setRejectionNotice] = useState<string | null>(null);
@@ -294,10 +292,7 @@ function ChatViewContent({
           sessionStatus={session.status}
           pendingAskRequests={pendingAskRequests}
           isCompacting={compactBusy}
-          compactedAfterMessageId={session.harness === 'codex-cli' && typeof session.metadata?.codexCompactedAfterMessageId === 'string'
-            ? session.metadata.codexCompactedAfterMessageId
-            : session.harness === 'claude-cli' && typeof session.metadata?.claudeCompactedAfterMessageId === 'string'
-              ? session.metadata.claudeCompactedAfterMessageId : undefined}
+          compactedAfterMessageId={harnessState?.compaction.boundaryMessageId ?? undefined}
           compactionSuccess={compactionSuccess}
           onClearCompactionSuccess={onClearCompactionSuccess}
           onAskResponse={onAskResponse}
@@ -305,7 +300,7 @@ function ChatViewContent({
           onRemoveFromQueue={onRemoveFromQueueForMode}
           onRevert={onRevertForMode}
           onFork={onForkForMode}
-          assistantOnlyFork={session.harness === 'codex-cli'}
+          assistantOnlyFork={harnessState?.fork.mode === 'assistant-only'}
           forkUnavailableReason={forkUnavailableReason}
           onEditMessage={onEditMessageForMode}
           onCompact={onCompactForMode}
@@ -350,10 +345,8 @@ function ChatViewContent({
         </button>
       </div>
 
-      {(session.harness === 'codex-cli' || session.harness === 'claude-cli') && pendingAskRequests.filter(request =>
-        (session.harness === 'codex-cli'
-          ? request.toolCallId.startsWith('codex-approval:')
-          : request.toolCallId.startsWith('claude-approval:'))
+      {nativeApprovalPrefix != null && pendingAskRequests.filter(request =>
+        request.toolCallId.startsWith(nativeApprovalPrefix)
           && (request.sessionId === session.id || request.originSessionId === session.id)
           && myClientId !== null && askControls[request.sessionId]?.status === 'controlled'
           && askControls[request.sessionId]?.controllerClientId === myClientId
@@ -420,7 +413,7 @@ function ChatViewContent({
         <div className="p-4 bg-muted/50 text-center flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <Lock className="size-4" />
           This is a subagent session (read-only)
-          {session.harness === 'codex-cli' && session.subagentStatus === 'running'
+          {harnessState?.capabilities.canInterruptSubagent && session.subagentStatus === 'running'
             && !isObserver && onInterrupt && (
             <Button variant="outline" size="sm" onClick={onInterrupt}>Stop agent</Button>
           )}

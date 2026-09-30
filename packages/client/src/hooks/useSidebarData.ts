@@ -111,12 +111,13 @@ export const useSidebarData = (): UseSidebarDataReturn => {
       }
     }
 
-    const runningCodexAncestors = new Set<string>();
+    const runningNativeAncestors = new Set<string>();
     for (const session of allSessions) {
-      if (session.harness !== 'codex-cli' || session.subagentStatus !== 'running') continue;
+      if (session.harnessState?.capabilities.subagentActivityPropagates !== true
+        || session.subagentStatus !== 'running') continue;
       let parent = parentMap.get(session.id);
       while (parent) {
-        runningCodexAncestors.add(parent);
+        runningNativeAncestors.add(parent);
         parent = parentMap.get(parent);
       }
     }
@@ -126,7 +127,7 @@ export const useSidebarData = (): UseSidebarDataReturn => {
       const isStreaming = streamingSessionIds.has(session.id);
       const hasPendingPermission = pendingPermissionSessionIds.has(session.id);
       const isRunning = isStreaming || session.subagentStatus === 'running' || !!session.runningAt
-        || (session.harness === 'codex-cli' && runningCodexAncestors.has(session.id));
+        || runningNativeAncestors.has(session.id);
       derived.set(session.id, { isStreaming, hasPendingPermission, isRunning });
     }
     return derived;

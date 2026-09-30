@@ -10,6 +10,7 @@
 
 import type { Database } from 'bun:sqlite';
 import type { Session, SessionStatus, SubagentStatus, SessionListFilter, SessionCategory, SessionCategoryCounts } from '@prokopai/sdk';
+import { withDerivedHarnessState } from '@/domains/sessions/harness-state';
 import type {
   ListSessionPageOptions,
   SessionCreateInput,
@@ -74,7 +75,7 @@ function mapRowToSession(row: SessionRow): Session {
   if (row.harness !== 'prokop' && row.harness !== 'codex-cli' && row.harness !== 'claude-cli') {
     throw new Error('Unknown session harness');
   }
-  return {
+  return withDerivedHarnessState({
     id: row.id,
     preconfigId: row.preconfig_id,
     workspaceId: row.workspace_id || '',
@@ -102,7 +103,7 @@ function mapRowToSession(row: SessionRow): Session {
     tags: row.tags ? JSON.parse(row.tags) : [],
     autoApproveSeverity: (row.auto_approve_severity as Session['autoApproveSeverity']) ?? null,
     agentId: row.agent_id ?? null,
-  };
+  });
 }
 
 /** Clamp a page size to the valid range. */
