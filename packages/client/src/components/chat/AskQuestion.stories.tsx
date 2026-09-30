@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import type { Ask } from '@prokopai/sdk';
+import type { Ask, ClassifiedPermissionAsk } from '@prokopai/sdk';
 import type { PendingAskRequest } from '@/stores/askStore';
 import { AskQuestion } from './AskQuestion';
 
@@ -147,6 +147,53 @@ const networkPermissionAsk: Ask = {
   metadata: { url: 'https://api.example.com/data', host: 'api.example.com' },
 };
 
+// Permissions v2 classified asks: concern chips + evidence on the wire.
+const concernsShellAsk = {
+  type: 'permission',
+  question: 'Allow this command to run?',
+  description: 'rm with a destructive flag',
+  resource: 'shell-command',
+  action: 'execute',
+  risk: 'high',
+  concerns: ['destructive', 'escape', 'sensitive'],
+  catastrophic: false,
+  evidence: [
+    'rm with a destructive flag',
+    'path /Users/cherry/.ssh is outside the allowed roots',
+    '.ssh references sensitive material',
+  ],
+  allowedScopes: ['once'],
+  metadata: { command: 'rm -rf ~/.ssh', cwd: '/project', baseCommand: 'rm' },
+} satisfies ClassifiedPermissionAsk;
+
+const catastrophicShellAsk = {
+  type: 'permission',
+  question: 'Allow this command to run?',
+  description: 'destructive target / is protected',
+  resource: 'shell-command',
+  action: 'execute',
+  risk: 'critical',
+  concerns: ['destructive'],
+  catastrophic: true,
+  evidence: ['destructive target / is protected'],
+  allowedScopes: ['once'],
+  metadata: { command: 'rm -rf /', cwd: '/project', baseCommand: 'rm' },
+} satisfies ClassifiedPermissionAsk;
+
+const escapeOnlyAsk = {
+  type: 'permission',
+  question: 'Allow this command to run?',
+  description: 'path /etc/release is outside the allowed roots',
+  resource: 'shell-command',
+  action: 'execute',
+  risk: 'medium',
+  concerns: ['escape'],
+  catastrophic: false,
+  evidence: ['path /etc/release is outside the allowed roots'],
+  allowedScopes: ['once', 'session', 'workspace'],
+  metadata: { command: 'cat /etc/release', cwd: '/project', baseCommand: 'cat' },
+} satisfies ClassifiedPermissionAsk;
+
 const meta = {
   title: 'Chat/AskQuestion',
   component: AskQuestion,
@@ -213,6 +260,24 @@ export const PermissionDestructive: Story = {
 export const PermissionNetwork: Story = {
   args: {
     request: createAskRequest(networkPermissionAsk, 'webfetch'),
+  },
+};
+
+export const PermissionConcernChips: Story = {
+  args: {
+    request: createAskRequest(concernsShellAsk, 'shell'),
+  },
+};
+
+export const PermissionCatastrophic: Story = {
+  args: {
+    request: createAskRequest(catastrophicShellAsk, 'shell'),
+  },
+};
+
+export const PermissionEscapeRememberable: Story = {
+  args: {
+    request: createAskRequest(escapeOnlyAsk, 'shell'),
   },
 };
 

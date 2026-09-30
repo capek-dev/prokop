@@ -2,7 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { HelpCircle, Shield, Monitor } from 'lucide-react';
 import type { HumanQuestion, FormQuestion, PermissionAsk, ClientCapabilityAsk, AskFormResponse, AskPermissionResponse, AskResponse } from '@prokopai/sdk';
 import type { SingleSelectQuestion, MultiSelectQuestion, TextQuestion, ConfirmQuestion } from '@prokopai/sdk';
+import { readPermissionAskDetails, type PermissionAskConcern } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { PendingAskRequest } from '@/stores/askStore';
@@ -461,6 +463,17 @@ function SubQuestionView({
 }
 
 // --- PermissionAskView ---
+
+/** Permissions v2 concern chips (docs/plans/unified-permissions.md): calm
+ * palette — amber for the high-severity concerns, neutral for the
+ * informational ones; red is reserved for the catastrophic floor. */
+const CONCERN_CHIPS: Record<PermissionAskConcern, { label: string; className: string }> = {
+  destructive: { label: 'Destructive', className: 'text-warning' },
+  sensitive: { label: 'Secrets', className: 'text-warning' },
+  escape: { label: 'Outside workspace', className: 'text-muted-foreground' },
+  opaque: { label: 'Complex command', className: 'text-muted-foreground' },
+};
+
 function PermissionAskView({
   ask,
   onRespond,
@@ -475,6 +488,13 @@ function PermissionAskView({
     high: 'text-destructive',
     critical: 'text-destructive',
   };
+
+  // Permissions v2: classified asks show concern chips plus evidence;
+  // legacy asks (feature risks like memory writes) keep the risk label.
+  const details = readPermissionAskDetails(ask);
+  const evidenceLines = (details?.evidence ?? [])
+    .filter(line => line !== ask.description)
+    .slice(0, 2);
 
   // Extract intent info for better UX
   const primaryIntent = ask.intents?.[0];
@@ -601,7 +621,23 @@ function PermissionAskView({
       {ask.description && (
         <p className="text-sm text-muted-foreground">{ask.description}</p>
       )}
-      {ask.risk && (
+      {details ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
+            {details.catastrophic && (
+              <Badge variant="destructive">Catastrophic</Badge>
+            )}
+            {details.concerns.map(concern => (
+              <Badge key={concern} variant="outline" className={CONCERN_CHIPS[concern].className}>
+                {CONCERN_CHIPS[concern].label}
+              </Badge>
+            ))}
+          </div>
+          {evidenceLines.map((line, index) => (
+            <p key={index} className="text-xs text-muted-foreground">{line}</p>
+          ))}
+        </div>
+      ) : ask.risk && (
         <div className="flex items-center gap-2">
           <span className={`text-xs font-medium uppercase ${riskColors[ask.risk ?? 'none'] ?? 'text-muted-foreground'}`}>
             Risk: {ask.risk}
