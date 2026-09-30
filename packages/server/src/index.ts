@@ -30,10 +30,7 @@ import { cleanupRunningSessionsOnStartup } from '@/infrastructure/sqlite/termina
 import { reconcileStuckRunningSessions } from '@/infrastructure/sqlite/session-store';
 import { reconcileAllSessionsCompaction } from '@/adapters/capek/compaction-recovery';
 import { readEnv } from '@/infrastructure/runtime/env-compat';
-import {
-  disposeJean2ExecutionScope,
-  initializeJean2ExecutionScope,
-} from '@/harnesses/prokop/composition/execution-scope';
+import { disposeExecutionLifecycle, initializeExecutionLifecycle } from '@/application/ports/execution-lifecycle';
 import { reconcileAllOrphanedToolCalls } from '@/infrastructure/sqlite/message-store';
 import { cleanupAllPendingAsks } from '@/infrastructure/sqlite/pending-asks';
 import { cleanupOrphanedData } from '@/infrastructure/sqlite/cleanup';
@@ -228,7 +225,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
       attempt(() => localServer?.stop());
       attempt(() => getTerminalManager().destroyAllSessions());
       try {
-        await disposeJean2ExecutionScope();
+        await disposeExecutionLifecycle();
       } catch (error: unknown) {
         failures.push(error);
       }
@@ -244,7 +241,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   };
 
   try {
-    await initializeJean2ExecutionScope();
+    await initializeExecutionLifecycle();
     // Recovery and subscription are complete before accepting HTTP mutations.
     await application.learning.start();
     server = Bun.serve({

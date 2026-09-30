@@ -10,11 +10,13 @@ import {
   configureJean2WorkspaceToolDiscovery,
 } from '@/adapters/capek';
 import { configureJean2Bindings } from '@/harnesses/prokop/composition/bindings';
+import { disposeJean2ExecutionScope, initializeJean2ExecutionScope } from '@/harnesses/prokop/composition/execution-scope';
 import { warmInstalledToolsCache } from '@/adapters/capek/tool-resolver';
 import type { Jean2SchedulerHostDeps } from '@/adapters/capek/scheduler';
 import type { Jean2SessionSearchHostDeps } from '@/adapters/capek/session-search';
 import { createWiredAgentsApplication } from '@/bootstrap/application';
 import type { AgentsApplication } from '@/application/agents';
+import { installExecutionLifecyclePort } from '@/application/ports/execution-lifecycle';
 import { createJean2ScheduledJobExecution } from '@/adapters/jean2/scheduled-job-execution';
 import { createJean2SessionRepository } from '@/adapters/jean2/session-repository';
 import { createScheduledJobRepository } from '@/infrastructure/sqlite/scheduled-job-repository';
@@ -78,7 +80,13 @@ export function createRuntime(existingAgents?: AgentsApplication): AgentsApplica
   configureJean2WorkspaceToolDiscovery();
   void warmInstalledToolsCache();
   configureJean2Bindings();
+  // S11.4: the harness-owned composed-scope lifecycle installs here; the
+  // startup root consumes the application port helpers and imports no
+  // harness internals. The initialize result (the composition) is owned by
+  // the harness holder; the port exposes lifecycle ordering only.
+  installExecutionLifecyclePort({
+    initialize: async () => { await initializeJean2ExecutionScope(); },
+    dispose: disposeJean2ExecutionScope,
+  });
   return agents;
 }
-
-export { createJean2RuntimeComposition } from '@/harnesses/prokop/composition/composition';

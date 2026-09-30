@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { relative, resolve, dirname } from 'node:path';
+import { relative, resolve, dirname, sep } from 'node:path';
 import {
   evaluateRules,
   parseImports,
@@ -326,7 +326,7 @@ const layerRules: DependencyRule[] = [
     name: 'layer-adapters',
     rationale: 'Adapters translate Capek contracts and Jean2 ports. Transport-owned implementation exceptions are explicit and documented; the built-in tools catalog is a server-internal asset leaf (resolver and catalog seam).',
     appliesTo: [adaptersDir],
-    allowedResolvedDirs: [adaptersDir, applicationDir, domainsDir, prokopHarnessDir, builtinToolsDir],
+    allowedResolvedDirs: [adaptersDir, applicationDir, domainsDir, builtinToolsDir],
     exceptions: layerAdaptersLegacyExceptions,
   },
   {
@@ -1809,26 +1809,49 @@ describe('server layer boundaries', () => {
     expect(specifiers.some((specifier) => specifier.startsWith('@/harnesses/'))).toBe(false);
   });
 
+  test('S11.4 gate: only the harness directories and the composition root import harnesses', () => {
+    const offenders: string[] = [];
+    for (const file of scanDirectory(serverSourceRoot)) {
+      const relativePath = relative(serverSourceRoot, file.path);
+      if (relativePath.startsWith(`harnesses${sep}`) || relativePath.startsWith(`bootstrap${sep}`)) continue;
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        if (imp.specifier.startsWith('@/harnesses/')) {
+          offenders.push(`${relativePath} imports ${imp.specifier} [rule: layer-harnesses-isolation]`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   test('S10 gate: startup owns execution composition creation and disposal', () => {
     const startupPath = resolve(serverSourceRoot, 'index.ts');
     const startup = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === startupPath);
     expect(startup).toBeDefined();
     expect(parseImports(startup!.sourceText, startup!.path).map((imp) => imp.specifier)).toContain(
-      '@/harnesses/prokop/composition/execution-scope',
+      '@/application/ports/execution-lifecycle',
     );
 
     const source = startup!.sourceText;
     expect(source.indexOf('const agents = createRuntime();')).toBeLessThan(
-      source.indexOf('await initializeJean2ExecutionScope();'),
+      source.indexOf('await initializeExecutionLifecycle();'),
     );
-    expect(source.indexOf('await disposeJean2ExecutionScope();')).toBeGreaterThan(
+    expect(source.indexOf('await disposeExecutionLifecycle();')).toBeGreaterThan(
       source.indexOf('const cleanup ='),
     );
     expect(source).toContain('if (cleanupPromise !== null) return cleanupPromise;');
     expect(source).toContain("console.error('Startup cleanup failed:', cleanupError);");
-    expect(source.indexOf('await disposeJean2ExecutionScope();')).toBeLessThan(
+    expect(source.indexOf('await disposeExecutionLifecycle();')).toBeLessThan(
       source.indexOf('attempt(() => closeDatabase());'),
     );
+
+    // S11.4: the composition root installs the harness-owned lifecycle; the
+    // startup root itself imports no harness internals.
+    const compositionRootPath = resolve(bootstrapDir, 'create-runtime.ts');
+    const compositionRoot = scanDirectory(serverSourceRoot).find((file) => file.path === compositionRootPath);
+    expect(compositionRoot).toBeDefined();
+    const rootSpecifiers = parseImports(compositionRoot!.sourceText, compositionRoot!.path).map((imp) => imp.specifier);
+    expect(rootSpecifiers).toContain('@/harnesses/prokop/composition/execution-scope');
+    expect(rootSpecifiers).toContain('@/application/ports/execution-lifecycle');
   });
 
   test('S9 gate: the store compatibility directory is absent and no source file imports @/store', () => {

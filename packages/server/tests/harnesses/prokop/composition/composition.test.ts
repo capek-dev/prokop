@@ -36,7 +36,8 @@ import { configureJean2SessionSearchHost } from '@/adapters/capek/session-search
 import { JEAN2_AGENT_PLUGIN_IDS, JEAN2_PROCESS_PLUGIN_IDS } from '@/harnesses/prokop/composition/profile';
 import { jean2CompatibilityBindings } from '@/harnesses/prokop/composition/bindings';
 import { createWiredApplication } from '@/bootstrap/application';
-import { createJean2RuntimeComposition, createRuntime } from '@/bootstrap/create-runtime';
+import { createRuntime } from '@/bootstrap/create-runtime';
+import { createJean2RuntimeComposition } from '@/harnesses/prokop/composition/composition';
 import { createMessage, createPart } from '@/infrastructure/sqlite/message-store';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { createTestTextPart, createTestUserMessage } from '#tests/factories';
@@ -58,6 +59,7 @@ const expectedCompositionSteps = [
   'configureJean2SchedulerHost',
   'configureJean2WorkspaceToolDiscovery',
   'configureJean2Bindings',
+  'installExecutionLifecyclePort',
 ];
 
 function topLevelCallsOf(sourceText: string, functionName: string): string[] {
@@ -119,8 +121,9 @@ describe('Čapek composition root', () => {
       '@/adapters/capek/storage',
       '@/adapters/capek/session-search',
       '@/adapters/capek/scheduler',
-      '@/harnesses/prokop/composition/composition',
       '@/harnesses/prokop/composition/bindings',
+      '@/harnesses/prokop/composition/execution-scope',
+      '@/application/ports/execution-lifecycle',
       '@/adapters/capek/tool-resolver',
       '@/bootstrap/application',
       '@/application/agents',
