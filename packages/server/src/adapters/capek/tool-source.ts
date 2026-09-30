@@ -12,11 +12,8 @@ import { getTools, initializeWorkspace } from '@/infrastructure/mcp';
 import { getToolsDir } from '@/infrastructure/runtime/paths';
 import { readEnv } from '@/infrastructure/runtime/env-compat';
 import { builtinTools } from '@/tools/builtin';
-import { isManagedWorktreeLifecycleTool } from './tool-policy';
 
-const exposedBuiltinTools = builtinTools.filter(
-  (tool) => !isManagedWorktreeLifecycleTool(tool.definition.name),
-);
+const exposedBuiltinTools = builtinTools;
 
 /** The Jean2 workspace tool discovery: the MCP manager's per-workspace
  * client lifecycle and tool listing. */
@@ -42,15 +39,13 @@ export const jean2ToolCatalog = {
       ...domains.filter((tool) => !builtinNames.has(tool.name)),
       ...installed
         .filter((definition) => (
-          !isManagedWorktreeLifecycleTool(definition.name)
-          && !builtinNames.has(definition.name)
+          !builtinNames.has(definition.name)
           && !domainNames.has(definition.name)
         ))
         .map((definition) => ({ ...definition, source: 'installed' as const })),
     ].sort((a, b) => a.name.localeCompare(b.name));
   },
   getTool: async (name: string) => {
-    if (isManagedWorktreeLifecycleTool(name)) return null;
     const builtin = exposedBuiltinTools.find((tool) => tool.definition.name === name);
     if (builtin) return builtin;
     return capekGetTool(name);

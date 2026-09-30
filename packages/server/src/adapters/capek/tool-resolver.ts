@@ -27,12 +27,9 @@ import {
 } from '@capekai/core/plugins';
 import { capekToolResolverKey, type CapekPlugin } from '@capekai/core/composition';
 import { builtinTools } from '@/tools/builtin';
-import { isManagedWorktreeLifecycleTool } from './tool-policy';
 
 const REFRESH_TTL_MS = 60_000;
-const exposedBuiltinTools = builtinTools.filter(
-  (tool) => !isManagedWorktreeLifecycleTool(tool.definition.name),
-);
+const exposedBuiltinTools = builtinTools;
 
 let lastRefreshAt = 0;
 let refreshInFlight: Promise<void> | null = null;
@@ -71,7 +68,6 @@ export function createMergedToolResolver(contributed: ToolRegistryResolver): Too
   return {
     get(name: string): LoadedTool | null {
       scheduleInstalledToolsRefresh();
-      if (isManagedWorktreeLifecycleTool(name)) return null;
       return contributed.get(name) ?? capekGetInstalledTool(name);
     },
     list(): LoadedTool[] {
@@ -79,7 +75,6 @@ export function createMergedToolResolver(contributed: ToolRegistryResolver): Too
       const merged = [...contributed.list()];
       const contributedNames = new Set(merged.map((tool) => tool.definition.name));
       for (const installed of capekListInstalledTools()) {
-        if (isManagedWorktreeLifecycleTool(installed.definition.name)) continue;
         if (contributedNames.has(installed.definition.name)) {
           warnShadowed(installed);
           continue;

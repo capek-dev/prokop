@@ -20,19 +20,13 @@ tools:
   - file-to-markdown
   - write-file
   - edit
-  - multiedit
-  - edit-range
-  - apply-patch
   - glob
   - grep
-  - ls
   - shell
   - tavily-search
   - terminal
-  - git-worktree
   - question
-  - todoread
-  - todowrite
+  - todo
   - webfetch
 settings:
   temperature: 0.2
@@ -114,7 +108,6 @@ tools:
   - read-file
   - glob
   - grep
-  - ls
   - webfetch
 settings:
   temperature: 0.2

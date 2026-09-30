@@ -12,7 +12,7 @@ import { useChatRetryStore } from '@/stores/chatRetryStore';
 export const STREAM_FLUSH_INTERVAL_MS = 75;
 
 const FILE_MUTATING_TOOLS = new Set([
-  'edit', 'multiedit', 'write-file', 'apply-patch', 'shell',
+  'edit', 'write-file', 'shell',
 ]);
 
 const SCHEDULER_TOOLS = new Set(['scheduler']);

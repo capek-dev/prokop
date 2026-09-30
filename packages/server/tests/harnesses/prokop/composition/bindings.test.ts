@@ -151,17 +151,17 @@ describe('Čapek binding group adapters', () => {
     })).rejects.toThrow('not available');
   });
 
-  test('hides the divergent git-worktree tool from runtime construction', async () => {
-    const gitWorktree = { name: 'git-worktree' } as ToolDefinition;
+  test('the tool policy is identity now that the divergent git-worktree lifecycle is removed', async () => {
     const readFile = { name: 'read-file' } as ToolDefinition;
+    const customTool = { name: 'custom-tool' } as ToolDefinition;
 
-    expect(await jean2ToolPolicy.resolveDefinition?.({
-      sessionId: 'session-1',
-      definition: gitWorktree,
-    })).toBeNull();
     expect(await jean2ToolPolicy.resolveDefinition?.({
       sessionId: 'session-1',
       definition: readFile,
     })).toBe(readFile);
+    expect(await jean2ToolPolicy.resolveDefinition?.({
+      sessionId: 'session-1',
+      definition: customTool,
+    })).toBe(customTool);
   });
 });

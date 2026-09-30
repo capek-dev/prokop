@@ -364,7 +364,6 @@ describe('C4 coding bundle in the Jean2 composition', () => {
   void STANDARD_CODING_TOOL_NAMES;
 
   const BUILTIN_BASELINE_TOOL_NAMES = [
-    'apply-patch',
     'browser_discover_elements',
     'browser_dom_action',
     'browser_navigate',
@@ -372,19 +371,15 @@ describe('C4 coding bundle in the Jean2 composition', () => {
     'browser_screenshot',
     'browser_tab_manage',
     'edit',
-    'edit-range',
     'file-to-markdown',
     'glob',
     'grep',
-    'ls',
-    'multiedit',
     'question',
     'read-file',
     'shell',
     'tavily-search',
     'terminal',
-    'todoread',
-    'todowrite',
+    'todo',
     'webfetch',
     'write-file',
   ];

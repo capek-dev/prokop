@@ -1,6 +1,6 @@
+import { createHash } from 'node:crypto';
 import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
-import type { DiffVisualization } from '@prokopai/sdk';
-import { createFilePermissionAsk } from '@prokopai/sdk';
+import type { DiffsVisualization, DiffVisualization } from '@prokopai/sdk';
 
 // ---------------------------------------------------------------------------
 // Local safe matching engine
@@ -418,14 +418,6 @@ const ORDERED_PASSES: MatchMode[] = [
   'indentation',
 ];
 
-/**
- * Find matches for `oldString` in `content`.
- *
- * - `strategy` omitted: run the safe ordered passes.
- * - `'exact'`: strict full-content exact match only.
- * - `'line_start'` / `'line_end'`: compatibility single-line anchored matches.
- * - `'partial'` / `'multi_line'`: compatibility, mapped to the safe ordered passes.
- */
 function findMatches(
   content: string,
   oldString: string,
@@ -445,7 +437,6 @@ function findMatches(
   return runPasses(content, oldString, passes);
 }
 
-/** Count exact full-content occurrences of `needle`. Used for diagnostics only. */
 function countExactOccurrences(content: string, needle: string): number {
   if (needle.length === 0) return 0;
   return findExactMatches(content, needle, buildLineStarts(content)).length;
@@ -465,12 +456,6 @@ function dominantLineEnding(content: string): '\r\n' | '\n' {
   return crlf > lf ? '\r\n' : '\n';
 }
 
-/**
- * Adapt the replacement text's line endings to the original file when a match
- * was located by a line-ending normalization pass and the replacement already
- * uses LF. This keeps unrelated bytes byte-for-byte equivalent except for the
- * matched span, while normalizing the introduced line breaks to the file style.
- */
 function adaptReplacement(
   replacement: string,
   mode: MatchMode | undefined,
@@ -484,34 +469,60 @@ function adaptReplacement(
 }
 
 // ---------------------------------------------------------------------------
-// Tool implementation
+// edit tool (merged string matching + range replacement)
 // ---------------------------------------------------------------------------
+
+const REVISION_RE = /^sha256:[0-9a-f]{64}$/;
+
+function contentRevision(content: string): string {
+  const hash = createHash('sha256');
+  hash.update(content);
+  return `sha256:${hash.digest('hex')}`;
+}
+
+function isBinaryContent(content: string): boolean {
+  // NUL byte in the first 8 KiB marks binary content.
+  return content.slice(0, 8192).includes('\0');
+}
 
 type EditFailureCode =
   | 'INVALID_INPUT'
   | 'FILE_NOT_FOUND'
   | 'NO_MATCH'
-  | 'AMBIGUOUS_MATCH';
+  | 'AMBIGUOUS_MATCH'
+  | 'STALE_REVISION';
 
 interface EditFailureResult {
   code: EditFailureCode;
   path: string;
+  editIndex?: number;
   attempts?: MatchAttempt[];
   candidateLines?: number[];
   newStringExactMatchCount?: number;
 }
 
-interface Input {
-  path: string;
-  oldString: string;
+/** String-mode item: { oldString, newString, strategy? }.
+ * Range-mode item: { startLine, endLine, newString }. */
+interface Edit {
+  oldString?: string;
   newString: string;
   strategy?: Strategy;
+  startLine?: number;
+  endLine?: number;
+}
+
+interface Input {
+  path: string;
+  revision?: string;
+  edits: Edit[];
 }
 
 interface MatchInfo {
   mode: string;
   lineNumber: number;
 }
+
+const MAX_EDITS_WITHOUT_APPROVAL = 10;
 
 const KNOWN_STRATEGIES = new Set<Strategy>([
   'exact',
@@ -528,62 +539,68 @@ const MODE_LABEL: Record<string, string> = {
   indentation: 'indentation',
   line_start: 'line-start',
   line_end: 'line-end',
+  range: 'range',
 };
 
-function failure(code: EditFailureCode, path: string, error: string, extra?: Partial<EditFailureResult>): ToolResult {
+function failure(
+  code: EditFailureCode,
+  path: string,
+  error: string,
+  extra?: Partial<EditFailureResult>,
+): ToolResult {
   return { success: false, error, result: { code, path, ...extra } satisfies EditFailureResult };
 }
 
 export const definition: ToolDefinition = {
   name: 'edit',
-  description: `Performs string replacements in an existing file.
+  description: `Performs targeted edits in an existing file, atomically.
+
+Every edit is either a string replacement (find oldString, replace with newString) or a line-range replacement (replace lines startLine..endLine with newString). All edits apply sequentially against the in-memory result of preceding edits, and no filesystem write occurs until every edit succeeds: either all edits are applied or the file is left unchanged.
 
 ## When to use
 
-- Making targeted changes to an existing file (adding, modifying, or removing lines)
-- Replacing a specific block of code, function, or text
-- Applying small, surgical edits without rewriting the entire file
+- Making targeted changes to an existing file (one or many edits)
+- Coordinated related edits that must all succeed together
+- Replacing content by line number when you have read numbered lines and cannot reliably reproduce the exact text
 
 ## When NOT to use
 
-- Creating a new file, use write-file instead
-- Replacing the entire file content, use write-file instead
-- Making many edits to the same file, use multiedit for atomic batch edits
-- Applying git-style patches, use apply-patch instead
-- Copying existing text is unreliable, use edit-range with line numbers and a revision
-- Complex or multi-file changes, use apply-patch instead
+- A new file or a full rewrite, use write-file instead
+- Reading file content, use read-file instead
 
 ## Parameters
 
 - path (required): Absolute path to the file to edit
-- oldString (required): The text to find and replace. Must be copied VERBATIM from the file, with the same indentation, quotes, punctuation, and whitespace. Do NOT guess, approximate, or "fix" what you think the text should be. Always read the file first to get the exact content. Exact matching supports both one-line and multi-line text.
+- revision (optional): The revision (sha256:...) returned by read-file for this file. The edit fails before writing when the file changed since that read.
+- edits (required): At least one edit object. Each edit is one of:
+
+String mode:
+- oldString (required): The text to find and replace, copied VERBATIM from the file. Exact matching supports both one-line and multi-line text.
 - newString (required): The replacement text. May be empty to delete the matched text.
-- strategy (optional): Matching strategy. Omit it to use safe formatting-tolerant passes, or use 'exact'. The values 'line_start', 'line_end', 'partial', and 'multi_line' are compatibility strategies kept for migration and may be removed in a later release.
+- strategy (optional): Omit for safe formatting-tolerant passes, or use 'exact'. 'line_start', 'line_end', 'partial', and 'multi_line' are compatibility strategies.
 
-## Matching behavior
+Range mode:
+- startLine (required): 1-based start line (inclusive), referring to the content as it stands when this edit applies (after preceding edits in the same call).
+- endLine (required): 1-based end line (inclusive).
+- newString (required): The replacement text. Empty string deletes the range.
 
-When strategy is omitted, the tool tries ordered passes from strictest to loosest and stops at the first pass that finds candidates:
+## Matching behavior (string mode)
 
-1. exact: literal full-content substring match (supports multi-line text)
-2. line-endings: treats \\\\r\\\\n and \\\\n as equivalent
-3. trailing-whitespace: ignores spaces/tabs immediately before a line ending
-4. indentation: allows one consistent indentation shift across all nonblank lines
+Each edit independently uses safe ordered passes: exact, then line-endings normalization, then trailing-whitespace normalization, then consistent-indentation shift. An ambiguous match (more than one candidate at any pass) fails that edit and leaves the whole file unchanged. Internal whitespace is never ignored.
 
-An ambiguous match (more than one candidate at any pass) fails rather than selecting the first occurrence. Internal whitespace is never ignored, and whitespace inside string literals is never altered.
+## Important
 
-## Critical rules
-
-- **Copy verbatim**: oldString must be an exact substring of the file content, matching character-for-character including all whitespace, indentation, blank lines, and surrounding code.
-- **Read first**: Always read the file before editing so you have the exact content to copy.
-- **Unique match**: oldString must match exactly one location. If it matches multiple locations or none, the edit fails. Make oldString specific enough to be unambiguous.
-- **No regex**: oldString is a literal string, not a regular expression. Do not use regex patterns.
-- **Single edit**: This tool performs one replacement per call. For multiple edits to the same file, use multiedit instead.
+- Edits are sequential: earlier edits affect the text that later edits search and the line numbers later range edits refer to.
+- If any edit fails (no match, ambiguous match, invalid input, or stale revision), no edits are written. The failing edit reports its zero-based index.
+- Supply the revision from read-file when you rely on line numbers; the revision check catches concurrent changes before any edit applies.
 
 ## Minimal example
 
 \`\`\`
-oldString: "const x = 1;"
-newString: "const x = 2;"
+edits: [
+  { oldString: "const x = 1;", newString: "const x = 10;" },
+  { startLine: 5, endLine: 7, newString: "// replaced block" }
+]
 \`\`\`
 
 ## Permission model
@@ -591,8 +608,9 @@ newString: "const x = 2;"
 This tool requires explicit permission for:
 - Files outside the workspace
 - Sensitive files (.env, .pem, .key, credentials, etc.)
+- More than ${MAX_EDITS_WITHOUT_APPROVAL} edits at once
 - Editing system directories is blocked entirely`,
-  display: { summary: '{path}' },
+  display: { summary: '{path} ({edits.length} edits)' },
   inputSchema: {
     type: 'object',
     properties: {
@@ -600,22 +618,47 @@ This tool requires explicit permission for:
         type: 'string',
         description: 'Absolute path to the file to edit',
       },
-      oldString: {
+      revision: {
         type: 'string',
-        description: 'The text to find and replace',
-        minLength: 1,
+        description: 'The revision (sha256:...) returned by read-file for this file; the edit fails before writing when the file changed since that read',
       },
-      newString: {
-        type: 'string',
-        description: 'The replacement text',
-      },
-      strategy: {
-        type: 'string',
-        description: "Matching strategy: omit for safe ordered passes, or use 'exact'. 'line_start', 'line_end', 'partial', and 'multi_line' are compatibility strategies.",
-        enum: ['exact', 'line_start', 'line_end', 'partial', 'multi_line'],
+      edits: {
+        type: 'array',
+        description: 'Array of edits to apply atomically; each item is a string replacement (oldString/newString) or a range replacement (startLine/endLine/newString)',
+        minItems: 1,
+        items: {
+          type: 'object',
+          properties: {
+            oldString: {
+              type: 'string',
+              description: 'String mode: the text to find and replace',
+              minLength: 1,
+            },
+            newString: {
+              type: 'string',
+              description: 'The replacement text (both modes)',
+            },
+            strategy: {
+              type: 'string',
+              description: "String mode matching strategy: omit for safe ordered passes, or use 'exact'.",
+              enum: ['exact', 'line_start', 'line_end', 'partial', 'multi_line'],
+            },
+            startLine: {
+              type: 'integer',
+              minimum: 1,
+              description: 'Range mode: 1-based start line (inclusive)',
+            },
+            endLine: {
+              type: 'integer',
+              minimum: 1,
+              description: 'Range mode: 1-based end line (inclusive)',
+            },
+          },
+          required: ['newString'],
+        },
       },
     },
-    required: ['path', 'oldString', 'newString'],
+    required: ['path', 'edits'],
   },
   timeout: 180000,
 };
@@ -633,20 +676,21 @@ function detectLanguage(filePath: string): string {
 function summarizeAttempts(attempts: MatchAttempt[]): string {
   if (attempts.length === 0) return '';
   const parts = attempts.map(a => `${MODE_LABEL[a.mode] ?? a.mode}=${a.count}`);
-  return `${parts.join(', ')}`;
+  return parts.join(', ');
 }
 
 function buildDiffVisualization(
   oldContent: string,
-  matchStartLine: number,
+  matchLineNumber: number,
+  strategy: string,
   oldString: string,
   newString: string,
-  usedMode: string,
-  resolvedPath: string,
+  filePath: string,
 ): DiffVisualization {
   const oldLines = oldContent.split('\n');
   const contextSize = 5;
-  const matchIndex = matchStartLine - 1;
+
+  const matchIndex = matchLineNumber - 1;
   const contextStart = Math.max(0, matchIndex - contextSize);
 
   type DiffChange = { type: 'added' | 'removed' | 'context'; content: string; oldLineNumber?: number; newLineNumber?: number };
@@ -682,8 +726,8 @@ function buildDiffVisualization(
 
   return {
     type: 'diff',
-    path: resolvedPath,
-    language: detectLanguage(resolvedPath),
+    path: filePath,
+    language: detectLanguage(filePath),
     hunks: [{
       oldStart: contextStart + 1,
       oldLines: oldLineNum - contextStart - 1,
@@ -693,18 +737,64 @@ function buildDiffVisualization(
     }],
     additions: newStringLines.length,
     deletions: oldStringLines.length,
-    matchInfo: { strategy: usedMode, lineNumber: matchStartLine },
+    matchInfo: { strategy, lineNumber: matchLineNumber },
   };
+}
+
+/** Apply one range edit to content, returning the new content and the replaced text. */
+function applyRangeEdit(
+  content: string,
+  startLine: number,
+  endLine: number,
+  newString: string,
+): { content: string; replacedText: string } {
+  const lines = buildContentLines(content);
+  const start = lines[startLine - 1];
+  const end = lines[endLine - 1];
+  const replacedText = content.substring(start.start, end.end);
+  const before = content.substring(0, start.start);
+  const after = content.substring(end.end);
+  let replacement = newString;
+  if (replacement.length > 0 && after.length > 0 && !replacement.endsWith('\n') && !replacement.endsWith('\r')) {
+    replacement += end.term || dominantLineEnding(content);
+  }
+  return { content: before + replacement + after, replacedText };
 }
 
 export async function execute(input: Input, ctx: ToolContext): Promise<ToolResult> {
   try {
-    // Runtime validation (callers are not guaranteed to pass through schema validation)
-    if (typeof input.oldString !== 'string' || input.oldString.length === 0) {
-      return failure('INVALID_INPUT', input.path, 'oldString must be a non-empty string.');
+    // Runtime validation
+    if (!Array.isArray(input.edits) || input.edits.length === 0) {
+      return failure('INVALID_INPUT', input.path, 'edits must be a non-empty array.');
     }
-    if (input.strategy !== undefined && !KNOWN_STRATEGIES.has(input.strategy)) {
-      return failure('INVALID_INPUT', input.path, `Unknown strategy: ${String(input.strategy)}.`);
+    for (let i = 0; i < input.edits.length; i++) {
+      const e = input.edits[i];
+      const isRange = typeof e?.startLine === 'number';
+      if (isRange) {
+        if (!Number.isInteger(e.startLine) || e.startLine! < 1
+          || !Number.isInteger(e.endLine) || e.endLine! < e.startLine!) {
+          return failure('INVALID_INPUT', input.path,
+            `edits[${i}] requires integer startLine >= 1 and endLine >= startLine.`, { editIndex: i });
+        }
+        if (typeof e?.oldString === 'string') {
+          return failure('INVALID_INPUT', input.path,
+            `edits[${i}] mixes oldString with startLine; provide either string mode or range mode, not both.`, { editIndex: i });
+        }
+      } else {
+        if (typeof e?.oldString !== 'string' || e.oldString.length === 0) {
+          return failure('INVALID_INPUT', input.path,
+            `edits[${i}].oldString must be a non-empty string (or provide startLine/endLine for range mode).`, { editIndex: i });
+        }
+        if (e.strategy !== undefined && !KNOWN_STRATEGIES.has(e.strategy)) {
+          return failure('INVALID_INPUT', input.path, `edits[${i}].strategy is unknown: ${String(e.strategy)}.`, { editIndex: i });
+        }
+      }
+      if (typeof e?.newString !== 'string') {
+        return failure('INVALID_INPUT', input.path, `edits[${i}].newString must be a string.`, { editIndex: i });
+      }
+    }
+    if (input.revision !== undefined && !REVISION_RE.test(input.revision)) {
+      return failure('INVALID_INPUT', input.path, 'revision must be an sha256:... value from read-file.');
     }
 
     const resolvedPath = ctx.resolvePath(input.path);
@@ -713,23 +803,30 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
       return failure('FILE_NOT_FOUND', input.path, `Editing system directories is not allowed: ${input.path}`);
     }
 
-    const outsideWorkspace = !ctx.isWithinWorkspace(resolvedPath);
-    const sensitive = ctx.isSensitivePath(resolvedPath);
-
-    if (outsideWorkspace) {
-      const permAsk = createFilePermissionAsk({
-        path: input.path, operation: 'edit', risk: 'medium', isOutsideWorkspace: true,
+    if (!ctx.isWithinWorkspace(resolvedPath)) {
+      const approved = await ctx.ask({
+        target: 'permission', type: 'permission',
+        question: 'Editing files outside the workspace requires approval.', risk: 'medium',
+        metadata: { permissionKey: 'path:outside_workspace', permissionType: 'action' },
       });
-      const approved = await ctx.ask(permAsk);
       if (!approved) return { success: false, error: 'USER_REJECTION' };
     }
 
-    if (sensitive) {
-      const permAsk = createFilePermissionAsk({
-        path: input.path, operation: 'edit', risk: 'medium', isSensitiveFile: true,
-        reason: 'This file may contain credentials or secrets.',
+    if (ctx.isSensitivePath(resolvedPath)) {
+      const approved = await ctx.ask({
+        target: 'permission', type: 'permission',
+        question: 'Editing sensitive files requires approval.', risk: 'medium',
+        metadata: { permissionKey: 'file_pattern:sensitive', permissionType: 'action' },
       });
-      const approved = await ctx.ask(permAsk);
+      if (!approved) return { success: false, error: 'USER_REJECTION' };
+    }
+
+    if (input.edits.length > MAX_EDITS_WITHOUT_APPROVAL) {
+      const approved = await ctx.ask({
+        target: 'permission', type: 'permission',
+        question: `Editing more than ${MAX_EDITS_WITHOUT_APPROVAL} edits at once requires approval.`, risk: 'medium',
+        metadata: { permissionKey: 'edit_count:excessive', permissionType: 'action', editCount: input.edits.length },
+      });
       if (!approved) return { success: false, error: 'USER_REJECTION' };
     }
 
@@ -740,37 +837,88 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
     const content = await ctx.fs.readFile(resolvedPath, 'utf-8');
 
-    const { matches, usedMode, attempts, ambiguous } = findMatches(content, input.oldString, input.strategy);
-
-    if (matches.length === 0) {
-      const newCount = input.newString.length > 0 ? countExactOccurrences(content, input.newString) : undefined;
-      const attemptSummary = summarizeAttempts(attempts);
-      const msg = `No match found.${attemptSummary ? ` Passes: ${attemptSummary}.` : ''} Re-read the file before retrying.`;
-      return failure('NO_MATCH', resolvedPath, msg, { attempts, newStringExactMatchCount: newCount });
+    if (isBinaryContent(content)) {
+      return failure('INVALID_INPUT', resolvedPath, `Cannot edit a binary file: ${resolvedPath}`);
     }
 
-    if (ambiguous || matches.length > 1) {
-      const candidateLines = matches.map(m => m.startLine);
-      const attemptSummary = summarizeAttempts(attempts);
-      const msg = `Found ${matches.length} matches.${attemptSummary ? ` Passes: ${attemptSummary}.` : ''} Provide a more specific oldString.`;
-      return failure('AMBIGUOUS_MATCH', resolvedPath, msg, { attempts, candidateLines });
+    if (input.revision !== undefined && contentRevision(content) !== input.revision) {
+      return failure('STALE_REVISION', resolvedPath,
+        'The file changed since the revision was read. Re-read the file and retry.');
     }
 
-    const match = matches[0];
-    const before = content.substring(0, match.startIndex);
-    const after = content.substring(match.endIndex);
-    const effectiveNewString = adaptReplacement(input.newString, match.mode, content);
-    const newContent = before + effectiveNewString + after;
+    interface EditRecord {
+      oldContent: string;
+      oldString: string;
+      newString: string;
+      matchInfo: MatchInfo;
+    }
+    const editRecords: EditRecord[] = [];
+    const results: { matchInfo: MatchInfo }[] = [];
 
-    await ctx.fs.writeFile(resolvedPath, newContent);
+    // Sequential application against in-memory content. No write until all edits succeed.
+    let contentToEdit = content;
+    for (let i = 0; i < input.edits.length; i++) {
+      const edit = input.edits[i];
+      const contentBeforeEdit = contentToEdit;
 
-    const matchInfo: MatchInfo = { mode: usedMode ?? 'exact', lineNumber: match.startLine };
+      if (typeof edit.startLine === 'number') {
+        // Range mode
+        const lineCount = buildContentLines(contentToEdit).length;
+        if (edit.endLine! > lineCount) {
+          return failure('INVALID_INPUT', resolvedPath,
+            `edits[${i}] endLine ${edit.endLine} exceeds the current line count ${lineCount}. Line numbers refer to the content after preceding edits.`, { editIndex: i });
+        }
+        const applied = applyRangeEdit(contentToEdit, edit.startLine, edit.endLine!, edit.newString);
+        const matchInfo: MatchInfo = { mode: 'range', lineNumber: edit.startLine };
+        editRecords.push({ oldContent: contentBeforeEdit, oldString: applied.replacedText, newString: edit.newString, matchInfo });
+        results.push({ matchInfo });
+        contentToEdit = applied.content;
+        continue;
+      }
 
-    const visualization = buildDiffVisualization(
-      content, match.startLine, input.oldString, effectiveNewString, matchInfo.mode, resolvedPath,
+      // String mode
+      const { matches, usedMode, attempts, ambiguous } = findMatches(contentToEdit, edit.oldString!, edit.strategy);
+
+      if (matches.length === 0) {
+        const newCount = edit.newString.length > 0 ? countExactOccurrences(contentToEdit, edit.newString) : undefined;
+        const attemptSummary = summarizeAttempts(attempts);
+        const msg = `No match for edit ${i}.${attemptSummary ? ` Passes: ${attemptSummary}.` : ''} Re-read the file before retrying.`;
+        return failure('NO_MATCH', resolvedPath, msg, { editIndex: i, attempts, newStringExactMatchCount: newCount });
+      }
+
+      if (ambiguous || matches.length > 1) {
+        const candidateLines = matches.map(m => m.startLine);
+        const attemptSummary = summarizeAttempts(attempts);
+        const msg = `Found ${matches.length} matches for edit ${i}.${attemptSummary ? ` Passes: ${attemptSummary}.` : ''} Provide a more specific oldString.`;
+        return failure('AMBIGUOUS_MATCH', resolvedPath, msg, { editIndex: i, attempts, candidateLines });
+      }
+
+      const match = matches[0];
+      const before = contentToEdit.substring(0, match.startIndex);
+      const after = contentToEdit.substring(match.endIndex);
+      const effectiveNewString = adaptReplacement(edit.newString, match.mode, contentToEdit);
+      const newContent = before + effectiveNewString + after;
+
+      const matchInfo: MatchInfo = { mode: usedMode ?? 'exact', lineNumber: match.startLine };
+
+      editRecords.push({ oldContent: contentBeforeEdit, oldString: edit.oldString!, newString: effectiveNewString, matchInfo });
+      results.push({ matchInfo });
+      contentToEdit = newContent;
+    }
+
+    // Single atomic write after all edits resolved successfully
+    await ctx.fs.writeFile(resolvedPath, contentToEdit);
+
+    const diffItems = editRecords.map(record =>
+      buildDiffVisualization(
+        record.oldContent, record.matchInfo.lineNumber, record.matchInfo.mode,
+        record.oldString, record.newString, resolvedPath,
+      ),
     );
 
-    return { success: true, result: { matchInfo }, visualization };
+    const visualization: DiffsVisualization = { type: 'diffs', items: diffItems };
+
+    return { success: true, result: { results }, visualization };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return { success: false, error: message };

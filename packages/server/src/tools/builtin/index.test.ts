@@ -4,7 +4,6 @@ import { builtinTools, builtinToolNames, isBuiltinToolName } from './index';
 describe('built-in tool catalog', () => {
   test('exposes the full baked-in set', () => {
     expect([...builtinToolNames].sort()).toEqual([
-      'apply-patch',
       'browser_discover_elements',
       'browser_dom_action',
       'browser_navigate',
@@ -12,27 +11,22 @@ describe('built-in tool catalog', () => {
       'browser_screenshot',
       'browser_tab_manage',
       'edit',
-      'edit-range',
       'file-to-markdown',
-      'git-worktree',
       'glob',
       'grep',
-      'ls',
-      'multiedit',
       'question',
       'read-file',
       'shell',
       'tavily-search',
       'terminal',
-      'todoread',
-      'todowrite',
+      'todo',
       'webfetch',
       'write-file',
     ]);
   });
 
   test('every tool has a valid definition and executor', () => {
-    expect(builtinTools).toHaveLength(24);
+    expect(builtinTools).toHaveLength(18);
     for (const tool of builtinTools) {
       expect(tool.definition.name).toBeTruthy();
       expect(tool.definition.description).toBeTruthy();
@@ -53,6 +47,7 @@ describe('built-in tool catalog', () => {
     expect(isBuiltinToolName('file-to-markdown')).toBe(true);
     expect(isBuiltinToolName('shell')).toBe(true);
     expect(isBuiltinToolName('tavily-search')).toBe(true);
+    expect(isBuiltinToolName('todo')).toBe(true);
     expect(isBuiltinToolName('')).toBe(false);
   });
 });
