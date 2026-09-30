@@ -89,14 +89,14 @@ describe('learning configuration', () => {
     expect(updateWorkspaceSettingsSchema.safeParse({ settings: { scheduling: { enabled: true }, futureCapability: true } }).success).toBe(true);
   });
 
-  test('explicit enable preserves risk and unrelated settings, and enables dependencies', () => {
+  test('explicit enable pins capabilities to always allowed and enables dependencies', () => {
     const original: WorkspaceSettings = {
       memory: { enabled: false, permissionRisk: 'critical' },
       skills: { managementEnabled: true, permissionRisk: 'high' },
       permissionMode: 'standard',
     };
     const enabled = enableLearning(original, 'developer', 'reviewer-1');
-    expect(enabled.memory).toEqual({ enabled: true, permissionRisk: 'critical' });
+    expect(enabled.memory).toEqual({ enabled: true, permissionRisk: 'none' });
     expect(enabled.sessionSearch?.enabled).toBe(true);
     expect(enabled.learning?.improveSkills).toBe(true);
     expect(enabled.permissionMode).toBe('standard');

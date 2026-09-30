@@ -83,48 +83,6 @@ test('prokop mcp tools pass the SDK gate while memory availability is enforced',
     .toMatchObject({ behavior: 'allow' });
 });
 
-test('memory asks follow the session ceiling and resolve once through the controller', async () => {
-  const approvals = new ClaudeApprovals(() => 2000);
-  const { requests, delivery } = fixture();
-  const ask = { type: 'permission' as const, risk: 'medium' as const, question: 'Allow memory add on memory?',
-    description: 'Action: add', resource: 'file', action: 'write' as const };
-  updateSession('session', { permissionMode: 'full' });
-  expect(await approvals.requestMemory(ask, 'session', 'ws', delivery)).toBe(true);
-  expect(requests).toHaveLength(0);
-  updateSession('session', { permissionMode: 'standard' });
-  const wait = approvals.requestMemory(ask, 'session', 'ws', delivery);
-  const first = requests[0] as { toolCallId: string; requestId: string; toolName: string };
-  expect(first.toolName).toBe('claude-cli:memory');
-  expect(getPermissionRequestByRequestId(first.requestId)).toMatchObject({ status: 'pending' });
-  expect(await approvals.resolve(first.toolCallId, { type: 'permission', grant: 'once' }, first.requestId)).toBe(true);
-  expect(await wait).toBe(true);
-  expect(await approvals.resolve(first.toolCallId, { type: 'permission', grant: 'once' }, first.requestId)).toBe(false);
-  const denied = approvals.requestMemory(ask, 'session', 'ws', delivery);
-  const second = requests[1] as { toolCallId: string; requestId: string };
-  expect(await approvals.resolve(second.toolCallId, { type: 'permission', grant: 'workspace' }, second.requestId)).toBe(true);
-  expect(await denied).toBe(false);
-});
-
-test('session search asks follow the session ceiling and resolve once through the controller', async () => {
-  const approvals = new ClaudeApprovals(() => 2000);
-  const { requests, delivery } = fixture();
-  const ask = { type: 'permission' as const, risk: 'medium' as const,
-    question: 'Allow searching workspace sessions for "deploy"?',
-    description: 'Tool: session_search', resource: 'session', action: 'read' as const };
-  updateSession('session', { permissionMode: 'extended' });
-  expect(await approvals.requestSessionSearch(ask, 'session', 'ws', delivery)).toBe(true);
-  expect(requests).toHaveLength(0);
-  updateSession('session', { permissionMode: 'standard' });
-  const wait = approvals.requestSessionSearch(ask, 'session', 'ws', delivery);
-  const first = requests[0] as { toolCallId: string; requestId: string; toolName: string;
-    ask: { allowedScopes: string[] } };
-  expect(first.toolName).toBe('claude-cli:session_search');
-  expect(first.ask.allowedScopes).toEqual(['once']);
-  expect(await approvals.resolve(first.toolCallId, { type: 'permission', grant: 'once' }, first.requestId)).toBe(true);
-  expect(await wait).toBe(true);
-  expect(await approvals.resolve(first.toolCallId, { type: 'permission', grant: 'once' }, first.requestId)).toBe(false);
-});
-
 test('child-owned approval reaches the parent controller and replays under the child', async () => {
   createSession({ id: 'child', workspaceId: 'ws', title: 'Claude child', status: 'active',
     permissionMode: 'standard', preconfigId: null, metadata: null, parentId: 'session',

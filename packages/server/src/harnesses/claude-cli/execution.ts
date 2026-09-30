@@ -203,17 +203,13 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
             // Per-turn registration mirrors Codex: workspace setting plus the selected agent home.
             dynamicTools = createClaudeMemoryTools({ bridge: deps.memoryTools,
               sessionId, workspaceId: session.workspaceId, root, agentDir, preconfigId,
-              signal: controller.signal,
-              ask: request => (deps.approvals ?? claudeApprovals)
-                .requestMemory(request, sessionId, session.workspaceId, wire.delivery) });
+              signal: controller.signal });
           }
           if (deps.sessionSearch && workspace.settings.sessionSearch?.enabled === true) {
             // Same in-process server; gated on the workspace session-search setting.
             dynamicTools = [...dynamicTools, ...createClaudeSessionSearchTools({
               bridge: deps.sessionSearch, sessionId, workspaceId: session.workspaceId,
-              preconfigId, agentDir, signal: controller.signal,
-              ask: request => (deps.approvals ?? claudeApprovals)
-                .requestSessionSearch(request, sessionId, session.workspaceId, wire.delivery) })];
+              preconfigId, agentDir, signal: controller.signal })];
           }
           if (deps.agentSkills && agentDir) {
             // The agent's own skill directory is writable; no workspace setting or ask applies.

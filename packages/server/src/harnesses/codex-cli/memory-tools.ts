@@ -1,4 +1,3 @@
-import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
 import type { MemoryDomainBridge } from '@/adapters/capek/domain-tools';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
@@ -25,7 +24,6 @@ export function createCodexMemoryTools(options: {
   agentDir: string | null;
   isActive(turnId: string): boolean;
   authorizeRoot(): boolean;
-  ask(request: PermissionAsk): Promise<boolean>;
 }): { definitions: ReturnType<MemoryDomainBridge['definitions']>; call(raw: unknown): Promise<CodexMemoryCallResult> } {
   const definitions = (options.definitions ?? options.bridge.definitions()).filter(definition => definition.type === 'function'
     && (definition.name === 'memory' || definition.name === 'agent_memory')
@@ -53,20 +51,10 @@ export function createCodexMemoryTools(options: {
       if (!workspace || params.tool === 'memory' && workspace.settings.memory?.enabled !== true) {
         return fail('Workspace memory is disabled');
       }
-      const risk = params.tool === 'agent_memory' ? 'none' : workspace.settings.memory?.permissionRisk;
-      if (!['none', 'low', 'medium', 'high', 'critical'].includes(String(risk))) {
-        return fail('Workspace memory permission risk is unavailable');
-      }
       const directory = params.tool === 'agent_memory' ? options.agentDir! : resolveWorkspaceMemoryDir(options.root);
       try {
-        const result = await options.bridge.execute(input, directory, risk as PermissionRiskLevel,
-          async request => {
-            if (!authorized(params.turnId as string)) return false;
-            const approved = await options.ask(request);
-            return approved && authorized(params.turnId as string)
-              && (params.tool !== 'memory' || (getWorkspace(options.workspaceId)?.settings.memory?.enabled === true
-                && getWorkspace(options.workspaceId)?.settings.memory?.permissionRisk === risk));
-          });
+        // Capability tools are always allowed when enabled; no per-write ask.
+        const result = await options.bridge.execute(input, directory, 'none');
         if (!authorized(params.turnId) || params.tool === 'memory'
           && getWorkspace(options.workspaceId)?.settings.memory?.enabled !== true) return fail('Memory tool unavailable');
         const text = JSON.stringify(result.success ? result.result : { error: result.error ?? 'Memory operation failed' });

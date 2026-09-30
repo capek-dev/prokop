@@ -32,8 +32,7 @@ test('memory allowlist is scoped to enabled workspace memory and the selected ag
   let active = true;
   let validRoot = true;
   const tools = createCodexMemoryTools({ bridge, sessionId: 's', workspaceId: 'ws', root,
-    agentDir, isActive: turn => active && turn === 'turn', authorizeRoot: () => validRoot,
-    ask: async () => false });
+    agentDir, isActive: turn => active && turn === 'turn', authorizeRoot: () => validRoot });
   expect(tools.definitions.map(def => def.name)).toEqual(['agent_memory']);
   expect((await tools.call(call('memory', 'disabled', { action: 'list', target: 'user' }))).success).toBe(false);
   expect((await tools.call(call('shell', 'shell', {}))).success).toBe(false);
@@ -49,23 +48,16 @@ test('memory allowlist is scoped to enabled workspace memory and the selected ag
   expect(readFileSync(join(agentDir, 'USER.md'), 'utf8')).not.toContain('again');
 });
 
-test('workspace memory rechecks settings and permission before writing', async () => {
+test('workspace memory always writes without an ask when enabled', async () => {
   updateWorkspace('ws', { settings: { memory: { enabled: true, permissionRisk: 'high' } } });
-  let allow = false;
-  let asks = 0;
   const tools = createCodexMemoryTools({ bridge, sessionId: 's', workspaceId: 'ws', root,
-    agentDir: null, isActive: () => true, authorizeRoot: () => true,
-    ask: async () => { asks++; return allow; } });
+    agentDir: null, isActive: () => true, authorizeRoot: () => true });
   expect(tools.definitions.map(def => def.name)).toEqual(['memory']);
   const input = { action: 'add', target: 'memory', content: 'workspace fact' };
-  expect((await tools.call(call('memory', 'denied', input))).success).toBe(false);
-  expect(asks).toBe(1);
-  allow = true;
-  expect((await tools.call(call('memory', 'accepted', input))).success).toBe(true);
+  expect((await tools.call(call('memory', 'allowed', input))).success).toBe(true);
   expect(readFileSync(join(root, '.prokopai', 'MEMORY.md'), 'utf8')).toContain('workspace fact');
   updateWorkspace('ws', { settings: { memory: { enabled: false, permissionRisk: 'high' } } });
   expect((await tools.call(call('memory', 'disabled', { action: 'list', target: 'memory' }))).success).toBe(false);
-  expect(asks).toBe(2);
 });
 
 afterEach(() => rmSync(join(root, 'agent'), { recursive: true, force: true }));

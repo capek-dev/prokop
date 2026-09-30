@@ -4,6 +4,7 @@ import {
   DEFAULT_WORKSPACE_SETTINGS,
   isAgentHomeWorkspace,
   mapWorkspaceRecord,
+  normalizeCapabilityRisk,
   parseWorkspaceSettings,
   permissionModeOf,
 } from '@/domains/workspaces';
@@ -85,7 +86,7 @@ function batchLoadWorkspacePaths(workspaceIds: string[]): Map<string, string[]> 
 export function createWorkspace(input: CreateWorkspaceInput): Workspace {
   const db = getDatabase();
   const now = new Date().toISOString();
-  const settings = input.settings ?? DEFAULT_SETTINGS;
+  const settings = normalizeCapabilityRisk(input.settings ?? DEFAULT_SETTINGS);
 
   const workspace: Workspace = {
     id: input.id,
@@ -184,7 +185,7 @@ export function updateWorkspace(
 
     if (updates.settings !== undefined) {
       db.run('UPDATE workspaces SET settings = ?, updated_at = ? WHERE id = ?', [
-        JSON.stringify(updates.settings), now, id,
+        JSON.stringify(normalizeCapabilityRisk(updates.settings)), now, id,
       ]);
       workspacePermissionModes.delete(id);
     }

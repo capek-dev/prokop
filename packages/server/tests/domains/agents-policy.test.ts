@@ -62,10 +62,10 @@ describe('agents domain: home directory semantics', () => {
     expect(agentHomeWorkspaceSettings('coder')).toEqual({
       isAgentHome: true,
       agentId: 'coder',
-      memory: { enabled: true, permissionRisk: 'low' },
-      skills: { managementEnabled: true, permissionRisk: 'low' },
-      sessionSearch: { enabled: true, permissionRisk: 'low', includeToolResults: false },
-      scheduling: { enabled: true, permissionRisk: 'low' },
+      memory: { enabled: true, permissionRisk: 'none' },
+      skills: { managementEnabled: true, permissionRisk: 'none' },
+      sessionSearch: { enabled: true, permissionRisk: 'none', includeToolResults: false },
+      scheduling: { enabled: true, permissionRisk: 'none' },
     });
   });
 });

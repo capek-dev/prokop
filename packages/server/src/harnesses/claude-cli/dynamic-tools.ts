@@ -1,7 +1,6 @@
 import { tool, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import { isAbsolute, join } from 'node:path';
-import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';
@@ -14,7 +13,6 @@ export const PROKOP_MCP_SERVER = 'prokop';
 const MAX_ARGUMENTS = 32_000;
 const MAX_RESULT = 16_000;
 const MAX_RESULT_SEARCH = 64_000;
-const RISKS = ['none', 'low', 'medium', 'high', 'critical'];
 
 /** Mirrors the Capek memory input schema; a test pins it to the live definition. */
 export const claudeMemoryShape = {
@@ -61,7 +59,6 @@ export function createClaudeMemoryTools(options: {
   agentDir: string | null;
   preconfigId: string | null;
   signal: AbortSignal;
-  ask(request: PermissionAsk): Promise<boolean>;
 }): SdkMcpToolDefinition[] {
   // A per-turn allowlist built from the workspace setting and the selected agent home.
   const definitions = (options.definitions ?? options.bridge.definitions()).filter(definition =>
@@ -87,19 +84,11 @@ export function createClaudeMemoryTools(options: {
       if (!workspace || definition.name === 'memory' && workspace.settings.memory?.enabled !== true) {
         return fail('Workspace memory is disabled');
       }
-      const risk = definition.name === 'agent_memory' ? 'none' : workspace.settings.memory?.permissionRisk;
-      if (!RISKS.includes(String(risk))) return fail('Workspace memory permission risk is unavailable');
       try {
+        // Capability tools are always allowed when enabled; no per-write ask.
         const result = await options.bridge.execute(input as Record<string, unknown>,
           definition.name === 'agent_memory' ? options.agentDir! : resolveWorkspaceMemoryDir(options.root),
-          risk as PermissionRiskLevel,
-          definition.name === 'agent_memory' ? undefined : async request => {
-            if (!authorized()) return false;
-            const approved = await options.ask(request);
-            const latest = getWorkspace(options.workspaceId);
-            return approved && authorized() && latest?.settings.memory?.enabled === true
-              && latest?.settings.memory?.permissionRisk === risk;
-          });
+          'none');
         if (!authorized()) return fail('Memory tool unavailable');
         const text = JSON.stringify(result.success ? result.result : { error: result.error ?? 'Memory operation failed' });
         return { content: [{ type: 'text', text: text.length <= MAX_RESULT ? text : `${text.slice(0, MAX_RESULT)}\n[truncated]` }],
@@ -119,7 +108,6 @@ export function createClaudeSessionSearchTools(options: {
   preconfigId: string | null;
   agentDir: string | null;
   signal: AbortSignal;
-  ask(request: PermissionAsk): Promise<boolean>;
 }): SdkMcpToolDefinition[] {
   const definitions = (options.definitions ?? options.bridge.definitions()).filter(definition =>
     definition.type === 'function' && definition.name === 'session_search'
@@ -141,27 +129,20 @@ export function createClaudeSessionSearchTools(options: {
         return fail('Invalid session search arguments');
       }
       const settings = getWorkspace(options.workspaceId)?.settings.sessionSearch;
-      if (!settings?.enabled || !RISKS.includes(String(settings.permissionRisk))) {
-        return fail('Session search is disabled or permission risk is unavailable');
+      if (!settings?.enabled) {
+        return fail('Session search is disabled');
       }
       // Agent scope reads the selected agent's cross-workspace sessions, exactly like Codex.
       const agentId = options.agentDir && getSession(options.sessionId)?.agentId === options.preconfigId
         ? options.preconfigId : null;
       if (input.scope === 'agent' && !agentId) return fail('Agent scope requires an agent session');
       try {
+        // Capability tools are always allowed when enabled; no per-write ask.
         const result = await options.bridge.execute(input as Record<string, unknown>, options.workspaceId,
           options.sessionId, settings.includeToolResults === true,
-          settings.permissionRisk as PermissionRiskLevel, async request => {
-            if (!authorized()) return false;
-            const approved = await options.ask(request);
-            const current = getWorkspace(options.workspaceId)?.settings.sessionSearch;
-            return approved && authorized() && current?.enabled === true
-              && current.permissionRisk === settings.permissionRisk
-              && current.includeToolResults === settings.includeToolResults
-              && (agentId === null || getSession(options.sessionId)?.agentId === agentId);
-          }, agentId);
+          'none', undefined, agentId);
         const current = getWorkspace(options.workspaceId)?.settings.sessionSearch;
-        if (!authorized() || !current?.enabled || current.permissionRisk !== settings.permissionRisk
+        if (!authorized() || !current?.enabled
           || current.includeToolResults !== settings.includeToolResults
           || agentId !== null && getSession(options.sessionId)?.agentId !== agentId) {
           return fail('Session search unavailable');

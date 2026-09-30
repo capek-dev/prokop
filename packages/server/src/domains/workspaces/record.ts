@@ -20,10 +20,26 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
 export function parseWorkspaceSettings(raw: string | null): WorkspaceSettings {
   if (!raw) return { ...DEFAULT_WORKSPACE_SETTINGS };
   try {
-    return { ...DEFAULT_WORKSPACE_SETTINGS, ...JSON.parse(raw) };
+    return normalizeCapabilityRisk({ ...DEFAULT_WORKSPACE_SETTINGS, ...JSON.parse(raw) });
   } catch {
     return { ...DEFAULT_WORKSPACE_SETTINGS };
   }
+}
+
+/** Capability tools (memory, skills, session search) are on/off in Prokop:
+ * an enabled capability always runs without a per-write permission ask, so
+ * every stored legacy risk level is coerced to 'none' on read and before
+ * persist. Old workspaces stop asking without a migration and no writer can
+ * re-introduce a level. Scheduling keeps its own stored setting. */
+export function normalizeCapabilityRisk(settings: WorkspaceSettings): WorkspaceSettings {
+  return {
+    ...settings,
+    ...(settings.memory ? { memory: { ...settings.memory, permissionRisk: 'none' as const } } : {}),
+    ...(settings.skills ? { skills: { ...settings.skills, permissionRisk: 'none' as const } } : {}),
+    ...(settings.sessionSearch
+      ? { sessionSearch: { ...settings.sessionSearch, permissionRisk: 'none' as const } }
+      : {}),
+  };
 }
 
 /** Structural row shape produced by the SQLite repository. The domain never

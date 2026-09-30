@@ -117,7 +117,8 @@ describe('WorkspaceSettingsDialog', () => {
     await waitFor(() =>
       expect(mocks.save).toHaveBeenCalledWith(
         'ws-1',
-        expect.objectContaining({ memory: { enabled: true, permissionRisk: 'medium' } }),
+        // Stored 'medium' risk is dropped: capabilities save as always allowed.
+        expect.objectContaining({ memory: { enabled: true, permissionRisk: 'none' } }),
       ),
     );
   });

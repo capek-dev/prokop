@@ -1,4 +1,3 @@
-import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
 import type { SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
@@ -9,7 +8,6 @@ const fail = (message: string): CodexMemoryCallResult => ({ success: false,
   contentItems: [{ type: 'inputText', text: message }] });
 const MAX_ARGUMENTS = 32_000;
 const MAX_RESULT = 64_000;
-const RISKS = ['none', 'low', 'medium', 'high', 'critical'];
 
 /** Restrict Codex calls to the configured workspace and the active turn. */
 export function createCodexSessionSearchTools(options: {
@@ -21,7 +19,6 @@ export function createCodexSessionSearchTools(options: {
   agentDir: string | null;
   isActive(turnId: string): boolean;
   authorizeRoot(): boolean;
-  ask(request: PermissionAsk): Promise<boolean>;
 }): { definitions: ReturnType<SessionSearchDomainBridge['definitions']>; call(raw: unknown): Promise<CodexMemoryCallResult> } {
   const definitions = (options.definitions ?? options.bridge.definitions()).filter(definition =>
     definition.type === 'function' && definition.name === 'session_search'
@@ -58,26 +55,18 @@ export function createCodexSessionSearchTools(options: {
         return fail('Invalid session search arguments');
       }
       const settings = getWorkspace(options.workspaceId)?.settings.sessionSearch;
-      if (!settings?.enabled || !RISKS.includes(String(settings.permissionRisk))) {
-        return fail('Session search is disabled or permission risk is unavailable');
+      if (!settings?.enabled) {
+        return fail('Session search is disabled');
       }
-      const risk = settings.permissionRisk as PermissionRiskLevel;
       const agentId = options.agentDir && getSession(options.sessionId)?.agentId === options.preconfigId
         ? options.preconfigId : null;
       if (input.scope === 'agent' && !agentId) return fail('Agent scope requires an agent session');
       try {
+        // Capability tools are always allowed when enabled; no per-write ask.
         const result = await options.bridge.execute(input, options.workspaceId, options.sessionId,
-          settings.includeToolResults === true, risk, async request => {
-            if (!authorized(params.turnId as string)) return false;
-            const approved = await options.ask(request);
-            const current = getWorkspace(options.workspaceId)?.settings.sessionSearch;
-            return approved && authorized(params.turnId as string)
-              && current?.enabled === true && current.permissionRisk === risk
-              && current.includeToolResults === settings.includeToolResults
-              && (agentId === null || getSession(options.sessionId)?.agentId === agentId);
-          }, agentId);
+          settings.includeToolResults === true, 'none', undefined, agentId);
         const current = getWorkspace(options.workspaceId)?.settings.sessionSearch;
-        if (!authorized(params.turnId) || !current?.enabled || current.permissionRisk !== risk
+        if (!authorized(params.turnId) || !current?.enabled
           || current.includeToolResults !== settings.includeToolResults
           || agentId !== null && getSession(options.sessionId)?.agentId !== agentId) {
           return fail('Session search unavailable');

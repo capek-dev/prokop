@@ -65,7 +65,8 @@ export function defaultLearningCadence(scope: LearningScope): LearningCadence {
   };
 }
 
-/** Explicit enable action only. Never changes existing permission risk settings. */
+/** Explicit enable action only. Capability dependencies are force-enabled
+ * and stay always-allowed (risk 'none'); includeToolResults is preserved. */
 export function enableLearning(
   settings: WorkspaceSettings,
   preconfigId: string,
@@ -86,8 +87,8 @@ export function enableLearning(
   });
   return {
     ...settings,
-    memory: { permissionRisk: 'low', ...settings.memory, enabled: true },
-    sessionSearch: { permissionRisk: 'low', includeToolResults: false, ...settings.sessionSearch, enabled: true },
+    memory: { ...settings.memory, enabled: true, permissionRisk: 'none' },
+    sessionSearch: { includeToolResults: false, ...settings.sessionSearch, enabled: true, permissionRisk: 'none' },
     learning,
   };
 }

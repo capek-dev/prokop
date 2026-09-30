@@ -781,7 +781,6 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
               return !!current && current.preconfigId === preconfigId && workspaceRoot(current) === root;
             } catch { return false; }
           },
-          ask: request => codexApprovals.requestMemory(request, sessionId, session.workspaceId, wire.delivery),
         });
         const sessionSearch = deps.sessionSearch && createCodexSessionSearchTools({
           bridge: deps.sessionSearch, definitions: searchDefinitions,
@@ -794,7 +793,6 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
               return !!current && current.preconfigId === preconfigId && workspaceRoot(current) === root;
             } catch { return false; }
           },
-          ask: request => codexApprovals.requestSessionSearch(request, sessionId, session.workspaceId, wire.delivery),
         });
         const agentSkills = deps.agentSkills && createCodexAgentSkillTools({
           bridge: deps.agentSkills, definitions: skillDefinitions,

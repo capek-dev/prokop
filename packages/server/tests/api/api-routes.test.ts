@@ -407,7 +407,8 @@ describe('API Routes', () => {
       expect(res.status).toBe(200);
       const body = await json(res);
       expect(body.workspace.settings.memory.enabled).toBe(true);
-      expect(body.workspace.settings.memory.permissionRisk).toBe('medium');
+      // Capability tools are on/off; sent or stored risk levels coerce to 'none'.
+      expect(body.workspace.settings.memory.permissionRisk).toBe('none');
     });
 
     test('PATCH /api/workspaces/:id validates settings shape', async () => {
@@ -440,7 +441,7 @@ describe('API Routes', () => {
       expect(body.error).toBe('bad_request');
     });
 
-    test('PATCH /api/workspaces/:id validates memory.permissionRisk enum', async () => {
+    test('PATCH /api/workspaces/:id ignores legacy capability risk fields', async () => {
       seedWorkspace({ id: 'ws1' });
 
       const res = await app.request('/api/workspaces/ws1', {
@@ -451,27 +452,10 @@ describe('API Routes', () => {
         }),
       });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(200);
       const body = await json(res);
-      expect(body.error).toBe('bad_request');
-    });
-
-    test('PATCH /api/workspaces/:id accepts all valid risk levels', async () => {
-      seedWorkspace({ id: 'ws1' });
-
-      for (const risk of ['none', 'low', 'medium', 'high', 'critical']) {
-        const res = await app.request('/api/workspaces/ws1', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            settings: { memory: { enabled: true, permissionRisk: risk } },
-          }),
-        });
-
-        expect(res.status).toBe(200);
-        const body = await json(res);
-        expect(body.workspace.settings.memory.permissionRisk).toBe(risk);
-      }
+      expect(body.workspace.settings.memory.enabled).toBe(true);
+      expect(body.workspace.settings.memory.permissionRisk).toBe('none');
     });
 
     test('PATCH /api/workspaces/:id returns 404 for missing', async () => {

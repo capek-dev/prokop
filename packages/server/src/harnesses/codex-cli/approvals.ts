@@ -74,27 +74,6 @@ export class CodexApprovals {
     return true;
   }
 
-  private async requestDynamicTool(ask: PermissionAsk, toolName: string, sessionId: string,
-    workspaceId: string, delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
-    const session = getSession(sessionId);
-    if (session?.harness !== 'codex-cli' || session.workspaceId !== workspaceId) return false;
-    if (shouldAutoApproveAsk(ask, session.permissionMode ?? 'standard')) return true;
-    return (await this.enqueue({ ...ask, allowedScopes: ['once'] }, toolName,
-      null, sessionId, workspaceId, delivery)).decision === 'accept';
-  }
-
-  /** Memory writes follow the session risk ceiling, otherwise ask the controller once. */
-  requestMemory(ask: PermissionAsk, sessionId: string, workspaceId: string,
-    delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
-    return this.requestDynamicTool(ask, 'codex-cli:memory', sessionId, workspaceId, delivery);
-  }
-
-  /** Session search reads follow the same ceiling and once-only fallback. */
-  requestSessionSearch(ask: PermissionAsk, sessionId: string, workspaceId: string,
-    delivery: ApplicationDeliveryPort<unknown>): Promise<boolean> {
-    return this.requestDynamicTool(ask, 'codex-cli:session_search', sessionId, workspaceId, delivery);
-  }
-
   private enqueue(ask: PermissionAsk, toolName: string, key: string | null,
     sessionId: string, workspaceId: string, delivery: ApplicationDeliveryPort<unknown>,
     controllerSessionId = sessionId): Promise<Decision> {

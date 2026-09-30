@@ -24,7 +24,7 @@ export interface SessionSearchDomainBridge {
   definitions(): Array<{ type: 'function'; name: string; description: string; inputSchema: unknown }>;
   execute(input: Record<string, unknown>, workspaceId: string, sessionId: string,
     includeToolResults: boolean, risk: PermissionRiskLevel,
-    ask: (request: PermissionAsk) => Promise<boolean>, agentId: string | null):
+    ask?: (request: PermissionAsk) => Promise<boolean>, agentId?: string | null):
     Promise<{ success: boolean; error?: string }>;
 }
 

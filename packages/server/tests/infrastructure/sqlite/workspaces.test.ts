@@ -193,7 +193,7 @@ describe('workspaces store', () => {
       expect(ws!.settings).toEqual({ permissionMode: 'standard' });
     });
 
-    test('creates workspace with memory settings', () => {
+    test('creates workspace with memory settings coerced to always allowed', () => {
       createWorkspace({
         id: 'ws-mem',
         name: 'Memory WS',
@@ -204,7 +204,7 @@ describe('workspaces store', () => {
 
       const ws = getWorkspace('ws-mem');
       expect(ws).not.toBeNull();
-      expect(ws!.settings.memory).toEqual({ enabled: true, permissionRisk: 'medium' });
+      expect(ws!.settings.memory).toEqual({ enabled: true, permissionRisk: 'none' });
     });
 
     test('updates settings on existing workspace', () => {
@@ -256,7 +256,7 @@ describe('workspaces store', () => {
 
       expect(updated!.name).toBe('New');
       expect(updated!.settings.memory!.enabled).toBe(true);
-      expect(updated!.settings.memory!.permissionRisk).toBe('high');
+      expect(updated!.settings.memory!.permissionRisk).toBe('none');
     });
 
     test('preserves settings when updating only name', () => {
@@ -273,7 +273,7 @@ describe('workspaces store', () => {
       const ws = getWorkspace('ws1');
       expect(ws!.name).toBe('Renamed');
       expect(ws!.settings.memory!.enabled).toBe(true);
-      expect(ws!.settings.memory!.permissionRisk).toBe('critical');
+      expect(ws!.settings.memory!.permissionRisk).toBe('none');
     });
   });
 });

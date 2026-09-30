@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { Brain, GraduationCap, Wrench, Search, Server, Shield, FolderSymlink, ShieldCheck, Cog, Loader2 } from 'lucide-react';
-import type { Workspace, WorkspaceSettings, PermissionRiskLevel, PermissionGrant, ProkopaiClient, PermissionMode } from '@prokopai/sdk';
+import type { Workspace, WorkspaceSettings, PermissionGrant, ProkopaiClient, PermissionMode } from '@prokopai/sdk';
 import { getSessionTagOrder } from '@/lib/sessionTagOrder';
 import { WorkspaceSessionsPanel } from './configuration/WorkspaceSessionsPanel';
 import { learningValidationError } from '@/lib/learningValidation';
@@ -75,11 +75,10 @@ interface WorkspaceSettingsDialogProps {
 function snapshot(workspace: Workspace) {
   const s = workspace.settings;
   return {
-    memory: { enabled: s?.memory?.enabled ?? false, permissionRisk: s?.memory?.permissionRisk ?? 'medium' as PermissionRiskLevel },
-    skills: { enabled: s?.skills?.managementEnabled ?? false, permissionRisk: s?.skills?.permissionRisk ?? 'medium' as PermissionRiskLevel },
+    memory: { enabled: s?.memory?.enabled ?? false },
+    skills: { enabled: s?.skills?.managementEnabled ?? false },
     search: {
       enabled: s?.sessionSearch?.enabled ?? false,
-      permissionRisk: s?.sessionSearch?.permissionRisk ?? 'medium' as PermissionRiskLevel,
       includeToolResults: s?.sessionSearch?.includeToolResults ?? false,
     },
     learning: s?.learning,
@@ -136,11 +135,12 @@ export function WorkspaceSettingsDialog({
     if (learningError) return;
     onSave(workspace.id, {
       ...workspace.settings,
-      memory: { enabled: draft.memory.enabled, permissionRisk: draft.memory.permissionRisk },
-      skills: { managementEnabled: draft.skills.enabled, permissionRisk: draft.skills.permissionRisk },
+      // Capability tools are on/off: always allowed when enabled.
+      memory: { enabled: draft.memory.enabled, permissionRisk: 'none' },
+      skills: { managementEnabled: draft.skills.enabled, permissionRisk: 'none' },
       sessionSearch: {
         enabled: draft.search.enabled,
-        permissionRisk: draft.search.permissionRisk,
+        permissionRisk: 'none',
         includeToolResults: draft.search.includeToolResults,
       },
       learning: draft.learning ? { ...draft.learning, enabled: draft.learning.enabled && draft.memory.enabled && draft.search.enabled } : undefined,
@@ -196,21 +196,18 @@ export function WorkspaceSettingsDialog({
           case 'memory':
             return <MemoryPanel
               enabled={draft.memory.enabled}
-              permissionRisk={draft.memory.permissionRisk}
-              onChange={(v) => setDraft((d) => ({ ...d, memory: v }))}
+              onChange={(v) => setDraft(d => ({ ...d, memory: v }))}
             />;
           case 'skills':
             return <SkillsPanel
               enabled={draft.skills.enabled}
-              permissionRisk={draft.skills.permissionRisk}
-              onChange={(v) => setDraft((d) => ({ ...d, skills: v }))}
+              onChange={(v) => setDraft(d => ({ ...d, skills: v }))}
             />;
           case 'search':
             return <SessionSearchPanel
               enabled={draft.search.enabled}
-              permissionRisk={draft.search.permissionRisk}
               includeToolResults={draft.search.includeToolResults}
-              onChange={(v) => setDraft((d) => ({ ...d, search: v }))}
+              onChange={(v) => setDraft(d => ({ ...d, search: v }))}
             />;
         }
       })()}

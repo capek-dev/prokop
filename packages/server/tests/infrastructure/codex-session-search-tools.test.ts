@@ -14,8 +14,6 @@ const settings = { enabled: true, permissionRisk: 'high' as const, includeToolRe
 const call = (callId: string, args: unknown, tool = 'session_search', turnId = 'turn'): unknown => ({
   threadId: 'thread', turnId, callId, namespace: null, tool, arguments: args,
 });
-const decoded = (result: { contentItems: Array<{ text: string }> }): Record<string, unknown> =>
-  JSON.parse(result.contentItems[0]!.text) as Record<string, unknown>;
 
 beforeEach(() => {
   setupTestDatabase();
@@ -28,40 +26,34 @@ afterEach(() => resetTestDatabase());
 test('session search uses the Prokop definition and stays hidden when disabled', async () => {
   expect(sessionSearchDomainTools.definitions().map(def => def.name)).toEqual(['session_search']);
   const tools = createCodexSessionSearchTools({ bridge: sessionSearchDomainTools, sessionId: 's', workspaceId: 'ws',
-    preconfigId: 'agent', agentDir: null, isActive: () => true, authorizeRoot: () => true, ask: async () => true });
+    preconfigId: 'agent', agentDir: null, isActive: () => true, authorizeRoot: () => true });
   expect(tools.definitions).toEqual([]);
   expect((await tools.call(call('disabled', { action: 'list' }))).success).toBe(false);
 });
 
-test('list bypasses ask, search and read require once-only approval and settings stay current', async () => {
+test('execution always runs without an ask and passes captured settings', async () => {
   updateWorkspace('ws', { settings: { sessionSearch: settings } });
-  let asks = 0;
   let active = true;
   let root = true;
   const contexts: Array<{ workspaceId: string; sessionId: string; risk: PermissionRiskLevel;
     agentId: string | null; includeTools: boolean }> = [];
   const bridge = { definitions: () => defs,
     execute: async (input: Record<string, unknown>, workspaceId: string, sessionId: string,
-      includeTools: boolean, risk: PermissionRiskLevel, ask: (request: PermissionAsk) => Promise<boolean>,
+      includeTools: boolean, risk: PermissionRiskLevel, _ask: (request: PermissionAsk) => Promise<boolean>,
       agentId: string | null) => {
       contexts.push({ workspaceId, sessionId, risk, agentId, includeTools });
-      if (input.action !== 'list' && !await ask({ type: 'permission', resource: 'session', action: 'read',
-        risk, question: 'Read session?', description: 'Search' })) return { success: false, error: 'USER_REJECTION' };
       return { success: true, mode: input.action ?? 'search', results: [{ sessionId: 's' }] };
     } };
   const tools = createCodexSessionSearchTools({ bridge, sessionId: 's', workspaceId: 'ws',
     preconfigId: 'agent', agentDir: null, isActive: id => active && id === 'turn',
-    authorizeRoot: () => root, ask: async () => { asks++; return false; } });
+    authorizeRoot: () => root });
   expect(tools.definitions.map(def => def.name)).toEqual(['session_search']);
   expect((await tools.call(call('list', { action: 'list' }))).success).toBe(true);
-  expect(asks).toBe(0);
-  expect(decoded(await tools.call(call('search', { query: 'hello' })))).toEqual({ error: 'USER_REJECTION' });
-  expect(asks).toBe(1);
+  expect((await tools.call(call('search', { query: 'hello' }))).success).toBe(true);
   expect(contexts).toEqual([
-    { workspaceId: 'ws', sessionId: 's', risk: 'high', agentId: null, includeTools: true },
-    { workspaceId: 'ws', sessionId: 's', risk: 'high', agentId: null, includeTools: true },
+    { workspaceId: 'ws', sessionId: 's', risk: 'none', agentId: null, includeTools: true },
+    { workspaceId: 'ws', sessionId: 's', risk: 'none', agentId: null, includeTools: true },
   ]);
-  expect((await tools.call(call('search', { query: 'hello' }))).success).toBe(false);
   expect((await tools.call(call('bad', { scope: 'other', query: 'hello' }))).success).toBe(false);
   expect((await tools.call(call('shell', { action: 'list' }, 'shell'))).success).toBe(false);
   active = false;
@@ -74,24 +66,21 @@ test('list bypasses ask, search and read require once-only approval and settings
   expect((await tools.call(call('disabled', { action: 'list' }))).success).toBe(false);
 });
 
-test('approval rechecks current settings and selected agent scope', async () => {
+test('execution rechecks current settings and selected agent scope', async () => {
   updateWorkspace('ws', { settings: { sessionSearch: settings } });
   updateSession('s', { agentId: 'agent' });
   const ids: Array<string | null> = [];
   const bridge = { definitions: () => defs,
     execute: async (_input: Record<string, unknown>, _ws: string, _session: string,
-      _include: boolean, risk: PermissionRiskLevel, ask: (request: PermissionAsk) => Promise<boolean>,
+      _include: boolean, _risk: PermissionRiskLevel, _ask: (request: PermissionAsk) => Promise<boolean>,
       agentId: string | null) => {
       ids.push(agentId);
-      return { success: await ask({ type: 'permission', resource: 'session', action: 'read',
-        risk, question: 'Read?', description: 'Search' }) };
+      return { success: true };
     } };
   const tools = createCodexSessionSearchTools({ bridge, sessionId: 's', workspaceId: 'ws',
-    preconfigId: 'agent', agentDir: '/agent', isActive: () => true, authorizeRoot: () => true,
-    ask: async () => { updateWorkspace('ws', { settings: { sessionSearch: { ...settings, enabled: false } } }); return true; } });
-  expect((await tools.call(call('read', { sessionId: 's', scope: 'agent' }))).success).toBe(false);
+    preconfigId: 'agent', agentDir: '/agent', isActive: () => true, authorizeRoot: () => true });
+  expect((await tools.call(call('read', { sessionId: 's', scope: 'agent' }))).success).toBe(true);
   expect(ids).toEqual(['agent']);
-  updateWorkspace('ws', { settings: { sessionSearch: settings } });
   updateSession('s', { agentId: 'other' });
   expect((await tools.call(call('list', { action: 'list', scope: 'agent' }))).success).toBe(false);
 });

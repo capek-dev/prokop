@@ -64,17 +64,17 @@ export function agentMemoryFilename(target: AgentMemoryTarget): 'USER.md' | 'MEM
 }
 
 /** The exact home workspace settings applied on promotion. Fixed policy:
- * memory, skills, session search, and scheduling are enabled with 'low'
- * permission risk; session search starts without tool results; the
+ * memory, skills, session search, and scheduling are enabled and always
+ * allowed (risk 'none'); session search starts without tool results; the
  * workspace is flagged as the agent home. */
 export function agentHomeWorkspaceSettings(agentId: string): WorkspaceSettings {
   return {
     isAgentHome: true,
     agentId,
-    memory: { enabled: true, permissionRisk: 'low' },
-    skills: { managementEnabled: true, permissionRisk: 'low' },
-    sessionSearch: { enabled: true, permissionRisk: 'low', includeToolResults: false },
-    scheduling: { enabled: true, permissionRisk: 'low' },
+    memory: { enabled: true, permissionRisk: 'none' },
+    skills: { managementEnabled: true, permissionRisk: 'none' },
+    sessionSearch: { enabled: true, permissionRisk: 'none', includeToolResults: false },
+    scheduling: { enabled: true, permissionRisk: 'none' },
   };
 }
 

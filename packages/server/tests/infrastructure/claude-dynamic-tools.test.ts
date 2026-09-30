@@ -56,13 +56,13 @@ afterAll(() => rmSync(root, { recursive: true, force: true }));
 function tools(overrides: Partial<Parameters<typeof createClaudeMemoryTools>[0]> = {}) {
   return createClaudeMemoryTools({ bridge: fakeBridge, sessionId: 's', workspaceId: 'ws', root,
     agentDir, preconfigId: 'agent', signal: new AbortController().signal,
-    ask: async () => false, ...overrides });
+    ...overrides });
 }
 
 function searchTools(overrides: Partial<Parameters<typeof createClaudeSessionSearchTools>[0]> = {}) {
   return createClaudeSessionSearchTools({ bridge: fakeSearchBridge, sessionId: 's', workspaceId: 'ws',
     agentDir, preconfigId: 'agent', signal: new AbortController().signal,
-    ask: async () => false, ...overrides });
+    ...overrides });
 }
 
 function skillTools(overrides: Partial<Parameters<typeof createClaudeSkillManageTools>[0]> = {}) {
@@ -150,29 +150,24 @@ test('session search registers only when the workspace enables it', () => {
   expect(searchTools().map(item => item.name)).toEqual(['session_search']);
 });
 
-test('session search routes settings, agent scope, and the once-only ask', async () => {
+test('session search routes settings and agent scope without any ask', async () => {
   updateWorkspace('ws', { settings: { sessionSearch: {
     enabled: true, permissionRisk: 'medium', includeToolResults: false } } });
   updateSession('s', { agentId: 'agent' });
-  const seen: Array<{ input: unknown; includeToolResults: boolean; risk: string; asked: boolean;
+  const seen: Array<{ input: unknown; includeToolResults: boolean; risk: string;
     agentId: string | null }> = [];
-  const asks: PermissionAsk[] = [];
   const bridge = { definitions: () => fakeSearchDefs,
     execute: async (input: Record<string, unknown>, _ws: string, _session: string,
-      includeToolResults: boolean, risk: string, ask?: (request: PermissionAsk) => Promise<boolean>,
+      includeToolResults: boolean, risk: string, _ask?: (request: PermissionAsk) => Promise<boolean>,
       agentId?: string | null) => {
-      seen.push({ input, includeToolResults, risk, asked: ask !== undefined, agentId: agentId ?? null });
-      const approved = ask ? await ask({ type: 'permission', risk: 'medium', question: 'Allow search?',
-        description: 'Tool: session_search', resource: 'session', action: 'read' }) : true;
-      return approved ? { success: true, mode: 'search', title: 'ok', results: [] }
-        : { success: false, mode: 'search', title: 'denied', error: 'USER_REJECTION' };
+      seen.push({ input, includeToolResults, risk, agentId: agentId ?? null });
+      return { success: true, mode: 'search', title: 'ok', results: [] };
     } };
-  const registered = searchTools({ bridge, ask: async request => { asks.push(request); return true; } });
+  const registered = searchTools({ bridge });
   const handler = registered.find(item => item.name === 'session_search')!.handler;
   const result = await handler({ query: 'deploy steps', scope: 'workspace' } as never, {});
   expect(result.isError).toBeFalsy();
-  expect(seen[0]).toMatchObject({ includeToolResults: false, risk: 'medium', asked: true, agentId: 'agent' });
-  expect(asks[0]).toMatchObject({ risk: 'medium', resource: 'session', action: 'read' });
+  expect(seen[0]).toMatchObject({ includeToolResults: false, risk: 'none', agentId: 'agent' });
   // Agent scope without an agent home refuses before reaching the bridge.
   const noAgent = searchTools({ bridge, agentDir: null });
   const refused = await noAgent.find(item => item.name === 'session_search')!
@@ -180,13 +175,12 @@ test('session search routes settings, agent scope, and the once-only ask', async
   expect(refused.isError).toBe(true);
   expect(refused.content[0]).toMatchObject({ type: 'text', text: 'Agent scope requires an agent session' });
   expect(seen).toHaveLength(1);
-  // Disabled mid-flight settings refuse without an ask.
+  // Disabled mid-flight settings refuse.
   updateWorkspace('ws', { settings: { sessionSearch: {
     enabled: false, permissionRisk: 'medium', includeToolResults: false } } });
   const off = await handler({ action: 'list' } as never, {});
   expect(off.isError).toBe(true);
-  expect(off.content[0]).toMatchObject({ type: 'text', text: 'Session search is disabled or permission risk is unavailable' });
-  expect(asks).toHaveLength(1);
+  expect(off.content[0]).toMatchObject({ type: 'text', text: 'Session search is disabled' });
 });
 
 test('registration follows the workspace memory setting and the agent home', () => {
@@ -196,7 +190,7 @@ test('registration follows the workspace memory setting and the agent home', () 
   expect(tools().map(item => item.name)).toEqual(['memory', 'agent_memory']);
 });
 
-test('each tool routes to its own directory, risk, and ask path', async () => {
+test('each tool routes to its own directory and never asks', async () => {
   updateWorkspace('ws', { settings: { memory: { enabled: true, permissionRisk: 'medium' } } });
   const seen: Array<{ directory: string; risk: string; asked: boolean }> = [];
   const bridge = { definitions: () => fakeDefs,
@@ -211,7 +205,7 @@ test('each tool routes to its own directory, risk, and ask path', async () => {
     content: [{ type: 'text', text: JSON.stringify({ action: 'list', entries: [] }) }] });
   await list('agent_memory');
   expect(seen).toEqual([
-    { directory: resolveWorkspaceMemoryDir(root), risk: 'medium', asked: true },
+    { directory: resolveWorkspaceMemoryDir(root), risk: 'none', asked: false },
     { directory: agentDir, risk: 'none', asked: false },
   ]);
 });
@@ -224,26 +218,18 @@ test('agent memory writes through the in-process tool without any ask', async ()
   expect(readFileSync(join(agentDir, 'USER.md'), 'utf8')).toContain('prefers concise output');
 });
 
-test('workspace memory writes ask once and refuse on denial or setting changes', async () => {
+test('workspace memory writes without any ask and still refuses when disabled', async () => {
   updateWorkspace('ws', { settings: { memory: { enabled: true, permissionRisk: 'high' } } });
-  const asks: PermissionAsk[] = [];
-  let approve = true;
-  const registered = tools({ ask: async request => { asks.push(request); return approve; } });
+  const registered = tools({});
   const memory = registered.find(item => item.name === 'memory')!;
   const write = (): Promise<ToolResult> =>
     memory.handler({ action: 'add', target: 'memory', content: 'a fact' } as never, {});
   expect((await write()).isError).toBeFalsy();
-  expect(asks).toHaveLength(1);
-  expect(asks[0]).toMatchObject({ risk: 'high', action: 'write', paths: ['MEMORY.md'] });
-  approve = false;
-  expect((await write()).isError).toBe(true);
-  expect((await write()).content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('USER_REJECTION') });
+  expect(readFileSync(join(root, '.prokopai', 'MEMORY.md'), 'utf8')).toContain('a fact');
   updateWorkspace('ws', { settings: { memory: { enabled: false, permissionRisk: 'high' } } });
-  asks.length = 0;
   const off = await memory.handler({ action: 'list', target: 'user' } as never, {});
   expect(off.isError).toBe(true);
   expect(off.content[0]).toMatchObject({ type: 'text', text: 'Workspace memory is disabled' });
-  expect(asks).toHaveLength(0);
 });
 
 test('a stale turn or changed preconfig refuses before executing', async () => {

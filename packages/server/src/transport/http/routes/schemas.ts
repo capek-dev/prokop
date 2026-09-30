@@ -256,23 +256,20 @@ export const providerCredentialsSchema = z.object({
 
 // ── Workspace settings schemas ─────────────────────────────────
 
-  const riskLevel = z.enum(['none', 'low', 'medium', 'high', 'critical']);
-
+  // Capability tools are on/off: an enabled capability is always allowed,
+  // so the API no longer accepts per-capability permission risk levels.
   export const workspaceSettingsSchema = z.object({
   sessionTagOrder: z.enum(['tagged-first', 'untagged-first']).optional(),
   learning: learningSettingsSchema.optional(),
   allowPersonalLearning: z.boolean().optional(),
   memory: z.object({
     enabled: z.boolean(),
-    permissionRisk: riskLevel,
   }).partial().optional(),
   skills: z.object({
     managementEnabled: z.boolean(),
-    permissionRisk: riskLevel,
   }).partial().optional(),
   sessionSearch: z.object({
     enabled: z.boolean(),
-    permissionRisk: riskLevel,
     includeToolResults: z.boolean(),
   }).partial().optional(),
   permissionMode: z.enum(['standard', 'extended', 'full']).optional(),
