@@ -3,7 +3,6 @@ import {
   configureJean2InstructionSource,
   configureJean2PreconfigSource,
   configureJean2RuntimeConfiguration,
-  configureJean2SchedulerHost,
   configureJean2SessionSearchHost,
   configureJean2Storage,
   configureJean2WorkspacePolicy,
@@ -12,16 +11,13 @@ import {
 import { configureJean2Bindings } from '@/harnesses/prokop/composition/bindings';
 import { disposeJean2ExecutionScope, initializeJean2ExecutionScope } from '@/harnesses/prokop/composition/execution-scope';
 import { warmInstalledToolsCache } from '@/adapters/capek/tool-resolver';
-import type { Jean2SchedulerHostDeps } from '@/adapters/capek/scheduler';
 import type { Jean2SessionSearchHostDeps } from '@/adapters/capek/session-search';
 import { createWiredAgentsApplication } from '@/bootstrap/application';
 import type { AgentsApplication } from '@/application/agents';
 import { installExecutionLifecyclePort } from '@/application/ports/execution-lifecycle';
 import { installBuiltinToolsPort } from '@/application/ports/builtin-tools';
 import { builtinTools } from '@/harnesses/prokop/tools';
-import { createJean2ScheduledJobExecution } from '@/adapters/jean2/scheduled-job-execution';
 import { createJean2SessionRepository } from '@/adapters/jean2/session-repository';
-import { createScheduledJobRepository } from '@/infrastructure/sqlite/scheduled-job-repository';
 import { createSessionSearchQueryRepository } from '@/infrastructure/sqlite/session-search-query-repository';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
@@ -49,16 +45,6 @@ function createSessionSearchHostDeps(agents: AgentsApplication): Jean2SessionSea
   };
 }
 
-/** S4/S5 scheduler host dependencies. The repository is the SQLite
- * infrastructure implementation with an injected store accessor; execution
- * delegates to the current runner through the focused Jean2 adapter. */
-function createSchedulerHostDeps(): Jean2SchedulerHostDeps {
-  return {
-    repository: createScheduledJobRepository(() => getDatabase()),
-    execution: createJean2ScheduledJobExecution(),
-  };
-}
-
 /**
  * Explicit Jean2 server composition root.
  *
@@ -82,7 +68,6 @@ export function createRuntime(existingAgents?: AgentsApplication): AgentsApplica
   configureJean2AgentSource(agents);
   configureJean2InstructionSource();
   configureJean2SessionSearchHost(createSessionSearchHostDeps(agents));
-  configureJean2SchedulerHost(createSchedulerHostDeps());
   configureJean2WorkspaceToolDiscovery();
   void warmInstalledToolsCache();
   configureJean2Bindings();

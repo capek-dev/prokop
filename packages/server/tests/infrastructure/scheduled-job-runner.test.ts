@@ -15,7 +15,7 @@ const preconfig = {
   name: 'Scheduled',
   description: '',
   systemPrompt: '',
-  tools: ['scheduler', 'shell'],
+  tools: ['shell'],
   model: null,
   provider: null,
   variant: null,
@@ -81,7 +81,7 @@ describe('scheduled job runner', () => {
     installHeadlessExecutionPort(null);
   });
 
-  test('filters recursive scheduling and records run before the result error', async () => {
+  test('records the run before the result error', async () => {
     const events: string[] = [];
     const runs: HeadlessSessionRunInput[] = [];
     const deps = dependencies(events, runs);

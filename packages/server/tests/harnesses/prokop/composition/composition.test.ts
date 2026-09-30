@@ -8,7 +8,7 @@ import { configureWorkspaceToolDiscovery, configureToolsPath, getWorkspaceToolDi
 import { sandboxController } from '@capekai/core/sandbox';
 import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/configuration';
 import { configureWorkspacePolicy } from '@capekai/core/workspace';
-import { configureAgentSource, configureInstructionSource, configurePreconfigSource, configureSchedulerHost, configureSessionSearchHost, getRuntimeHost as getJean2CompatibilityBindings, getSchedulerHost, getSessionSearchHost } from '@capekai/core/hosts';
+import { configureAgentSource, configureInstructionSource, configurePreconfigSource, configureSessionSearchHost, getRuntimeHost as getJean2CompatibilityBindings, getSessionSearchHost } from '@capekai/core/hosts';
 import {
   configureStorage,
   createInMemoryStorageBundle,
@@ -22,7 +22,6 @@ import {
   capekRuntimeConfigurationKey,
   capekRuntimeHostKey,
   capekSandboxControllerKey,
-  capekSchedulerHostKey,
   capekSessionSearchHostKey,
   capekStorageKey,
   capekToolResolverKey,
@@ -57,7 +56,6 @@ const expectedCompositionSteps = [
   'configureJean2AgentSource',
   'configureJean2InstructionSource',
   'configureJean2SessionSearchHost',
-  'configureJean2SchedulerHost',
   'configureJean2WorkspaceToolDiscovery',
   'configureJean2Bindings',
   'installExecutionLifecyclePort',
@@ -104,7 +102,6 @@ describe('Čapek composition root', () => {
     configureAgentSource();
     configureInstructionSource();
     configureSessionSearchHost();
-    configureSchedulerHost();
     configureToolsPath();
     configureWorkspaceToolDiscovery();
     configureWorkspacePolicy();
@@ -121,7 +118,6 @@ describe('Čapek composition root', () => {
       '@/adapters/capek',
       '@/adapters/capek/storage',
       '@/adapters/capek/session-search',
-      '@/adapters/capek/scheduler',
       '@/harnesses/prokop/composition/bindings',
       '@/harnesses/prokop/composition/execution-scope',
       '@/application/ports/execution-lifecycle',
@@ -131,9 +127,7 @@ describe('Čapek composition root', () => {
       '@/application/ports/builtin-tools',
       '@/harnesses/prokop/tools',
       '@/adapters/jean2/session-repository',
-      '@/adapters/jean2/scheduled-job-execution',
       '@/infrastructure/sqlite/session-search-query-repository',
-      '@/infrastructure/sqlite/scheduled-job-repository',
       '@/infrastructure/sqlite/database',
       '@/infrastructure/sqlite/message-store',
       '@/infrastructure/sqlite/workspaces',
@@ -156,7 +150,6 @@ describe('Čapek composition root', () => {
     expect(getRuntimeConfiguration()).toBe(focused.jean2RuntimeConfiguration);
     expect(getStorage()).toBe(focused.jean2StorageBundle);
     expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);
-    expect(getSchedulerHost()).toBe(focused.jean2SchedulerHost);
     expect(getWorkspaceToolDiscovery()).toBe(focused.jean2WorkspaceToolDiscovery);
     expect(focused.jean2WorkspacePolicyOptions.blockedPaths).toEqual([
       '/etc/', '/usr/', '/bin/', '/sbin/', '/boot/', '/dev/', '/proc/', '/sys/', '/root/',
@@ -258,7 +251,6 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
     expect(sources.instructions).toBe(focused.jean2InstructionSource);
 
     expect(processScope.require(capekSessionSearchHostKey)).toBe(focused.jean2SessionSearchHost);
-    expect(processScope.require(capekSchedulerHostKey)).toBe(focused.jean2SchedulerHost);
     expect(typeof processScope.require(capekProviderRegistryKey).getProvider).toBe('function');
 
     // The accessors return the same focused adapter objects after composition.
@@ -266,7 +258,6 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
     expect(getRuntimeConfiguration()).toBe(focused.jean2RuntimeConfiguration);
     expect(getStorage()).toBe(focused.jean2StorageBundle);
     expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);
-    expect(getSchedulerHost()).toBe(focused.jean2SchedulerHost);
     expect(getWorkspaceToolDiscovery()).toBe(focused.jean2WorkspaceToolDiscovery);
   });
 
@@ -315,7 +306,6 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
       ['capek.storage', 'agent', 'current.storage', 'agent'],
       ['capek.goal-domain', 'agent', 'current.goal-domain', 'agent'],
       ['capek.memory-domain', 'agent', 'current.memory-domain', 'agent'],
-      ['capek.scheduler-domain', 'agent', 'current.scheduler-domain', 'agent'],
       ['capek.session-search-domain', 'agent', 'current.session-search-domain', 'agent'],
       ['capek.skills-domain', 'agent', 'current.skills-domain', 'agent'],
       ['capek.subagent-domain', 'agent', 'current.subagent-domain', 'agent'],
@@ -325,7 +315,6 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
       ['capek.tool-resolver', 'agent', 'prokopai.tool-resolver', 'agent'],
       ['capek.installed-tool-registry', 'process', 'current.installed-tool-registry', 'process'],
       ['capek.provider-registry', 'process', 'current.provider-registry', 'process'],
-      ['capek.scheduler-host', 'process', 'current.scheduler-host', 'process'],
       ['capek.session-search-host', 'process', 'current.session-search-host', 'process'],
     ]);
 
@@ -412,7 +401,6 @@ describe('C4 coding bundle in the Jean2 composition', () => {
     'memory',
     'skill_manage',
       'session_search',
-      'scheduler',
       'agent_memory',
       'agent_skill_manage',
       ...BUILTIN_BASELINE_TOOL_NAMES,
@@ -423,7 +411,6 @@ describe('C4 coding bundle in the Jean2 composition', () => {
         tool.pluginId === 'prokopai.builtin-tools'
         || tool.pluginId === 'current.tool-output-policy'
         || tool.pluginId === 'current.session-search-domain'
-        || tool.pluginId === 'current.scheduler-domain'
         || tool.pluginId === 'current.subagent-domain'
         || tool.pluginId === 'current.memory-domain'
         || tool.pluginId === 'current.skills-domain',

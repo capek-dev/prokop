@@ -4,7 +4,6 @@ import {
   configureRuntimeHost,
   fixedBuilderContextAssembler,
   installMemoryToolFallback,
-  installSchedulerToolFallback,
   installSessionSearchToolFallback,
   installSkillsToolFallback,
   installTaskToolFallback,
@@ -44,7 +43,6 @@ export function configureJean2Bindings(): void {
   setDefaultContextAssembler(fixedBuilderContextAssembler);
   configureRuntimeHost(jean2CompatibilityBindings);
   installSessionSearchToolFallback();
-  installSchedulerToolFallback();
   installTaskToolFallback();
   installWorkflowToolFallback();
   installMemoryToolFallback();

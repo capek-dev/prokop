@@ -19,7 +19,6 @@ export {
   jean2RuntimeConfiguration,
 } from './runtime-configuration';
 export { jean2SandboxBindings } from './sandbox';
-export { configureJean2SchedulerHost, jean2SchedulerHost } from './scheduler';
 export {
   configureJean2SessionSearchHost,
   jean2SessionSearchHost,

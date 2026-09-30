@@ -62,11 +62,6 @@ export function createScheduledJobRunner(deps: ScheduledJobRunnerDeps): {
         sessionId = createScheduledSession(deps.sessions, job, preconfig, jobHarness, modelId, providerId, permissionMode);
       }
 
-      const safePreconfig: Preconfig = {
-        ...preconfig,
-        tools: (preconfig.tools ?? []).filter((toolName) => toolName !== 'scheduler'),
-      };
-
       console.log(`[scheduler] Running job '${job.name}' in session ${sessionId}`);
 
       // Headless dispatch: the owning harness runs the child session inside
@@ -78,7 +73,7 @@ export function createScheduledJobRunner(deps: ScheduledJobRunnerDeps): {
             harness: jobHarness,
             parentSessionId: sessionId,
             childSessionId: sessionId,
-            preconfig: safePreconfig,
+            preconfig,
             prompt: job.prompt,
             workspacePath: workspace?.path || undefined,
             workspaceId: job.workspaceId,

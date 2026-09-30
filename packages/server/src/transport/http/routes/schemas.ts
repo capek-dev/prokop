@@ -275,10 +275,6 @@ export const providerCredentialsSchema = z.object({
     permissionRisk: riskLevel,
     includeToolResults: z.boolean(),
   }).partial().optional(),
-  scheduling: z.object({
-    enabled: z.boolean(),
-    permissionRisk: riskLevel,
-  }).partial().optional(),
   permissionMode: z.enum(['standard', 'extended', 'full']).optional(),
   preconfigs: z.object({
     selectedIds: z.array(z.string()).nullable().optional(),
