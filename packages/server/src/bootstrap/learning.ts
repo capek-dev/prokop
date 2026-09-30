@@ -4,9 +4,7 @@ import { broadcastEvent, broadcastSessionUpdated } from '@/transport/websocket/b
 import { createLearningService } from '@/application/learning/service';
 import { createLearningReviewRunner } from '@/application/learning/review-runner';
 import { createLearningRecovery } from '@/application/learning/recovery';
-import { createLearningExecution, type LearningExecutionDependencies } from '@/harnesses/prokop/learning/learning-execution';
-import { createLearningDirectoryResolver } from '@/harnesses/prokop/learning/learning-directories';
-import { createLearningHistory } from '@/harnesses/prokop/learning/learning-history';
+import type { LearningRuntimePort } from '@/application/ports/learning-runtime';
 import { createJean2SessionRepository } from '@/adapters/jean2/session-repository';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { getWorkspace, listWorkspaces } from '@/infrastructure/sqlite/workspaces';
@@ -17,12 +15,13 @@ import { getModelsDocument, getModelRuntimeStatus } from '@/config/models';
 
 export function createWiredLearning(
   agents: Pick<AgentsApplication, 'getAgentDirectory' | 'getPreconfigOrAgent' | 'isAgentSync'>,
-  overrides: { execute?: LearningExecutionDependencies['execute']; modelAvailable?: (provider: string, model: string) => boolean } = {},
+  runtime: LearningRuntimePort,
+  overrides: { modelAvailable?: (provider: string, model: string) => boolean } = {},
 ) {
   const db = getDatabase();
   const repository = createLearningRepository(db);
-  const directories = createLearningDirectoryResolver(agents);
-  const history = createLearningHistory({ repository, directories, workspace: getWorkspace, now: Date.now });
+  const directories = runtime.directories;
+  const history = runtime.createHistory({ repository, directories, workspace: getWorkspace, now: Date.now });
   const recoverWorkspace = createLearningRecovery({ repository, reconcile: history.reconcile, now: Date.now,
     onError: error => console.warn('[learning] Recovery preserved current files', error instanceof Error ? error.message : 'Unavailable history destination') });
   const operations = new Map<string, Promise<unknown>>();
@@ -37,12 +36,12 @@ export function createWiredLearning(
     workspace.settings.isAgentHome
       ? { kind: 'agent', agentId: workspace.settings.agentId ?? '', sources: workspace.settings.learning?.sources ?? { mode: 'all' } }
       : { kind: 'workspace', workspaceId: workspace.id });
-  const execute = createLearningExecution({
-    database: db, repository, directories, workspace: getWorkspace, execute: overrides.execute,
+  const execute = runtime.createExecution({
+    database: db, repository, directories, workspace: getWorkspace,
     createSession(workspace, preconfigId, runId) {
       return db.transaction(() => {
         const id = crypto.randomUUID();
-        sessions.createSession({ id, workspaceId: workspace.id, harness: 'prokop', preconfigId, title: '[Learning]', status: 'active',
+        sessions.createSession({ id, workspaceId: workspace.id, harness: runtime.harness, preconfigId, title: '[Learning]', status: 'active',
           metadata: { learningRunId: runId }, parentId: null, agentName: null, autoApproveSeverity: 'off' });
         db.run('INSERT INTO learning_session_origins (session_id, run_id) VALUES (?, ?)', [id, runId]);
         return id;

@@ -90,6 +90,7 @@ import { getDataDir } from '@/infrastructure/runtime/paths';
 import { codexAccounts } from '@/infrastructure/providers/codex-accounts';
 import { createProkopHarness } from '@/harnesses/prokop';
 import { prokopAskResolution } from '@/harnesses/prokop/composition/contracts';
+import { createProkopLearningRuntime } from '@/harnesses/prokop/learning';
 import { codexApprovals } from '@/harnesses/codex-cli/approvals';
 import { installCodexApprovalPort } from '@/application/ports/codex-approval';
 import { claudeApprovals } from '@/harnesses/claude-cli/approvals';
@@ -392,5 +393,5 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
 
   installTerminalSessionStore(createJean2TerminalSessionPort());
 
-  return { learning: createWiredLearning(agents), session, control, http, scheduling, schedulerTicker, agents, workspaces, worktrees, tools, mcp, providers, notifications, permissions, files, configuration, maintenance, responseFormats };
+  return { learning: createWiredLearning(agents, createProkopLearningRuntime({ agents })), session, control, http, scheduling, schedulerTicker, agents, workspaces, worktrees, tools, mcp, providers, notifications, permissions, files, configuration, maintenance, responseFormats };
 }

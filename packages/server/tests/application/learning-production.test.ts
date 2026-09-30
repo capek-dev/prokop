@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import type { Preconfig, LearningRunSummary, LearningRunDetail } from '@prokopai/sdk';
 import { createWiredLearning } from '@/bootstrap/learning';
 import type { LearningExecutionDependencies } from '@/harnesses/prokop/learning/learning-execution';
+import { createProkopLearningRuntime } from '@/harnesses/prokop/learning';
 import { createSessionSchema, updateSessionSchema } from '@/transport/http/routes/schemas';
 import { registerLearningRoutes } from '@/transport/http/routes/learning';
 import { getSession, updateSession, createSession } from '@/infrastructure/sqlite/session-store';
@@ -33,16 +34,21 @@ async function fixture(personal = false, execute?: LearningExecutionDependencies
   db.run(`INSERT INTO messages (id,session_id,role,created_at,status,agent,completed_at,sequence) VALUES ('answer','source','assistant',?,'completed','dev',?,0)`, [now, now]);
   let reviewSession = '';
   let calls = 0;
-  const wire = () => createWiredLearning({ getAgentDirectory: async () => personal ? root! : null, isAgentSync: () => false,
-    getPreconfigOrAgent: async () => ({ id: 'dev', provider: 'test', model: 'fake', systemPrompt: 'Review' } as Preconfig) }, {
-    modelAvailable: () => true,
-    execute: async input => {
+  const agents = {
+    getAgentDirectory: async () => personal ? root! : null, isAgentSync: () => false,
+    getPreconfigOrAgent: async () => ({ id: 'dev', provider: 'test', model: 'fake', systemPrompt: 'Review' } as Preconfig),
+  };
+  const wire = () => createWiredLearning(agents, createProkopLearningRuntime({
+    agents,
+    executeOverride: async input => {
       calls++; reviewSession = input.sessionId;
       if (execute) return execute(input);
       expect(getSession(input.sessionId)?.metadata?.learningRunId).toBeTruthy();
       expect((await input.knowledge(personal ? 'agent_memory' : 'memory', { action: 'add', target: 'memory', content: 'Verified production lesson' })).success).toBe(true);
       return {};
     },
+  }), {
+    modelAvailable: () => true,
   });
   learning = wire();
   const app = new Hono();

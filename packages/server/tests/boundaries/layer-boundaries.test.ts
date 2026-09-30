@@ -1800,6 +1800,15 @@ describe('server layer boundaries', () => {
     expect(violations).toEqual([]);
   });
 
+  test('S11.3 gate: wired learning receives its runtime through the application port', () => {
+    const learningPath = resolve(bootstrapDir, 'learning.ts');
+    const learning = scanDirectory(serverSourceRoot).find((file) => file.path === learningPath);
+    expect(learning).toBeDefined();
+    const specifiers = parseImports(learning!.sourceText, learning!.path).map((imp) => imp.specifier);
+    expect(specifiers).toContain('@/application/ports/learning-runtime');
+    expect(specifiers.some((specifier) => specifier.startsWith('@/harnesses/'))).toBe(false);
+  });
+
   test('S10 gate: startup owns execution composition creation and disposal', () => {
     const startupPath = resolve(serverSourceRoot, 'index.ts');
     const startup = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === startupPath);
