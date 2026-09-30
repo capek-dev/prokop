@@ -379,9 +379,6 @@ function ChatViewContent({
           prompts={prompts}
           sessionId={session.id}
           modelSupportsImage={modelSupportsImage}
-          goalState={(session.metadata as Record<string, unknown> | null)?.goal as import('@prokopai/sdk').GoalState | null ?? null}
-          codexGoal={(session.metadata as Record<string, unknown> | null)?.codexGoal as import('@prokopai/sdk').CodexGoalState | null ?? null}
-          claudeGoal={(session.metadata as Record<string, unknown> | null)?.claudeGoal as import('@prokopai/sdk').ClaudeGoalState | null ?? null}
           isStreaming={isStreaming}
           onStopStreaming={onInterrupt}
           session={session}

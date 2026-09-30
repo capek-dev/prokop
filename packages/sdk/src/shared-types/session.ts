@@ -57,9 +57,39 @@ export interface SessionHarnessForkState {
   reason?: string;
 }
 
+export interface SessionHarnessGoalProgress {
+  /** What the progress number counts. */
+  kind: 'turns' | 'tokens' | 'iterations';
+  current: number;
+  max: number | null;
+}
+
+export interface SessionHarnessGoalState {
+  status: string;
+  /** Codex objective / prokop and claude condition text. */
+  objective: string | null;
+  progress: SessionHarnessGoalProgress | null;
+}
+
+export interface SessionHarnessUsageRow {
+  label: string;
+  value: string;
+}
+
+export interface SessionHarnessUsageState {
+  /** Context-occupancy numerator for the meter fill. */
+  used: number;
+  /** Denominator for the meter fill; 0 renders the unknown state. */
+  contextWindow: number;
+  /** Pre-computed display rows (label + formatted value). */
+  rows: SessionHarnessUsageRow[];
+}
+
 export interface SessionHarnessState {
   compaction: SessionHarnessCompactionState;
   fork: SessionHarnessForkState;
+  goal: SessionHarnessGoalState | null;
+  usage: SessionHarnessUsageState | null;
   /** True when a native Goal outcome is uncertain and locks the input. */
   goalUncertain: boolean;
   /** Native-harness approval tool-call prefix ('codex-approval:' and

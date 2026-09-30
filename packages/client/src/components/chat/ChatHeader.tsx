@@ -34,8 +34,7 @@ interface ChatHeaderProps {
   preconfigs: Preconfig[];
   models: Model[];
   defaultModel: string;
-  usage: SessionUsage;
-  modelName: string;
+  usage: SessionUsage;  modelName: string;
   onChangePreconfig: (preconfigId: string) => void;
   onChangeModel: (modelId: string, providerId: string) => void;
   onChangeVariant: (variant: string | null) => void;
@@ -57,7 +56,6 @@ export function ChatHeader({
   serverUrl = null,
   preconfigs,
   models,
-  usage,
   modelName,
   onChangePreconfig,
   onChangeModel,
@@ -204,11 +202,6 @@ export function ChatHeader({
     preconfigs.find((p) => p.id === session.preconfigId)?.model ||
     modelName;
 
-  const currentModelInfo = session.selectedProvider
-    ? models.find((m) => m.providerId === session.selectedProvider && m.id === selectedModel)
-    : models.find((m) => m.id === selectedModel);
-  const contextWindow = currentModelInfo?.contextWindow;
-
   return (
     <div className="flex-1 min-w-0 flex items-center justify-between gap-1">
       <TooltipProvider delayDuration={300}>
@@ -246,22 +239,7 @@ export function ChatHeader({
               </h2>
             )}
 
-            <TokenMeter
-              codex={codexSession}
-              codexUsage={session.metadata?.codexUsage}
-              claude={claudeSession}
-              claudeUsage={session.metadata?.claudeUsage}
-              claudeContext={session.metadata?.claudeContext}
-              promptTokens={usage.promptTokens}
-              completionTokens={usage.completionTokens}
-              totalTokens={usage.totalTokens}
-              cacheReadTokens={usage.cacheReadTokens}
-              cacheWriteTokens={usage.cacheWriteTokens}
-              noCacheTokens={usage.noCacheTokens}
-              contextWindow={contextWindow}
-              modelName={modelName}
-              compact={isMobile}
-            />
+            <TokenMeter usage={session.harnessState?.usage ?? null} />
             {session.status === 'closed' && (
               <Badge variant="secondary">
                 <Archive className="size-3" data-icon="inline-start" />

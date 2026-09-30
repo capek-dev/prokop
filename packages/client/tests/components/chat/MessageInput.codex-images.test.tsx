@@ -48,11 +48,13 @@ test('Claude Goal sends a condition without Codex limits and shows native checks
   fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
   fireEvent.click(screen.getByRole('button', { name: 'Set goal' }));
   expect(onSendMessage).toHaveBeenCalledWith('Tests pass', undefined, undefined, { condition: 'Tests pass' });
-  view.rerender(<MessageInput session={claude} sessionId={session.id} workspaceId="ws"
-    onSendMessage={onSendMessage} claudeGoal={{ condition: 'Tests pass', status: 'active', iterations: 1 }} />);
+  view.rerender(<MessageInput session={{ ...claude, harnessState: { goal: { status: 'active', objective: 'Tests pass',
+    progress: { kind: 'iterations', current: 1, max: null } } } as Session['harnessState'] } as Session}
+    sessionId={session.id} workspaceId="ws" onSendMessage={onSendMessage} />);
   expect(screen.getByText('active · 1 checks')).toBeInTheDocument();
-  view.rerender(<MessageInput session={claude} sessionId={session.id} workspaceId="ws"
-    onSendMessage={onSendMessage} claudeGoal={{ condition: 'Tests pass', status: 'ended', iterations: 2 }} />);
+  view.rerender(<MessageInput session={{ ...claude, harnessState: { goal: { status: 'ended', objective: 'Tests pass',
+    progress: { kind: 'iterations', current: 2, max: null } } } as Session['harnessState'] } as Session}
+    sessionId={session.id} workspaceId="ws" onSendMessage={onSendMessage} />);
   expect(screen.queryByText('ended · 2 checks')).not.toBeInTheDocument();
   expect(screen.queryByText('Tests pass')).not.toBeInTheDocument();
   expect(screen.getByPlaceholderText('Message Claude CLI (text and images)')).not.toBeDisabled();
@@ -77,9 +79,10 @@ test('Codex Goal sends a token budget separately from max turns', async () => {
 
 test('an active Codex Goal shows usage and disables the composer', () => {
   const { onSendMessage, view } = setup();
-  view.rerender(<MessageInput session={session} sessionId={session.id} workspaceId="ws"
-    onSendMessage={onSendMessage} codexGoal={{ objective: 'Ship it', status: 'active',
-      tokenBudget: 50000, tokensUsed: 123 }} />);
+  view.rerender(<MessageInput session={{ ...session, harnessState: { goal: { status: 'active', objective: 'Ship it',
+    progress: { kind: 'tokens', current: 123, max: 50000 } } } as Session['harnessState'] } as Session}
+    sessionId={session.id} workspaceId="ws"
+    onSendMessage={onSendMessage} />);
   expect(screen.getByText('123/50,000 tokens', { exact: false })).toBeInTheDocument();
   expect(screen.getByPlaceholderText('Goal active')).toBeDisabled();
 });

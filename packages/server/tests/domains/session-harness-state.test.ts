@@ -63,4 +63,61 @@ describe('session harness state derivation', () => {
     expect(deriveSessionHarnessState('claude-cli', [1, 2] as unknown as Record<string, unknown>).fork.mode)
       .toBe('any');
   });
+
+  test('codex goal and usage derive from metadata', () => {
+    const state = deriveSessionHarnessState('codex-cli', {
+      codexGoal: { status: 'active', objective: 'Ship it', tokenBudget: 50000, tokensUsed: 123 },
+      codexUsage: {
+        last: { inputTokens: 9500, outputTokens: 2500, totalTokens: 12000 },
+        total: { totalTokens: 48000 },
+        modelContextWindow: 200000,
+      },
+    });
+    expect(state.goal).toEqual({
+      status: 'active', objective: 'Ship it',
+      progress: { kind: 'tokens', current: 123, max: 50000 },
+    });
+    expect(state.usage).toMatchObject({ used: 12000, contextWindow: 200000 });
+    expect(state.usage?.rows.map(row => row.label)).toEqual(['Latest input', 'Latest output', 'Thread total', 'Context window']);
+  });
+
+  test('claude goal and usage derive from metadata with context occupancy', () => {
+    const state = deriveSessionHarnessState('claude-cli', {
+      claudeGoal: { status: 'active', condition: 'Tests pass', iterations: 3 },
+      claudeUsage: { last: { prompt: 1200, completion: 100, cacheRead: 400, cacheWrite: 200 } },
+      claudeContext: { used: 50000, window: 200000 },
+    });
+    expect(state.goal).toEqual({
+      status: 'active', objective: 'Tests pass',
+      progress: { kind: 'iterations', current: 3, max: null },
+    });
+    expect(state.usage).toEqual({
+      used: 50000, contextWindow: 200000,
+      rows: [
+        { label: 'Latest input', value: '1,200' },
+        { label: 'Latest output', value: '100' },
+        { label: 'Latest cached input', value: '400' },
+        { label: 'Latest cache creation', value: '200' },
+        { label: 'Context', value: '50,000 / 200,000' },
+      ],
+    });
+  });
+
+  test('malformed goal and usage metadata derive to null', () => {
+    const state = deriveSessionHarnessState('codex-cli', {
+      codexGoal: 'nonsense',
+      codexUsage: 42,
+    });
+    expect(state.goal).toBeNull();
+    expect(state.usage).toBeNull();
+  });
+
+  test('prokop usage derives from session token totals', () => {
+    expect(deriveSessionHarnessState('prokop', null, {
+      promptTokens: 4200, completionTokens: 800, totalTokens: 5000,
+    }).usage).toMatchObject({ used: 5000, contextWindow: 0 });
+
+    expect(deriveSessionHarnessState('prokop', null, { totalTokens: 0 }).usage).toBeNull();
+    expect(deriveSessionHarnessState('prokop', null).usage).toBeNull();
+  });
 });

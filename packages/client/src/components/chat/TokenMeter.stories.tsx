@@ -1,5 +1,19 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { SessionHarnessUsageState } from '@prokopai/sdk';
 import { TokenMeter } from './TokenMeter';
+
+function usage(overrides: Partial<SessionHarnessUsageState> = {}): SessionHarnessUsageState {
+  return {
+    used: 5000,
+    contextWindow: 200000,
+    rows: [
+      { label: 'Input', value: '4,200' },
+      { label: 'Output', value: '800' },
+      { label: 'Total', value: '5,000' },
+    ],
+    ...overrides,
+  };
+}
 
 const meta = {
   title: 'Chat/TokenMeter',
@@ -8,14 +22,7 @@ const meta = {
     layout: 'centered',
   },
   args: {
-    promptTokens: 4200,
-    completionTokens: 800,
-    totalTokens: 5000,
-    cacheReadTokens: 3000,
-    cacheWriteTokens: 200,
-    noCacheTokens: 1000,
-    contextWindow: 200000,
-    modelName: 'Claude 3.5 Sonnet',
+    usage: usage(),
   },
 } satisfies Meta<typeof TokenMeter>;
 
@@ -25,66 +32,44 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const NoUsage: Story = {
-  args: {
-    totalTokens: 0,
-    contextWindow: 200000,
-  },
-};
-
-export const LowUsage: Story = {
-  args: {
-    totalTokens: 5000,
-    contextWindow: 200000,
-  },
+  args: { usage: null },
 };
 
 export const MediumUsage: Story = {
-  args: {
-    totalTokens: 40000,
-    contextWindow: 100000,
-  },
+  args: { usage: usage({ used: 40000, contextWindow: 100000 }) },
 };
 
 export const HighUsage: Story = {
-  args: {
-    totalTokens: 70000,
-    contextWindow: 100000,
-  },
+  args: { usage: usage({ used: 70000, contextWindow: 100000 }) },
 };
 
 export const NearLimit: Story = {
-  args: {
-    totalTokens: 92000,
-    contextWindow: 100000,
-  },
+  args: { usage: usage({ used: 92000, contextWindow: 100000 }) },
 };
 
 export const AtLimit: Story = {
-  args: {
-    totalTokens: 100000,
-    contextWindow: 100000,
-  },
+  args: { usage: usage({ used: 100000, contextWindow: 100000 }) },
 };
 
 export const NoContextWindow: Story = {
-  args: {
-    totalTokens: 5000,
-    contextWindow: 0,
-  },
+  args: { usage: usage({ used: 5000, contextWindow: 0, rows: [{ label: 'Total', value: '5,000' }] }) },
 };
 
 export const LargeContext: Story = {
-  args: {
-    totalTokens: 150000,
-    contextWindow: 1000000,
-    modelName: 'Gemini 2.0 Flash',
-  },
+  args: { usage: usage({ used: 150000, contextWindow: 1000000 }) },
 };
 
-export const Compact: Story = {
+export const CodexStyle: Story = {
   args: {
-    totalTokens: 25000,
-    contextWindow: 200000,
-    compact: true,
+    usage: usage({
+      used: 12000,
+      contextWindow: 200000,
+      rows: [
+        { label: 'Latest input', value: '9,500' },
+        { label: 'Latest output', value: '2,500' },
+        { label: 'Thread total', value: '48,000' },
+        { label: 'Context window', value: '200,000' },
+      ],
+    }),
   },
 };

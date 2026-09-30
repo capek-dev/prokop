@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
-import type { ProkopaiClient, Session, CodexGoalState, ClaudeGoalState } from '@prokopai/sdk';
+import type { ProkopaiClient, Session } from '@prokopai/sdk';
 import { ArrowUp, Square, Paperclip, AlertTriangle, Target, ChevronDown } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -37,9 +37,6 @@ interface MessageInputProps {
   /** Checkout is locked once the session has messages. */
   checkoutLocked?: boolean;
   modelSupportsImage?: boolean;
-  goalState?: import('@prokopai/sdk').GoalState | null;
-  codexGoal?: CodexGoalState | null;
-  claudeGoal?: ClaudeGoalState | null;
 }
 
 interface PendingAttachmentData {
@@ -90,9 +87,6 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   session,
   checkoutLocked,
   modelSupportsImage,
-  goalState,
-  codexGoal,
-  claudeGoal,
 }: MessageInputProps, ref) {
   const codexSession = session?.harness === 'codex-cli';
   const claudeSession = session?.harness === 'claude-cli';
@@ -347,8 +341,8 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
     }
   }, [addFiles]);
 
-  const goalActive = goalState?.status === 'active' || codexSession && codexGoal?.status === 'active'
-    || claudeSession && claudeGoal?.status === 'active';
+  const goal = session?.harnessState?.goal ?? null;
+  const goalActive = goal?.status === 'active';
   const budgetValid = Number.isSafeInteger(goalTokenBudget) && goalTokenBudget > 0 && goalTokenBudget <= 1_000_000;
   const effectiveDisabled = disabled || goalActive || ((codexSession || claudeSession) && isStreaming);
 
@@ -577,28 +571,19 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
             ))}
           </div>
         )}
-        {codexSession && codexGoal && (
+        {goal?.status === 'active' && (
           <div className="flex items-center gap-2 px-3 pt-3 text-xs text-muted-foreground">
             <Target className="size-3 shrink-0" />
-            <span className="min-w-0 truncate" title={codexGoal.objective}>{codexGoal.objective}</span>
-            <span className="ml-auto shrink-0 tabular-nums">{codexGoal.status} · {codexGoal.tokensUsed.toLocaleString()}/{codexGoal.tokenBudget?.toLocaleString() ?? 'unlimited'} tokens</span>
-          </div>
-        )}
-        {claudeSession && claudeGoal?.status === 'active' && (
-          <div className="flex items-center gap-2 px-3 pt-3 text-xs text-muted-foreground">
-            <Target className="size-3 shrink-0" />
-            <span className="min-w-0 truncate" title={claudeGoal.condition}>{claudeGoal.condition}</span>
-            <span className="ml-auto shrink-0 tabular-nums">{claudeGoal.status} · {claudeGoal.iterations} checks</span>
-          </div>
-        )}
-        {!codexSession && !claudeSession && goalActive && (
-          <div className="flex items-center gap-2 px-3 pt-3 text-xs">
-            <Target className="size-3 shrink-0 text-warning" />
-            <span className="min-w-0 truncate text-warning" title={goalState?.condition ?? ''}>
-              {goalState?.condition}
-            </span>
-            <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
-              Turn {goalState?.currentTurn ?? 0}/{goalState?.maxTurns ?? 0}
+            <span className="min-w-0 truncate" title={goal.objective ?? ''}>{goal.objective}</span>
+            <span className="ml-auto shrink-0 tabular-nums">
+              {goal.status}
+              {goal.progress && (
+                <> · {goal.progress.kind === 'tokens'
+                  ? `${goal.progress.current.toLocaleString()}/${goal.progress.max?.toLocaleString() ?? 'unlimited'} tokens`
+                  : goal.progress.kind === 'iterations'
+                    ? `${goal.progress.current} checks`
+                    : `Turn ${goal.progress.current}/${goal.progress.max ?? 0}`}</>
+              )}
             </span>
           </div>
         )}

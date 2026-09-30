@@ -15,6 +15,8 @@ vi.mock('@/contexts/ServerContext', () => ({ useServerContext: () => ({ servers:
 const codexHarnessState: SessionHarnessState = {
   compaction: { pending: false, uncertain: false, boundaryMessageId: null },
   fork: { mode: 'assistant-only' },
+  goal: null,
+  usage: null,
   goalUncertain: false,
   nativeApprovalPrefix: 'codex-approval:',
   capabilities: { canRemoveQueuedMessages: false, canInterruptSubagent: true, subagentActivityPropagates: true },
