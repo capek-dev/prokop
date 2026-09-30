@@ -104,7 +104,8 @@ import {
   listCodexModels,
   saveCodexModelSelection,
 } from '@/harnesses/codex-cli';
-import { createHarnessExecution } from '@/application/sessions/harness-execution';
+import { createHarnessExecution, type HarnessRegistration } from '@/application/sessions/harness-execution';
+import { installHeadlessExecutionPort } from '@/application/ports/headless-execution';
 import { claudeCliAvailable, createClaudeCliHarness, createClaudeExecution,
   getClaudeModelSelection, listClaudeModels, saveClaudeModelSelection } from '@/harnesses/claude-cli';
 
@@ -207,7 +208,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     sessionSearch: sessionSearchDomainTools,
     agentSkills: agentSkillsDomainTools,
   });
-  const execution = createHarnessExecution(repository, {
+  const harnessRegistrations: Record<import('@prokopai/sdk').SessionHarness, HarnessRegistration> = {
     prokop: createProkopHarness({
       onSessionChanged: (changedSession) => {
         if (changedSession.workspaceRootId) {
@@ -217,6 +218,23 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     }),
     'codex-cli': createCodexCliHarness(codexExecution, sessionTitleRegeneration),
     'claude-cli': createClaudeCliHarness(claudeExecution, sessionTitleRegeneration),
+  };
+  const execution = createHarnessExecution(repository, harnessRegistrations);
+  // Headless (scheduled) dispatch routes through the harness registry: the
+  // Prokop registration owns the composed-scope child run; harnesses
+  // without headless support fail closed per run and are rejected at job
+  // creation through supportedHarnesses().
+  installHeadlessExecutionPort({
+    run(input) {
+      const headless = harnessRegistrations[input.harness]?.headless;
+      return headless
+        ? headless(input)
+        : Promise.resolve({ error: `Scheduled jobs are not supported for ${input.harness} sessions` });
+    },
+    supportedHarnesses() {
+      return (Object.keys(harnessRegistrations) as Array<import('@prokopai/sdk').SessionHarness>)
+        .filter(harness => harnessRegistrations[harness].headless !== undefined);
+    },
   });
   const askAuthority = createJean2AskAuthorityPort();
   const pendingAsks = createJean2PendingAskPort();

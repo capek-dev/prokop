@@ -1,6 +1,7 @@
 import type { SessionHarness } from '@prokopai/sdk';
 import type { SessionExecutionPort } from '@/application/ports/execution';
 import type { SessionRepositoryPort } from '@/application/ports/session';
+import type { HeadlessSessionRunInput } from '@/application/ports/headless-execution';
 
 export type HarnessOperation = 'editMessage' | 'regenerateTitle' | 'compact' | 'revert' | 'fork';
 
@@ -10,6 +11,9 @@ export type HarnessExecutor = Pick<SessionExecutionPort, 'sendMessage' | 'interr
 
 export interface HarnessRegistration {
   execution: HarnessExecutor;
+  /** Headless (scheduled) child runs; absent means the harness cannot run
+   * scheduled jobs and creation rejects it. */
+  headless?: (input: HeadlessSessionRunInput) => Promise<{ error?: string }>;
   unsupportedMessages?: Partial<Record<HarnessOperation, string>>;
 }
 

@@ -18,6 +18,7 @@ function makeJob(overrides: Partial<ScheduledJob> = {}): ScheduledJob {
   return {
     id: 'job-1',
     workspaceId: 'ws-1',
+    harness: 'prokop',
     name: 'Job',
     prompt: 'Run',
     scheduleKind: 'interval',
@@ -219,6 +220,7 @@ describe('scheduling HTTP use cases', () => {
     expect(captured).toEqual({
       name: 'J',
       prompt: 'P',
+      harness: 'prokop',
       scheduleKind: 'interval',
       scheduleConfig: { type: 'interval', intervalMinutes: 60 },
       repeatLimit: null,
@@ -229,6 +231,56 @@ describe('scheduling HTTP use cases', () => {
       autoApproveSeverity: null,
       notificationsEnabled: false,
     });
+  });
+
+  test('createJob rejects harnesses without headless execution support', () => {
+    const fakes = makeFakes();
+    const createdHarnesses: Array<string | undefined> = [];
+    fakes.repository.create = (_workspaceId, input) => {
+      createdHarnesses.push(input.harness);
+      return makeJob({ harness: input.harness });
+    };
+    const application = createSchedulingHttpApplication({
+      repository: fakes.repository,
+      workspaces: fakes.workspaces,
+      execution: fakes.execution,
+      headlessSupport: { supportedHarnesses: () => ['prokop'] },
+    });
+
+    const rejected = application.createJob('ws-1', {
+      name: 'J',
+      prompt: 'P',
+      scheduleKind: 'interval',
+      scheduleConfig: { type: 'interval', intervalMinutes: 60 },
+      harness: 'codex-cli',
+    });
+    expect(rejected).toEqual({ kind: 'harness_unsupported', harness: 'codex-cli' });
+    expect(createdHarnesses).toEqual([]);
+
+    const defaulted = application.createJob('ws-1', {
+      name: 'J',
+      prompt: 'P',
+      scheduleKind: 'interval',
+      scheduleConfig: { type: 'interval', intervalMinutes: 60 },
+    });
+    expect(defaulted.kind).toBe('created');
+    expect(createdHarnesses).toEqual(['prokop']);
+
+    const supported = createSchedulingHttpApplication({
+      repository: fakes.repository,
+      workspaces: fakes.workspaces,
+      execution: fakes.execution,
+      headlessSupport: { supportedHarnesses: () => ['prokop', 'codex-cli'] },
+    });
+    const accepted = supported.createJob('ws-1', {
+      name: 'J',
+      prompt: 'P',
+      scheduleKind: 'interval',
+      scheduleConfig: { type: 'interval', intervalMinutes: 60 },
+      harness: 'codex-cli',
+    });
+    expect(accepted.kind).toBe('created');
+    expect(createdHarnesses).toEqual(['prokop', 'codex-cli']);
   });
 
   test('createJob trims padded name and prompt before creating', () => {

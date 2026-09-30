@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { Preconfig, ScheduledJob, Session } from '@prokopai/sdk';
-import { executeChildSession, findProviderFromModel } from '@/adapters/capek/contracts';
+import { findProviderFromModel } from '@/adapters/capek/contracts';
+import { getHeadlessExecutionPort, type HeadlessSessionRunPort } from '@/application/ports/headless-execution';
 import type {
   ScheduledJobRepositoryPort,
   ScheduledRunModelsConfigPort,
@@ -15,6 +16,8 @@ export interface ScheduledJobRunnerDeps {
   workspaces: ScheduledRunWorkspacePort;
   preconfigs: ScheduledRunPreconfigPort;
   modelsConfig: ScheduledRunModelsConfigPort;
+  /** Test seam; production dispatches through the installed headless port. */
+  headless?: Pick<HeadlessSessionRunPort, 'run'>;
 }
 
 export function createScheduledJobRunner(deps: ScheduledJobRunnerDeps): {
@@ -39,6 +42,7 @@ export function createScheduledJobRunner(deps: ScheduledJobRunnerDeps): {
         config.defaultProvider;
       const autoApproveSeverity =
         job.autoApproveSeverity ?? deps.workspaces.getAutoApproveSeverity(job.workspaceId);
+      const jobHarness = job.harness ?? 'prokop';
 
       let sessionId: string;
       let resumeFromHistory = false;
@@ -52,10 +56,10 @@ export function createScheduledJobRunner(deps: ScheduledJobRunnerDeps): {
             `[scheduler] Reusing session ${sessionId} for job '${job.name}' (history: ${resumeFromHistory})`,
           );
         } else {
-          sessionId = createScheduledSession(deps.sessions, job, preconfig, modelId, providerId, autoApproveSeverity);
+          sessionId = createScheduledSession(deps.sessions, job, preconfig, jobHarness, modelId, providerId, autoApproveSeverity);
         }
       } else {
-        sessionId = createScheduledSession(deps.sessions, job, preconfig, modelId, providerId, autoApproveSeverity);
+        sessionId = createScheduledSession(deps.sessions, job, preconfig, jobHarness, modelId, providerId, autoApproveSeverity);
       }
 
       const safePreconfig: Preconfig = {
@@ -65,17 +69,24 @@ export function createScheduledJobRunner(deps: ScheduledJobRunnerDeps): {
 
       console.log(`[scheduler] Running job '${job.name}' in session ${sessionId}`);
 
-      const result = await executeChildSession({
-        parentSessionId: sessionId,
-        childSessionId: sessionId,
-        preconfig: safePreconfig,
-        prompt: job.prompt,
-        workspacePath: workspace?.path || undefined,
-        workspaceId: job.workspaceId,
-        modelId,
-        providerId,
-        resumeFromHistory,
-      });
+      // Headless dispatch: the owning harness runs the child session inside
+      // its own runtime scope. A missing installed port fails closed and the
+      // job records the failure instead of executing.
+      const headless = deps.headless ?? getHeadlessExecutionPort();
+      const result = headless
+        ? await headless.run({
+            harness: jobHarness,
+            parentSessionId: sessionId,
+            childSessionId: sessionId,
+            preconfig: safePreconfig,
+            prompt: job.prompt,
+            workspacePath: workspace?.path || undefined,
+            workspaceId: job.workspaceId,
+            modelId,
+            providerId,
+            resumeFromHistory,
+          })
+        : { error: 'Scheduled execution is unavailable' };
 
       deps.repository.markRun(job.id, sessionId);
       if (result.error) {
@@ -89,6 +100,7 @@ function createScheduledSession(
   sessions: ScheduledRunSessionPort,
   job: ScheduledJob,
   preconfig: Preconfig,
+  harness: Session['harness'],
   modelId: string,
   providerId: string,
   autoApproveSeverity: Session['autoApproveSeverity'],
@@ -97,7 +109,7 @@ function createScheduledSession(
   sessions.createSession({
     id: sessionId,
     workspaceId: job.workspaceId,
-    harness: 'prokop',
+    harness,
     preconfigId: preconfig.id,
     title: `[Scheduled] ${job.name}`,
     status: 'active',

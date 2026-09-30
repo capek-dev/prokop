@@ -15,6 +15,7 @@ function makeJob(overrides: Partial<ScheduledJob> = {}): ScheduledJob {
   return {
     id: 'job-1',
     workspaceId: 'ws-1',
+    harness: 'prokop',
     name: 'test-job',
     prompt: 'Run',
     scheduleKind: 'interval',

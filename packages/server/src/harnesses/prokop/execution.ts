@@ -9,6 +9,7 @@ import {
   regenerateSessionTitle as regenerateCapekSessionTitle,
   revertToStep as revertCapekToStep,
 } from '@capekai/core/execution';
+import { executeChildSession as capekExecuteChildSession } from '@capekai/core/providers';
 import type {
   CompactionExecutionOutcome,
   ForkExecutionResult,
@@ -16,6 +17,10 @@ import type {
   RevertExecutionResult,
   SessionExecutionPort,
 } from '@/application/ports/execution';
+import type {
+  HeadlessSessionRunInput,
+  HeadlessSessionRunResult,
+} from '@/application/ports/headless-execution';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import { createJean2RuntimeContext } from '@/adapters/capek/events';
 import { withJean2ComposedScopeSync, withJean2ExecutionScope } from '@/harnesses/prokop/composition/execution-scope';
@@ -27,6 +32,7 @@ export interface Jean2SessionExecutionDependencies {
   executeCompaction?: typeof executeCapekCompaction;
   revertToStep?: typeof revertCapekToStep;
   forkSession?: typeof forkCapekSession;
+  executeChildSession?: typeof capekExecuteChildSession;
   onSessionChanged?: (session: Session) => void;
 }
 
@@ -143,4 +149,21 @@ export function createJean2SessionExecution(
       return result as unknown as ForkExecutionResult;
     },
   };
+}
+
+/**
+ * Headless child-run execution for scheduled jobs (S11.3 slice 3). Enters
+ * the composed Jean2 agent scope for the full awaited run exactly like the
+ * session execution entries; the scheduled runner resolves session
+ * identity and model selection and never reaches harness internals. The
+ * harness field is dispatch metadata and is dropped before the Capek call.
+ */
+export function createJean2HeadlessExecution(
+  dependencies: Pick<Jean2SessionExecutionDependencies, 'executeChildSession'> = {},
+): (input: HeadlessSessionRunInput) => Promise<HeadlessSessionRunResult> {
+  const executeChildSession = dependencies.executeChildSession ?? capekExecuteChildSession;
+  return input => withJean2ExecutionScope(() => {
+    const { harness: _harness, ...child } = input;
+    return executeChildSession(child);
+  });
 }

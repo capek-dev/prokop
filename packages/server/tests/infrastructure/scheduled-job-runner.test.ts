@@ -1,18 +1,11 @@
-import { describe, expect, mock, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import type { Preconfig, ScheduledJob } from '@prokopai/sdk';
 import type {
   ScheduledRunSessionPort,
   ScheduledRunWorkspacePort,
 } from '@/application/ports/scheduling';
+import type { HeadlessSessionRunInput } from '@/application/ports/headless-execution';
 import type { ScheduledJobRunnerDeps } from '@/infrastructure/scheduling/scheduled-job-runner';
-
-const executeChildSession = mock(async (_input: unknown) => ({ error: 'run failed' }));
-const findProviderFromModel = mock(() => 'inferred-provider');
-
-mock.module('@/adapters/capek/contracts', () => ({
-  executeChildSession,
-  findProviderFromModel,
-}));
 
 const { createScheduledJobRunner } = await import('@/infrastructure/scheduling/scheduled-job-runner');
 
@@ -45,11 +38,10 @@ const job = {
   autoApproveSeverity: null,
 } as ScheduledJob;
 
-function dependencies(events: string[]): ScheduledJobRunnerDeps {
+function dependencies(events: string[], runs: HeadlessSessionRunInput[]): ScheduledJobRunnerDeps {
   const sessions: ScheduledRunSessionPort = {
     createSession: (session) => {
-      expect(session.harness).toBe('prokop');
-      events.push(`create:${session.selectedModel}:${session.selectedProvider}`);
+      events.push(`create:${session.harness}:${session.selectedModel}:${session.selectedProvider}`);
       return session as never;
     },
     getSession: () => null,
@@ -72,30 +64,70 @@ function dependencies(events: string[]): ScheduledJobRunnerDeps {
     modelsConfig: {
       getModelsConfig: () => ({ defaultModel: 'default-model', defaultProvider: 'default-provider' }),
     },
+    headless: {
+      async run(input) {
+        runs.push(input);
+        return {};
+      },
+    },
   };
 }
 
 describe('scheduled job runner', () => {
   test('filters recursive scheduling and records run before the result error', async () => {
-    executeChildSession.mockImplementationOnce(async (rawInput) => {
-      const input = rawInput as {
-        modelId: string;
-        providerId: string;
-        preconfig: Preconfig;
-        workspacePath?: string;
-      };
-      expect(input.modelId).toBe('default-model');
-      expect(input.providerId).toBe('inferred-provider');
-      expect(input.preconfig.tools).toEqual(['shell']);
-      expect(input.workspacePath).toBe('/workspace');
-      return { error: 'run failed' };
-    });
     const events: string[] = [];
+    const runs: HeadlessSessionRunInput[] = [];
+    const deps = dependencies(events, runs);
+    deps.headless = {
+      async run(input) {
+        runs.push(input);
+        return { error: 'run failed' };
+      },
+    };
 
-    await createScheduledJobRunner(dependencies(events)).run(job);
+    await createScheduledJobRunner(deps).run(job);
 
-    expect(events[0]).toMatch(/^create:/);
+    expect(runs).toHaveLength(1);
+    expect(runs[0].modelId).toBe('default-model');
+    // Unknown model id: the neutral provider lookup misses and the models
+    // config default provider applies.
+    expect(runs[0].providerId).toBe('default-provider');
+    expect(runs[0].preconfig.tools).toEqual(['shell']);
+    expect(runs[0].workspacePath).toBe('/workspace');
+    expect(events[0]).toMatch(/^create:prokop:/);
     expect(events.slice(-2)).toEqual([expect.stringMatching(/^mark:/), 'error:run failed']);
-    expect(findProviderFromModel).toHaveBeenCalledWith('default-model');
+  });
+
+  test('dispatches by the persisted job harness and defaults legacy jobs to prokop', async () => {
+    const events: string[] = [];
+    const runs: HeadlessSessionRunInput[] = [];
+    const runner = createScheduledJobRunner(dependencies(events, runs));
+
+    await runner.run({ ...job, harness: 'codex-cli' } as ScheduledJob);
+    await runner.run(job);
+
+    const creates = events.filter(event => event.startsWith('create:'));
+    expect(creates).toEqual([
+      expect.stringMatching(/^create:codex-cli:/),
+      expect.stringMatching(/^create:prokop:/),
+    ]);
+    expect(runs.map(run => run.harness)).toEqual(['codex-cli', 'prokop']);
+    for (const run of runs) {
+      expect(run.parentSessionId).toBe(run.childSessionId);
+    }
+  });
+
+  test('fails closed with a recorded error when no headless port is available', async () => {
+    const events: string[] = [];
+    const deps = dependencies(events, []);
+    delete (deps as { headless?: unknown }).headless;
+
+    await createScheduledJobRunner(deps).run(job);
+
+    expect(events).toEqual([
+      expect.stringMatching(/^create:prokop:/),
+      expect.stringMatching(/^mark:/),
+      'error:Scheduled execution is unavailable',
+    ]);
   });
 });

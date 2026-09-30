@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import type { ScheduledJob } from '@prokopai/sdk';
 import type {
   executeCompaction as CapekExecuteCompaction,
   forkSession as CapekForkSession,
@@ -17,11 +16,8 @@ import { configureJean2Bindings } from '@/harnesses/prokop/composition/bindings'
 import { configureJean2RuntimeConfiguration } from '@/adapters/capek/runtime-configuration';
 import { configureJean2Storage, jean2StorageBundle } from '@/adapters/capek/storage';
 import { configureJean2WorkspaceToolDiscovery } from '@/adapters/capek/tool-source';
-import {
-  createJean2SessionExecution,
-  type Jean2SessionExecutionDependencies,
-} from '@/harnesses/prokop/execution';
-import { createJean2ScheduledJobExecution } from '@/adapters/jean2/scheduled-job-execution';
+import { createJean2SessionExecution, type Jean2SessionExecutionDependencies } from '@/harnesses/prokop/execution';
+import { createProkopHarness } from '@/harnesses/prokop';
 import {
   disposeJean2ExecutionScope,
   getJean2ExecutionComposition,
@@ -200,35 +196,35 @@ describe('Jean2 composed execution scope', () => {
     expect(attempts).toBe(1);
   });
 
-  test('scheduled run and fire-and-forget trigger enter the composed scope', async () => {
+  test('headless scheduled run enters the composed scope across suspension', async () => {
     configureComposition();
     await getJean2ExecutionComposition();
     configureStorage(createInMemoryStorageBundle());
 
     const observedStorages: unknown[] = [];
-    let resolveTrigger: (() => void) | undefined;
-    const runner = {
-      async run(_job: ScheduledJob): Promise<void> {
+    const registration = createProkopHarness({
+      executeChildSession: async () => {
         observedStorages.push(getStorage());
         await Promise.resolve();
         observedStorages.push(getStorage());
-        if (observedStorages.length === 4) {
-          resolveTrigger?.();
-        }
+        return { parts: [] };
       },
-    };
-    const execution = createJean2ScheduledJobExecution(runner);
+    });
 
-    await execution.run({} as ScheduledJob);
+    await registration.headless!({
+      harness: 'prokop',
+      parentSessionId: 'scheduled-session',
+      childSessionId: 'scheduled-session',
+      preconfig: {} as never,
+      prompt: 'nightly checks',
+      workspacePath: undefined,
+      workspaceId: 'workspace-1',
+      modelId: 'm',
+      providerId: 'p',
+      resumeFromHistory: false,
+    });
+
     expect(observedStorages[0]).toBe(jean2StorageBundle);
     expect(observedStorages[1]).toBe(jean2StorageBundle);
-
-    const triggered = new Promise<void>((resolve) => {
-      resolveTrigger = resolve;
-    });
-    execution.trigger({} as ScheduledJob);
-    await triggered;
-    expect(observedStorages[2]).toBe(jean2StorageBundle);
-    expect(observedStorages[3]).toBe(jean2StorageBundle);
   });
 });

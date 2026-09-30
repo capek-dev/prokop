@@ -1734,6 +1734,7 @@ describe('server layer boundaries', () => {
     expect(runner).toBeDefined();
     expect(parseImports(runner!.sourceText, runner!.path).map((imp) => imp.specifier).sort()).toEqual([
       '@/adapters/capek/contracts',
+      '@/application/ports/headless-execution',
       '@/application/ports/scheduling',
       '@prokopai/sdk',
       'crypto',
@@ -1743,7 +1744,6 @@ describe('server layer boundaries', () => {
     const adapter = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(adapter).toBeDefined();
     expect(parseImports(adapter!.sourceText, adapter!.path).map((imp) => imp.specifier).sort()).toEqual([
-      '@/harnesses/prokop/composition/execution-scope',
       '@/application/ports/scheduling',
       '@/config',
       '@/infrastructure/config/preconfig',

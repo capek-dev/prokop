@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import type { CreateScheduledJobInput, UpdateScheduledJobInput } from '@prokopai/sdk';
 import type { SchedulingHttpApplication } from '@/application/scheduling';
 import { validate } from './validate';
-import { NotFoundError } from '@/application/http-errors';
+import { BadRequestError, NotFoundError } from '@/application/http-errors';
 import { createScheduledJobSchema, updateScheduledJobSchema } from './schemas';
 
 /**
@@ -46,9 +46,13 @@ export function registerSchedulerRoutes(app: Hono, application: SchedulingHttpAp
         includeHistory: body.includeHistory,
         autoApproveSeverity: body.autoApproveSeverity,
         notificationsEnabled: body.notificationsEnabled,
+        harness: body.harness,
       });
       if (result.kind === 'workspace_not_found') {
         throw new NotFoundError('Workspace not found');
+      }
+      if (result.kind === 'harness_unsupported') {
+        throw new BadRequestError(`Scheduled jobs are not supported for ${result.harness} sessions`);
       }
       return c.json({ job: result.job }, 201);
     },

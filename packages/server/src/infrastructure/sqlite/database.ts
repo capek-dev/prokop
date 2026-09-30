@@ -268,6 +268,7 @@ export function initializeSchema(db: Database): void {
   db.run(`CREATE TABLE IF NOT EXISTS scheduled_jobs (
     id TEXT PRIMARY KEY,
     workspace_id TEXT NOT NULL,
+    harness TEXT NOT NULL DEFAULT 'prokop',
     name TEXT NOT NULL,
     prompt TEXT NOT NULL,
     schedule_kind TEXT NOT NULL,
@@ -297,6 +298,7 @@ export function initializeSchema(db: Database): void {
     'ALTER TABLE scheduled_jobs ADD COLUMN include_history INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE scheduled_jobs ADD COLUMN auto_approve_severity TEXT',
     'ALTER TABLE scheduled_jobs ADD COLUMN notifications_enabled INTEGER NOT NULL DEFAULT 0',
+    "ALTER TABLE scheduled_jobs ADD COLUMN harness TEXT NOT NULL DEFAULT 'prokop'",
     'ALTER TABLE workspaces ADD COLUMN settings TEXT DEFAULT "{}"',
     'ALTER TABLE terminal_sessions ADD COLUMN managed_worktree_id TEXT REFERENCES managed_worktrees(id)',
     'ALTER TABLE managed_worktrees ADD COLUMN name TEXT',

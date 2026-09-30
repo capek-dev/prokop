@@ -1,6 +1,7 @@
 import type {
   CreateScheduledJobInput,
   ScheduledJob,
+  SessionHarness,
   UpdateScheduledJobInput,
 } from '@prokopai/sdk';
 import type {
@@ -8,15 +9,20 @@ import type {
   ScheduledJobRepositoryPort,
   ScheduledJobWorkspacePort,
 } from '@/application/ports/scheduling';
+import { getHeadlessExecutionPort } from '@/application/ports/headless-execution';
 
 export type SchedulingCreateResult =
   | { kind: 'created'; job: ScheduledJob }
-  | { kind: 'workspace_not_found' };
+  | { kind: 'workspace_not_found' }
+  | { kind: 'harness_unsupported'; harness: SessionHarness };
 
 export interface SchedulingApplicationDeps {
   repository: ScheduledJobRepositoryPort;
   workspaces: ScheduledJobWorkspacePort;
   execution: ScheduledJobExecutionPort;
+  /** Test seam for the create-time headless support check; production reads
+   * the installed headless port and defaults to prokop when uninstalled. */
+  headlessSupport?: { supportedHarnesses(): SessionHarness[] };
 }
 
 /**
@@ -54,10 +60,18 @@ export function createSchedulingHttpApplication(
       if (!deps.workspaces.getWorkspace(workspaceId)) {
         return { kind: 'workspace_not_found' };
       }
+      const supported = deps.headlessSupport?.supportedHarnesses()
+        ?? getHeadlessExecutionPort()?.supportedHarnesses()
+        ?? ['prokop'];
+      const harness = input.harness ?? 'prokop';
+      if (!supported.includes(harness)) {
+        return { kind: 'harness_unsupported', harness };
+      }
       return {
         kind: 'created',
         job: deps.repository.create(workspaceId, {
           ...input,
+          harness,
           name: input.name.trim(),
           prompt: input.prompt.trim(),
           repeatLimit: input.repeatLimit ?? null,

@@ -89,6 +89,7 @@ export const createScheduledJobSchema = z.object({
   includeHistory: z.boolean().optional(),
   autoApproveSeverity: z.enum(['off', 'none', 'low', 'medium', 'high']).nullable().optional(),
   notificationsEnabled: z.boolean().optional(),
+  harness: z.enum(['prokop', 'codex-cli', 'claude-cli']).optional(),
 }).loose();
 
 export const updateScheduledJobSchema = z.object({

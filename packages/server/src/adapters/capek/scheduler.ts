@@ -35,7 +35,13 @@ export const jean2SchedulerHost: SchedulerHost = {
   delete: (id) => activeDeps?.repository.delete(id) ?? false,
   trigger(job) {
     if (!activeDeps) return;
-    activeDeps.execution.run(job).catch((error: unknown) => {
+    // The Capek host contract types jobs without the product harness field;
+    // repository rows carry it, so preserve it and default to prokop.
+    const scheduledJob = {
+      ...job,
+      harness: (job as { harness?: import('@prokopai/sdk').SessionHarness }).harness ?? 'prokop',
+    } as import('@prokopai/sdk').ScheduledJob;
+    activeDeps.execution.run(scheduledJob).catch((error: unknown) => {
       console.error(`[scheduler-tool] Trigger of '${job.name}' failed:`, error);
     });
   },

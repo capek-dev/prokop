@@ -1,4 +1,3 @@
-import { withJean2ExecutionScope } from '@/harnesses/prokop/composition/execution-scope';
 import { getModelsConfig } from '@/config';
 import type { ScheduledJob } from '@prokopai/sdk';
 import { getDefaultPreconfig, getPreconfig } from '@/infrastructure/config/preconfig';
@@ -8,6 +7,12 @@ import { getWorkspace, getWorkspaceAutoApproveSeverity } from '@/infrastructure/
 import { markScheduledJobError, markScheduledJobRun } from '@/infrastructure/sqlite/scheduled-job-store';
 import type { ScheduledJobExecutionPort } from '@/application/ports/scheduling';
 
+/**
+ * Jean2 scheduled-job execution adapter. Harness-agnostic since S11.3: the
+ * runner dispatches headless child runs through the installed
+ * HeadlessSessionRunPort, and the owning harness enters its own runtime
+ * scope, so this adapter no longer reaches any harness internals.
+ */
 export function createJean2ScheduledJobExecution(
   runner: Pick<ScheduledJobExecutionPort, 'run'> = createScheduledJobRunner({
     repository: {
@@ -22,11 +27,11 @@ export function createJean2ScheduledJobExecution(
 ): ScheduledJobExecutionPort {
   return {
     run(job: ScheduledJob) {
-      return withJean2ExecutionScope(() => runner.run(job));
+      return runner.run(job);
     },
 
     trigger(job: ScheduledJob) {
-      withJean2ExecutionScope(() => runner.run(job)).catch((err: unknown) => {
+      runner.run(job).catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
         console.error(`[scheduler] Manual trigger of '${job.name}' failed:`, message);
       });
