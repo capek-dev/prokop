@@ -1823,6 +1823,23 @@ describe('server layer boundaries', () => {
     expect(offenders).toEqual([]);
   });
 
+  test('S11.5a gate: the permissions domain imports only SDK contracts, node builtins, and siblings', () => {
+    const permissionsDir = resolve(domainsDir, 'permissions');
+    const files = scanDirectory(serverSourceRoot).filter((file) => file.path.startsWith(`${permissionsDir}/`));
+    expect(files.length).toBeGreaterThan(0);
+    const violations: string[] = [];
+    for (const file of files) {
+      for (const imp of parseImports(file.sourceText, file.path)) {
+        const allowed = imp.specifier.startsWith('./')
+          || imp.specifier === '@prokopai/sdk'
+          || imp.specifier.startsWith('@prokopai/sdk/')
+          || imp.specifier.startsWith('node:');
+        if (!allowed) violations.push(`${relative(repositoryRoot, file.path)} imports ${imp.specifier}`);
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
   test('S10 gate: startup owns execution composition creation and disposal', () => {
     const startupPath = resolve(serverSourceRoot, 'index.ts');
     const startup = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === startupPath);

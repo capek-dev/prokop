@@ -7,7 +7,7 @@ import {
   createOutsideWorkspaceAsk,
   createWorkspaceModificationAsk,
 } from '@prokopai/sdk';
-import { analyzeRisk, resolveCommandPath, stripRedundantCd } from './risk';
+import { analyzeRisk, resolveCommandPath, stripRedundantCd } from '@/domains/permissions';
 
 interface Input {
   command: string;

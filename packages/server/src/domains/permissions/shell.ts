@@ -1,17 +1,42 @@
 /**
- * Shared shell command risk analysis, used by the shell tool and the
- * terminal tool so both apply identical permission gating.
+ * Shared shell command risk classification (S11.5a).
+ *
+ * One policy definition point for shell operations, consumed identically by
+ * the Prokop shell and terminal tools and by the native-harness permission
+ * policies (Codex pre-tool hook, Claude pre-tool hook). The end-goal anchor:
+ * sensitive files, potentially dangerous or destructive actions, and
+ * workspace locking are decided here; per-harness adapters only translate
+ * the classification into their own wire formats.
  */
 
 import { isAbsolute, resolve } from 'node:path';
-import type { ToolContext } from '@capekai/tool';
+import type { PermissionAsk } from '@prokopai/sdk';
 import {
   SHELL_DANGEROUS_COMMANDS,
   SHELL_FILESYSTEM_COMMANDS,
   SHELL_SHELL_OPERATORS,
+  createShellPermissionAskStructured,
+  createWorkspaceModificationAsk,
   getEffectiveShellCommandIdentity,
   type ShellRiskCategory,
 } from '@prokopai/sdk';
+import { isSensitivePath, isWithinRoot } from './paths';
+
+/**
+ * Neutral classification context. Structural subset of the tool runtime
+ * context the Prokop shell and terminal tools already carry, so real tool
+ * contexts satisfy it without casts and native harnesses can supply their
+ * own root-bound implementations.
+ */
+export interface ShellRiskContext {
+  workspacePath: string;
+  fs: { tempDir: string };
+  resolvePath(path: string): string;
+  isWithinWorkspace(path: string): boolean;
+  isSensitivePath(path: string): boolean;
+  /** Optional workspace-aware resolution the tools may provide. */
+  resolvePathFrom?(candidate: string, basePath: string): string;
+}
 
 export interface ParsedCommand {
   baseCommand: string;
@@ -81,7 +106,7 @@ function extractPathArguments(cmd: string): string[] {
     if (part.startsWith('-')) continue;
 
     const isUnixPath = part.startsWith('/') || part.startsWith('~') || part.startsWith('./') || part.startsWith('../');
-    const isWindowsPath = /^[A-Za-z]:[\\]/.test(part) || /^\\\\/.test(part);
+    const isWindowsPath = /^[A-Za-z]:[\\/]/.test(part) || /^\\\\/.test(part);
 
     if (isUnixPath || isWindowsPath) {
       paths.push(part);
@@ -103,12 +128,9 @@ export interface RiskAnalysis {
   flags: string[];
 }
 
-export function resolveCommandPath(path: string, executionCwd: string, ctx: ToolContext): string {
-  const resolvePathFrom = (ctx as ToolContext & {
-    resolvePathFrom?: (candidate: string, basePath: string) => string;
-  }).resolvePathFrom;
-  if (resolvePathFrom) {
-    return resolvePathFrom(path, executionCwd);
+export function resolveCommandPath(path: string, executionCwd: string, ctx: ShellRiskContext): string {
+  if (ctx.resolvePathFrom) {
+    return ctx.resolvePathFrom(path, executionCwd);
   }
   if (path === '~' || path.startsWith('~/') || isAbsolute(path)) {
     return ctx.resolvePath(path);
@@ -118,7 +140,7 @@ export function resolveCommandPath(path: string, executionCwd: string, ctx: Tool
 
 export function analyzeRisk(
   cmd: string,
-  ctx: ToolContext,
+  ctx: ShellRiskContext,
   executionCwd: string = ctx.workspacePath,
 ): RiskAnalysis {
   const effectiveCommand = getEffectiveShellCommandIdentity(cmd);
@@ -239,4 +261,37 @@ export function analyzeRisk(
     baseCommand: effectiveCommand,
     flags,
   };
+}
+
+/** Native harnesses have no Prokop temp-dir exception: a temp path outside
+ * the root stays outside for classification. */
+const NATIVE_HARNESS_TEMP_DIR = '/__prokop_no_temp_exception__';
+
+/**
+ * Classify a native-harness Bash command into its permission ask. Shared by
+ * the Codex pre-tool hook and the Claude pre-tool hook so both harnesses
+ * apply identical shell policy. Undefined means malformed input; null means
+ * an ordinary command that needs no ask.
+ */
+export function classifyShellCommand(command: string, root: string, cwd: string): PermissionAsk | null | undefined {
+  if (typeof command !== 'string' || !command.trim() || command.length > 64 * 1024) return undefined;
+  // Native harnesses wrap unified exec in a login shell; inspect the inner command if present.
+  const match = command.match(/^\/(?:bin\/)?(?:zsh|bash|sh)\s+-lc\s+'([\s\S]*)'$/);
+  const effective = match ? match[1]!.replace(/'\\''/g, "'") : command;
+  const risk = analyzeRisk(effective, {
+    workspacePath: root,
+    fs: { tempDir: NATIVE_HARNESS_TEMP_DIR },
+    resolvePath: path => resolve(cwd, path),
+    isWithinWorkspace: path => isWithinRoot(path, root),
+    isSensitivePath,
+  }, cwd);
+  if (!risk.requiresAsk) return null;
+  if (risk.riskCategory === 'workspace-modification') {
+    return createWorkspaceModificationAsk({
+      command: effective, baseCommand: risk.baseCommand, resolvedPaths: risk.resolvedPaths, hasOperators: risk.hasOperators,
+    });
+  }
+  return createShellPermissionAskStructured({ command: effective, baseCommand: risk.baseCommand,
+    flags: risk.flags, risk: risk.risk, riskCategory: risk.riskCategory, reason: risk.reason,
+    resolvedPaths: risk.resolvedPaths, workspaceBound: risk.workspaceBound, hasOperators: risk.hasOperators });
 }

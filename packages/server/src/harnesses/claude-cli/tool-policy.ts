@@ -1,33 +1,14 @@
-import { realpathSync } from 'node:fs';
-import { isAbsolute, relative, resolve, sep, dirname } from 'node:path';
+import { resolve } from 'node:path';
 import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
-import { SENSITIVE_FILE_PATTERNS } from '@prokopai/sdk';
-import { classifyCodexHook } from '@/harnesses/codex-cli/hook-policy';
+import { classifyShellCommand, effectivePath, isOutsideRoot, isSensitivePath } from '@/domains/permissions';
 
-const sensitive = (path: string): boolean => SENSITIVE_FILE_PATTERNS.some(pattern => path.toLowerCase().includes(pattern));
 const valid = (value: unknown): value is string => typeof value === 'string'
   && !!value.trim() && value.length <= 64 * 1024 && !value.includes('\0');
 
-function outside(path: string, root: string): boolean {
-  const offset = relative(root, path);
-  return offset === '..' || offset.startsWith(`..${sep}`) || isAbsolute(offset);
-}
-
-// Follow existing ancestors so an existing symlink cannot turn a low-risk read/write into an outside-root operation.
-function effectivePath(path: string): string {
-  let ancestor = path;
-  while (true) {
-    try {
-      return resolve(realpathSync(ancestor), relative(ancestor, path));
-    } catch {
-      const parent = dirname(ancestor);
-      if (parent === ancestor) return path;
-      ancestor = parent;
-    }
-  }
-}
-
-/** Undefined means no local classification; null means a known tool has invalid input. */
+/** Undefined means no local classification; null means a known tool has invalid input.
+ * Shell policy comes from the shared permissions domain (same classifier the
+ * Codex pre-tool hook uses); only the native file/web tool shapes are
+ * Claude-specific. */
 export function classifyClaudeTool(toolName: string, input: Record<string, unknown>, root: string): PermissionAsk | null | undefined {
   let risk: PermissionRiskLevel;
   let resource = 'file';
@@ -37,8 +18,7 @@ export function classifyClaudeTool(toolName: string, input: Record<string, unkno
 
   if (toolName === 'Bash') {
     if (!valid(input.command)) return null;
-    const ask = classifyCodexHook({ session_id: 'claude', turn_id: 'claude', tool_use_id: 'claude',
-      hook_event_name: 'PreToolUse', cwd: root, tool_name: 'Bash', tool_input: input }, root);
+    const ask = classifyShellCommand(input.command, root, root);
     if (ask === undefined) return null;
     return { ...(ask ?? { type: 'permission', risk: 'low', resource: 'shell-command', action: 'execute',
       question: 'Allow Claude to run this command?' }),
@@ -53,14 +33,14 @@ export function classifyClaudeTool(toolName: string, input: Record<string, unkno
     path = resolve(root, input.file_path);
     const target = effectivePath(path);
     action = toolName === 'Read' ? 'read' : 'write';
-    risk = sensitive(path) || sensitive(target) || outside(target, root) ? 'high'
+    risk = isSensitivePath(path) || isSensitivePath(target) || isOutsideRoot(target, root) ? 'high'
       : action === 'write' ? 'medium' : 'low';
     description = path;
   } else if (toolName === 'Glob' || toolName === 'Grep') {
     if (!valid(input.pattern) || input.path !== undefined && !valid(input.path)) return null;
     path = resolve(root, typeof input.path === 'string' ? input.path : '.');
     const target = effectivePath(path);
-    risk = sensitive(path) || sensitive(target) || sensitive(input.pattern) || outside(target, root) ? 'high' : 'low';
+    risk = isSensitivePath(path) || isSensitivePath(target) || isSensitivePath(input.pattern) || isOutsideRoot(target, root) ? 'high' : 'low';
     description = `${input.pattern} in ${path}`;
   } else if (toolName === 'WebFetch') {
     if (!valid(input.url)) return null;
