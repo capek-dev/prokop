@@ -4,14 +4,16 @@ import type { SessionExecutionPort } from '@/application/ports/execution';
 export { codexCliAvailable, codexCliVersion, createCodexExecution } from './execution';
 export { getCodexModelSelection, listCodexModels, saveCodexModelSelection } from './models';
 
-/** Codex CLI owns turns and model choice; unsupported Čapek operations remain explicit. */
+/** Codex CLI owns turns and model choice; titles use the universal
+ * server-side regeneration supplied by the composition root. */
 export function createCodexCliHarness(
   execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork' | 'compact'>,
+  regenerateTitle: SessionExecutionPort['regenerateTitle'],
 ): HarnessRegistration {
   return {
-    execution,
-    unsupportedMessages: {
-      regenerateTitle: 'Title generation is not supported for Codex CLI sessions',
+    execution: {
+      ...execution,
+      regenerateTitle,
     },
   };
 }

@@ -9,6 +9,7 @@ import {
   createSessionApplication,
   createSessionControlApplication,
   createSessionHttpApplication,
+  createSessionTitleRegeneration,
   createToolsHttpApplication,
   createWorkspaceApplication,
   createWorktreeApplication,
@@ -39,6 +40,7 @@ import {
   createJean2AskAuthorityPort,
   configureJean2PreconfigSource,
   createJean2ProviderRegistryPort,
+  jean2TitleBindings,
 } from '@/adapters/capek';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { listPreconfigs } from '@/infrastructure/config/preconfig';
@@ -168,6 +170,9 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   configureJean2AgentSource(agents);
 
   const repository = createJean2SessionRepository(agents);
+  // Universal server-side title generation shared by the external harnesses;
+  // the Prokop harness keeps its Capek implementation.
+  const sessionTitleRegeneration = createSessionTitleRegeneration({ repository, titles: jean2TitleBindings });
   let refreshWorktreeAttachments: ((worktreeId: string) => void) | null = null;
   const worktreeAttachments = {
     changed: (worktreeId: string): void => refreshWorktreeAttachments?.(worktreeId),
@@ -210,8 +215,8 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
         }
       },
     }),
-    'codex-cli': createCodexCliHarness(codexExecution),
-    'claude-cli': createClaudeCliHarness(claudeExecution),
+    'codex-cli': createCodexCliHarness(codexExecution, sessionTitleRegeneration),
+    'claude-cli': createClaudeCliHarness(claudeExecution, sessionTitleRegeneration),
   });
   const askAuthority = createJean2AskAuthorityPort();
   const pendingAsks = createJean2PendingAskPort();

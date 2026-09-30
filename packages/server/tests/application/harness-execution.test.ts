@@ -57,7 +57,7 @@ function fixture() {
       revert: async () => { calls.push('claude:revert'); return { revertedTo: { messageId: null, messageCount: 0 },
         removed: { messageIds: [], partCount: 0 } }; },
       fork: async () => { calls.push('claude:fork'); return { forkedSession: sessions.prokop, messages: [] }; },
-    }),
+    }, async () => { calls.push('claude:title'); }),
   });
   return { execution, calls, messages, wire };
 }
@@ -82,15 +82,14 @@ test('dispatches each operation by stored harness, including legacy Prokop ident
   ]);
 });
 
-test('Claude Edit, Undo, and fork route to its harness without enabling title', async () => {
+test('Claude Edit, Undo, fork, and universal title regeneration route to its harness', async () => {
   const { execution, calls, wire, messages } = fixture();
   await execution.editMessage(wire, 'origin', { sessionId: 'claude', messageId: 'u', content: 'new text' });
   await execution.revert({ sessionId: 'claude', targetMessageId: 'a' });
   await execution.fork({ sessionId: 'claude', targetMessageId: 'a' });
   await execution.regenerateTitle(wire, 'origin', 'claude');
-  expect(messages).toEqual([expect.objectContaining({ code: 'invalid_session', sessionId: 'claude',
-    message: 'Claude CLI title generation is not supported' })]);
-  expect(calls).toEqual(['claude:edit', 'claude:revert', 'claude:fork']);
+  expect(messages).toEqual([]);
+  expect(calls).toEqual(['claude:edit', 'claude:revert', 'claude:fork', 'claude:title']);
 });
 
 test('Codex token budgets reject ambiguous and non-Codex sends before dispatch', async () => {

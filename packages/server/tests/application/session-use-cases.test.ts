@@ -241,6 +241,37 @@ describe('application session use cases', () => {
       }]);
     });
 
+    test('send fires universal auto-title for external harnesses after the turn', async () => {
+      const titleCalls: string[] = [];
+      const execution = makeExecution({ regenerateTitle: async (...args: unknown[]) => { titleCalls.push(String(args[2])); } });
+      const app = createSessionChatApplication({
+        repository: makeRepository({ getSession: () => makeSession({ harness: 'claude-cli' }) }),
+        execution,
+        gate: noGate(),
+      });
+      const wire = makeWire(makeSpy());
+
+      await app.sendMessage(wire, origin, 'sess-1', 'hello');
+      await app.editMessage(wire, origin, { sessionId: 'sess-1', messageId: 'm-1', content: 'edited' });
+
+      expect(titleCalls).toEqual(['sess-1', 'sess-1']);
+    });
+
+    test('send keeps Prokop and legacy sessions on the Capek auto-title path', async () => {
+      const titleCalls: string[] = [];
+      const execution = makeExecution({ regenerateTitle: async (...args: unknown[]) => { titleCalls.push(String(args[2])); } });
+      for (const session of [makeSession(), makeSession({ harness: 'prokop' })]) {
+        const app = createSessionChatApplication({
+          repository: makeRepository({ getSession: () => session }),
+          execution,
+          gate: noGate(),
+        });
+        await app.sendMessage(makeWire(makeSpy()), origin, 'sess-1', 'hello');
+        await app.editMessage(makeWire(makeSpy()), origin, { sessionId: 'sess-1', messageId: 'm-1', content: 'edited' });
+      }
+      expect(titleCalls).toEqual([]);
+    });
+
     test('edit gates with the chat.message action', async () => {
       const gateCalls: Array<{ sessionId: string; action: string }> = [];
       const gate: ControllerGatePort<Origin> = {

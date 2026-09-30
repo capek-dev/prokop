@@ -21,6 +21,7 @@ import {
   type SessionQueueApplication,
 } from './queue';
 import { createSessionHttpApplication, type SessionHttpApplication } from './http';
+import { createSessionTitleRegeneration } from './title';
 
 export interface SessionApplicationDeps<Origin> {
   repository: SessionRepositoryPort;
@@ -71,6 +72,7 @@ export function createSessionApplication<Origin>(
 export {
   createSessionHttpApplication,
   createSessionQueueApplication,
+  createSessionTitleRegeneration,
   createSessionTranscriptApplication,
   type SessionChatApplication,
   type SessionCreateInput,
