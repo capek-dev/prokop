@@ -8,7 +8,7 @@ import {
   registerProvider,
   type ConnectableProvider,
   type TokenResponse,
-} from '@/harnesses/prokop/composition/contracts';
+} from '@/adapters/capek/contracts';
 import { codexAccounts } from './codex-accounts';
 import { CodexAccountRuntime } from './codex-account-runtime';
 import {

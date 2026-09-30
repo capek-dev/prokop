@@ -1,4 +1,3 @@
-export { configureJean2Bindings, jean2CompatibilityBindings } from '@/harnesses/prokop/composition/bindings';
 export {
   configureJean2AgentSource,
   configureJean2InstructionSource,

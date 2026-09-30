@@ -34,6 +34,7 @@ import {
 import * as focused from '@/adapters/capek';
 import { configureJean2SessionSearchHost } from '@/adapters/capek/session-search';
 import { JEAN2_AGENT_PLUGIN_IDS, JEAN2_PROCESS_PLUGIN_IDS } from '@/harnesses/prokop/composition/profile';
+import { jean2CompatibilityBindings } from '@/harnesses/prokop/composition/bindings';
 import { createWiredApplication } from '@/bootstrap/application';
 import { createJean2RuntimeComposition, createRuntime } from '@/bootstrap/create-runtime';
 import { createMessage, createPart } from '@/infrastructure/sqlite/message-store';
@@ -119,6 +120,7 @@ describe('Čapek composition root', () => {
       '@/adapters/capek/session-search',
       '@/adapters/capek/scheduler',
       '@/harnesses/prokop/composition/composition',
+      '@/harnesses/prokop/composition/bindings',
       '@/adapters/capek/tool-resolver',
       '@/bootstrap/application',
       '@/application/agents',
@@ -144,7 +146,7 @@ describe('Čapek composition root', () => {
     createRuntime();
     const configured = getJean2CompatibilityBindings();
 
-    expect(configured).toBe(focused.jean2CompatibilityBindings);
+    expect(configured).toBe(jean2CompatibilityBindings);
     expect(getRuntimeConfiguration()).toBe(focused.jean2RuntimeConfiguration);
     expect(getStorage()).toBe(focused.jean2StorageBundle);
     expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);
@@ -229,7 +231,7 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
 
     expect(agentScope.require(capekStorageKey)).toBe(focused.jean2StorageBundle);
     expect(agentScope.require(capekRuntimeConfigurationKey)).toBe(focused.jean2RuntimeConfiguration);
-    expect(agentScope.require(capekRuntimeHostKey)).toBe(focused.jean2CompatibilityBindings);
+    expect(agentScope.require(capekRuntimeHostKey)).toBe(jean2CompatibilityBindings);
     expect(agentScope.require(capekWorkspaceToolDiscoveryKey)).toBe(focused.jean2WorkspaceToolDiscovery);
     expect(agentScope.require(capekSandboxControllerKey)).toBe(sandboxController);
     expect(agentScope.require(capekProviderOverridesKey)).toBeInstanceOf(Map);
@@ -254,7 +256,7 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
     expect(typeof processScope.require(capekProviderRegistryKey).getProvider).toBe('function');
 
     // The accessors return the same focused adapter objects after composition.
-    expect(getJean2CompatibilityBindings()).toBe(focused.jean2CompatibilityBindings);
+    expect(getJean2CompatibilityBindings()).toBe(jean2CompatibilityBindings);
     expect(getRuntimeConfiguration()).toBe(focused.jean2RuntimeConfiguration);
     expect(getStorage()).toBe(focused.jean2StorageBundle);
     expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);

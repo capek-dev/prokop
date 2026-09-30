@@ -8,7 +8,7 @@ import {
   createInMemoryStorageBundle,
 } from '@capekai/core/storage';
 import type { AskRequestMessage, AskTimedOutMessage, PermissionAsk } from '@prokopai/sdk';
-import { resolveAsk, getAuthorityForPendingAsk } from '@/harnesses/prokop/composition/contracts';
+import { prokopAskResolution } from '@/harnesses/prokop/composition/contracts';
 import { configureJean2Bindings } from '@/harnesses/prokop/composition/bindings';
 import { configureJean2RuntimeConfiguration } from '@/adapters/capek/runtime-configuration';
 import { configureJean2Storage } from '@/adapters/capek/storage';
@@ -21,6 +21,10 @@ import {
 } from '@/harnesses/prokop/composition/execution-scope';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
+
+// Production port implementation (bootstrap installs it); destructured to
+// keep the historical call sites below unchanged.
+const { resolveAsk, getAuthorityForPendingAsk } = prokopAskResolution;
 
 // ---------------------------------------------------------------------------
 // Regression: the WS ask.response handler resolves asks through the contracts

@@ -87,10 +87,12 @@ import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-director
 import { getDataDir } from '@/infrastructure/runtime/paths';
 import { codexAccounts } from '@/infrastructure/providers/codex-accounts';
 import { createProkopHarness } from '@/harnesses/prokop';
+import { prokopAskResolution } from '@/harnesses/prokop/composition/contracts';
 import { codexApprovals } from '@/harnesses/codex-cli/approvals';
 import { installCodexApprovalPort } from '@/application/ports/codex-approval';
 import { claudeApprovals } from '@/harnesses/claude-cli/approvals';
 import { installClaudeApprovalPort } from '@/application/ports/claude-approval';
+import { installAskResolutionPort } from '@/application/ports/ask-resolution';
 import {
   codexCliAvailable,
   codexCliVersion,
@@ -172,6 +174,9 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   };
   installCodexApprovalPort(codexApprovals);
   installClaudeApprovalPort(claudeApprovals);
+  // The prokop composition owns the ask waiters; wire-side resolution must
+  // land in the same composed permission runtime execution enters.
+  installAskResolutionPort(prokopAskResolution);
   const codexExecution = createCodexExecution({
     connect: spawnCodexAppServer,
     version: codexCliVersion,

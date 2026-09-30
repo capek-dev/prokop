@@ -1,6 +1,5 @@
 import {
   configureJean2AgentSource,
-  configureJean2Bindings,
   configureJean2InstructionSource,
   configureJean2PreconfigSource,
   configureJean2RuntimeConfiguration,
@@ -10,6 +9,7 @@ import {
   configureJean2WorkspacePolicy,
   configureJean2WorkspaceToolDiscovery,
 } from '@/adapters/capek';
+import { configureJean2Bindings } from '@/harnesses/prokop/composition/bindings';
 import { warmInstalledToolsCache } from '@/adapters/capek/tool-resolver';
 import type { Jean2SchedulerHostDeps } from '@/adapters/capek/scheduler';
 import type { Jean2SessionSearchHostDeps } from '@/adapters/capek/session-search';

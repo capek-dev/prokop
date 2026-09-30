@@ -1,7 +1,8 @@
 import type { RouterContext } from '@/transport/websocket/router-context';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { handleClientRegistration, getClientByClientId, getClientIdForConnection, getConnectionById } from '@/transport/websocket/connection-registry';
-import { resolveAsk, getSessionIdForPendingAsk, getAuthorityForPendingAsk, sandboxController, type SandboxRespondMessage } from '@/harnesses/prokop/composition/contracts';
+import { sandboxController, capekResolveAsk, capekGetSessionIdForPendingAsk, capekGetAuthorityForPendingAsk, type SandboxRespondMessage } from '@/adapters/capek/contracts';
+import { getAskResolutionPort } from '@/application/ports/ask-resolution';
 import { getControlState } from '@/transport/websocket/control-registry';
 import { requireWireApplication } from '@/transport/websocket/application';
 import { checkAskResponseEligibility } from '@/application/ports/control';
@@ -59,16 +60,23 @@ const harnessApproval = (toolCallId: string) => toolCallId.startsWith('codex-app
 const isHarnessApproval = (toolCallId: string): boolean =>
   toolCallId.startsWith('codex-approval:') || toolCallId.startsWith('claude-approval:');
 
+// The installed prokop ask-resolution port routes through the composed
+// permission runtime. When no port is installed (router-level tests, hosts
+// without the wired application) fall back to the process-default Capek
+// runtime, matching behavior before the composition resolves.
 const askResponseDependencies: AskResponseDependencies = {
   resolveAsk: (toolCallId, response, requestId) => isHarnessApproval(toolCallId)
     ? (harnessApproval(toolCallId)?.resolve(toolCallId, response, requestId) ?? Promise.resolve(false))
-    : resolveAsk(toolCallId, response, requestId),
+    : (getAskResolutionPort()?.resolveAsk(toolCallId, response, requestId)
+      ?? capekResolveAsk(toolCallId, response, requestId)),
   getSessionIdForPendingAsk: (toolCallId, requestId) => isHarnessApproval(toolCallId)
     ? Promise.resolve(harnessApproval(toolCallId)?.getSessionId(toolCallId, requestId) ?? null)
-    : getSessionIdForPendingAsk(toolCallId, requestId),
+    : (getAskResolutionPort()?.getSessionIdForPendingAsk(toolCallId, requestId)
+      ?? capekGetSessionIdForPendingAsk(toolCallId, requestId)),
   getAuthorityForPendingAsk: (toolCallId) => isHarnessApproval(toolCallId)
     ? { visibilityScope: 'controller_only', resolutionMode: 'controller_only' }
-    : getAuthorityForPendingAsk(toolCallId),
+    : (getAskResolutionPort()?.getAuthorityForPendingAsk(toolCallId)
+      ?? capekGetAuthorityForPendingAsk(toolCallId)),
 };
 
 export async function handleAskResponseWithDependencies(

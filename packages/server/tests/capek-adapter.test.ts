@@ -3,8 +3,8 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { getRuntimeConfiguration } from '@capekai/core/configuration';
 import { getRuntimeHost as getJean2CompatibilityBindings } from '@capekai/core/hosts';
+import { jean2CompatibilityBindings } from '@/harnesses/prokop/composition/bindings';
 import {
-  jean2CompatibilityBindings,
   jean2RuntimeConfiguration,
   jean2StorageBundle,
 } from '@/adapters/capek';

@@ -8,7 +8,7 @@ import {
   type ToolOutputArtifact,
   type ToolOutputArtifactPage,
   type ToolOutputArtifactStore,
-} from '@/harnesses/prokop/composition/contracts';
+} from '@/adapters/capek/contracts';
 import { getDatabase } from './database';
 
 export {

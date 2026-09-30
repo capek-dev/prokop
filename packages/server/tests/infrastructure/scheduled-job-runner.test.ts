@@ -9,7 +9,7 @@ import type { ScheduledJobRunnerDeps } from '@/infrastructure/scheduling/schedul
 const executeChildSession = mock(async (_input: unknown) => ({ error: 'run failed' }));
 const findProviderFromModel = mock(() => 'inferred-provider');
 
-mock.module('@/harnesses/prokop/composition/contracts', () => ({
+mock.module('@/adapters/capek/contracts', () => ({
   executeChildSession,
   findProviderFromModel,
 }));

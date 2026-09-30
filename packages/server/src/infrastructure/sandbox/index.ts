@@ -1,4 +1,4 @@
-import { registerProvider, sandboxController, SandboxProvider, type AutoResponderRule, type SandboxControlEvent } from '@/harnesses/prokop/composition/contracts';
+import { registerProvider, sandboxController, SandboxProvider, type AutoResponderRule, type SandboxControlEvent } from '@/adapters/capek/contracts';
 
 const defaultAutoResponderRules: AutoResponderRule[] = [
   {

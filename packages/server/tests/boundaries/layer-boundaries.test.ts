@@ -185,7 +185,7 @@ const layerHttpRoutesLegacyExceptions: Record<string, string[]> = {};
 // here until the route is migrated onto a sandbox application port.
 const layerHttpRoutesSandboxExceptions: Record<string, string[]> = {
   'packages/server/src/transport/http/routes/sandbox.ts': [
-    '@/harnesses/prokop/composition/contracts', '@/infrastructure/sandbox',
+    '@/adapters/capek/contracts', '@/infrastructure/sandbox',
   ],
 };
 
@@ -201,7 +201,7 @@ const layerInfrastructureExceptions: Record<string, string[]> = {
   'packages/server/src/infrastructure/sqlite/database.ts': ['@/config', '@/utils/perf'],
   'packages/server/src/infrastructure/mcp/manager.ts': ['@/version'],
   'packages/server/src/infrastructure/daemon/index.ts': ['@/config'],
-  'packages/server/src/infrastructure/session-title.ts': ['@/config'],
+  'packages/server/src/infrastructure/session-title.ts': ['@/config', '@/adapters/capek/contracts'],
   'packages/server/src/infrastructure/providers/provider-credential-files.ts': [
     '@/config/errors', '@/config/files',
   ],
@@ -285,7 +285,7 @@ const layerRules: DependencyRule[] = [
       { prefix: '@ai-sdk/' },
       { prefix: '@capekai/core' },
     ],
-    allowedResolvedDirs: [transportDir, applicationDir, adaptersCapekDir, prokopHarnessDir],
+    allowedResolvedDirs: [transportDir, applicationDir, adaptersCapekDir],
     exceptions: {
       ...layerTransportLegacyExceptions,
       ...layerTransportRenameCompatExceptions,
@@ -319,7 +319,7 @@ const layerRules: DependencyRule[] = [
     name: 'layer-infrastructure',
     rationale: 'Infrastructure implements ports. It may import domains and application ports but not transport route handlers. The built-in tools catalog is a server-internal asset leaf (installer collision guard).',
     appliesTo: [infrastructureDir],
-    allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir, adaptersCapekDir, prokopHarnessDir, builtinToolsDir],
+    allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir, adaptersCapekDir, builtinToolsDir],
     exceptions: layerInfrastructureExceptions,
   },
   {
@@ -1203,7 +1203,7 @@ describe('server layer boundaries', () => {
     expect(file).toBeDefined();
 
     expect(parseImports(file!.sourceText, file!.path).map((imp) => imp.specifier).sort()).toEqual([
-      '@/harnesses/prokop/composition/contracts',
+      '@/adapters/capek/contracts',
       './database',
       'node:crypto',
     ].sort());
@@ -1733,7 +1733,7 @@ describe('server layer boundaries', () => {
     const runner = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === runnerPath);
     expect(runner).toBeDefined();
     expect(parseImports(runner!.sourceText, runner!.path).map((imp) => imp.specifier).sort()).toEqual([
-      '@/harnesses/prokop/composition/contracts',
+      '@/adapters/capek/contracts',
       '@/application/ports/scheduling',
       '@prokopai/sdk',
       'crypto',
