@@ -34,7 +34,6 @@ import {
   subagentDomainPlugin,
   toolOutputPolicyPlugin,
   workspaceToolDiscoveryValuePlugin,
-  workflowDomainPlugin,
   workspacePolicyPlugin,
   CURRENT_GOAL_DOMAIN_PLUGIN_ID,
   CURRENT_MEMORY_DOMAIN_PLUGIN_ID,
@@ -42,7 +41,6 @@ import {
   CURRENT_SESSION_SEARCH_DOMAIN_PLUGIN_ID,
   CURRENT_SKILLS_DOMAIN_PLUGIN_ID,
   CURRENT_SUBAGENT_DOMAIN_PLUGIN_ID,
-  CURRENT_WORKFLOW_DOMAIN_PLUGIN_ID,
 } from '@capekai/core/plugins';
 import { builtinTools } from '@/harnesses/prokop/tools';
 import { builtinToolsAgentPlugins } from '@/adapters/capek/tool-resolver';
@@ -73,7 +71,6 @@ export const JEAN2_AGENT_PLUGIN_IDS = [
   CURRENT_SESSION_SEARCH_DOMAIN_PLUGIN_ID,
   CURRENT_SCHEDULER_DOMAIN_PLUGIN_ID,
   CURRENT_SUBAGENT_DOMAIN_PLUGIN_ID,
-  CURRENT_WORKFLOW_DOMAIN_PLUGIN_ID,
   CURRENT_GOAL_DOMAIN_PLUGIN_ID,
   CURRENT_MEMORY_DOMAIN_PLUGIN_ID,
   CURRENT_SKILLS_DOMAIN_PLUGIN_ID,
@@ -113,7 +110,6 @@ export function jean2AgentPlugins(): readonly CapekPlugin<unknown>[] {
     sessionSearchDomainPlugin(CURRENT_SESSION_SEARCH_DOMAIN_PLUGIN_ID),
     schedulerDomainPlugin(CURRENT_SCHEDULER_DOMAIN_PLUGIN_ID),
     subagentDomainPlugin(CURRENT_SUBAGENT_DOMAIN_PLUGIN_ID),
-    workflowDomainPlugin(CURRENT_WORKFLOW_DOMAIN_PLUGIN_ID),
     goalDomainPlugin(CURRENT_GOAL_DOMAIN_PLUGIN_ID),
     memoryDomainPlugin(CURRENT_MEMORY_DOMAIN_PLUGIN_ID),
     skillsDomainPlugin(CURRENT_SKILLS_DOMAIN_PLUGIN_ID),

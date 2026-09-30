@@ -276,9 +276,6 @@ export const workspaceSettingsSchema = z.object({
     permissionRisk: riskLevel,
     includeToolResults: z.boolean(),
   }).partial().optional(),
-  workflow: z.object({
-    enabled: z.boolean(),
-  }).partial().optional(),
   scheduling: z.object({
     enabled: z.boolean(),
     permissionRisk: riskLevel,

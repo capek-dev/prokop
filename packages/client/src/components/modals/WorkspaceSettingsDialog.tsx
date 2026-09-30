@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
-import { Brain, GraduationCap, Wrench, Search, Workflow, Server, Shield, FolderSymlink, Clock, ShieldCheck, Cog, Loader2 } from 'lucide-react';
+import { Brain, GraduationCap, Wrench, Search, Server, Shield, FolderSymlink, Clock, ShieldCheck, Cog, Loader2 } from 'lucide-react';
 import type { Workspace, WorkspaceSettings, PermissionRiskLevel, PermissionGrant, ProkopaiClient, AutoApproveSeverity } from '@prokopai/sdk';
 import { getSessionTagOrder } from '@/lib/sessionTagOrder';
 import { WorkspaceSessionsPanel } from './configuration/WorkspaceSessionsPanel';
@@ -12,7 +12,6 @@ import { SettingsDialogShell, PanelLoadingFallback, type SettingsSection } from 
 const MemoryPanel = lazy(() => import('./configuration/MemoryPanel').then((m) => ({ default: m.MemoryPanel })));
 const SkillsPanel = lazy(() => import('./configuration/SkillsPanel').then((m) => ({ default: m.SkillsPanel })));
 const SessionSearchPanel = lazy(() => import('./configuration/SessionSearchPanel').then((m) => ({ default: m.SessionSearchPanel })));
-const WorkflowPanel = lazy(() => import('./configuration/WorkflowPanel').then((m) => ({ default: m.WorkflowPanel })));
 const SchedulingPanel = lazy(() => import('./configuration/SchedulingPanel').then((m) => ({ default: m.SchedulingPanel })));
 const MCPServersPanel = lazy(() => import('./configuration/MCPServersPanel').then((m) => ({ default: m.MCPServersPanel })));
 const PermissionsPanel = lazy(() => import('./configuration/PermissionsPanel').then((m) => ({ default: m.PermissionsPanel })));
@@ -22,7 +21,7 @@ const WorkspacePreconfigsPanel = lazy(() => import('./configuration/WorkspacePre
 
 const LearningPanel = lazy(() => import('./configuration/LearningPanel').then(m => ({ default: m.LearningPanel })));
 
-type Section = 'sessions' | 'learning' | 'mcp' | 'permissions' | 'paths' | 'autoApprove' | 'memory' | 'skills' | 'search' | 'workflow' | 'scheduling' | 'preconfigs';
+type Section = 'sessions' | 'learning' | 'mcp' | 'permissions' | 'paths' | 'autoApprove' | 'memory' | 'skills' | 'search' | 'scheduling' | 'preconfigs';
 
 const SECTIONS: Omit<SettingsSection, 'icon'>[] = [
   { value: 'sessions', label: 'Sessions', group: 'general' },
@@ -35,7 +34,6 @@ const SECTIONS: Omit<SettingsSection, 'icon'>[] = [
   { value: 'memory', label: 'Memory', group: 'capabilities' },
   { value: 'skills', label: 'Skills', group: 'capabilities' },
   { value: 'search', label: 'Session Search', group: 'capabilities' },
-  { value: 'workflow', label: 'Workflow', group: 'capabilities' },
   { value: 'scheduling', label: 'Scheduling', group: 'capabilities' },
 ];
 
@@ -46,7 +44,7 @@ const GROUPS = [
 
 /** Sections whose edits are held locally until Save is pressed. */
 const DEFERRED_SAVE_SECTIONS = new Set<Section>([
-  'sessions', 'learning', 'memory', 'skills', 'search', 'workflow', 'scheduling', 'autoApprove', 'preconfigs',
+  'sessions', 'learning', 'memory', 'skills', 'search', 'scheduling', 'autoApprove', 'preconfigs',
 ]);
 
 const ICONS: Record<Section, SettingsSection['icon']> = {
@@ -60,7 +58,6 @@ const ICONS: Record<Section, SettingsSection['icon']> = {
   memory: Brain,
   skills: Wrench,
   search: Search,
-  workflow: Workflow,
   scheduling: Clock,
 };
 
@@ -90,7 +87,6 @@ function snapshot(workspace: Workspace) {
     },
     learning: s?.learning,
     allowPersonalLearning: s?.allowPersonalLearning !== false,
-    workflow: s?.workflow?.enabled ?? false,
     scheduling: { enabled: s?.scheduling?.enabled ?? false, permissionRisk: s?.scheduling?.permissionRisk ?? 'medium' as PermissionRiskLevel },
     autoApprove: s?.autoApproveSeverity ?? 'low' as AutoApproveSeverity,
     sessionTagOrder: getSessionTagOrder(s?.sessionTagOrder),
@@ -153,7 +149,6 @@ export function WorkspaceSettingsDialog({
       },
       learning: draft.learning ? { ...draft.learning, enabled: draft.learning.enabled && draft.memory.enabled && draft.search.enabled } : undefined,
       allowPersonalLearning: draft.allowPersonalLearning,
-      workflow: { enabled: draft.workflow },
       scheduling: { enabled: draft.scheduling.enabled, permissionRisk: draft.scheduling.permissionRisk },
       autoApproveSeverity: draft.autoApprove,
       preconfigs: draft.preconfigSettings,
@@ -221,11 +216,6 @@ export function WorkspaceSettingsDialog({
               permissionRisk={draft.search.permissionRisk}
               includeToolResults={draft.search.includeToolResults}
               onChange={(v) => setDraft((d) => ({ ...d, search: v }))}
-            />;
-          case 'workflow':
-            return <WorkflowPanel
-              enabled={draft.workflow}
-              onChange={(v) => setDraft((d) => ({ ...d, workflow: v }))}
             />;
           case 'scheduling':
             return <SchedulingPanel

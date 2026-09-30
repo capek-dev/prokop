@@ -16,7 +16,6 @@ test.each(['workspace', 'agent'] as const)('full %s composition suppresses domai
     sessionSearch: { enabled: true, permissionRisk: 'high', includeToolResults: true },
     scheduling: { enabled: true, permissionRisk: 'high' },
     skills: { managementEnabled: true, permissionRisk: 'high' },
-    workflow: { enabled: true },
   } });
   seedSession('ws', { id: 'review' });
   const host = getRuntimeHost();

@@ -145,7 +145,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
 
   useEffect(() => {
     if (toolsData?.tools) {
-      // Domain tools (memory, skills, search, workflow, scheduler, task)
+      // Domain tools (memory, skills, search, scheduler, task)
       // are gated by workspace capability toggles, not preconfig tool
       // selection; selecting them here would do nothing.
       setAvailableTools(toolsData.tools.filter(tool => tool.source !== 'domain'));

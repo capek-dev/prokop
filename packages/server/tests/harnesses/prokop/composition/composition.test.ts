@@ -320,7 +320,6 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
       ['capek.skills-domain', 'agent', 'current.skills-domain', 'agent'],
       ['capek.subagent-domain', 'agent', 'current.subagent-domain', 'agent'],
       ['capek.tool-output-policy', 'agent', 'current.tool-output-policy', 'agent'],
-      ['capek.workflow-domain', 'agent', 'current.workflow-domain', 'agent'],
       ['capek.workspace-policy', 'agent', 'current.workspace-policy', 'agent'],
       ['capek.workspace-tool-discovery', 'agent', 'current.workspace-tool-discovery', 'agent'],
       ['capek.tool-resolver', 'agent', 'prokopai.tool-resolver', 'agent'],
@@ -409,10 +408,9 @@ describe('C4 coding bundle in the Jean2 composition', () => {
     expect(tools.map((tool) => tool.definition.name)).toEqual([
       'retrieve-tool-output',
       'task',
-      'skill',
-      'memory',
-      'workflow',
-      'skill_manage',
+    'skill',
+    'memory',
+    'skill_manage',
       'session_search',
       'scheduler',
       'agent_memory',
@@ -427,7 +425,6 @@ describe('C4 coding bundle in the Jean2 composition', () => {
         || tool.pluginId === 'current.session-search-domain'
         || tool.pluginId === 'current.scheduler-domain'
         || tool.pluginId === 'current.subagent-domain'
-        || tool.pluginId === 'current.workflow-domain'
         || tool.pluginId === 'current.memory-domain'
         || tool.pluginId === 'current.skills-domain',
       ).toBe(true);

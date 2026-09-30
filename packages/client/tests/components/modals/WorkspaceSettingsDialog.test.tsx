@@ -31,7 +31,6 @@ function makeWorkspace(overrides: Partial<Workspace['settings']> = {}): Workspac
       memory: { enabled: false, permissionRisk: 'medium' },
       skills: { managementEnabled: false, permissionRisk: 'medium' },
       sessionSearch: { enabled: false, permissionRisk: 'medium', includeToolResults: false },
-      workflow: { enabled: false },
       scheduling: { enabled: false, permissionRisk: 'medium' },
       autoApproveSeverity: 'low',
       preconfigs: { selectedIds: null, defaultId: null },
