@@ -84,7 +84,7 @@ describe('Čapek storage adapter', () => {
     expect(typeof jean2StorageBundle.queue.peek).toBe('function');
     expect(typeof jean2StorageBundle.attachments.get).toBe('function');
     expect(typeof jean2StorageBundle.workspaces.get).toBe('function');
-    expect(typeof jean2StorageBundle.workspaces.getAutoApproveSeverity).toBe('function');
+    expect('getAutoApproveSeverity' in jean2StorageBundle.workspaces).toBe(false);
     expect(typeof jean2StorageBundle.responseFormats.get).toBe('function');
     expect(typeof jean2StorageBundle.index.syncMessage).toBe('function');
   });

@@ -1,12 +1,19 @@
 import type { PermissionMode } from './concerns';
 
 /**
- * TEMPORARY bridge (permissions v2, slice 2): maps the three-level permission
- * mode onto the legacy risk-severity ladder while the severity consumers
- * (capek runtime auto-approve, the native harness approval ladders, the
- * client ask handler) still decide. Deleted in slice 4 when decide() becomes
- * the only authority. There is no ask-everything level: it was removed by
- * design, so nothing maps below 'low'.
+ * The permissions-v2 risk bridge: maps the three-level permission mode onto
+ * capek's legacy risk-severity ceiling. Load-bearing in two places, both
+ * intentional and permanent:
+ *
+ * - The capek interaction host getter: capek's default permission provider
+ *   auto-approves asks whose Finding-derived risk (`concernRisk`, the other
+ *   half of the bridge) sits at or below this ceiling — which reproduces
+ *   decide() exactly for prokop tool asks.
+ * - `shouldAutoApproveAsk`'s legacy ceiling for asks without concern fields
+ *   (feature-risk settings like memory writes and session search).
+ *
+ * There is no ask-everything level: it was removed by design, so nothing
+ * maps below 'low'.
  */
 export type LegacyAutoApproveSeverity = 'none' | 'low' | 'medium' | 'high';
 

@@ -32,7 +32,6 @@ function makeJob(overrides: Partial<ScheduledJob> = {}): ScheduledJob {
     preconfigId: null,
     originSessionId: null,
     permissionMode: null,
-    autoApproveSeverity: null,
     notificationsEnabled: false,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

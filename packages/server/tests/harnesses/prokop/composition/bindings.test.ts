@@ -57,9 +57,9 @@ describe('Čapek binding group adapters', () => {
     const withSeverity = seedSession('ws1', { permissionMode: 'extended' });
     const withoutSeverity = seedSession('ws1');
 
-    expect(await jean2InteractionBindings.getSessionAutoApproveSeverity(withSeverity.id)).toBe('medium');
-    expect(await jean2InteractionBindings.getSessionAutoApproveSeverity(withoutSeverity.id)).toBe('low');
-    expect(await jean2InteractionBindings.getSessionAutoApproveSeverity('missing')).toBeUndefined();
+    expect(await jean2InteractionBindings.getSessionAutoApproveSeverity?.(withSeverity.id)).toBe('medium');
+    expect(await jean2InteractionBindings.getSessionAutoApproveSeverity?.(withoutSeverity.id)).toBe('low');
+    expect(await jean2InteractionBindings.getSessionAutoApproveSeverity?.('missing')).toBeUndefined();
     expect(getSession(withSeverity.id)?.permissionMode).toBe('extended');
   });
 

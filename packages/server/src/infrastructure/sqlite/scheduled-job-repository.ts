@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { Database } from 'bun:sqlite';
 import type {
-  PermissionMode,
   ScheduleConfig,
   ScheduleKind,
   ScheduledJob,
@@ -13,7 +12,6 @@ import {
   decideNextRunOnUpdate,
 } from '@/domains/scheduling/job-lifecycle';
 import { computeNextRun, scheduleDisplay } from '@/domains/scheduling/schedule';
-import { severityFromMode } from '@/domains/permissions';
 
 /** Database accessor injected by the composition root or the S5 compat
  * module. No module-global connection state exists in this layer. */
@@ -67,11 +65,6 @@ function rowToScheduledJob(row: ScheduledJobRow): ScheduledJob {
     preconfigId: row.preconfig_id,
     originSessionId: row.origin_session_id,
     permissionMode: row.permission_mode as ScheduledJob['permissionMode'],
-    // Capek's ScheduledJob contract still carries the legacy severity field
-    // as required; keep it derived from the mode until the contract drops it.
-    autoApproveSeverity: row.permission_mode
-      ? severityFromMode(row.permission_mode as PermissionMode)
-      : null,
     notificationsEnabled: row.notifications_enabled === 1,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),

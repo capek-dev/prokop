@@ -279,7 +279,7 @@ export const providerCredentialsSchema = z.object({
     enabled: z.boolean(),
     permissionRisk: riskLevel,
   }).partial().optional(),
-  autoApproveSeverity: z.enum(['standard', 'extended', 'full']).optional(),
+  permissionMode: z.enum(['standard', 'extended', 'full']).optional(),
   preconfigs: z.object({
     selectedIds: z.array(z.string()).nullable().optional(),
     defaultId: z.string().nullable().optional(),
