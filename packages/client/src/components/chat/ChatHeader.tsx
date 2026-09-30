@@ -202,6 +202,21 @@ export function ChatHeader({
     preconfigs.find((p) => p.id === session.preconfigId)?.model ||
     modelName;
 
+  const currentModelInfo = session.selectedProvider
+    ? models.find((m) => m.providerId === session.selectedProvider && m.id === selectedModel)
+    : models.find((m) => m.id === selectedModel);
+  const modelContextWindow = currentModelInfo?.contextWindow ?? 0;
+  // Prokop sessions carry no server-side context window (the server does not
+  // know model limits); fill the meter denominator from the model catalog so
+  // the ring keeps its percentage. Codex and Claude report theirs.
+  const reportedUsage = session.harnessState?.usage ?? null;
+  const meterUsage = reportedUsage
+    ? {
+      ...reportedUsage,
+      contextWindow: reportedUsage.contextWindow > 0 ? reportedUsage.contextWindow : modelContextWindow,
+    }
+    : null;
+
   return (
     <div className="flex-1 min-w-0 flex items-center justify-between gap-1">
       <TooltipProvider delayDuration={300}>
@@ -239,7 +254,7 @@ export function ChatHeader({
               </h2>
             )}
 
-            <TokenMeter usage={session.harnessState?.usage ?? null} />
+            <TokenMeter usage={meterUsage} />
             {session.status === 'closed' && (
               <Badge variant="secondary">
                 <Archive className="size-3" data-icon="inline-start" />
