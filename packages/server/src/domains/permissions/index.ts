@@ -29,6 +29,10 @@ export {
   type InvocationShape,
 } from './command/tables';
 export {
+  analyzeCommand,
+  type CommandAnalyzeContext,
+} from './command/analyze';
+export {
   analyzeRisk,
   classifyShellCommand,
   parseCommand,

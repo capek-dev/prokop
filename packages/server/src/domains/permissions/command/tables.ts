@@ -169,7 +169,9 @@ const SENSITIVE_TEMPLATE_SUFFIXES = ['.example', '.sample', '.template'];
 const SENSITIVE_DIR_SEGMENTS = new Set(['.ssh', '.aws', '.gnupg', '.docker']);
 
 /** Basename and directory-segment sensitive matching. Replaces the legacy
- * substring list, which flagged files like `password-reset.ts`. */
+ * substring list, which flagged files like `password-reset.ts`. Directory
+ * segments include the final segment: `.ssh`/`.aws` are always the sensitive
+ * directories themselves, whether read as a target or traversed. */
 export function isSensitiveFilename(path: string): boolean {
   const normalized = path.replace(/\\/g, '/').toLowerCase();
   const segments = normalized.split('/').filter(Boolean);
@@ -181,5 +183,5 @@ export function isSensitiveFilename(path: string): boolean {
       base.startsWith(prefix) && !SENSITIVE_TEMPLATE_SUFFIXES.some(suffix => base.endsWith(suffix)))
   ) return true;
   if (SENSITIVE_BASENAMES_SUFFIX.some(suffix => base.endsWith(suffix))) return true;
-  return segments.slice(0, -1).some(segment => SENSITIVE_DIR_SEGMENTS.has(segment));
+  return segments.some(segment => SENSITIVE_DIR_SEGMENTS.has(segment));
 }
