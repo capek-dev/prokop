@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { definition, execute } from './tool';
-import { createMockContext, VirtualFS, getAskCall, getAllAskCalls } from '@/tools/builtin/test-utils';
+import { createMockContext, VirtualFS, getAskCall, getAllAskCalls } from '@/harnesses/prokop/tools/test-utils';
 
 let vfs: VirtualFS;
 let ctx: ReturnType<typeof createMockContext>;
@@ -12,14 +12,7 @@ beforeEach(() => {
       const r = request as Record<string, unknown>;
       if (r.type === 'permission') return true;
       if (r.type === 'client_capability') {
-        return {
-          success: true,
-          elements: [
-            { tag: 'button', selector: '#btn1', text: 'Click me', type: 'button' },
-            { tag: 'input', selector: '#search', text: '', type: 'text', attributes: { placeholder: 'Search...' } },
-            { tag: 'a', selector: 'a.nav-link', text: 'Home', type: 'link', attributes: { href: '/' } },
-          ],
-        };
+        return { success: true, dataUrl: 'data:image/png;base64,iVBORw0KGgo=' };
       }
       return true;
     }) as unknown as ReturnType<typeof createMockContext>['ask'],
@@ -30,13 +23,13 @@ beforeEach(() => {
 // Tool Definition
 // ══════════════════════════════════════════════════════════════════
 
-describe('browser_discover_elements tool definition', () => {
+describe('browser_screenshot tool definition', () => {
   test('has correct name', () => {
-    expect(definition.name).toBe('browser_discover_elements');
+    expect(definition.name).toBe('browser_screenshot');
   });
 
-  test('has description mentioning interactive elements', () => {
-    expect(definition.description).toContain('interactive elements');
+  test('has description mentioning screenshot', () => {
+    expect(definition.description).toContain('screenshot');
   });
 
   test('accepts an optional tabId', () => {
@@ -52,7 +45,7 @@ describe('browser_discover_elements tool definition', () => {
 // Permission Ask
 // ══════════════════════════════════════════════════════════════════
 
-describe('browser_discover_elements permissions', () => {
+describe('browser_screenshot permissions', () => {
   test('asks for permission with low risk', async () => {
     await execute({}, ctx);
     const permAsk = getAskCall(ctx);
@@ -75,29 +68,62 @@ describe('browser_discover_elements permissions', () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe('USER_REJECTION');
   });
+
+  test('permission ask has allowedScopes once and session', async () => {
+    await execute({}, ctx);
+    const permAsk = getAskCall(ctx);
+    expect(permAsk.allowedScopes).toEqual(['once', 'session']);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════
 // Successful Execution
 // ══════════════════════════════════════════════════════════════════
 
-describe('browser_discover_elements execution', () => {
-  test('returns elements and count on success', async () => {
+describe('browser_screenshot execution', () => {
+  test('returns compact client output and raw PNG model output on success', async () => {
     const result = await execute({}, ctx);
-    expect(result.success).toBe(true);
-    const data = result.result as { elementCount: number; elements: unknown[] };
-    expect(data.elementCount).toBe(3);
-    expect(data.elements.length).toBe(3);
+
+    expect(result).toEqual({
+      success: true,
+      result: {
+        captured: true,
+        mediaType: 'image/png',
+      },
+      modelOutput: [{
+        type: 'image',
+        data: 'iVBORw0KGgo=',
+        mediaType: 'image/png',
+      }],
+    });
   });
 
-  test('returns elements with correct structure', async () => {
-    const result = await execute({}, ctx);
-    expect(result.success).toBe(true);
-    const data = result.result as { elements: Record<string, unknown>[] };
-    const btn = data.elements[0];
-    expect(btn.tag).toBe('button');
-    expect(btn.selector).toBe('#btn1');
-    expect(btn.text).toBe('Click me');
+  test('rejects a response without PNG screenshot data', async () => {
+    const fallbackCtx = createMockContext(vfs, {
+      ask: mock(async (request: unknown) => {
+        const r = request as Record<string, unknown>;
+        if (r.type === 'permission') return true;
+        return { success: true };
+      }) as unknown as ReturnType<typeof createMockContext>['ask'],
+    });
+
+    const result = await execute({}, fallbackCtx);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Extension returned invalid PNG screenshot data.');
+  });
+
+  test('rejects empty PNG screenshot data', async () => {
+    const emptyCtx = createMockContext(vfs, {
+      ask: mock(async (request: unknown) => {
+        const r = request as Record<string, unknown>;
+        if (r.type === 'permission') return true;
+        return { success: true, dataUrl: 'data:image/png;base64,' };
+      }) as unknown as ReturnType<typeof createMockContext>['ask'],
+    });
+
+    const result = await execute({}, emptyCtx);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Extension returned empty PNG screenshot data.');
   });
 
   test('forwards tabId to the extension', async () => {
@@ -112,47 +138,34 @@ describe('browser_discover_elements execution', () => {
 // Error Handling
 // ══════════════════════════════════════════════════════════════════
 
-describe('browser_discover_elements error handling', () => {
+describe('browser_screenshot error handling', () => {
+  test('handles extension returning failure', async () => {
+    const failCtx = createMockContext(vfs, {
+      ask: mock(async (request: unknown) => {
+        const r = request as Record<string, unknown>;
+        if (r.type === 'permission') return true;
+        return { success: false, error: 'Tab not accessible' };
+      }) as unknown as ReturnType<typeof createMockContext>['ask'],
+    });
+
+    const result = await execute({}, failCtx);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Screenshot failed');
+    expect(result.error).toContain('Tab not accessible');
+  });
+
   test('handles invalid extension response', async () => {
     const badCtx = createMockContext(vfs, {
       ask: mock(async (request: unknown) => {
         const r = request as Record<string, unknown>;
         if (r.type === 'permission') return true;
-        return 'not an object';
+        return undefined;
       }) as unknown as ReturnType<typeof createMockContext>['ask'],
     });
 
     const result = await execute({}, badCtx);
     expect(result.success).toBe(false);
     expect(result.error).toContain('invalid response');
-  });
-
-  test('handles missing elements array', async () => {
-    const noElemsCtx = createMockContext(vfs, {
-      ask: mock(async (request: unknown) => {
-        const r = request as Record<string, unknown>;
-        if (r.type === 'permission') return true;
-        return { success: true };
-      }) as unknown as ReturnType<typeof createMockContext>['ask'],
-    });
-
-    const result = await execute({}, noElemsCtx);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('invalid element list');
-  });
-
-  test('handles non-array elements', async () => {
-    const badArrayCtx = createMockContext(vfs, {
-      ask: mock(async (request: unknown) => {
-        const r = request as Record<string, unknown>;
-        if (r.type === 'permission') return true;
-        return { success: true, elements: 'not-an-array' };
-      }) as unknown as ReturnType<typeof createMockContext>['ask'],
-    });
-
-    const result = await execute({}, badArrayCtx);
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('invalid element list');
   });
 
   test('handles timeout error', async () => {
@@ -174,13 +187,13 @@ describe('browser_discover_elements error handling', () => {
       ask: mock(async (request: unknown) => {
         const r = request as Record<string, unknown>;
         if (r.type === 'permission') return true;
-        throw new Error('Discovery failed');
+        throw new Error('Capture failed');
       }) as unknown as ReturnType<typeof createMockContext>['ask'],
     });
 
     const result = await execute({}, errorCtx);
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Element discovery failed');
-    expect(result.error).toContain('Discovery failed');
+    expect(result.error).toContain('Screenshot failed');
+    expect(result.error).toContain('Capture failed');
   });
 });

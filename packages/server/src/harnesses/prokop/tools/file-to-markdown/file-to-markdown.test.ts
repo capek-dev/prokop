@@ -14,7 +14,7 @@ import {
   convertOdp,
   convertZip,
 } from './tool';
-import { createMockContext, VirtualFS, WORKSPACE } from '@/tools/builtin/test-utils';
+import { createMockContext, VirtualFS, WORKSPACE } from '@/harnesses/prokop/tools/test-utils';
 import type { SupportedFormat } from './tool';
 
 let vfs: VirtualFS;

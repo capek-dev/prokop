@@ -44,6 +44,7 @@ import {
   CURRENT_SUBAGENT_DOMAIN_PLUGIN_ID,
   CURRENT_WORKFLOW_DOMAIN_PLUGIN_ID,
 } from '@capekai/core/plugins';
+import { builtinTools } from '@/harnesses/prokop/tools';
 import { builtinToolsAgentPlugins } from '@/adapters/capek/tool-resolver';
 import { jean2WorkspacePolicyOptions } from '@/adapters/capek/workspace-policy';
 
@@ -92,7 +93,7 @@ export function jean2ProcessPlugins(): readonly CapekPlugin<unknown>[] {
 
 export function jean2AgentPlugins(): readonly CapekPlugin<unknown>[] {
   return [
-    ...builtinToolsAgentPlugins(),
+    ...builtinToolsAgentPlugins(builtinTools),
     storageValuePlugin('current.storage', getStorage()),
     runtimeConfigurationValuePlugin('current.runtime-configuration', getRuntimeConfiguration()),
     runtimeHostValuePlugin('current.runtime-host', getRuntimeHost()),

@@ -8,24 +8,24 @@
  */
 
 import type { LoadedTool, ToolContext, ToolDefinition, ToolResult } from '@capekai/tool';
-import * as browserDiscoverElements from '@/tools/builtin/browser-discover-elements/tool';
-import * as browserDomAction from '@/tools/builtin/browser-dom-action/tool';
-import * as browserNavigate from '@/tools/builtin/browser-navigate/tool';
-import * as browserReadActiveTab from '@/tools/builtin/browser-read-active-tab/tool';
-import * as browserScreenshot from '@/tools/builtin/browser-screenshot/tool';
-import * as browserTabManage from '@/tools/builtin/browser-tab-manage/tool';
-import * as edit from '@/tools/builtin/edit/tool';
-import * as fileToMarkdown from '@/tools/builtin/file-to-markdown/tool';
-import * as glob from '@/tools/builtin/glob/tool';
-import * as grep from '@/tools/builtin/grep/tool';
-import * as question from '@/tools/builtin/question/tool';
-import * as readFile from '@/tools/builtin/read-file/tool';
-import * as shell from '@/tools/builtin/shell/tool';
-import * as tavilySearch from '@/tools/builtin/tavily-search/tool';
-import * as terminal from '@/tools/builtin/terminal/tool';
-import * as todo from '@/tools/builtin/todo/tool';
-import * as webfetch from '@/tools/builtin/webfetch/tool';
-import * as writeFile from '@/tools/builtin/write-file/tool';
+import * as browserDiscoverElements from '@/harnesses/prokop/tools/browser-discover-elements/tool';
+import * as browserDomAction from '@/harnesses/prokop/tools/browser-dom-action/tool';
+import * as browserNavigate from '@/harnesses/prokop/tools/browser-navigate/tool';
+import * as browserReadActiveTab from '@/harnesses/prokop/tools/browser-read-active-tab/tool';
+import * as browserScreenshot from '@/harnesses/prokop/tools/browser-screenshot/tool';
+import * as browserTabManage from '@/harnesses/prokop/tools/browser-tab-manage/tool';
+import * as edit from '@/harnesses/prokop/tools/edit/tool';
+import * as fileToMarkdown from '@/harnesses/prokop/tools/file-to-markdown/tool';
+import * as glob from '@/harnesses/prokop/tools/glob/tool';
+import * as grep from '@/harnesses/prokop/tools/grep/tool';
+import * as question from '@/harnesses/prokop/tools/question/tool';
+import * as readFile from '@/harnesses/prokop/tools/read-file/tool';
+import * as shell from '@/harnesses/prokop/tools/shell/tool';
+import * as tavilySearch from '@/harnesses/prokop/tools/tavily-search/tool';
+import * as terminal from '@/harnesses/prokop/tools/terminal/tool';
+import * as todo from '@/harnesses/prokop/tools/todo/tool';
+import * as webfetch from '@/harnesses/prokop/tools/webfetch/tool';
+import * as writeFile from '@/harnesses/prokop/tools/write-file/tool';
 
 const BUILTIN_PATH = 'builtin:prokopai';
 

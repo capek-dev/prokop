@@ -26,7 +26,7 @@ const routesDir = resolve(serverSourceRoot, 'transport/http/routes');
 const utilsDir = resolve(serverSourceRoot, 'utils');
 const layerDirs = [bootstrapDir, transportDir, applicationDir, domainsDir, infrastructureDir, adaptersDir, harnessesDir];
 const infrastructureSqliteDir = resolve(infrastructureDir, 'sqlite');
-const builtinToolsDir = resolve(serverSourceRoot, 'tools', 'builtin');
+const prokopToolsDir = resolve(prokopHarnessDir, 'tools');
 
 const capekInternalPrefix = '@capekai/core/' + 'internal/';
 
@@ -234,7 +234,7 @@ const globalBaselineRules: DependencyRule[] = [
     rationale: 'SQLite is infrastructure-only (built-in tools ship their own standalone databases). New consumers fail.',
     appliesTo: [serverSourceRoot],
     forbiddenSpecifiers: [{ exact: 'bun:sqlite' }],
-    allowedInDirs: [infrastructureSqliteDir, builtinToolsDir],
+    allowedInDirs: [infrastructureSqliteDir, prokopToolsDir],
     exceptions: sqliteExceptions,
   },
   {
@@ -319,14 +319,14 @@ const layerRules: DependencyRule[] = [
     name: 'layer-infrastructure',
     rationale: 'Infrastructure implements ports. It may import domains and application ports but not transport route handlers. The built-in tools catalog is a server-internal asset leaf (installer collision guard).',
     appliesTo: [infrastructureDir],
-    allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir, adaptersCapekDir, builtinToolsDir],
+    allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir, adaptersCapekDir],
     exceptions: layerInfrastructureExceptions,
   },
   {
     name: 'layer-adapters',
     rationale: 'Adapters translate Capek contracts and Jean2 ports. Transport-owned implementation exceptions are explicit and documented; the built-in tools catalog is a server-internal asset leaf (resolver and catalog seam).',
     appliesTo: [adaptersDir],
-    allowedResolvedDirs: [adaptersDir, applicationDir, domainsDir, builtinToolsDir],
+    allowedResolvedDirs: [adaptersDir, applicationDir, domainsDir],
     exceptions: layerAdaptersLegacyExceptions,
   },
   {

@@ -17,6 +17,8 @@ import type { Jean2SessionSearchHostDeps } from '@/adapters/capek/session-search
 import { createWiredAgentsApplication } from '@/bootstrap/application';
 import type { AgentsApplication } from '@/application/agents';
 import { installExecutionLifecyclePort } from '@/application/ports/execution-lifecycle';
+import { installBuiltinToolsPort } from '@/application/ports/builtin-tools';
+import { builtinTools } from '@/harnesses/prokop/tools';
 import { createJean2ScheduledJobExecution } from '@/adapters/jean2/scheduled-job-execution';
 import { createJean2SessionRepository } from '@/adapters/jean2/session-repository';
 import { createScheduledJobRepository } from '@/infrastructure/sqlite/scheduled-job-repository';
@@ -68,6 +70,10 @@ function createSchedulerHostDeps(): Jean2SchedulerHostDeps {
  */
 export function createRuntime(existingAgents?: AgentsApplication): AgentsApplication {
   const agents = existingAgents ?? createWiredAgentsApplication();
+
+  // The Prokop harness owns the built-in tools; the catalog adapter reads
+  // them through this port instead of importing harness internals.
+  installBuiltinToolsPort({ tools: () => builtinTools });
 
   configureJean2Storage();
   configureJean2RuntimeConfiguration();

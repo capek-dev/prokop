@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { definition, execute } from './tool';
-import { createMockContext, VirtualFS, getAskCall, getAllAskCalls } from '@/tools/builtin/test-utils';
+import { createMockContext, VirtualFS, getAskCall, getAllAskCalls } from '@/harnesses/prokop/tools/test-utils';
 
 let vfs: VirtualFS;
 let ctx: ReturnType<typeof createMockContext>;

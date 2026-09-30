@@ -36,6 +36,8 @@ mock.module('@capekai/core/tools', () => ({
 }));
 
 const adapter = await import('@/adapters/capek/tool-source');
+const { builtinTools } = await import('@/harnesses/prokop/tools');
+const { getBuiltinToolsPort, installBuiltinToolsPort } = await import('@/application/ports/builtin-tools');
 
 let savedToolsPathEnv: string | undefined;
 
@@ -60,9 +62,31 @@ describe('Čapek workspace tool discovery adapter', () => {
     expect(adapter.jean2WorkspaceToolDiscovery.discoverTools).toBe(realMcp.getTools);
   });
 
-  test('does not expose the divergent git-worktree lifecycle', async () => {
-    expect((await adapter.jean2ToolCatalog.listTools()).some((tool) => tool.name === 'git-worktree')).toBe(false);
-    expect(await adapter.jean2ToolCatalog.getTool('git-worktree')).toBeNull();
+  test('lists the harness built-ins through the installed port', async () => {
+    const previousPort = getBuiltinToolsPort();
+    installBuiltinToolsPort({ tools: () => builtinTools });
+    try {
+      const tools = await adapter.jean2ToolCatalog.listTools();
+      const readFile = tools.find((tool) => tool.name === 'read-file');
+      expect(readFile).toMatchObject({ source: 'builtin' });
+      expect(await adapter.jean2ToolCatalog.getTool('read-file')).toBeDefined();
+      // The removed tools stay absent even with the port installed.
+      expect(tools.some((tool) => tool.name === 'git-worktree')).toBe(false);
+      expect(await adapter.jean2ToolCatalog.getTool('git-worktree')).toBeNull();
+    } finally {
+      installBuiltinToolsPort(previousPort);
+    }
+  });
+
+  test('without an installed port the catalog lists no built-in entries', async () => {
+    const previousPort = getBuiltinToolsPort();
+    installBuiltinToolsPort(null);
+    try {
+      const tools = await adapter.jean2ToolCatalog.listTools();
+      expect(tools.every((tool) => tool.source !== 'builtin')).toBe(true);
+    } finally {
+      installBuiltinToolsPort(previousPort);
+    }
   });
 
   test('configures the resolved tools path first and installs the module-level discovery', () => {

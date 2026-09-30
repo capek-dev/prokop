@@ -26,10 +26,8 @@ import {
   loadedToolsPlugin,
 } from '@capekai/core/plugins';
 import { capekToolResolverKey, type CapekPlugin } from '@capekai/core/composition';
-import { builtinTools } from '@/tools/builtin';
 
 const REFRESH_TTL_MS = 60_000;
-const exposedBuiltinTools = builtinTools;
 
 let lastRefreshAt = 0;
 let refreshInFlight: Promise<void> | null = null;
@@ -97,12 +95,14 @@ export async function warmInstalledToolsCache(): Promise<void> {
 }
 
 /** The built-in tools agent plugins: one plugin contributing the
- * baked-in baseline, one providing the merged resolver above the
- * scope's contributed catalog (which includes those built-ins, the
- * tool-output policy's retrieval tool, and domain tool payloads). */
-export function builtinToolsAgentPlugins(): readonly CapekPlugin<unknown>[] {
+ * harness-owned baked-in baseline (passed explicitly by the composition
+ * profile, which owns the harness tool set), one providing the merged
+ * resolver above the scope's contributed catalog (which includes those
+ * built-ins, the tool-output policy's retrieval tool, and domain tool
+ * payloads). */
+export function builtinToolsAgentPlugins(tools: readonly LoadedTool[]): readonly CapekPlugin<unknown>[] {
   return [
-    loadedToolsPlugin('prokopai.builtin-tools', exposedBuiltinTools),
+    loadedToolsPlugin('prokopai.builtin-tools', tools),
     {
       id: 'prokopai.tool-resolver',
       scope: 'agent',

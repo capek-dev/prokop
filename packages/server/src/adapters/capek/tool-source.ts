@@ -11,9 +11,14 @@ import type { ToolCatalogEntry } from '@/application/ports/tool-catalog';
 import { getTools, initializeWorkspace } from '@/infrastructure/mcp';
 import { getToolsDir } from '@/infrastructure/runtime/paths';
 import { readEnv } from '@/infrastructure/runtime/env-compat';
-import { builtinTools } from '@/tools/builtin';
+import type { LoadedTool } from '@capekai/tool';
+import { getBuiltinToolsPort } from '@/application/ports/builtin-tools';
 
-const exposedBuiltinTools = builtinTools;
+/** Harness-owned built-ins, read through the installed port at call time
+ * so this adapter never imports harness internals. */
+function exposedBuiltinTools(): readonly LoadedTool[] {
+  return getBuiltinToolsPort()?.tools() ?? [];
+}
 
 /** The Jean2 workspace tool discovery: the MCP manager's per-workspace
  * client lifecycle and tool listing. */
@@ -29,13 +34,14 @@ export const jean2WorkspaceToolDiscovery: WorkspaceToolDiscovery = {
  * resolver enforces the same precedence at execution time). */
 export const jean2ToolCatalog = {
   listTools: async (): Promise<ToolCatalogEntry[]> => {
+    const builtins = exposedBuiltinTools();
     const installed = await capekListTools();
-    const builtinNames = new Set(exposedBuiltinTools.map((tool) => tool.definition.name));
+    const builtinNames = new Set(builtins.map((tool) => tool.definition.name));
     const domains = listDomainToolFallbackDefinitions()
       .map((definition) => ({ ...definition, source: 'domain' as const }));
     const domainNames = new Set(domains.map((tool) => tool.name));
     return [
-      ...exposedBuiltinTools.map((tool) => ({ ...tool.definition, source: 'builtin' as const })),
+      ...builtins.map((tool) => ({ ...tool.definition, source: 'builtin' as const })),
       ...domains.filter((tool) => !builtinNames.has(tool.name)),
       ...installed
         .filter((definition) => (
@@ -46,7 +52,7 @@ export const jean2ToolCatalog = {
     ].sort((a, b) => a.name.localeCompare(b.name));
   },
   getTool: async (name: string) => {
-    const builtin = exposedBuiltinTools.find((tool) => tool.definition.name === name);
+    const builtin = exposedBuiltinTools().find((tool) => tool.definition.name === name);
     if (builtin) return builtin;
     return capekGetTool(name);
   },

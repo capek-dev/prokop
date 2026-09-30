@@ -49,6 +49,7 @@ const serverSourceRoot = resolve(repositoryRoot, 'packages/server/src');
 const compositionRootPath = resolve(serverSourceRoot, 'bootstrap/create-runtime.ts');
 
 const expectedCompositionSteps = [
+  'installBuiltinToolsPort',
   'configureJean2Storage',
   'configureJean2RuntimeConfiguration',
   'configureJean2WorkspacePolicy',
@@ -127,6 +128,8 @@ describe('Čapek composition root', () => {
       '@/adapters/capek/tool-resolver',
       '@/bootstrap/application',
       '@/application/agents',
+      '@/application/ports/builtin-tools',
+      '@/harnesses/prokop/tools',
       '@/adapters/jean2/session-repository',
       '@/adapters/jean2/scheduled-job-execution',
       '@/infrastructure/sqlite/session-search-query-repository',
