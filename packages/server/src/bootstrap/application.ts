@@ -49,6 +49,7 @@ import { agentSkillsDomainTools, memoryDomainTools, sessionSearchDomainTools } f
 import { createPretoolChannel } from '@/harnesses/codex-cli/pretool-hook';
 import { selectEmptySessionHarnessModel } from '@/infrastructure/sqlite/session-store';
 import { getModelsConfigWithStatus } from '@/config/models';
+import { findModelVariantKeys } from '@/config';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { countMessagesInSession } from '@/infrastructure/sqlite/message-store';
@@ -286,6 +287,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     isHarnessDisabled: harnessSettings.isDisabled,
     prokopModelAvailable: (modelId, providerId) => getModelsConfigWithStatus().providers
       .some(provider => provider.id === providerId && provider.models.some(model => model.id === modelId && model.runtimeStatus.usable)),
+    modelVariantKeys: findModelVariantKeys,
     selectEmptySessionHarnessModel,
   });
 

@@ -21,7 +21,7 @@ interface VariantOption {
 interface VariantSelectorProps {
   variants: Record<string, VariantOption> | undefined;
   selectedVariant: string | null;
-  onChangeVariant: (variant: string | null) => void;
+  onChangeVariant: (variant: string) => void;
   disabled?: boolean;
   compact?: boolean;
   iconOnly?: boolean;
@@ -40,6 +40,11 @@ function capitalize(key: string): string {
   return VARIANT_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1);
 }
 
+/**
+ * Concrete variant picker: catalogs order variants ascending and the first
+ * key is the model's default, so there is no "default" state — an absent or
+ * stale selection shows and behaves as the first key.
+ */
 export function VariantSelector({
   variants,
   selectedVariant,
@@ -55,32 +60,21 @@ export function VariantSelector({
   }
 
   const variantKeys = Object.keys(variants);
+  const resolved = selectedVariant && variantKeys.includes(selectedVariant)
+    ? selectedVariant
+    : variantKeys[0];
 
   const handleSelect = (value: string) => {
-    onChangeVariant(value === '__none__' ? null : value);
+    onChangeVariant(value);
     setOpen(false);
   };
 
-  const selectedLabel = selectedVariant ? capitalize(selectedVariant) : 'Default';
+  const selectedLabel = capitalize(resolved);
 
   const commandList = (
     <Command>
       <CommandInput placeholder="Search..." />
       <CommandList className="max-h-[50vh] overflow-y-auto">
-        <CommandItem
-          key="__none__"
-          value="__none__"
-          onSelect={() => handleSelect('__none__')}
-          className="justify-between"
-        >
-          <span>Default</span>
-          <Check
-            className={cn(
-              'size-4',
-              selectedVariant === null ? 'opacity-100' : 'opacity-0',
-            )}
-          />
-        </CommandItem>
         {variantKeys.map((key) => (
           <CommandItem
             key={key}
@@ -92,7 +86,7 @@ export function VariantSelector({
             <Check
               className={cn(
                 'size-4',
-                selectedVariant === key ? 'opacity-100' : 'opacity-0',
+                resolved === key ? 'opacity-100' : 'opacity-0',
               )}
             />
           </CommandItem>

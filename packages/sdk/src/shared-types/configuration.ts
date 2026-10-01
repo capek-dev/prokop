@@ -49,6 +49,7 @@ export interface ModelsConfigResponse {
   providers: ProviderWithStatus[];
   defaultModel: string;
   defaultProvider: string;
+  defaultVariant?: string | null;
 }
 
 export interface CreateModelRequest {
@@ -91,6 +92,7 @@ export interface UpdateModelRequest {
 export interface SetDefaultsRequest {
   defaultModel: string;
   defaultProvider: string;
+  defaultVariant?: string | null;
 }
 
 export interface SyncResult {

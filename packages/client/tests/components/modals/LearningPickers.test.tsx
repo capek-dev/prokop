@@ -37,7 +37,7 @@ test('a selected workspace that revoked access can still be removed', async () =
   expect(change).toHaveBeenCalledWith([]);
 });
 
-test('existing model picker selects provider identity, clears stale variant and restores inheritance', async () => {
+test('existing model picker selects provider identity, resets to the model default variant and restores inheritance', async () => {
   const user = userEvent.setup();
   const change = vi.fn();
   const models = ['first', 'second'].map(providerId => ({ id: 'shared', name: `${providerId} model`, providerId, providerName: providerId, contextWindow: 1000, runtimeStatus: { providerSupported: true, providerConfigured: true, usable: true }, variants: { high: { providerOptions: {} } } })) as ModelWithStatus[];
@@ -49,8 +49,8 @@ test('existing model picker selects provider identity, clears stale variant and 
   render(<Harness />);
   await user.click(screen.getByRole('combobox', { name: 'Select model' }));
   await user.click(screen.getByRole('option', { name: /second model/ }));
-  expect(change).toHaveBeenLastCalledWith({ modelId: 'shared', providerId: 'second', variant: null });
-  await user.click(screen.getByRole('button', { name: 'Use preconfig model' }));
+  expect(change).toHaveBeenLastCalledWith({ modelId: 'shared', providerId: 'second', variant: 'high' });
+  await user.click(screen.getByRole('button', { name: 'Use agent model' }));
   expect(change).toHaveBeenLastCalledWith(null);
-  expect(screen.getByText('Using the preconfig model and variant.')).toBeInTheDocument();
+  expect(screen.getByText('Using the agent model and variant.')).toBeInTheDocument();
 });

@@ -137,4 +137,32 @@ describe('scheduled job runner', () => {
       'error:Scheduled execution is unavailable',
     ]);
   });
+
+  test('a model-less preconfig inherits the configured default variant', async () => {
+    const created: Array<{ selectedVariant: string | null }> = [];
+    const deps = dependencies([], []);
+    deps.modelsConfig = {
+      getModelsConfig: () => ({
+        defaultModel: 'glm-5.3',
+        defaultProvider: 'zhipu-coding',
+        defaultVariant: 'max',
+        providers: [
+          { id: 'zhipu-coding', models: [{ id: 'glm-5.3', variants: { high: {}, max: {} } }] },
+        ],
+      }),
+    };
+    const originalCreate = deps.sessions.createSession.bind(deps.sessions);
+    deps.sessions = {
+      ...deps.sessions,
+      createSession: (session) => {
+        created.push(session as { selectedVariant: string | null });
+        return originalCreate(session);
+      },
+    };
+
+    await createScheduledJobRunner(deps).run(job);
+
+    expect(created).toHaveLength(1);
+    expect(created[0].selectedVariant).toBe('max');
+  });
 });

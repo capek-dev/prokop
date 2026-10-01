@@ -277,13 +277,6 @@ export function useServerSessionManager({
   const models = storeModels as ModelInfo[];
   const defaultModel = storeDefaultModel;
 
-  useEffect(() => {
-    const modelVariants = models.find(m => m.id === currentModel)?.variants;
-    if (selectedVariant && modelVariants && !modelVariants[selectedVariant]) {
-      setSelectedVariant(null);
-    }
-  }, [currentModel, selectedVariant, models, setSelectedVariant]);
-
   const { setCompletion, clearCompletion, clearAllCompletions } = useCompletionStore(
     useShallow((s) => ({
       setCompletion: s.setCompletion,

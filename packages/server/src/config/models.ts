@@ -165,9 +165,25 @@ export async function setDefaults(data: SetDefaultsRequest): Promise<ModelsConfi
   }
 
   const defaultProvider = config.providers.find(p => p.id === data.defaultProvider)!;
+  const defaultModel = defaultProvider.models.find(m => m.id === data.defaultModel)!;
   const modelExists = defaultProvider.models.some(m => m.id === data.defaultModel);
   if (!modelExists) {
     throw new ConfigurationValidationError(`Model "${data.defaultModel}" does not exist in provider "${data.defaultProvider}"`);
+  }
+
+  // The default variant is concrete: a provided value must exist on the
+  // default model; omitting it (e.g. a model change) clears back to the
+  // model's first (lowest) declared variant.
+  if (data.defaultVariant !== undefined && data.defaultVariant !== null) {
+    const variantKeys = defaultModel.variants ? Object.keys(defaultModel.variants) : [];
+    if (!variantKeys.includes(data.defaultVariant)) {
+      throw new ConfigurationValidationError(
+        `Variant "${data.defaultVariant}" does not exist on model "${data.defaultModel}"`,
+      );
+    }
+    config.defaultVariant = data.defaultVariant;
+  } else {
+    config.defaultVariant = null;
   }
 
   config.defaultProvider = data.defaultProvider;
@@ -223,5 +239,6 @@ export function getModelsConfigWithStatus(): ModelsConfigResponse {
     providers: providersWithStatus,
     defaultModel: config.defaultModel,
     defaultProvider: config.defaultProvider,
+    defaultVariant: config.defaultVariant ?? null,
   };
 }

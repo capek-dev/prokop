@@ -223,7 +223,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
         mode: form.mode,
         model: form.model.trim() || null,
         provider: form.provider.trim() || null,
-        variant: form.variant.trim() || null,
+        variant: selectedModelVariants.length > 0 ? (form.variant.trim() || selectedModelVariants[0]) : null,
         tools: form.tools.length > 0 ? form.tools : null,
         settings,
         canSpawnSubagents,
@@ -433,11 +433,10 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
               <div>
                 <Label className="text-sm">Variant</Label>
                 <select
-                  value={form.variant}
+                  value={selectedModelVariants.includes(form.variant) ? form.variant : selectedModelVariants[0] ?? ''}
                   onChange={(e) => setForm(prev => ({ ...prev, variant: e.target.value }))}
                   className="w-full h-9 rounded-md border bg-background px-3 text-sm"
                 >
-                  <option value="">Default</option>
                   {selectedModelVariants.map(v => (
                     <option key={v} value={v}>{v}</option>
                   ))}

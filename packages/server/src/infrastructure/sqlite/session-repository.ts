@@ -11,6 +11,8 @@
 import type { Database } from 'bun:sqlite';
 import type { Session, SessionStatus, SubagentStatus, SessionListFilter, SessionCategory, SessionCategoryCounts, PermissionMode } from '@prokopai/sdk';
 import { withDerivedHarnessState } from '@/domains/sessions/harness-state';
+import { resolveSessionVariant } from '@/domains/sessions/variant';
+import { findModelVariantKeys, getModelsConfig } from '@/config';
 import { getWorkspacePermissionMode } from './workspaces';
 import type {
   ListSessionPageOptions,
@@ -72,6 +74,35 @@ const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
 const MIN_PAGE_SIZE = 1;
 
+/**
+ * Read-time variant resolution: every model with variants always carries a
+ * concrete variant. A null or stale stored value resolves to the model's
+ * first (lowest) variant; sessions without a model resolve against the
+ * config default so fresh sessions display the effective variant. Catalog
+ * read failures fall back to the stored value.
+ */
+function resolveRowVariant(modelId: string | null, providerId: string | null, storedParam: string | null): string | null {
+  try {
+    let resolvedModel = modelId;
+    let resolvedProvider = providerId;
+    let stored = storedParam;
+    if (!resolvedModel) {
+      const config = getModelsConfig();
+      resolvedModel = config.defaultModel;
+      resolvedProvider = resolvedProvider ?? config.defaultProvider;
+      // Fresh sessions follow the default-model default variant; an explicit
+      // session variant is never overridden by it.
+      stored = stored ?? config.defaultVariant ?? null;
+    }
+    return resolveSessionVariant(
+      findModelVariantKeys(resolvedModel || undefined, resolvedProvider || undefined),
+      stored,
+    );
+  } catch {
+    return storedParam;
+  }
+}
+
 function mapRowToSession(row: SessionRow): Session {
   if (row.harness !== 'prokop' && row.harness !== 'codex-cli' && row.harness !== 'claude-cli') {
     throw new Error('Unknown session harness');
@@ -89,7 +120,7 @@ function mapRowToSession(row: SessionRow): Session {
     metadata: row.metadata ? JSON.parse(row.metadata) : null,
     selectedModel: row.selected_model ?? null,
     selectedProvider: row.selected_provider ?? null,
-    selectedVariant: row.selected_variant ?? null,
+    selectedVariant: resolveRowVariant(row.selected_model ?? null, row.selected_provider ?? null, row.selected_variant ?? null),
     promptTokens: row.prompt_tokens ?? undefined,
     completionTokens: row.completion_tokens ?? undefined,
     totalTokens: row.total_tokens ?? undefined,

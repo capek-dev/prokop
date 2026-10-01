@@ -14,10 +14,15 @@ export function LearningModelPicker({ models, preconfig, value, onChange }: Lear
   const modelId = value ? value.modelId : preconfig?.model;
   const providerId = value ? value.providerId : preconfig?.provider;
   const model = models.find(candidate => candidate.id === modelId && candidate.providerId === providerId);
+  // No default-variant state: picking a model resets to its first (lowest) variant.
+  const firstVariantOf = (nextModelId: string, nextProviderId: string): string | null => {
+    const target = models.find(m => m.id === nextModelId && m.providerId === nextProviderId);
+    return target?.variants ? Object.keys(target.variants)[0] ?? null : null;
+  };
   return <div className="flex min-w-0 flex-col gap-1">
     <div className="flex flex-wrap items-center gap-2">
       <ModelSelector models={models} selectedModelId={modelId} selectedProviderId={providerId}
-        onChangeModel={(modelId, providerId) => onChange({ modelId, providerId, variant: null })} />
+        onChangeModel={(modelId, providerId) => onChange({ modelId, providerId, variant: firstVariantOf(modelId, providerId) })} />
       <VariantSelector variants={model?.variants} selectedVariant={value ? value.variant ?? null : preconfig?.variant ?? null}
         onChangeVariant={variant => { if (modelId && providerId) onChange({ modelId, providerId, variant }); }} />
       {value && <Button variant="ghost" size="sm" onClick={() => onChange(null)}>Use agent model</Button>}

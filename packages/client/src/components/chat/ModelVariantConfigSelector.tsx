@@ -77,8 +77,6 @@ const VARIANT_LABELS: Record<string, string> = {
   max: 'Max',
 };
 
-const NONE_VALUE = '__none__';
-
 function capitalizeVariant(key: string): string {
   return VARIANT_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1);
 }
@@ -201,7 +199,7 @@ export function ModelVariantConfigSelector({
   const handleSelectVariant = (value: string) => {
     if (claudeSession && selectedClaude) onChangeClaude?.(selectedClaude.model, value);
     else if (codexSession && selectedCodex) onChangeCodex?.(selectedCodex.model, value);
-    else onChangeVariant(value === NONE_VALUE ? null : value);
+    else onChangeVariant(value);
     setOpenSection(null);
   };
 
@@ -304,19 +302,6 @@ export function ModelVariantConfigSelector({
 
   const variantItems = (
     <>
-      {!codexSession && !claudeSession && <CommandItem
-        value="default none"
-        showCheck={false}
-        onSelect={() => handleSelectVariant(NONE_VALUE)}
-      >
-        <span>default</span>
-        <Check
-          className={cn(
-            'ml-auto size-4',
-            selectedVariant === null ? 'opacity-100' : 'opacity-0',
-          )}
-        />
-      </CommandItem>}
       {variantKeys.map((key) => (
         <CommandItem
           key={key}
@@ -477,7 +462,7 @@ export function ModelVariantConfigSelector({
   const sections: { icon: ReactNode; label: string; value: string; section: Section }[] = [
     { icon: <HarnessMark className="size-3.5" />, label: 'Model', value: modelDisplayName, section: 'model' },
     ...(hasVariants
-      ? [{ icon: <Brain className="size-3.5" />, label: codexSession || claudeSession ? 'Effort' : 'Variant', value: variantDisplayName ? variantDisplayName.toLowerCase() : 'default', section: 'variant' as const }]
+      ? [{ icon: <Brain className="size-3.5" />, label: codexSession || claudeSession ? 'Effort' : 'Variant', value: variantDisplayName?.toLowerCase() ?? '', section: 'variant' as const }]
       : []),
     ...(preconfigs.length > 0 && !lockPreconfig
       ? [{ icon: (() => {

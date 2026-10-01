@@ -61,5 +61,10 @@ export interface ScheduledRunPreconfigPort {
 }
 
 export interface ScheduledRunModelsConfigPort {
-  getModelsConfig(): { defaultModel: string; defaultProvider: string };
+  getModelsConfig(): {
+    defaultModel: string;
+    defaultProvider: string;
+    defaultVariant?: string | null;
+    providers?: Array<{ id: string; models: Array<{ id: string; variants?: Record<string, unknown> }> }>;
+  };
 }

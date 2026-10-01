@@ -11,6 +11,7 @@ interface ModelsConfigResponse {
   }>;
   defaultModel: string;
   defaultProvider: string;
+  defaultVariant?: string | null;
 }
 
 export function useModelsConfigQuery(sdkClient: ProkopaiClient | null) {
@@ -68,7 +69,7 @@ export function useDeleteModel(sdkClient: ProkopaiClient | null) {
 export function useSetModelDefaults(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { defaultProvider: string; defaultModel: string }) =>
+    mutationFn: (body: { defaultProvider: string; defaultModel: string; defaultVariant?: string | null }) =>
       sdkClient!.http.config.models.setDefaults(body),
     onSuccess: () => {
       if (sdkClient) syncModelsToStoreAndCache(sdkClient, queryClient);

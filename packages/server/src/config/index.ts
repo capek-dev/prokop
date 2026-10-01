@@ -214,6 +214,11 @@ export interface ModelsConfig {
   providers: ProviderDefinition[];
   defaultModel: string;
   defaultProvider: string;
+  /**
+   * Default variant for the default model. Absent/null resolves to the
+   * default model's first (lowest) declared variant.
+   */
+  defaultVariant?: string | null;
 }
 
 export function getModelsConfig(): ModelsConfig {
@@ -260,6 +265,22 @@ export function findModelVariant(
 ): Record<string, unknown> | undefined {
   const model = findModel(modelId, providerId);
   return model?.variants?.[variantKey]?.providerOptions;
+}
+
+/**
+ * Ordered variant keys for a model. Catalog entries declare variants
+ * ascending (lowest thinking level first); the first key is the model's
+ * default variant. Returns [] for unknown models, models without variants,
+ * and catalog read failures (never throws).
+ */
+export function findModelVariantKeys(modelId?: string | null, providerId?: string | null): string[] {
+  if (!modelId) return [];
+  try {
+    const model = findModel(modelId, providerId || undefined);
+    return model?.variants ? Object.keys(model.variants) : [];
+  } catch {
+    return [];
+  }
 }
 
 /**

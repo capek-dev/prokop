@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { Preconfig, ScheduledJob, Session } from '@prokopai/sdk';
 import { findProviderFromModel } from '@/adapters/capek/contracts';
+import { modelVariantKeys, resolveSessionVariant } from '@/domains/sessions/variant';
 import { getHeadlessExecutionPort, type HeadlessSessionRunPort } from '@/application/ports/headless-execution';
 import type {
   ScheduledJobRepositoryPort,
@@ -43,6 +44,14 @@ export function createScheduledJobRunner(deps: ScheduledJobRunnerDeps): {
       const permissionMode =
         job.permissionMode ?? deps.workspaces.permissionMode(job.workspaceId);
       const jobHarness = job.harness ?? 'prokop';
+      const variantKeys = modelVariantKeys(config.providers ?? [], modelId, providerId);
+
+      // A preconfig-pinned model resolves its own variant (first key when the
+      // preconfig pins none); a model-less preconfig follows the configured
+      // default variant of the default model.
+      const storedVariant = preconfig.model
+        ? preconfig.variant ?? null
+        : config.defaultVariant ?? null;
 
       let sessionId: string;
       let resumeFromHistory = false;
@@ -56,10 +65,10 @@ export function createScheduledJobRunner(deps: ScheduledJobRunnerDeps): {
             `[scheduler] Reusing session ${sessionId} for job '${job.name}' (history: ${resumeFromHistory})`,
           );
         } else {
-          sessionId = createScheduledSession(deps.sessions, job, preconfig, jobHarness, modelId, providerId, permissionMode);
+          sessionId = createScheduledSession(deps.sessions, job, preconfig, jobHarness, modelId, providerId, permissionMode, resolveSessionVariant(variantKeys, storedVariant));
         }
       } else {
-        sessionId = createScheduledSession(deps.sessions, job, preconfig, jobHarness, modelId, providerId, permissionMode);
+        sessionId = createScheduledSession(deps.sessions, job, preconfig, jobHarness, modelId, providerId, permissionMode, resolveSessionVariant(variantKeys, storedVariant));
       }
 
       console.log(`[scheduler] Running job '${job.name}' in session ${sessionId}`);
@@ -99,6 +108,7 @@ function createScheduledSession(
   modelId: string,
   providerId: string,
   permissionMode: Session['permissionMode'],
+  resolvedVariant: string | null,
 ): string {
   const sessionId = randomUUID();
   sessions.createSession({
@@ -113,7 +123,7 @@ function createScheduledSession(
     agentName: null,
     selectedModel: modelId,
     selectedProvider: providerId,
-    selectedVariant: preconfig.variant ?? null,
+    selectedVariant: resolvedVariant,
     permissionMode,
   });
   return sessionId;

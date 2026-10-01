@@ -77,7 +77,7 @@ const defaultAccessors: RuntimeConfigurationAccessors = {
     const config = getModelsConfig();
     return {
       ...config,
-      providers: config.providers.map(provider => ({
+      providers: (config.providers ?? []).map(provider => ({
         ...provider,
         models: provider.models.map(model => withContractTier(model)),
       })),

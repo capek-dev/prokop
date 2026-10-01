@@ -16,6 +16,7 @@ import type { WorktreeAttachmentRefreshPort } from '@/application/ports/worktree
 import { sendGateRejection } from './chat';
 import { projectMessagesForClient } from './tool-debug';
 import { checkHarnessCreate, prokopFeatureError, unknownHarnessError } from './harness-policy';
+import { resolveSessionVariant } from '@/domains/sessions/variant';
 
 export interface SessionLifecycleDeps<Origin> {
   repository: SessionRepositoryPort;
@@ -36,6 +37,8 @@ export interface SessionLifecycleDeps<Origin> {
   claudeWorkspaceAvailable?: (workspaceId: string) => boolean;
   claudeModels?: () => Promise<CodexModel[]>;
   prokopModelAvailable?: (modelId: string, providerId: string) => boolean;
+  /** Ordered variant keys for a model; absent wiring means no variants. */
+  modelVariantKeys?: (modelId?: string | null, providerId?: string | null) => string[];
   isHarnessDisabled?: (harness: SessionHarness) => boolean;
   selectEmptySessionHarnessModel?: (id: string, expected: SessionHarness, updatedAt: string, choice: HarnessModelChoice) => Session | null;
 }
@@ -169,7 +172,10 @@ export function createSessionLifecycleApplication<Origin>(
           if (decision.harness === 'prokop') {
             if (preconfig.model) updates.selectedModel = preconfig.model;
             if (preconfig.provider) updates.selectedProvider = preconfig.provider;
-            updates.selectedVariant = preconfig.variant ?? null;
+            updates.selectedVariant = resolveSessionVariant(
+              deps.modelVariantKeys?.(preconfig.model ?? null, preconfig.provider ?? null) ?? [],
+              preconfig.variant ?? null,
+            );
           }
           updates.agentId = deps.repository.isAgentSync(input.preconfigId) ? input.preconfigId : null;
           const updated = deps.repository.updateSession(sessionId, updates);
@@ -307,7 +313,10 @@ export function createSessionLifecycleApplication<Origin>(
           wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Preconfig is unavailable', sessionId });
           return;
         }
-        if (session.harness !== 'codex-cli') updates.selectedVariant = preconfig?.variant ? preconfig.variant : null;
+        if (session.harness !== 'codex-cli') updates.selectedVariant = resolveSessionVariant(
+          deps.modelVariantKeys?.(session.selectedModel ?? null, session.selectedProvider ?? null) ?? [],
+          preconfig?.variant ?? null,
+        );
         updates.agentId = deps.repository.isAgentSync(input.preconfigId) ? input.preconfigId : null;
       }
       const updated = deps.repository.updateSession(sessionId, updates);
@@ -417,7 +426,10 @@ export function createSessionLifecycleApplication<Origin>(
       const updated = deps.repository.updateSession(sessionId, {
         selectedModel: input.modelId,
         selectedProvider: input.providerId,
-        selectedVariant: input.variant || null,
+        selectedVariant: resolveSessionVariant(
+          deps.modelVariantKeys?.(input.modelId, input.providerId) ?? [],
+          input.variant ?? null,
+        ),
       });
       wire.delivery.send(origin, { type: 'session.updated', session: updated! });
     },

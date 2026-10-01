@@ -37,17 +37,19 @@ function fallbackProviderName(id: string): string {
     || id.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-/** Compact default-model selector: pick provider, pick model, it applies immediately. */
+/** Compact default selector: provider, model, and variant apply immediately. */
 function DefaultModelRow({
   sdkClient,
   providers,
   defaultProvider,
   defaultModel,
+  defaultVariant,
 }: {
   sdkClient: ProkopaiClient | null;
   providers: Array<{ id: string; name: string; models: ModelWithStatus[] }>;
   defaultProvider: string;
   defaultModel: string;
+  defaultVariant: string | null;
 }) {
   const setDefaultsMut = useSetModelDefaults(sdkClient);
   const [draftProvider, setDraftProvider] = useState<string | null>(null);
@@ -55,9 +57,25 @@ function DefaultModelRow({
   const provider = draftProvider ?? defaultProvider;
   const models = providers.find(p => p.id === provider)?.models ?? [];
 
-  const apply = async (modelId: string) => {
+  // Variant options exist only for the stored default; a draft provider has
+  // no model context until the model pick applies (which clears the variant
+  // server-side to the new model's first key).
+  const onStoredDefault = !draftProvider;
+  const storedModel = onStoredDefault
+    ? providers.find(p => p.id === defaultProvider)?.models.find(m => m.id === defaultModel)
+    : undefined;
+  const variantKeys = storedModel?.variants ? Object.keys(storedModel.variants) : [];
+  const variantValue = defaultVariant && variantKeys.includes(defaultVariant)
+    ? defaultVariant
+    : variantKeys[0];
+
+  const apply = async (next: { defaultModel: string; defaultVariant?: string | null }) => {
     try {
-      await setDefaultsMut.mutateAsync({ defaultProvider: provider, defaultModel: modelId });
+      await setDefaultsMut.mutateAsync({
+        defaultProvider: provider,
+        defaultModel: next.defaultModel,
+        defaultVariant: next.defaultVariant ?? null,
+      });
       setDraftProvider(null);
     } catch {
       // mutation hooks surface failures; keep the draft so the user can retry
@@ -85,7 +103,7 @@ function DefaultModelRow({
       </Select>
       <Select
         value={defaultProvider === provider && !draftProvider ? defaultModel : undefined}
-        onValueChange={apply}
+        onValueChange={(id) => apply({ defaultModel: id })}
         disabled={setDefaultsMut.isPending || models.length === 0}
       >
         <SelectTrigger size="sm" className="min-w-36" aria-label="Default model">
@@ -99,6 +117,24 @@ function DefaultModelRow({
           </SelectGroup>
         </SelectContent>
       </Select>
+      {onStoredDefault && variantKeys.length > 0 && (
+        <Select
+          value={variantValue}
+          onValueChange={(v) => apply({ defaultModel: defaultModel, defaultVariant: v })}
+          disabled={setDefaultsMut.isPending}
+        >
+          <SelectTrigger size="sm" className="min-w-28" aria-label="Default variant">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {variantKeys.map(key => (
+                <SelectItem key={key} value={key}>{key}</SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      )}
       {setDefaultsMut.isPending && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
     </div>
   );
@@ -201,6 +237,7 @@ export function ProvidersModelsPanel({ sdkClient }: ProvidersModelsPanelProps) {
           providers={providers}
           defaultProvider={config?.defaultProvider ?? ''}
           defaultModel={config?.defaultModel ?? ''}
+          defaultVariant={config?.defaultVariant ?? null}
         />
         <SyncButton sdkClient={sdkClient} />
       </div>

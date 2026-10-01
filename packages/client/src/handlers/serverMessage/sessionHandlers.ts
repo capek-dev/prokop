@@ -144,7 +144,6 @@ export function handleSessionResumed(
     setVariantForSession,
     sessionAccessTimesRef,
     partIdIndexRef,
-    models,
     defaultModel,
     clearCompletion,
   } = ctx;
@@ -214,11 +213,6 @@ export function handleSessionResumed(
   setModelForSession(session.id, restoredModel);
   setVariantForSession(session.id, session.selectedVariant || null);
 
-  const restoredModelId = session.selectedModel || defaultModel;
-  const restoredVariants = models.find(m => m.id === restoredModelId)?.variants;
-  if (session.selectedVariant && restoredVariants && !restoredVariants[session.selectedVariant]) {
-    setVariantForSession(session.id, null);
-  }
   sessionAccessTimesRef.current.set(session.id, Date.now());
 
   if (control) {

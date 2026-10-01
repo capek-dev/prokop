@@ -199,6 +199,7 @@ const layerBootstrapExceptions: Record<string, string[]> = {};
 // file mutations) are the only exceptions, pinned by the S5 gate below.
 const layerInfrastructureExceptions: Record<string, string[]> = {
   'packages/server/src/infrastructure/sqlite/database.ts': ['@/config', '@/utils/perf'],
+  'packages/server/src/infrastructure/sqlite/session-repository.ts': ['@/config'],
   'packages/server/src/infrastructure/mcp/manager.ts': ['@/version'],
   'packages/server/src/infrastructure/daemon/index.ts': ['@/config'],
   'packages/server/src/infrastructure/session-title.ts': ['@/config', '@/adapters/capek/contracts'],

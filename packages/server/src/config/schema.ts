@@ -27,6 +27,14 @@ export function validateModelsDocument(config: unknown): config is ModelsConfig 
     return false;
   }
 
+  // Optional default variant for the default model; a stale key is tolerated
+  // here because read-time resolution validates membership.
+  if (c.defaultVariant !== undefined && c.defaultVariant !== null) {
+    if (typeof c.defaultVariant !== 'string' || c.defaultVariant.trim() === '') {
+      return false;
+    }
+  }
+
   const providerIds = new Set<string>();
   const allModelIds = new Set<string>();
 

@@ -11,18 +11,19 @@ import type {
 const mocks = vi.hoisted(() => {
   const usable: ModelRuntimeStatus = { providerSupported: true, providerConfigured: true, usable: true };
   const needsConfig: ModelRuntimeStatus = { providerSupported: true, providerConfigured: false, usable: false };
-  const model = (id: string, name: string, providerId: string, runtimeStatus: ModelRuntimeStatus): ModelWithStatus =>
-    ({ id, name, contextWindow: 200000, providerId, providerName: providerId, runtimeStatus });
+  const model = (id: string, name: string, providerId: string, runtimeStatus: ModelRuntimeStatus, variants?: ModelWithStatus['variants']): ModelWithStatus =>
+    ({ id, name, contextWindow: 200000, providerId, providerName: providerId, runtimeStatus, variants });
   return {
   config: {
     defaultModel: 'MiniMax-M3',
     defaultProvider: 'minimax',
+    defaultVariant: 'max',
     providers: [
       {
         id: 'minimax',
         name: 'MiniMax',
         models: [
-          model('MiniMax-M3', 'MiniMax M3', 'minimax', usable),
+          model('MiniMax-M3', 'MiniMax M3', 'minimax', usable, { high: { providerOptions: {} }, max: { providerOptions: {} } }),
           model('MiniMax-M2.7', 'MiniMax M2.7', 'minimax', usable),
         ],
       },
@@ -107,10 +108,14 @@ describe('ProvidersModelsPanel', () => {
     expect(await screen.findByRole('button', { name: /disconnect/i })).toBeInTheDocument();
   });
 
-  test('header carries the default selector and the sync menu, no provider CRUD', () => {
+  test('header carries the default selector with variant and the sync menu, no provider CRUD', () => {
     render(<ProvidersModelsPanel sdkClient={sdkClient} />);
 
     expect(screen.getAllByText('Default').length).toBeGreaterThan(0);
+    // The default model declares variants, so the third select renders with
+    // the stored default variant selected.
+    const variantTrigger = screen.getByRole('combobox', { name: 'Default variant' });
+    expect(variantTrigger).toHaveTextContent('max');
     expect(screen.getByRole('button', { name: /sync models from registry/i })).toBeInTheDocument();
     // Providers are read-only catalog entries: no create/edit/delete affordances.
     expect(screen.queryByRole('button', { name: /add provider/i })).not.toBeInTheDocument();
