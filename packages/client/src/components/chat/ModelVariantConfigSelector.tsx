@@ -322,7 +322,7 @@ export function ModelVariantConfigSelector({
         showCheck={false}
         onSelect={() => handleSelectVariant(NONE_VALUE)}
       >
-        <span>Default</span>
+        <span>default</span>
         <Check
           className={cn(
             'ml-auto size-4',
@@ -337,7 +337,7 @@ export function ModelVariantConfigSelector({
           showCheck={false}
           onSelect={() => handleSelectVariant(key)}
         >
-          <span>{capitalizeVariant(key)}</span>
+          <span>{capitalizeVariant(key).toLowerCase()}</span>
           <Check
             className={cn(
               'ml-auto size-4',
@@ -490,7 +490,7 @@ export function ModelVariantConfigSelector({
   const sections: { icon: ReactNode; label: string; value: string; section: Section }[] = [
     { icon: <HarnessMark className="size-3.5" />, label: 'Model', value: modelDisplayName, section: 'model' },
     ...(hasVariants
-      ? [{ icon: <Brain className="size-3.5" />, label: codexSession || claudeSession ? 'Effort' : 'Variant', value: variantDisplayName ? variantDisplayName.toLowerCase() : 'Default', section: 'variant' as const }]
+      ? [{ icon: <Brain className="size-3.5" />, label: codexSession || claudeSession ? 'Effort' : 'Variant', value: variantDisplayName ? variantDisplayName.toLowerCase() : 'default', section: 'variant' as const }]
       : []),
     ...(preconfigs.length > 0 && !lockPreconfig
       ? [{ icon: (() => {
