@@ -479,7 +479,7 @@ export function ModelVariantConfigSelector({
     }
     return (
       <Command>
-        <CommandInput placeholder="Search config..." autoFocus />
+        <CommandInput placeholder="Search agents..." autoFocus />
         <CommandList className="max-h-[30vh]">
           {configItems}
         </CommandList>
@@ -497,7 +497,7 @@ export function ModelVariantConfigSelector({
             const isSelectedAgent = selectedPreconfig ? isAgentPreconfig(selectedPreconfig.id) : false;
             const Icon = isSelectedAgent ? Bot : Cog;
             return <Icon className={cn('size-3.5', isSelectedAgent && 'text-primary')} />;
-          })(), label: 'Config', value: selectedPreconfig ? preconfigDisplayName(selectedPreconfig.name) : 'None', section: 'config' as const }]
+          })(), label: 'Agent', value: selectedPreconfig ? preconfigDisplayName(selectedPreconfig.name) : 'None', section: 'config' as const }]
       : []),
   ];
 

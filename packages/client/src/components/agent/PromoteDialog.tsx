@@ -75,12 +75,12 @@ export function PromoteDialog({ open, onOpenChange }: PromoteDialogProps) {
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Promote Preconfig to Agent</DialogTitle>
+          <DialogTitle>Promote to Agent Home</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1">
-            <span className="text-sm font-medium">Preconfig</span>
+            <span className="text-sm font-medium">Agent</span>
             <Popover open={selectorOpen} onOpenChange={setSelectorOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -90,16 +90,16 @@ export function PromoteDialog({ open, onOpenChange }: PromoteDialogProps) {
                   className="w-full justify-between font-mono text-sm h-9"
                 >
                   <span className="truncate">
-                    {selected ? selected.name : 'Select a preconfig...'}
+                    {selected ? selected.name : 'Select an agent...'}
                   </span>
                   <ChevronsUpDown className="size-3 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[280px] p-0" align="start">
                 <Command>
-                  <CommandInput placeholder="Search preconfigs..." />
+                  <CommandInput placeholder="Search agents..." />
                   <CommandList className="max-h-[50vh] overflow-y-auto">
-                    <CommandEmpty>No preconfigs available.</CommandEmpty>
+                    <CommandEmpty>No agents available.</CommandEmpty>
                     <CommandGroup>
                       {available.map(preconfig => (
                         <CommandItem

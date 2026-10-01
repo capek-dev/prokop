@@ -20,9 +20,9 @@ export function LearningModelPicker({ models, preconfig, value, onChange }: Lear
         onChangeModel={(modelId, providerId) => onChange({ modelId, providerId, variant: null })} />
       <VariantSelector variants={model?.variants} selectedVariant={value ? value.variant ?? null : preconfig?.variant ?? null}
         onChangeVariant={variant => { if (modelId && providerId) onChange({ modelId, providerId, variant }); }} />
-      {value && <Button variant="ghost" size="sm" onClick={() => onChange(null)}>Use preconfig model</Button>}
+      {value && <Button variant="ghost" size="sm" onClick={() => onChange(null)}>Use agent model</Button>}
     </div>
-    {!value && <p className="text-xs text-muted-foreground">Using the preconfig model and variant.</p>}
+    {!value && <p className="text-xs text-muted-foreground">Using the agent model and variant.</p>}
     {value && !model && <p role="status" className="text-xs text-muted-foreground">Unavailable model: {value.modelId} ({value.providerId})</p>}
   </div>;
 }

@@ -40,10 +40,10 @@ export function WorkspacePreconfigsPanel({ preconfigs, settings, onChange }: Pre
   return (
     <div className="p-3 sm:p-4 space-y-6">
       <div className="space-y-0.5">
-        <Label>Preconfigs</Label>
+        <Label>Agents</Label>
         <p className="text-xs text-muted-foreground">
-          Select which preconfigs are available in this workspace and choose the default for new chats.
-          When none are selected, all primary preconfigs are shown.
+          Select which agents are available in this workspace and choose the default for new chats.
+          When none are selected, all primary agents are shown.
         </p>
       </div>
 
@@ -88,7 +88,7 @@ export function WorkspacePreconfigsPanel({ preconfigs, settings, onChange }: Pre
                 type="button"
                 onClick={() => setDefault(preconfig.id)}
                 disabled={!isSelected}
-                title={isDefault ? 'Default preconfig' : 'Set as default'}
+                title={isDefault ? 'Default agent' : 'Set as default'}
                 className="p-1 rounded hover:bg-secondary transition-colors disabled:opacity-30"
               >
                 <Star

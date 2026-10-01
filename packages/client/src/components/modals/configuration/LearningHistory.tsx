@@ -69,7 +69,7 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
   const reviewerNameById = useMemo(() => {
     const map: Record<string, string> = {};
     for (const reviewer of workspaces.find(w => w.id === workspaceId)?.settings?.learning?.reviewers ?? []) {
-      map[reviewer.id] = preconfigs.find(p => p.id === reviewer.preconfigId)?.name ?? 'Unavailable preconfig';
+      map[reviewer.id] = preconfigs.find(p => p.id === reviewer.preconfigId)?.name ?? 'Unavailable agent';
     }
     return map;
   }, [workspaces, preconfigs, workspaceId]);

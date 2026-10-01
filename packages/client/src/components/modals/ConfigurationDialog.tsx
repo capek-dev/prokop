@@ -36,7 +36,7 @@ const SECTIONS: SettingsSection[] = [
   { value: 'providers', label: 'LLM Providers', icon: Key, group: 'server' },
   { value: 'models', label: 'Models', icon: Boxes, group: 'server' },
   { value: 'prompts', label: 'Prompts', icon: FileText, group: 'server' },
-  { value: 'preconfigs', label: 'Preconfigs', icon: Layers, group: 'server' },
+  { value: 'preconfigs', label: 'Agents', icon: Layers, group: 'server' },
   { value: 'response-formats', label: 'Formats', icon: Braces, group: 'server' },
   { value: 'env', label: 'Environment', icon: Terminal, group: 'server' },
   { value: 'tools', label: 'Tools', icon: Wrench, group: 'server' },

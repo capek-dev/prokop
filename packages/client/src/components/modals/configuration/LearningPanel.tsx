@@ -169,11 +169,11 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
 
       {!initialId && (
         <Alert>
-          <AlertTitle>{personal ? 'Agent reference missing' : 'Select a default preconfig first'}</AlertTitle>
+          <AlertTitle>{personal ? 'Agent reference missing' : 'Select a default agent first'}</AlertTitle>
           <AlertDescription>
             {personal
               ? 'This agent home has no agent reference, so learning cannot run.'
-              : 'Learning needs a preconfig to run. Pick one in the Preconfigs section.'}
+              : 'Learning needs an agent to run. Pick one in the Agents section.'}
           </AlertDescription>
         </Alert>
       )}
@@ -231,9 +231,9 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
 
                     <div className="space-y-3 border-t px-3 py-3">
                       <div className="space-y-1.5">
-                        <Label htmlFor={`reviewer-preconfig-${item.id}`}>Preconfig</Label>
+                        <Label htmlFor={`reviewer-preconfig-${item.id}`}>Agent</Label>
                         <Select value={item.preconfigId} onValueChange={preconfigId => update(item.id, { preconfigId })}>
-                          <SelectTrigger id={`reviewer-preconfig-${item.id}`} aria-label="Learner preconfig" className="w-full">
+                          <SelectTrigger id={`reviewer-preconfig-${item.id}`} aria-label="Learner agent" className="w-full">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>

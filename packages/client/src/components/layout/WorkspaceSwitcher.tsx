@@ -372,7 +372,7 @@ export function WorkspaceSwitcher({
       open={agentToDemote !== null}
       onOpenChange={(open) => !open && setAgentToDemote(null)}
       title={agentToDemote ? `Demote ${agentToDemote.name}?` : 'Demote agent?'}
-      description="This will remove the agent directory and its home workspace. Sessions created in the home workspace will be deleted. The original preconfig is preserved."
+      description="This will remove the agent directory and its home workspace. Sessions created in the home workspace will be deleted. The original agent is preserved."
       confirmLabel="Demote"
       variant="destructive"
       loading={demoteAgent.isPending}

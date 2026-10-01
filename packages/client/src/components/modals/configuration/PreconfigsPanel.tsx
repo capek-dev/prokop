@@ -241,7 +241,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
       setIsCreating(false);
       setEditingPreconfig(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save preconfig');
+      setError(err instanceof Error ? err.message : 'Failed to save agent');
     } finally {
       setSaving(false);
     }
@@ -269,11 +269,11 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
         skills: preconfig.skills,
         format: 'md',
       });
-      toast.success(`Duplicated preconfig as ${name}`);
+      toast.success(`Duplicated agent as ${name}`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to duplicate preconfig';
+      const message = err instanceof Error ? err.message : 'Failed to duplicate agent';
       setError(message);
-      toast.error('Failed to duplicate preconfig', { description: message });
+      toast.error('Failed to duplicate agent', { description: message });
     } finally {
       setDuplicatingId(null);
     }
@@ -286,9 +286,9 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
       await deletePreconfigMut.mutateAsync(deleteTarget);
       setDeleteTarget(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to delete preconfig';
+      const message = err instanceof Error ? err.message : 'Failed to delete agent';
       setError(message);
-      toast.error('Failed to delete preconfig', { description: message });
+      toast.error('Failed to delete agent', { description: message });
     } finally {
       setDeleting(false);
     }
@@ -313,7 +313,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
               <ArrowLeft className="size-4" />
             </Button>
             <h3 className="text-sm font-medium">
-              {isCreating ? 'New Preconfig' : `Edit: ${editingPreconfig?.name}`}
+              {isCreating ? 'New Agent' : `Edit: ${editingPreconfig?.name}`}
             </h3>
           </div>
           <Button size="sm" onClick={handleSave} disabled={saving || !form.name.trim()}>
@@ -615,7 +615,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
                   <Input
                     value={subagentInput}
                     onChange={(e) => setSubagentInput(e.target.value)}
-                    placeholder="Preconfig ID..."
+                    placeholder="Agent ID..."
                     className="h-7 text-xs font-mono"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && subagentInput.trim()) {
@@ -752,11 +752,11 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
     <div className="p-3 sm:p-4 space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {preconfigs.length} preconfig{preconfigs.length !== 1 ? 's' : ''}
+          {preconfigs.length} agent{preconfigs.length !== 1 ? 's' : ''}
         </p>
         <Button size="sm" onClick={handleCreate}>
           <Plus className="size-3" />
-          <span className="hidden sm:inline">New Preconfig</span>
+          <span className="hidden sm:inline">New Agent</span>
         </Button>
       </div>
 
@@ -766,7 +766,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
 
       {preconfigs.length === 0 ? (
         <div className="text-center py-8 text-sm text-muted-foreground">
-          No preconfigs yet. Create one to get started.
+          No agents yet. Create one to get started.
         </div>
       ) : (
         <div className="space-y-2">
@@ -804,7 +804,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
                   size="icon-xs"
                   variant="ghost"
                   onClick={() => handleEdit(preconfig)}
-                  title="Edit preconfig"
+                  title="Edit agent"
                 >
                   <Pencil className="size-3" />
                 </Button>
@@ -813,7 +813,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
                   variant="ghost"
                   onClick={() => handleDuplicate(preconfig)}
                   disabled={duplicatingId !== null}
-                  title="Duplicate preconfig"
+                  title="Duplicate agent"
                 >
                   {duplicatingId === preconfig.id
                     ? <Loader2 className="size-3 animate-spin" />
@@ -824,7 +824,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
                     size="icon-xs"
                     variant="ghost"
                     onClick={() => setDeleteTarget(preconfig.id)}
-                    title="Delete preconfig"
+                    title="Delete agent"
                   >
                     <Trash2 className="size-3" />
                   </Button>
@@ -838,8 +838,8 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
-        title="Delete Preconfig"
-        description="Are you sure you want to delete this preconfig? This cannot be undone."
+        title="Delete Agent"
+        description="Are you sure you want to delete this agent? This cannot be undone."
         confirmLabel="Delete"
         variant="destructive"
         onConfirm={handleDelete}
