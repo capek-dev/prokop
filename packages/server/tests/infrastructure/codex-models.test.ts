@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
 import { createSession } from '@/infrastructure/sqlite/session-store';
-import { getCodexModelSelection, listCodexModels, saveCodexModelSelection } from '@/harnesses/codex-cli/models';
+import { createCodexModelCatalogCache, getCodexModelSelection, listCodexModels, saveCodexModelSelection } from '@/harnesses/codex-cli/models';
 import type { CodexConnection } from '@/harnesses/codex-cli/app-server';
 
 beforeEach(() => { setupTestDatabase(); seedWorkspace({ id: 'ws', path: process.cwd() }); });
@@ -57,6 +57,37 @@ test('malformed Codex catalog fails closed', async () => {
   const fake = fakeCatalog([{ data: [{ ...model('codex-one'), supportedReasoningEfforts: [{}] }], nextCursor: null }]);
   await expect(listCodexModels({ connect: () => fake.connection, version: () => 'codex-cli 0.156.1' }))
     .rejects.toThrow('Invalid Codex reasoning effort');
+});
+
+test('catalog cache shares one spawn across concurrent callers and expires by TTL', async () => {
+  let spawns = 0;
+  const fakeList = async (): Promise<ReturnType<typeof listCodexModels>> => {
+    spawns++;
+    const fake = fakeCatalog([{ data: [model('codex-one')], nextCursor: null }]);
+    return listCodexModels({ connect: () => fake.connection, version: () => 'codex-cli 0.156.1' });
+  };
+  const cached = createCodexModelCatalogCache(fakeList, 60_000);
+  const [a, b] = await Promise.all([cached(), cached()]);
+  expect(a).toBe(b);
+  expect(spawns).toBe(1);
+
+  const expired = createCodexModelCatalogCache(fakeList, -1);
+  await expired();
+  await expired();
+  expect(spawns).toBe(3);
+});
+
+test('a failed Codex spawn clears the cache so the next caller retries', async () => {
+  let fail = true;
+  const fakeList = async (): Promise<ReturnType<typeof listCodexModels>> => {
+    if (fail) throw new Error('spawn down');
+    const fake = fakeCatalog([{ data: [model('codex-one')], nextCursor: null }]);
+    return listCodexModels({ connect: () => fake.connection, version: () => 'codex-cli 0.156.1' });
+  };
+  const cached = createCodexModelCatalogCache(fakeList, 60_000);
+  await expect(cached()).rejects.toThrow('spawn down');
+  fail = false;
+  await expect(cached()).resolves.toBeDefined();
 });
 
 test('model preferences persist before binding a thread and never attach to Prokop sessions', () => {

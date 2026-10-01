@@ -102,13 +102,13 @@ import {
   createCodexCliHarness,
   createCodexExecution,
   getCodexModelSelection,
-  listCodexModels,
+  listCachedCodexModels,
   saveCodexModelSelection,
 } from '@/harnesses/codex-cli';
 import { createHarnessExecution, type HarnessRegistration } from '@/application/sessions/harness-execution';
 import { installHeadlessExecutionPort } from '@/application/ports/headless-execution';
 import { claudeCliAvailable, createClaudeCliHarness, createClaudeExecution,
-  getClaudeModelSelection, listClaudeModels, saveClaudeModelSelection } from '@/harnesses/claude-cli';
+  getClaudeModelSelection, listCachedClaudeModels, saveClaudeModelSelection } from '@/harnesses/claude-cli';
 
 import { createWiredLearning } from './learning';
 
@@ -278,8 +278,8 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     codexWorkspaceAvailable,
     claudeAvailable: claudeCliAvailable,
     claudeWorkspaceAvailable: codexWorkspaceAvailable,
-    claudeModels: listClaudeModels,
-    codexModels: listCodexModels,
+    claudeModels: listCachedClaudeModels,
+    codexModels: listCachedCodexModels,
     prokopModelAvailable: (modelId, providerId) => getModelsConfigWithStatus().providers
       .some(provider => provider.id === providerId && provider.models.some(model => model.id === modelId && model.runtimeStatus.usable)),
     selectEmptySessionHarnessModel,
@@ -296,10 +296,10 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     worktreeAttachments,
     codexCliAvailable,
     codexWorkspaceAvailable,
-    { list: listCodexModels, get: getCodexModelSelection, save: saveCodexModelSelection,
+    { list: listCachedCodexModels, get: getCodexModelSelection, save: saveCodexModelSelection,
       isActive: codexExecution.isSessionActive },
     claudeCliAvailable,
-    { list: listClaudeModels, get: getClaudeModelSelection, save: saveClaudeModelSelection,
+    { list: listCachedClaudeModels, get: getClaudeModelSelection, save: saveClaudeModelSelection,
       isActive: claudeExecution.isSessionActive },
     codexWorkspaceAvailable,
   );

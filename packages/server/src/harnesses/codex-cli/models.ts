@@ -71,3 +71,31 @@ export function saveCodexModelSelection(sessionId: string, selection: CodexModel
   [selection.model, selection.effort, sessionId]);
   if (result.changes !== 1) throw new Error('Codex session unavailable');
 }
+
+/** Listing spawns a Codex app-server process; callers share one catalog per TTL window. */
+const CATALOG_TTL_MS = 10 * 60_000;
+
+export function createCodexModelCatalogCache(
+  list: () => Promise<CodexModel[]> = listCodexModels,
+  ttlMs: number = CATALOG_TTL_MS,
+): () => Promise<CodexModel[]> {
+  let cache: { at: number; promise: Promise<CodexModel[]> } | null = null;
+  return () => {
+    if (!cache || Date.now() - cache.at > ttlMs) {
+      const promise = list().catch((err: unknown) => {
+        // Clear only our own entry; a newer probe may already be cached.
+        if (cache?.promise === promise) cache = null;
+        throw err;
+      });
+      cache = { at: Date.now(), promise };
+    }
+    return cache.promise;
+  };
+}
+
+const cachedCodexModels = createCodexModelCatalogCache();
+
+/** Catalog over the shared spawn cache. */
+export function listCachedCodexModels(): Promise<CodexModel[]> {
+  return cachedCodexModels();
+}

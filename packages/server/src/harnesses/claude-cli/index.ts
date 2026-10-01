@@ -3,7 +3,7 @@ import type { SessionExecutionPort } from '@/application/ports/execution';
 
 export { createClaudeExecution } from './execution';
 export { claudeCliAvailable } from './version';
-export { listClaudeModels, getClaudeModelSelection, saveClaudeModelSelection } from './models';
+export { listClaudeModels, listCachedClaudeModels, getClaudeModelSelection, saveClaudeModelSelection } from './models';
 
 /** Claude CLI owns turns and model choice; titles use the universal
  * server-side regeneration supplied by the composition root. */

@@ -1,9 +1,38 @@
+import { probeClaudeModels } from './model-probe';
 import type { ModelInfo } from '@anthropic-ai/claude-agent-sdk';
 import type { CodexModel, CodexModelSelection } from '@prokopai/sdk';
 import { getDatabase } from '@/infrastructure/sqlite/database';
-import { probeClaudeModels } from './model-probe';
 
 const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
+
+/** The CLI catalog only changes with the installed CLI version; a probe boots
+ * the whole CLI process, so callers share one probe per TTL window. */
+const CATALOG_TTL_MS = 10 * 60_000;
+
+export function createClaudeModelCatalogCache(
+  probe: () => Promise<unknown> = probeClaudeModels,
+  ttlMs: number = CATALOG_TTL_MS,
+): () => Promise<unknown> {
+  let cache: { at: number; promise: Promise<unknown> } | null = null;
+  return () => {
+    if (!cache || Date.now() - cache.at > ttlMs) {
+      const promise = probe().catch((err: unknown) => {
+        // Clear only our own entry; a newer probe may already be cached.
+        if (cache?.promise === promise) cache = null;
+        throw err;
+      });
+      cache = { at: Date.now(), promise };
+    }
+    return cache.promise;
+  };
+}
+
+const cachedClaudeCatalog = createClaudeModelCatalogCache();
+
+/** Validated catalog over the shared probe cache. */
+export function listCachedClaudeModels(): Promise<CodexModel[]> {
+  return listClaudeModels(cachedClaudeCatalog);
+}
 
 /** Only advertise concrete models and effort levels reported by the installed CLI. */
 export async function listClaudeModels(discover: () => Promise<unknown> = probeClaudeModels): Promise<CodexModel[]> {
