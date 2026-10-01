@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import { Check, ChevronsUpDown, Cpu, Brain, Bot, Cog } from 'lucide-react';
+import { Check, ChevronsUpDown, Brain, Bot, Cog } from 'lucide-react';
 import type { CodexModel, Preconfig } from '@prokopai/sdk';
 import { useServerDataStore } from '@/stores/serverDataStore';
+import { AnthropicMark, OpenAIMark, ProkopMark } from '@/components/branding/BrandMarks';
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -83,6 +84,17 @@ function capitalizeVariant(key: string): string {
   return VARIANT_LABELS[key] || key.charAt(0).toUpperCase() + key.slice(1);
 }
 
+/** Full name up to 15 chars; longer names collapse to initials (SuperDuperCoder -> SDC). */
+function preconfigDisplayName(name: string): string {
+  if (name.length <= 15) return name;
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join('');
+}
+
 function getTierBadge(tier: string): string {
   switch (tier) {
     case 'budget': return '$';
@@ -93,6 +105,7 @@ function getTierBadge(tier: string): string {
 }
 
 type Section = 'model' | 'variant' | 'config';
+type ModelTab = 'prokop' | 'openai' | 'anthropic';
 
 export function ModelVariantConfigSelector({
   models,
@@ -123,9 +136,21 @@ export function ModelVariantConfigSelector({
 }: ModelVariantConfigSelectorProps) {
   const [open, setOpen] = useState(false);
   const [openSection, setOpenSection] = useState<Section | null>(null);
+  const [modelTab, setModelTab] = useState<ModelTab>('prokop');
   const isMobile = useIsMobile();
   const agents = useServerDataStore((s) => s.agents);
   const isAgentPreconfig = (id: string) => agents.some(a => a.id === id);
+
+  const defaultModelTab: ModelTab = claudeSession ? 'anthropic' : codexSession ? 'openai' : 'prokop';
+  const modelTabs: { id: ModelTab; label: string; Mark: typeof ProkopMark }[] = [
+    ...(models.length > 0 ? [{ id: 'prokop' as const, label: 'Prokop', Mark: ProkopMark }] : []),
+    ...(codexModels.length > 0 ? [{ id: 'openai' as const, label: 'OpenAI', Mark: OpenAIMark }] : []),
+    ...(claudeModels.length > 0 ? [{ id: 'anthropic' as const, label: 'Anthropic', Mark: AnthropicMark }] : []),
+  ];
+  const activeModelTab = modelTabs.some((t) => t.id === modelTab)
+    ? modelTab
+    : modelTabs[0]?.id ?? 'prokop';
+  const HarnessMark = claudeSession ? AnthropicMark : codexSession ? OpenAIMark : ProkopMark;
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
@@ -164,9 +189,9 @@ export function ModelVariantConfigSelector({
       : selectedVariant ? capitalizeVariant(selectedVariant) : null;
   const fullSelectionLabel = [
     modelDisplayName,
-    variantDisplayName,
+    variantDisplayName ? variantDisplayName.toLowerCase() : null,
     selectedPreconfig && !lockPreconfig ? selectedPreconfig.name : null,
-  ].filter(Boolean).join(', ');
+  ].filter(Boolean).join(' · ');
 
   const hasVariants = claudeSession ? !!selectedClaude?.supportedEfforts.length
     : codexSession ? !!selectedCodex?.supportedEfforts.length
@@ -197,6 +222,7 @@ export function ModelVariantConfigSelector({
 
   const toggleSection = (section: Section) => {
     setOpenSection((prev) => (prev === section ? null : section));
+    if (section === 'model') setModelTab(defaultModelTab);
   };
 
   const renderTriggerLabel = () => {
@@ -209,15 +235,15 @@ export function ModelVariantConfigSelector({
         <span className="min-w-0 flex-1 truncate font-medium">{modelDisplayName}</span>
         {variantDisplayName && (
           <span className="shrink-0 text-muted-foreground">
-            {'(' + variantDisplayName + ')'}
+            · {variantDisplayName.toLowerCase()}
           </span>
         )}
         {selectedPreconfig && !lockPreconfig && (
           <span className={cn(
-            'max-w-[40%] min-w-0 truncate text-muted-foreground',
+            'shrink-0 text-muted-foreground',
             isAgentPreconfig(selectedPreconfig.id) && 'text-primary font-medium',
           )}>
-            · {selectedPreconfig.name}
+            · {preconfigDisplayName(selectedPreconfig.name)}
           </span>
         )}
       </span>
@@ -226,7 +252,7 @@ export function ModelVariantConfigSelector({
 
   // --- Shared list items ---
 
-  const modelItems = (
+  const prokopItems = (
     <>
       {Object.entries(groupedModels).map(([providerName, providerModels]) => (
         <CommandGroup key={providerName} heading={providerName}>
@@ -254,32 +280,38 @@ export function ModelVariantConfigSelector({
           })}
         </CommandGroup>
       ))}
-      {claudeModels.length > 0 && <CommandGroup heading="Claude CLI">
-        {claudeModels.map(model => (
-          <CommandItem key={model.model} value={`claude-cli ${model.name} ${model.model}`}
-            showCheck={false} onSelect={() => {
-              onChangeClaude?.(model.model, model.model === selectedClaude?.model
-                ? claudeEffort ?? model.defaultEffort : model.defaultEffort);
-              setOpenSection(null);
-            }}>
-            <span>{model.name}</span>
-            <Check className={cn('ml-auto size-4', claudeSession && selectedClaude?.model === model.model ? 'opacity-100' : 'opacity-0')} />
-          </CommandItem>
-        ))}
-      </CommandGroup>}
-      {codexModels.length > 0 && <CommandGroup heading="Codex CLI">
-        {codexModels.map(model => (
-          <CommandItem key={model.model} value={`codex-cli ${model.name} ${model.model}`}
-            showCheck={false} onSelect={() => {
-              onChangeCodex?.(model.model, model.model === selectedCodex?.model
-                ? codexEffort ?? model.defaultEffort : model.defaultEffort);
-              setOpenSection(null);
-            }}>
-            <span>{model.name}</span>
-            <Check className={cn('ml-auto size-4', codexSession && selectedCodex?.model === model.model ? 'opacity-100' : 'opacity-0')} />
-          </CommandItem>
-        ))}
-      </CommandGroup>}
+    </>
+  );
+
+  const claudeItems = (
+    <>
+      {claudeModels.map(model => (
+        <CommandItem key={model.model} value={`claude-cli ${model.name} ${model.model}`}
+          showCheck={false} onSelect={() => {
+            onChangeClaude?.(model.model, model.model === selectedClaude?.model
+              ? claudeEffort ?? model.defaultEffort : model.defaultEffort);
+            setOpenSection(null);
+          }}>
+          <span>{model.name}</span>
+          <Check className={cn('ml-auto size-4', claudeSession && selectedClaude?.model === model.model ? 'opacity-100' : 'opacity-0')} />
+        </CommandItem>
+      ))}
+    </>
+  );
+
+  const codexItems = (
+    <>
+      {codexModels.map(model => (
+        <CommandItem key={model.model} value={`codex-cli ${model.name} ${model.model}`}
+          showCheck={false} onSelect={() => {
+            onChangeCodex?.(model.model, model.model === selectedCodex?.model
+              ? codexEffort ?? model.defaultEffort : model.defaultEffort);
+            setOpenSection(null);
+          }}>
+          <span>{model.name}</span>
+          <Check className={cn('ml-auto size-4', codexSession && selectedCodex?.model === model.model ? 'opacity-100' : 'opacity-0')} />
+        </CommandItem>
+      ))}
     </>
   );
 
@@ -387,13 +419,52 @@ export function ModelVariantConfigSelector({
     if (openSection !== section) return null;
     if (section === 'model') {
       return (
-        <Command>
-          <CommandInput placeholder="Search model..." autoFocus />
-          <CommandList className="max-h-[40vh]">
-            <CommandEmpty>No model found.</CommandEmpty>
-            {modelItems}
-          </CommandList>
-        </Command>
+        <div className="flex">
+          {modelTabs.length > 1 && (
+            <div
+              role="tablist"
+              aria-label="Model source"
+              aria-orientation="vertical"
+              className={cn(
+                'flex shrink-0 flex-col gap-0.5 border-r border-border p-1',
+                isMobile ? 'w-12 items-center' : 'w-28',
+              )}
+            >
+              {modelTabs.map(({ id, label, Mark }) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeModelTab === id}
+                  aria-label={label}
+                  title={isMobile ? label : undefined}
+                  onClick={() => setModelTab(id)}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-sm text-xs font-medium transition-colors',
+                    isMobile ? 'h-9 w-9 justify-center p-0' : 'justify-start px-2 py-1.5',
+                    activeModelTab === id
+                      ? 'bg-accent text-foreground'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <Mark className="size-3.5 shrink-0" />
+                  {!isMobile && label}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <Command>
+              <CommandInput placeholder="Search model..." autoFocus />
+              <CommandList className="max-h-[40vh]">
+                <CommandEmpty>No model found.</CommandEmpty>
+                {activeModelTab === 'prokop' ? prokopItems
+                  : activeModelTab === 'openai' ? codexItems
+                    : claudeItems}
+              </CommandList>
+            </Command>
+          </div>
+        </div>
       );
     }
     if (section === 'variant') {
@@ -417,16 +488,16 @@ export function ModelVariantConfigSelector({
   };
 
   const sections: { icon: ReactNode; label: string; value: string; section: Section }[] = [
-    { icon: <Cpu className="size-3.5" />, label: 'Model', value: modelDisplayName, section: 'model' },
+    { icon: <HarnessMark className="size-3.5" />, label: 'Model', value: modelDisplayName, section: 'model' },
     ...(hasVariants
-      ? [{ icon: <Brain className="size-3.5" />, label: codexSession || claudeSession ? 'Effort' : 'Variant', value: variantDisplayName ? capitalizeVariant(variantDisplayName) : 'Default', section: 'variant' as const }]
+      ? [{ icon: <Brain className="size-3.5" />, label: codexSession || claudeSession ? 'Effort' : 'Variant', value: variantDisplayName ? variantDisplayName.toLowerCase() : 'Default', section: 'variant' as const }]
       : []),
     ...(preconfigs.length > 0 && !lockPreconfig
       ? [{ icon: (() => {
             const isSelectedAgent = selectedPreconfig ? isAgentPreconfig(selectedPreconfig.id) : false;
             const Icon = isSelectedAgent ? Bot : Cog;
             return <Icon className={cn('size-3.5', isSelectedAgent && 'text-primary')} />;
-          })(), label: 'Config', value: selectedPreconfig?.name || 'None', section: 'config' as const }]
+          })(), label: 'Config', value: selectedPreconfig ? preconfigDisplayName(selectedPreconfig.name) : 'None', section: 'config' as const }]
       : []),
   ];
 
@@ -466,7 +537,7 @@ export function ModelVariantConfigSelector({
             aria-label={'Model and configuration: ' + fullSelectionLabel}
             disabled={disabled}
           >
-            <Cpu />
+            <HarnessMark className="size-5" />
           </Button>
         </SheetTrigger>
         <SheetContent
@@ -500,7 +571,7 @@ export function ModelVariantConfigSelector({
             title={fullSelectionLabel}
             disabled={disabled}
           >
-            <Cpu />
+            <HarnessMark className="size-5" />
           </Button>
         </PopoverTrigger>
         {popoverContent}

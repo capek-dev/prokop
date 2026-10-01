@@ -1,12 +1,10 @@
-import { Shield, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, ShieldHalf } from 'lucide-react';
 import { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -26,9 +24,8 @@ interface AutoApproveSelectorProps {
 }
 
 interface ModeConfig {
-  icon: typeof Shield;
+  icon: typeof ShieldCheck;
   iconClass: string;
-  tooltip: string;
   label: string;
   ariaLabel: string;
 }
@@ -37,23 +34,20 @@ const MODE_CONFIGS: Record<PermissionMode, ModeConfig> = {
   standard: {
     icon: ShieldCheck,
     iconClass: 'text-success',
-    tooltip: 'Permissions: Standard',
-    label: 'Ordinary commands and workspace edits run automatically. Force/recursive deletes, secrets, and outside-workspace paths ask first.',
-    ariaLabel: 'Permissions: standard',
+    label: 'Standard',
+    ariaLabel: 'Standard permissions',
   },
   extended: {
-    icon: Shield,
-    iconClass: 'text-success',
-    tooltip: 'Permissions: Extended',
-    label: 'Also reads and writes files anywhere on this machine. Secrets and destructive actions still ask.',
-    ariaLabel: 'Permissions: extended',
+    icon: ShieldHalf,
+    iconClass: 'text-warning',
+    label: 'Extended',
+    ariaLabel: 'Extended permissions',
   },
   full: {
     icon: ShieldAlert,
-    iconClass: 'text-warning',
-    tooltip: 'Permissions: Full access',
-    label: 'Everything runs automatically except commands that can damage the system (rm -rf /, dd to a device, shutdown).',
-    ariaLabel: 'Permissions: full access',
+    iconClass: 'text-destructive',
+    label: 'Full access',
+    ariaLabel: 'Full access permissions',
   },
 };
 
@@ -62,8 +56,8 @@ const MODE_ORDER: PermissionMode[] = ['standard', 'extended', 'full'];
 function getMenuItemIconClass(mode: PermissionMode): string {
   switch (mode) {
     case 'standard': return 'text-success';
-    case 'extended': return 'text-success';
-    case 'full': return 'text-warning';
+    case 'extended': return 'text-warning';
+    case 'full': return 'text-destructive';
   }
 }
 
@@ -109,7 +103,7 @@ export function AutoApproveSelector({
               <Icon className={`size-4 ${config.iconClass}`} />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{config.tooltip}</TooltipContent>
+          <TooltipContent>{config.label}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
@@ -131,12 +125,10 @@ export function AutoApproveSelector({
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
-          <TooltipContent>{config.tooltip}</TooltipContent>
+          <TooltipContent>{config.label}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      <DropdownMenuContent align="end" sideOffset={4} className="w-56">
-        <DropdownMenuLabel>{config.label}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
+      <DropdownMenuContent align="end" sideOffset={4}>
         {MODE_ORDER.map((mode) => {
           const modeConfig = MODE_CONFIGS[mode];
           const ModeIcon = modeConfig.icon;
@@ -148,7 +140,7 @@ export function AutoApproveSelector({
               className={isActive ? 'bg-accent' : ''}
             >
               <ModeIcon className={`size-4 ${getMenuItemIconClass(mode)}`} />
-              <span className="ml-2">{modeConfig.tooltip}</span>
+              <span>{modeConfig.label}</span>
             </DropdownMenuItem>
           );
         })}

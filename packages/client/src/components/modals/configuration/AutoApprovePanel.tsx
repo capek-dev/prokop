@@ -1,34 +1,21 @@
-import { ShieldCheck, Shield, ShieldAlert } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, ShieldHalf } from 'lucide-react';
 import type { PermissionMode } from '@prokopai/sdk';
 import { Label } from '@/components/ui/label';
 
 interface ModeOption {
   value: PermissionMode;
   label: string;
-  description: string;
 }
 
 const MODE_OPTIONS: ModeOption[] = [
-  {
-    value: 'standard',
-    label: 'Standard',
-    description: 'Ordinary commands and workspace edits run automatically. Force/recursive deletes, secrets, and outside-workspace paths ask first.',
-  },
-  {
-    value: 'extended',
-    label: 'Extended',
-    description: 'Also reads and writes files anywhere on this machine. Secrets and destructive actions still ask.',
-  },
-  {
-    value: 'full',
-    label: 'Full access',
-    description: 'Everything runs automatically except commands that can damage the system (rm -rf /, dd to a device, shutdown).',
-  },
+  { value: 'standard', label: 'Standard' },
+  { value: 'extended', label: 'Extended' },
+  { value: 'full', label: 'Full access' },
 ];
 
-const MODE_ICONS: Record<PermissionMode, typeof Shield> = {
+const MODE_ICONS: Record<PermissionMode, typeof ShieldCheck> = {
   standard: ShieldCheck,
-  extended: Shield,
+  extended: ShieldHalf,
   full: ShieldAlert,
 };
 
@@ -64,10 +51,7 @@ export function AutoApprovePanel({ mode, onChange }: AutoApprovePanelProps) {
               }`}
             >
               <Icon className="size-4 shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-medium">{option.label}</span>
-                <span className="text-xs">{option.description}</span>
-              </div>
+              <span className="font-medium">{option.label}</span>
             </button>
           );
         })}

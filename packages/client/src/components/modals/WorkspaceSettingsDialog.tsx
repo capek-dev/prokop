@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
-import { Brain, GraduationCap, Wrench, Search, Server, Shield, FolderSymlink, ShieldCheck, Cog, Loader2 } from 'lucide-react';
+import { GraduationCap, Wrench, Server, Shield, FolderSymlink, ShieldCheck, Cog, Loader2 } from 'lucide-react';
 import type { Workspace, WorkspaceSettings, PermissionGrant, ProkopaiClient, PermissionMode } from '@prokopai/sdk';
 import { getSessionTagOrder } from '@/lib/sessionTagOrder';
 import { WorkspaceSessionsPanel } from './configuration/WorkspaceSessionsPanel';
@@ -9,9 +9,7 @@ import { Button } from '@/components/ui/button';
 import { DialogFooter } from '@/components/ui/dialog';
 import { SettingsDialogShell, PanelLoadingFallback, type SettingsSection } from './SettingsDialogShell';
 
-const MemoryPanel = lazy(() => import('./configuration/MemoryPanel').then((m) => ({ default: m.MemoryPanel })));
-const SkillsPanel = lazy(() => import('./configuration/SkillsPanel').then((m) => ({ default: m.SkillsPanel })));
-const SessionSearchPanel = lazy(() => import('./configuration/SessionSearchPanel').then((m) => ({ default: m.SessionSearchPanel })));
+const AgentToolsPanel = lazy(() => import('./configuration/AgentToolsPanel').then((m) => ({ default: m.AgentToolsPanel })));
 const MCPServersPanel = lazy(() => import('./configuration/MCPServersPanel').then((m) => ({ default: m.MCPServersPanel })));
 const PermissionsPanel = lazy(() => import('./configuration/PermissionsPanel').then((m) => ({ default: m.PermissionsPanel })));
 const AdditionalPathsPanel = lazy(() => import('./configuration/AdditionalPathsPanel').then((m) => ({ default: m.AdditionalPathsPanel })));
@@ -20,7 +18,7 @@ const WorkspacePreconfigsPanel = lazy(() => import('./configuration/WorkspacePre
 
 const LearningPanel = lazy(() => import('./configuration/LearningPanel').then(m => ({ default: m.LearningPanel })));
 
-type Section = 'sessions' | 'learning' | 'mcp' | 'permissions' | 'paths' | 'autoApprove' | 'memory' | 'skills' | 'search' | 'preconfigs';
+type Section = 'sessions' | 'learning' | 'mcp' | 'permissions' | 'paths' | 'autoApprove' | 'agentTools' | 'preconfigs';
 
 const SECTIONS: Omit<SettingsSection, 'icon'>[] = [
   { value: 'sessions', label: 'Sessions', group: 'general' },
@@ -30,9 +28,7 @@ const SECTIONS: Omit<SettingsSection, 'icon'>[] = [
   { value: 'paths', label: 'Additional Paths', group: 'general' },
   { value: 'preconfigs', label: 'Preconfigs', group: 'general' },
   { value: 'learning', label: 'Learning', group: 'capabilities' },
-  { value: 'memory', label: 'Memory', group: 'capabilities' },
-  { value: 'skills', label: 'Skills', group: 'capabilities' },
-  { value: 'search', label: 'Session Search', group: 'capabilities' },
+  { value: 'agentTools', label: 'Agent Tools', group: 'capabilities' },
 ];
 
 const GROUPS = [
@@ -42,7 +38,7 @@ const GROUPS = [
 
 /** Sections whose edits are held locally until Save is pressed. */
 const DEFERRED_SAVE_SECTIONS = new Set<Section>([
-  'sessions', 'learning', 'memory', 'skills', 'search', 'autoApprove', 'preconfigs',
+  'sessions', 'learning', 'agentTools', 'autoApprove', 'preconfigs',
 ]);
 
 const ICONS: Record<Section, SettingsSection['icon']> = {
@@ -53,9 +49,7 @@ const ICONS: Record<Section, SettingsSection['icon']> = {
   paths: FolderSymlink,
   preconfigs: Cog,
   learning: GraduationCap,
-  memory: Brain,
-  skills: Wrench,
-  search: Search,
+  agentTools: Wrench,
 };
 
 interface WorkspaceSettingsDialogProps {
@@ -193,21 +187,15 @@ export function WorkspaceSettingsDialog({
                 search: learning.enabled ? { ...d.search, enabled: true } : d.search,
                 skills: learning.enabled && learning.improveSkills ? { ...d.skills, enabled: true } : d.skills,
               }))} />;
-          case 'memory':
-            return <MemoryPanel
-              enabled={draft.memory.enabled}
-              onChange={(v) => setDraft(d => ({ ...d, memory: v }))}
-            />;
-          case 'skills':
-            return <SkillsPanel
-              enabled={draft.skills.enabled}
-              onChange={(v) => setDraft(d => ({ ...d, skills: v }))}
-            />;
-          case 'search':
-            return <SessionSearchPanel
-              enabled={draft.search.enabled}
+          case 'agentTools':
+            return <AgentToolsPanel
+              memoryEnabled={draft.memory.enabled}
+              skillsEnabled={draft.skills.enabled}
+              searchEnabled={draft.search.enabled}
               includeToolResults={draft.search.includeToolResults}
-              onChange={(v) => setDraft(d => ({ ...d, search: v }))}
+              onChangeMemory={(v) => setDraft(d => ({ ...d, memory: { enabled: v } }))}
+              onChangeSkills={(v) => setDraft(d => ({ ...d, skills: { enabled: v } }))}
+              onChangeSearch={(v) => setDraft(d => ({ ...d, search: v }))}
             />;
         }
       })()}
