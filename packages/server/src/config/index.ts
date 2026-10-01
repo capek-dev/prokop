@@ -195,7 +195,11 @@ export interface ModelDefinition {
   name: string;
   contextWindow: number;
   maxOutputTokens?: number;
-  tier: 'budget' | 'standard' | 'premium';
+  /**
+   * Legacy cost tier from older models.json files. Parsed for compatibility
+   * when present; nothing consumes it and new writes omit it.
+   */
+  tier?: 'budget' | 'standard' | 'premium';
   variants?: Record<string, { providerOptions: Record<string, unknown> }>;
   capabilities?: ModelCapabilities;
 }

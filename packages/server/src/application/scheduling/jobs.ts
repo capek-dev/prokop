@@ -14,7 +14,8 @@ import { getHeadlessExecutionPort } from '@/application/ports/headless-execution
 export type SchedulingCreateResult =
   | { kind: 'created'; job: ScheduledJob }
   | { kind: 'workspace_not_found' }
-  | { kind: 'harness_unsupported'; harness: SessionHarness };
+  | { kind: 'harness_unsupported'; harness: SessionHarness }
+  | { kind: 'harness_disabled'; harness: SessionHarness };
 
 export interface SchedulingApplicationDeps {
   repository: ScheduledJobRepositoryPort;
@@ -23,6 +24,8 @@ export interface SchedulingApplicationDeps {
   /** Test seam for the create-time headless support check; production reads
    * the installed headless port and defaults to prokop when uninstalled. */
   headlessSupport?: { supportedHarnesses(): SessionHarness[] };
+  /** Server-global harness disablement; absent wiring means all enabled. */
+  isHarnessDisabled?: (harness: SessionHarness) => boolean;
 }
 
 /**
@@ -66,6 +69,9 @@ export function createSchedulingHttpApplication(
       const harness = input.harness ?? 'prokop';
       if (!supported.includes(harness)) {
         return { kind: 'harness_unsupported', harness };
+      }
+      if (harness !== 'prokop' && deps.isHarnessDisabled?.(harness)) {
+        return { kind: 'harness_disabled', harness };
       }
       return {
         kind: 'created',

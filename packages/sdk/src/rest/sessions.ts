@@ -11,7 +11,7 @@ import type {
   GetToolDebugResponse,
   SessionWorktreeResponse,
 } from '../types/rest-responses';
-import type { SessionStatus, SessionListFilter, SessionCategoryCounts, SessionHarness, CodexModel, CodexModelSelection, PermissionMode } from '../shared-types/session';
+import type { SessionStatus, SessionListFilter, SessionCategoryCounts, SessionHarness, HarnessStatus, CodexModel, CodexModelSelection, PermissionMode } from '../shared-types/session';
 
 interface ListOptions {
   status?: SessionStatus;
@@ -57,8 +57,12 @@ interface ListByWorkspaceOptions extends SessionListFilter {
 export class SessionsRestNamespace {
   constructor(private http: HttpClient) {}
 
-  async harnesses(): Promise<{ harnesses: Array<{ id: SessionHarness; available: boolean; approvals?: boolean }> }> {
+  async harnesses(): Promise<{ harnesses: HarnessStatus[] }> {
     return this.http.get('/harnesses');
+  }
+
+  async setHarnessEnabled(harness: SessionHarness, enabled: boolean): Promise<{ harnesses: HarnessStatus[] }> {
+    return this.http.put(`/harnesses/${encodeURIComponent(harness)}`, { enabled });
   }
 
   async claudeCatalog(): Promise<{ models: CodexModel[] }> {

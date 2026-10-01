@@ -45,8 +45,8 @@ export function StoreHydrator({ children }: StoreHydratorProps) {
       workspaces: data.workspaces,
       preconfigs: data.preconfigs,
       models: usableModels,
-      defaultModel: data.defaultModel || 'gpt-4o',
-      defaultProvider: data.defaultProvider || 'openai',
+      defaultModel: data.defaultModel || '',
+      defaultProvider: data.defaultProvider || '',
     });
 
     queryClient.setQueryData(queryKeys.config.preconfigs, { preconfigs: data.preconfigs });

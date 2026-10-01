@@ -21,7 +21,6 @@ interface Model {
   id: string;
   name: string;
   contextWindow: number;
-  tier: 'budget' | 'standard' | 'premium';
   providerId: string;
   providerName: string;
   variants?: Record<string, { providerOptions: Record<string, unknown> }>;

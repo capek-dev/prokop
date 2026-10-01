@@ -238,33 +238,9 @@ export function registerConfigRoutes(
     return c.json(result);
   });
 
-  app.post(
-    '/api/config/models/providers',
-    validate('json', looseObjectSchema),
-    async (c) => {
-      const body = c.req.valid('json');
-      const result = await configuration.models.createProvider(body as never);
-      return c.json(result, 201);
-    },
-  );
-
-  app.put(
-    '/api/config/models/providers/:providerId',
-    validate('json', looseObjectSchema),
-    async (c) => {
-      const providerId = c.req.param('providerId');
-      const body = c.req.valid('json');
-      const result = await configuration.models.updateProvider(providerId, body);
-      return c.json(result);
-    },
-  );
-
-  app.delete('/api/config/models/providers/:providerId', async (c) => {
-    const providerId = c.req.param('providerId');
-    const result = await configuration.models.deleteProvider(providerId);
-    return c.json(result);
-  });
-
+  // Providers are read-only catalog entries: they come from models.json or a
+  // registry sync. Model-level CRUD stays; provider create/rename/delete is
+  // intentionally not exposed.
   app.post(
     '/api/config/models/providers/:providerId/models',
     validate('json', looseObjectSchema),

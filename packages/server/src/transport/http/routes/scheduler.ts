@@ -54,6 +54,9 @@ export function registerSchedulerRoutes(app: Hono, application: SchedulingHttpAp
       if (result.kind === 'harness_unsupported') {
         throw new BadRequestError(`Scheduled jobs are not supported for ${result.harness} sessions`);
       }
+      if (result.kind === 'harness_disabled') {
+        throw new BadRequestError(`${result.harness} sessions are disabled on this server`);
+      }
       return c.json({ job: result.job }, 201);
     },
   );
@@ -64,13 +67,14 @@ export function registerSchedulerRoutes(app: Hono, application: SchedulingHttpAp
     async (c) => {
       const jobId = c.req.param('jobId');
       const body = c.req.valid('json');
-      const updated = application.updateJob(
+      const result = application.updateJob(
         jobId,
         body as unknown as UpdateScheduledJobInput,
       );
-      if (!updated) {
+      if (!result) {
         throw new NotFoundError('Scheduled job not found');
       }
+      const updated = result;
       return c.json({ job: updated });
     },
   );

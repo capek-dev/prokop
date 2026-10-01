@@ -75,7 +75,9 @@ export function validateModelsDocument(config: unknown): config is ModelsConfig 
         return false;
       }
 
-      if (m.tier !== 'budget' && m.tier !== 'standard' && m.tier !== 'premium') {
+      // Legacy field: parsed when present so older models.json files keep
+      // loading, but nothing consumes it and new writes omit it.
+      if (m.tier !== undefined && m.tier !== 'budget' && m.tier !== 'standard' && m.tier !== 'premium') {
         return false;
       }
 

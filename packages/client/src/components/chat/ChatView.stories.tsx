@@ -40,7 +40,6 @@ const models = createModelList().map((m) => ({
   id: m.id,
   name: m.name,
   contextWindow: m.contextWindow,
-  tier: m.tier,
   providerId: m.providerId,
   providerName: m.providerName,
   capabilities: m.capabilities

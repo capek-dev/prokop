@@ -102,20 +102,12 @@ export function getModelsRegistryUrl(): string {
   );
 }
 
-export function getLLMOpenAIApiKey(): string | undefined {
-  return readOverlayEnv('LLM_OPENAI_API_KEY');
-}
-
 export function getLLMOpenRouterApiKey(): string | undefined {
   return readOverlayEnv('LLM_OPENROUTER_API_KEY');
 }
 
 export function getLLMMinimaxApiKey(): string | undefined {
   return readOverlayEnv('LLM_MINIMAX_API_KEY');
-}
-
-export function getLLMZhipuApiKey(): string | undefined {
-  return readOverlayEnv('LLM_ZHIPU_API_KEY');
 }
 
 export function getLLMZhipuCodingApiKey(): string | undefined {
@@ -151,10 +143,8 @@ export function getLLMSubagentMaxSteps(): number {
 
 export function getLLMApiKeys(): Record<string, string | undefined> {
   return {
-    openai: getLLMOpenAIApiKey(),
     openrouter: getLLMOpenRouterApiKey(),
     minimax: getLLMMinimaxApiKey(),
-    zhipu: getLLMZhipuApiKey(),
     'zhipu-coding': getLLMZhipuCodingApiKey(),
     'deepseek': getLLMDeepseekApiKey(),
   };

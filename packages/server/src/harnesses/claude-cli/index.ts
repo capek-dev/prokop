@@ -2,7 +2,7 @@ import type { HarnessRegistration } from '@/application/sessions/harness-executi
 import type { SessionExecutionPort } from '@/application/ports/execution';
 
 export { createClaudeExecution } from './execution';
-export { claudeCliAvailable } from './version';
+export { claudeCliAvailable, claudeCliVersion } from './version';
 export { listClaudeModels, listCachedClaudeModels, getClaudeModelSelection, saveClaudeModelSelection } from './models';
 
 /** Claude CLI owns turns and model choice; titles use the universal

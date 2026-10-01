@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useHarnessesQuery, isHarnessEnabled } from '@/hooks/queries';
 import { toast } from 'sonner';
 import { ArrowLeft, Archive, Minimize2, Loader2, AlertTriangle } from 'lucide-react';
 import type { Session, Preconfig, ProkopaiClient } from '@prokopai/sdk';
@@ -22,7 +23,6 @@ interface Model {
   id: string;
   name: string;
   contextWindow: number;
-  tier: 'budget' | 'standard' | 'premium';
   providerId: string;
   providerName: string;
 }
@@ -83,10 +83,15 @@ export function ChatHeader({
     && messages?.length === 0 && !queued?.length;
   const codexSession = session.harness === 'codex-cli';
   const claudeSession = session.harness === 'claude-cli';
+  const harnessesData = useHarnessesQuery(sdkClient).data;
+  const harnessEnabled = (id: 'codex-cli' | 'claude-cli') =>
+    isHarnessEnabled(harnessesData?.harnesses.find(h => h.id === id));
+  const claudeHarnessEnabled = harnessEnabled('claude-cli');
+  const codexHarnessEnabled = harnessEnabled('codex-cli');
   const claudeCatalog = useQuery({
     queryKey: ['claude-catalog', serverUrl],
     queryFn: () => sdkClient!.http.sessions.claudeCatalog(),
-    enabled: !!sdkClient && !!serverUrl && emptyRoot && !claudeSession
+    enabled: !!sdkClient && !!serverUrl && emptyRoot && !claudeSession && claudeHarnessEnabled
       && !!workspace && !workspace.isVirtual && !!workspace.path,
     staleTime: 60_000,
     retry: false,
@@ -100,7 +105,7 @@ export function ChatHeader({
     retry: false,
   });
   const claudeModels = claudeSession ? claudeSelection.data?.models ?? []
-    : emptyRoot && workspace && !workspace.isVirtual ? claudeCatalog.data?.models ?? [] : [];
+    : emptyRoot && workspace && !workspace.isVirtual && claudeHarnessEnabled ? claudeCatalog.data?.models ?? [] : [];
   const claudeModel = claudeSelection.data?.selection?.model ?? session.selectedModel;
   const claudeEffort = claudeSelection.data?.selection?.effort ?? null;
   const selectClaude = async (modelId: string, effort: string) => {
@@ -119,7 +124,7 @@ export function ChatHeader({
   const catalog = useQuery({
     queryKey: ['codex-catalog', serverUrl],
     queryFn: () => sdkClient!.http.sessions.codexCatalog(),
-    enabled: !!sdkClient && !!serverUrl && emptyRoot && !codexSession
+    enabled: !!sdkClient && !!serverUrl && emptyRoot && !codexSession && codexHarnessEnabled
       && !!workspace && !workspace.isVirtual && !!workspace.path,
     staleTime: 60_000,
     retry: false,
@@ -133,7 +138,7 @@ export function ChatHeader({
     retry: false,
   });
   const codexModels = codexSession ? codexSelection.data?.models ?? []
-    : emptyRoot && workspace && !workspace.isVirtual ? catalog.data?.models ?? [] : [];
+    : emptyRoot && workspace && !workspace.isVirtual && codexHarnessEnabled ? catalog.data?.models ?? [] : [];
   const codexModel = codexSelection.data?.selection?.model ?? session.selectedModel;
   const codexEffort = codexSelection.data?.selection?.effort ?? null;
   const selectCodex = async (modelId: string, effort: string) => {

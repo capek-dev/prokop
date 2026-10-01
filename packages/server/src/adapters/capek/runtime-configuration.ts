@@ -7,6 +7,7 @@ import {
   findModelVariant,
   getMaxOutputTokens,
   getModelsConfig,
+  type ModelDefinition,
 } from '@/config';
 import {
   getCompactionAutoReserveCapTokens,
@@ -23,11 +24,9 @@ import {
   getLLMDeepseekApiKey,
   getLLMMaxSteps,
   getLLMMinimaxApiKey,
-  getLLMOpenAIApiKey,
   getLLMOpenRouterApiKey,
   getLLMSubagentMaxSteps,
   getLLMTemperature,
-  getLLMZhipuApiKey,
   getLLMZhipuCodingApiKey,
 } from '@/infrastructure/runtime/environment';
 
@@ -50,19 +49,40 @@ interface RuntimeConfigurationAccessors {
   getCompactionAutoThresholdRatio: RuntimeConfiguration['getCompactionAutoThresholdRatio'];
   getCompactionAutoReserveCapTokens: RuntimeConfiguration['getCompactionAutoReserveCapTokens'];
   getCompactionAutoSafetyMarginTokens: RuntimeConfiguration['getCompactionAutoSafetyMarginTokens'];
-  getLLMOpenAIApiKey(): string | undefined;
   getLLMOpenRouterApiKey(): string | undefined;
   getLLMMinimaxApiKey(): string | undefined;
-  getLLMZhipuApiKey(): string | undefined;
   getLLMZhipuCodingApiKey(): string | undefined;
   getLLMDeepseekApiKey(): string | undefined;
 }
 
+/**
+ * The pinned Capek contract still requires the legacy tier field on models
+ * even though the product no longer has tiers (Capek main already dropped
+ * it). Serve Capek a defaulted view until the pin moves past that removal.
+ */
+export function withContractTier<T extends ModelDefinition>(
+  model: T,
+): T & { tier: 'budget' | 'standard' | 'premium' } {
+  return { tier: 'standard', ...model };
+}
+
 const defaultAccessors: RuntimeConfigurationAccessors = {
-  findModel,
+  findModel: (modelId, providerId) => {
+    const found = findModel(modelId, providerId);
+    return found ? withContractTier(found) : undefined;
+  },
   getMaxOutputTokens,
   findModelVariant,
-  getModelsConfig,
+  getModelsConfig: () => {
+    const config = getModelsConfig();
+    return {
+      ...config,
+      providers: config.providers.map(provider => ({
+        ...provider,
+        models: provider.models.map(model => withContractTier(model)),
+      })),
+    };
+  },
   getLLMTemperature,
   getLLMMaxSteps,
   getLLMSubagentMaxSteps,
@@ -77,10 +97,8 @@ const defaultAccessors: RuntimeConfigurationAccessors = {
   getCompactionAutoThresholdRatio,
   getCompactionAutoReserveCapTokens,
   getCompactionAutoSafetyMarginTokens,
-  getLLMOpenAIApiKey,
   getLLMOpenRouterApiKey,
   getLLMMinimaxApiKey,
-  getLLMZhipuApiKey,
   getLLMZhipuCodingApiKey,
   getLLMDeepseekApiKey,
 };
@@ -100,10 +118,8 @@ export function createJean2RuntimeConfiguration(
     getLLMBaseUrl: accessors.getLLMBaseUrl,
     getApiKey(providerId) {
       switch (providerId) {
-        case 'openai': return accessors.getLLMOpenAIApiKey();
         case 'openrouter': return accessors.getLLMOpenRouterApiKey();
         case 'minimax': return accessors.getLLMMinimaxApiKey();
-        case 'zhipu': return accessors.getLLMZhipuApiKey();
         case 'zhipu-coding': return accessors.getLLMZhipuCodingApiKey();
         case 'deepseek': return accessors.getLLMDeepseekApiKey();
         default: return undefined;

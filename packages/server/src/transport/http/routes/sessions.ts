@@ -2,7 +2,7 @@ import type { Hono } from 'hono';
 import type { SessionStatus } from '@prokopai/sdk';
 import { validate } from './validate';
 import { parseSessionCategory } from './session-category';
-import { createSessionSchema, updateSessionSchema, codexModelSelectionSchema } from './schemas';
+import { createSessionSchema, updateSessionSchema, codexModelSelectionSchema, harnessEnableSchema } from './schemas';
 import {
   BadRequestError,
   ForbiddenError,
@@ -22,12 +22,22 @@ import type { SessionHttpApplication } from '@/application';
  */
 export function registerSessionRoutes(app: Hono, application: SessionHttpApplication): void {
   app.get('/api/harnesses', c => c.json({
-    harnesses: [
-      { id: 'prokop', available: true },
-      { id: 'codex-cli', available: application.codexAvailable(), approvals: false },
-      { id: 'claude-cli', available: application.claudeAvailable(), approvals: false },
-    ],
+    harnesses: application.listHarnessStatuses(),
   }));
+
+  app.put('/api/harnesses/:id', validate('json', harnessEnableSchema), async c => {
+    const id = c.req.param('id');
+    if (id !== 'prokop' && id !== 'codex-cli' && id !== 'claude-cli') {
+      throw new NotFoundError('Unknown session harness');
+    }
+    if (id === 'prokop') {
+      throw new BadRequestError('The Prokop runtime cannot be disabled');
+    }
+    const result = application.setHarnessEnabled(id, c.req.valid('json').enabled);
+    if (result === 'not_found') throw new NotFoundError('Unknown session harness');
+    if (result === 'prokop_immutable') throw new BadRequestError('The Prokop runtime cannot be disabled');
+    return c.json({ harnesses: application.listHarnessStatuses() });
+  });
 
   app.get('/api/harnesses/claude-cli/models', async c => {
     const catalog = application.claudeCatalog();

@@ -155,11 +155,15 @@ describe('provider-accounts domain: OAuth flow policy', () => {
 
 describe('provider-accounts domain: credential policy', () => {
   test('pins the supported credential registry and lookup', () => {
-    expect(PROVIDER_CREDENTIALS).toHaveLength(6);
-    expect(getSupportedProviderCredential('openai')).toEqual({
-      provider: 'openai',
-      envKey: 'PROKOPAI_LLM_OPENAI_API_KEY',
+    expect(PROVIDER_CREDENTIALS).toHaveLength(4);
+    expect(getSupportedProviderCredential('zhipu-coding')).toEqual({
+      provider: 'zhipu-coding',
+      envKey: 'PROKOPAI_LLM_ZHIPU_CODING_API_KEY',
     });
+    // Removed providers stay unsupported: OpenAI models run through the Codex
+    // (ChatGPT) subscription provider; plain Z.AI has no catalog.
+    expect(getSupportedProviderCredential('openai')).toBeUndefined();
+    expect(getSupportedProviderCredential('zhipu')).toBeUndefined();
     expect(getSupportedProviderCredential('ghost')).toBeUndefined();
   });
 

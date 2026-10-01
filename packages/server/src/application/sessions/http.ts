@@ -17,6 +17,7 @@ import type {
 } from '@/application/ports/session';
 import type { ToolCatalogPort } from '@/application/ports/tool-catalog';
 import type { WorktreeAttachmentRefreshPort } from '@/application/ports/worktree';
+import type { HarnessSettingsApplication } from '@/application/harnesses/settings';
 import {
   getToolDebugData,
   projectMessagesForClient,
@@ -57,9 +58,26 @@ export interface CodexModelPort {
   isActive(sessionId: string): boolean;
 }
 
+export interface HarnessStatusEntry {
+  id: SessionHarness;
+  available: boolean;
+  enabled: boolean;
+  version: string | null;
+  approvals: boolean;
+}
+
+/** Harness registry wiring: persisted enablement plus optional CLI version probes. */
+export interface SessionHarnessSettingsDeps {
+  settings: HarnessSettingsApplication;
+  codexVersion?: () => string;
+  claudeVersion?: () => string;
+}
+
 export interface SessionHttpApplication {
   codexAvailable(): boolean;
   claudeAvailable(): boolean;
+  listHarnessStatuses(): HarnessStatusEntry[];
+  setHarnessEnabled(harness: SessionHarness, enabled: boolean): 'ok' | 'not_found' | 'prokop_immutable';
   claudeCatalog(): Promise<CodexModel[]> | null;
   claudeModels(sessionId: string): Promise<{ models: CodexModel[]; selection: CodexModelSelection | null }> | null;
   setClaudeModel(sessionId: string, selection: CodexModelSelection): Promise<'ok' | 'not_found' | 'invalid' | 'active'>;
@@ -121,10 +139,42 @@ export function createSessionHttpApplication(
   claudeAvailable: () => boolean = () => false,
   claudeModels?: CodexModelPort,
   claudeWorkspaceAvailable: (workspaceId: string) => boolean = () => false,
+  harnessSettings?: SessionHarnessSettingsDeps,
 ): SessionHttpApplication {
+  const harnessVersion = (probe: (() => string) | undefined, available: boolean): string | null => {
+    if (!available || !probe) return null;
+    try {
+      return probe();
+    } catch {
+      return null;
+    }
+  };
   return {
     codexAvailable,
     claudeAvailable,
+    listHarnessStatuses() {
+      return [
+        { id: 'prokop' as const, available: true, enabled: true, version: null, approvals: true },
+        {
+          id: 'codex-cli' as const,
+          available: codexAvailable(),
+          enabled: !harnessSettings?.settings.isDisabled('codex-cli'),
+          version: harnessVersion(harnessSettings?.codexVersion, codexAvailable()),
+          approvals: false,
+        },
+        {
+          id: 'claude-cli' as const,
+          available: claudeAvailable(),
+          enabled: !harnessSettings?.settings.isDisabled('claude-cli'),
+          version: harnessVersion(harnessSettings?.claudeVersion, claudeAvailable()),
+          approvals: false,
+        },
+      ];
+    },
+    setHarnessEnabled(harness, enabled) {
+      if (!harnessSettings) return 'not_found';
+      return harnessSettings.settings.setEnabled(harness, enabled).kind;
+    },
     claudeCatalog() {
       return claudeAvailable() && claudeModels ? claudeModels.list() : null;
     },
@@ -166,12 +216,14 @@ export function createSessionHttpApplication(
 
     createSessionError(input) {
       const decision = checkHarnessCreate(input, { codexAvailable, codexWorkspaceAvailable,
-        claudeAvailable, claudeWorkspaceAvailable, workspaceRoots });
+        claudeAvailable, claudeWorkspaceAvailable, workspaceRoots,
+        isHarnessDisabled: harnessSettings?.settings.isDisabled });
       return decision.ok ? null : decision.message;
     },
     createSession(input) {
       const decision = checkHarnessCreate(input, { codexAvailable, codexWorkspaceAvailable,
-        claudeAvailable, claudeWorkspaceAvailable, workspaceRoots });
+        claudeAvailable, claudeWorkspaceAvailable, workspaceRoots,
+        isHarnessDisabled: harnessSettings?.settings.isDisabled });
       if (!decision.ok) return null;
       const workspaceId = input.workspaceId || '';
       const session = repository.createSession({

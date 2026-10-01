@@ -61,7 +61,7 @@ test('malformed Codex catalog fails closed', async () => {
 
 test('catalog cache shares one spawn across concurrent callers and expires by TTL', async () => {
   let spawns = 0;
-  const fakeList = async (): Promise<ReturnType<typeof listCodexModels>> => {
+  const fakeList = async (): ReturnType<typeof listCodexModels> => {
     spawns++;
     const fake = fakeCatalog([{ data: [model('codex-one')], nextCursor: null }]);
     return listCodexModels({ connect: () => fake.connection, version: () => 'codex-cli 0.156.1' });
@@ -79,7 +79,7 @@ test('catalog cache shares one spawn across concurrent callers and expires by TT
 
 test('a failed Codex spawn clears the cache so the next caller retries', async () => {
   let fail = true;
-  const fakeList = async (): Promise<ReturnType<typeof listCodexModels>> => {
+  const fakeList = async (): ReturnType<typeof listCodexModels> => {
     if (fail) throw new Error('spawn down');
     const fake = fakeCatalog([{ data: [model('codex-one')], nextCursor: null }]);
     return listCodexModels({ connect: () => fake.connection, version: () => 'codex-cli 0.156.1' });

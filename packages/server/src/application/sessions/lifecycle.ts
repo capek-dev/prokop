@@ -36,6 +36,7 @@ export interface SessionLifecycleDeps<Origin> {
   claudeWorkspaceAvailable?: (workspaceId: string) => boolean;
   claudeModels?: () => Promise<CodexModel[]>;
   prokopModelAvailable?: (modelId: string, providerId: string) => boolean;
+  isHarnessDisabled?: (harness: SessionHarness) => boolean;
   selectEmptySessionHarnessModel?: (id: string, expected: SessionHarness, updatedAt: string, choice: HarnessModelChoice) => Session | null;
 }
 
@@ -129,6 +130,7 @@ export function createSessionLifecycleApplication<Origin>(
         claudeAvailable: deps.claudeAvailable,
         claudeWorkspaceAvailable: deps.claudeWorkspaceAvailable,
         workspaceRoots: deps.workspaceRoots,
+        isHarnessDisabled: deps.isHarnessDisabled,
       });
       if (!decision.ok) {
         wire.delivery.send(origin, { type: 'error', code: decision.code, message: decision.message });
@@ -344,6 +346,7 @@ export function createSessionLifecycleApplication<Origin>(
           codexAvailable: deps.codexAvailable ?? (() => false),
           codexWorkspaceAvailable: deps.codexWorkspaceAvailable ?? (() => false),
           workspaceRoots: deps.workspaceRoots,
+          isHarnessDisabled: deps.isHarnessDisabled,
         });
         if (!decision.ok) return invalid(decision.message);
         if (!await deps.repository.getPreconfigOrAgent(session.preconfigId!)) return invalid('Preconfig is unavailable');
@@ -366,6 +369,7 @@ export function createSessionLifecycleApplication<Origin>(
           claudeAvailable: deps.claudeAvailable,
           claudeWorkspaceAvailable: deps.claudeWorkspaceAvailable,
           workspaceRoots: deps.workspaceRoots,
+          isHarnessDisabled: deps.isHarnessDisabled,
         });
         if (!decision.ok) return invalid(decision.message);
         if (typeof choice.effort !== 'string' || !deps.claudeModels) return invalid('Invalid Claude model selection');

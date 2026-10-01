@@ -16,6 +16,8 @@ import {
 
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
+  /** Render without outer padding when composed into a merged panel. */
+  embedded?: boolean;
 }
 
 interface Group {
@@ -77,7 +79,7 @@ function groupVars(vars: ToolEnvVarStatus[]): Group[] {
   return groups;
 }
 
-export function EnvPanel({ sdkClient }: PanelProps) {
+export function EnvPanel({ sdkClient, embedded = false }: PanelProps) {
   const { data: envData, isLoading: loading } = useToolEnvVarsQuery(sdkClient);
   const setEnvVarMut = useToolSetEnvVar(sdkClient);
   const clearEnvVarMut = useToolClearEnvVar(sdkClient);
@@ -183,7 +185,7 @@ export function EnvPanel({ sdkClient }: PanelProps) {
   }
 
   return (
-    <div className="p-3 sm:p-4 space-y-4">
+    <div className={embedded ? 'space-y-4' : 'p-3 sm:p-4 space-y-4'}>
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">
           Manage environment variables for integrations. Values are stored in{' '}

@@ -38,6 +38,10 @@ export const codexModelSelectionSchema = z.strictObject({
   effort: z.string().min(1).max(100),
 });
 
+export const harnessEnableSchema = z.strictObject({
+  enabled: z.boolean(),
+});
+
 export const updateSessionSchema = z.object({
   title: z.string().nullable().optional(),
   status: z.enum(['active', 'closed']).optional(),

@@ -13,7 +13,6 @@ const mockModel: ModelWithStatus = {
   id: 'model-1',
   name: 'GPT-4o',
   contextWindow: 128000,
-  tier: 'standard',
   providerId: 'openai',
   providerName: 'OpenAI',
   runtimeStatus: { providerSupported: true, providerConfigured: true, usable: true },
@@ -43,11 +42,11 @@ describe('serverDataStore', () => {
     });
 
     test('starts with default model', () => {
-      expect(useServerDataStore.getState().defaultModel).toBe('gpt-4o');
+      expect(useServerDataStore.getState().defaultModel).toBe('');
     });
 
     test('starts with default provider', () => {
-      expect(useServerDataStore.getState().defaultProvider).toBe('openai');
+      expect(useServerDataStore.getState().defaultProvider).toBe('');
     });
   });
 
@@ -151,8 +150,8 @@ describe('serverDataStore', () => {
       expect(state.preconfigs).toEqual([]);
       expect(state.prompts).toEqual([]);
       expect(state.models).toEqual([]);
-      expect(state.defaultModel).toBe('gpt-4o');
-      expect(state.defaultProvider).toBe('openai');
+      expect(state.defaultModel).toBe('');
+      expect(state.defaultProvider).toBe('');
       expect(state.providers).toEqual([]);
     });
   });

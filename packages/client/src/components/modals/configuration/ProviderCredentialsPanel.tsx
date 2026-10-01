@@ -9,13 +9,16 @@ import { Badge } from '@/components/ui/badge';
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
   embedded?: boolean;
+  /** Render only this provider's credential row (used by provider cards). */
+  provider?: string;
 }
 
-export function ProviderCredentialsPanel({ sdkClient, embedded = false }: PanelProps) {
+export function ProviderCredentialsPanel({ sdkClient, embedded = false, provider: filter }: PanelProps) {
   const { data: credentialsData, isLoading: loading } = useProviderCredentialsQuery(sdkClient);
   const setCredentialMut = useSetProviderCredential(sdkClient);
   const clearCredentialMut = useClearProviderCredential(sdkClient);
-  const providers: ProviderCredentialStatus[] = credentialsData?.providers ?? [];
+  const providers: ProviderCredentialStatus[] = (credentialsData?.providers ?? [])
+    .filter(cred => !filter || cred.provider === filter);
   const [error, setError] = useState<string | null>(null);
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -51,15 +54,17 @@ export function ProviderCredentialsPanel({ sdkClient, embedded = false }: PanelP
   const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
     deepseek: 'DeepSeek',
     minimax: 'MiniMax',
-    openai: 'OpenAI',
     openrouter: 'OpenRouter',
-    zhipu: 'Z.AI',
     'zhipu-coding': 'Z.AI Coding',
   };
 
   const formatProviderName = (provider: string): string => {
     return PROVIDER_DISPLAY_NAMES[provider] || provider.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
   };
+
+  if (filter && providers.length === 0) {
+    return null;
+  }
 
   if (loading) {
     return (
@@ -76,8 +81,8 @@ export function ProviderCredentialsPanel({ sdkClient, embedded = false }: PanelP
   }
 
   return (
-    <div className={embedded ? 'space-y-4' : 'p-3 sm:p-4 space-y-4'}>
-      {!embedded && (
+    <div className={filter ? 'space-y-2' : embedded ? 'space-y-4' : 'p-3 sm:p-4 space-y-4'}>
+      {!embedded && !filter && (
         <p className="text-sm text-muted-foreground">
           Manage API keys for LLM providers. Keys are stored in ~/.prokopai/.env and never exposed to the client.
         </p>
@@ -91,15 +96,19 @@ export function ProviderCredentialsPanel({ sdkClient, embedded = false }: PanelP
         {providers.map((cred) => (
           <div
             key={cred.provider}
-            className="flex items-center justify-between p-3 rounded-lg border"
+            className={filter ? 'flex items-center' : 'flex items-center justify-between p-3 rounded-lg border'}
           >
-            <div className="flex items-center gap-3">
-              <Key className="size-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{formatProviderName(cred.provider)}</span>
-              <Badge variant={cred.configured ? 'default' : 'secondary'}>
-                {cred.configured ? 'Configured' : 'Not set'}
-              </Badge>
-            </div>
+            {/* Embedded in a provider card: the card header already carries the
+                provider name and configured status, so only the action renders. */}
+            {!filter && (
+              <div className="flex items-center gap-3">
+                <Key className="size-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{formatProviderName(cred.provider)}</span>
+                <Badge variant={cred.configured ? 'default' : 'secondary'}>
+                  {cred.configured ? 'Configured' : 'Not set'}
+                </Badge>
+              </div>
+            )}
 
             <div className="flex items-center gap-2">
               {editingProvider === cred.provider ? (

@@ -32,7 +32,6 @@ interface Model {
   id: string;
   name: string;
   contextWindow: number;
-  tier: 'budget' | 'standard' | 'premium';
   providerId: string;
   providerName: string;
 }
@@ -93,15 +92,6 @@ function preconfigDisplayName(name: string): string {
     .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase())
     .join('');
-}
-
-function getTierBadge(tier: string): string {
-  switch (tier) {
-    case 'budget': return '$';
-    case 'standard': return '$$';
-    case 'premium': return '$$$';
-    default: return '';
-  }
 }
 
 type Section = 'model' | 'variant' | 'config';
@@ -266,9 +256,6 @@ export function ModelVariantConfigSelector({
                 onSelect={() => handleSelectModel(key)}
               >
                 <span>{model.name}</span>
-                <span className="text-muted-foreground text-xs">
-                  {getTierBadge(model.tier)}
-                </span>
                 <Check
                   className={cn(
                     'ml-auto size-4',

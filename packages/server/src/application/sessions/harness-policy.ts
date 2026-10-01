@@ -6,6 +6,8 @@ export interface HarnessCreatePolicy {
   claudeAvailable?: () => boolean;
   claudeWorkspaceAvailable?: (workspaceId: string) => boolean;
   workspaceRoots?: { isAvailable(workspaceId: string, workspaceRootId: string): boolean };
+  /** Server-global disablement; absent wiring means every harness enabled. */
+  isHarnessDisabled?: (harness: SessionHarness) => boolean;
 }
 
 export interface HarnessCreateRequest {
@@ -28,6 +30,10 @@ export function checkHarnessCreate(
     return { ok: false, code: 'invalid_session', message: 'Unknown session harness' };
   }
   const harness = input.harness ?? 'prokop';
+  if (harness !== 'prokop' && policy.isHarnessDisabled?.(harness)) {
+    return { ok: false, code: 'invalid_session',
+      message: harness === 'codex-cli' ? 'Codex CLI sessions are disabled on this server' : 'Claude CLI sessions are disabled on this server' };
+  }
   if (harness === 'codex-cli' && !policy.codexAvailable()) {
     return { ok: false, code: 'invalid_session', message: 'Codex CLI 0.156.x is unavailable on this host' };
   }

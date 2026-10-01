@@ -4,7 +4,7 @@ import { ModelVariantConfigSelector } from '@/components/chat/ModelVariantConfig
 
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
 
-const prokop = [{ id: 'shared', name: 'Provider Model', contextWindow: 1000, tier: 'standard' as const,
+const prokop = [{ id: 'shared', name: 'Provider Model', contextWindow: 1000,
   providerId: 'provider', providerName: 'Provider' }];
 const codex = [{ model: 'shared', name: 'Codex Model', defaultEffort: 'medium',
   supportedEfforts: ['medium', 'high'], isDefault: true }];

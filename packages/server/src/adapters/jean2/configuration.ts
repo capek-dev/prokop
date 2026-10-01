@@ -17,9 +17,6 @@ export function createJean2ConfigurationPorts(): {
   return {
     models: {
       getModelsConfigWithStatus: models.getModelsConfigWithStatus,
-      createProvider: models.createProvider,
-      updateProvider: models.updateProvider,
-      deleteProvider: models.deleteProvider,
       createModel: models.createModel,
       updateModel: models.updateModel,
       deleteModel: models.deleteModel,

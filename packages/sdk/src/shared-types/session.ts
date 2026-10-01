@@ -30,6 +30,20 @@ export interface SessionListFilter {
 
 export type SessionHarness = 'prokop' | 'codex-cli' | 'claude-cli';
 
+/**
+ * Harness registry entry. `available` reflects the host CLI probe; `enabled`
+ * is the persisted server setting (both optional so older-server payloads
+ * still parse, treating absence as available/enabled). Prokop is always
+ * available and enabled.
+ */
+export interface HarnessStatus {
+  id: SessionHarness;
+  available: boolean;
+  enabled?: boolean;
+  version?: string | null;
+  approvals?: boolean;
+}
+
 export type HarnessModelChoice =
   | { harness: 'prokop'; modelId: string; providerId: string }
   | { harness: 'codex-cli'; modelId: string; effort: string }

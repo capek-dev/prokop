@@ -49,6 +49,19 @@ test('Claude creation requires the local CLI and a physical workspace', () => {
   expect(checkHarnessCreate(request, available)).toEqual({ ok: true, harness: 'claude-cli' });
 });
 
+test('disabled harnesses reject creation even when the CLI is available', () => {
+  const disabled = (harness: string) => harness === 'codex-cli' || harness === 'claude-cli';
+  const codexPolicy = { ...policy, isHarnessDisabled: disabled };
+  expect(checkHarnessCreate({ harness: 'codex-cli', workspaceId: 'physical', preconfigId: 'agent' }, codexPolicy))
+    .toMatchObject({ ok: false, code: 'invalid_session', message: 'Codex CLI sessions are disabled on this server' });
+  const claudePolicy = { ...policy, claudeAvailable: () => true,
+    claudeWorkspaceAvailable: () => true, isHarnessDisabled: disabled };
+  expect(checkHarnessCreate({ harness: 'claude-cli', workspaceId: 'physical' }, claudePolicy))
+    .toMatchObject({ ok: false, message: 'Claude CLI sessions are disabled on this server' });
+  expect(checkHarnessCreate({ harness: 'prokop' }, codexPolicy)).toEqual({ ok: true, harness: 'prokop' });
+  expect(checkHarnessCreate({}, codexPolicy)).toEqual({ ok: true, harness: 'prokop' });
+});
+
 test('Čapek-only operations deny unknown owners and retain Codex refusal messages', () => {
   for (const owner of [undefined, 'prokop', 'codex-cli']) expect(unknownHarnessError(owner)).toBeNull();
   for (const owner of [null, '', 'other', 12, '__proto__']) {

@@ -1,7 +1,6 @@
 import type {
   CreateModelRequest,
   CreatePromptRequest,
-  CreateProviderRequest,
   ModelsConfigResponse,
   Preconfig,
   PromptInfo,
@@ -9,14 +8,10 @@ import type {
   SyncResult,
   UpdateModelRequest,
   UpdatePromptRequest,
-  UpdateProviderRequest,
 } from '@prokopai/sdk';
 
 export interface ModelsConfigurationPort {
   getModelsConfigWithStatus(): ModelsConfigResponse;
-  createProvider(data: CreateProviderRequest): Promise<unknown>;
-  updateProvider(providerId: string, data: UpdateProviderRequest): Promise<unknown>;
-  deleteProvider(providerId: string): Promise<unknown>;
   createModel(providerId: string, data: CreateModelRequest): Promise<unknown>;
   updateModel(providerId: string, modelId: string, data: UpdateModelRequest): Promise<unknown>;
   deleteModel(providerId: string, modelId: string): Promise<unknown>;

@@ -29,39 +29,6 @@ async function syncModelsToStoreAndCache(sdkClient: ProkopaiClient, queryClient:
   queryClient.setQueryData(queryKeys.config.models, data);
 }
 
-export function useCreateProvider(sdkClient: ProkopaiClient | null) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { id: string; name: string }) =>
-      sdkClient!.http.config.models.createProvider(body),
-    onSuccess: () => {
-      if (sdkClient) syncModelsToStoreAndCache(sdkClient, queryClient);
-    },
-  });
-}
-
-export function useUpdateProvider(sdkClient: ProkopaiClient | null) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ providerId, body }: { providerId: string; body: { name: string } }) =>
-      sdkClient!.http.config.models.updateProvider(providerId, body),
-    onSuccess: () => {
-      if (sdkClient) syncModelsToStoreAndCache(sdkClient, queryClient);
-    },
-  });
-}
-
-export function useDeleteProvider(sdkClient: ProkopaiClient | null) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (providerId: string) =>
-      sdkClient!.http.config.models.deleteProvider(providerId),
-    onSuccess: () => {
-      if (sdkClient) syncModelsToStoreAndCache(sdkClient, queryClient);
-    },
-  });
-}
-
 export function useCreateModel(sdkClient: ProkopaiClient | null) {
   const queryClient = useQueryClient();
   return useMutation({

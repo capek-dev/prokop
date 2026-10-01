@@ -30,9 +30,7 @@ export function legacyEnvKeyFor(envKey: string): string | undefined {
 
 export const PROVIDER_CREDENTIALS: readonly ProviderCredentialDefinition[] = [
   { provider: 'minimax', envKey: 'PROKOPAI_LLM_MINIMAX_API_KEY' },
-  { provider: 'openai', envKey: 'PROKOPAI_LLM_OPENAI_API_KEY' },
   { provider: 'openrouter', envKey: 'PROKOPAI_LLM_OPENROUTER_API_KEY' },
-  { provider: 'zhipu', envKey: 'PROKOPAI_LLM_ZHIPU_API_KEY' },
   { provider: 'zhipu-coding', envKey: 'PROKOPAI_LLM_ZHIPU_CODING_API_KEY' },
   { provider: 'deepseek', envKey: 'PROKOPAI_LLM_DEEPSEEK_API_KEY' },
 ];

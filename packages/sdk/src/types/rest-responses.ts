@@ -285,24 +285,6 @@ export interface ClearCredentialResponse {
 export type GetModelsConfigResponse = ModelsConfigResponse;
 
 /**
- * POST /api/config/models/providers
- * Returns the updated full models config after provider creation.
- */
-export type CreateProviderResponse = ModelsConfig;
-
-/**
- * PUT /api/config/models/providers/:id
- * Returns the updated full models config after provider update.
- */
-export type UpdateProviderResponse = ModelsConfig;
-
-/**
- * DELETE /api/config/models/providers/:id
- * Returns the updated full models config after provider deletion.
- */
-export type DeleteProviderResponse = ModelsConfig;
-
-/**
  * POST /api/config/models/providers/:id/models
  * Returns the updated full models config after model creation.
  */

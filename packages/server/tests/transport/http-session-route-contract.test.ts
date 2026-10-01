@@ -3,6 +3,8 @@ import { Hono } from 'hono';
 import { HttpError } from '@/application/http-errors';
 import { registerSessionRoutes } from '@/transport/http/routes/sessions';
 import { createSessionHttpApplication, type SessionHttpApplication } from '@/application/sessions/http';
+import { createHarnessSettingsApplication } from '@/application/harnesses/settings';
+import type { HarnessSettingsRepository } from '@/application/ports/harness-settings';
 import type { SessionRepositoryPort } from '@/application/ports/session';
 import type { Session, ToolPart } from '@prokopai/sdk';
 
@@ -125,6 +127,54 @@ describe('HTTP session route contract', () => {
     const res = await app.request('/api/sessions?status=closed');
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual({ sessions: [expect.objectContaining({ status: 'closed' })] });
+  });
+
+  test('harness status exposes enablement and PUT validates ids, prokop, and payload shape', async () => {
+    const stored: unknown[] = [];
+    const settingsRepository: HarnessSettingsRepository = {
+      read: () => stored.at(-1) ?? null,
+      write: (settings) => { stored.push(settings); },
+    };
+    const application = createSessionHttpApplication(makeRepository(), undefined, undefined, undefined,
+      () => true, () => true, undefined, () => true, undefined, () => true,
+      {
+        settings: createHarnessSettingsApplication(settingsRepository),
+        codexVersion: () => 'codex-1.2.3',
+        claudeVersion: () => { throw new Error('probe failed'); },
+      });
+    const app = new Hono();
+    app.onError((err, c) => err instanceof HttpError
+      ? c.json({ message: err.message }, err.status as never)
+      : c.json({ message: 'unexpected error' }, 500));
+    registerSessionRoutes(app, application);
+    const put = (id: string, body: unknown) => app.request(`/api/harnesses/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+
+    expect(await json(await app.request('/api/harnesses'))).toEqual({
+      harnesses: [
+        { id: 'prokop', available: true, enabled: true, version: null, approvals: true },
+        { id: 'codex-cli', available: true, enabled: true, version: 'codex-1.2.3', approvals: false },
+        { id: 'claude-cli', available: true, enabled: true, version: null, approvals: false },
+      ],
+    });
+    const updated = await json(await put('codex-cli', { enabled: false }));
+    expect(updated).toMatchObject({ harnesses: [
+      expect.objectContaining({ id: 'prokop', enabled: true }),
+      expect.objectContaining({ id: 'codex-cli', enabled: false }),
+      expect.objectContaining({ id: 'claude-cli', enabled: true }),
+    ] });
+    expect((await put('prokop', { enabled: false })).status).toBe(400);
+    expect((await put('unknown', { enabled: false })).status).toBe(404);
+    expect((await put('codex-cli', {})).status).toBe(400);
+    expect((await put('codex-cli', { enabled: 'yes' })).status).toBe(400);
+
+    const created = await app.request('/api/sessions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ harness: 'codex-cli', preconfigId: 'agent' }),
+    });
+    expect(created.status).toBe(400);
+    expect(await json(created)).toMatchObject({ message: 'Codex CLI sessions are disabled on this server' });
   });
 
   test('Codex model selection validates host models, effort, session ownership and active turns', async () => {

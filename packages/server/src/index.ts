@@ -41,10 +41,8 @@ import { ensurePromptsDir } from '@/config/prompts-registry';
 // before any provider lookup (P2 requirement).
 import '@/infrastructure/providers';
 import {
-  getLLMOpenAIApiKey,
   getLLMOpenRouterApiKey,
   getLLMMinimaxApiKey,
-  getLLMZhipuApiKey,
   getLLMZhipuCodingApiKey,
   getTlsEnabled,
   getTlsCertFile,
@@ -135,10 +133,8 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   installDeliveryPort(transport.delivery);
 
   const availableProviders: string[] = [];
-  if (getLLMOpenAIApiKey()) availableProviders.push('openai');
   if (getLLMOpenRouterApiKey()) availableProviders.push('openrouter');
   if (getLLMMinimaxApiKey()) availableProviders.push('minimax');
-  if (getLLMZhipuApiKey()) availableProviders.push('zhipu');
   if (getLLMZhipuCodingApiKey()) availableProviders.push('zhipu-coding');
   if (getLLMDeepseekApiKey()) availableProviders.push('deepseek');
 
@@ -146,7 +142,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     console.log(`Available providers: ${availableProviders.join(', ')}`);
   } else {
     console.warn('WARNING: No LLM API keys configured. Chat will not work.');
-    console.warn('Set at least one of: JEAN2_LLM_OPENAI_API_KEY, JEAN2_LLM_OPENROUTER_API_KEY, JEAN2_LLM_MINIMAX_API_KEY, JEAN2_LLM_DEEPSEEK_API_KEY');
+    console.warn('Set at least one of: JEAN2_LLM_OPENROUTER_API_KEY, JEAN2_LLM_MINIMAX_API_KEY, JEAN2_LLM_ZHIPU_CODING_API_KEY, JEAN2_LLM_DEEPSEEK_API_KEY');
   }
 
   console.log('Scanning for tools...');

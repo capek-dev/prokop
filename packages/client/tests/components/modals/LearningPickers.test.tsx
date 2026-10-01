@@ -40,7 +40,7 @@ test('a selected workspace that revoked access can still be removed', async () =
 test('existing model picker selects provider identity, clears stale variant and restores inheritance', async () => {
   const user = userEvent.setup();
   const change = vi.fn();
-  const models = ['first', 'second'].map(providerId => ({ id: 'shared', name: `${providerId} model`, providerId, providerName: providerId, tier: 'standard', contextWindow: 1000, runtimeStatus: { providerSupported: true, providerConfigured: true, usable: true }, variants: { high: { providerOptions: {} } } })) as ModelWithStatus[];
+  const models = ['first', 'second'].map(providerId => ({ id: 'shared', name: `${providerId} model`, providerId, providerName: providerId, contextWindow: 1000, runtimeStatus: { providerSupported: true, providerConfigured: true, usable: true }, variants: { high: { providerOptions: {} } } })) as ModelWithStatus[];
   function Harness() {
     const [value, setValue] = useState<LearningReviewer['modelOverride']>({ providerId: 'first', modelId: 'shared', variant: 'high' });
     return <LearningModelPicker models={models} preconfig={{ model: 'shared', provider: 'first' } as Preconfig} value={value}

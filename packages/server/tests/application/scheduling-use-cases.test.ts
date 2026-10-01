@@ -281,6 +281,23 @@ describe('scheduling HTTP use cases', () => {
     });
     expect(accepted.kind).toBe('created');
     expect(createdHarnesses).toEqual(['prokop', 'codex-cli']);
+
+    const disabled = createSchedulingHttpApplication({
+      repository: fakes.repository,
+      workspaces: fakes.workspaces,
+      execution: fakes.execution,
+      headlessSupport: { supportedHarnesses: () => ['prokop', 'codex-cli'] },
+      isHarnessDisabled: harness => harness === 'codex-cli',
+    });
+    const blocked = disabled.createJob('ws-1', {
+      name: 'J',
+      prompt: 'P',
+      scheduleKind: 'interval',
+      scheduleConfig: { type: 'interval', intervalMinutes: 60 },
+      harness: 'codex-cli',
+    });
+    expect(blocked).toEqual({ kind: 'harness_disabled', harness: 'codex-cli' });
+    expect(createdHarnesses).toEqual(['prokop', 'codex-cli']);
   });
 
   test('createJob trims padded name and prompt before creating', () => {

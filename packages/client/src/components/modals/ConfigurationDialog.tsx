@@ -1,17 +1,16 @@
 import { Suspense, lazy } from 'react';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { Key, Boxes, FileText, Layers, Braces, Terminal, User, Palette, Keyboard, Wrench, FolderOpen } from 'lucide-react';
+import { Boxes, FileText, Layers, Braces, User, Palette, Keyboard, Wrench, FolderOpen, CircuitBoard } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import type { ConfigurationSection } from '@/stores/uiStore';
 import { SettingsDialogShell, PanelLoadingFallback, type SettingsSection } from './SettingsDialogShell';
 
-const LLMProvidersPanel = lazy(() => import('./configuration/LLMProvidersPanel').then((m) => ({ default: m.LLMProvidersPanel })));
-const ModelsPanel = lazy(() => import('./configuration/ModelsPanel').then((m) => ({ default: m.ModelsPanel })));
+const HarnessesPanel = lazy(() => import('./configuration/HarnessesPanel').then((m) => ({ default: m.HarnessesPanel })));
+const ProvidersModelsPanel = lazy(() => import('./configuration/ProvidersModelsPanel').then((m) => ({ default: m.ProvidersModelsPanel })));
 const PromptsPanel = lazy(() => import('./configuration/PromptsPanel').then((m) => ({ default: m.PromptsPanel })));
 const PreconfigsPanel = lazy(() => import('./configuration/PreconfigsPanel').then((m) => ({ default: m.PreconfigsPanel })));
 const ResponseFormatsPanel = lazy(() => import('./configuration/ResponseFormatsPanel').then((m) => ({ default: m.ResponseFormatsPanel })));
-const EnvPanel = lazy(() => import('./configuration/EnvPanel').then((m) => ({ default: m.EnvPanel })));
-const ToolsPanel = lazy(() => import('./tools/ToolsPanel').then((m) => ({ default: m.ToolsPanel })));
+const ToolsEnvironmentPanel = lazy(() => import('./configuration/ToolsEnvironmentPanel').then((m) => ({ default: m.ToolsEnvironmentPanel })));
 const AccountPanel = lazy(() => import('./configuration/AccountPanel').then((m) => ({ default: m.AccountPanel })));
 const AppearancePanel = lazy(() => import('./configuration/AppearancePanel').then((m) => ({ default: m.AppearancePanel })));
 const KeybindsPanel = lazy(() => import('./configuration/KeybindsPanel').then((m) => ({ default: m.KeybindsPanel })));
@@ -32,19 +31,20 @@ const SECTIONS: SettingsSection[] = [
   { value: 'appearance', label: 'Appearance', icon: Palette, group: 'preferences' },
   { value: 'keybinds', label: 'Keybinds', icon: Keyboard, group: 'preferences' },
   { value: 'files', label: 'Files', icon: FolderOpen, group: 'preferences' },
-  // Server
-  { value: 'providers', label: 'LLM Providers', icon: Key, group: 'server' },
-  { value: 'models', label: 'Models', icon: Boxes, group: 'server' },
-  { value: 'prompts', label: 'Prompts', icon: FileText, group: 'server' },
+  // Server: shared across harnesses (prompts are client-level text shortcuts, harness-agnostic)
+  { value: 'harnesses', label: 'Harnesses', icon: CircuitBoard, group: 'server' },
   { value: 'preconfigs', label: 'Agents', icon: Layers, group: 'server' },
-  { value: 'response-formats', label: 'Formats', icon: Braces, group: 'server' },
-  { value: 'env', label: 'Environment', icon: Terminal, group: 'server' },
-  { value: 'tools', label: 'Tools', icon: Wrench, group: 'server' },
+  { value: 'prompts', label: 'Prompts', icon: FileText, group: 'server' },
+  // Prokop runtime
+  { value: 'providers-models', label: 'Providers & Models', icon: Boxes, group: 'prokop' },
+  { value: 'response-formats', label: 'Formats', icon: Braces, group: 'prokop' },
+  { value: 'tools-env', label: 'Tools & Environment', icon: Wrench, group: 'prokop' },
 ];
 
 const GROUPS = [
   { key: 'preferences', label: 'Preferences' },
   { key: 'server', label: 'Server' },
+  { key: 'prokop', label: 'Prokop' },
 ];
 
 export function ConfigurationDialog({
@@ -70,20 +70,18 @@ export function ConfigurationDialog({
             return <KeybindsPanel />;
           case 'files':
             return <FilesPanelPreferences />;
-          case 'providers':
-            return <LLMProvidersPanel sdkClient={sdkClient} />;
-          case 'models':
-            return <ModelsPanel sdkClient={sdkClient} />;
-          case 'prompts':
-            return <PromptsPanel sdkClient={sdkClient} />;
+          case 'harnesses':
+            return <HarnessesPanel sdkClient={sdkClient} />;
           case 'preconfigs':
             return <PreconfigsPanel sdkClient={sdkClient} />;
+          case 'providers-models':
+            return <ProvidersModelsPanel sdkClient={sdkClient} />;
+          case 'prompts':
+            return <PromptsPanel sdkClient={sdkClient} />;
           case 'response-formats':
             return <ResponseFormatsPanel sdkClient={sdkClient} />;
-          case 'env':
-            return <EnvPanel sdkClient={sdkClient} />;
-          case 'tools':
-            return <ToolsPanel sdkClient={sdkClient} />;
+          case 'tools-env':
+            return <ToolsEnvironmentPanel sdkClient={sdkClient} />;
         }
       })()}
     </Suspense>
@@ -94,7 +92,7 @@ export function ConfigurationDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Settings"
-      description="Manage preferences, LLM providers, models, and environment"
+      description="Manage preferences, harnesses, agents, and the Prokop runtime"
       sections={SECTIONS}
       groups={GROUPS}
       value={section}

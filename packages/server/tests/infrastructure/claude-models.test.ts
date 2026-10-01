@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { createClaudeModelCatalogCache, listClaudeModels } from '@/harnesses/claude-cli/models';
+import { listClaudeModels } from '@/harnesses/claude-cli/models';
 import { claudeTextTurnArgs } from '@/harnesses/claude-cli/command';
 
 const discovered = [

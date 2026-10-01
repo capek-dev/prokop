@@ -307,7 +307,7 @@ export function useSessionCommands({
     if (client && client.connected && session) {
       client.sessions.updateModel(sessionId, {
         modelId: sessionModel,
-        providerId: session.selectedProvider || 'openai',
+        providerId: session.selectedProvider || '',
         variant: variant ?? undefined,
       });
       store.setVariantForSession(sessionId, variant);

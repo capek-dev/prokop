@@ -55,9 +55,6 @@ export function resetAllStores(): void {
   useUIStore.setState({
     showSettings: false,
     showConfiguration: false,
-    showTools: false,
-    showMCPDialog: false,
-    showWorkspacePermissions: false,
     chatFinishSoundEnabled: true,
     permissionSoundEnabled: true,
     filePreviewTarget: null,

@@ -9,7 +9,6 @@
           "name": "DeepSeek V4 Pro",
           "contextWindow": 1000000,
           "maxOutputTokens": 384000,
-          "tier": "premium",
           "variants": {
             "high": {
               "providerOptions": {
@@ -34,7 +33,6 @@
           "name": "DeepSeek V4.1 Flash",
           "contextWindow": 1000000,
           "maxOutputTokens": 384000,
-          "tier": "budget",
           "variants": {
             "high": {
               "providerOptions": {
@@ -71,7 +69,6 @@
           "name": "MiniMax M3",
           "contextWindow": 1000000,
           "maxOutputTokens": 512000,
-          "tier": "premium",
           "variants": {
             "No Thinking": {
               "providerOptions": {
@@ -104,7 +101,6 @@
           "name": "MiniMax M2.7",
           "contextWindow": 204800,
           "maxOutputTokens": 32000,
-          "tier": "budget",
           "capabilities": {
             "structuredOutput": {
               "mode": "prompt"
@@ -116,7 +112,6 @@
           "name": "MiniMax M2.5",
           "contextWindow": 204800,
           "maxOutputTokens": 32000,
-          "tier": "budget",
           "capabilities": {
             "structuredOutput": {
               "mode": "prompt"
@@ -134,7 +129,6 @@
           "name": "GLM-5.3 (Flash)",
           "contextWindow": 1000000,
           "maxOutputTokens": 131072,
-          "tier": "standard",
           "variants": {
             "high": {
               "providerOptions": {
@@ -161,7 +155,6 @@
           "name": "GLM-5.3",
           "contextWindow": 1000000,
           "maxOutputTokens": 131072,
-          "tier": "premium",
           "variants": {
             "high": {
               "providerOptions": {
@@ -185,7 +178,6 @@
           "name": "GLM-5.2",
           "contextWindow": 1000000,
           "maxOutputTokens": 131072,
-          "tier": "premium",
           "variants": {
             "high": {
               "providerOptions": {
@@ -209,7 +201,6 @@
           "name": "GLM-5.1",
           "contextWindow": 200000,
           "maxOutputTokens": 128000,
-          "tier": "premium",
           "capabilities": {
             "structuredOutput": {
               "mode": "prompt"
@@ -221,7 +212,6 @@
           "name": "GLM-5 (Turbo)",
           "contextWindow": 200000,
           "maxOutputTokens": 128000,
-          "tier": "premium",
           "capabilities": {
             "structuredOutput": {
               "mode": "prompt"
@@ -233,7 +223,6 @@
           "name": "GLM-5",
           "contextWindow": 200000,
           "maxOutputTokens": 128000,
-          "tier": "premium",
           "capabilities": {
             "structuredOutput": {
               "mode": "prompt"
@@ -245,7 +234,6 @@
           "name": "GLM-4.7",
           "contextWindow": 200000,
           "maxOutputTokens": 128000,
-          "tier": "premium",
           "capabilities": {
             "structuredOutput": {
               "mode": "prompt"
@@ -257,7 +245,6 @@
           "name": "GLM-4.7 (Flash)",
           "contextWindow": 200000,
           "maxOutputTokens": 128000,
-          "tier": "budget",
           "capabilities": {
             "structuredOutput": {
               "mode": "prompt"
@@ -338,7 +325,6 @@
           "name": "GPT-6 Astra",
           "contextWindow": 372000,
           "maxOutputTokens": 128000,
-          "tier": "premium",
           "capabilities": {
             "input": {
               "text": true,
@@ -401,7 +387,6 @@
           "name": "GPT-6 Sol",
           "contextWindow": 372000,
           "maxOutputTokens": 128000,
-          "tier": "premium",
           "capabilities": {
             "input": {
               "text": true,
@@ -464,7 +449,6 @@
           "name": "GPT-6 Luna",
           "contextWindow": 372000,
           "maxOutputTokens": 128000,
-          "tier": "premium",
           "capabilities": {
             "input": {
               "text": true,
@@ -527,7 +511,6 @@
           "name": "GPT-5.6 Sol",
           "contextWindow": 372000,
           "maxOutputTokens": 128000,
-          "tier": "premium",
           "capabilities": {
             "input": {
               "text": true,
@@ -590,7 +573,6 @@
           "name": "GPT-5.6 Terra",
           "contextWindow": 372000,
           "maxOutputTokens": 128000,
-          "tier": "standard",
           "capabilities": {
             "input": {
               "text": true,
@@ -653,7 +635,6 @@
           "name": "GPT-5.6 Luna",
           "contextWindow": 372000,
           "maxOutputTokens": 128000,
-          "tier": "budget",
           "capabilities": {
             "input": {
               "text": true,
@@ -703,474 +684,6 @@
             "max": {
               "providerOptions": {
                 "reasoningEffort": "max",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            }
-          }
-        }
-      ]
-    },
-    {
-      "id": "openai",
-      "name": "OpenAI",
-      "models": [
-        {
-          "id": "gpt-6-astra",
-          "name": "GPT-6 Astra",
-          "contextWindow": 1050000,
-          "maxOutputTokens": 128000,
-          "tier": "premium",
-          "capabilities": {
-            "input": {
-              "text": true,
-              "image": true,
-              "file": [
-                "application/pdf"
-              ]
-            }
-          },
-          "variants": {
-            "low": {
-              "providerOptions": {
-                "reasoningEffort": "low",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "medium": {
-              "providerOptions": {
-                "reasoningEffort": "medium",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "high": {
-              "providerOptions": {
-                "reasoningEffort": "high",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "xhigh": {
-              "providerOptions": {
-                "reasoningEffort": "xhigh",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "max": {
-              "providerOptions": {
-                "reasoningEffort": "max",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "id": "gpt-5.6-sol",
-          "name": "GPT-5.6 Sol",
-          "contextWindow": 1050000,
-          "maxOutputTokens": 128000,
-          "tier": "premium",
-          "capabilities": {
-            "input": {
-              "text": true,
-              "image": true,
-              "file": [
-                "application/pdf"
-              ]
-            }
-          },
-          "variants": {
-            "low": {
-              "providerOptions": {
-                "reasoningEffort": "low",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "medium": {
-              "providerOptions": {
-                "reasoningEffort": "medium",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "high": {
-              "providerOptions": {
-                "reasoningEffort": "high",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "xhigh": {
-              "providerOptions": {
-                "reasoningEffort": "xhigh",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "max": {
-              "providerOptions": {
-                "reasoningEffort": "max",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "id": "gpt-5.6-terra",
-          "name": "GPT-5.6 Terra",
-          "contextWindow": 1050000,
-          "maxOutputTokens": 128000,
-          "tier": "standard",
-          "capabilities": {
-            "input": {
-              "text": true,
-              "image": true,
-              "file": [
-                "application/pdf"
-              ]
-            }
-          },
-          "variants": {
-            "low": {
-              "providerOptions": {
-                "reasoningEffort": "low",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "medium": {
-              "providerOptions": {
-                "reasoningEffort": "medium",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "high": {
-              "providerOptions": {
-                "reasoningEffort": "high",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "xhigh": {
-              "providerOptions": {
-                "reasoningEffort": "xhigh",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "max": {
-              "providerOptions": {
-                "reasoningEffort": "max",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "id": "gpt-5.6-luna",
-          "name": "GPT-5.6 Luna",
-          "contextWindow": 1050000,
-          "maxOutputTokens": 128000,
-          "tier": "budget",
-          "capabilities": {
-            "input": {
-              "text": true,
-              "image": true,
-              "file": [
-                "application/pdf"
-              ]
-            }
-          },
-          "variants": {
-            "low": {
-              "providerOptions": {
-                "reasoningEffort": "low",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "medium": {
-              "providerOptions": {
-                "reasoningEffort": "medium",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "high": {
-              "providerOptions": {
-                "reasoningEffort": "high",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "xhigh": {
-              "providerOptions": {
-                "reasoningEffort": "xhigh",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "max": {
-              "providerOptions": {
-                "reasoningEffort": "max",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "id": "gpt-5.5",
-          "name": "GPT-5.5",
-          "contextWindow": 1050000,
-          "maxOutputTokens": 128000,
-          "tier": "premium",
-          "capabilities": {
-            "input": {
-              "text": true,
-              "image": true,
-              "file": [
-                "application/pdf"
-              ]
-            }
-          },
-          "variants": {
-            "low": {
-              "providerOptions": {
-                "reasoningEffort": "low",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "medium": {
-              "providerOptions": {
-                "reasoningEffort": "medium",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "high": {
-              "providerOptions": {
-                "reasoningEffort": "high",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "xhigh": {
-              "providerOptions": {
-                "reasoningEffort": "xhigh",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "id": "gpt-5.4",
-          "name": "GPT-5.4",
-          "contextWindow": 1050000,
-          "maxOutputTokens": 128000,
-          "tier": "standard",
-          "capabilities": {
-            "input": {
-              "text": true,
-              "image": true,
-              "file": [
-                "application/pdf"
-              ]
-            }
-          },
-          "variants": {
-            "low": {
-              "providerOptions": {
-                "reasoningEffort": "low",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "medium": {
-              "providerOptions": {
-                "reasoningEffort": "medium",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "high": {
-              "providerOptions": {
-                "reasoningEffort": "high",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "xhigh": {
-              "providerOptions": {
-                "reasoningEffort": "xhigh",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "id": "gpt-5.4-mini",
-          "name": "GPT-5.4 Mini",
-          "contextWindow": 400000,
-          "maxOutputTokens": 128000,
-          "tier": "budget",
-          "capabilities": {
-            "input": {
-              "text": true,
-              "image": true
-            }
-          },
-          "variants": {
-            "low": {
-              "providerOptions": {
-                "reasoningEffort": "low",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "medium": {
-              "providerOptions": {
-                "reasoningEffort": "medium",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "high": {
-              "providerOptions": {
-                "reasoningEffort": "high",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "xhigh": {
-              "providerOptions": {
-                "reasoningEffort": "xhigh",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "id": "gpt-5.2",
-          "name": "GPT-5.2",
-          "contextWindow": 200000,
-          "maxOutputTokens": 128000,
-          "tier": "premium",
-          "capabilities": {
-            "input": {
-              "text": true,
-              "image": true
-            }
-          },
-          "variants": {
-            "low": {
-              "providerOptions": {
-                "reasoningEffort": "low",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "medium": {
-              "providerOptions": {
-                "reasoningEffort": "medium",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "high": {
-              "providerOptions": {
-                "reasoningEffort": "high",
-                "reasoningSummary": "auto",
-                "include": [
-                  "reasoning.encrypted_content"
-                ]
-              }
-            },
-            "xhigh": {
-              "providerOptions": {
-                "reasoningEffort": "xhigh",
                 "reasoningSummary": "auto",
                 "include": [
                   "reasoning.encrypted_content"

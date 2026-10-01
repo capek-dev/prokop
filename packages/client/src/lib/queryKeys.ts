@@ -28,6 +28,9 @@ export const queryKeys = {
     all: ['tools'] as const,
     envVars: ['tools', 'envVars'] as const,
   },
+  harnesses: {
+    all: ['harnesses'] as const,
+  },
   config: {
     models: ['config', 'models'] as const,
     preconfigs: ['config', 'preconfigs'] as const,

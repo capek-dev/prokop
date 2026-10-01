@@ -107,8 +107,10 @@ import {
 } from '@/harnesses/codex-cli';
 import { createHarnessExecution, type HarnessRegistration } from '@/application/sessions/harness-execution';
 import { installHeadlessExecutionPort } from '@/application/ports/headless-execution';
-import { claudeCliAvailable, createClaudeCliHarness, createClaudeExecution,
+import { claudeCliAvailable, claudeCliVersion, createClaudeCliHarness, createClaudeExecution,
   getClaudeModelSelection, listCachedClaudeModels, saveClaudeModelSelection } from '@/harnesses/claude-cli';
+import { createHarnessSettingsApplication } from '@/application/harnesses/settings';
+import { createServerSettingsRepository } from '@/infrastructure/sqlite/server-settings';
 
 import { createWiredLearning } from './learning';
 
@@ -242,6 +244,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   const transportControl = createTransportControllerPorts();
   const toolCatalog = createJean2ToolCatalogPort();
   const managedWorktrees = createManagedWorktreeRepository(getDatabase);
+  const harnessSettings = createHarnessSettingsApplication(createServerSettingsRepository(getDatabase));
   const codexWorkspaceAvailable = (workspaceId: string): boolean => {
     const workspace = getWorkspace(workspaceId);
     return Boolean(workspace && !workspace.isVirtual && workspace.path && existsSync(workspace.path));
@@ -280,6 +283,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     claudeWorkspaceAvailable: codexWorkspaceAvailable,
     claudeModels: listCachedClaudeModels,
     codexModels: listCachedCodexModels,
+    isHarnessDisabled: harnessSettings.isDisabled,
     prokopModelAvailable: (modelId, providerId) => getModelsConfigWithStatus().providers
       .some(provider => provider.id === providerId && provider.models.some(model => model.id === modelId && model.runtimeStatus.usable)),
     selectEmptySessionHarnessModel,
@@ -302,6 +306,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     { list: listCachedClaudeModels, get: getClaudeModelSelection, save: saveClaudeModelSelection,
       isActive: claudeExecution.isSessionActive },
     codexWorkspaceAvailable,
+    { settings: harnessSettings, codexVersion: codexCliVersion, claudeVersion: claudeCliVersion },
   );
 
   const schedulingRepository = createJean2ScheduledJobRepository();
@@ -313,6 +318,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
       getWorkspace,
     },
     execution: schedulingExecution,
+    isHarnessDisabled: harnessSettings.isDisabled,
   });
 
   const schedulerTicker = createSchedulingTicker({

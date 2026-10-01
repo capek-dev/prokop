@@ -6,9 +6,6 @@ import type { ProviderDescriptor } from '@prokopai/sdk';
 
 mock.module('@/config/models', () => ({
   getModelsConfigWithStatus: () => ({ providers: [], defaultModel: '', defaultProvider: '' }),
-  createProvider: async (input: unknown) => input,
-  updateProvider: async (id: string, input: unknown) => ({ id, ...(input as object) }),
-  deleteProvider: async () => ({ success: true }),
   createModel: async (id: string, input: unknown) => ({ providerId: id, ...(input as object) }),
   updateModel: async (_id: string, _m: string, input: unknown) => input,
   deleteModel: async () => ({ success: true }),

@@ -384,6 +384,13 @@ export function initializeSchema(db: Database): void {
   )`);
   db.run("CREATE INDEX IF NOT EXISTS idx_push_deliveries_retry ON push_deliveries(status, next_attempt_at) WHERE status = 'pending_retry'");
 
+  // Server-global key/value settings (harness enablement, future host flags).
+  db.run(`CREATE TABLE IF NOT EXISTS server_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`);
+
   initializeFts(db);
   migrateFtsForAgents(db);
 }

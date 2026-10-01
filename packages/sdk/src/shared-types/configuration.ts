@@ -22,7 +22,6 @@ export interface ModelWithStatus {
   name: string;
   contextWindow: number;
   maxOutputTokens?: number;
-  tier: 'budget' | 'standard' | 'premium';
   variants?: Record<string, { providerOptions: Record<string, unknown> }>;
   capabilities?: {
     input?: {
@@ -52,21 +51,11 @@ export interface ModelsConfigResponse {
   defaultProvider: string;
 }
 
-export interface CreateProviderRequest {
-  id: string;
-  name: string;
-}
-
-export interface UpdateProviderRequest {
-  name?: string;
-}
-
 export interface CreateModelRequest {
   id: string;
   name: string;
   contextWindow: number;
   maxOutputTokens?: number;
-  tier: 'budget' | 'standard' | 'premium';
   variants?: Record<string, { providerOptions: Record<string, unknown> }>;
   capabilities?: {
     input?: {
@@ -85,7 +74,6 @@ export interface UpdateModelRequest {
   name?: string;
   contextWindow?: number;
   maxOutputTokens?: number;
-  tier?: 'budget' | 'standard' | 'premium';
   variants?: Record<string, { providerOptions: Record<string, unknown> }>;
   capabilities?: {
     input?: {

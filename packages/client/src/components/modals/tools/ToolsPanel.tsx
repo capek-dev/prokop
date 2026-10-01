@@ -5,11 +5,13 @@ import { useToolsQuery, useToolEnvVarsQuery } from '@/hooks/queries';
 
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
+  /** Render without outer padding when composed into a merged panel. */
+  embedded?: boolean;
 }
 
 type ToolsListEntry = ToolDefinition & { source?: 'builtin' | 'installed' | 'domain' };
 
-export function ToolsPanel({ sdkClient }: PanelProps) {
+export function ToolsPanel({ sdkClient, embedded = false }: PanelProps) {
   const { data: toolsData, isLoading: toolsLoading, error: toolsError } = useToolsQuery(sdkClient);
   const { data: envData, isLoading: envLoading } = useToolEnvVarsQuery(sdkClient);
 
@@ -42,7 +44,7 @@ export function ToolsPanel({ sdkClient }: PanelProps) {
   }
 
   return (
-    <div className="p-3 sm:p-4 space-y-4">
+    <div className={embedded ? 'space-y-4' : 'p-3 sm:p-4 space-y-4'}>
       {error && (
         <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{error}</div>
       )}
@@ -52,7 +54,7 @@ export function ToolsPanel({ sdkClient }: PanelProps) {
           <Package className="size-3.5 shrink-0" />
           <span>
             {tools.length} tool{tools.length !== 1 ? 's' : ''} loaded ({tools.filter((t) => t.source === 'builtin' || t.source === 'domain').length} built-in). Configure their environment variables in the{' '}
-            <span className="font-medium text-foreground">Environment</span> tab.
+            <span className="font-medium text-foreground">Environment</span> section {embedded ? 'below' : 'tab'}.
           </span>
         </p>
       </div>

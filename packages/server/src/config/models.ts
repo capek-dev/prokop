@@ -1,4 +1,4 @@
-import { resolveModelsPath, clearModelsCache, type ModelsConfig, type ProviderDefinition, type ModelDefinition } from '@/config';
+import { resolveModelsPath, clearModelsCache, type ModelsConfig, type ModelDefinition } from '@/config';
 import { atomicWriteFile } from '@/config/files';
 import { existsSync, readFileSync } from 'fs';
 import { ConfigurationNotFoundError, ConfigurationValidationError, ConfigurationConflictError } from '@/config/errors';
@@ -7,8 +7,6 @@ import { getProviderStatus } from '@/adapters/capek/contracts';
 import type {
   ModelsConfigResponse,
   ModelRuntimeStatus,
-  CreateProviderRequest,
-  UpdateProviderRequest,
   CreateModelRequest,
   UpdateModelRequest,
   SetDefaultsRequest,
@@ -16,15 +14,13 @@ import type {
 } from '@prokopai/sdk';
 
 const KNOWN_PROVIDERS = new Set([
-  'openai', 'openrouter', 'minimax', 'zhipu', 'zhipu-coding',
+  'openrouter', 'minimax', 'zhipu-coding',
   'codex', 'deepseek',
 ]);
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
-  openai: 'PROKOPAI_LLM_OPENAI_API_KEY',
   openrouter: 'PROKOPAI_LLM_OPENROUTER_API_KEY',
   minimax: 'PROKOPAI_LLM_MINIMAX_API_KEY',
-  zhipu: 'PROKOPAI_LLM_ZHIPU_API_KEY',
   'zhipu-coding': 'PROKOPAI_LLM_ZHIPU_CODING_API_KEY',
   'deepseek': 'PROKOPAI_LLM_DEEPSEEK_API_KEY',
 };
@@ -72,65 +68,6 @@ export async function saveModelsDocument(config: ModelsConfig): Promise<ModelsCo
 
 export { validateModelsDocument } from './schema';
 import { validateModelsDocument } from './schema';
-export async function createProvider(data: CreateProviderRequest): Promise<ModelsConfig> {
-  const config = getModelsDocument();
-
-  const existingProvider = config.providers.find(p => p.id === data.id);
-  if (existingProvider) {
-    throw new ConfigurationConflictError(`Provider with id "${data.id}" already exists`);
-  }
-
-  const newProvider: ProviderDefinition = {
-    id: data.id,
-    name: data.name,
-    models: [],
-  };
-
-  config.providers.push(newProvider);
-
-  return await saveModelsDocument(config);
-}
-
-export async function updateProvider(providerId: string, data: UpdateProviderRequest): Promise<ModelsConfig> {
-  const config = getModelsDocument();
-
-  const provider = config.providers.find(p => p.id === providerId);
-  if (!provider) {
-    throw new ConfigurationNotFoundError('Provider', providerId);
-  }
-
-  if (data.name !== undefined) {
-    provider.name = data.name;
-  }
-
-  return await saveModelsDocument(config);
-}
-
-export async function deleteProvider(providerId: string): Promise<ModelsConfig> {
-  const config = getModelsDocument();
-
-  const providerIndex = config.providers.findIndex(p => p.id === providerId);
-  if (providerIndex === -1) {
-    throw new ConfigurationNotFoundError('Provider', providerId);
-  }
-
-  if (config.defaultProvider === providerId) {
-    throw new ConfigurationValidationError(
-      `Cannot delete provider "${providerId}" because it is set as the default provider`,
-    );
-  }
-
-  const providerToDelete = config.providers[providerIndex];
-  if (providerToDelete.models.some(m => m.id === config.defaultModel)) {
-    throw new ConfigurationValidationError(
-      `Cannot delete provider "${providerId}" because it contains the default model "${config.defaultModel}"`,
-    );
-  }
-
-  config.providers.splice(providerIndex, 1);
-
-  return await saveModelsDocument(config);
-}
 
 export async function createModel(providerId: string, data: CreateModelRequest): Promise<ModelsConfig> {
   const config = getModelsDocument();
@@ -150,7 +87,6 @@ export async function createModel(providerId: string, data: CreateModelRequest):
     name: data.name,
     contextWindow: data.contextWindow,
     maxOutputTokens: data.maxOutputTokens,
-    tier: data.tier,
     variants: data.variants,
     capabilities: data.capabilities,
   };
@@ -183,10 +119,6 @@ export async function updateModel(providerId: string, modelId: string, data: Upd
 
   if (data.maxOutputTokens !== undefined) {
     model.maxOutputTokens = data.maxOutputTokens;
-  }
-
-  if (data.tier !== undefined) {
-    model.tier = data.tier;
   }
 
   if (data.variants !== undefined) {

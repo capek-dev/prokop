@@ -10,14 +10,14 @@ export type ConfigurationSection =
   | 'appearance'
   | 'keybinds'
   | 'files'
-  // Server
-  | 'providers'
-  | 'models'
-  | 'prompts'
+  // Server (shared across harnesses; prompts are client-level shortcuts)
+  | 'harnesses'
   | 'preconfigs'
+  | 'prompts'
+  // Prokop runtime
+  | 'providers-models'
   | 'response-formats'
-  | 'env'
-  | 'tools';
+  | 'tools-env';
 
 // --- Default File Open Mode ---
 export type DefaultFileOpenMode = 'preview' | 'edit';
@@ -34,18 +34,12 @@ interface ConfigurationSectionActions {
 interface DialogState {
   showSettings: boolean;
   showConfiguration: boolean;
-  showTools: boolean;
-  showMCPDialog: boolean;
-  showWorkspacePermissions: boolean;
   showWorkspaceSettings: boolean;
 }
 
 interface DialogActions {
   setShowSettings: (show: boolean) => void;
   setShowConfiguration: (show: boolean) => void;
-  setShowTools: (show: boolean) => void;
-  setShowMCPDialog: (show: boolean) => void;
-  setShowWorkspacePermissions: (show: boolean) => void;
   setShowWorkspaceSettings: (show: boolean) => void;
 }
 
@@ -142,21 +136,15 @@ export const useUIStore: UseBoundStore<StoreApi<UIStore>> = create<UIStore>((set
   // --- Dialogs ---
   showSettings: false,
   showConfiguration: false,
-  showTools: false,
-  showMCPDialog: false,
-  showWorkspacePermissions: false,
   showWorkspaceSettings: false,
 
   // Open the unified settings dialog (preference or server section)
   setShowSettings: (show: boolean) => set({ showConfiguration: show, showSettings: show }),
   setShowConfiguration: (show) => set({ showConfiguration: show }),
-  setShowTools: (show) => set({ showTools: show }),
-  setShowMCPDialog: (show) => set({ showMCPDialog: show }),
-  setShowWorkspacePermissions: (show) => set({ showWorkspacePermissions: show }),
   setShowWorkspaceSettings: (show) => set({ showWorkspaceSettings: show }),
 
   // --- Configuration Section ---
-  configurationSection: 'providers',
+  configurationSection: 'account',
   setConfigurationSection: (section) => set({ configurationSection: section }),
 
   // --- Settings ---

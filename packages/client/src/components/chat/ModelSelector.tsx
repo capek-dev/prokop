@@ -20,7 +20,6 @@ interface Model {
   id: string;
   name: string;
   contextWindow: number;
-  tier: 'budget' | 'standard' | 'premium';
   providerId: string;
   providerName: string;
 }
@@ -33,15 +32,6 @@ interface ModelSelectorProps {
   disabled?: boolean;
   compact?: boolean;
   iconOnly?: boolean;
-}
-
-function getTierBadge(tier: string): string {
-  switch (tier) {
-    case 'budget': return '$';
-    case 'standard': return '$$';
-    case 'premium': return '$$$';
-    default: return '';
-  }
 }
 
 function renderCommandItems(
@@ -62,9 +52,6 @@ function renderCommandItems(
             onSelect={() => handleSelect(key)}
           >
             <span>{model.name}</span>
-            <span className="text-muted-foreground text-xs">
-              {getTierBadge(model.tier)}
-            </span>
             <Check
               className={cn(
                 'ml-auto size-4',

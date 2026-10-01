@@ -1,9 +1,6 @@
 import type { HttpClient } from '../transport/http';
 import type {
   GetModelsConfigResponse,
-  CreateProviderResponse,
-  UpdateProviderResponse,
-  DeleteProviderResponse,
   CreateModelResponse,
   UpdateModelResponse,
   DeleteModelResponse,
@@ -16,8 +13,6 @@ import type {
   DeletePromptConfigResponse,
 } from '../types/rest-responses';
 import type {
-  CreateProviderRequest,
-  UpdateProviderRequest,
   CreateModelRequest,
   UpdateModelRequest,
   SetDefaultsRequest,
@@ -30,18 +25,6 @@ import type {
 // =============================================================================
 
 interface GetModelsOptions {
-  signal?: AbortSignal;
-}
-
-interface CreateProviderOptions {
-  signal?: AbortSignal;
-}
-
-interface UpdateProviderOptions {
-  signal?: AbortSignal;
-}
-
-interface DeleteProviderOptions {
   signal?: AbortSignal;
 }
 
@@ -70,33 +53,12 @@ export class ConfigModelsNamespace {
 
   /**
    * GET /api/config/models - Get full models configuration with runtime status
+   *
+   * Providers are read-only catalog entries (managed via models.json or
+   * registry sync); only model-level CRUD is exposed.
    */
   async get(options?: GetModelsOptions): Promise<GetModelsConfigResponse> {
     return this.http.get('/config/models', { signal: options?.signal });
-  }
-
-  async createProvider(
-    data: CreateProviderRequest,
-    options?: CreateProviderOptions,
-  ): Promise<CreateProviderResponse> {
-    return this.http.post('/config/models/providers', data, { signal: options?.signal });
-  }
-
-  async updateProvider(
-    id: string,
-    data: UpdateProviderRequest,
-    options?: UpdateProviderOptions,
-  ): Promise<UpdateProviderResponse> {
-    return this.http.put(`/config/models/providers/${encodeURIComponent(id)}`, data, { signal: options?.signal });
-  }
-
-  /**
-   * DELETE /api/config/models/providers/:id - Delete a provider
-   */
-  async deleteProvider(id: string, options?: DeleteProviderOptions): Promise<DeleteProviderResponse> {
-    return this.http.delete(`/config/models/providers/${encodeURIComponent(id)}`, {
-      signal: options?.signal,
-    });
   }
 
   async createModel(

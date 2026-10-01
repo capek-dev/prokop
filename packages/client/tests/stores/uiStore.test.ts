@@ -11,9 +11,6 @@ describe('uiStore', () => {
     useUIStore.setState({
       showSettings: false,
       showConfiguration: false,
-      showTools: false,
-      showMCPDialog: false,
-      showWorkspacePermissions: false,
       chatFinishSoundEnabled: true,
       permissionSoundEnabled: true,
       filePreviewTarget: null,
@@ -47,39 +44,6 @@ describe('uiStore', () => {
       test('setShowConfiguration toggles', () => {
         useUIStore.getState().setShowConfiguration(true);
         expect(useUIStore.getState().showConfiguration).toBe(true);
-      });
-    });
-
-    describe('showTools', () => {
-      test('starts false', () => {
-        expect(useUIStore.getState().showTools).toBe(false);
-      });
-
-      test('setShowTools toggles', () => {
-        useUIStore.getState().setShowTools(true);
-        expect(useUIStore.getState().showTools).toBe(true);
-      });
-    });
-
-    describe('showMCPDialog', () => {
-      test('starts false', () => {
-        expect(useUIStore.getState().showMCPDialog).toBe(false);
-      });
-
-      test('setShowMCPDialog toggles', () => {
-        useUIStore.getState().setShowMCPDialog(true);
-        expect(useUIStore.getState().showMCPDialog).toBe(true);
-      });
-    });
-
-    describe('showWorkspacePermissions', () => {
-      test('starts false', () => {
-        expect(useUIStore.getState().showWorkspacePermissions).toBe(false);
-      });
-
-      test('setShowWorkspacePermissions toggles', () => {
-        useUIStore.getState().setShowWorkspacePermissions(true);
-        expect(useUIStore.getState().showWorkspacePermissions).toBe(true);
       });
     });
   });

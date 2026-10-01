@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
   embedded?: boolean;
+  /** Render only this provider's entry (used by provider cards). */
+  provider?: string;
 }
 
 interface PendingAuth {
@@ -24,13 +26,14 @@ function connectionIds(provider?: ProviderAccountStatus): string[] {
     ?? (provider?.connectedAt ? [provider.connectedAt] : []);
 }
 
-export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps) {
+export function OAuthProvidersPanel({ sdkClient, embedded = false, provider: filter }: PanelProps) {
   const { data: providersData, isLoading: loading, isFetching, refetch } = useProvidersQuery(sdkClient);
   const connectMut = useConnectProvider(sdkClient);
   const disconnectMut = useDisconnectProvider(sdkClient);
   const completeMut = useCompleteOAuth(sdkClient);
   const accountsMut = useProviderAccountMutation(sdkClient);
-  const providers: ProviderAccountStatus[] = providersData?.providers ?? [];
+  const providers: ProviderAccountStatus[] = (providersData?.providers ?? [])
+    .filter(provider => !filter || provider.provider === filter);
   const [error, setError] = useState<string | null>(null);
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [pendingAuth, setPendingAuth] = useState<PendingAuth | null>(null);
@@ -198,6 +201,10 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
     }
   }, [pendingAuth, completing, providers]);
 
+  if (filter && providers.length === 0) {
+    return null;
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -208,22 +215,24 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
 
   return (
     <div className={embedded ? 'space-y-4' : 'p-3 sm:p-4 space-y-4'}>
-      <div className={`flex items-center gap-2 ${embedded ? 'justify-end' : 'justify-between'}`}>
-        {!embedded && (
-          <p className="text-sm text-muted-foreground">
-            Connect subscription-based providers using OAuth. No API keys needed.
-          </p>
-        )}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isFetching}
-        >
-          <RefreshCw className={isFetching ? 'animate-spin' : ''} data-icon="inline-start" />
-          Refresh
-        </Button>
-      </div>
+      {!filter && (
+        <div className={`flex items-center gap-2 ${embedded ? 'justify-end' : 'justify-between'}`}>
+          {!embedded && (
+            <p className="text-sm text-muted-foreground">
+              Connect subscription-based providers using OAuth. No API keys needed.
+            </p>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isFetching}
+          >
+            <RefreshCw className={isFetching ? 'animate-spin' : ''} data-icon="inline-start" />
+            Refresh
+          </Button>
+        </div>
+      )}
 
       {error && (
         <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{error}</div>
@@ -236,20 +245,25 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
       ) : (
         <div className="flex flex-col gap-3">
           {providers.map((provider) => (
-            <div key={provider.provider} className="rounded-lg border p-3 sm:p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`size-2 rounded-full ${provider.reauthRequired ? 'bg-amber-500' : provider.connected ? 'bg-green-500' : 'bg-muted-foreground'}`} />
-                  <span className="text-sm font-medium">
-                    {provider.displayName || provider.provider}
-                  </span>
+            <div key={provider.provider} className={filter ? 'space-y-2' : 'rounded-lg border p-3 sm:p-4 space-y-3'}>
+              {/* Embedded in a provider card: the card header already carries
+                  the provider name and connected status, so the entry renders
+                  its controls directly. */}
+              {!filter && (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`size-2 rounded-full ${provider.reauthRequired ? 'bg-amber-500' : provider.connected ? 'bg-green-500' : 'bg-muted-foreground'}`} />
+                    <span className="text-sm font-medium">
+                      {provider.displayName || provider.provider}
+                    </span>
+                  </div>
+                  {provider.reauthRequired ? (
+                    <span className="text-xs text-amber-600 dark:text-amber-400">Reauthentication required</span>
+                  ) : provider.connected ? (
+                    <span className="text-xs text-muted-foreground">Connected</span>
+                  ) : null}
                 </div>
-                {provider.reauthRequired ? (
-                  <span className="text-xs text-amber-600 dark:text-amber-400">Reauthentication required</span>
-                ) : provider.connected ? (
-                  <span className="text-xs text-muted-foreground">Connected</span>
-                ) : null}
-              </div>
+              )}
 
               {provider.error && (
                 <p className={`text-xs ${provider.reauthRequired ? 'text-amber-700 dark:text-amber-300' : 'text-destructive'}`}>
@@ -257,7 +271,7 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false }: PanelProps)
                 </p>
               )}
 
-              {provider.connected && provider.connectedAt && (
+              {!filter && provider.connected && provider.connectedAt && (
                 <p className="text-xs text-muted-foreground">
                   Connected {new Date(provider.connectedAt).toLocaleDateString()}
                 </p>
