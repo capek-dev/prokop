@@ -188,8 +188,14 @@ function CompactionDivider({ part }: { part: CompactionPart }) {
 const STREAMED_PART_IDS = new Set<string>();
 
 const MIN_REVEAL_CPS = 12;
-const ACTIVE_CATCHUP_S = 0.45;
-const DONE_CATCHUP_S = 0.25;
+// Backlog drains within this window while a part is the live tail. Short on
+// purpose: smoothing only polishes chunk-to-chunk cadence; it must not queue
+// visible text behind the stream (web UIs like ChatGPT use ~150-250ms).
+const ACTIVE_CATCHUP_S = 0.22;
+// A single flush bigger than this reveals all but the last BURST_SNAP_CHARS
+// instantly: reasoning dumps after provider-side buffering would otherwise
+// type out for seconds while later parts wait below.
+const BURST_SNAP_CHARS = 400;
 
 const StreamBlock = memo(function StreamBlock({ block }: { block: string }) {
   return <MarkdownRenderer>{block}</MarkdownRenderer>;
@@ -197,20 +203,20 @@ const StreamBlock = memo(function StreamBlock({ block }: { block: string }) {
 
 /**
  * Reveals `text` at a steady character rate via rAF instead of jumping per
- * network flush. Mounts snapped to the current text (no replay); afterwards
- * new arrivals drain within a small catch-up window so the visible text never
- * lags far behind. Same renderer for tail and blocks, so a block graduating
- * from tail to stable is pixel-identical (no typography pop).
+ * network flush. Only a message's live tail part animates (`active`); when
+ * `active` goes false — a successor part was created or the message completed
+ * — the remainder flushes instantly, so later content never renders while
+ * earlier text is still typing. Mounts snapped (no replay); arrivals drain
+ * within a small catch-up window. Same renderer for tail and blocks, so a
+ * block graduating from tail to stable is pixel-identical (no typography pop).
  */
 function useRevealedLength(text: string, active: boolean): number {
   const [revealed, setRevealed] = useState(() => text.length);
   const revealedRef = useRef(revealed);
   const targetRef = useRef(text.length);
-  const activeRef = useRef(active);
 
   useEffect(() => {
     targetRef.current = text.length;
-    activeRef.current = active;
 
     if (targetRef.current < revealedRef.current) {
       // Text replaced wholesale (edit/revert): snap to it.
@@ -220,6 +226,20 @@ function useRevealedLength(text: string, active: boolean): number {
     }
     if (targetRef.current === revealedRef.current) return;
 
+    if (!active) {
+      // Part no longer animating: flush what is left instead of typing it.
+      revealedRef.current = targetRef.current;
+      setRevealed(targetRef.current);
+      return;
+    }
+
+    if (targetRef.current - revealedRef.current > BURST_SNAP_CHARS) {
+      // Burst cap: reveal everything but the last BURST_SNAP_CHARS at once;
+      // only that remainder keeps animating.
+      revealedRef.current = targetRef.current - BURST_SNAP_CHARS;
+      setRevealed(revealedRef.current);
+    }
+
     let raf = 0;
     let last = performance.now();
     const step = (now: number) => {
@@ -227,8 +247,7 @@ function useRevealedLength(text: string, active: boolean): number {
       last = now;
       const backlog = targetRef.current - revealedRef.current;
       if (backlog <= 0) return;
-      const catchUpS = activeRef.current ? ACTIVE_CATCHUP_S : DONE_CATCHUP_S;
-      const rate = Math.max(MIN_REVEAL_CPS, backlog / catchUpS);
+      const rate = Math.max(MIN_REVEAL_CPS, backlog / ACTIVE_CATCHUP_S);
       const next = Math.min(
         targetRef.current,
         revealedRef.current + Math.max(1, Math.round(rate * dt)),
@@ -302,7 +321,10 @@ const MessageParts = memo(function MessageParts({
 }) {
   return (
     <>
-      {parts.map((part) => {
+      {parts.map((part, index) => {
+        // Parts stream sequentially, so only the last part of a streaming
+        // message animates; any part with a successor snaps to full text.
+        const animate = isStreaming && index === parts.length - 1;
         switch (part.type) {
           case 'text': {
             const text = inverted && part.text
@@ -313,7 +335,7 @@ const MessageParts = memo(function MessageParts({
             return (
               <div key={part.id} className="min-w-0">
                 {streamingPath ? (
-                  <StreamingText text={text} active={isStreaming} />
+                  <StreamingText text={text} active={animate} />
                 ) : (
                   <MarkdownRenderer inverted={inverted}>{text}</MarkdownRenderer>
                 )}
@@ -327,7 +349,7 @@ const MessageParts = memo(function MessageParts({
                 key={part.id}
                 className="visualization-container text-muted-foreground text-sm italic border-l-2 border-muted-foreground/30 pl-3 my-2 wrap-break-word"
               >
-                <StreamingReasoning text={part.text} active={isStreaming} />
+                <StreamingReasoning text={part.text} active={animate} />
               </div>
             );
 
