@@ -97,7 +97,14 @@ test('a harness-pinned reviewer runs a headless turn on its harness', async () =
     harnessModelEffort: async () => 'high',
     saveHarnessSelection: (harness, sessionId, model, effort) => selections.push({ harness, sessionId, model, effort }),
     headless: {
-      run: async input => { headlessInputs.push(input); return {}; },
+      // Simulate a real turn: the dispatch contract requires the review
+      // session to carry an assistant message before a run may complete.
+      run: async input => {
+        headlessInputs.push(input);
+        db.run(`INSERT INTO messages (id,session_id,role,created_at,status,completed_at,sequence) VALUES (? ,? ,'assistant',?,'completed',?,0)`,
+          [crypto.randomUUID(), input.childSessionId, Date.now(), Date.now()]);
+        return {};
+      },
       supportedHarnesses: () => ['codex-cli', 'claude-cli'],
     },
   });
@@ -125,6 +132,44 @@ test('a harness-pinned reviewer runs a headless turn on its harness', async () =
     { harness: 'claude-cli', sessionId: dispatched.childSessionId, model: 'claude-opus-4-6', effort: 'high' },
   ]);
   await expect(learning.api.undo('ws', run.id, 'missing')).rejects.toThrow('Harness-run reviews cannot be undone');
+});
+
+test('a harness review whose turn never ran records a failed run', async () => {
+  const db = setupTestDatabase();
+  root = await mkdtemp(join(await realpath(tmpdir()), 'learning-noop-'));
+  const settings = enableLearning({}, 'dev', 'reviewer');
+  settings.learning!.reviewers[0]!.cadence = { idleMinutes: 1, minimumIntervalMinutes: 1, maximumPendingMinutes: 1 };
+  seedWorkspace({ id: 'ws', path: root, settings });
+  seedSession('ws', { id: 'source', title: 'Fix retry handling' });
+  const now = Date.now() - 120_000;
+  db.run(`INSERT INTO messages (id,session_id,role,created_at,status,agent,completed_at,sequence) VALUES ('answer','source','assistant',?,'completed','dev',?,0)`, [now, now]);
+  const agents = {
+    getAgentDirectory: async () => null,
+    isAgentSync: () => true,
+    getPreconfigOrAgent: async () => ({
+      id: 'dev', name: 'Dev', description: '', systemPrompt: 'Review', tools: null,
+      model: 'claude-opus-4-6', provider: '', variant: 'high', modelHarness: 'claude-cli',
+      settings: null, isDefault: false,
+    }) as unknown as Preconfig,
+  };
+  learning = createWiredLearning(agents, createProkopLearningRuntime({ agents }), {
+    modelAvailable: () => false,
+    harnessModelEffort: async () => 'high',
+    headless: {
+      // Resolves success without writing any message: the pre-turn no-op
+      // case (validation errors are swallowed by the no-op wire).
+      run: async () => ({}),
+      supportedHarnesses: () => ['codex-cli', 'claude-cli'],
+    },
+  });
+
+  await learning.start();
+  for (let i = 0; i < 200 && !learning.repository.listRuns('ws')[0]?.finished_at; i++) await Bun.sleep(5);
+  await learning.stop();
+
+  const run = learning.repository.listRuns('ws')[0]!;
+  expect(run.status).toBe('failed');
+  expect(run.error).toBe('Harness review turn did not run');
 });
 
 test('personal home reference writes survive failure and support history undo without replay', async () => {

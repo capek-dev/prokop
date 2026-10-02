@@ -113,9 +113,15 @@ export function WorkspaceSettingsDialog({
   const learningError = draft.memory.enabled
     ? learningValidationError(draft.learning, allPreconfigs.map(p => p.id)) : null;
 
+  // Agent homes configure learning on the agent itself (Settings → Agents):
+  // the Learning section never renders there, and a stale selection falls back.
+  const isAgentHome = workspace.settings?.isAgentHome === true;
+  const activeSection: Section = isAgentHome && section === 'learning' ? 'agentTools' : section;
   const sectionsWithIcons = useMemo(
-    () => SECTIONS.map((s) => ({ ...s, icon: ICONS[s.value as Section] })) satisfies SettingsSection[],
-    [],
+    () => SECTIONS
+      .filter((s) => !(isAgentHome && s.value === 'learning'))
+      .map((s) => ({ ...s, icon: ICONS[s.value as Section] })) satisfies SettingsSection[],
+    [isAgentHome],
   );
 
   const handleSave = () => {
@@ -179,7 +185,7 @@ export function WorkspaceSettingsDialog({
     </Suspense>
   );
 
-  const showFooter = DEFERRED_SAVE_SECTIONS.has(section);
+  const showFooter = DEFERRED_SAVE_SECTIONS.has(activeSection);
 
   return (
     <SettingsDialogShell
@@ -189,7 +195,7 @@ export function WorkspaceSettingsDialog({
       description="Manage workspace configuration: MCP servers, permissions, paths, and capabilities"
       sections={sectionsWithIcons}
       groups={GROUPS}
-      value={section}
+      value={activeSection}
       onValueChange={(v) => setSection(v as Section)}
       renderPanel={renderPanel}
       footer={showFooter ? (

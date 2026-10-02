@@ -23,6 +23,7 @@ import { forkClaudeSession } from './fork';
 import { claudeDeveloperInstructions, defaultClaudePreconfigId, type ClaudeInstructionSources } from './instructions';
 import { createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools } from './dynamic-tools';
 import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
+import { cliWorkspaceAvailable } from '@/harnesses/shared/cli-workspace';
 import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
 
 interface Binding {
@@ -67,7 +68,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
     rollingBack.add(sessionId);
     try {
       const workspace = getWorkspace(session.workspaceId);
-      if (!workspace?.path || workspace.isVirtual) throw new Error('Claude workspace is unavailable');
+      if (!cliWorkspaceAvailable(workspace)) throw new Error('Claude workspace is unavailable');
       const worktree = session.workspaceRootId
         ? createManagedWorktreeRepository(getDatabase).get(session.workspaceRootId) : null;
       if (session.workspaceRootId && (!worktree || worktree.workspaceId !== session.workspaceId
@@ -187,7 +188,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
       let children: ClaudeChildTimelines | null = null;
       try {
         const workspace = getWorkspace(session.workspaceId);
-        if (!workspace || workspace.isVirtual || !workspace.path) throw new Error('Claude workspace unavailable');
+        if (!cliWorkspaceAvailable(workspace)) throw new Error('Claude workspace unavailable');
         const path = session.workspaceRootId
           ? createManagedWorktreeRepository(getDatabase).get(session.workspaceRootId) : null;
         if (session.workspaceRootId && (!path || path.workspaceId !== session.workspaceId || path.state !== 'available')) {
@@ -278,8 +279,8 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         }
         wire.actor.attachOriginToSession(origin, sessionId);
         assistant = createMessage({ id: crypto.randomUUID(), sessionId, role: 'assistant', status: 'streaming',
-          modelId: selection.model, providerId: 'claude-cli', tokens: { prompt: 0, completion: 0 },
-          cost: 0, createdAt: Date.now() }) as AssistantMessage;
+          modelId: selection.model, providerId: 'claude-cli', agent: session.agentId ?? undefined,
+          tokens: { prompt: 0, completion: 0 }, cost: 0, createdAt: Date.now() }) as AssistantMessage;
         wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: assistant });
         let result: string | null = null;
         let goalActivated = false;
@@ -570,7 +571,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
       let confirmed = false;
       try {
         const workspace = getWorkspace(session.workspaceId);
-        if (!workspace || workspace.isVirtual || !workspace.path) throw new Error('Claude workspace unavailable');
+        if (!cliWorkspaceAvailable(workspace)) throw new Error('Claude workspace unavailable');
         const worktree = session.workspaceRootId
           ? createManagedWorktreeRepository(getDatabase).get(session.workspaceRootId) : null;
         if (session.workspaceRootId && (!worktree || worktree.workspaceId !== session.workspaceId

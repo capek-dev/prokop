@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
 import type { LearningChange, LearningRunSummary } from '@prokopai/sdk';
 import { useServerClient } from '@/contexts/ServerClientContext';
+import { useSessionManager } from '@/contexts/SessionManagerContext';
+import { useUIStore } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { DiffViewer } from '@/components/visualizations/DiffViewer';
 import { generateDiff } from '@/utils/diff';
@@ -48,7 +49,9 @@ function ChangeDiff({ change }: { change: LearningChange }) {
 
 export function LearningHistory({ workspaceId }: { workspaceId: string }) {
   const { sdkClient: client, serverUrl } = useServerClient();
-  const { serverId } = useParams({ strict: false });
+  const { resumeSession } = useSessionManager();
+  const setShowConfiguration = useUIStore(s => s.setShowConfiguration);
+  const setShowWorkspaceSettings = useUIStore(s => s.setShowWorkspaceSettings);
   const cache = useQueryClient();
   const [runId, setRunId] = useState<string | null>(null);
   const key = ['learning', workspaceId, serverUrl];
@@ -73,7 +76,11 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
     }
     return map;
   }, [workspaces, preconfigs, workspaceId]);
-  const reviewerLabel = (id: string) => reviewerNameById[id] ?? 'Unavailable learner';
+  const reviewerLabel = (id: string) => reviewerNameById[id]
+    // Agent-home runs record the agent id as the reviewer id; those live in
+    // the agent config, not the stored workspace settings.
+    ?? preconfigs.find(p => p.id === id)?.name
+    ?? 'Unavailable learner';
   const sessionTitle = (title: string | null | undefined) => title?.trim() || 'Untitled conversation';
   /** One row per conversation: sources are message-level and a run often reads several from the same conversation. */
   const sourceSessions = useMemo(() => {
@@ -90,6 +97,16 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
     ? `${sourceSessions.length} ${sourceSessions.length === 1 ? 'conversation' : 'conversations'}${detail.data && detail.data.sources.length > sourceSessions.length ? ` · ${detail.data.sources.length} messages` : ''}`
     : null;
   const back = () => { setRunId(null); mutation.reset(); };
+
+  /** Sessions can live outside the active workspace (agent-home review
+   * sessions, cross-workspace sources): resume through the session manager,
+   * which fetches unknown sessions, switches the workspace, and opens the
+   * board pane — a plain route link shows an empty view for those. */
+  const openSession = (sessionId: string): void => {
+    setShowConfiguration(false);
+    setShowWorkspaceSettings(false);
+    resumeSession(sessionId);
+  };
 
   /** Run screen: the list unmounts, so the run reads as its own page with back navigation. */
   if (runId) {
@@ -115,12 +132,11 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
                 <p className="text-xs text-muted-foreground">Learner: {reviewerLabel(detail.data.run.reviewerId)}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {serverId && detail.data.sessionId && (
-                  <Link className="text-sm text-primary underline-offset-4 hover:underline"
-                    to="/server/$serverId/workspace/session/$sessionId"
-                    params={{ serverId, sessionId: detail.data.sessionId }}>
+                {detail.data.sessionId && (
+                  <button type="button" className="text-sm text-primary underline-offset-4 hover:underline"
+                    onClick={() => openSession(detail.data.sessionId!)}>
                     Open learning session
-                  </Link>
+                  </button>
                 )}
                 <RunStatusBadge status={detail.data.run.status} />
               </div>
@@ -155,16 +171,16 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
               ))}
             </div>
 
-            {serverId && sourceSessions.length > 0 && (
+            {sourceSessions.length > 0 && (
               <DisclosureRow label="Source conversations" summary={sourcesSummary} defaultOpen={false}>
                 <div className="flex flex-col">
                   {sourceSessions.map(source => (
-                    <Link key={source.sessionId}
-                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm text-primary underline-offset-4 hover:bg-muted/50 hover:underline"
-                      to="/server/$serverId/workspace/session/$sessionId" params={{ serverId, sessionId: source.sessionId }}>
+                    <button key={source.sessionId} type="button"
+                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm text-primary underline-offset-4 hover:bg-muted/50 hover:underline"
+                      onClick={() => openSession(source.sessionId)}>
                       <span className="truncate">{sessionTitle(source.title)}</span>
                       {source.count > 1 && <span className="shrink-0 text-xs text-muted-foreground">{source.count} messages</span>}
-                    </Link>
+                    </button>
                   ))}
                 </div>
               </DisclosureRow>

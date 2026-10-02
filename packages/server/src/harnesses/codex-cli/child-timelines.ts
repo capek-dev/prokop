@@ -169,6 +169,7 @@ export class CodexChildTimelines {
     if (event.method === 'turn/started' && !child.turns.has(turnId) && child.turns.size < 32) {
       const assistant = createMessage({ id: crypto.randomUUID(), sessionId: child.sessionId,
         role: 'assistant', status: 'streaming', modelId: 'codex-cli', providerId: 'codex-cli',
+        agent: this.parent.agentId ?? undefined,
         tokens: { prompt: 0, completion: 0 }, cost: 0, createdAt: Date.now() }) as AssistantMessage;
       child.turns.set(turnId, { id: turnId, assistant,
         tools: new CodexToolItems(child.sessionId, assistant.id, turnId, this.delivery), deltas: new Map() });

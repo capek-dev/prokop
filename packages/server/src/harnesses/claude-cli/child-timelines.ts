@@ -46,6 +46,7 @@ export class ClaudeChildTimelines {
       status: 'active', metadata: null, agentName: 'Claude agent', subagentStatus: 'running' });
     const assistant = createMessage({ id: crypto.randomUUID(), sessionId: session.id, role: 'assistant',
       status: 'streaming', providerId: 'claude-cli', modelId: this.parent.selectedModel ?? 'claude-cli',
+      agent: this.parent.agentId ?? undefined,
       tokens: { prompt: 0, completion: 0 }, cost: 0, createdAt: Date.now() }) as AssistantMessage;
     this.children.set(id, { sessionId: session.id, assistant, segments: [], openSegment: null,
       textLength: 0, partClock: 0, openTools: new Set(), status: 'running' });

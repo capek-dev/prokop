@@ -162,6 +162,14 @@ export function createWiredLearning(
       preconfig: input.preconfig, prompt, workspacePath: workspace.path, workspaceId: workspace.id,
       modelId: model, providerId: '', resumeFromHistory: false });
     signal.throwIfAborted();
+    // Defense in depth: the no-op headless wire swallows pre-turn validation
+    // errors, so a dispatch that never ran a turn would otherwise record a
+    // green run. A real review always writes an assistant message.
+    if (!result.error && !db.query(
+      "SELECT 1 FROM messages WHERE session_id = ? AND role = 'assistant' LIMIT 1",
+    ).get(sessionId)) {
+      return { error: 'Harness review turn did not run' };
+    }
     return result;
   };
   const execute: LearningReviewRunnerDependencies['execute'] = async input =>

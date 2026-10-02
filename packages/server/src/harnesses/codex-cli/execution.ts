@@ -5,6 +5,7 @@ import type { SessionWirePorts } from '@/application/ports/delivery';
 import type { SessionExecutionPort, InterruptExecutionResult } from '@/application/ports/execution';
 import { getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { createMessage, createPart, deleteMessage, getMessageWithParts, listMessagesWithParts, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
+import { cliWorkspaceAvailable } from '@/harnesses/shared/cli-workspace';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { getDatabase } from '@/infrastructure/sqlite/database';
@@ -108,7 +109,7 @@ function resolveImages(session: Session, references: Array<{ id: string; kind: s
 
 function workspaceRoot(session: Session): string {
   const workspace = getWorkspace(session.workspaceId);
-  if (!workspace || workspace.isVirtual || !workspace.path) throw new Error('Codex requires a physical workspace');
+  if (!cliWorkspaceAvailable(workspace)) throw new Error('Codex requires a physical workspace');
   let root = workspace.path;
   if (session.workspaceRootId) {
     const worktree = createManagedWorktreeRepository(getDatabase).get(session.workspaceRootId);
@@ -596,7 +597,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         }
         wire.actor.attachOriginToSession(origin, sessionId);
         assistant = createMessage({ id: crypto.randomUUID(), sessionId, role: 'assistant',
-          status: 'streaming', modelId: 'codex-cli', providerId: 'codex-cli',
+          status: 'streaming', modelId: 'codex-cli', providerId: 'codex-cli', agent: session.agentId ?? undefined,
           tokens: { prompt: 0, completion: 0 }, cost: 0, createdAt: Date.now() }) as AssistantMessage;
         wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: assistant });
 
@@ -686,7 +687,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
               toolItems = undefined;
               pendingDeltas.clear();
               assistant = createMessage({ id: crypto.randomUUID(), sessionId, role: 'assistant',
-                status: 'streaming', modelId: 'codex-cli', providerId: 'codex-cli',
+                status: 'streaming', modelId: 'codex-cli', providerId: 'codex-cli', agent: session.agentId ?? undefined,
                 tokens: { prompt: 0, completion: 0 }, cost: 0, createdAt: Date.now() }) as AssistantMessage;
               markCodexTurnStarted(sessionId, eventTurnId, assistant.id, true);
               turnIdentityRecorded = true;

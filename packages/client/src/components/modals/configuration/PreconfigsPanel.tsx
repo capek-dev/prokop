@@ -591,7 +591,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
                       className="w-fit text-xs text-primary underline-offset-4 hover:underline"
                       onClick={() => setHistoryOpen(true)}
                     >
-                      Learning history
+                      History
                     </button>
                   )}
                   {form.learningEnabled && (
@@ -919,7 +919,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
           <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
             <DialogContent className="flex flex-col overflow-hidden sm:max-w-2xl sm:max-h-[85vh]">
               <DialogHeader className="shrink-0">
-                <DialogTitle>Learning history</DialogTitle>
+                <DialogTitle>History</DialogTitle>
                 <DialogDescription>Learning runs and revision-checked undo.</DialogDescription>
               </DialogHeader>
               <div className="dialog-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain">

@@ -5,7 +5,6 @@ import type { LearningCadence, LearningReviewer, Preconfig, Workspace, Workspace
 import { useSdkClient } from '@/contexts/ServerClientContext';
 import { LearningHistory } from './LearningHistory';
 import { AgentModelPicker, type AgentModelSelection } from './AgentModelPicker';
-import { LearningSourcePicker } from './LearningSourcePicker';
 import { DisclosureRow } from './DisclosureRow';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -28,12 +27,8 @@ export interface LearningPanelProps {
   onPersonalLearningChange(value: boolean): void;
 }
 
-/** Server defaults for a null cadence, scoped like the learning runtime scopes them. */
-function defaultCadence(personal: boolean): LearningCadence {
-  return personal
-    ? { idleMinutes: 60, minimumIntervalMinutes: 1440, maximumPendingMinutes: 1440 }
-    : { idleMinutes: 30, minimumIntervalMinutes: 120, maximumPendingMinutes: 1440 };
-}
+/** Server defaults for a null cadence. */
+const DEFAULT_CADENCE: LearningCadence = { idleMinutes: 30, minimumIntervalMinutes: 120, maximumPendingMinutes: 1440 };
 
 const CADENCE_FIELDS = [
   { key: 'idleMinutes', label: 'Quiet period' },
@@ -61,9 +56,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
   });
   const onChange = (settings: WorkspaceLearningSettings) => { preview.reset(); setPreviewPrompt(null); onSettingsChange(settings); };
   const models = useServerDataStore(state => state.models);
-  const workspaces = useServerDataStore(state => state.workspaces);
-  const personal = workspace.settings.isAgentHome === true;
-  const initialId = personal ? workspace.settings.agentId : getWorkspaceDefaultPreconfigId(workspace, preconfigs);
+  const initialId = getWorkspaceDefaultPreconfigId(workspace, preconfigs);
 
   /** A harness-pinned learner agent runs its reviews as headless turns on that
    * harness unless overridden; overrides may target any harness's models. */
@@ -88,7 +81,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
     staleTime: 60_000,
     retry: false,
   });
-  const defaults = defaultCadence(personal);
+  const defaults = DEFAULT_CADENCE;
   const settings: WorkspaceLearningSettings = value ?? {
     enabled: false,
     reviewers: [],
@@ -205,30 +198,6 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
     return bordered ? <div className="border-t px-3 py-2">{link}</div> : link;
   };
 
-  // Agent homes are no longer a learning settings surface: the owning
-  // agent's learning is configured in Settings → Server → Agents. Only the
-  // history browser stays relevant here.
-  if (personal) {
-    return (
-      <div className="flex flex-col gap-3 p-3 sm:p-4">
-        <Alert>
-          <AlertTitle>Agent learning is configured on the agent</AlertTitle>
-          <AlertDescription>
-            This workspace is an agent home. Its learning is enabled, tuned, and turned off on the agent itself:
-            Settings → Server → Agents → Learning.
-          </AlertDescription>
-        </Alert>
-        <button
-          type="button"
-          className="w-fit text-xs text-primary underline-offset-4 hover:underline"
-          onClick={() => setHistoryOpen(true)}
-        >
-          Learning history
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-6 p-3 sm:p-4">
       <div className="flex items-center justify-between gap-4">
@@ -243,7 +212,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
             className="w-fit text-xs text-primary underline-offset-4 hover:underline"
             onClick={() => setHistoryOpen(true)}
           >
-            Learning history
+            History
           </button>
         </div>
         <Switch
@@ -263,17 +232,15 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
         </Alert>
       )}
 
-      {!personal && (
-        <div className="flex items-center justify-between gap-4">
-          <div className="space-y-0.5">
-            <Label htmlFor="personal-learning">Use as personal learning source</Label>
-            <p className="text-xs text-muted-foreground">
-              Allow agent-home workspaces to include this workspace's conversations when their agents learn.
-            </p>
-          </div>
-          <Switch id="personal-learning" checked={allowPersonalLearning} onCheckedChange={onPersonalLearningChange} />
+      <div className="flex items-center justify-between gap-4">
+        <div className="space-y-0.5">
+          <Label htmlFor="personal-learning">Use as personal learning source</Label>
+          <p className="text-xs text-muted-foreground">
+            Allow agent-home workspaces to include this workspace's conversations when their agents learn.
+          </p>
         </div>
-      )}
+        <Switch id="personal-learning" checked={allowPersonalLearning} onCheckedChange={onPersonalLearningChange} />
+      </div>
 
       {settings.enabled && (
         <>
@@ -343,7 +310,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
             <div className="space-y-0.5">
               <Label htmlFor="learning-skills">Improve skills</Label>
               <p className="text-xs text-muted-foreground">
-                {personal ? "Learning may also create and refine this agent's skills." : 'Learning may also create and refine workspace skills.'}{' '}
+                {'Learning may also create and refine workspace skills. '}
                 Turning this on also enables skill management.
               </p>
             </div>
@@ -351,40 +318,15 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
               onCheckedChange={improveSkills => onChange({ ...settings, improveSkills })} />
           </div>
 
-          {!personal && (
-            <DisclosureRow label="Shared instructions" summary={settings.instructions.trim() || null} bordered={false}>
-              <div className="space-y-1.5">
-                <p className="text-xs text-muted-foreground">Appended to every learner's prompt.</p>
-                <Textarea aria-label="Shared instructions" value={settings.instructions} maxLength={20_000}
-                  placeholder="Optional guidance applied to all learners"
-                  onChange={event => onChange({ ...settings, instructions: event.target.value })} />
-              </div>
-            </DisclosureRow>
-          )}
+          <DisclosureRow label="Shared instructions" summary={settings.instructions.trim() || null} bordered={false}>
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">Appended to every learner's prompt.</p>
+              <Textarea aria-label="Shared instructions" value={settings.instructions} maxLength={20_000}
+                placeholder="Optional guidance applied to all learners"
+                onChange={event => onChange({ ...settings, instructions: event.target.value })} />
+            </div>
+          </DisclosureRow>
 
-          {personal && (
-            <>
-              <Separator />
-              <div className="space-y-1.5">
-                <Label>Learning sources</Label>
-                <p className="text-xs text-muted-foreground">Which workspaces this agent learns from.</p>
-                <Select value={settings.sources.mode}
-                  onValueChange={mode => onChange({ ...settings, sources: mode === 'all' ? { mode: 'all' } : { mode: 'selected', workspaceIds: [] } })}>
-                  <SelectTrigger aria-label="Learning sources" className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="all">All eligible workspaces</SelectItem>
-                      <SelectItem value="selected">Selected workspaces</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                {settings.sources.mode === 'selected' && (
-                  <LearningSourcePicker workspaces={workspaces} selectedIds={settings.sources.workspaceIds}
-                    onChange={workspaceIds => onChange({ ...settings, sources: { mode: 'selected', workspaceIds } })} />
-                )}
-              </div>
-            </>
-          )}
         </>
       )}
 
@@ -398,7 +340,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
         <DialogContent className="flex flex-col overflow-hidden sm:max-w-2xl sm:max-h-[85vh]">
           <DialogHeader className="shrink-0">
-            <DialogTitle>Learning history</DialogTitle>
+            <DialogTitle>History</DialogTitle>
             <DialogDescription>Learning runs and revision-checked undo.</DialogDescription>
           </DialogHeader>
           <div className="dialog-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain">

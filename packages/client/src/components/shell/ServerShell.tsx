@@ -187,18 +187,16 @@ export default function ServerShell() {
             )}
           </div>
 
-          <div className="flex flex-1 min-h-0 p-0">
-            <SessionManagerContext.Provider value={sessionManager}>
+          <SessionManagerContext.Provider value={sessionManager}>
+            <div className="flex flex-1 min-h-0 p-0">
               <SessionCommandsProvider value={commandsValue}>
                 <ViewRefsContext.Provider value={viewRefs}>
                   <Outlet />
                 </ViewRefsContext.Provider>
               </SessionCommandsProvider>
-            </SessionManagerContext.Provider>
+            </div>
 
-          </div>
-
-          <AppKeyboardHandlersMount
+            <AppKeyboardHandlersMount
             sidebarRef={sidebarRef}
             terminalPanelRef={terminalPanelRef}
             filesPanelRef={filesPanelRef}
@@ -223,6 +221,7 @@ export default function ServerShell() {
             onUpdateWorkspaceSettings={sessionManager.updateWorkspaceSettings}
             isUpdatingWorkspace={sessionManager.isUpdatingWorkspace}
           />
+          </SessionManagerContext.Provider>
         </SidebarProvider>
       </ServerClientProvider>
     </SessionPaneRegistryContext.Provider>

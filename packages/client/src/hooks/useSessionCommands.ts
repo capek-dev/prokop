@@ -152,6 +152,13 @@ export function useSessionCommands({
     if (!session && client && client.connected) {
       client.http.sessions.get(sessionId).then((response: { session: Session }) => {
         useSessionStore.getState().addSessionToFront(response.session);
+        // Deep links (e.g. learning history) can target a session outside the
+        // active workspace; the stale `sessions` lookup above could not switch
+        // for it, so switch here once the workspace is known.
+        const target = workspaces.find(w => w.id === response.session.workspaceId);
+        if (target && target.id !== activeWorkspace?.id) {
+          setActiveWorkspace(target);
+        }
       }).catch(() => {});
     }
 
