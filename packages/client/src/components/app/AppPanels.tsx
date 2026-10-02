@@ -43,7 +43,6 @@ export function AppPanels({
         additionalPaths={activeWorkspace?.additionalPaths ?? []}
         sdkClient={sdkClient}
         isOpen={showTerminalPanel}
-        onOpen={() => setShowTerminalPanel(true)}
         onClose={() => setShowTerminalPanel(false)}
       />
     </Suspense>

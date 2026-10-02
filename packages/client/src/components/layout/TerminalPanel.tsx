@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
-import { X, Plus, Folder, Terminal as TerminalIcon, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, Plus, Folder, Terminal as TerminalIcon } from 'lucide-react';
 import { TerminalView } from './TerminalView';
 import {
   useTerminalConnection,
@@ -55,7 +55,6 @@ interface TerminalPanelProps {
   additionalPaths: string[];
   sdkClient: ProkopaiClient | null;
   isOpen: boolean;
-  onOpen: () => void;
   onClose: () => void;
 }
 
@@ -70,7 +69,6 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   additionalPaths,
   sdkClient,
   isOpen,
-  onOpen,
   onClose,
 }, ref) {
   const isMobile = useIsMobile();
@@ -577,6 +575,13 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   }, [beginTerminalResize, panelHeight]);
 
 
+  // Toggled from the app header like the sessions and files panels: nothing
+  // renders while closed (the component stays mounted, so terminals keep
+  // running and the cache survives; only the view is hidden).
+  if (!isOpen) {
+    return null;
+  }
+
   if (!workspaceId || !workspacePath) {
     return (
       <div className="flex items-center justify-center h-[300px] bg-sidebar text-muted-foreground text-sm">
@@ -711,108 +716,70 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       ? `calc(${viewport.height}px - env(safe-area-inset-top, 0px))`
       : Math.min(window.innerHeight * 0.7, viewport.height);
 
+    // Opened from the app header toggle; dismissed by tapping outside.
     return (
-      <>
-        {/* Single header bar — toggles both directions */}
-        <div className="flex items-center gap-2 bg-sidebar px-3 py-1 shrink-0">
-          <button
-            onClick={() => isOpen ? onClose() : onOpen()}
-            className="flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <TerminalIcon className="w-3 h-3 flex-shrink-0" />
-            <span>Terminal</span>
-          </button>
-          <div className="flex-1" />
-          <button
-            onClick={() => isOpen ? onClose() : onOpen()}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            {isOpen
-              ? <ChevronDown className="w-3 h-3" />
-              : <ChevronUp className="w-3 h-3" />}
-          </button>
-        </div>
-        {isOpen && (
-          <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <SheetContent
-              side="top"
-              className="p-0 bg-sidebar [&>button]:hidden flex flex-col"
-              style={{ height: sheetHeight }}
-            >
-              <SheetHeader className="sr-only">
-                <SheetTitle>Terminal</SheetTitle>
-              </SheetHeader>
-              {renderTabs()}
-              {renderTerminalContent()}
-            </SheetContent>
-          </Sheet>
-        )}
-      </>
+      <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <SheetContent
+          side="top"
+          className="p-0 bg-sidebar [&>button]:hidden flex flex-col"
+          style={{ height: sheetHeight }}
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>Terminal</SheetTitle>
+          </SheetHeader>
+          {renderTabs()}
+          {renderTerminalContent()}
+        </SheetContent>
+      </Sheet>
     );
   }
 
   return (
     <div data-terminal-panel="" className="md:rounded-xl md:border md:border-border/50 md:overflow-hidden">
-      {/* Single header bar — toggles both directions, tabs inline when expanded */}
+      {/* Header with inline tabs; the panel itself toggles from the app header like the other panels */}
       <div className="flex items-center gap-1 bg-sidebar px-2 py-1 shrink-0">
         <TerminalIcon className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-        {isOpen ? (
-          <div className="flex items-center gap-0.5 overflow-x-auto flex-1 min-h-0">
-            {tabs.map(tab => (
-              <div
-                key={tab.serverSessionId}
-                className={cn(
-                  'group flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer rounded-sm whitespace-nowrap border border-transparent',
-                  tab.serverSessionId === activeTabServerId
-                    ? 'bg-muted text-foreground'
-                    : 'text-muted-foreground hover:bg-muted'
-                )}
-                onClick={() => selectTerminalTab(tab.serverSessionId)}
+        <div className="flex items-center gap-0.5 overflow-x-auto flex-1 min-h-0">
+          {tabs.map(tab => (
+            <div
+              key={tab.serverSessionId}
+              className={cn(
+                'group flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer rounded-sm whitespace-nowrap border border-transparent',
+                tab.serverSessionId === activeTabServerId
+                  ? 'bg-muted text-foreground'
+                  : 'text-muted-foreground hover:bg-muted'
+              )}
+              onClick={() => selectTerminalTab(tab.serverSessionId)}
+            >
+              <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', statusIndicator(tab.status))} />
+              <span>{shortName} {tab.title}</span>
+              <button
+                className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity ml-0.5"
+                onClick={(e) => { e.stopPropagation(); closeTab(tab.serverSessionId); }}
               >
-                <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', statusIndicator(tab.status))} />
-                <span>{shortName} {tab.title}</span>
-                <button
-                  className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity ml-0.5"
-                  onClick={(e) => { e.stopPropagation(); closeTab(tab.serverSessionId); }}
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-            {renderAddTerminalMenu()}
-          </div>
-        ) : (
-          <span className="text-xs text-muted-foreground flex-1">Terminal</span>
-        )}
-        <button
-          onClick={() => isOpen ? onClose() : onOpen()}
-          className="flex items-center justify-center size-5 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {isOpen
-            ? <ChevronDown className="w-3.5 h-3.5" />
-            : <ChevronUp className="w-3.5 h-3.5" />}
-        </button>
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+          {renderAddTerminalMenu()}
+        </div>
       </div>
 
-      {/* Expanded content */}
-      {isOpen && (
-        <>
-          <div
-            className="w-full touch-none cursor-ns-resize flex items-center justify-center bg-sidebar select-none shrink-0"
-            style={{ height: 4 }}
-            onPointerDown={handleResizeStart}
-          >
-            <div className="w-10 h-0.5 bg-muted-foreground/30 rounded-full" />
-          </div>
-          <div
-            ref={panelBodyRef}
-            className="flex flex-col bg-sidebar overflow-hidden shrink-0"
-            style={{ height: panelHeight }}
-          >
-            {renderTerminalContent()}
-          </div>
-        </>
-      )}
+      {/* Resize handle and terminal body */}
+      <div
+        className="w-full touch-none cursor-ns-resize flex items-center justify-center bg-sidebar select-none shrink-0"
+        style={{ height: 4 }}
+        onPointerDown={handleResizeStart}
+      >
+        <div className="w-10 h-0.5 bg-muted-foreground/30 rounded-full" />
+      </div>
+      <div
+        ref={panelBodyRef}
+        className="flex flex-col bg-sidebar overflow-hidden shrink-0"
+        style={{ height: panelHeight }}
+      >
+        {renderTerminalContent()}
+      </div>
     </div>
   );
 });
