@@ -4,6 +4,7 @@ import { createSession, updateSession } from '@/infrastructure/sqlite/session-st
 import { createMessage, createPart, getToolPartByCallId, transitionToolToCompleted,
   transitionToolToError, transitionToolToInterrupted, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
 import type { ClaudeTurnEvent } from './sdk-turn';
+import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
 
 interface Child {
   sessionId: string;
@@ -93,14 +94,13 @@ export class ClaudeChildTimelines {
     } else if (event.type === 'tool-start') {
       const callId = `claude-tool:${this.nativeId}:${event.id}`;
       if (getToolPartByCallId(sessionId, callId)) throw new Error('Duplicate Claude child tool identity');
-      const input = Object.fromEntries(Object.entries(event.input).slice(0, 16).map(([key, value]) => [key.slice(0, 80),
-        typeof value === 'string' ? value.slice(0, 1000) : typeof value === 'number' || typeof value === 'boolean' ? value : '[omitted]']));
+      const input = claudeToolInput(event.input);
       const nestedId = event.name === 'Agent' ? this.start(event.id, owner) : null;
+      const name = claudeToolName(event.name);
       const part: ToolPart = { id: crypto.randomUUID(), messageId: assistant.id, type: 'tool', callId,
-        name: event.name === 'Agent' ? 'Claude Agent' : `Claude ${event.name}`, createdAt: Date.now(),
+        name, createdAt: Date.now(),
         state: { status: 'running', input, startedAt: Date.now(), ...(nestedId ? { childSessionId: nestedId } : {}) },
-        presentation: { summary: typeof input.command === 'string' ? input.command.slice(0, 200)
-          : typeof input.file_path === 'string' ? input.file_path.slice(0, 200) : event.name, debugAvailable: false } };
+        presentation: { summary: claudeToolSummary(name, input), debugAvailable: false } };
       createPart(part, sessionId);
       child.openTools.add(part.id);
       this.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part });
@@ -109,7 +109,9 @@ export class ClaudeChildTimelines {
       if (!part || !child.openTools.delete(part.id)) throw new Error('Unknown Claude child tool result');
       if (this.children.has(event.id)) this.finish(event.id, event.failed ? 'error' : 'completed');
       const updated = event.failed ? transitionToolToError(part.id, 'Claude tool failed')
-        : transitionToolToCompleted(part.id, { _visualization: { type: 'none', message: 'Claude tool completed' },
+        : transitionToolToCompleted(part.id, {
+          _visualization: claudeToolVisualization(part.name, part.state.input,
+            typeof event.output === 'string' ? event.output : '', event.failed),
           preview: event.output });
       if (updated) this.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part: updated });
     }

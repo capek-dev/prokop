@@ -26,7 +26,7 @@ function extractChildSessionId(part: ToolPart): string | undefined {
   if ('childSessionId' in part.state && part.state.childSessionId) {
     return part.state.childSessionId;
   }
-  if (part.name !== 'task' || part.state.status !== 'completed') return undefined;
+  if ((part.name !== 'task' && part.name !== 'subagent') || part.state.status !== 'completed') return undefined;
   if (typeof part.state.output !== 'string') return undefined;
   return part.state.output.match(/task_id:\s*([a-f0-9-]{36})/i)?.[1];
 }
@@ -119,26 +119,15 @@ export async function projectMessagesForClient(
       const visualization = part.name === 'webfetch' && storedVisualization?.type === 'markdown'
         ? { type: 'none' as const, badge: storedVisualization.badge,
           message: 'Fetched page (open raw data to inspect)' }
-        : part.callId.startsWith('codex-item:') && part.name === 'Codex tool'
-          && part.state.input.tool === 'agent_skill_manage' && storedVisualization?.type === 'markdown'
-          ? { type: 'none' as const, message: 'Agent skill operation completed' }
-          : part.callId.startsWith('codex-item:') && part.name === 'Codex agent'
-            && storedVisualization?.type === 'markdown'
-            ? { type: 'none' as const, message: 'Codex agent task completed' }
-            : storedVisualization;
+        : storedVisualization;
       return {
         ...part,
         state: projectState(part, visualization),
         presentation: {
-          summary: part.callId.startsWith('codex-item:') && part.name === 'Codex agent'
-            ? part.presentation?.summary ?? 'Agent task'
-            : part.callId.startsWith('codex-item:') && part.name === 'Codex tool'
-            && part.state.input.tool === 'agent_skill_manage' ? 'agent_skill_manage'
-            : part.name === 'agent_skill_manage' && !templates.has(part.name)
-              ? part.presentation?.summary ?? 'Agent skill management'
-              : part.callId.startsWith('codex-item:') && part.name === 'Codex tool'
-                ? part.presentation?.summary ?? resolveToolSummary(part.state.input, templates.get(part.name))
-                : resolveToolSummary(part.state.input, templates.get(part.name)),
+          summary: part.name === 'agent_skill_manage' && !templates.has(part.name)
+            ? part.presentation?.summary ?? 'Agent skill management'
+            : part.presentation?.summary
+              ?? resolveToolSummary(part.state.input, templates.get(part.name)),
           ...(visualization && { visualization }),
           debugAvailable: true,
         },

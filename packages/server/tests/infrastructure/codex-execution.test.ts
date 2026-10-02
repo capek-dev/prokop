@@ -400,14 +400,14 @@ test('Codex tool items appear in the transcript and settle on completion or proc
   await turn;
   const tools = listMessagesWithParts('s')[1]!.parts.filter(part => part.type === 'tool');
   expect(tools.map(part => [part.name, part.state.status]).sort()).toEqual([
-    ['Codex command', 'completed'], ['Codex file change', 'completed'],
-    ['Codex MCP', 'interrupted'], ['Codex tool', 'error'],
-    ['Codex tool', 'completed'], ['memory', 'completed'], ['session_search', 'completed'],
+    ['shell', 'completed'], ['edit', 'completed'],
+    ['docs: search', 'interrupted'], ['fetch', 'error'],
+    ['example', 'completed'], ['memory', 'completed'], ['session_search', 'completed'],
   ].sort());
-  expect(tools.find(part => part.name === 'Codex command')?.state)
+  expect(tools.find(part => part.name === 'shell')?.state)
     .toMatchObject({ output: { exitCode: 0, _visualization: { type: 'shell-output', stdout: 'clean' } } });
-  expect(tools.find(part => part.name === 'Codex file change')?.presentation?.summary).toContain('src/a.ts');
-  const fileChange = tools.find(part => part.name === 'Codex file change');
+  expect(tools.find(part => part.name === 'edit')?.presentation?.summary).toContain('src/a.ts');
+  const fileChange = tools.find(part => part.name === 'edit');
   expect(fileChange?.state).toMatchObject({ output: { _visualization: {
     type: 'diff', path: 'src/a.ts', additions: 1, deletions: 1,
     hunks: [{ oldStart: 1, newStart: 1, changes: [

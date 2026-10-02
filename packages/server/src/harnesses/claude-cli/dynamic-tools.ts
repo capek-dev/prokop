@@ -7,8 +7,8 @@ import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-di
 import { safeSkillDirectory,
   type AgentSkillsDomainBridge, type MemoryDomainBridge, type SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
 
-/** The in-process server name; the SDK reports its tools as mcp__prokop__<name>. */
-export const PROKOP_MCP_SERVER = 'prokop';
+/** The in-process server name; re-exported from the shared harness module. */
+export { PROKOP_MCP_SERVER } from '@/harnesses/shared/tool-viz';
 
 const MAX_ARGUMENTS = 32_000;
 const MAX_RESULT = 16_000;
@@ -206,13 +206,4 @@ export function createClaudeSkillManageTools(options: {
       } catch { return fail('Agent skill operation failed'); }
     },
     { alwaysLoad: true })) as unknown as SdkMcpToolDefinition[];
-}
-
-/** Transcript-friendly names for the Prokop MCP tools the SDK reports. */
-export function claudeMcpToolDisplayName(name: string): string | null {
-  if (name === `mcp__${PROKOP_MCP_SERVER}__memory`) return 'Claude Memory';
-  if (name === `mcp__${PROKOP_MCP_SERVER}__agent_memory`) return 'Claude Agent memory';
-  if (name === `mcp__${PROKOP_MCP_SERVER}__session_search`) return 'Claude Session search';
-  if (name === `mcp__${PROKOP_MCP_SERVER}__agent_skill_manage`) return 'Claude Agent skills';
-  return null;
 }

@@ -78,7 +78,7 @@ function getStatusIcon(status: string) {
 }
 
 function extractTaskSessionId(part: ToolPart): string | null {
-  if (part.name !== 'task' && part.name !== 'Codex agent' && part.name !== 'Claude Agent') return null;
+  if (part.name !== 'task' && part.name !== 'subagent') return null;
   const state = part.state;
   if ('childSessionId' in state && state.childSessionId) {
     return state.childSessionId as string;

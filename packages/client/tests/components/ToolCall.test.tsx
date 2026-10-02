@@ -91,7 +91,7 @@ describe('ToolCall debug loading', () => {
 
   test('does not repeat harness child approvals inside the parent Agent tool row', () => {
     const childId = '11111111-1111-4111-8111-111111111111';
-    const part: ToolPart = { ...makeProjectedPart(), name: 'Claude Agent',
+    const part: ToolPart = { ...makeProjectedPart(), name: 'subagent',
       state: { status: 'running', input: {}, startedAt: 1, childSessionId: childId },
       presentation: { summary: 'explorer', debugAvailable: false } };
     const ask = (toolCallId: string): PendingAskRequest => ({
@@ -114,7 +114,7 @@ describe('ToolCall debug loading', () => {
     expect(screen.getByText('ordinary-child-ask')).toBeInTheDocument();
   });
 
-  test.each(['Codex agent', 'Claude Agent'])('opens a linked %s child timeline from the agent row', (name) => {
+  test.each(['subagent', 'task'])('opens a linked %s child timeline from the agent row', (name) => {
     const childId = '11111111-1111-4111-8111-111111111111';
     const opened: string[] = [];
     const part: ToolPart = { ...makeProjectedPart(), name,

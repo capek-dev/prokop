@@ -21,8 +21,8 @@ import type { ClaudeTurnUsage } from './usage';
 import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistory, type ClaudeRollbackDependencies } from './rollback';
 import { forkClaudeSession } from './fork';
 import { claudeDeveloperInstructions, defaultClaudePreconfigId, type ClaudeInstructionSources } from './instructions';
-import { createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools,
-  claudeMcpToolDisplayName } from './dynamic-tools';
+import { createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools } from './dynamic-tools';
+import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
 import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
 
 interface Binding {
@@ -328,7 +328,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
             const part = getToolPartByCallId(sessionId, `claude-tool:${nativeId}:${event.id}`);
             if (part && openTools.delete(part.id)) {
               const updated = event.status === 'completed'
-                ? transitionToolToCompleted(part.id, { _visualization: { type: 'none', message: 'Claude agent completed' } })
+                ? transitionToolToCompleted(part.id, { _visualization: { type: 'none', message: 'Subagent task completed' } })
                 : event.status === 'error' ? transitionToolToError(part.id, 'Claude agent failed')
                   : transitionToolToInterrupted(part.id, 'error');
               if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part: updated });
@@ -360,23 +360,14 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           if (event.type === 'tool-start') {
             const callId = `claude-tool:${nativeId}:${event.id}`;
             if (getToolPartByCallId(sessionId, callId)) throw new Error('Duplicate Claude tool identity');
-            const input = Object.fromEntries(Object.entries(event.input).slice(0, 16).map(([key, value]) => [key.slice(0, 80),
-              typeof value === 'string' ? value.slice(0, 1000) : typeof value === 'number' || typeof value === 'boolean' ? value : '[omitted]']));
+            const input = claudeToolInput(event.input);
             const childId = event.name === 'Agent' ? children.start(event.id) : null;
-            const displayName = claudeMcpToolDisplayName(event.name);
-            const dynamicSummary = displayName
-              ? (typeof input.query === 'string' && input.query ? `search: ${input.query}`
-                : [input.action, input.target].filter(value => typeof value === 'string').join(' '))
-                .slice(0, 200) || displayName
-              : null;
+            const name = claudeToolName(event.name);
             const part: ToolPart = { id: crypto.randomUUID(), messageId: assistant.id, type: 'tool',
-              callId, name: displayName ?? `Claude ${event.name}`, createdAt: Date.now(),
+              callId, name, createdAt: Date.now(),
               state: { status: 'running', input, startedAt: Date.now(),
                 ...(childId ? { childSessionId: childId } : {}) },
-              presentation: { summary: dynamicSummary
-                ?? (typeof input.command === 'string' ? input.command.slice(0, 200)
-                : typeof input.file_path === 'string' ? input.file_path.slice(0, 200) : event.name),
-              debugAvailable: false } };
+              presentation: { summary: claudeToolSummary(name, input), debugAvailable: false } };
             createPart(part, sessionId);
             openTools.add(part.id);
             wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part });
@@ -384,14 +375,16 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           if (event.type === 'tool-end') {
             const part = getToolPartByCallId(sessionId, `claude-tool:${nativeId}:${event.id}`);
             if (!part || !openTools.has(part.id)) throw new Error('Unknown Claude tool result');
-            if (part.name === 'Claude Agent' && backgroundAgents.has(event.id) && !event.failed) {
+            if (part.name === 'subagent' && backgroundAgents.has(event.id) && !event.failed) {
               // The initial tool result only confirms that the agent was backgrounded.
               // Its task_notification is the terminal signal for the linked timeline.
               continue;
             }
-            if (part.name === 'Claude Agent') children.finish(event.id, event.failed ? 'error' : 'completed');
+            if (part.name === 'subagent') children.finish(event.id, event.failed ? 'error' : 'completed');
             const updated = event.failed ? transitionToolToError(part.id, 'Claude tool failed')
-              : transitionToolToCompleted(part.id, { _visualization: { type: 'none', message: 'Claude tool completed' },
+              : transitionToolToCompleted(part.id, {
+                _visualization: claudeToolVisualization(part.name, part.state.input,
+                  typeof event.output === 'string' ? event.output : '', event.failed),
                 preview: event.output });
             openTools.delete(part.id);
             if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part: updated });

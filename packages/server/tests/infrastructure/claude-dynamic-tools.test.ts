@@ -9,8 +9,9 @@ type ToolResult = Awaited<ReturnType<SdkMcpToolDefinition['handler']>>;
 import type { PermissionAsk } from '@prokopai/sdk';
 import { installMemoryToolFallback, installSessionSearchToolFallback, installSkillsToolFallback } from '@capekai/core/hosts';
 import { agentSkillsDomainTools, memoryDomainTools, sessionSearchDomainTools } from '@/adapters/capek/domain-tools';
-import { claudeMemoryShape, claudeSessionSearchShape, claudeSkillManageShape, claudeMcpToolDisplayName,
+import { claudeMemoryShape, claudeSessionSearchShape, claudeSkillManageShape,
   createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools } from '@/harnesses/claude-cli/dynamic-tools';
+import { claudeToolName, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
 import { createClaudeExecution } from '@/harnesses/claude-cli/execution';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
@@ -378,10 +379,42 @@ test('Claude turns register the agent skill manager and its guidance for agent s
   }
 });
 
-test('MCP tool names map to friendly transcript labels', () => {
-  expect(claudeMcpToolDisplayName('mcp__prokop__memory')).toBe('Claude Memory');
-  expect(claudeMcpToolDisplayName('mcp__prokop__agent_memory')).toBe('Claude Agent memory');
-  expect(claudeMcpToolDisplayName('mcp__prokop__session_search')).toBe('Claude Session search');
-  expect(claudeMcpToolDisplayName('mcp__prokop__agent_skill_manage')).toBe('Claude Agent skills');
-  expect(claudeMcpToolDisplayName('Read')).toBeNull();
+test('Claude tool names map to the canonical hybrid scheme', () => {
+  // Prokop-builtin equivalents collapse to the shared vocabulary.
+  expect(claudeToolName('Bash')).toBe('shell');
+  expect(claudeToolName('Edit')).toBe('edit');
+  expect(claudeToolName('MultiEdit')).toBe('edit');
+  expect(claudeToolName('Write')).toBe('write-file');
+  expect(claudeToolName('Read')).toBe('read-file');
+  expect(claudeToolName('TodoWrite')).toBe('todo');
+  expect(claudeToolName('Agent')).toBe('subagent');
+  // Prokop MCP tools use their bare domain names (parent and child alike).
+  expect(claudeToolName('mcp__prokop__memory')).toBe('memory');
+  expect(claudeToolName('mcp__prokop__agent_memory')).toBe('agent_memory');
+  expect(claudeToolName('mcp__prokop__session_search')).toBe('session_search');
+  expect(claudeToolName('mcp__prokop__agent_skill_manage')).toBe('agent_skill_manage');
+  // Foreign MCP reads server: tool; unknown tools stay native and unprefixed.
+  expect(claudeToolName('mcp__filesystem__read_file')).toBe('filesystem: read_file');
+  expect(claudeToolName('NotebookEdit')).toBe('NotebookEdit');
+});
+
+test('Claude completions synthesize real visualizations per canonical name', () => {
+  const bash = claudeToolVisualization('shell', { command: 'npm test' }, 'all passing', false);
+  expect(bash).toEqual({ type: 'shell-output', command: 'npm test', stdout: 'all passing', exitCode: 0 });
+
+  const edit = claudeToolVisualization('edit',
+    { file_path: 'src/a.ts', old_string: 'one', new_string: 'two\nlines' }, 'done', false);
+  expect(edit).toMatchObject({ type: 'diff', path: 'src/a.ts', additions: 2, deletions: 1 });
+
+  const grep = claudeToolVisualization('grep', { pattern: 'TODO' }, 'src/a.ts:1:TODO fix\nsrc/b.ts:3:TODO x', false);
+  expect(grep).toMatchObject({ type: 'file-list', badge: '2 matches', total: 2 });
+
+  const memory = claudeToolVisualization('memory', { action: 'list', target: 'memory' },
+    JSON.stringify({ success: true, action: 'list', target: 'memory', entries: [], usage: { chars: 0, limit: 2500 } }), false);
+  expect(memory).toEqual({ type: 'none', badge: '0 entries · 0/2500 chars', message: 'Memory (memory)' });
+
+  expect(claudeToolVisualization('subagent', { prompt: 'go' }, 'summary', false))
+    .toEqual({ type: 'none', message: 'Subagent task completed' });
+  expect(claudeToolVisualization('NotebookEdit', {}, 'ok', false))
+    .toEqual({ type: 'none', message: 'NotebookEdit completed' });
 });

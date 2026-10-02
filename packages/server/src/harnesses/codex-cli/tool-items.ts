@@ -1,18 +1,18 @@
-import { resolveToolSummary, type ToolPart } from '@prokopai/sdk';
+import { resolveToolSummary, type AnyVisualization, type ToolPart } from '@prokopai/sdk';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { createPart, getToolPartByCallId, transitionToolToCompleted,
   transitionToolToError, transitionToolToInterrupted, updatePart } from '@/infrastructure/sqlite/message-store';
 import { codexObject } from './app-server';
 import { fileChangeVisualization } from './file-change-visualization';
+import {
+  agentSkillResultVisualization,
+  memoryResultVisualization,
+  preview,
+  sessionSearchResultVisualization,
+} from '@/harnesses/shared/tool-viz';
 
-const MAX_PREVIEW = 8_000;
 const MAX_CHANGES = 50;
 const DOMAIN_TOOLS = new Set(['memory', 'agent_memory', 'session_search', 'agent_skill_manage']);
-
-function preview(value: unknown): string {
-  const text = typeof value === 'string' ? value : JSON.stringify(value ?? '');
-  return text.length > MAX_PREVIEW ? `${text.slice(0, MAX_PREVIEW)}\n[truncated]` : text;
-}
 
 function dynamicContent(item: Record<string, unknown>): string | null {
   const items = Array.isArray(item.contentItems) ? item.contentItems
@@ -28,90 +28,42 @@ function dynamicResult(item: Record<string, unknown>): Record<string, unknown> |
   try { return text ? codexObject(JSON.parse(text)) : null; } catch { return null; }
 }
 
-function memoryVisualization(item: Record<string, unknown>): Record<string, unknown> | null {
+function domainVisualization(item: Record<string, unknown>): AnyVisualization | null {
   if (item.type !== 'dynamicToolCall' || item.namespace !== null
-    || !['memory', 'agent_memory'].includes(String(item.tool))) return null;
+    || !DOMAIN_TOOLS.has(String(item.tool))) return null;
+  const tool = String(item.tool);
   const result = dynamicResult(item);
-  if (!result) return { type: 'none', message: preview(dynamicContent(item) ?? 'Memory result unavailable') };
-  if (typeof result.error === 'string') return { type: 'none', message: preview(result.error) };
-  const agent = item.tool === 'agent_memory';
-  if (result.action === 'list') {
-    const count = Array.isArray(result.entries) ? result.entries.length : 0;
-    const usage = codexObject(result.usage);
-    const chars = typeof usage?.chars === 'number' ? usage.chars : 0;
-    const limit = typeof usage?.limit === 'number' ? usage.limit : 0;
-    return { type: 'none', badge: `${count} entr${count === 1 ? 'y' : 'ies'}`
-      + (!agent && usage ? ` · ${chars}/${limit} chars` : ''),
-    message: `${agent ? 'Agent memory' : 'Memory'} (${result.target ?? 'memory'})` };
+  if (!result) {
+    // The skill body stays in the tool exchange: a malformed skill result
+    // shows a status, never the raw text.
+    const fallback = tool === 'memory' ? 'Memory result unavailable'
+      : tool === 'agent_memory' ? 'Agent memory result unavailable'
+        : tool === 'session_search' ? 'Session search result unavailable'
+          : 'Agent skill result unavailable';
+    return { type: 'none', message: tool === 'agent_skill_manage'
+      ? fallback : preview(dynamicContent(item) ?? fallback) };
   }
-  return { type: 'none', message: typeof result.title === 'string' ? preview(result.title)
-    : agent ? 'Agent memory updated' : 'Memory updated' };
-}
-
-function sessionSearchVisualization(item: Record<string, unknown>): Record<string, unknown> | null {
-  if (item.type !== 'dynamicToolCall' || item.namespace !== null || item.tool !== 'session_search') return null;
-  const result = dynamicResult(item);
-  if (!result) return { type: 'none', message: preview(dynamicContent(item) ?? 'Session search result unavailable') };
   if (typeof result.error === 'string') return { type: 'none', message: preview(result.error) };
-  const results = Array.isArray(result.results) ? result.results : null;
-  const sessions = Array.isArray(result.sessions) ? result.sessions : null;
-  if (results || sessions) {
-    const entries = (results ?? sessions)!;
-    const label = results ? 'result' : 'session';
-    return { type: 'file-list', badge: `${entries.length} ${label}${entries.length === 1 ? '' : 's'}`,
-      singularLabel: label, pluralLabel: `${label}s`,
-      ...(results && { title: typeof result.query === 'string' ? preview(result.query)
-        : typeof result.title === 'string' ? preview(result.title) : 'Search' }),
-      files: entries.slice(0, 20).map(entry => {
-        const row = codexObject(entry);
-        const title = results ? row?.sessionTitle ?? row?.sessionId : row?.title ?? row?.id;
-        return { path: preview(typeof title === 'string' ? title : '') };
-      }), total: entries.length };
-  }
-  if (Array.isArray(result.messages)) return { type: 'none',
-    badge: `${result.messages.length} message${result.messages.length === 1 ? '' : 's'}`,
-    message: typeof result.sessionTitle === 'string' ? preview(result.sessionTitle) : 'Session context' };
-  return { type: 'none', message: typeof result.title === 'string' ? preview(result.title) : 'Session search completed' };
-}
-
-function agentSkillVisualization(item: Record<string, unknown>): Record<string, unknown> | null {
-  if (item.type !== 'dynamicToolCall' || item.namespace !== null || item.tool !== 'agent_skill_manage') return null;
-  const result = dynamicResult(item);
-  if (!result) return { type: 'none', message: 'Agent skill result unavailable' };
-  if (typeof result.error === 'string') return { type: 'none', message: preview(result.error) };
-  if (result.action === 'list' && Array.isArray(result.skills)) {
-    return { type: 'file-list', badge: `${result.skills.length} skill${result.skills.length === 1 ? '' : 's'}`,
-      singularLabel: 'skill', pluralLabel: 'skills', title: 'Agent skills',
-      files: result.skills.slice(0, 20).map(skill => {
-        const entry = codexObject(skill);
-        return { path: typeof entry?.name === 'string' ? preview(entry.name) : '',
-          content: typeof entry?.description === 'string' ? preview(entry.description) : '' };
-      }), total: result.skills.length };
-  }
-  return { type: 'none', message: typeof result.title === 'string' ? preview(result.title) : 'Agent skill updated' };
-}
-
-function collabAgentVisualization(item: Record<string, unknown>): Record<string, unknown> | null {
-  if (item.type !== 'collabAgentToolCall' && item.type !== 'subAgentActivity') return null;
-  const action = typeof item.tool === 'string' ? item.tool : 'task';
-  return { type: 'none', message: `Codex agent ${action} completed` };
+  if (tool === 'memory' || tool === 'agent_memory') return memoryResultVisualization(tool, result);
+  if (tool === 'session_search') return sessionSearchResultVisualization(result);
+  return agentSkillResultVisualization(result);
 }
 
 function itemIdentity(item: Record<string, unknown>): { name: string; summary: string; input: Record<string, unknown> } | null {
   switch (item.type) {
     case 'commandExecution':
       if (typeof item.command !== 'string') return null;
-      return { name: 'Codex command', summary: preview(item.command).slice(0, 500),
+      return { name: 'shell', summary: preview(item.command).slice(0, 500),
         input: { command: preview(item.command), cwd: typeof item.cwd === 'string' ? preview(item.cwd) : '' } };
     case 'fileChange': {
       const changes = Array.isArray(item.changes) ? item.changes.slice(0, MAX_CHANGES).map(codexObject).filter(Boolean) : [];
       const paths = changes.map(change => change?.path).filter((path): path is string => typeof path === 'string');
-      return { name: 'Codex file change', summary: paths.length ? paths.map(path => preview(path).slice(0, 200)).join(', ').slice(0, 500) : 'Editing files',
+      return { name: 'edit', summary: paths.length ? paths.map(path => preview(path).slice(0, 200)).join(', ').slice(0, 500) : 'Editing files',
         input: { paths, total: Array.isArray(item.changes) ? item.changes.length : 0 } };
     }
     case 'mcpToolCall':
       if (typeof item.server !== 'string' || typeof item.tool !== 'string') return null;
-      return { name: 'Codex MCP', summary: `${item.server}: ${item.tool}`.slice(0, 500),
+      return { name: `${item.server}: ${item.tool}`.slice(0, 200), summary: `${item.server}: ${item.tool}`.slice(0, 500),
         input: { server: preview(item.server), tool: preview(item.tool), arguments: preview(item.arguments) } };
     case 'dynamicToolCall':
       if (typeof item.tool !== 'string') return null;
@@ -124,21 +76,27 @@ function itemIdentity(item: Record<string, unknown>): { name: string; summary: s
           item.tool === 'session_search' ? '{action} {query}'
             : item.tool === 'agent_skill_manage' ? '{action} {name}' : '{action} {target}'), input };
       }
-      return { name: 'Codex tool', summary: `${typeof item.namespace === 'string' ? `${item.namespace}: ` : ''}${item.tool}`.slice(0, 500),
+      return { name: `${typeof item.namespace === 'string' ? `${item.namespace}: ` : ''}${item.tool}`.slice(0, 200),
+        summary: `${typeof item.namespace === 'string' ? `${item.namespace}: ` : ''}${item.tool}`.slice(0, 500),
         input: { tool: preview(item.tool), arguments: preview(item.arguments) } };
     case 'collabAgentToolCall':
-      return { name: 'Codex agent', summary: typeof item.tool === 'string' ? item.tool : 'Agent task',
+      return { name: 'subagent', summary: typeof item.tool === 'string' ? item.tool : 'Subagent task',
         input: { tool: item.tool, prompt: typeof item.prompt === 'string' ? preview(item.prompt) : undefined } };
     case 'subAgentActivity':
       if (item.kind !== 'started' || typeof item.agentThreadId !== 'string') return null;
-      return { name: 'Codex agent', summary: typeof item.agentPath === 'string'
-        ? item.agentPath.split('/').at(-1) ?? 'Agent task' : 'Agent task', input: { tool: 'spawnAgent' } };
+      return { name: 'subagent', summary: typeof item.agentPath === 'string'
+        ? item.agentPath.split('/').at(-1) ?? 'Subagent task' : 'Subagent task', input: { tool: 'spawnAgent' } };
     case 'webSearch':
-      return { name: 'Codex web search', summary: 'Web search', input: {} };
+      return { name: 'web-search',
+        summary: typeof item.query === 'string' ? preview(item.query).slice(0, 500) : 'Web search',
+        input: typeof item.query === 'string' ? { query: preview(item.query) } : {} };
     case 'imageView':
-      return { name: 'Codex image view', summary: typeof item.path === 'string' ? preview(item.path).slice(0, 500) : 'Image', input: {} };
+      return { name: 'image-view', summary: typeof item.path === 'string' ? preview(item.path).slice(0, 500) : 'Image',
+        input: typeof item.path === 'string' ? { path: preview(item.path) } : {} };
     case 'imageGeneration':
-      return { name: 'Codex image generation', summary: 'Generate image', input: {} };
+      return { name: 'image-generation',
+        summary: typeof item.prompt === 'string' ? preview(item.prompt).slice(0, 500) : 'Generate image',
+        input: typeof item.prompt === 'string' ? { prompt: preview(item.prompt) } : {} };
     default: {
       // Native Codex or user-provided integrations can add tool item kinds without a Prokop renderer.
       // Do not turn message, reasoning or control items into tool rows.
@@ -146,7 +104,7 @@ function itemIdentity(item: Record<string, unknown>): { name: string; summary: s
         || typeof item.tool !== 'string' || !item.tool.trim()) return null;
       const label = typeof item.server === 'string' ? `${item.server}: ${item.tool}`
         : typeof item.namespace === 'string' ? `${item.namespace}: ${item.tool}` : item.tool;
-      return { name: 'Codex tool', summary: label.slice(0, 500),
+      return { name: label.slice(0, 200), summary: label.slice(0, 500),
         input: { tool: preview(item.tool),
           ...(item.server !== undefined ? { server: preview(item.server) } : {}),
           ...(item.arguments !== undefined ? { arguments: preview(item.arguments) } : {}) } };
@@ -215,9 +173,12 @@ export class CodexToolItems {
           ? { type: 'shell-output', command: preview(item.command), stdout: content,
             exitCode: typeof item.exitCode === 'number' ? item.exitCode : -1 }
           : item.type === 'fileChange' ? fileChangeVisualization(item.changes)
-            : memoryVisualization(item) ?? sessionSearchVisualization(item)
-              ?? agentSkillVisualization(item) ?? collabAgentVisualization(item)
-              ?? { type: 'markdown', content } });
+            : domainVisualization(item)
+              ?? ((item.type === 'collabAgentToolCall' || item.type === 'subAgentActivity')
+                ? { type: 'none' as const,
+                  message: `Subagent ${typeof item.tool === 'string' && item.tool ? item.tool : 'task'} completed` }
+                : item.type === 'webSearch' ? webSearchVisualization(item, content)
+                  : { type: 'markdown', content }) });
     }
     this.open.delete(part.id);
     if (updated) {
@@ -236,4 +197,20 @@ export class CodexToolItems {
     }
     this.open.clear();
   }
+}
+
+function webSearchVisualization(item: Record<string, unknown>, content: string): AnyVisualization {
+  const result = dynamicResult(item);
+  if (result && Array.isArray(result.results)) {
+    const entries = result.results as unknown[];
+    return { type: 'file-list', badge: `${entries.length} result${entries.length === 1 ? '' : 's'}`,
+      singularLabel: 'result', pluralLabel: 'results',
+      title: typeof item.query === 'string' ? preview(item.query) : 'Web search',
+      files: entries.slice(0, 20).map(entry => {
+        const row = entry as Record<string, unknown>;
+        return { path: preview(typeof row.title === 'string' ? row.title
+          : typeof row.url === 'string' ? row.url : '') };
+      }), total: entries.length };
+  }
+  return { type: 'markdown', content };
 }

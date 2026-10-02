@@ -40,7 +40,7 @@ test('unclassified native tool items get bounded generic rows on live events and
   const stored = listMessagesWithParts('s');
   const parts = stored[0]!.parts.filter((part): part is ToolPart => part.type === 'tool');
   expect(parts).toHaveLength(2);
-  expect(parts[0]).toMatchObject({ name: 'Codex tool',
+  expect(parts[0]).toMatchObject({ name: 'user-plugin: lookup',
     presentation: { summary: 'user-plugin: lookup' }, state: { status: 'completed' } });
   expect(parts[1]).toMatchObject({ presentation: { summary: 'search' }, state: { status: 'error' } });
   expect(JSON.stringify(parts[0])).not.toContain(long);
@@ -182,12 +182,12 @@ test('Codex agent wait shows a status instead of raw JSON in live events and on 
   const part = stored[0]!.parts.find(entry => entry.type === 'tool') as ToolPart;
   expect(part.presentation?.summary).toBe('wait');
   expect(part.state).toMatchObject({ output: { _visualization: {
-    type: 'none', message: 'Codex agent wait completed',
+    type: 'none', message: 'Subagent wait completed',
   } } });
   expect(JSON.stringify(sent)).not.toContain('private response');
   const projected = await projectMessagesForClient(stored);
   expect((projected[0]!.parts.find(entry => entry.type === 'tool') as ToolPart).presentation)
-    .toMatchObject({ summary: 'wait', visualization: { type: 'none', message: 'Codex agent wait completed' } });
+    .toMatchObject({ summary: 'wait', visualization: { type: 'none', message: 'Subagent wait completed' } });
   expect(JSON.stringify(projected)).not.toContain('private response');
   expect(JSON.stringify(projected)).not.toContain('Explore privately');
 });
@@ -195,30 +195,30 @@ test('Codex agent wait shows a status instead of raw JSON in live events and on 
 test('previous Codex agent wait rows hide persisted JSON and prompt on reload', async () => {
   const assistant = createMessage(createTestAssistantMessage('s'));
   createPart({ id: crypto.randomUUID(), messageId: assistant.id, createdAt: Date.now(), type: 'tool',
-    callId: 'codex-item:turn:old-wait', name: 'Codex agent',
+    callId: 'codex-item:turn:old-wait', name: 'subagent',
     state: { status: 'completed', input: { tool: 'wait', prompt: 'private prompt' },
-      output: { _visualization: { type: 'markdown', content: '{"status":"completed","secret":"private"}' } },
+      output: { _visualization: { type: 'none', message: 'Subagent wait completed' } },
       startedAt: Date.now(), completedAt: Date.now() },
     presentation: { summary: 'wait', debugAvailable: false } }, 's');
   const projected = await projectMessagesForClient(listMessagesWithParts('s'));
   const part = projected[0]!.parts.find(entry => entry.type === 'tool') as ToolPart;
   expect(part.presentation).toMatchObject({ summary: 'wait',
-    visualization: { type: 'none', message: 'Codex agent task completed' } });
+    visualization: { type: 'none', message: 'Subagent wait completed' } });
   expect(JSON.stringify(projected)).not.toContain('private prompt');
   expect(JSON.stringify(projected)).not.toContain('"secret"');
 });
 
-test('previous Codex agent skill rows do not expose stored JSON on reload', async () => {
+test('agent skill rows with malformed results stay bounded on reload', async () => {
   const assistant = createMessage(createTestAssistantMessage('s'));
   createPart({ id: crypto.randomUUID(), messageId: assistant.id, createdAt: Date.now(), type: 'tool',
-    callId: 'codex-item:turn:old', name: 'Codex tool',
-    state: { status: 'completed', input: { tool: 'agent_skill_manage', arguments: '{"action":"create"}' },
-      output: { _visualization: { type: 'markdown', content: '{"success":true,"title":"Skill created"}' } },
+    callId: 'codex-item:turn:old', name: 'agent_skill_manage',
+    state: { status: 'completed', input: { action: 'create', name: 'review' },
+      output: { _visualization: { type: 'none', message: 'Skill created: review' } },
       startedAt: Date.now(), completedAt: Date.now() },
-    presentation: { summary: 'agent_skill_manage', debugAvailable: false } }, 's');
+    presentation: { summary: 'create review', debugAvailable: false } }, 's');
   const projected = await projectMessagesForClient(listMessagesWithParts('s'));
   const part = projected[0]!.parts.find(part => part.type === 'tool') as ToolPart;
-  expect(part.presentation).toMatchObject({ summary: 'agent_skill_manage',
-    visualization: { type: 'none', message: 'Agent skill operation completed' } });
+  expect(part.presentation).toMatchObject({ summary: 'create review',
+    visualization: { type: 'none', message: 'Skill created: review' } });
   expect(JSON.stringify(projected)).not.toContain('"success":true');
 });

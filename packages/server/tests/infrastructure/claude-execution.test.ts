@@ -241,7 +241,7 @@ test('persists native tool calls, bounded results, and assistant text', async ()
   const assistant = listMessagesWithParts('session')[1];
   expect(assistant?.message).toMatchObject({ status: 'completed' });
   expect(assistant?.parts).toEqual(expect.arrayContaining([
-    expect.objectContaining({ type: 'tool', name: 'Claude Read', state: expect.objectContaining({ status: 'completed' }) }),
+    expect.objectContaining({ type: 'tool', name: 'read-file', state: expect.objectContaining({ status: 'completed' }) }),
     expect.objectContaining({ type: 'text', text: 'Here is the file' }),
   ]));
   expect(events.some(event => (event as { type?: string }).type === 'part.updated')).toBe(true);
@@ -408,13 +408,13 @@ test.each([false, true])('Agent child and nested tool transcripts persist when c
   expect(parent.parts.find(part => part.type === 'text')).toMatchObject({ text: 'parent reply' });
   const agent = parent.parts.find(part => part.type === 'tool')!;
   const status = failed ? 'error' : 'completed';
-  expect(agent).toMatchObject({ name: 'Claude Agent', state: { status } });
+  expect(agent).toMatchObject({ name: 'subagent', state: { status } });
   const childId = (agent.state as { childSessionId: string }).childSessionId;
   expect(childId).toBeTruthy();
   expect(getSession(childId)).toMatchObject({ parentId: 'session', harness: 'claude-cli', subagentStatus: status });
   expect(listMessagesWithParts(childId)[0]).toMatchObject({ message: { status },
     parts: expect.arrayContaining([expect.objectContaining({ type: 'text', text: 'child text' }),
-      expect.objectContaining({ type: 'tool', name: 'Claude Read', state: expect.objectContaining({ status: 'completed' }) })]) });
+      expect.objectContaining({ type: 'tool', name: 'read-file', state: expect.objectContaining({ status: 'completed' }) })]) });
   expect(events.some(event => (event as { type: string }).type === 'session.created')).toBe(true);
 });
 test('child keeps working after parent result and finishes on native task notification', async () => {
