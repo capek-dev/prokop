@@ -36,20 +36,24 @@ export function createScheduledJobRunner(deps: ScheduledJobRunnerDeps): {
 
       const config = deps.modelsConfig.getModelsConfig();
       const workspace = deps.workspaces.getWorkspace(job.workspaceId);
-      const modelId = preconfig.model || config.defaultModel;
+      const jobHarness = job.harness ?? 'prokop';
+      // A preconfig model pin applies only to a matching harness; on any other
+      // harness the pin is ignored and the job follows the configured defaults.
+      const pinApplies = (preconfig.modelHarness ?? 'prokop') === jobHarness;
+      const pinnedModel = pinApplies ? preconfig.model : null;
+      const modelId = pinnedModel || config.defaultModel;
       const providerId =
-        preconfig.provider ||
+        (pinApplies ? preconfig.provider : null) ||
         findProviderFromModel(modelId) ||
         config.defaultProvider;
       const permissionMode =
         job.permissionMode ?? deps.workspaces.permissionMode(job.workspaceId);
-      const jobHarness = job.harness ?? 'prokop';
       const variantKeys = modelVariantKeys(config.providers ?? [], modelId, providerId);
 
       // A preconfig-pinned model resolves its own variant (first key when the
       // preconfig pins none); a model-less preconfig follows the configured
       // default variant of the default model.
-      const storedVariant = preconfig.model
+      const storedVariant = pinnedModel
         ? preconfig.variant ?? null
         : config.defaultVariant ?? null;
 

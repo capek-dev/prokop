@@ -109,9 +109,12 @@ export function useSessionCommands({
     pendingPartAppendsRef.current.clear();
     if (client && client.connected) {
       client.sessions.create({
-        preconfigId: options?.harness === 'codex-cli'
-          ? preconfigId ?? (activeWorkspace ? getWorkspaceDefaultPreconfigId(activeWorkspace, primaryPreconfigs) : undefined)
-          : preconfigId,
+        // New sessions always carry the workspace default agent when none was
+        // picked explicitly, so the agent (and its model pin, including a
+        // pinned harness model) governs the session from the start. The server
+        // lets the pin carry the harness when the caller chose none.
+        preconfigId: preconfigId
+          ?? (activeWorkspace ? getWorkspaceDefaultPreconfigId(activeWorkspace, primaryPreconfigs) : undefined),
         title,
         workspaceId: activeWorkspace?.id,
         workspaceRootId: options?.workspaceRootId,

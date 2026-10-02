@@ -6,7 +6,7 @@ import type {
   UpdatePreconfigResponse,
   DeletePreconfigResponse,
 } from '../types/rest-responses';
-import type { PreconfigCapabilities, PreconfigMode } from '../shared';
+import type { PreconfigCapabilities, PreconfigMode, SessionHarness } from '../shared';
 
 interface ListOptions {
   signal?: AbortSignal;
@@ -21,6 +21,8 @@ interface CreateOptions {
   model?: string | null;
   provider?: string | null;
   variant?: string | null;
+  /** Harness the pinned model belongs to; null means the Prokop catalog. */
+  modelHarness?: SessionHarness | null;
   settings?: Record<string, unknown> | null;
   mode?: PreconfigMode;
   canSpawnSubagents?: boolean | string[] | null;
@@ -41,6 +43,8 @@ interface UpdateOptions {
   model?: string | null;
   provider?: string | null;
   variant?: string | null;
+  /** Harness the pinned model belongs to; null means the Prokop catalog. */
+  modelHarness?: SessionHarness | null;
   settings?: Record<string, unknown> | null;
   isDefault?: boolean;
   mode?: PreconfigMode;

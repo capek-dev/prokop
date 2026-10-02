@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { ProkopaiClient, ModelWithStatus } from '@prokopai/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { parseAgentLearningSettings } from '@prokopai/sdk';
 import { usePreconfigsQuery, useCreatePreconfig, useUpdatePreconfig, useDeletePreconfig, useToolsQuery, useAgentsQuery, useDemoteAgent } from '@/hooks/queries';
-import { Layers, Plus, Pencil, Copy, Trash2, ArrowLeft, Loader2, Star, Check, X, Cpu, ChevronsUpDown, RefreshCw } from 'lucide-react';
+import { Layers, Plus, Pencil, Copy, Trash2, ArrowLeft, Loader2, Star, Check, X, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -11,22 +12,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { LearningSourcePicker } from './LearningSourcePicker';
+import { AgentModelPicker } from './AgentModelPicker';
 
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
@@ -41,6 +30,7 @@ interface Preconfig {
   model: string | null;
   provider: string | null;
   variant?: string | null;
+  modelHarness?: 'prokop' | 'codex-cli' | 'claude-cli' | null;
   settings: Record<string, unknown> | null;
   isDefault: boolean;
   mode?: 'primary' | 'subagent' | 'both';
@@ -76,6 +66,7 @@ interface PreconfigForm {
   model: string;
   provider: string;
   variant: string;
+  modelHarness: '' | 'prokop' | 'codex-cli' | 'claude-cli';
   tools: string[];
   temperature: string;
   canSpawnSubagentsMode: 'all' | 'none' | 'specific';
@@ -102,6 +93,7 @@ const emptyForm: PreconfigForm = {
   model: '',
   provider: '',
   variant: '',
+  modelHarness: '',
   tools: [],
   temperature: '',
   canSpawnSubagentsMode: 'none',
@@ -157,18 +149,26 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
 
   const models = useServerDataStore((s) => s.models);
   const workspaces = useServerDataStore((s) => s.workspaces);
-  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
 
-  const selectedModelObj = form.model ? models.find(m => m.id === form.model) : null;
-  const selectedModelVariants = selectedModelObj?.variants ? Object.keys(selectedModelObj.variants) : [];
+  // Harness catalogs for cross-harness model pins. A missing or unavailable
+  // CLI yields an empty list and simply hides that picker group.
+  const codexCatalog = useQuery({
+    queryKey: ['codex-catalog'],
+    queryFn: () => sdkClient!.http.sessions.codexCatalog(),
+    enabled: !!sdkClient,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const claudeCatalog = useQuery({
+    queryKey: ['claude-catalog'],
+    queryFn: () => sdkClient!.http.sessions.claudeCatalog(),
+    enabled: !!sdkClient,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const codexCatalogModels = codexCatalog.data?.models ?? [];
+  const claudeCatalogModels = claudeCatalog.data?.models ?? [];
 
-
-  const groupedModels = models.reduce((acc, model) => {
-    const key = model.providerName || model.providerId;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(model);
-    return acc;
-  }, {} as Record<string, ModelWithStatus[]>);
 
   const availableSubagents = preconfigs.filter(p => {
     const mode = p.mode ?? 'primary';
@@ -223,7 +223,6 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
     setCustomToolInput('');
     setSubagentInput('');
     setSkillInput('');
-    setModelSelectorOpen(false);
   };
 
   const handleEdit = (preconfig: Preconfig) => {
@@ -238,6 +237,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
       model: preconfig.model || '',
       provider: preconfig.provider || '',
       variant: preconfig.variant || '',
+      modelHarness: preconfig.modelHarness ?? '',
       tools: preconfig.tools ?? [],
       temperature: preconfig.settings?.temperature != null
         ? String(preconfig.settings.temperature)
@@ -332,7 +332,8 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
         mode: form.mode,
         model: form.model.trim() || null,
         provider: form.provider.trim() || null,
-        variant: selectedModelVariants.length > 0 ? (form.variant.trim() || selectedModelVariants[0]) : null,
+        variant: form.variant.trim() || null,
+        modelHarness: form.modelHarness || null,
         tools: form.tools.length > 0 ? form.tools : null,
         settings: Object.keys(settings).length > 0 ? settings : null,
         canSpawnSubagents,
@@ -374,6 +375,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
         model: preconfig.model,
         provider: preconfig.provider,
         variant: preconfig.variant,
+        modelHarness: preconfig.modelHarness ?? null,
         tools: preconfig.tools,
         settings: preconfig.settings,
         canSpawnSubagents: preconfig.canSpawnSubagents ?? false,
@@ -443,7 +445,6 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
     setCustomToolInput('');
     setSubagentInput('');
     setSkillInput('');
-    setModelSelectorOpen(false);
   };
 
   if (isCreating || editingPreconfig) {
@@ -499,95 +500,22 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
           <div className="grid grid-cols-1 gap-3">
             <div className="space-y-1">
               <Label className="text-sm">Model</Label>
-              <Popover open={modelSelectorOpen} onOpenChange={setModelSelectorOpen} modal>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={modelSelectorOpen}
-                    className="w-full justify-between font-mono text-sm h-9"
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Cpu className="size-4 shrink-0 text-muted-foreground" />
-                      {selectedModelObj
-                        ? <span className="truncate">{selectedModelObj.name}</span>
-                        : <span className="text-muted-foreground">Use server default</span>
-                      }
-                    </div>
-                    <ChevronsUpDown className="size-3 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[280px] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search models..." />
-                    <CommandList className="max-h-[300px] overflow-y-auto">
-                      <CommandEmpty>No model found.</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem
-                          onSelect={() => {
-                            setForm(prev => ({ ...prev, model: '', provider: '', variant: '' }));
-                            setModelSelectorOpen(false);
-                          }}
-                          className="justify-between"
-                        >
-                          <span className="text-muted-foreground">Use server default</span>
-                          {!form.model && <Check className="size-4" />}
-                        </CommandItem>
-                      </CommandGroup>
-                      {Object.entries(groupedModels).map(([providerName, providerModels]) => (
-                        <CommandGroup key={providerName} heading={providerName}>
-                          {providerModels.map((model) => (
-                            <CommandItem
-                              key={model.id}
-                              value={`${model.name} ${model.id}`}
-                              onSelect={() => {
-                                setForm(prev => ({
-                                  ...prev,
-                                  model: model.id,
-                                  provider: model.providerId,
-                                  variant: '',
-                                }));
-                                setModelSelectorOpen(false);
-                              }}
-                              className="justify-between"
-                            >
-                              <span className="truncate">{model.name}</span>
-                              <Check
-                                className={cn(
-                                  'size-4 shrink-0',
-                                  form.model === model.id ? 'opacity-100' : 'opacity-0',
-                                )}
-                              />
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      ))}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <AgentModelPicker
+                models={models}
+                codexModels={codexCatalogModels}
+                claudeModels={claudeCatalogModels}
+                value={{
+                  model: form.model,
+                  provider: form.provider,
+                  variant: form.variant,
+                  modelHarness: form.modelHarness,
+                }}
+                onChange={(next) => setForm(prev => ({ ...prev, ...next }))}
+              />
               <p className="text-[10px] text-muted-foreground">
                 Provider is set automatically based on the selected model
               </p>
             </div>
-
-            {selectedModelVariants.length > 0 && (
-              <div>
-                <Label className="text-sm">Variant</Label>
-                <select
-                  value={selectedModelVariants.includes(form.variant) ? form.variant : selectedModelVariants[0] ?? ''}
-                  onChange={(e) => setForm(prev => ({ ...prev, variant: e.target.value }))}
-                  className="w-full h-9 rounded-md border bg-background px-3 text-sm"
-                >
-                  {selectedModelVariants.map(v => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Model variant from models.json (e.g., reasoning effort)
-                </p>
-              </div>
-            )}
           </div>
 
           <Separator className="my-1" />

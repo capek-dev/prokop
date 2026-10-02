@@ -153,9 +153,23 @@ export function validatePreconfigData(data: Record<string, unknown>): string[] {
   }
 
   if (data.model !== undefined && data.model !== null) {
-    const modelError = validateModelReference(data.model as string);
-    if (modelError) {
-      errors.push(modelError);
+    // A harness pin references a CLI catalog model, not the Prokop models.json
+    // catalog; it is validated against the live CLI catalog at session create
+    // (fail-open to the CLI default), so the Prokop reference check applies
+    // only to prokop pins.
+    if (data.modelHarness === undefined || data.modelHarness === null
+      || data.modelHarness === 'prokop') {
+      const modelError = validateModelReference(data.model as string);
+      if (modelError) {
+        errors.push(modelError);
+      }
+    }
+  }
+
+  if (data.modelHarness !== undefined && data.modelHarness !== null) {
+    const validHarnesses = new Set(['prokop', 'codex-cli', 'claude-cli']);
+    if (!validHarnesses.has(data.modelHarness as string)) {
+      errors.push('modelHarness must be one of: prokop, codex-cli, claude-cli');
     }
   }
 

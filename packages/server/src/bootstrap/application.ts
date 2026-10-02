@@ -284,6 +284,10 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     claudeWorkspaceAvailable: codexWorkspaceAvailable,
     claudeModels: listCachedClaudeModels,
     codexModels: listCachedCodexModels,
+    saveHarnessModelSelection: (sessionId, selection) => {
+      if (selection.harness === 'codex-cli') saveCodexModelSelection(sessionId, selection);
+      else saveClaudeModelSelection(sessionId, selection);
+    },
     isHarnessDisabled: harnessSettings.isDisabled,
     prokopModelAvailable: (modelId, providerId) => getModelsConfigWithStatus().providers
       .some(provider => provider.id === providerId && provider.models.some(model => model.id === modelId && model.runtimeStatus.usable)),

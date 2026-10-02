@@ -36,6 +36,13 @@ export interface SessionLifecycleDeps<Origin> {
   claudeAvailable?: () => boolean;
   claudeWorkspaceAvailable?: (workspaceId: string) => boolean;
   claudeModels?: () => Promise<CodexModel[]>;
+  /** Persist the harness selection-table row for a freshly created codex/claude
+   * session seeded from a preconfig pin (mirrors the empty-session switch). */
+  saveHarnessModelSelection?: (sessionId: string, selection: {
+    harness: 'codex-cli' | 'claude-cli';
+    model: string;
+    effort: string;
+  }) => void;
   prokopModelAvailable?: (modelId: string, providerId: string) => boolean;
   /** Ordered variant keys for a model; absent wiring means no variants. */
   modelVariantKeys?: (modelId?: string | null, providerId?: string | null) => string[];
@@ -127,21 +134,37 @@ export function createSessionLifecycleApplication<Origin>(
 
   return {
     async create(wire, origin, input): Promise<void> {
-      const decision = checkHarnessCreate(input, {
+      const policy = {
         codexAvailable: deps.codexAvailable ?? (() => false),
         codexWorkspaceAvailable: deps.codexWorkspaceAvailable ?? (() => false),
         claudeAvailable: deps.claudeAvailable,
         claudeWorkspaceAvailable: deps.claudeWorkspaceAvailable,
         workspaceRoots: deps.workspaceRoots,
         isHarnessDisabled: deps.isHarnessDisabled,
-      });
+      };
+      // An agent pinned to a harness model carries its harness: when the caller
+      // did not choose one, a usable codex/claude pin decides it. An explicit
+      // harness choice always wins, and an unusable pin (CLI missing/disabled,
+      // virtual workspace) falls back to prokop silently.
+      const preconfig = input.preconfigId
+        ? await deps.repository.getPreconfigOrAgent(input.preconfigId)
+        : null;
+      const pinnedHarness = preconfig?.model
+        && (preconfig.modelHarness === 'codex-cli' || preconfig.modelHarness === 'claude-cli')
+        ? preconfig.modelHarness
+        : undefined;
+      let requestedHarness = input.harness;
+      if (requestedHarness === undefined && pinnedHarness) {
+        const probe = checkHarnessCreate({ ...input, harness: pinnedHarness }, policy);
+        if (probe.ok) requestedHarness = pinnedHarness;
+      }
+      const decision = checkHarnessCreate({ ...input, harness: requestedHarness }, policy);
       if (!decision.ok) {
         wire.delivery.send(origin, { type: 'error', code: decision.code, message: decision.message });
         return;
       }
       const workspaceId = input.workspaceId || '';
-      if (decision.harness === 'codex-cli' && input.preconfigId
-        && !await deps.repository.getPreconfigOrAgent(input.preconfigId)) {
+      if (decision.harness === 'codex-cli' && input.preconfigId && !preconfig) {
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Preconfig is unavailable' });
         return;
       }
@@ -161,7 +184,6 @@ export function createSessionLifecycleApplication<Origin>(
       wire.actor.attachOriginToSession(origin, session.id);
 
       if (input.preconfigId) {
-        const preconfig = await deps.repository.getPreconfigOrAgent(input.preconfigId);
         if (preconfig) {
           const updates: {
             selectedModel?: string;
@@ -169,13 +191,42 @@ export function createSessionLifecycleApplication<Origin>(
             selectedVariant?: string | null;
             agentId?: string | null;
           } = {};
+          // A model pin applies only to a matching harness: null means the
+          // Prokop catalog (existing preconfigs), and a codex/claude pin is
+          // ignored everywhere else (duplicate model ids across harnesses
+          // must never leak onto the wrong one).
+          const pinHarness = preconfig.modelHarness ?? 'prokop';
           if (decision.harness === 'prokop') {
-            if (preconfig.model) updates.selectedModel = preconfig.model;
-            if (preconfig.provider) updates.selectedProvider = preconfig.provider;
+            const pinApplies = pinHarness === 'prokop';
+            const pinnedModel = pinApplies ? preconfig.model : null;
+            const pinnedProvider = pinApplies ? preconfig.provider : null;
+            if (pinnedModel) updates.selectedModel = pinnedModel;
+            if (pinnedProvider) updates.selectedProvider = pinnedProvider;
             updates.selectedVariant = resolveSessionVariant(
-              deps.modelVariantKeys?.(preconfig.model ?? null, preconfig.provider ?? null) ?? [],
-              preconfig.variant ?? null,
+              deps.modelVariantKeys?.(pinnedModel, pinnedProvider) ?? [],
+              pinApplies ? preconfig.variant ?? null : null,
             );
+          } else if (preconfig.model && pinHarness === decision.harness) {
+            // Validate the pin against the live CLI catalog; an unavailable
+            // catalog or an unknown model/effort leaves the CLI default.
+            const catalog = decision.harness === 'codex-cli' ? deps.codexModels : deps.claudeModels;
+            try {
+              const models = catalog ? await catalog() : [];
+              const entry = models.find(model => model.model === preconfig.model);
+              if (entry) {
+                const effort = entry.supportedEfforts.includes(preconfig.variant ?? '')
+                  ? preconfig.variant!
+                  : entry.defaultEffort;
+                updates.selectedModel = entry.model;
+                deps.saveHarnessModelSelection?.(sessionId, {
+                  harness: decision.harness as 'codex-cli' | 'claude-cli',
+                  model: entry.model,
+                  effort,
+                });
+              }
+            } catch {
+              // CLI catalog unavailable on this host: keep the CLI default.
+            }
           }
           updates.agentId = deps.repository.isAgentSync(input.preconfigId) ? input.preconfigId : null;
           const updated = deps.repository.updateSession(sessionId, updates);
@@ -313,10 +364,17 @@ export function createSessionLifecycleApplication<Origin>(
           wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Preconfig is unavailable', sessionId });
           return;
         }
-        if (session.harness !== 'codex-cli') updates.selectedVariant = resolveSessionVariant(
-          deps.modelVariantKeys?.(session.selectedModel ?? null, session.selectedProvider ?? null) ?? [],
-          preconfig?.variant ?? null,
-        );
+        // Switching agents never changes the model on any harness (the prompt
+        // and tools change, not the session's model). A pin that does not match
+        // the session's harness must not even reset the variant.
+        const pinMatchesSession = !preconfig
+          || (preconfig.modelHarness ?? 'prokop') === (session.harness ?? 'prokop');
+        if (session.harness !== 'codex-cli' && pinMatchesSession) {
+          updates.selectedVariant = resolveSessionVariant(
+            deps.modelVariantKeys?.(session.selectedModel ?? null, session.selectedProvider ?? null) ?? [],
+            preconfig?.variant ?? null,
+          );
+        }
         updates.agentId = deps.repository.isAgentSync(input.preconfigId) ? input.preconfigId : null;
       }
       const updated = deps.repository.updateSession(sessionId, updates);

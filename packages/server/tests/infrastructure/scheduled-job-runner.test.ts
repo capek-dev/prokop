@@ -165,4 +165,36 @@ describe('scheduled job runner', () => {
     expect(created).toHaveLength(1);
     expect(created[0].selectedVariant).toBe('max');
   });
+
+  test('a harness pin seeds the job model on the matching harness', async () => {
+    const events: string[] = [];
+    const runs: HeadlessSessionRunInput[] = [];
+    const deps = dependencies(events, runs);
+    const pinned = { ...preconfig, model: 'gpt-5.2-codex', modelHarness: 'codex-cli' } as Preconfig;
+    deps.preconfigs = {
+      getPreconfig: async () => pinned,
+      getDefaultPreconfig: async () => pinned,
+    };
+
+    await createScheduledJobRunner(deps).run({ ...job, harness: 'codex-cli' } as ScheduledJob);
+
+    expect(runs[0].modelId).toBe('gpt-5.2-codex');
+    expect(events[0]).toMatch(/^create:codex-cli:gpt-5.2-codex:/);
+  });
+
+  test('a harness pin is ignored on a non-matching harness job', async () => {
+    const events: string[] = [];
+    const runs: HeadlessSessionRunInput[] = [];
+    const deps = dependencies(events, runs);
+    const pinned = { ...preconfig, model: 'gpt-5.2-codex', modelHarness: 'codex-cli' } as Preconfig;
+    deps.preconfigs = {
+      getPreconfig: async () => pinned,
+      getDefaultPreconfig: async () => pinned,
+    };
+
+    await createScheduledJobRunner(deps).run(job);
+
+    expect(runs[0].modelId).toBe('definitely-not-a-registered-model');
+    expect(events[0]).toMatch(/^create:prokop:definitely-not-a-registered-model:/);
+  });
 });

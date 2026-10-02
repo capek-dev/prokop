@@ -41,6 +41,11 @@ export interface SessionApplicationDeps<Origin> {
   claudeAvailable?: () => boolean;
   claudeWorkspaceAvailable?: (workspaceId: string) => boolean;
   claudeModels?: () => Promise<import('@prokopai/sdk').CodexModel[]>;
+  saveHarnessModelSelection?: (sessionId: string, selection: {
+    harness: 'codex-cli' | 'claude-cli';
+    model: string;
+    effort: string;
+  }) => void;
   prokopModelAvailable?: (modelId: string, providerId: string) => boolean;
   modelVariantKeys?: (modelId?: string | null, providerId?: string | null) => string[];
   isHarnessDisabled?: (harness: import('@prokopai/sdk').SessionHarness) => boolean;

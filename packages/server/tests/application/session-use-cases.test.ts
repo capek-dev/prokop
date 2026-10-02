@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { ServerMessage, Session } from '@prokopai/sdk';
+import type { CodexModel, Preconfig, ServerMessage, Session } from '@prokopai/sdk';
 import {
   createSessionApplication,
   type SessionApplicationDeps,
@@ -999,6 +999,48 @@ describe('application session use cases', () => {
       expect(updateInputs).toEqual([{ preconfigId: 'pre-1', selectedVariant: null, agentId: null }]);
     });
 
+    test('update ignores a pin whose harness does not match the session', async () => {
+      const updateInputs: unknown[] = [];
+      const repository = makeRepository({
+        getSession: () => makeSession({ selectedModel: 'glm-5.3', selectedProvider: 'zhipu-coding' }),
+        getPreconfigOrAgent: async () => ({ id: 'pc-1', name: 'P', model: 'claude-opus-4-6', modelHarness: 'claude-cli', variant: 'high' }) as never,
+        isAgentSync: () => false,
+        updateSession: (_id, updates) => {
+          updateInputs.push(updates);
+          return makeSession();
+        },
+      });
+      const app = createSessionLifecycleApplication({ ...makeDeps({
+        repository,
+        modelVariantKeys: () => ['high', 'max'],
+      }) });
+      const wire = makeWire(makeSpy());
+
+      await app.update(wire, origin, { sessionId: 'sess-1', preconfigId: 'pc-1' });
+
+      // Agent switch applies; a claude pin on a prokop session touches nothing else.
+      expect(updateInputs).toEqual([{ preconfigId: 'pc-1', agentId: null }]);
+    });
+
+    test('update still resolves the variant for a matching prokop pin', async () => {
+      const updateInputs: unknown[] = [];
+      const repository = makeRepository({
+        getSession: () => makeSession({ selectedModel: 'glm-5.3', selectedProvider: 'zhipu-coding' }),
+        getPreconfigOrAgent: async () => ({ id: 'pre-1', name: 'P', model: null, provider: null, modelHarness: null, variant: 'max' }) as never,
+        isAgentSync: () => false,
+        updateSession: (_id, updates) => {
+          updateInputs.push(updates);
+          return makeSession();
+        },
+      });
+      const app = createSessionLifecycleApplication({ ...makeDeps({ repository, modelVariantKeys: () => ['high', 'max'] }) });
+      const wire = makeWire(makeSpy());
+
+      await app.update(wire, origin, { sessionId: 'sess-1', preconfigId: 'pre-1' });
+
+      expect(updateInputs).toEqual([{ preconfigId: 'pre-1', selectedVariant: 'max', agentId: null }]);
+    });
+
     test('updateModel sends session.updated with the exact selection', () => {
       const updateInputs: unknown[] = [];
       const repository = makeRepository({
@@ -1129,6 +1171,215 @@ describe('application session use cases', () => {
 
       expect(gateCalls).toEqual(['session.update', 'session.update_model']);
       expect(spy.sent.map((m) => m.type)).toEqual(['session.action_rejected', 'session.action_rejected']);
+    });
+  });
+
+  describe('lifecycle create', () => {
+    interface CreateCapture {
+      harness: string;
+      updates: Array<Record<string, unknown>>;
+      selections: Array<{ harness: string; model: string; effort: string }>;
+    }
+
+    function makeCreateDeps(
+      preconfig: Partial<Preconfig> | null,
+      capture: CreateCapture,
+      overrides: Partial<SessionApplicationDeps<Origin>> = {},
+    ): SessionApplicationDeps<Origin> {
+      return makeDeps({
+        codexAvailable: () => true,
+        codexWorkspaceAvailable: () => true,
+        claudeAvailable: () => true,
+        claudeWorkspaceAvailable: () => true,
+        ...overrides,
+        repository: makeRepository({
+          createSession: (input) => {
+            capture.harness = input.harness ?? 'prokop';
+            return makeSession({ id: 'sess-new', harness: input.harness ?? 'prokop', workspaceId: input.workspaceId ?? '' });
+          },
+          getPreconfigOrAgent: async () => preconfig as Preconfig | null,
+          updateSession: (_id, updates) => {
+            capture.updates.push(updates as Record<string, unknown>);
+            return makeSession({ id: 'sess-new', ...(updates as object) });
+          },
+        }),
+      });
+    }
+
+    function catalog(model: string, efforts: string[], defaultEffort: string): CodexModel[] {
+      return [{ model, name: model, supportedEfforts: efforts, defaultEffort, isDefault: false }];
+    }
+
+    test('applies a codex pin to a codex session with its pinned effort', async () => {
+      const capture: CreateCapture = { harness: '', updates: [], selections: [] };
+      const saveHarnessModelSelection = (_sessionId: string, selection: { harness: string; model: string; effort: string }) => {
+        capture.selections.push(selection);
+      };
+      const preconfig: Partial<Preconfig> = {
+        id: 'pc-1', model: 'gpt-5.2-codex', provider: null, variant: 'low', modelHarness: 'codex-cli',
+      };
+      const deps = makeCreateDeps(preconfig, capture, {
+        codexModels: async () => catalog('gpt-5.2-codex', ['low', 'medium'], 'medium'),
+        saveHarnessModelSelection,
+      });
+      const spy = makeSpy();
+
+      await createSessionLifecycleApplication(deps).create(makeWire(spy), origin, {
+        preconfigId: 'pc-1', harness: 'codex-cli',
+      });
+
+      expect(capture.harness).toBe('codex-cli');
+      expect(capture.updates[0].selectedModel).toBe('gpt-5.2-codex');
+      expect(capture.selections).toEqual([
+        { harness: 'codex-cli', model: 'gpt-5.2-codex', effort: 'low' },
+      ]);
+      expect(spy.sent[0].type).toBe('session.created');
+    });
+
+    test('ignores a codex pin when prokop is chosen explicitly', async () => {
+      const capture: CreateCapture = { harness: '', updates: [], selections: [] };
+      const preconfig: Partial<Preconfig> = {
+        id: 'pc-1', model: 'gpt-5.2-codex', provider: null, variant: 'low', modelHarness: 'codex-cli',
+      };
+      const deps = makeCreateDeps(preconfig, capture, {
+        codexModels: async () => catalog('gpt-5.2-codex', ['low', 'medium'], 'medium'),
+      });
+
+      await createSessionLifecycleApplication(deps).create(makeWire(makeSpy()), origin, { preconfigId: 'pc-1', harness: 'prokop' });
+
+      expect(capture.harness).toBe('prokop');
+      expect('selectedModel' in capture.updates[0]).toBe(false);
+      expect('selectedProvider' in capture.updates[0]).toBe(false);
+      expect(capture.selections).toEqual([]);
+    });
+
+    test('keeps the CLI default when the pinned model is not in the catalog', async () => {
+      const capture: CreateCapture = { harness: '', updates: [], selections: [] };
+      const preconfig: Partial<Preconfig> = {
+        id: 'pc-1', model: 'retired-model', provider: null, variant: 'low', modelHarness: 'codex-cli',
+      };
+      const deps = makeCreateDeps(preconfig, capture, {
+        codexModels: async () => catalog('gpt-5.2-codex', ['low', 'medium'], 'medium'),
+        saveHarnessModelSelection: (_id, selection) => capture.selections.push(selection),
+      });
+
+      await createSessionLifecycleApplication(deps).create(makeWire(makeSpy()), origin, {
+        preconfigId: 'pc-1', harness: 'codex-cli',
+      });
+
+      expect('selectedModel' in capture.updates[0]).toBe(false);
+      expect(capture.selections).toEqual([]);
+    });
+
+    test('keeps the CLI default when the catalog is unavailable', async () => {
+      const capture: CreateCapture = { harness: '', updates: [], selections: [] };
+      const preconfig: Partial<Preconfig> = {
+        id: 'pc-1', model: 'gpt-5.2-codex', provider: null, variant: null, modelHarness: 'codex-cli',
+      };
+      const deps = makeCreateDeps(preconfig, capture, {
+        codexModels: async () => {
+          throw new Error('CLI not installed');
+        },
+        saveHarnessModelSelection: (_id, selection) => capture.selections.push(selection),
+      });
+
+      await createSessionLifecycleApplication(deps).create(makeWire(makeSpy()), origin, {
+        preconfigId: 'pc-1', harness: 'codex-cli',
+      });
+
+      expect('selectedModel' in capture.updates[0]).toBe(false);
+      expect(capture.selections).toEqual([]);
+    });
+
+    test('falls back to the model default effort when the pinned variant is unsupported', async () => {
+      const capture: CreateCapture = { harness: '', updates: [], selections: [] };
+      const preconfig: Partial<Preconfig> = {
+        id: 'pc-1', model: 'gpt-5.2-codex', provider: null, variant: 'xhigh', modelHarness: 'codex-cli',
+      };
+      const deps = makeCreateDeps(preconfig, capture, {
+        codexModels: async () => catalog('gpt-5.2-codex', ['low', 'medium'], 'medium'),
+        saveHarnessModelSelection: (_id, selection) => capture.selections.push(selection),
+      });
+
+      await createSessionLifecycleApplication(deps).create(makeWire(makeSpy()), origin, {
+        preconfigId: 'pc-1', harness: 'codex-cli',
+      });
+
+      expect(capture.selections).toEqual([
+        { harness: 'codex-cli', model: 'gpt-5.2-codex', effort: 'medium' },
+      ]);
+    });
+
+    test('applies a claude pin to a claude session', async () => {
+      const capture: CreateCapture = { harness: '', updates: [], selections: [] };
+      const preconfig: Partial<Preconfig> = {
+        id: 'pc-1', model: 'claude-opus-4-6', provider: null, variant: 'high', modelHarness: 'claude-cli',
+      };
+      const deps = makeCreateDeps(preconfig, capture, {
+        claudeModels: async () => catalog('claude-opus-4-6', ['low', 'high'], 'low'),
+        saveHarnessModelSelection: (_id, selection) => capture.selections.push(selection),
+      });
+
+      await createSessionLifecycleApplication(deps).create(makeWire(makeSpy()), origin, {
+        preconfigId: 'pc-1', harness: 'claude-cli',
+      });
+
+      expect(capture.updates[0].selectedModel).toBe('claude-opus-4-6');
+      expect(capture.selections).toEqual([
+        { harness: 'claude-cli', model: 'claude-opus-4-6', effort: 'high' },
+      ]);
+    });
+
+    test('a pinned harness model carries the session onto its harness when none was chosen', async () => {
+      const capture: CreateCapture = { harness: '', updates: [], selections: [] };
+      const preconfig: Partial<Preconfig> = {
+        id: 'pc-1', model: 'claude-opus-4-6', provider: null, variant: 'high', modelHarness: 'claude-cli',
+      };
+      const deps = makeCreateDeps(preconfig, capture, {
+        claudeModels: async () => catalog('claude-opus-4-6', ['low', 'high'], 'low'),
+        saveHarnessModelSelection: (_id, selection) => capture.selections.push(selection),
+      });
+
+      await createSessionLifecycleApplication(deps).create(makeWire(makeSpy()), origin, { preconfigId: 'pc-1' });
+
+      expect(capture.harness).toBe('claude-cli');
+      expect(capture.updates[0].selectedModel).toBe('claude-opus-4-6');
+      expect(capture.selections).toEqual([
+        { harness: 'claude-cli', model: 'claude-opus-4-6', effort: 'high' },
+      ]);
+    });
+
+    test('an unusable pinned harness falls back to prokop silently', async () => {
+      const capture: CreateCapture = { harness: '', updates: [], selections: [] };
+      const preconfig: Partial<Preconfig> = {
+        id: 'pc-1', model: 'claude-opus-4-6', provider: null, variant: 'high', modelHarness: 'claude-cli',
+      };
+      const deps = makeCreateDeps(preconfig, capture, {
+        claudeAvailable: () => false,
+        saveHarnessModelSelection: (_id, selection) => capture.selections.push(selection),
+      });
+
+      await createSessionLifecycleApplication(deps).create(makeWire(makeSpy()), origin, { preconfigId: 'pc-1' });
+
+      expect(capture.harness).toBe('prokop');
+      expect('selectedModel' in capture.updates[0]).toBe(false);
+      expect(capture.selections).toEqual([]);
+    });
+
+    test('a null harness pin keeps applying the model on prokop sessions', async () => {
+      const capture: CreateCapture = { harness: '', updates: [], selections: [] };
+      const preconfig: Partial<Preconfig> = {
+        id: 'pc-1', model: 'glm-5.3', provider: 'zhipu-coding', variant: 'high', modelHarness: null,
+      };
+      const deps = makeCreateDeps(preconfig, capture, {
+        saveHarnessModelSelection: (_id, selection) => capture.selections.push(selection),
+      });
+
+      await createSessionLifecycleApplication(deps).create(makeWire(makeSpy()), origin, { preconfigId: 'pc-1' });
+
+      expect(capture.updates[0].selectedModel).toBe('glm-5.3');
+      expect(capture.updates[0].selectedProvider).toBe('zhipu-coding');
+      expect(capture.selections).toEqual([]);
     });
   });
 

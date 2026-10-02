@@ -11,6 +11,17 @@ import { DEFAULT_PREAMBLES } from '@/infrastructure/config/defaults/index';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const MODEL_HARNESSES = new Set(['prokop', 'codex-cli', 'claude-cli']);
+
+/** Stored modelHarness is coerced at every read exit: an unknown or
+ * malformed value falls back to null (Prokop semantics), so a hand-edited
+ * file can never pin a session onto a nonexistent harness. */
+function parseModelHarness(raw: unknown): NonNullable<Preconfig['modelHarness']> | null {
+  return typeof raw === 'string' && MODEL_HARNESSES.has(raw)
+    ? (raw as NonNullable<Preconfig['modelHarness']>)
+    : null;
+}
+
 /** Check if a string looks like a UUID. */
 function isUuid(str: string): boolean {
   return UUID_REGEX.test(str);
@@ -187,6 +198,7 @@ function parsePreconfigMd(content: string): Preconfig {
     model: data.model ?? null,
     provider: data.provider ?? null,
     variant: data.variant ?? null,
+    modelHarness: parseModelHarness(data.modelHarness),
     settings: data.settings ?? null,
     isDefault: data.isDefault ?? false,
     mode: data.mode,
@@ -303,7 +315,11 @@ export async function listPreconfigs(): Promise<Preconfig[]> {
     try {
       const content = await readFile(join(getPreconfigsDir(), file), 'utf-8');
       const parsed = JSON.parse(content) as Preconfig;
-      preconfigs.push({ ...parsed, allowSelfAsSubagent: parsed.allowSelfAsSubagent ?? false });
+      preconfigs.push({
+        ...parsed,
+        allowSelfAsSubagent: parsed.allowSelfAsSubagent ?? false,
+        modelHarness: parseModelHarness(parsed.modelHarness),
+      });
     } catch (e) {
       console.error(`Failed to read preconfig ${file}:`, e);
     }
@@ -331,7 +347,8 @@ export function getPreconfigSync(id: string): Preconfig | null {
     }
     const jsonPath = getPreconfigJsonPath(id);
     if (existsSync(jsonPath)) {
-      return JSON.parse(readFileSync(jsonPath, 'utf-8')) as Preconfig;
+      const parsed = JSON.parse(readFileSync(jsonPath, 'utf-8')) as Preconfig;
+      return { ...parsed, modelHarness: parseModelHarness(parsed.modelHarness) };
     }
   } catch {
     return null;
@@ -376,7 +393,11 @@ export async function getPreconfig(id: string): Promise<Preconfig | null> {
   try {
     const content = await readFile(jsonPath, 'utf-8');
     const parsed = JSON.parse(content) as Preconfig;
-    return { ...parsed, allowSelfAsSubagent: parsed.allowSelfAsSubagent ?? false };
+    return {
+      ...parsed,
+      allowSelfAsSubagent: parsed.allowSelfAsSubagent ?? false,
+      modelHarness: parseModelHarness(parsed.modelHarness),
+    };
   } catch (_e) {
     return null;
   }
