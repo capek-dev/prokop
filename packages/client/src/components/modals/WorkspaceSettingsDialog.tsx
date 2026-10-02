@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, Suspense, lazy } from 'react';
-import { GraduationCap, Wrench, Server, Shield, FolderSymlink, ShieldCheck, Cog, Loader2 } from 'lucide-react';
-import type { Workspace, WorkspaceSettings, PermissionGrant, ProkopaiClient, PermissionMode } from '@prokopai/sdk';
+import { GraduationCap, Wrench, Server, Shield, FolderSymlink, Cog, Loader2 } from 'lucide-react';
+import type { Workspace, WorkspaceSettings, PermissionGrant, ProkopaiClient } from '@prokopai/sdk';
 import { getSessionTagOrder } from '@/lib/sessionTagOrder';
 import { WorkspaceSessionsPanel } from './configuration/WorkspaceSessionsPanel';
 import { learningValidationError } from '@/lib/learningValidation';
@@ -13,17 +13,15 @@ const AgentToolsPanel = lazy(() => import('./configuration/AgentToolsPanel').the
 const MCPServersPanel = lazy(() => import('./configuration/MCPServersPanel').then((m) => ({ default: m.MCPServersPanel })));
 const PermissionsPanel = lazy(() => import('./configuration/PermissionsPanel').then((m) => ({ default: m.PermissionsPanel })));
 const AdditionalPathsPanel = lazy(() => import('./configuration/AdditionalPathsPanel').then((m) => ({ default: m.AdditionalPathsPanel })));
-const AutoApprovePanel = lazy(() => import('./configuration/AutoApprovePanel').then((m) => ({ default: m.AutoApprovePanel })));
 
 const LearningPanel = lazy(() => import('./configuration/LearningPanel').then(m => ({ default: m.LearningPanel })));
 
-type Section = 'sessions' | 'learning' | 'mcp' | 'permissions' | 'paths' | 'autoApprove' | 'agentTools';
+type Section = 'sessions' | 'learning' | 'mcp' | 'permissions' | 'paths' | 'agentTools';
 
 const SECTIONS: Omit<SettingsSection, 'icon'>[] = [
   { value: 'sessions', label: 'Sessions', group: 'general' },
   { value: 'mcp', label: 'MCP Servers · Prokop', group: 'general' },
   { value: 'permissions', label: 'Permissions', group: 'general' },
-  { value: 'autoApprove', label: 'Auto-Approve', group: 'general' },
   { value: 'paths', label: 'Additional Paths', group: 'general' },
   { value: 'learning', label: 'Learning', group: 'capabilities' },
   { value: 'agentTools', label: 'Agent Tools', group: 'capabilities' },
@@ -36,14 +34,13 @@ const GROUPS = [
 
 /** Sections whose edits are held locally until Save is pressed. */
 const DEFERRED_SAVE_SECTIONS = new Set<Section>([
-  'sessions', 'learning', 'agentTools', 'autoApprove',
+  'sessions', 'learning', 'agentTools',
 ]);
 
 const ICONS: Record<Section, SettingsSection['icon']> = {
   sessions: Cog,
   mcp: Server,
   permissions: Shield,
-  autoApprove: ShieldCheck,
   paths: FolderSymlink,
   learning: GraduationCap,
   agentTools: Wrench,
@@ -70,7 +67,6 @@ function snapshot(workspace: Workspace) {
     skills: { enabled: s?.skills?.managementEnabled ?? false },
     learning: s?.learning,
     allowPersonalLearning: s?.allowPersonalLearning !== false,
-    autoApprove: s?.permissionMode ?? 'standard' as PermissionMode,
     sessionTagOrder: getSessionTagOrder(s?.sessionTagOrder),
     defaultAgentId: s?.preconfigs?.defaultId ?? null,
   };
@@ -131,7 +127,6 @@ export function WorkspaceSettingsDialog({
       skills: { managementEnabled: draft.skills.enabled, permissionRisk: 'none' },
       learning: draft.learning ? { ...draft.learning, enabled: draft.learning.enabled && draft.memory.enabled } : undefined,
       allowPersonalLearning: draft.allowPersonalLearning,
-      permissionMode: draft.autoApprove,
       preconfigs: { selectedIds: null, defaultId: draft.defaultAgentId },
       sessionTagOrder: draft.sessionTagOrder,
     });
@@ -152,6 +147,8 @@ export function WorkspaceSettingsDialog({
             return <MCPServersPanel workspaceId={workspace.id} sdkClient={sdkClient} />;
           case 'permissions':
             return <PermissionsPanel
+              mode={workspace.settings?.permissionMode ?? 'standard'}
+              onModeChange={(v) => onSave(workspace.id, { ...workspace.settings, permissionMode: v })}
               permissions={permissions}
               onRefreshPermissions={onRefreshPermissions}
               onRevokePermission={onRevokePermission}
@@ -162,11 +159,6 @@ export function WorkspaceSettingsDialog({
               workspace={workspace}
               onSave={onUpdateWorkspacePaths}
               sdkClient={sdkClient}
-            />;
-          case 'autoApprove':
-            return <AutoApprovePanel
-              mode={draft.autoApprove}
-              onChange={(v) => setDraft((d) => ({ ...d, autoApprove: v }))}
             />;
           case 'learning':
             return <LearningPanel workspace={workspace} preconfigs={allPreconfigs} value={draft.learning} allowPersonalLearning={draft.allowPersonalLearning}

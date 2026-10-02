@@ -1,13 +1,22 @@
 import { useState } from 'react';
-import { RefreshCw, Trash2 } from 'lucide-react';
-import type { PermissionGrant } from '@prokopai/sdk';
+import { RefreshCw, Trash2, ShieldCheck, ShieldHalf, ShieldAlert } from 'lucide-react';
+import type { PermissionGrant, PermissionMode } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PermissionListItem } from '../PermissionListItem';
 import { ConfirmDialog } from '../ConfirmDialog';
 
+const MODE_OPTIONS: { value: PermissionMode; label: string; icon: typeof ShieldCheck }[] = [
+  { value: 'standard', label: 'Standard', icon: ShieldCheck },
+  { value: 'extended', label: 'Extended', icon: ShieldHalf },
+  { value: 'full', label: 'Full access', icon: ShieldAlert },
+];
+
 interface PermissionsPanelProps {
+  mode: PermissionMode;
+  onModeChange: (mode: PermissionMode) => void;
   permissions: PermissionGrant[];
   onRefreshPermissions: () => void;
   onRevokePermission: (permissionId: string) => void;
@@ -15,6 +24,8 @@ interface PermissionsPanelProps {
 }
 
 export function PermissionsPanel({
+  mode,
+  onModeChange,
   permissions,
   onRefreshPermissions,
   onRevokePermission,
@@ -27,6 +38,31 @@ export function PermissionsPanel({
 
   return (
     <div className="p-3 sm:p-4 space-y-4">
+      {/* Default mode: applies immediately, like the default-model select */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <Label className="text-sm font-medium">Default mode for new sessions</Label>
+          <p className="text-sm text-muted-foreground">
+            Override per session via the shield icon in the chat header
+          </p>
+        </div>
+        <Select value={mode} onValueChange={(v) => onModeChange(v as PermissionMode)}>
+          <SelectTrigger size="sm" className="w-36 shrink-0" aria-label="Default permission mode">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MODE_OPTIONS.map(({ value, label, icon: Icon }) => (
+              <SelectItem key={value} value={value}>
+                <Icon className="size-4" />
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Separator />
+
       <div className="flex items-center justify-between">
         <div>
           <Label className="text-sm font-medium">Saved Permissions</Label>
