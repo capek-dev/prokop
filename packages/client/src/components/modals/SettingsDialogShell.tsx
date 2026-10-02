@@ -12,6 +12,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -25,7 +26,8 @@ export interface SettingsSection {
 
 export interface SettingsGroup {
   key: string;
-  label: string;
+  /** Omit for an unlabeled group (e.g. a trailing section pinned to the bottom). */
+  label?: string;
 }
 
 interface SettingsDialogShellProps {
@@ -82,8 +84,8 @@ export function SettingsDialogShell({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {groups.map((group) => (
-              <SectionSelectItems key={group.key} group={group} sections={sectionsFor(group.key)} />
+            {groups.map((group, groupIndex) => (
+              <SectionSelectItems key={group.key} group={group} groupIndex={groupIndex} sections={sectionsFor(group.key)} />
             ))}
           </SelectContent>
         </Select>
@@ -98,9 +100,13 @@ export function SettingsDialogShell({
           <TabsList className="hidden sm:flex flex-col h-fit w-44 lg:w-48 shrink-0 items-stretch gap-0.5 bg-transparent p-1 rounded-lg">
             {groups.map((group, groupIndex) => (
               <div key={group.key} className="contents">
-                <span className={groupIndex === 0 ? 'px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground' : 'px-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'}>
-                  {group.label}
-                </span>
+                {group.label ? (
+                  <span className={groupIndex === 0 ? 'px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground' : 'px-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'}>
+                    {group.label}
+                  </span>
+                ) : (
+                  groupIndex > 0 && <div className="mx-2 my-1 border-t" aria-hidden="true" />
+                )}
                 {sectionsFor(group.key).map((s) => (
                   <TabsTrigger
                     key={s.value}
@@ -129,12 +135,16 @@ export function SettingsDialogShell({
   );
 }
 
-function SectionSelectItems({ group, sections }: { group: SettingsGroup; sections: SettingsSection[] }) {
+function SectionSelectItems({ group, groupIndex, sections }: { group: SettingsGroup; groupIndex: number; sections: SettingsSection[] }) {
   return (
     <>
-      <SelectItem value={`_${group.key}_group`} disabled className="text-xs font-semibold text-muted-foreground">
-        {group.label}
-      </SelectItem>
+      {group.label ? (
+        <SelectItem value={`_${group.key}_group`} disabled className="text-xs font-semibold text-muted-foreground">
+          {group.label}
+        </SelectItem>
+      ) : (
+        groupIndex > 0 && <SelectSeparator className="my-1" />
+      )}
       {sections.map((s) => (
         <SelectItem key={s.value} value={s.value}>
           <s.icon className="size-4" />

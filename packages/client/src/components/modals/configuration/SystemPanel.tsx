@@ -4,7 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import LogoutButton from '@/components/LogoutButton';
 import { VersionInfo } from '@/components/VersionInfo';
 
-interface AccountPanelProps {
+interface SystemPanelProps {
   apiToken: string | null;
   isConnected: boolean;
   onLogout: () => void;
@@ -12,13 +12,13 @@ interface AccountPanelProps {
   open: boolean;
 }
 
-export function AccountPanel({ apiToken, isConnected, onLogout, sdkClient, open }: AccountPanelProps) {
+export function SystemPanel({ apiToken, isConnected, onLogout, sdkClient, open }: SystemPanelProps) {
   return (
     <div className="p-3 sm:p-4 flex flex-col gap-4">
       <div>
-        <Label className="text-sm font-medium">Session</Label>
+        <Label className="text-sm font-medium">Connection</Label>
         <p className="text-sm text-muted-foreground mb-3">
-          Manage your current session
+          Manage your connection to this server
         </p>
         {isConnected ? (
           <LogoutButton token={apiToken} onLogout={onLogout} />

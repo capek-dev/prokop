@@ -1,4 +1,5 @@
-import { Sun, Moon, Monitor, Volume2, VolumeX } from 'lucide-react';
+import { Sun, Moon, Monitor, Volume2, VolumeX, Eye, Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -6,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import type { ThemeMode, ThemeScheme } from '@/components/providers/ThemeProvider';
 import { useUIStore } from '@/stores/uiStore';
+import type { DefaultFileOpenMode } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
 import { NotificationSettings } from './NotificationSettings';
 import { WorkspaceOrderControl } from '@/components/layout/WorkspaceOrderControl';
@@ -71,25 +73,33 @@ const MODES: { value: ThemeMode; icon: typeof Sun; label: string }[] = [
   { value: 'system', icon: Monitor, label: 'System' },
 ];
 
+const OPEN_MODES: { value: DefaultFileOpenMode; icon: typeof Eye; label: string }[] = [
+  { value: 'preview', icon: Eye, label: 'Preview files' },
+  { value: 'edit', icon: Pencil, label: 'Edit files' },
+];
+
 export function AppearancePanel() {
   const { mode, scheme, setMode, setScheme } = useTheme();
-  const { chatFinishSoundEnabled, setChatFinishSoundEnabled, permissionSoundEnabled, setPermissionSoundEnabled } = useUIStore(
+  const {
+    chatFinishSoundEnabled,
+    setChatFinishSoundEnabled,
+    permissionSoundEnabled,
+    setPermissionSoundEnabled,
+    defaultFileOpenMode,
+    setDefaultFileOpenMode,
+  } = useUIStore(
     useShallow((s) => ({
       chatFinishSoundEnabled: s.chatFinishSoundEnabled,
       setChatFinishSoundEnabled: s.setChatFinishSoundEnabled,
       permissionSoundEnabled: s.permissionSoundEnabled,
       setPermissionSoundEnabled: s.setPermissionSoundEnabled,
+      defaultFileOpenMode: s.defaultFileOpenMode,
+      setDefaultFileOpenMode: s.setDefaultFileOpenMode,
     })),
   );
 
   return (
     <div className="p-3 sm:p-4 flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="workspace-order">Workspace order</Label>
-        <WorkspaceOrderControl />
-        <p className="text-sm text-muted-foreground">Applies to the workspace selector on this device, across servers. Recently active uses the latest conversation message, not opening a session.</p>
-      </div>
-      <Separator />
       <div>
         <Label className="text-sm font-medium">Mode</Label>
         <p className="text-sm text-muted-foreground mb-3">
@@ -113,6 +123,25 @@ export function AppearancePanel() {
               <Icon className="size-3.5" />
               {label}
             </button>
+          ))}
+        </div>
+      </div>
+
+      <Separator />
+
+      <div>
+        <Label className="text-sm font-medium">Color Scheme</Label>
+        <p className="text-sm text-muted-foreground mb-3">
+          Previews render the live tokens for both modes
+        </p>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          {SCHEMES.map((s) => (
+            <SchemeButton
+              key={s}
+              scheme={s}
+              currentScheme={scheme}
+              onClick={setScheme}
+            />
           ))}
         </div>
       </div>
@@ -153,19 +182,30 @@ export function AppearancePanel() {
 
       <Separator />
 
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="workspace-order">Workspace order</Label>
+        <WorkspaceOrderControl />
+        <p className="text-sm text-muted-foreground">Applies to the workspace selector on this device, across servers. Recently active uses the latest conversation message, not opening a session.</p>
+      </div>
+
+      <Separator />
+
       <div>
-        <Label className="text-sm font-medium">Color Scheme</Label>
+        <Label className="text-sm font-medium">File Open Mode</Label>
         <p className="text-sm text-muted-foreground mb-3">
-          Previews render the live tokens for both modes
+          Choose what happens when you click a file. Right-click always offers both actions.
         </p>
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-          {SCHEMES.map((s) => (
-            <SchemeButton
-              key={s}
-              scheme={s}
-              currentScheme={scheme}
-              onClick={setScheme}
-            />
+        <div className="grid grid-cols-2 gap-2">
+          {OPEN_MODES.map(({ value, icon: Icon, label }) => (
+            <Button
+              key={value}
+              variant={defaultFileOpenMode === value ? 'default' : 'outline'}
+              className="justify-start"
+              onClick={() => setDefaultFileOpenMode(value)}
+            >
+              <Icon className="size-4" data-icon="inline-start" />
+              {label}
+            </Button>
           ))}
         </div>
       </div>

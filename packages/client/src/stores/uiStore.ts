@@ -6,10 +6,9 @@ import type { UseBoundStore, StoreApi } from 'zustand';
 // --- Configuration Section (deep-linking) ---
 export type ConfigurationSection =
   // Preferences
-  | 'account'
+  | 'system'
   | 'appearance'
   | 'keybinds'
-  | 'files'
   // Server (shared across harnesses; prompts are client-level shortcuts)
   | 'harnesses'
   | 'preconfigs'
@@ -144,7 +143,7 @@ export const useUIStore: UseBoundStore<StoreApi<UIStore>> = create<UIStore>((set
   setShowWorkspaceSettings: (show) => set({ showWorkspaceSettings: show }),
 
   // --- Configuration Section ---
-  configurationSection: 'account',
+  configurationSection: 'appearance',
   setConfigurationSection: (section) => set({ configurationSection: section }),
 
   // --- Settings ---
