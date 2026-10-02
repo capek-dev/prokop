@@ -165,6 +165,8 @@ export interface MessageStorePort {
 
   createPart(part: Part, sessionId: string, options?: { syncFts?: boolean }): Part;
   getPart(id: string): Part | null;
+  /** Session ownership of a part; parts rows carry session_id directly. */
+  getSessionIdByPartId(partId: string): string | null;
   updatePart(
     id: string,
     updates: Record<string, unknown>,

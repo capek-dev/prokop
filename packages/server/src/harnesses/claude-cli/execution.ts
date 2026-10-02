@@ -22,8 +22,9 @@ import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistory, type ClaudeR
 import { forkClaudeSession } from './fork';
 import { claudeDeveloperInstructions, defaultClaudePreconfigId, type ClaudeInstructionSources } from './instructions';
 import { createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools } from './dynamic-tools';
-import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
 import { cliWorkspaceAvailable } from '@/harnesses/shared/cli-workspace';
+import { notifySessionFilesChanged } from '@/harnesses/shared/files-changed';
+import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
 import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
 
 interface Binding {
@@ -499,7 +500,9 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
     },
     async revert(input) {
       try {
-        return await rollback(input.sessionId, 'revert', input.targetMessageId, null);
+        const result = await rollback(input.sessionId, 'revert', input.targetMessageId, null);
+        notifySessionFilesChanged(input.sessionId);
+        return result;
       } catch (error) {
         if (intent(input.sessionId)) throw new Error('Claude Undo outcome requires recovery; do not retry or send in this session', { cause: error });
         const safe = new Set(['Claude session is unavailable or busy', 'Claude Goal or Compact history cannot be edited',

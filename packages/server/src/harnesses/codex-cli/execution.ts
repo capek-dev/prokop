@@ -6,6 +6,7 @@ import type { SessionExecutionPort, InterruptExecutionResult } from '@/applicati
 import { getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { createMessage, createPart, deleteMessage, getMessageWithParts, listMessagesWithParts, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
 import { cliWorkspaceAvailable } from '@/harnesses/shared/cli-workspace';
+import { notifySessionFilesChanged } from '@/harnesses/shared/files-changed';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { getDatabase } from '@/infrastructure/sqlite/database';
@@ -1213,6 +1214,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
     async revert(input) {
       const result = await rollback(input.sessionId, 'revert', input.targetMessageId, null);
       if (!result) throw new Error('Codex revert result is unavailable');
+      notifySessionFilesChanged(input.sessionId);
       return result;
     },
     async editMessage(wire, origin, input) {

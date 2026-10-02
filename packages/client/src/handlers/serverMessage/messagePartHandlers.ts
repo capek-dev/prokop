@@ -1,9 +1,9 @@
-import { getTerminalNotificationEventId } from '@prokopai/sdk';
+import { getTerminalNotificationEventId, isFileMutatingToolName } from '@prokopai/sdk';
 import type { CompactionCompleteMessage, Message, Part, ToolPart } from '@prokopai/sdk';
 import type { SessionHandlersContext, SessionUsage } from './types';
+import { handleFilesChanged } from './fileHandlers';
 import { useSessionStore } from '@/stores/sessionStore';
 import { queryClient } from '@/components/providers/QueryProvider';
-import { queryKeys } from '@/lib/queryKeys';
 import { toast } from 'sonner';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
@@ -11,18 +11,7 @@ import { useChatRetryStore } from '@/stores/chatRetryStore';
 
 export const STREAM_FLUSH_INTERVAL_MS = 75;
 
-const FILE_MUTATING_TOOLS = new Set([
-  'edit', 'write-file', 'shell',
-]);
-
 const SCHEDULER_TOOLS = new Set(['scheduler']);
-
-function invalidateFileQueries(): void {
-  queryClient.invalidateQueries({ queryKey: queryKeys.files.browsePrefix });
-  queryClient.invalidateQueries({ queryKey: queryKeys.files.treePrefix });
-  queryClient.invalidateQueries({ queryKey: queryKeys.files.searchPrefix });
-  queryClient.invalidateQueries({ queryKey: queryKeys.files.gitStatusPrefix });
-}
 
 function invalidateSchedulerQueries(): void {
   queryClient.invalidateQueries({ queryKey: ['scheduledJobs'] });
@@ -235,12 +224,15 @@ export function handlePartUpdated(
   if (part.type === 'tool') {
     const toolPart = part as ToolPart;
     if (
-      FILE_MUTATING_TOOLS.has(toolPart.name) &&
+      isFileMutatingToolName(toolPart.name) &&
       (toolPart.state.status === 'completed' ||
         toolPart.state.status === 'error' ||
         toolPart.state.status === 'interrupted')
     ) {
-      invalidateFileQueries();
+      // Fallback fast path for sessions this client participates in; the
+      // server files.changed broadcast covers every other writer.
+      const workspaceId = ctx.sessionsRef.current.find(s => s.id === sessionId)?.workspaceId;
+      if (workspaceId) handleFilesChanged(workspaceId);
     }
     if (
       SCHEDULER_TOOLS.has(toolPart.name) &&

@@ -395,7 +395,8 @@ test('Claude tool names map to the canonical hybrid scheme', () => {
   expect(claudeToolName('mcp__prokop__agent_skill_manage')).toBe('agent_skill_manage');
   // Foreign MCP reads server: tool; unknown tools stay native and unprefixed.
   expect(claudeToolName('mcp__filesystem__read_file')).toBe('filesystem: read_file');
-  expect(claudeToolName('NotebookEdit')).toBe('NotebookEdit');
+  expect(claudeToolName('NotebookEdit')).toBe('edit');
+  expect(claudeToolName('Unknown')).toBe('Unknown');
 });
 
 test('Claude completions synthesize real visualizations per canonical name', () => {

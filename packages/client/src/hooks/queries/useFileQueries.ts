@@ -81,10 +81,10 @@ export function useFilePreviewQuery(
     queryKey: queryKeys.files.preview(workspaceId ?? '', path ?? '', root),
     queryFn: () => sdkClient!.http.files.preview(workspaceId!, path!, { root }),
     enabled: !!sdkClient && !!workspaceId && !!path && enabled,
+    // staleTime Infinity keeps first-open instant; without refetchOnMount:
+    // false a query invalidated by files.changed refetches when reopened.
     staleTime: Infinity,
     gcTime: Infinity,
-    refetchOnReconnect: false,
-    refetchOnMount: false,
   });
 }
 
@@ -99,10 +99,11 @@ export function useFileGitDiffQuery(
     queryKey: queryKeys.files.gitDiff(workspaceId ?? '', path ?? '', root),
     queryFn: () => sdkClient!.http.files.gitDiff(workspaceId!, path!, { root }),
     enabled: !!sdkClient && !!workspaceId && !!path && enabled,
+    // Same policy as the preview query: instant open, but a files.changed
+    // invalidation makes the next mount refetch instead of showing a stale
+    // cached diff.
     staleTime: Infinity,
     gcTime: Infinity,
-    refetchOnReconnect: false,
-    refetchOnMount: false,
   });
 }
 

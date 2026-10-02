@@ -45,6 +45,7 @@ import type {
   ContextOverflowErrorMessage,
   WorktreeUpdatedMessage,
   WorktreeDeletedMessage,
+  FilesChangedMessage,
 } from '../shared';
 import type { TypedEventEmitter } from '../emitter';
 import type { SdkEvent } from './sdk-types';
@@ -94,6 +95,7 @@ export interface SdkEventMap {
   'workspace.conversation_activity': [workspaceId: string, lastConversationAt: number | null];
   'learning.changed': [workspaceId: string];
   'git.changed': [workspaceId: string, root: string];
+  'files.changed': [workspaceId: FilesChangedMessage['workspaceId']];
   'worktree.updated': [worktree: WorktreeUpdatedMessage['worktree']];
   'worktree.deleted': [worktree: WorktreeDeletedMessage['worktree']];
   'session.interrupted': [
@@ -271,6 +273,9 @@ export function routeServerMessage(
       break;
     case 'git.changed':
       emitter.emit('git.changed', msg.workspaceId, msg.root);
+      break;
+    case 'files.changed':
+      emitter.emit('files.changed', msg.workspaceId);
       break;
     case 'worktree.updated':
       emitter.emit('worktree.updated', msg.worktree);

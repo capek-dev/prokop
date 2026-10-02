@@ -21,7 +21,6 @@ vi.mock('@/stores/pendingOperationsStore', () => ({
 }));
 
 import { handleMessageUpdated, handlePartUpdated } from '@/handlers/serverMessage/messagePartHandlers';
-import { queryKeys } from '@/lib/queryKeys';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 
@@ -158,71 +157,78 @@ test('authoritative text snapshot discards buffered deltas before the trailing f
 
 describe('messagePartHandlers - file query invalidation', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     mockInvalidate.mockClear();
   });
 
-  test('completed file-mutating tool invalidates browse, search, and git-status', () => {
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    mockInvalidate.mockClear();
+  });
+
+  function ctxWithWorkspaceSession(): SessionHandlersContext {
+    const ctx = makeCtx();
+    ctx.sessionsRef.current = [{
+      id: 'sess-1',
+      parentId: null,
+      workspaceId: 'ws-1',
+    }] as unknown as typeof ctx.sessionsRef.current;
+    return ctx;
+  }
+
+  test('completed file-mutating tool debounces a workspace-scoped invalidation', () => {
     const part = makeToolPart('edit', 'completed');
-    handlePartUpdated({ type: 'part.updated', sessionId: 'sess-1', part }, makeCtx());
+    handlePartUpdated({ type: 'part.updated', sessionId: 'sess-1', part }, ctxWithWorkspaceSession());
+
+    expect(mockInvalidate).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(300);
 
     const invalidatedKeys = getInvalidatedKeys();
-
-    expect(invalidatedKeys).toContainEqual(queryKeys.files.browsePrefix);
-    expect(invalidatedKeys).toContainEqual(queryKeys.files.searchPrefix);
-    expect(invalidatedKeys).toContainEqual(queryKeys.files.gitStatusPrefix);
+    expect(invalidatedKeys).toContainEqual(['files', 'browse', 'ws-1']);
+    expect(invalidatedKeys).toContainEqual(['files', 'tree', 'ws-1']);
+    expect(invalidatedKeys).toContainEqual(['files', 'search', 'ws-1']);
+    expect(invalidatedKeys).toContainEqual(['files', 'git-status', 'ws-1']);
+    expect(invalidatedKeys).toContainEqual(['files', 'git-diff', 'ws-1']);
+    expect(invalidatedKeys).toContainEqual(['files', 'preview', 'ws-1']);
   });
 
-  test('does not invalidate file preview or git-diff queries', () => {
-    const part = makeToolPart('edit', 'completed');
-    handlePartUpdated({ type: 'part.updated', sessionId: 'sess-1', part }, makeCtx());
+  test('a burst of completions coalesces into a single invalidation batch', () => {
+    for (const name of ['shell', 'write-file', 'edit']) {
+      handlePartUpdated(
+        { type: 'part.updated', sessionId: 'sess-1', part: makeToolPart(name, 'completed') },
+        ctxWithWorkspaceSession(),
+      );
+    }
+    vi.advanceTimersByTime(300);
 
-    const invalidatedKeys = getInvalidatedKeys();
+    // One batched set: git.changed set plus search and preview.
+    expect(mockInvalidate).toHaveBeenCalledTimes(11);
+  });
 
-    const hasPreview = invalidatedKeys.some(
-      (k) => k[0] === 'files' && k[1] === 'preview',
+  test('error and interrupted terminal states invalidate the workspace', () => {
+    handlePartUpdated(
+      { type: 'part.updated', sessionId: 'sess-1', part: makeToolPart('write-file', 'error') },
+      ctxWithWorkspaceSession(),
     );
-    const hasGitDiff = invalidatedKeys.some(
-      (k) => k[0] === 'files' && k[1] === 'git-diff',
+    vi.advanceTimersByTime(300);
+    expect(mockInvalidate).toHaveBeenCalled();
+
+    mockInvalidate.mockClear();
+    handlePartUpdated(
+      { type: 'part.updated', sessionId: 'sess-1', part: makeToolPart('terminal', 'interrupted') },
+      ctxWithWorkspaceSession(),
     );
-    expect(hasPreview).toBe(false);
-    expect(hasGitDiff).toBe(false);
-  });
-
-  test('error terminal state triggers same invalidation', () => {
-    const part = makeToolPart('write-file', 'error');
-    handlePartUpdated({ type: 'part.updated', sessionId: 'sess-1', part }, makeCtx());
-
-    const invalidatedKeys = getInvalidatedKeys();
-
-    expect(invalidatedKeys).toContainEqual(queryKeys.files.browsePrefix);
-    expect(invalidatedKeys).toContainEqual(queryKeys.files.gitStatusPrefix);
-  });
-
-  test('interrupted terminal state triggers same invalidation', () => {
-    const part = makeToolPart('apply-patch', 'interrupted');
-    handlePartUpdated({ type: 'part.updated', sessionId: 'sess-1', part }, makeCtx());
-
-    const invalidatedKeys = getInvalidatedKeys();
-
-    expect(invalidatedKeys).toContainEqual(queryKeys.files.browsePrefix);
-  });
-
-  test('shell is classified as file-mutating and invalidates file queries', () => {
-    const part = makeToolPart('shell', 'completed');
-    handlePartUpdated({ type: 'part.updated', sessionId: 'sess-1', part }, makeCtx());
-
-    const invalidatedKeys = getInvalidatedKeys();
-
-    expect(invalidatedKeys).toContainEqual(queryKeys.files.browsePrefix);
-    expect(invalidatedKeys).toContainEqual(queryKeys.files.gitStatusPrefix);
+    vi.advanceTimersByTime(300);
+    expect(mockInvalidate).toHaveBeenCalled();
   });
 
   test('non-file tool does not invalidate file queries', () => {
     const part = makeToolPart('read-file', 'completed');
-    handlePartUpdated({ type: 'part.updated', sessionId: 'sess-1', part }, makeCtx());
+    handlePartUpdated({ type: 'part.updated', sessionId: 'sess-1', part }, ctxWithWorkspaceSession());
+    vi.advanceTimersByTime(300);
 
     const invalidatedKeys = getInvalidatedKeys();
-
     const hasAnyFileKey = invalidatedKeys.some(
       (k) => k[0] === 'files',
     );
@@ -231,7 +237,16 @@ describe('messagePartHandlers - file query invalidation', () => {
 
   test('file-mutating tool in non-terminal state does not invalidate', () => {
     const part = makeToolPart('edit', 'running' as 'completed');
+    handlePartUpdated({ type: 'part.updated', sessionId: 'sess-1', part }, ctxWithWorkspaceSession());
+    vi.advanceTimersByTime(300);
+
+    expect(mockInvalidate).not.toHaveBeenCalled();
+  });
+
+  test('session absent from the loaded list does not invalidate', () => {
+    const part = makeToolPart('edit', 'completed');
     handlePartUpdated({ type: 'part.updated', sessionId: 'sess-1', part }, makeCtx());
+    vi.advanceTimersByTime(300);
 
     expect(mockInvalidate).not.toHaveBeenCalled();
   });

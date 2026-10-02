@@ -11,6 +11,7 @@ import { controlHandlers } from '@/handlers/serverMessage';
 import { worktreeHandlers } from '@/handlers/serverMessage';
 import { queryClient } from '@/components/providers/QueryProvider';
 import { handleGitChanged } from '@/handlers/serverMessage/gitHandlers';
+import { handleFilesChanged } from '@/handlers/serverMessage/fileHandlers';
 import { useChatRetryStore } from '@/stores/chatRetryStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { handleWorkspaceActivity } from '@/handlers/serverMessage/workspaceActivity';
@@ -89,6 +90,9 @@ export function subscribeToServerEvents(
   });
   add('git.changed', (workspaceId: unknown) => {
     if (typeof workspaceId === 'string') handleGitChanged(workspaceId);
+  });
+  add('files.changed', (workspaceId: unknown) => {
+    if (typeof workspaceId === 'string') handleFilesChanged(workspaceId);
   });
   add('worktree.updated', (worktree: unknown) => {
     worktreeHandlers['worktree.updated'](worktree as ManagedWorktree);

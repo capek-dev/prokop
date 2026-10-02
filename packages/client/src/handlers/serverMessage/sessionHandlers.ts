@@ -1,5 +1,6 @@
 import type { Session, MessageWithParts, SessionControlState } from '@prokopai/sdk';
 import type { SessionHandlersContext, SessionUsage } from './types';
+import { handleFilesChanged } from './fileHandlers';
 import { useSessionControlStore } from '@/stores/sessionControlStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
@@ -387,7 +388,7 @@ export function handleSessionInterrupted(
 
 export function handleSessionReverted(
   msg: { type: 'session.reverted'; sessionId: string; revertedTo: { messageId: string | null; messageCount: number }; removed: { messageIds: string[]; partCount: number } },
-  _ctx: SessionHandlersContext,
+  ctx: SessionHandlersContext,
 ): void {
   const { sessionId, revertedTo, removed } = msg;
   if (revertedTo.messageId === null) {
@@ -395,6 +396,9 @@ export function handleSessionReverted(
   } else {
     console.log(`Session ${sessionId} reverted to message ${revertedTo.messageId}, removed ${removed.messageIds.length} messages`);
   }
+  // A revert restores files on disk; refresh every file view of the workspace.
+  const workspaceId = ctx.sessionsRef.current.find(s => s.id === sessionId)?.workspaceId;
+  if (workspaceId) handleFilesChanged(workspaceId);
 }
 
 export function handleSessionForked(

@@ -381,6 +381,12 @@ export function createMessageRepository(
     return row ? rowToPart(row) : null;
   }
 
+  function getSessionIdByPartId(partId: string): string | null {
+    const row = getDb().query('SELECT session_id FROM parts WHERE id = ?').get(partId) as
+      { session_id: string } | undefined;
+    return row?.session_id ?? null;
+  }
+
   function updatePart(
     id: string,
     updates: Record<string, unknown>,
@@ -1083,6 +1089,7 @@ export function createMessageRepository(
     deleteMessage,
     createPart,
     getPart,
+    getSessionIdByPartId,
     updatePart,
     getPartsByMessage,
     getPartsBySession,

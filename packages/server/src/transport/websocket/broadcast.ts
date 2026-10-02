@@ -1,6 +1,7 @@
 import type { ServerMessage, Session, AskAuthority } from '@prokopai/sdk';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { installWorkspaceActivityListener } from '@/application/workspaces/activity';
+import { installWorkspaceFilesChangedListener } from '@/application/workspaces/files-changed';
 
 export type BroadcastFn = (message: ServerMessage) => void;
 
@@ -33,6 +34,9 @@ export function installDeliveryPort(port: DeliveryPort): void {
   installedPort = port;
   installWorkspaceActivityListener((workspaceId, lastConversationAt) => {
     port.broadcast({ type: 'workspace.conversation_activity', workspaceId, lastConversationAt });
+  });
+  installWorkspaceFilesChangedListener((workspaceId) => {
+    port.broadcast({ type: 'files.changed', workspaceId });
   });
 }
 

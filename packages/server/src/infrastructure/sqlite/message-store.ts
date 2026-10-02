@@ -6,10 +6,12 @@
 
 import { getDatabase } from './database';
 import { notifyWorkspaceActivity } from '@/application/workspaces/activity';
+import { notifyWorkspaceFilesChanged } from '@/application/workspaces/files-changed';
 import { getWorkspaceLastConversationAt } from './workspaces';
 import { notifyLearningActivity } from '@/application/learning/activity';
 import { getSession } from './session-store';
 import { createFtsProjector } from '@/infrastructure/session-search/fts-projector';
+import { isFileMutatingToolName } from '@prokopai/sdk';
 import type { Message, MessageWithParts, Part, ToolPart } from '@prokopai/sdk';
 import {
   createMessageRepository,
@@ -55,6 +57,27 @@ function repo(): MessageStorePort {
 function publishConversationActivity(sessionId: string): void {
   const workspaceId = getSession(sessionId)?.workspaceId;
   if (workspaceId) notifyWorkspaceActivity(workspaceId, getWorkspaceLastConversationAt(workspaceId));
+}
+
+const TERMINAL_TOOL_STATUSES = new Set(['completed', 'error', 'interrupted']);
+
+/**
+ * Emits the workspace files-changed notification when a tool part whose
+ * completion may write files reaches a terminal status. `previous` guards
+ * against re-firing when a terminal state is re-persisted; the transition
+ * wrappers pass null because the repository already gates them on a running
+ * part.
+ */
+function notifyFilesChangedFromToolPart(previous: Part | null, updated: Part | null): void {
+  if (!updated || updated.type !== 'tool') return;
+  const toolPart = updated as ToolPart;
+  if (!isFileMutatingToolName(toolPart.name)) return;
+  if (previous?.type === 'tool'
+    && TERMINAL_TOOL_STATUSES.has((previous as ToolPart).state.status)) return;
+  const sessionId = repo().getSessionIdByPartId(toolPart.id);
+  if (!sessionId) return;
+  const workspaceId = getSession(sessionId)?.workspaceId;
+  if (workspaceId) notifyWorkspaceFilesChanged(workspaceId);
 }
 
 export function createMessage(message: Message): Message {
@@ -118,7 +141,19 @@ export function updatePart(
   updates: Record<string, unknown>,
   options?: { syncFts?: boolean },
 ): Part | null {
-  return repo().updatePart(id, updates, options);
+  // The capek runtime persists tool transitions as updatePart(id, { state }).
+  // Streaming text updates never carry state, so the pre-read below costs
+  // nothing on the hot path.
+  const state = updates.state;
+  const status = state !== null && typeof state === 'object'
+    && typeof (state as { status?: unknown }).status === 'string'
+      ? (state as { status: string }).status
+      : null;
+  const isTerminalTransition = status !== null && TERMINAL_TOOL_STATUSES.has(status);
+  const previous = isTerminalTransition ? repo().getPart(id) : null;
+  const result = repo().updatePart(id, updates, options);
+  if (isTerminalTransition) notifyFilesChangedFromToolPart(previous, result);
+  return result;
 }
 
 export function getPartsByMessage(messageId: string): Part[] {
@@ -158,11 +193,15 @@ export function transitionToolToCompleted(
   partId: string,
   output: unknown,
 ): ToolPart | null {
-  return repo().transitionToolToCompleted(partId, output);
+  const result = repo().transitionToolToCompleted(partId, output);
+  notifyFilesChangedFromToolPart(null, result);
+  return result;
 }
 
 export function transitionToolToError(partId: string, error: string): ToolPart | null {
-  return repo().transitionToolToError(partId, error);
+  const result = repo().transitionToolToError(partId, error);
+  notifyFilesChangedFromToolPart(null, result);
+  return result;
 }
 
 export function getToolPartByCallId(
@@ -184,7 +223,9 @@ export function transitionToolToInterrupted(
   partId: string,
   reason: ToolInterruptReason,
 ): ToolPart | null {
-  return repo().transitionToolToInterrupted(partId, reason);
+  const result = repo().transitionToolToInterrupted(partId, reason);
+  notifyFilesChangedFromToolPart(null, result);
+  return result;
 }
 
 export function findOrphanedToolCalls(sessionId: string): ToolPart[] {

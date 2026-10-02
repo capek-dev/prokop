@@ -20,6 +20,7 @@ const CLAUDE_CANONICAL_NAMES: Record<string, string> = {
   Bash: 'shell',
   Edit: 'edit',
   MultiEdit: 'edit',
+  NotebookEdit: 'edit',
   Write: 'write-file',
   Read: 'read-file',
   Glob: 'glob',
