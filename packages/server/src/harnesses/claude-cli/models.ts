@@ -41,7 +41,7 @@ export async function listClaudeModels(discover: () => Promise<unknown> = probeC
     throw new Error('Invalid Claude CLI model catalog');
   }
   const models: CodexModel[] = [];
-  const seen = new Set<string>();
+  const seen = new Map<string, { entry: CodexModel; defaultAlias: boolean }>();
   for (const raw of catalog as ModelInfo[]) {
     if (!raw || typeof raw !== 'object' || typeof raw.value !== 'string'
       || typeof raw.displayName !== 'string' || (raw.supportedEffortLevels !== undefined
@@ -49,7 +49,17 @@ export async function listClaudeModels(discover: () => Promise<unknown> = probeC
       throw new Error('Invalid Claude CLI model catalog');
     }
     const model = raw.resolvedModel ?? raw.value;
-    const name = raw.description?.split(' · ')[0]?.trim() || raw.displayName.trim();
+    const displayName = raw.displayName.trim();
+    const described = raw.description?.split(' · ')[0]?.trim();
+    // Older catalogs ship bare display names ('Opus') with the versioned name
+    // leading the description ('Opus 4.6 · ...'); newer ones ship full display
+    // names with capability blurbs. The 'default' alias row instead carries a
+    // recommendation label as its display name, so its real name comes from the
+    // description segment (guarded by the separator, so a blurb never leaks in).
+    const isDefaultAlias = raw.value === 'default';
+    const name = (isDefaultAlias && described && described !== raw.description
+      ? described
+      : (described && (!displayName || described.startsWith(displayName)) ? described : displayName)) || described;
     if (!/^claude-[a-z0-9-]{1,180}$/.test(model) || !name || name.length > 200) {
       throw new Error('Invalid Claude CLI model catalog');
     }
@@ -59,10 +69,25 @@ export async function listClaudeModels(discover: () => Promise<unknown> = probeC
       || new Set(efforts).size !== efforts.length) {
       throw new Error('Invalid Claude CLI model effort');
     }
-    if (seen.has(model)) continue;
-    seen.add(model);
-    models.push({ model, name, supportedEfforts: efforts.length ? efforts : ['default'],
-      defaultEffort: efforts.includes('high') ? 'high' : efforts[0] ?? 'default', isDefault: models.length === 0 });
+    const existing = seen.get(model);
+    if (existing) {
+      // The same model can appear twice: the 'default' alias row plus a
+      // concrete row. The concrete row carries the real name and efforts, so
+      // it upgrades an entry first added from the alias row.
+      if (existing.defaultAlias && !isDefaultAlias) {
+        existing.entry.name = name;
+        existing.entry.supportedEfforts = efforts.length ? [...efforts] : ['default'];
+        existing.entry.defaultEffort = efforts.includes('high') ? 'high' : efforts[0] ?? 'default';
+        existing.defaultAlias = false;
+      }
+      continue;
+    }
+    const entry: CodexModel = { model, name,
+      supportedEfforts: efforts.length ? [...efforts] : ['default'],
+      defaultEffort: efforts.includes('high') ? 'high' : efforts[0] ?? 'default',
+      isDefault: models.length === 0 };
+    seen.set(model, { entry, defaultAlias: isDefaultAlias });
+    models.push(entry);
   }
   if (!models.length) throw new Error('Invalid Claude CLI model catalog');
   return models;
