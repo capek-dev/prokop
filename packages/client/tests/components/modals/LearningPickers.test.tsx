@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
-import type { LearningReviewer, ModelWithStatus, Preconfig, Workspace } from '@prokopai/sdk';
+import type { Workspace } from '@prokopai/sdk';
 import { LearningSourcePicker } from '@/components/modals/configuration/LearningSourcePicker';
-import { LearningModelPicker } from '@/components/modals/configuration/LearningModelPicker';
 
 const workspace = (id: string, settings = {}): Workspace => ({ id, name: id, path: `/projects/${id}`, settings } as Workspace);
 
@@ -35,22 +34,4 @@ test('a selected workspace that revoked access can still be removed', async () =
   render(<LearningSourcePicker workspaces={[workspace('private', { allowPersonalLearning: false })]} selectedIds={['private']} onChange={change} />);
   await userEvent.click(screen.getByRole('button', { name: /private/ }));
   expect(change).toHaveBeenCalledWith([]);
-});
-
-test('existing model picker selects provider identity, resets to the model default variant and restores inheritance', async () => {
-  const user = userEvent.setup();
-  const change = vi.fn();
-  const models = ['first', 'second'].map(providerId => ({ id: 'shared', name: `${providerId} model`, providerId, providerName: providerId, contextWindow: 1000, runtimeStatus: { providerSupported: true, providerConfigured: true, usable: true }, variants: { high: { providerOptions: {} } } })) as ModelWithStatus[];
-  function Harness() {
-    const [value, setValue] = useState<LearningReviewer['modelOverride']>({ providerId: 'first', modelId: 'shared', variant: 'high' });
-    return <LearningModelPicker models={models} preconfig={{ model: 'shared', provider: 'first' } as Preconfig} value={value}
-      onChange={next => { change(next); setValue(next); }} />;
-  }
-  render(<Harness />);
-  await user.click(screen.getByRole('combobox', { name: 'Select model' }));
-  await user.click(screen.getByRole('option', { name: /second model/ }));
-  expect(change).toHaveBeenLastCalledWith({ modelId: 'shared', providerId: 'second', variant: 'high' });
-  await user.click(screen.getByRole('button', { name: 'Use agent model' }));
-  expect(change).toHaveBeenLastCalledWith(null);
-  expect(screen.getByText('Using the agent model and variant.')).toBeInTheDocument();
 });

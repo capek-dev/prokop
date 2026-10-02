@@ -20,10 +20,16 @@ export const learningSettingsSchema = z.object({
     preconfigId: identifier,
     instructions: instructions.default(''),
     modelOverride: z.object({
-      providerId: identifier,
+      providerId: z.string().trim().max(200),
       modelId: identifier,
       variant: identifier.nullable().optional(),
-    }).strict().nullable().default(null),
+      harness: z.enum(['codex-cli', 'claude-cli']).optional(),
+    }).strict().superRefine((value, context) => {
+      // Harness overrides have no provider; Prokop overrides need one.
+      if (!value.harness && !value.providerId) {
+        context.addIssue({ code: 'custom', path: ['providerId'], message: 'Prokop model overrides need a provider' });
+      }
+    }).nullable().default(null),
     cadence: learningCadenceSchema.nullable().default(null),
   }).strict()).max(20),
   improveSkills: z.boolean().default(false),

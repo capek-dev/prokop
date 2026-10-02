@@ -34,6 +34,9 @@ export interface LearningModelOverride {
   providerId: string;
   modelId: string;
   variant?: string | null;
+  /** Present when the override targets a harness model instead of the Prokop
+   * catalog: providerId is then empty and variant carries the CLI effort. */
+  harness?: 'codex-cli' | 'claude-cli';
 }
 
 export interface LearningCadence {

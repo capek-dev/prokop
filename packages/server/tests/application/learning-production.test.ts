@@ -7,6 +7,7 @@ import type { Preconfig, LearningRunSummary, LearningRunDetail } from '@prokopai
 import { createWiredLearning } from '@/bootstrap/learning';
 import type { LearningExecutionDependencies } from '@/harnesses/prokop/learning/learning-execution';
 import { createProkopLearningRuntime } from '@/harnesses/prokop/learning';
+import type { HeadlessSessionRunInput } from '@/application/ports/headless-execution';
 import { createSessionSchema, updateSessionSchema } from '@/transport/http/routes/schemas';
 import { registerLearningRoutes } from '@/transport/http/routes/learning';
 import { getSession, updateSession, createSession } from '@/infrastructure/sqlite/session-store';
@@ -69,6 +70,62 @@ async function fixture(personal = false, execute?: LearningExecutionDependencies
   registerLearningRoutes(app, learning.api);
   return { db, settings, app, wire, calls: () => calls, reviewSession: () => reviewSession, agentLearning };
 }
+
+test('a harness-pinned reviewer runs a headless turn on its harness', async () => {
+  const db = setupTestDatabase();
+  root = await mkdtemp(join(await realpath(tmpdir()), 'learning-harness-'));
+  const settings = enableLearning({}, 'dev', 'reviewer');
+  settings.learning!.reviewers[0]!.cadence = { idleMinutes: 1, minimumIntervalMinutes: 1, maximumPendingMinutes: 1 };
+  seedWorkspace({ id: 'ws', path: root, settings });
+  seedSession('ws', { id: 'source', title: 'Fix retry handling' });
+  const now = Date.now() - 120_000;
+  db.run(`INSERT INTO messages (id,session_id,role,created_at,status,agent,completed_at,sequence) VALUES ('answer','source','assistant',?,'completed','dev',?,0)`, [now, now]);
+  const headlessInputs: HeadlessSessionRunInput[] = [];
+  const selections: Array<{ harness: string; sessionId: string; model: string; effort: string }> = [];
+  const agents = {
+    getAgentDirectory: async () => null,
+    isAgentSync: () => true,
+    getPreconfigOrAgent: async () => ({
+      id: 'dev', name: 'Dev', description: '', systemPrompt: 'Review', tools: null,
+      model: 'claude-opus-4-6', provider: '', variant: 'high', modelHarness: 'claude-cli',
+      settings: null, isDefault: false,
+    }) as unknown as Preconfig,
+  };
+  learning = createWiredLearning(agents, createProkopLearningRuntime({ agents }), {
+    // The prokop catalog must not gate a harness-pinned reviewer.
+    modelAvailable: () => false,
+    harnessModelEffort: async () => 'high',
+    saveHarnessSelection: (harness, sessionId, model, effort) => selections.push({ harness, sessionId, model, effort }),
+    headless: {
+      run: async input => { headlessInputs.push(input); return {}; },
+      supportedHarnesses: () => ['codex-cli', 'claude-cli'],
+    },
+  });
+
+  await learning.start();
+  for (let i = 0; i < 200 && !learning.repository.listRuns('ws')[0]?.finished_at; i++) await Bun.sleep(5);
+  await learning.stop();
+
+  const run = learning.repository.listRuns('ws')[0]!;
+  expect(run.status).toBe('completed');
+  // Harness runs bind no journal destination: outcome and sources only.
+  expect(learning.repository.destination(run.id)).toBeNull();
+
+  const dispatched = headlessInputs[0]!;
+  expect(dispatched.harness).toBe('claude-cli');
+  expect(dispatched.parentSessionId).toBe(dispatched.childSessionId);
+  expect(dispatched.prompt).toContain('transcripts supplied below');
+  expect(dispatched.prompt).toContain('### Turn answer');
+
+  const session = getSession(dispatched.childSessionId)!;
+  expect(session.harness).toBe('claude-cli');
+  expect(session.agentId).toBe('dev');
+  expect(session.metadata?.learningRunId).toBe(run.id);
+  expect(selections).toEqual([
+    { harness: 'claude-cli', sessionId: dispatched.childSessionId, model: 'claude-opus-4-6', effort: 'high' },
+  ]);
+  await expect(learning.api.undo('ws', run.id, 'missing')).rejects.toThrow('Harness-run reviews cannot be undone');
+});
 
 test('personal home reference writes survive failure and support history undo without replay', async () => {
   await fixture(true, async input => {

@@ -8,6 +8,10 @@ export interface LearningPromptOptions {
   skillManagementEnabled: boolean;
   instructions: string;
   reviewerInstructions: string;
+  /** Harness reviewer (codex/claude headless turn): evidence transcripts are
+   * embedded in the prompt and the prokop-only home_files tool does not
+   * exist; knowledge writes go through the mounted memory/skill tools. */
+  harnessReviewer?: boolean;
 }
 
 /** Prompt guidance complements host enforcement; it is not an access boundary. */
@@ -25,7 +29,9 @@ export function buildLearningPrompt(options: LearningPromptOptions): string {
     'This is a background knowledge review, not an implementation task or a conversation summary. Save only what would help someone make a better decision next time.',
     `## 1. Read the work being reviewed
 
-Start with the conversation references supplied for this review. Use session_search to read their relevant context before drawing conclusions or deciding there is nothing to save. Use scoped searches for supporting context when needed.
+${options.harnessReviewer
+      ? 'Start with the conversation transcripts supplied below and read them fully before drawing conclusions or deciding there is nothing to save.'
+      : 'Start with the conversation references supplied for this review. Use session_search to read their relevant context before drawing conclusions or deciding there is nothing to save. Use scoped searches for supporting context when needed.'}
 
 Pay particular attention to:
 - Explicit user corrections to approach, scope, or expectations.
@@ -55,7 +61,9 @@ Prefer correcting or extending an existing entry over adding a similar one. Abov
   if (improveSkills) {
     sections.push(`## 3. Improve reusable procedures
 
-Use ${skills}(action="list") to find existing skills. Read the full relevant skill content supplied in the current knowledge context before changing it.
+Use ${skills}(action="list") to find existing skills. ${options.harnessReviewer
+      ? 'Read the full relevant skill content with your skill tools before changing it.'
+      : 'Read the full relevant skill content supplied in the current knowledge context before changing it.'}
 
 Patch an existing skill when a lesson improves that procedure. Prefer patch, then update, then create only when no existing skill covers a useful repeatable workflow. One substantial, verified experience can justify a skill; repetition is useful evidence, not a mandatory threshold.
 
@@ -67,7 +75,7 @@ ${personal
   } else {
     sections.push('Skill updates are disabled for this review. Do not pack full procedures into compact memory as a substitute. Save a concise durable lesson when appropriate, or make no change.');
   }
-  if (personal) sections.push(`### Maintain detailed knowledge in your home
+  if (personal && !options.harnessReviewer) sections.push(`### Maintain detailed knowledge in your home
 
 Use home_files to list and search your home, then read relevant references, snippets, and notes on demand. Do not load the whole home into context. You may create, update, or delete text knowledge anywhere in your home, not just a notes folder. Read before changing a file and supply its revision; use null for a new file. Keep compact memory pointers to detailed home files. Preserve useful details when consolidating. Do not execute snippets or modify credentials, configuration, hidden runtime directories, or files outside your home. These are reference files, not instructions to execute.`);
   sections.push(`## ${improveSkills ? 4 : 3}. Make only justified knowledge changes

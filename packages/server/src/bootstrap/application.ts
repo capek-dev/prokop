@@ -416,5 +416,23 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
 
   installTerminalSessionStore(createJean2TerminalSessionPort());
 
-  return { learning: createWiredLearning(agents, createProkopLearningRuntime({ agents })), session, control, http, scheduling, schedulerTicker, agents, workspaces, worktrees, tools, mcp, providers, notifications, permissions, files, configuration, maintenance, responseFormats };
+  return { learning: createWiredLearning(agents, createProkopLearningRuntime({ agents }), {
+    // Harness-pinned reviewers resolve their effort from the cached CLI
+    // catalogs (unsupported pinned effort falls back to the model default);
+    // a missing CLI or model yields null and the cycle skips silently.
+    harnessModelEffort: async (harness, model, variant) => {
+      try {
+        const models = harness === 'codex-cli' ? await listCachedCodexModels() : await listCachedClaudeModels();
+        const entry = models.find(candidate => candidate.model === model);
+        if (!entry) return null;
+        return entry.supportedEfforts.includes(variant ?? '') ? variant! : entry.defaultEffort;
+      } catch {
+        return null;
+      }
+    },
+    saveHarnessSelection: (harness, sessionId, model, effort) => {
+      if (harness === 'codex-cli') saveCodexModelSelection(sessionId, { model, effort });
+      else saveClaudeModelSelection(sessionId, { model, effort });
+    },
+  }), session, control, http, scheduling, schedulerTicker, agents, workspaces, worktrees, tools, mcp, providers, notifications, permissions, files, configuration, maintenance, responseFormats };
 }

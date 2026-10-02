@@ -10,6 +10,10 @@ export interface LearningReviewRunnerDependencies {
   learningSettings(workspace: Workspace): Promise<WorkspaceLearningSettings | null>;
   preconfig(id: string): Promise<Preconfig | null>;
   modelAvailable(provider: string, model: string): boolean;
+  /** Harness gate: resolves the effective CLI effort for a harness review
+   * model (override or pin), or null when the model (or its CLI catalog) is
+   * unavailable. Absent wiring fails closed to a silent skip. */
+  harnessModelEffort?: (harness: 'codex-cli' | 'claude-cli', model: string, variant: string | null) => Promise<string | null>;
   eligible(workspace: Workspace, messageId: string): boolean;
   execute(input: {
     runId: string;
@@ -19,6 +23,12 @@ export interface LearningReviewRunnerDependencies {
     prompt: string;
     messageIds: string[];
     signal: AbortSignal;
+    /** Harness the review runs on: decided by the effective model — an
+     * explicit reviewer override in either direction, else the preconfig's
+     * pin ('prokop' when unpinned, every pre-existing reviewer). */
+    reviewHarness: 'prokop' | 'codex-cli' | 'claude-cli';
+    /** Resolved CLI effort for harness reviews; null for prokop reviews. */
+    reviewEffort: string | null;
     /** Resolved learning sources (agent config for homes, stored settings
      * otherwise) used by the evidence reader inside execution. */
     sources: WorkspaceLearningSettings['sources'];
@@ -57,12 +67,38 @@ export function createLearningReviewRunner(deps: LearningReviewRunnerDependencie
       const preconfig = await deps.preconfig(reviewer.preconfigId);
       signal.throwIfAborted();
       if (!preconfig) return false;
-      const selected = reviewer.modelOverride;
-      const model = selected?.modelId ?? preconfig.model;
-      const provider = selected?.providerId ?? preconfig.provider;
-      if (!model || !provider || !deps.modelAvailable(provider, model)) {
-        console.info(`[learning] Skipping review: model ${provider ?? '?'}/${model ?? '?'} is unavailable`);
-        return false;
+      // The effective model decides the review harness: an explicit override
+      // wins (in either direction — a harness model overrides a Prokop pin
+      // and vice versa), otherwise the preconfig's pin applies.
+      const pinHarness: 'prokop' | 'codex-cli' | 'claude-cli'
+        = preconfig.modelHarness === 'codex-cli' || preconfig.modelHarness === 'claude-cli'
+          ? preconfig.modelHarness
+          : 'prokop';
+      const override = reviewer.modelOverride;
+      const reviewHarness: 'prokop' | 'codex-cli' | 'claude-cli'
+        = override
+          ? (override.harness === 'codex-cli' || override.harness === 'claude-cli' ? override.harness : 'prokop')
+          : pinHarness;
+      const variant = override ? override.variant ?? null : preconfig.variant ?? null;
+      let model: string | null;
+      let provider: string | null;
+      let effort: string | null = null;
+      if (reviewHarness === 'prokop') {
+        model = override ? override.modelId : preconfig.model;
+        provider = override ? override.providerId : preconfig.provider;
+        if (!model || !provider || !deps.modelAvailable(provider, model)) {
+          console.info(`[learning] Skipping review: model ${provider ?? '?'}/${model ?? '?'} is unavailable`);
+          return false;
+        }
+      } else {
+        model = override ? override.modelId : preconfig.model;
+        provider = null;
+        effort = model ? await deps.harnessModelEffort?.(reviewHarness, model, variant) ?? null : null;
+        signal.throwIfAborted();
+        if (!model || !effort) {
+          console.info(`[learning] Skipping review: ${reviewHarness} model ${model ?? '?'} is unavailable`);
+          return false;
+        }
       }
       const run = deps.repository.claim(workspaceId, reviewerId, deps.now(), 3_600_000, 20, id => deps.eligible(workspace, id));
       if (!run) return false;
@@ -79,11 +115,13 @@ export function createLearningReviewRunner(deps: LearningReviewRunnerDependencie
             ? preconfig.capabilities?.skills !== false
             : settings.skills?.managementEnabled === true,
           instructions: learning.instructions, reviewerInstructions: reviewer.instructions,
+          harnessReviewer: reviewHarness !== 'prokop',
         });
         const result = await deps.execute({
           runId: run.id, workspace, reviewer,
-          preconfig: { ...preconfig, model, provider, variant: selected ? selected.variant ?? null : preconfig.variant },
+          preconfig: { ...preconfig, model, provider, variant },
           prompt, messageIds: evidence.map(item => item.message_id), signal,
+          reviewHarness, reviewEffort: effort,
           sources: learning.sources,
           improveSkills: learning.improveSkills && (settings.isAgentHome
             ? preconfig.capabilities?.skills !== false

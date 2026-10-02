@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
 import type { LearningReviewer, Preconfig, Workspace, WorkspaceLearningSettings } from '@prokopai/sdk';
 
-const mocks = vi.hoisted(() => ({ preview: vi.fn() }));
+const mocks = vi.hoisted(() => ({ preview: vi.fn(), claudeCatalog: vi.fn(), codexCatalog: vi.fn() }));
 
 vi.mock('@/contexts/ServerClientContext', () => ({
-  useSdkClient: () => ({ http: { workspaces: { previewLearning: mocks.preview } } }),
+  useSdkClient: () => ({ http: {
+    workspaces: { previewLearning: mocks.preview },
+    sessions: { claudeCatalog: mocks.claudeCatalog, codexCatalog: mocks.codexCatalog },
+  } }),
 }));
 
 vi.mock('@/components/modals/configuration/LearningHistory', () => ({ LearningHistory: () => null }));
@@ -27,6 +30,7 @@ import { LearningPanel } from '@/components/modals/configuration/LearningPanel';
 const preconfigs: Preconfig[] = [
   { id: 'main', name: 'Main', mode: 'primary', model: 'm1', provider: 'p1' } as Preconfig,
   { id: 'alt', name: 'Alt', mode: 'primary', model: 'm2', provider: 'p2' } as Preconfig,
+  { id: 'claude-agent', name: 'ClaudeAgent', mode: 'primary', model: 'claude-opus-4-6', provider: '', modelHarness: 'claude-cli' } as Preconfig,
 ];
 
 const workspace = (settings: Partial<Workspace['settings']>): Workspace =>
@@ -35,7 +39,7 @@ const workspace = (settings: Partial<Workspace['settings']>): Workspace =>
 function Harness(props: { workspace: Workspace; initial?: WorkspaceLearningSettings; allowPersonalLearning?: boolean }) {
   const [value, setValue] = useState(props.initial);
   const [allow, setAllow] = useState(props.allowPersonalLearning ?? true);
-  const cache = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+  const cache = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
   return <QueryClientProvider client={cache}>
     <LearningPanel workspace={props.workspace} preconfigs={preconfigs} value={value} allowPersonalLearning={allow}
       onChange={setValue} onPersonalLearningChange={setAllow} />
@@ -44,6 +48,8 @@ function Harness(props: { workspace: Workspace; initial?: WorkspaceLearningSetti
 
 beforeEach(() => {
   mocks.preview.mockReset();
+  mocks.claudeCatalog.mockReset();
+  mocks.codexCatalog.mockReset();
 });
 
 test('disabled state shows the two gates and hides reviewer configuration', () => {
@@ -105,6 +111,43 @@ test('tuning stays collapsed by default and recaps custom values on the triggers
   render(<Harness workspace={workspace({})} initial={initial({ cadence: { idleMinutes: 5, minimumIntervalMinutes: 120, maximumPendingMinutes: 1440 } })} />);
   expect(screen.getByRole('button', { name: /^Timing/ })).toHaveTextContent('5m · 2h · 1d');
   expect(screen.getByLabelText('Quiet period')).toHaveValue(5);
+});
+
+test('a harness-pinned learner inherits its harness model and can override to any harness', async () => {
+  const user = userEvent.setup();
+  mocks.claudeCatalog.mockResolvedValue({
+    models: [{ model: 'claude-opus-4-6', name: 'Opus 4.6', supportedEfforts: ['low', 'high'], defaultEffort: 'high', isDefault: true }],
+  });
+  mocks.codexCatalog.mockResolvedValue({
+    models: [{ model: 'gpt-5.2-codex', name: 'GPT 5.2 Codex', supportedEfforts: ['low', 'medium'], defaultEffort: 'medium', isDefault: true }],
+  });
+  const initial = { enabled: true,
+    reviewers: [{ id: 'r1', preconfigId: 'claude-agent', instructions: '', modelOverride: null, cadence: null }],
+    improveSkills: false, instructions: '', sources: { mode: 'all' } } as WorkspaceLearningSettings;
+  const { container } = render(<Harness workspace={workspace({})} initial={initial} />);
+  void container;
+  // Inherit state: the agent default is the pinned Claude model.
+  expect(await screen.findByText('Agent default: Claude CLI · Opus 4.6')).toBeInTheDocument();
+  expect(screen.getByText(/Reviews run on Claude CLI with this model/)).toBeInTheDocument();
+  expect(screen.getByText(/can't be undone from history/)).toBeInTheDocument();
+
+  // Override to a Codex model: the picker offers every harness.
+  await user.click(screen.getByRole('combobox', { name: 'Model' }));
+  await user.click(screen.getByRole('tab', { name: 'Codex' }));
+  await user.click(screen.getByText('GPT 5.2 Codex'));
+  expect(screen.getByRole('combobox', { name: 'Model' })).toHaveTextContent('Codex · GPT 5.2 Codex');
+  expect(screen.getByText(/Reviews run on Codex CLI with this model/)).toBeInTheDocument();
+});
+
+test('an unpinned learner keeps the inherit row and resolves the agent default from the prokop catalog', async () => {
+  render(<Harness workspace={workspace({})} initial={{ enabled: true,
+    reviewers: [{ id: 'r1', preconfigId: 'main', instructions: '', modelOverride: null, cadence: null }],
+    improveSkills: false, instructions: '', sources: { mode: 'all' } }} />);
+  expect(screen.getByRole('combobox', { name: 'Model' })).toHaveTextContent('Use agent default');
+  expect(screen.queryByText(/Reviews run on/)).toBeNull();
+  // Catalogs are fetched whenever learners exist: any of them may override to a harness.
+  await waitFor(() => expect(mocks.claudeCatalog).toHaveBeenCalled());
+  expect(mocks.codexCatalog).toHaveBeenCalled();
 });
 
 test('preview opens a dialog with the reviewer prompt', async () => {

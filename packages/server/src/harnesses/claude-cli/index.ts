@@ -1,5 +1,6 @@
 import type { HarnessRegistration } from '@/application/sessions/harness-execution';
 import type { SessionExecutionPort } from '@/application/ports/execution';
+import { runHeadlessTurn } from '@/application/ports/headless-execution';
 
 export { createClaudeExecution } from './execution';
 export { claudeCliAvailable, claudeCliVersion } from './version';
@@ -16,5 +17,8 @@ export function createClaudeCliHarness(
       ...execution,
       regenerateTitle,
     },
+    // Headless child runs (scheduled jobs, learning reviews) drive a normal
+    // turn with no client attached; sendMessage resolves at turn completion.
+    headless: input => runHeadlessTurn(execution.sendMessage, input),
   };
 }

@@ -25,7 +25,7 @@ const SECTIONS: Omit<SettingsSection, 'icon'>[] = [
   { value: 'permissions', label: 'Permissions', group: 'general' },
   { value: 'autoApprove', label: 'Auto-Approve', group: 'general' },
   { value: 'paths', label: 'Additional Paths', group: 'general' },
-  { value: 'learning', label: 'Learning · Prokop', group: 'capabilities' },
+  { value: 'learning', label: 'Learning', group: 'capabilities' },
   { value: 'agentTools', label: 'Agent Tools', group: 'capabilities' },
 ];
 

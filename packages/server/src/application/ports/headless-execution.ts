@@ -1,4 +1,5 @@
 import type { Preconfig, SessionHarness } from '@prokopai/sdk';
+import type { SessionWirePorts } from './delivery';
 
 /**
  * Resolved child-run contract for headless (scheduled) execution. The
@@ -41,4 +42,38 @@ export function installHeadlessExecutionPort(port: HeadlessSessionRunPort | null
 
 export function getHeadlessExecutionPort(): HeadlessSessionRunPort | null {
   return current;
+}
+
+type HeadlessSendMessage = <Origin>(
+  wire: SessionWirePorts<Origin>,
+  origin: Origin,
+  sessionId: string,
+  content: string,
+) => Promise<void>;
+
+/**
+ * Run one headless agent turn over a harness sendMessage entry: every delivery
+ * sink is discarded (there is no client), and the returned promise settles
+ * when the turn completes. Wire-sent validation errors are silent by contract;
+ * callers that need them should pre-validate the session before dispatch.
+ */
+export function runHeadlessTurn(
+  sendMessage: HeadlessSendMessage,
+  input: HeadlessSessionRunInput,
+): Promise<HeadlessSessionRunResult> {
+  const wire: SessionWirePorts<string> = {
+    delivery: {
+      send: () => {},
+      broadcast: () => {},
+      broadcastToSession: () => {},
+      sendToController: () => {},
+      sendToAskTargets: () => {},
+    },
+    actor: { attachOriginToSession: () => {} },
+  };
+  return sendMessage(wire, `headless:${input.childSessionId}`, input.childSessionId, input.prompt)
+    .then(() => ({}) as HeadlessSessionRunResult)
+    .catch((error: unknown): HeadlessSessionRunResult => ({
+      error: error instanceof Error ? error.message : 'Headless run failed',
+    }));
 }

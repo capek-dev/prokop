@@ -580,6 +580,12 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
                 </div>
                 {form.learningEnabled && (
                   <div className="space-y-2">
+                    {(form.modelHarness === 'codex-cli' || form.modelHarness === 'claude-cli') && (
+                      <p className="text-[10px] text-muted-foreground">
+                        Reviews run on {form.modelHarness === 'codex-cli' ? 'Codex CLI' : 'Claude CLI'} (from the
+                        agent's model pin) with that harness's own tools; harness reviews can't be undone from history.
+                      </p>
+                    )}
                     <div>
                       <p className="text-[10px] text-muted-foreground">Cadence in minutes (leave empty for defaults)</p>
                       <div className="grid grid-cols-3 gap-1.5">

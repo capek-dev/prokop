@@ -97,3 +97,68 @@ test('an already cancelled request never claims evidence', async () => {
   expect(repository.listRuns('ws')).toHaveLength(0);
   expect(calls).toHaveLength(0);
 });
+
+test('a harness-pinned reviewer runs on its harness without the prokop catalog', async () => {
+  // modelAvailable must not be consulted for a harness pin; the effective
+  // model is the preconfig pin and the effort resolves from the CLI catalog.
+  const { runner, repository, calls, settings, preconfig } = fixture({
+    modelAvailable: () => false,
+    harnessModelEffort: async () => 'high',
+  });
+  preconfig.modelHarness = 'claude-cli';
+  preconfig.model = 'claude-opus-4-6';
+  preconfig.provider = '';
+  settings.learning!.reviewers[0]!.modelOverride = null;
+  updateWorkspace('ws', { settings });
+
+  expect(await runner.run('ws', 'reviewer', new AbortController().signal)).toBe(true);
+
+  expect(calls[0]?.reviewHarness).toBe('claude-cli');
+  expect(calls[0]?.reviewEffort).toBe('high');
+  expect(calls[0]?.preconfig.model).toBe('claude-opus-4-6');
+  expect(calls[0]?.preconfig.provider).toBeNull();
+  expect(calls[0]?.prompt).toContain('transcripts supplied below');
+  expect(repository.pending('ws', 'reviewer')).toHaveLength(0);
+});
+
+test('a harness override wins over the agent pin and carries its own effort', async () => {
+  const { runner, repository, calls, settings, preconfig } = fixture({ harnessModelEffort: async () => 'low' });
+  preconfig.modelHarness = 'claude-cli';
+  preconfig.model = 'claude-opus-4-6';
+  settings.learning!.reviewers[0]!.modelOverride = { providerId: '', modelId: 'gpt-5.2-codex', variant: 'low', harness: 'codex-cli' };
+  updateWorkspace('ws', { settings });
+
+  expect(await runner.run('ws', 'reviewer', new AbortController().signal)).toBe(true);
+
+  expect(calls[0]?.reviewHarness).toBe('codex-cli');
+  expect(calls[0]?.reviewEffort).toBe('low');
+  expect(calls[0]?.preconfig.model).toBe('gpt-5.2-codex');
+  expect(repository.pending('ws', 'reviewer')).toHaveLength(0);
+});
+
+test('a prokop override on a harness-pinned agent runs the prokop review', async () => {
+  const { runner, calls, settings, preconfig } = fixture({ modelAvailable: () => true });
+  preconfig.modelHarness = 'claude-cli';
+  preconfig.model = 'claude-opus-4-6';
+  settings.learning!.reviewers[0]!.modelOverride = { providerId: 'zhipu-coding', modelId: 'glm-5.3', variant: 'max' };
+  updateWorkspace('ws', { settings });
+
+  expect(await runner.run('ws', 'reviewer', new AbortController().signal)).toBe(true);
+
+  expect(calls[0]?.reviewHarness).toBe('prokop');
+  expect(calls[0]?.reviewEffort).toBeNull();
+  expect(calls[0]?.preconfig).toMatchObject({ model: 'glm-5.3', provider: 'zhipu-coding', variant: 'max' });
+  expect(calls[0]?.prompt).toContain('session_search');
+});
+
+test('an unavailable harness model skips the cycle silently without a recorded run', async () => {
+  const { runner, repository, calls, preconfig } = fixture({ harnessModelEffort: async () => null });
+  preconfig.modelHarness = 'codex-cli';
+  preconfig.model = 'gpt-5.2-codex';
+
+  expect(await runner.run('ws', 'reviewer', new AbortController().signal)).toBe(false);
+
+  expect(calls).toHaveLength(0);
+  expect(repository.listRuns('ws')).toHaveLength(0);
+  expect(repository.pending('ws', 'reviewer')).toHaveLength(1);
+});

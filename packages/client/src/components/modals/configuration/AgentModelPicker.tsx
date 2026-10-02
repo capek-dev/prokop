@@ -37,6 +37,9 @@ interface AgentModelPickerProps {
   claudeModels: CodexModel[];
   value: AgentModelSelection;
   onChange: (next: AgentModelSelection) => void;
+  /** Copy for the inherit row/trigger when no model is pinned (agent editor:
+   * "Use server default", learning: "Use agent default"). */
+  defaultLabel?: string;
 }
 
 type PickerHarness = 'prokop' | 'codex-cli' | 'claude-cli';
@@ -62,7 +65,7 @@ const HARNESS_TABS: { id: PickerHarness; label: string; Mark: typeof ProkopMark 
  * key or the harness default effort), so a saved pin never carries an
  * unnormalized variant.
  */
-export function AgentModelPicker({ models, codexModels, claudeModels, value, onChange }: AgentModelPickerProps) {
+export function AgentModelPicker({ models, codexModels, claudeModels, value, onChange, defaultLabel = 'Use server default' }: AgentModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<PickerHarness>(() => (value.modelHarness || 'prokop') as PickerHarness);
   const isMobile = useIsMobile();
@@ -127,7 +130,7 @@ export function AgentModelPicker({ models, codexModels, claudeModels, value, onC
                 : <Cpu className="size-4 shrink-0 text-muted-foreground" />}
               {triggerLabel
                 ? <span className="truncate">{triggerLabel}</span>
-                : <span className="text-muted-foreground">Use server default</span>
+                : <span className="text-muted-foreground">{defaultLabel}</span>
               }
             </div>
             <ChevronsUpDown className="size-3 shrink-0 opacity-50" />
@@ -174,13 +177,13 @@ export function AgentModelPicker({ models, codexModels, claudeModels, value, onC
                 <CommandList className="max-h-[300px] overflow-y-auto">
                   <CommandEmpty>No model found.</CommandEmpty>
                   <CommandGroup>
-                    <CommandItem
-                      onSelect={() => commit({ model: '', provider: '', variant: '', modelHarness: '' })}
-                      className="justify-between"
-                    >
-                      <span className="text-muted-foreground">Use server default</span>
-                      {!value.model && <Check className="size-4" />}
-                    </CommandItem>
+                <CommandItem
+                  onSelect={() => commit({ model: '', provider: '', variant: '', modelHarness: '' })}
+                  className="justify-between"
+                >
+                  <span className="text-muted-foreground">{defaultLabel}</span>
+                  {!value.model && <Check className="size-4" />}
+                </CommandItem>
                   </CommandGroup>
                   {activeTab === 'prokop' && Object.entries(groupedModels).map(([providerName, providerModels]) => (
                     <CommandGroup key={providerName} heading={providerName}>

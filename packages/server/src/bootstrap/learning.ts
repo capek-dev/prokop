@@ -3,9 +3,10 @@ import type { Workspace, WorkspaceLearningSettings } from '@prokopai/sdk';
 import { createLearningHistoryApi } from '@/application/learning/history-api';
 import { broadcastEvent, broadcastSessionUpdated } from '@/transport/websocket/broadcast';
 import { createLearningService } from '@/application/learning/service';
-import { createLearningReviewRunner } from '@/application/learning/review-runner';
+import { createLearningReviewRunner, type LearningReviewRunnerDependencies } from '@/application/learning/review-runner';
 import { createLearningRecovery } from '@/application/learning/recovery';
 import type { LearningRuntimePort } from '@/application/ports/learning-runtime';
+import { getHeadlessExecutionPort, type HeadlessSessionRunPort } from '@/application/ports/headless-execution';
 import { createJean2SessionRepository } from '@/adapters/jean2/session-repository';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { getWorkspace, listWorkspaces } from '@/infrastructure/sqlite/workspaces';
@@ -27,7 +28,12 @@ import {
 export function createWiredLearning(
   agents: Pick<AgentsApplication, 'getAgentDirectory' | 'getPreconfigOrAgent' | 'isAgentSync'>,
   runtime: LearningRuntimePort,
-  overrides: { modelAvailable?: (provider: string, model: string) => boolean } = {},
+  overrides: {
+    modelAvailable?: (provider: string, model: string) => boolean;
+    harnessModelEffort?: (harness: 'codex-cli' | 'claude-cli', model: string, variant: string | null) => Promise<string | null>;
+    saveHarnessSelection?: (harness: 'codex-cli' | 'claude-cli', sessionId: string, model: string, effort: string) => void;
+    headless?: Pick<HeadlessSessionRunPort, 'run' | 'supportedHarnesses'>;
+  } = {},
 ) {
   const db = getDatabase();
   const repository = createLearningRepository(db);
@@ -79,7 +85,7 @@ export function createWiredLearning(
     workspace.settings.isAgentHome
       ? { kind: 'agent', agentId: workspace.settings.agentId ?? '', sources: agentSourcesFor(workspace.settings.agentId ?? '') }
       : { kind: 'workspace', workspaceId: workspace.id });
-  const execute = runtime.createExecution({
+  const executeProkop = runtime.createExecution({
     database: db, repository, directories, workspace: getWorkspace,
     createSession(workspace, preconfigId, runId) {
       return db.transaction(() => {
@@ -91,10 +97,80 @@ export function createWiredLearning(
       })();
     },
   });
+  /** Harness reviews run as normal headless agent turns with the harness's
+   * own tools (prompt-embedded evidence, mounted memory/skill tools). They
+   * bind no journal destination, so history records the outcome and sources
+   * but no undoable changes. */
+  const harnessExecute = async (
+    input: Parameters<LearningReviewRunnerDependencies['execute']>[0],
+    harness: 'codex-cli' | 'claude-cli',
+  ): Promise<{ error?: string }> => {
+    const { workspace, reviewer, runId, signal } = input;
+    signal.throwIfAborted();
+    const headless = overrides.headless ?? getHeadlessExecutionPort();
+    if (!headless || !headless.supportedHarnesses().includes(harness)) {
+      return { error: `${harness} is unavailable for learning reviews on this host` };
+    }
+    const model = input.preconfig.model ?? '';
+    const sessionId = db.transaction(() => {
+      const id = crypto.randomUUID();
+      sessions.createSession({ id, workspaceId: workspace.id, harness, preconfigId: reviewer.preconfigId,
+        title: '[Learning]', status: 'active', metadata: { learningRunId: runId },
+        parentId: null, agentName: null, permissionMode: 'standard' });
+      // Belt-and-braces: metadata.learningRunId alone already disqualifies the
+      // review session from ever becoming evidence.
+      db.run('INSERT INTO learning_session_origins (session_id, run_id) VALUES (?, ?)', [id, runId]);
+      return id;
+    })();
+    // Materialized agent reviewers carry agentId so the harness mounts the
+    // agent-scoped tools (codex/claude only do when session.agentId === preconfigId).
+    sessions.updateSession(sessionId, {
+      agentId: agents.isAgentSync(reviewer.preconfigId) ? reviewer.preconfigId : null,
+      selectedModel: model || null,
+    });
+    if (model && input.reviewEffort) {
+      overrides.saveHarnessSelection?.(harness, sessionId, model, input.reviewEffort);
+    }
+    // The reviewer cannot rely on session_search reaching cross-workspace
+    // evidence, so transcripts are embedded (newest first into the budget).
+    const evidence = repository.evidence(runId);
+    const source = reader(workspace);
+    const transcripts: string[] = []
+    let omitted = 0;
+    let budget = 0;
+    for (let index = evidence.length - 1; index >= 0; index--) {
+      const item = evidence[index];
+      let turn: string;
+      try {
+        turn = source.readTurn(item.message_id)
+          .map(message => `${message.role}: ${message.content}`)
+          .join('\n');
+      } catch {
+        turn = '(transcript unavailable)';
+      }
+      const block = `### Turn ${item.message_id} (session ${item.session_id}, completed ${new Date(item.completed_at).toISOString()})\n${turn}`;
+      if (budget + block.length > 120_000) {
+        omitted++;
+        continue;
+      }
+      budget += block.length;
+      transcripts.unshift(block);
+    }
+    const note = omitted > 0 ? `\n\n(${omitted} older evidence transcript(s) omitted to fit the review budget)` : '';
+    const prompt = `${input.prompt}\n\nEvidence to review (full transcripts):\n${transcripts.join('\n\n')}${note}`;
+    const result = await headless.run({ harness, parentSessionId: sessionId, childSessionId: sessionId,
+      preconfig: input.preconfig, prompt, workspacePath: workspace.path, workspaceId: workspace.id,
+      modelId: model, providerId: '', resumeFromHistory: false });
+    signal.throwIfAborted();
+    return result;
+  };
+  const execute: LearningReviewRunnerDependencies['execute'] = async input =>
+    (input.reviewHarness === 'prokop' ? executeProkop(input) : harnessExecute(input, input.reviewHarness));
   const runner = createLearningReviewRunner({
     repository, workspace: getWorkspace, learningSettings: learningSettingsFor, preconfig: id => agents.getPreconfigOrAgent(id),
     modelAvailable: overrides.modelAvailable ?? ((provider, model) => getModelRuntimeStatus(provider).usable
       && getModelsDocument().providers.some(p => p.id === provider && p.models.some(m => m.id === model))),
+    harnessModelEffort: overrides.harnessModelEffort,
     eligible: (workspace, id) => reader(workspace).eligible(id), execute, now: Date.now,
   });
   const service = createLearningService({

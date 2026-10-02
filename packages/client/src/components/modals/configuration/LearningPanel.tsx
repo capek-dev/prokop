@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Plus, X } from 'lucide-react';
 import type { LearningCadence, LearningReviewer, Preconfig, Workspace, WorkspaceLearningSettings } from '@prokopai/sdk';
 import { useSdkClient } from '@/contexts/ServerClientContext';
 import { LearningHistory } from './LearningHistory';
-import { LearningModelPicker } from './LearningModelPicker';
+import { AgentModelPicker, type AgentModelSelection } from './AgentModelPicker';
 import { LearningSourcePicker } from './LearningSourcePicker';
 import { DisclosureRow } from './DisclosureRow';
 import { useServerDataStore } from '@/stores/serverDataStore';
@@ -64,6 +64,30 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
   const workspaces = useServerDataStore(state => state.workspaces);
   const personal = workspace.settings.isAgentHome === true;
   const initialId = personal ? workspace.settings.agentId : getWorkspaceDefaultPreconfigId(workspace, preconfigs);
+
+  /** A harness-pinned learner agent runs its reviews as headless turns on that
+   * harness unless overridden; overrides may target any harness's models. */
+  const pinnedHarness = (preconfig: Preconfig | undefined): 'codex-cli' | 'claude-cli' | null =>
+    preconfig?.modelHarness === 'codex-cli' || preconfig?.modelHarness === 'claude-cli'
+      ? preconfig.modelHarness
+      : null;
+  // Any learner can override its model to any harness, so the CLI catalogs
+  // are fetched whenever reviewers exist.
+  const hasReviewers = (value?.reviewers?.length ?? 0) > 0;
+  const claudeCatalog = useQuery({
+    queryKey: ['claude-catalog'],
+    queryFn: () => client!.http.sessions.claudeCatalog(),
+    enabled: !!client && hasReviewers,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const codexCatalog = useQuery({
+    queryKey: ['codex-catalog'],
+    queryFn: () => client!.http.sessions.codexCatalog(),
+    enabled: !!client && hasReviewers,
+    staleTime: 60_000,
+    retry: false,
+  });
   const defaults = defaultCadence(personal);
   const settings: WorkspaceLearningSettings = value ?? {
     enabled: false,
@@ -81,13 +105,55 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
       update(item.id, { cadence: { ...defaults, ...item.cadence, [key]: number } });
     }
   };
-  const learnerModel = (item: LearningReviewer) => (
-    <div className="space-y-1.5">
-      <Label>Model</Label>
-      <LearningModelPicker models={models} preconfig={preconfigs.find(p => p.id === item.preconfigId)} value={item.modelOverride}
-        onChange={modelOverride => update(item.id, { modelOverride })} />
-    </div>
-  );
+  const learnerModel = (item: LearningReviewer) => {
+    const preconfig = preconfigs.find(p => p.id === item.preconfigId);
+    const pin = pinnedHarness(preconfig);
+    const override = item.modelOverride;
+    const effective: 'prokop' | 'codex-cli' | 'claude-cli'
+      = override ? (override.harness ?? 'prokop') : (pin ?? 'prokop');
+    const selection: AgentModelSelection = override
+      ? {
+          model: override.modelId,
+          provider: override.harness ? '' : override.providerId,
+          variant: override.variant ?? '',
+          modelHarness: (override.harness ?? 'prokop') as AgentModelSelection['modelHarness'],
+        }
+      : { model: '', provider: '', variant: '', modelHarness: '' };
+    const catalogModels = pin === 'codex-cli' ? codexCatalog.data?.models : claudeCatalog.data?.models;
+    const agentDefault = pin
+      ? `${pin === 'codex-cli' ? 'Codex CLI' : 'Claude CLI'} · ${catalogModels?.find(m => m.model === preconfig?.model)?.name ?? preconfig?.model ?? 'agent-pinned model'}`
+      : models.find(m => m.id === preconfig?.model && m.providerId === preconfig?.provider)?.name
+        ?? preconfig?.model ?? null;
+    return (
+      <div className="space-y-1.5">
+        <Label>Model</Label>
+        <AgentModelPicker
+          models={models}
+          codexModels={codexCatalog.data?.models ?? []}
+          claudeModels={claudeCatalog.data?.models ?? []}
+          value={selection}
+          onChange={next => update(item.id, {
+            modelOverride: next.modelHarness === '' ? null : {
+              providerId: next.modelHarness === 'prokop' ? next.provider : '',
+              modelId: next.model,
+              variant: next.variant || null,
+              ...(next.modelHarness !== 'prokop' ? { harness: next.modelHarness } : {}),
+            },
+          })}
+          defaultLabel="Use agent default"
+        />
+        {!override && agentDefault && (
+          <p className="text-xs text-muted-foreground">Agent default: {agentDefault}</p>
+        )}
+        {effective !== 'prokop' && (
+          <p className="text-xs text-muted-foreground">
+            Reviews run on {effective === 'codex-cli' ? 'Codex CLI' : 'Claude CLI'} with this model.
+            Harness reviews can't be undone from history.
+          </p>
+        )}
+      </div>
+    );
+  };
 
   /** Focus and timing are rare tuning: collapsed by default, with the custom value recapped on the trigger. */
   const learnerTuning = (item: LearningReviewer, bordered: boolean) => {

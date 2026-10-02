@@ -48,13 +48,21 @@ export function createLearningHistoryApi(deps: {
       if (!reviewer) throw new BadRequestError('Reviewer not found');
       const preconfig = await deps.preconfig(reviewer.preconfigId);
       if (!preconfig) throw new BadRequestError('Reviewer preconfig is unavailable');
+      // Effective harness: an explicit override wins over the pin.
+      const override = reviewer.modelOverride;
+      const harnessReviewer = override?.harness === 'codex-cli' || override?.harness === 'claude-cli'
+        || (!override && (preconfig.modelHarness === 'codex-cli' || preconfig.modelHarness === 'claude-cli'));
       return { prompt: `${preconfig.systemPrompt}\n\n${buildLearningPrompt({ scope: scope.settings.isAgentHome ? 'agent' : 'workspace',
         memoryEnabled: true, sessionSearchEnabled: true, improveSkills: settings.improveSkills,
-        skillManagementEnabled: scope.settings.skills?.managementEnabled === true, instructions: settings.instructions, reviewerInstructions: reviewer.instructions })}` };
+        skillManagementEnabled: scope.settings.skills?.managementEnabled === true, instructions: settings.instructions, reviewerInstructions: reviewer.instructions,
+        harnessReviewer })}` };
     },
     async undo(workspaceId: string, runId: string, changeId: string) {
       const current = detail(workspaceId, runId);
       if (current.run.resolved) throw new BadRequestError('This run was resolved by keeping current files');
+      // Harness reviews run with their own tools: no destination is bound and
+      // nothing is journaled, so there is nothing to undo.
+      if (!repository.destination(runId)) throw new BadRequestError('Harness-run reviews cannot be undone');
       if (!current.changes.some(c => c.id === changeId)) throw new NotFoundError('Change not found');
       if (busy.has(workspaceId)) throw new BadRequestError('History operation already in progress');
       busy.add(workspaceId);
