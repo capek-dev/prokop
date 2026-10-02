@@ -168,9 +168,21 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
       const controller = new AbortController();
       active.set(sessionId, controller);
       let assistant: AssistantMessage | null = null;
-      let text = '';
-      let textPart: TextPart | null = null;
+      interface TextSegment { part: TextPart; text: string }
+      // Text interleaves with tool calls: each tool-start closes the open
+      // text segment so following text becomes a new part after the tool
+      // rows instead of appending above them.
+      const segments: TextSegment[] = [];
+      let openSegment: TextSegment | null = null;
+      // Parts sort by created_at; a monotonic clock keeps segments and tool
+      // rows strictly ordered even when created in the same millisecond.
+      let partClock = 0;
+      const nextCreatedAt = (): number => {
+        partClock = Math.max(Date.now(), partClock + 1);
+        return partClock;
+      };
       const openTools = new Set<string>();
+      const openText = (): string => openSegment?.text ?? '';
       const approvals = deps.approvals ?? claudeApprovals;
       let children: ClaudeChildTimelines | null = null;
       try {
@@ -278,20 +290,22 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         const backgroundAgents = new Set<string>();
         const saveText = (next: string, delta?: string): void => {
           if (!assistant) return;
-          if (!textPart) {
-            textPart = createPart({ id: crypto.randomUUID(), messageId: assistant.id, type: 'text',
-              text: delta === undefined ? next : '', createdAt: Date.now() }, sessionId) as TextPart;
-            wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part: textPart });
+          if (!openSegment) {
+            const part = createPart({ id: crypto.randomUUID(), messageId: assistant.id, type: 'text',
+              text: delta === undefined ? next : '', createdAt: nextCreatedAt() }, sessionId) as TextPart;
+            wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part });
+            openSegment = { part, text: delta === undefined ? next : '' };
+            segments.push(openSegment);
           }
           if (delta !== undefined) {
-            updatePart(textPart.id, { text: next });
+            updatePart(openSegment.part.id, { text: next });
             wire.delivery.broadcastToSession(sessionId, { type: 'part.append', sessionId,
-              partId: textPart.id, field: 'text', delta });
-          } else if (textPart.text !== next) {
-            const updated = updatePart(textPart.id, { text: next });
+              partId: openSegment.part.id, field: 'text', delta });
+          } else if (openSegment.part.text !== next) {
+            const updated = updatePart(openSegment.part.id, { text: next });
             if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part: updated });
           }
-          textPart = { ...textPart, text: next };
+          openSegment = { part: { ...openSegment.part, text: next }, text: next };
         };
         for await (const event of runClaudeTurn({ cwd: root, prompt: content, images,
           userMessageId: user.id, instructions: developerInstructions, dynamicTools,
@@ -349,22 +363,23 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
             }
           }
           if (event.type === 'text-delta' && event.text) {
-            text += event.text;
-            saveText(text, event.text);
+            saveText(openText() + event.text, event.text);
           }
           if (event.type === 'text-final') {
-            if (event.streamed && !text.endsWith(event.streamed)) throw new Error('Claude text stream changed');
-            text = text.slice(0, text.length - event.streamed.length) + event.text;
-            if (text || textPart) saveText(text);
+            const current = openText();
+            if (event.streamed && !current.endsWith(event.streamed)) throw new Error('Claude text stream changed');
+            const next = current.slice(0, current.length - event.streamed.length) + event.text;
+            if (next || openSegment) saveText(next);
           }
           if (event.type === 'tool-start') {
+            openSegment = null;
             const callId = `claude-tool:${nativeId}:${event.id}`;
             if (getToolPartByCallId(sessionId, callId)) throw new Error('Duplicate Claude tool identity');
             const input = claudeToolInput(event.input);
             const childId = event.name === 'Agent' ? children.start(event.id) : null;
             const name = claudeToolName(event.name);
             const part: ToolPart = { id: crypto.randomUUID(), messageId: assistant.id, type: 'tool',
-              callId, name, createdAt: Date.now(),
+              callId, name, createdAt: nextCreatedAt(),
               state: { status: 'running', input, startedAt: Date.now(),
                 ...(childId ? { childSessionId: childId } : {}) },
               presentation: { summary: claudeToolSummary(name, input), debugAvailable: false } };
@@ -422,7 +437,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           wire.delivery.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
         }
         if (controller.signal.aborted) throw new Error('Claude turn interrupted');
-        if (!text && result) saveText(result);
+        if (segments.length === 0 && result) saveText(result);
         children.close('interrupted');
         const contextSession = getSession(sessionId);
         if (contextSession) {

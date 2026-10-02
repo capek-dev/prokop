@@ -247,6 +247,44 @@ test('persists native tool calls, bounded results, and assistant text', async ()
   expect(events.some(event => (event as { type?: string }).type === 'part.updated')).toBe(true);
 });
 
+test('text interleaves with tool calls as separate ordered parts', async () => {
+  const { wire } = wireFixture();
+  const exec = createClaudeExecution({ version: () => '2.1.274', start: (_prompt, options) => {
+    const id = options.sessionId!;
+    async function* stream(): AsyncGenerator<SDKMessage> {
+      yield { type: 'system', subtype: 'init', session_id: id } as SDKMessage;
+      yield { type: 'stream_event', session_id: id, parent_tool_use_id: null,
+        event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Checking ' } } } as SDKMessage;
+      yield { type: 'stream_event', session_id: id, parent_tool_use_id: null,
+        event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'the file' } } } as SDKMessage;
+      yield { type: 'assistant', session_id: id, parent_tool_use_id: null, message: {
+        content: [{ type: 'text', text: 'Checking the file' },
+          { type: 'tool_use', id: 'call-1', name: 'Read', input: { file_path: 'README.md' } }],
+      } } as SDKMessage;
+      yield { type: 'user', session_id: id, parent_tool_use_id: null, message: {
+        content: [{ type: 'tool_result', tool_use_id: 'call-1', content: 'contents' }],
+      } } as SDKMessage;
+      yield { type: 'stream_event', session_id: id, parent_tool_use_id: null,
+        event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'All do' } } } as SDKMessage;
+      yield { type: 'stream_event', session_id: id, parent_tool_use_id: null,
+        event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'ne' } } } as SDKMessage;
+      yield { type: 'assistant', session_id: id, parent_tool_use_id: null, message: {
+        content: [{ type: 'text', text: 'All done' }],
+      } } as SDKMessage;
+      yield { type: 'result', subtype: 'success', session_id: id, is_error: false, result: 'All done' } as SDKMessage;
+    }
+    return stream();
+  } });
+  await exec.sendMessage(wire, 'origin', 'session', 'check');
+  const assistant = listMessagesWithParts('session')[1]!;
+  // Text before a tool, the tool, then the following text as its own part.
+  expect(assistant.parts).toEqual([
+    expect.objectContaining({ type: 'text', text: 'Checking the file' }),
+    expect.objectContaining({ type: 'tool', name: 'read-file' }),
+    expect.objectContaining({ type: 'text', text: 'All done' }),
+  ]);
+});
+
 test('streams text before completion and reconciles the complete message without duplicate parts', async () => {
   const { wire, events } = wireFixture();
   let resume!: () => void;

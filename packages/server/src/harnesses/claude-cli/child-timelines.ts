@@ -6,11 +6,19 @@ import { createMessage, createPart, getToolPartByCallId, transitionToolToComplet
 import type { ClaudeTurnEvent } from './sdk-turn';
 import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
 
+interface ChildTextSegment { part: TextPart; text: string }
+
 interface Child {
   sessionId: string;
   assistant: AssistantMessage;
-  text: string;
-  part: TextPart | null;
+  // Text interleaves with tool calls: a tool-start closes the open segment
+  // so following text lands in a new part after the tool row.
+  segments: ChildTextSegment[];
+  openSegment: ChildTextSegment | null;
+  textLength: number;
+  // Parts sort by created_at; a monotonic clock keeps the order stable
+  // within the same millisecond.
+  partClock: number;
   openTools: Set<string>;
   status: 'running' | 'completed' | 'error' | 'interrupted';
 }
@@ -39,8 +47,8 @@ export class ClaudeChildTimelines {
     const assistant = createMessage({ id: crypto.randomUUID(), sessionId: session.id, role: 'assistant',
       status: 'streaming', providerId: 'claude-cli', modelId: this.parent.selectedModel ?? 'claude-cli',
       tokens: { prompt: 0, completion: 0 }, cost: 0, createdAt: Date.now() }) as AssistantMessage;
-    this.children.set(id, { sessionId: session.id, assistant, text: '', part: null,
-      openTools: new Set(), status: 'running' });
+    this.children.set(id, { sessionId: session.id, assistant, segments: [], openSegment: null,
+      textLength: 0, partClock: 0, openTools: new Set(), status: 'running' });
     if (owner) this.owners.set(id, owner);
     this.delivery.broadcast({ type: 'session.created', session });
     this.delivery.broadcastToSession(session.id, { type: 'message.created', message: assistant });
@@ -70,35 +78,45 @@ export class ClaudeChildTimelines {
     if (child.status !== 'running') return;
     const { sessionId, assistant } = child;
     if (event.type === 'text-delta' || event.type === 'text-final') {
-      if (event.type === 'text-final' && event.streamed && !child.text.endsWith(event.streamed)) {
+      if (event.type === 'text-final' && event.streamed
+        && !(child.openSegment?.text ?? '').endsWith(event.streamed)) {
         throw new Error('Claude child text stream changed');
       }
-      const next = event.type === 'text-delta' ? child.text + event.text
-        : child.text.slice(0, child.text.length - event.streamed.length) + event.text;
-      if (next.length > MAX_CHILD_TEXT) throw new Error('Claude child transcript exceeds limit');
-      if (!child.part) {
-        child.part = createPart({ id: crypto.randomUUID(), messageId: assistant.id,
-          type: 'text', text: event.type === 'text-delta' ? '' : next, createdAt: Date.now() }, sessionId) as TextPart;
-        this.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part: child.part });
+      const current = child.openSegment?.text ?? '';
+      const delta = event.type === 'text-delta' ? event.text : undefined;
+      const streamed = event.type === 'text-final' ? event.streamed : '';
+      const next = event.type === 'text-delta' ? current + event.text
+        : current.slice(0, current.length - streamed.length) + event.text;
+      if (child.textLength - current.length + next.length > MAX_CHILD_TEXT) {
+        throw new Error('Claude child transcript exceeds limit');
       }
-      if (event.type === 'text-delta') {
-        updatePart(child.part.id, { text: next });
+      if (!child.openSegment) {
+        child.partClock = Math.max(Date.now(), child.partClock + 1);
+        const part = createPart({ id: crypto.randomUUID(), messageId: assistant.id,
+          type: 'text', text: delta === undefined ? next : '', createdAt: child.partClock }, sessionId) as TextPart;
+        this.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part });
+        child.openSegment = { part, text: delta === undefined ? next : '' };
+        child.segments.push(child.openSegment);
+      }
+      if (delta !== undefined) {
+        updatePart(child.openSegment.part.id, { text: next });
         this.delivery.broadcastToSession(sessionId, { type: 'part.append', sessionId,
-          partId: child.part.id, field: 'text', delta: event.text });
-      } else if (child.part.text !== next) {
-        const updated = updatePart(child.part.id, { text: next });
+          partId: child.openSegment.part.id, field: 'text', delta });
+      } else if (child.openSegment.part.text !== next) {
+        const updated = updatePart(child.openSegment.part.id, { text: next });
         if (updated) this.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part: updated });
       }
-      child.part = { ...child.part, text: next };
-      child.text = next;
+      child.textLength = child.textLength - current.length + next.length;
+      child.openSegment = { part: { ...child.openSegment.part, text: next }, text: next };
     } else if (event.type === 'tool-start') {
+      child.openSegment = null;
       const callId = `claude-tool:${this.nativeId}:${event.id}`;
       if (getToolPartByCallId(sessionId, callId)) throw new Error('Duplicate Claude child tool identity');
       const input = claudeToolInput(event.input);
       const nestedId = event.name === 'Agent' ? this.start(event.id, owner) : null;
       const name = claudeToolName(event.name);
       const part: ToolPart = { id: crypto.randomUUID(), messageId: assistant.id, type: 'tool', callId,
-        name, createdAt: Date.now(),
+        name, createdAt: (child.partClock = Math.max(Date.now(), child.partClock + 1)),
         state: { status: 'running', input, startedAt: Date.now(), ...(nestedId ? { childSessionId: nestedId } : {}) },
         presentation: { summary: claudeToolSummary(name, input), debugAvailable: false } };
       createPart(part, sessionId);
