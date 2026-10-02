@@ -395,7 +395,18 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   const files = createFilesApplication(createJean2FilesApplicationPort({
     listAvailableWorktreePaths: worktreeRoots.listAvailablePaths,
   }), (workspaceId, root) => broadcastEvent({ type: 'git.changed', workspaceId, root }));
-  const configuration = createConfigurationApplication(createJean2ConfigurationPorts());
+  const configuration = createConfigurationApplication({
+    ...createJean2ConfigurationPorts(),
+    // Primary/both preconfigs materialize as agents on save. Materialization
+    // failure must not fail an otherwise-successful config write.
+    onPreconfigSaved: async (preconfigId) => {
+      try {
+        await agents.ensureAgentMaterialized(preconfigId);
+      } catch (error: unknown) {
+        console.warn(`[agents] Failed to materialize agent for preconfig ${preconfigId}:`, error);
+      }
+    },
+  });
   const maintenance = createMaintenanceApplication(createJean2MaintenanceApplication());
   const responseFormats = createResponseFormatsApplication(createJean2ResponseFormatsApplication());
 

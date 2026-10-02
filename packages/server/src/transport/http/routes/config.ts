@@ -49,6 +49,7 @@ export function registerConfigRoutes(
         canSpawnSubagents: body.canSpawnSubagents as boolean | string[] | undefined,
         allowSelfAsSubagent: body.allowSelfAsSubagent,
         skills: body.skills ?? null,
+        capabilities: body.capabilities ?? null,
       }, format);
       return c.json({ preconfig }, 201);
     },
@@ -86,6 +87,7 @@ export function registerConfigRoutes(
           ? { allowSelfAsSubagent: body.allowSelfAsSubagent }
           : {}),
         skills: body.skills,
+        ...(body.capabilities !== undefined ? { capabilities: body.capabilities } : {}),
       });
       return c.json({ preconfig });
     },

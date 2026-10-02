@@ -31,6 +31,11 @@ export function registerAgentRoutes(app: Hono, application: AgentsApplication): 
     return c.json({ success: true });
   });
 
+  app.get('/api/agents/:id/skills', async (c) => {
+    const skills = await application.listAgentSkills(c.req.param('id'));
+    return c.json({ skills });
+  });
+
   app.get('/api/agents/:id/memory', async (c) => {
     const memory = await application.getAgentMemory(c.req.param('id'));
     return c.json(memory);

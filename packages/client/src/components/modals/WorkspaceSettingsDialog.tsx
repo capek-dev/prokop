@@ -14,11 +14,10 @@ const MCPServersPanel = lazy(() => import('./configuration/MCPServersPanel').the
 const PermissionsPanel = lazy(() => import('./configuration/PermissionsPanel').then((m) => ({ default: m.PermissionsPanel })));
 const AdditionalPathsPanel = lazy(() => import('./configuration/AdditionalPathsPanel').then((m) => ({ default: m.AdditionalPathsPanel })));
 const AutoApprovePanel = lazy(() => import('./configuration/AutoApprovePanel').then((m) => ({ default: m.AutoApprovePanel })));
-const WorkspacePreconfigsPanel = lazy(() => import('./configuration/WorkspacePreconfigsPanel').then((m) => ({ default: m.WorkspacePreconfigsPanel })));
 
 const LearningPanel = lazy(() => import('./configuration/LearningPanel').then(m => ({ default: m.LearningPanel })));
 
-type Section = 'sessions' | 'learning' | 'mcp' | 'permissions' | 'paths' | 'autoApprove' | 'agentTools' | 'preconfigs';
+type Section = 'sessions' | 'learning' | 'mcp' | 'permissions' | 'paths' | 'autoApprove' | 'agentTools';
 
 const SECTIONS: Omit<SettingsSection, 'icon'>[] = [
   { value: 'sessions', label: 'Sessions', group: 'general' },
@@ -26,7 +25,6 @@ const SECTIONS: Omit<SettingsSection, 'icon'>[] = [
   { value: 'permissions', label: 'Permissions', group: 'general' },
   { value: 'autoApprove', label: 'Auto-Approve', group: 'general' },
   { value: 'paths', label: 'Additional Paths', group: 'general' },
-  { value: 'preconfigs', label: 'Agents', group: 'general' },
   { value: 'learning', label: 'Learning · Prokop', group: 'capabilities' },
   { value: 'agentTools', label: 'Agent Tools', group: 'capabilities' },
 ];
@@ -38,7 +36,7 @@ const GROUPS = [
 
 /** Sections whose edits are held locally until Save is pressed. */
 const DEFERRED_SAVE_SECTIONS = new Set<Section>([
-  'sessions', 'learning', 'agentTools', 'autoApprove', 'preconfigs',
+  'sessions', 'learning', 'agentTools', 'autoApprove',
 ]);
 
 const ICONS: Record<Section, SettingsSection['icon']> = {
@@ -47,7 +45,6 @@ const ICONS: Record<Section, SettingsSection['icon']> = {
   permissions: Shield,
   autoApprove: ShieldCheck,
   paths: FolderSymlink,
-  preconfigs: Cog,
   learning: GraduationCap,
   agentTools: Wrench,
 };
@@ -71,15 +68,11 @@ function snapshot(workspace: Workspace) {
   return {
     memory: { enabled: s?.memory?.enabled ?? false },
     skills: { enabled: s?.skills?.managementEnabled ?? false },
-    search: {
-      enabled: s?.sessionSearch?.enabled ?? false,
-      includeToolResults: s?.sessionSearch?.includeToolResults ?? false,
-    },
     learning: s?.learning,
     allowPersonalLearning: s?.allowPersonalLearning !== false,
     autoApprove: s?.permissionMode ?? 'standard' as PermissionMode,
     sessionTagOrder: getSessionTagOrder(s?.sessionTagOrder),
-    preconfigSettings: s?.preconfigs ?? { selectedIds: null, defaultId: null },
+    defaultAgentId: s?.preconfigs?.defaultId ?? null,
   };
 }
 
@@ -102,6 +95,10 @@ export function WorkspaceSettingsDialog({
 
   const [draft, setDraft] = useState<DraftState>(() => snapshot(workspace));
   const allPreconfigs = useServerDataStore((s) => s.preconfigs);
+  const primaryPreconfigs = useMemo(
+    () => allPreconfigs.filter(p => p.mode !== 'subagent'),
+    [allPreconfigs],
+  );
 
   useEffect(() => {
     if (open) {
@@ -117,7 +114,7 @@ export function WorkspaceSettingsDialog({
 
   const saved = useMemo(() => snapshot(workspace), [workspace.settings]);
   const isDirty = JSON.stringify(draft) !== JSON.stringify(saved);
-  const learningError = draft.memory.enabled && draft.search.enabled
+  const learningError = draft.memory.enabled
     ? learningValidationError(draft.learning, allPreconfigs.map(p => p.id)) : null;
 
   const sectionsWithIcons = useMemo(
@@ -132,15 +129,10 @@ export function WorkspaceSettingsDialog({
       // Capability tools are on/off: always allowed when enabled.
       memory: { enabled: draft.memory.enabled, permissionRisk: 'none' },
       skills: { managementEnabled: draft.skills.enabled, permissionRisk: 'none' },
-      sessionSearch: {
-        enabled: draft.search.enabled,
-        permissionRisk: 'none',
-        includeToolResults: draft.search.includeToolResults,
-      },
-      learning: draft.learning ? { ...draft.learning, enabled: draft.learning.enabled && draft.memory.enabled && draft.search.enabled } : undefined,
+      learning: draft.learning ? { ...draft.learning, enabled: draft.learning.enabled && draft.memory.enabled } : undefined,
       allowPersonalLearning: draft.allowPersonalLearning,
       permissionMode: draft.autoApprove,
-      preconfigs: draft.preconfigSettings,
+      preconfigs: { selectedIds: null, defaultId: draft.defaultAgentId },
       sessionTagOrder: draft.sessionTagOrder,
     });
     onOpenChange(false);
@@ -152,7 +144,10 @@ export function WorkspaceSettingsDialog({
         switch (value as Section) {
           case 'sessions':
             return <WorkspaceSessionsPanel order={draft.sessionTagOrder}
-              onChange={sessionTagOrder => setDraft(d => ({ ...d, sessionTagOrder }))} />;
+              onChange={sessionTagOrder => setDraft(d => ({ ...d, sessionTagOrder }))}
+              preconfigs={primaryPreconfigs}
+              defaultAgentId={draft.defaultAgentId}
+              onDefaultAgentChange={id => setDraft(d => ({ ...d, defaultAgentId: id }))} />;
           case 'mcp':
             return <MCPServersPanel workspaceId={workspace.id} sdkClient={sdkClient} />;
           case 'permissions':
@@ -168,12 +163,6 @@ export function WorkspaceSettingsDialog({
               onSave={onUpdateWorkspacePaths}
               sdkClient={sdkClient}
             />;
-          case 'preconfigs':
-            return <WorkspacePreconfigsPanel
-              preconfigs={allPreconfigs}
-              settings={draft.preconfigSettings}
-              onChange={(v) => setDraft((d) => ({ ...d, preconfigSettings: v }))}
-            />;
           case 'autoApprove':
             return <AutoApprovePanel
               mode={draft.autoApprove}
@@ -184,18 +173,14 @@ export function WorkspaceSettingsDialog({
               onPersonalLearningChange={allowPersonalLearning => setDraft(d => ({ ...d, allowPersonalLearning }))}
               onChange={learning => setDraft(d => ({ ...d, learning,
                 memory: learning.enabled ? { ...d.memory, enabled: true } : d.memory,
-                search: learning.enabled ? { ...d.search, enabled: true } : d.search,
                 skills: learning.enabled && learning.improveSkills ? { ...d.skills, enabled: true } : d.skills,
               }))} />;
           case 'agentTools':
             return <AgentToolsPanel
               memoryEnabled={draft.memory.enabled}
               skillsEnabled={draft.skills.enabled}
-              searchEnabled={draft.search.enabled}
-              includeToolResults={draft.search.includeToolResults}
               onChangeMemory={(v) => setDraft(d => ({ ...d, memory: { enabled: v } }))}
               onChangeSkills={(v) => setDraft(d => ({ ...d, skills: { enabled: v } }))}
-              onChangeSearch={(v) => setDraft(d => ({ ...d, search: v }))}
             />;
         }
       })()}

@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Bot, Check, ChevronsUpDown, Folder, Box, Plus, MoreHorizontal, Trash2, Pencil, FolderInput, FolderSymlink, Loader2 } from 'lucide-react';
 import type { Workspace } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
-import { PromoteDialog } from '@/components/agent/PromoteDialog';
 import { FolderPickerDialog } from '@/components/modals/FolderPickerDialog';
 import { WorkspaceAdditionalPathsDialog } from '@/components/modals/WorkspaceAdditionalPathsDialog';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
@@ -26,8 +25,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { useDemoteAgent } from '@/hooks/queries';
-import { useServerDataStore } from '@/stores/serverDataStore';
 import { getWorkspaceDisplayName, isAgentHomeWorkspace } from '@/lib/workspaceKind';
 import { cn } from '@/lib/utils';
 import { sortWorkspaces } from '@/lib/workspaceOrder';
@@ -82,14 +79,11 @@ export function WorkspaceSwitcher({
   };
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [workspaceToMove, setWorkspaceToMove] = useState<Workspace | null>(null);
-  const [promoteOpen, setPromoteOpen] = useState(false);
-  const [agentToDemote, setAgentToDemote] = useState<Agent | null>(null);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null);
   const [editingPathsWorkspace, setEditingPathsWorkspace] = useState<Workspace | null>(null);
   const [renamingWorkspaceId, setRenamingWorkspaceId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
-  const demoteAgent = useDemoteAgent(sdkClient);
 
   useEffect(() => {
     if (renamingWorkspaceId && renameInputRef.current) {
@@ -158,7 +152,7 @@ export function WorkspaceSwitcher({
                 items: orderedWorkspaces.filter(workspace => !isAgentHomeWorkspace(workspace)),
               },
               {
-                heading: 'Agent homes',
+                heading: 'Agents',
                 items: orderedWorkspaces.filter(workspace => isAgentHomeWorkspace(workspace)),
               },
             ].map(group => (
@@ -219,19 +213,18 @@ export function WorkspaceSwitcher({
                           : 'opacity-0'
                       )}
                     />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          className="p-1 rounded hover:bg-secondary transition-colors"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal className="size-4" />
-                          <span className="sr-only">Workspace actions</span>
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-48">
-                        {!isAgentHomeWorkspace(workspace) ? (
-                          <>
+                     {!isAgentHomeWorkspace(workspace) && (
+                     <DropdownMenu>
+                       <DropdownMenuTrigger asChild>
+                         <button
+                           className="p-1 rounded hover:bg-secondary transition-colors"
+                           onClick={(e) => e.stopPropagation()}
+                         >
+                           <MoreHorizontal className="size-4" />
+                           <span className="sr-only">Workspace actions</span>
+                         </button>
+                       </DropdownMenuTrigger>
+                       <DropdownMenuContent align="end" className="min-w-48">
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
@@ -271,26 +264,9 @@ export function WorkspaceSwitcher({
                           <Trash2 className="size-4" />
                           Delete
                         </DropdownMenuItem>
-                          </>
-                        ) : (
-                          <DropdownMenuItem
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              const agentId = workspace.settings?.agentId;
-                              const agent = agents.find(candidate => candidate.id === agentId);
-                              if (agent) {
-                                setAgentToDemote(agent);
-                                setOpen(false);
-                              }
-                            }}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="size-4" />
-                            Demote agent
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                      </DropdownMenu>
+                       </DropdownMenuContent>
+                     </DropdownMenu>
+                     )}
                   </div>
                   </CommandItem>
                 ))}
@@ -323,22 +299,10 @@ export function WorkspaceSwitcher({
                 Add existing folder
               </CommandItem>
             </CommandGroup>
-            <CommandGroup heading="Agent actions">
-              <CommandItem
-                onSelect={() => {
-                  setOpen(false);
-                  setPromoteOpen(true);
-                }}
-              >
-                <Bot className="size-4" data-icon="inline-start" />
-                Promote preconfig to agent
-              </CommandItem>
-            </CommandGroup>
           </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
-    <PromoteDialog open={promoteOpen} onOpenChange={setPromoteOpen} />
     <FolderPickerDialog
       open={showFolderPicker || workspaceToMove !== null}
       onOpenChange={(nextOpen) => {
@@ -367,36 +331,6 @@ export function WorkspaceSwitcher({
       onSave={onUpdateWorkspacePaths}
       sdkClient={sdkClient}
       isSaving={editingPathsWorkspace ? !!isUpdatingWorkspace[editingPathsWorkspace.id] : false}
-    />
-    <ConfirmationDialog
-      open={agentToDemote !== null}
-      onOpenChange={(open) => !open && setAgentToDemote(null)}
-      title={agentToDemote ? `Demote ${agentToDemote.name}?` : 'Demote agent?'}
-      description="This will remove the agent directory and its home workspace. Sessions created in the home workspace will be deleted. The original agent is preserved."
-      confirmLabel="Demote"
-      variant="destructive"
-      loading={demoteAgent.isPending}
-      onConfirm={() => {
-        if (!agentToDemote) return;
-        const removedHomeId = `${agentToDemote.id}-home`;
-        demoteAgent.mutate(agentToDemote.id, {
-          onSuccess: () => {
-            const state = useServerDataStore.getState();
-            if (state.activeWorkspace?.id === removedHomeId) {
-              const fallback = state.workspaces.find(workspace => !workspace.settings?.isAgentHome)
-                ?? state.workspaces[0]
-                ?? null;
-              state.setActiveWorkspace(fallback);
-              if (fallback) {
-                localStorage.setItem('activeWorkspaceId', fallback.id);
-              } else {
-                localStorage.removeItem('activeWorkspaceId');
-              }
-            }
-            setAgentToDemote(null);
-          },
-        });
-      }}
     />
     <ConfirmationDialog
       open={workspaceToDelete !== null}

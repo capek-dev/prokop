@@ -207,6 +207,11 @@ export const updateAgentMemorySchema = z.object({
 
 // ── Preconfig schemas ──────────────────────────────────────────
 
+export const preconfigCapabilitiesSchema = z.object({
+  memory: z.boolean().optional(),
+  skills: z.boolean().optional(),
+}).nullable().optional();
+
 export const createPreconfigSchema = z.object({
   id: z.string().optional(),
   name: z.string().optional(),
@@ -221,6 +226,7 @@ export const createPreconfigSchema = z.object({
   canSpawnSubagents: z.union([z.boolean(), z.array(z.string())]).optional(),
   allowSelfAsSubagent: z.boolean().optional(),
   skills: z.array(z.string()).nullable().optional(),
+  capabilities: preconfigCapabilitiesSchema,
   format: z.enum(['md']).optional(),
 }).loose();
 
@@ -237,6 +243,7 @@ export const updatePreconfigSchema = z.object({
   canSpawnSubagents: z.union([z.boolean(), z.array(z.string())]).nullable().optional(),
   allowSelfAsSubagent: z.boolean().optional(),
   skills: z.array(z.string()).nullable().optional(),
+  capabilities: preconfigCapabilitiesSchema,
 }).loose();
 
 // ── Prompt schemas ─────────────────────────────────────────────
@@ -272,13 +279,8 @@ export const providerCredentialsSchema = z.object({
   skills: z.object({
     managementEnabled: z.boolean(),
   }).partial().optional(),
-  sessionSearch: z.object({
-    enabled: z.boolean(),
-    includeToolResults: z.boolean(),
-  }).partial().optional(),
   permissionMode: z.enum(['standard', 'extended', 'full']).optional(),
   preconfigs: z.object({
-    selectedIds: z.array(z.string()).nullable().optional(),
     defaultId: z.string().nullable().optional(),
   }).optional(),
 }).loose();

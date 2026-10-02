@@ -6,6 +6,7 @@ import type {
   DeleteAgentResponse,
   GetAgentMemoryResponse,
   UpdateAgentMemoryResponse,
+  ListAgentSkillsResponse,
 } from '../types/rest-responses';
 
 interface GetOptions {
@@ -48,6 +49,12 @@ export class AgentsRestNamespace {
 
   async getMemory(id: string, options?: GetOptions): Promise<GetAgentMemoryResponse> {
     return this.http.get(`/agents/${encodeURIComponent(id)}/memory`, {
+      signal: options?.signal,
+    });
+  }
+
+  async listSkills(id: string, options?: GetOptions): Promise<ListAgentSkillsResponse> {
+    return this.http.get(`/agents/${encodeURIComponent(id)}/skills`, {
       signal: options?.signal,
     });
   }

@@ -3,11 +3,17 @@ import type { Preconfig } from '@prokopai/sdk';
 import { createLearningReviewRunner, type LearningReviewRunnerDependencies } from '@/application/learning/review-runner';
 import { createLearningRepository } from '@/infrastructure/sqlite/learning-repository';
 import { getWorkspace, updateWorkspace } from '@/infrastructure/sqlite/workspaces';
-import { enableLearning } from '@/domains/learning/settings';
+import { enableLearning, parseLearningSettings } from '@/domains/learning/settings';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedSession, seedWorkspace } from '#tests/seed';
 
 afterEach(resetTestDatabase);
+
+/** Workspace-settings resolution semantics (the pre-agent-config behavior). */
+function workspaceLearningSettings(workspace: { settings: { learning?: unknown; memory?: { enabled?: boolean } } }) {
+  const learning = parseLearningSettings(workspace.settings.learning);
+  return learning?.enabled && workspace.settings.memory?.enabled ? learning : null;
+}
 
 function fixture(overrides: Partial<LearningReviewRunnerDependencies> = {}) {
   const db = setupTestDatabase();
@@ -23,7 +29,9 @@ function fixture(overrides: Partial<LearningReviewRunnerDependencies> = {}) {
   const calls: Parameters<LearningReviewRunnerDependencies['execute']>[0][] = [];
   const preconfig = { id: 'dev', model: 'inherited', provider: 'provider', variant: 'normal', systemPrompt: 'Review' } as Preconfig;
   const runner = createLearningReviewRunner({
-    repository, workspace: getWorkspace, preconfig: async () => preconfig,
+    repository, workspace: getWorkspace,
+    learningSettings: async (workspace) => workspaceLearningSettings(workspace),
+    preconfig: async () => preconfig,
     modelAvailable: () => true, eligible: () => true, now: Date.now,
     execute: async input => { calls.push(input); return {}; },
     ...overrides,
@@ -48,11 +56,13 @@ test('model overrides preserve their explicit variant without changing the preco
   expect(preconfig).toMatchObject({ provider: 'provider', model: 'inherited', variant: 'normal' });
 });
 
-test('unavailable models fail visibly without execution or checkpoint advancement', async () => {
+test('unavailable models skip the cycle silently without execution or recorded failure', async () => {
   const { runner, repository, calls } = fixture({ modelAvailable: () => false });
   expect(await runner.run('ws', 'reviewer', new AbortController().signal)).toBe(false);
   expect(calls).toHaveLength(0);
-  expect(repository.listRuns('ws')[0]).toMatchObject({ status: 'failed', error: 'Learning model is unavailable' });
+  // No run is claimed or recorded: default-on learning must not spam error
+  // runs on installs without provider credentials, and evidence stays queued.
+  expect(repository.listRuns('ws')).toHaveLength(0);
   expect(repository.pending('ws', 'reviewer')).toHaveLength(1);
 });
 

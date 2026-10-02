@@ -6,7 +6,7 @@ test('learning drafts reject missing reviewers and inconsistent timing without b
   const settings: WorkspaceLearningSettings = { enabled: true, reviewers: [], improveSkills: false, instructions: '', sources: { mode: 'all' } };
   expect(learningValidationError(settings, ['dev'])).toContain('learner');
   settings.reviewers.push({ id: 'r', preconfigId: 'dev', instructions: '', modelOverride: null, cadence: null });
-  expect(learningValidationError(settings, [])).toContain('available preconfig');
+  expect(learningValidationError(settings, [])).toContain('available agent');
   expect(learningValidationError(settings, ['dev'])).toBeNull();
   settings.reviewers[0].cadence = { idleMinutes: 1, minimumIntervalMinutes: 10, maximumPendingMinutes: 5 };
   expect(learningValidationError(settings, ['dev'])).toContain('Maximum pending');

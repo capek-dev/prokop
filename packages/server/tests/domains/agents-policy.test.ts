@@ -18,6 +18,7 @@ import {
   isSubagentTargetPreconfig,
   knownSubagentIds,
   sanitizeCanSpawnSubagentsIds,
+  shouldMaterializeAgent,
 } from '@/domains/agents';
 import { PROMOTION_ERRORS } from '@/domains/agents';
 
@@ -62,10 +63,6 @@ describe('agents domain: home directory semantics', () => {
     expect(agentHomeWorkspaceSettings('coder')).toEqual({
       isAgentHome: true,
       agentId: 'coder',
-      memory: { enabled: true, permissionRisk: 'none' },
-      skills: { managementEnabled: true, permissionRisk: 'none' },
-      sessionSearch: { enabled: true, permissionRisk: 'none', includeToolResults: false },
-      scheduling: { enabled: true, permissionRisk: 'none' },
     });
   });
 });
@@ -83,6 +80,7 @@ describe('agents domain: promotion policy', () => {
   test('pins the exact promotion error messages', () => {
     expect(PROMOTION_ERRORS).toEqual({
       preconfigNotFound: 'Preconfig not found',
+      subagentOnlyNotPromotable: 'Subagent-only preconfigs cannot be promoted to agents',
       alreadyAgent: 'Already an agent',
       failedToCreate: 'Failed to create agent',
     });
@@ -97,6 +95,13 @@ describe('agents domain: subagent configuration rules', () => {
     expect(isSubagentTargetPreconfig(preconfig({ mode: 'both' }))).toBe(true);
     expect(isSubagentTargetPreconfig(preconfig({ mode: 'primary' }))).toBe(false);
     expect(isSubagentTargetPreconfig(preconfig())).toBe(false);
+  });
+
+  test('materializes every primary/both preconfig and skips subagent-only ones', () => {
+    expect(shouldMaterializeAgent(preconfig())).toBe(true);
+    expect(shouldMaterializeAgent(preconfig({ mode: 'primary' }))).toBe(true);
+    expect(shouldMaterializeAgent(preconfig({ mode: 'both' }))).toBe(true);
+    expect(shouldMaterializeAgent(preconfig({ mode: 'subagent' }))).toBe(false);
   });
 
   test('computes known subagent ids and sanitizes configured id lists in order', () => {

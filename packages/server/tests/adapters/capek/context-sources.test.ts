@@ -46,6 +46,15 @@ function makeAgentsApplication(calls: string[]): AgentsApplication {
       calls.push(`preconfig:${id}`);
       return id === preconfig.id ? preconfig : null;
     },
+    async ensureAgentMaterialized() {
+      return null;
+    },
+    async ensureAgentsMaterialized() {
+      return [];
+    },
+    async listAgentSkills() {
+      return [];
+    },
     async promotePreconfig() {
       throw new Error('unused');
     },

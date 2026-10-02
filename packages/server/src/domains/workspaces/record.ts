@@ -18,12 +18,45 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
 /** Merge raw stored settings over the defaults; malformed JSON falls back to
  * the defaults exactly like the pre-domain store. */
 export function parseWorkspaceSettings(raw: string | null): WorkspaceSettings {
-  if (!raw) return { ...DEFAULT_WORKSPACE_SETTINGS };
+  if (!raw) return applyWorkspacePolicy({ ...DEFAULT_WORKSPACE_SETTINGS });
   try {
-    return normalizeCapabilityRisk({ ...DEFAULT_WORKSPACE_SETTINGS, ...JSON.parse(raw) });
+    return applyWorkspacePolicy(normalizeCapabilityRisk({ ...DEFAULT_WORKSPACE_SETTINGS, ...JSON.parse(raw) }));
   } catch {
-    return { ...DEFAULT_WORKSPACE_SETTINGS };
+    return applyWorkspacePolicy({ ...DEFAULT_WORKSPACE_SETTINGS });
   }
+}
+
+/** Product policy applied on every read, expressed as data for Capek's
+ * neutral gates (never as Capek behavior changes):
+ * - Session search is always on, risk-free, without tool results; stored
+ *   values are ignored and never surfaced.
+ * - Agent homes suppress the workspace memory and skill-manage surfaces:
+ *   the agent-scoped tools (`agent_memory`, `agent_skill_manage`) own those
+ *   capabilities in a home, so the duplicate workspace files under
+ *   `home/.prokopai` never load.
+ * - The per-workspace preconfig selection (`selectedIds`) no longer exists;
+ *   stale stored values are dropped so only `defaultId` is ever read. */
+export function applyWorkspacePolicy(settings: WorkspaceSettings): WorkspaceSettings {
+  const withoutSessionSearch = { ...settings };
+  delete withoutSessionSearch.sessionSearch;
+
+  const next: WorkspaceSettings = {
+    ...withoutSessionSearch,
+    sessionSearch: { enabled: true, permissionRisk: 'none', includeToolResults: false },
+  };
+
+  if (settings.preconfigs?.selectedIds !== undefined) {
+    // The per-workspace selection no longer exists: null means every primary
+    // preconfig is visible. Only `defaultId` survives a read.
+    next.preconfigs = { selectedIds: null, defaultId: settings.preconfigs.defaultId ?? null };
+  }
+
+  if (next.isAgentHome === true) {
+    if (next.memory) next.memory = { ...next.memory, enabled: false };
+    if (next.skills) next.skills = { ...next.skills, managementEnabled: false };
+  }
+
+  return next;
 }
 
 /** Capability tools (memory, skills, session search) are on/off in Prokop:

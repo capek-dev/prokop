@@ -1,12 +1,15 @@
-import type { Workspace } from '@prokopai/sdk';
+import type { Workspace, WorkspaceLearningSettings } from '@prokopai/sdk';
 import type { LearningRepository } from '@/infrastructure/sqlite/learning-repository';
-import { defaultLearningCadence, parseLearningSettings } from '@/domains/learning/settings';
+import { defaultLearningCadence } from '@/domains/learning/settings';
 import { createLearningCoordinator } from './coordinator';
 import { subscribeLearningActivity } from './activity';
 
 export interface LearningServiceDependencies {
   repository: LearningRepository;
   workspaces(): Workspace[];
+  /** Effective learning settings for a workspace: agent homes resolve from
+   * the owning agent's config, other workspaces from stored settings. */
+  learningSettings(workspace: Workspace): Promise<WorkspaceLearningSettings | null>;
   discover(workspace: Workspace, since: number, signal: AbortSignal, reviewerId: string): Promise<Array<{ sessionId: string; messageId: string; completedAt: number }>>;
   activity(workspace: Workspace): { lastActivityAt: number; running: boolean };
   eligible(workspace: Workspace, messageId: string): boolean;
@@ -32,8 +35,8 @@ export function createLearningService(deps: LearningServiceDependencies) {
       let next: number | null = null;
       for (const workspace of deps.workspaces()) {
         signal.throwIfAborted();
-        const learning = parseLearningSettings(workspace.settings.learning);
-        if (!learning?.enabled || !workspace.settings.memory?.enabled || !workspace.settings.sessionSearch?.enabled) continue;
+        const learning = await deps.learningSettings(workspace);
+        if (!learning?.enabled) continue;
         if (deps.repository.blocked(workspace.id)) continue;
         for (const reviewer of learning.reviewers) {
           const state = deps.repository.activate(workspace.id, reviewer.id, deps.now());

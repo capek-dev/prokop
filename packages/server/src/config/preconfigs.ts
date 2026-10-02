@@ -181,6 +181,26 @@ export function validatePreconfigData(data: Record<string, unknown>): string[] {
     errors.push('skills must be an array of strings');
   }
 
+  if (data.capabilities !== undefined && data.capabilities !== null) {
+    if (typeof data.capabilities !== 'object' || Array.isArray(data.capabilities)) {
+      errors.push('capabilities must be a plain object or null');
+    } else {
+      const capabilities = data.capabilities as Record<string, unknown>;
+      if (capabilities.memory !== undefined && typeof capabilities.memory !== 'boolean') {
+        errors.push('capabilities.memory must be a boolean');
+      }
+      if (capabilities.skills !== undefined && typeof capabilities.skills !== 'boolean') {
+        errors.push('capabilities.skills must be a boolean');
+      }
+      const knownKeys = new Set(['memory', 'skills']);
+      for (const key of Object.keys(capabilities)) {
+        if (!knownKeys.has(key)) {
+          errors.push(`capabilities has unknown key: ${key}`);
+        }
+      }
+    }
+  }
+
   return errors;
 }
 

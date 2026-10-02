@@ -72,7 +72,6 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
     instructions: '',
     sources: { mode: 'all' },
   };
-  const singleReviewer = personal ? settings.reviewers[0] : undefined;
   const createReviewer = (): LearningReviewer => ({ id: crypto.randomUUID(), preconfigId: initialId!, instructions: '', modelOverride: null, cadence: null });
   const update = (id: string, change: Partial<LearningReviewer>) =>
     onChange({ ...settings, reviewers: settings.reviewers.map(item => item.id === id ? { ...item, ...change } : item) });
@@ -140,16 +139,38 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
     return bordered ? <div className="border-t px-3 py-2">{link}</div> : link;
   };
 
+  // Agent homes are no longer a learning settings surface: the owning
+  // agent's learning is configured in Settings → Server → Agents. Only the
+  // history browser stays relevant here.
+  if (personal) {
+    return (
+      <div className="flex flex-col gap-3 p-3 sm:p-4">
+        <Alert>
+          <AlertTitle>Agent learning is configured on the agent</AlertTitle>
+          <AlertDescription>
+            This workspace is an agent home. Its learning is enabled, tuned, and turned off on the agent itself:
+            Settings → Server → Agents → Learning.
+          </AlertDescription>
+        </Alert>
+        <button
+          type="button"
+          className="w-fit text-xs text-primary underline-offset-4 hover:underline"
+          onClick={() => setHistoryOpen(true)}
+        >
+          Learning history
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 p-3 sm:p-4">
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-0.5">
           <Label htmlFor="learning-enabled">Automatic learning</Label>
           <p className="text-xs text-muted-foreground">
-            {personal
-              ? "Study this agent's conversations across eligible projects and save durable improvements."
-              : 'Study conversations during quiet periods and maintain shared project knowledge.'}{' '}
-            Enabling also turns on Memory and Session search. The first run covers the last seven days.
+            {'Study conversations during quiet periods and maintain shared project knowledge. '}
+            Enabling also turns on Memory. The first run covers the last seven days.
           </p>
           <button
             type="button"
@@ -169,11 +190,9 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
 
       {!initialId && (
         <Alert>
-          <AlertTitle>{personal ? 'Agent reference missing' : 'Select a default agent first'}</AlertTitle>
+          <AlertTitle>Select a default agent first</AlertTitle>
           <AlertDescription>
-            {personal
-              ? 'This agent home has no agent reference, so learning cannot run.'
-              : 'Learning needs an agent to run. Pick one in the Agents section.'}
+            Learning needs an agent to run. Pick one in the Sessions section.
           </AlertDescription>
         </Alert>
       )}
@@ -194,15 +213,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
         <>
           <Separator />
 
-          {personal ? (
-            singleReviewer && (
-              <div className="space-y-3">
-                {learnerModel(singleReviewer)}
-                {learnerTuning(singleReviewer, false)}
-                {previewLink(singleReviewer, false)}
-              </div>
-            )
-          ) : (
+          {(
             <div className="space-y-3">
               <div className="space-y-0.5">
                 <Label>Learners</Label>

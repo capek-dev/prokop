@@ -1,6 +1,11 @@
 import type { AgentPreconfigPort, AgentWorkspacePort } from '@/application/ports/agents';
-import { getPreconfig } from '@/infrastructure/config/preconfig';
-import { createWorkspace, deleteWorkspace, updateWorkspace } from '@/infrastructure/sqlite/workspaces';
+import { getPreconfig, listPreconfigs } from '@/infrastructure/config/preconfig';
+import {
+  createWorkspace,
+  deleteWorkspace,
+  getWorkspace,
+  updateWorkspace,
+} from '@/infrastructure/sqlite/workspaces';
 
 /**
  * Jean2 adapter for the agent workspace port (S4). Wraps the current
@@ -11,6 +16,9 @@ export function createJean2AgentWorkspacePort(): AgentWorkspacePort {
   return {
     create(input) {
       return createWorkspace(input);
+    },
+    get(id) {
+      return getWorkspace(id);
     },
     applySettings(id, settings) {
       updateWorkspace(id, { settings });
@@ -25,5 +33,6 @@ export function createJean2AgentWorkspacePort(): AgentWorkspacePort {
 export function createJean2AgentPreconfigPort(): AgentPreconfigPort {
   return {
     get: getPreconfig,
+    list: listPreconfigs,
   };
 }

@@ -27,16 +27,29 @@ async function fixture(personal = false, execute?: LearningExecutionDependencies
   seedWorkspace({ id: 'ws', path: root, settings: personal ? {} : settings });
   if (personal) {
     await mkdir(join(root, 'home'));
-    seedWorkspace({ id: 'dev-home', path: join(root, 'home'), settings: { ...settings, isAgentHome: true, agentId: 'dev' } });
+    // The home carries only the flags; personal learning config lives on
+    // the agent preconfig (settings.learning below).
+    seedWorkspace({ id: 'dev-home', path: join(root, 'home'), settings: { isAgentHome: true, agentId: 'dev' } });
   }
   seedSession('ws', { id: 'source', title: 'Fix retry handling' });
   const now = Date.now() - 120_000;
   db.run(`INSERT INTO messages (id,session_id,role,created_at,status,agent,completed_at,sequence) VALUES ('answer','source','assistant',?,'completed','dev',?,0)`, [now, now]);
   let reviewSession = '';
   let calls = 0;
+  // Mutable so personal tests can tighten the agent cadence.
+  const agentLearning = {
+    enabled: true,
+    cadence: { idleMinutes: 1, minimumIntervalMinutes: 1, maximumPendingMinutes: 1 },
+    instructions: '',
+    sources: { mode: 'all' as const },
+  };
   const agents = {
     getAgentDirectory: async () => personal ? root! : null, isAgentSync: () => false,
-    getPreconfigOrAgent: async () => ({ id: 'dev', provider: 'test', model: 'fake', systemPrompt: 'Review' } as Preconfig),
+    getPreconfigOrAgent: async () => ({
+      id: 'dev', provider: 'test', model: 'fake', systemPrompt: 'Review',
+      // Personal (agent-scope) learning reads its cadence from here.
+      settings: personal ? { learning: agentLearning } : undefined,
+    } as unknown as Preconfig),
   };
   const wire = () => createWiredLearning(agents, createProkopLearningRuntime({
     agents,
@@ -54,7 +67,7 @@ async function fixture(personal = false, execute?: LearningExecutionDependencies
   const app = new Hono();
   app.onError((error, c) => c.json({ error: error.message }, 400));
   registerLearningRoutes(app, learning.api);
-  return { db, settings, app, wire, calls: () => calls, reviewSession: () => reviewSession };
+  return { db, settings, app, wire, calls: () => calls, reviewSession: () => reviewSession, agentLearning };
 }
 
 test('personal home reference writes survive failure and support history undo without replay', async () => {
@@ -71,7 +84,7 @@ test('personal home reference writes survive failure and support history undo wi
   const run = learning!.repository.listRuns('dev-home')[0]!;
   expect(run.status).toBe('failed');
   expect(learning!.repository.isRecovered(run.id)).toBe(true);
-  expect(learning!.repository.pending('dev-home', 'reviewer')).toHaveLength(1);
+  expect(learning!.repository.pending('dev-home', 'dev')).toHaveLength(1);
   expect(await readFile(join(root!, 'home/examples/retry.ts'), 'utf8')).toBe('// reference only');
   const detail = learning!.api.detail('dev-home', run.id);
   expect(detail.changes[0].path).toBe('home/examples/retry.ts');
@@ -153,8 +166,9 @@ test('exclusion and malformed policy are enforced by HTTP before discovery', asy
 
 test('personal cadence waits for running sessions with owning-agent message participation', async () => {
   const f = await fixture(true);
-  f.settings.learning!.reviewers[0]!.cadence!.maximumPendingMinutes = 120;
-  f.db.run('UPDATE workspaces SET settings = ? WHERE id = ?', [JSON.stringify({ ...f.settings, isAgentHome: true, agentId: 'dev' }), 'dev-home']);
+  // The cadence lives on the agent config; a long maximum-pending window
+  // with a still-running participating session holds the review back.
+  f.agentLearning.cadence!.maximumPendingMinutes = 120;
   updateSession('source', { runningAt: new Date().toISOString() });
   await learning!.start(); await Bun.sleep(30); await learning!.stop();
   expect(f.calls()).toBe(0);
@@ -233,6 +247,7 @@ test.each([false, true])('shutdown preserves partial lessons and restart continu
     return {};
   });
   const workspaceId = personal ? 'dev-home' : 'ws';
+  const reviewerId = personal ? 'dev' : 'reviewer';
   const path = join(root!, personal ? 'MEMORY.md' : '.prokopai/MEMORY.md');
   await learning!.start();
   await wrote.promise;
@@ -246,7 +261,7 @@ test.each([false, true])('shutdown preserves partial lessons and restart continu
   expect(learning!.repository.getRun(run.id)?.status).toBe('interrupted');
   expect(learning!.repository.isRecovered(run.id)).toBe(true);
   expect(learning!.repository.blocked(workspaceId)).toBe(false);
-  expect(learning!.repository.pending(workspaceId, 'reviewer')).toHaveLength(1);
+  expect(learning!.repository.pending(workspaceId, reviewerId)).toHaveLength(1);
   expect(await readFile(path, 'utf8')).toBe('- First saved lesson');
 
   // Simulate the elapsed cooldown and a new production composition after update.
@@ -254,7 +269,7 @@ test.each([false, true])('shutdown preserves partial lessons and restart continu
   learning = f.wire();
   await learning.start(); await waitForReview(workspaceId); await learning.stop();
   expect(await readFile(path, 'utf8')).toBe('- First saved lesson\n- Remaining lesson');
-  expect(learning.repository.pending(workspaceId, 'reviewer')).toEqual([]);
+  expect(learning.repository.pending(workspaceId, reviewerId)).toEqual([]);
   expect(attempts).toBe(2);
   await learning.start(); await Bun.sleep(20); await learning.stop();
   expect(attempts).toBe(2);

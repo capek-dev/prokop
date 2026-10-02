@@ -8,7 +8,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/stores/serverDataStore', () => ({
-  useServerDataStore: (selector: (s: { preconfigs: unknown[] }) => unknown) => selector({ preconfigs: [] }),
+  useServerDataStore: (selector: (s: { preconfigs: unknown[] }) => unknown) => selector({
+    preconfigs: [
+      { id: 'general', name: 'General', mode: 'primary' },
+      { id: 'explore', name: 'Explore', mode: 'subagent' },
+    ],
+  }),
 }));
 
 vi.mock('@/hooks/queries', () => ({
@@ -95,15 +100,15 @@ describe('WorkspaceSettingsDialog', () => {
       />,
     );
 
-    // Open the Memory section from the desktop tab rail.
-    await user.click(screen.getByRole('tab', { name: /memory/i }));
+    // Open the Agent Tools section from the desktop tab rail.
+    await user.click(screen.getByRole('tab', { name: /agent tools/i }));
 
     const saveButton = await screen.findByRole('button', { name: /saved/i });
     expect(saveButton).toBeDisabled();
 
     // Toggle the enable switch: draft diverges from snapshot. The panel is
     // lazy-loaded, so wait for the switch to mount.
-    await user.click(await screen.findByRole('switch', { name: /enable memory/i }));
+    await user.click(await screen.findByRole('switch', { name: 'Memory' }));
     expect(screen.getByRole('button', { name: /save changes/i })).toBeEnabled();
 
     // The footer survives switching to a non-form section and back:
@@ -111,7 +116,7 @@ describe('WorkspaceSettingsDialog', () => {
     await user.click(screen.getByRole('tab', { name: /mcp servers/i }));
     expect(screen.queryByRole('button', { name: /save changes/i })).toBeNull();
 
-    await user.click(screen.getByRole('tab', { name: /memory/i }));
+    await user.click(screen.getByRole('tab', { name: /agent tools/i }));
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() =>
@@ -120,6 +125,25 @@ describe('WorkspaceSettingsDialog', () => {
         // Stored 'medium' risk is dropped: capabilities save as always allowed.
         expect.objectContaining({ memory: { enabled: true, permissionRisk: 'none' } }),
       ),
+    );
+  });
+
+  test('default agent dropdown writes only defaultId and keeps every agent visible', async () => {
+    const user = userEvent.setup();
+    render(<WorkspaceSettingsDialog {...props} open workspace={makeWorkspace()} />);
+
+    await user.click(screen.getByRole('tab', { name: 'Sessions' }));
+    await user.click(screen.getByRole('combobox', { name: 'Default agent' }));
+    // Primary/both agents are offered; subagent-only ones never are.
+    expect(screen.queryByRole('option', { name: 'Explore' })).toBeNull();
+    await user.click(screen.getByRole('option', { name: 'General' }));
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() =>
+      expect(mocks.save).toHaveBeenCalledWith('ws-1', expect.objectContaining({
+        // The retired selection list is written as null: all agents visible.
+        preconfigs: { selectedIds: null, defaultId: 'general' },
+      })),
     );
   });
 });

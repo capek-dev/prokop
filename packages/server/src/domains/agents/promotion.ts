@@ -12,6 +12,7 @@ import type { Agent, Preconfig } from '@prokopai/sdk';
 
 export const PROMOTION_ERRORS = {
   preconfigNotFound: 'Preconfig not found',
+  subagentOnlyNotPromotable: 'Subagent-only preconfigs cannot be promoted to agents',
   alreadyAgent: 'Already an agent',
   failedToCreate: 'Failed to create agent',
 } as const;

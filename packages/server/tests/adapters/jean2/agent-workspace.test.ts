@@ -50,7 +50,13 @@ describe('jean2 agents adapters over the real store and filesystem', () => {
     expect(workspace).not.toBeNull();
     expect(workspace!.path).toBe(join(getDataDir(), 'agents', 'coder', 'home'));
     expect(workspace!.isVirtual).toBe(true);
-    expect(workspace!.settings).toEqual({ ...agentHomeWorkspaceSettings('coder'), permissionMode: 'standard' });
+    // Read back through the store: the home policy plus the always-on
+    // session-search product policy applied at read time.
+    expect(workspace!.settings).toEqual({
+      ...agentHomeWorkspaceSettings('coder'),
+      permissionMode: 'standard',
+      sessionSearch: { enabled: true, permissionRisk: 'none', includeToolResults: false },
+    });
 
     await application.demoteAgent('coder');
     expect(getWorkspace('coder-home')).toBeNull();

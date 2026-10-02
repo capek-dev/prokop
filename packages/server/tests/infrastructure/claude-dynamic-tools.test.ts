@@ -143,10 +143,10 @@ test('a stale turn, unbound agent, or changed preconfig refuses skill calls', as
   expect((await call({ action: 'list' } as never, {})).isError).toBe(true);
 });
 
-test('session search registers only when the workspace enables it', () => {
-  expect(searchTools().map(item => item.name)).toEqual([]);
+test('session search registers unconditionally: the read policy keeps it always on', () => {
+  expect(searchTools().map(item => item.name)).toEqual(['session_search']);
   updateWorkspace('ws', { settings: { sessionSearch: {
-    enabled: true, permissionRisk: 'low', includeToolResults: false } } });
+    enabled: false, permissionRisk: 'low', includeToolResults: false } } });
   expect(searchTools().map(item => item.name)).toEqual(['session_search']);
 });
 
@@ -175,12 +175,11 @@ test('session search routes settings and agent scope without any ask', async () 
   expect(refused.isError).toBe(true);
   expect(refused.content[0]).toMatchObject({ type: 'text', text: 'Agent scope requires an agent session' });
   expect(seen).toHaveLength(1);
-  // Disabled mid-flight settings refuse.
+  // A stored disable is ignored at read time: search keeps running.
   updateWorkspace('ws', { settings: { sessionSearch: {
     enabled: false, permissionRisk: 'medium', includeToolResults: false } } });
   const off = await handler({ action: 'list' } as never, {});
-  expect(off.isError).toBe(true);
-  expect(off.content[0]).toMatchObject({ type: 'text', text: 'Session search is disabled' });
+  expect(off.isError).toBeFalsy();
 });
 
 test('registration follows the workspace memory setting and the agent home', () => {

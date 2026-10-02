@@ -1731,9 +1731,9 @@ test('Codex advertises session search, routes reads without asks, and handles re
   resumed.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
   await second;
   expect(calls).toEqual([
-    { input: { action: 'list' }, includeTools: true, risk: 'none' },
-    { input: { query: 'needle' }, includeTools: true, risk: 'none' },
-    { input: { action: 'list' }, includeTools: true, risk: 'none' },
+    { input: { action: 'list' }, includeTools: false, risk: 'none' },
+    { input: { query: 'needle' }, includeTools: false, risk: 'none' },
+    { input: { action: 'list' }, includeTools: false, risk: 'none' },
   ]);
 });
 

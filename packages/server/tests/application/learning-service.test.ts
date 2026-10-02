@@ -5,7 +5,7 @@ import { createLearningService, type LearningServiceDependencies } from '@/appli
 import { notifyLearningActivity } from '@/application/learning/activity';
 import { createLearningRepository } from '@/infrastructure/sqlite/learning-repository';
 import { initializeLearningSchema } from '@/infrastructure/sqlite/learning-schema';
-import { enableLearning } from '@/domains/learning/settings';
+import { enableLearning, parseLearningSettings } from '@/domains/learning/settings';
 
 let stop: (() => Promise<void>) | undefined;
 let db: Database;
@@ -28,6 +28,10 @@ function fixture(overrides: Partial<LearningServiceDependencies> = {}) {
   const events: string[] = [];
   const service = createLearningService({
     repository, workspaces: () => [workspace], now: () => now,
+    learningSettings: async (candidate) => {
+      const learning = parseLearningSettings(candidate.settings.learning);
+      return learning?.enabled && candidate.settings.memory?.enabled ? learning : null;
+    },
     discover: async () => [{ messageId: 'm', sessionId: 's', completedAt: now - 4_000_000 }],
     activity: () => ({ lastActivityAt: now - 4_000_000, running: false }), eligible: () => true,
     recover: async () => { events.push('recover'); }, onError: error => { throw error; },

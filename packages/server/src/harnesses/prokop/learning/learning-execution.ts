@@ -29,7 +29,7 @@ export function createLearningExecution(deps: LearningExecutionDependencies): Le
     const initialSettings = JSON.stringify(workspace.settings);
     const directories = await deps.directories(workspace);
     const scope = workspace.settings.isAgentHome
-      ? { kind: 'agent' as const, agentId: workspace.settings.agentId!, sources: workspace.settings.learning!.sources }
+      ? { kind: 'agent' as const, agentId: workspace.settings.agentId!, sources: input.sources }
       : { kind: 'workspace' as const, workspaceId: workspace.id };
     const evidence = createLearningEvidenceReader(deps.database, scope);
     const accessed = new Set(input.messageIds);
@@ -58,7 +58,7 @@ export function createLearningExecution(deps: LearningExecutionDependencies): Le
         if (result !== 'applied' && result !== 'unchanged') throw new Error('Knowledge activation requires reconciliation');
       },
     }, authorize);
-    const improveSkills = workspace.settings.learning!.improveSkills && workspace.settings.skills?.managementEnabled === true;
+    const improveSkills = input.improveSkills;
     const knowledge = createLearningKnowledgeExecutor({
       ...directories, scope: scope.kind, improveSkills, authorize, mutate,
     });

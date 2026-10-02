@@ -15,6 +15,14 @@ export function effectivePreconfigMode(mode: PreconfigMode | undefined): Preconf
   return mode ?? 'primary';
 }
 
+/** Every primary or both preconfig is an agent out of the box: its agent
+ * directory, memory, skills, and home workspace materialize automatically.
+ * Subagent-only preconfigs (e.g. the seeded explore agent) never
+ * materialize; they stay lean task delegates. */
+export function shouldMaterializeAgent(preconfig: Pick<Preconfig, 'mode'>): boolean {
+  return effectivePreconfigMode(preconfig.mode) !== 'subagent';
+}
+
 /** A preconfig is a subagent target when its effective mode is 'subagent'
  * or 'both'. */
 export function isSubagentTargetPreconfig(preconfig: Pick<Preconfig, 'mode'>): boolean {

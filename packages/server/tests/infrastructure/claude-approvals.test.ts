@@ -75,10 +75,9 @@ test('prokop mcp tools pass the SDK gate while memory availability is enforced',
     options(controller.signal))).toMatchObject({ behavior: 'allow' });
   expect(await gate('mcp__prokop__agent_skill_manage', { action: 'list' },
     options(controller.signal))).toMatchObject({ behavior: 'allow' });
+  // Session search is always on: the gate passes before any settings write.
   expect(await gate('mcp__prokop__session_search', { action: 'list' }, options(controller.signal)))
-    .toMatchObject({ behavior: 'deny', message: 'Session search is disabled' });
-  updateWorkspace('ws', { settings: { memory: { enabled: true, permissionRisk: 'high' },
-    sessionSearch: { enabled: true, permissionRisk: 'low', includeToolResults: false } } });
+    .toMatchObject({ behavior: 'allow' });
   expect(await gate('mcp__prokop__session_search', { query: 'deploy' }, options(controller.signal)))
     .toMatchObject({ behavior: 'allow' });
 });

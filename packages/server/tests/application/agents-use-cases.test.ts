@@ -81,6 +81,9 @@ function makeWorkspaces(state: FakeState): AgentWorkspacePort {
       state.workspaces.set(input.id, workspace);
       return workspace as unknown as Workspace;
     },
+    get(id) {
+      return (state.workspaces.get(id) as Workspace | undefined) ?? null;
+    },
     applySettings(id, settings) {
       state.log.push(`applySettings:${id}`);
       const existing = state.workspaces.get(id);
@@ -99,6 +102,9 @@ function makePreconfigs(state: FakeState): AgentPreconfigPort {
   return {
     async get(id) {
       return state.preconfigs.get(id) ?? null;
+    },
+    async list() {
+      return [...state.preconfigs.values()];
     },
   };
 }
@@ -208,15 +214,73 @@ describe('agents application use cases', () => {
     expect(state.workspaces.get('coder-home')!.settings).toEqual(agentHomeWorkspaceSettings('coder'));
   });
 
-  test('promotePreconfig throws the exact pre-S4 errors', async () => {
+  test('promotePreconfig throws the exact errors for missing and subagent-only preconfigs', async () => {
     const state = makeFakes();
     const application = makeApplication(state);
 
     await expect(application.promotePreconfig('missing')).rejects.toThrow('Preconfig not found');
 
+    state.preconfigs.set('explore', makePreconfig({ id: 'explore', mode: 'subagent' }));
+    await expect(application.promotePreconfig('explore')).rejects.toThrow('Subagent-only preconfigs cannot be promoted to agents');
+  });
+
+  test('promotePreconfig is idempotent: materializing an existing agent returns it and heals the home flags', async () => {
+    const state = makeFakes();
     state.preconfigs.set('coder', makePreconfig());
-    state.dirs.add('/data/agents/coder');
-    await expect(application.promotePreconfig('coder')).rejects.toThrow('Already an agent');
+    const application = makeApplication(state);
+
+    const first = await application.promotePreconfig('coder');
+    const again = await application.promotePreconfig('coder');
+    expect(again.id).toBe('coder');
+    expect(again.hasHome).toBe(true);
+    expect(first.id).toBe('coder');
+
+    // Second call healed the existing row instead of re-creating it.
+    expect(state.log.filter((entry) => entry === 'createWorkspace:coder-home')).toHaveLength(1);
+    const home = state.workspaces.get('coder-home')!;
+    expect(home.settings).toMatchObject({ isAgentHome: true, agentId: 'coder' });
+  });
+
+  test('ensureAgentMaterialized creates the layout and home, skips subagent-only preconfigs, and preserves stored settings', async () => {
+    const state = makeFakes();
+    state.preconfigs.set('coder', makePreconfig());
+    state.preconfigs.set('explore', makePreconfig({ id: 'explore', mode: 'subagent' }));
+    const application = makeApplication(state);
+
+    expect(await application.ensureAgentMaterialized('missing')).toBeNull();
+    expect(await application.ensureAgentMaterialized('explore')).toBeNull();
+    expect(state.dirs.has('/data/agents/explore')).toBe(false);
+
+    const agent = await application.ensureAgentMaterialized('coder');
+    expect(agent?.id).toBe('coder');
+    expect(state.dirs.has('/data/agents/coder/skills')).toBe(true);
+    expect(state.dirs.has('/data/agents/coder/home/.prokopai')).toBe(true);
+    expect(state.workspaces.get('coder-home')!.settings).toEqual(agentHomeWorkspaceSettings('coder'));
+
+    // Re-ensure with a pre-existing customized workspace: settings survive,
+    // the agent-home flags are re-asserted, and nothing is re-created.
+    state.workspaces.get('coder-home')!.settings.permissionMode = 'extended';
+    const repeated = await application.ensureAgentMaterialized('coder');
+    expect(repeated?.id).toBe('coder');
+    expect(state.log.filter((entry) => entry === 'createWorkspace:coder-home')).toHaveLength(1);
+    expect(state.workspaces.get('coder-home')!.settings).toMatchObject({
+      isAgentHome: true,
+      agentId: 'coder',
+      permissionMode: 'extended',
+    });
+  });
+
+  test('ensureAgentsMaterialized materializes every primary/both preconfig and skips subagent-only ones', async () => {
+    const state = makeFakes();
+    state.preconfigs.set('coder', makePreconfig());
+    state.preconfigs.set('writer', makePreconfig({ id: 'writer', mode: 'both' }));
+    state.preconfigs.set('explore', makePreconfig({ id: 'explore', mode: 'subagent' }));
+    const application = makeApplication(state);
+
+    const materialized = await application.ensureAgentsMaterialized();
+    expect(materialized.sort()).toEqual(['coder', 'writer']);
+    expect(state.dirs.has('/data/agents/explore')).toBe(false);
+    expect(state.workspaces.has('explore-home')).toBe(false);
   });
 
   test('demoteAgent removes the home workspace and the directory, and noops when absent', async () => {

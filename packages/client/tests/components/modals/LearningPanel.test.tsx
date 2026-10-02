@@ -74,23 +74,15 @@ test('enabling seeds one reviewer with the default preconfig and exposes every s
   expect(screen.queryByRole('switch', { name: 'Use as personal learning source' })).not.toBeNull();
 });
 
-test('agent home renders one implicit reviewer without multi-reviewer scaffolding', async () => {
-  const user = userEvent.setup();
+test('agent home points to the agent editor instead of the learning form', async () => {
   render(<Harness workspace={workspace({ isAgentHome: true, agentId: 'home-agent' })} />);
-  await user.click(screen.getByRole('switch', { name: 'Automatic learning' }));
+  // Agent learning is configured on the agent itself now; the workspace
+  // panel only points there and keeps the history browser reachable.
+  expect(screen.getByRole('alert')).toHaveTextContent('Agent learning is configured on the agent');
+  expect(screen.queryByRole('switch', { name: 'Automatic learning' })).toBeNull();
   expect(screen.queryByRole('switch', { name: 'Use as personal learning source' })).toBeNull();
   expect(screen.queryByText('Learners')).toBeNull();
-  expect(screen.queryByText(/Learner 1/)).toBeNull();
-  expect(screen.queryByRole('combobox', { name: 'Learner preconfig' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Add learner' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Remove learner' })).toBeNull();
-  await user.click(screen.getByRole('button', { name: /^Timing/ }));
-  expect(screen.getByLabelText('Quiet period')).toHaveValue(60);
-  expect(screen.getByLabelText('Min interval')).toHaveValue(1440);
-  expect(screen.getByLabelText('Max pending age')).toHaveValue(1440);
-  expect(screen.getByRole('button', { name: /preview prompt/i })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /^Shared instructions/ })).toBeNull();
-  expect(screen.getByRole('combobox', { name: 'Learning sources' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Learning history' })).toBeInTheDocument();
 });
 
 test('tuning stays collapsed by default and recaps custom values on the triggers', async () => {

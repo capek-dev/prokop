@@ -28,6 +28,7 @@ export interface AgentWorkspacePort {
     path: string;
     isVirtual: boolean;
   }): Workspace;
+  get(id: string): Workspace | null;
   applySettings(id: string, settings: WorkspaceSettings): void;
   delete(id: string): void;
 }
@@ -35,4 +36,5 @@ export interface AgentWorkspacePort {
 /** Preconfig lookup used by promotion and agent records. */
 export interface AgentPreconfigPort {
   get(id: string): Promise<Preconfig | null>;
+  list(): Promise<Preconfig[]>;
 }

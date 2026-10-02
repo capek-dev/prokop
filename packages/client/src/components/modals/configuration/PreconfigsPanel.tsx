@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import type { ProkopaiClient, ModelWithStatus } from '@prokopai/sdk';
-import { usePreconfigsQuery, useCreatePreconfig, useUpdatePreconfig, useDeletePreconfig, useToolsQuery } from '@/hooks/queries';
-import { Layers, Plus, Pencil, Copy, Trash2, ArrowLeft, Loader2, Star, Check, X, Cpu, ChevronsUpDown } from 'lucide-react';
+import { parseAgentLearningSettings } from '@prokopai/sdk';
+import { usePreconfigsQuery, useCreatePreconfig, useUpdatePreconfig, useDeletePreconfig, useToolsQuery, useAgentsQuery, useDemoteAgent } from '@/hooks/queries';
+import { Layers, Plus, Pencil, Copy, Trash2, ArrowLeft, Loader2, Star, Check, X, Cpu, ChevronsUpDown, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +26,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { useServerDataStore } from '@/stores/serverDataStore';
+import { LearningSourcePicker } from './LearningSourcePicker';
 
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
@@ -45,6 +47,7 @@ interface Preconfig {
   canSpawnSubagents?: boolean | string[] | null;
   allowSelfAsSubagent?: boolean;
   skills?: string[] | null;
+  capabilities?: { memory?: boolean; skills?: boolean } | null;
 }
 
 const MODE_OPTIONS = [
@@ -80,6 +83,15 @@ interface PreconfigForm {
   allowSelfAsSubagent: boolean;
   skills: string[];
   isDefault: boolean;
+  capabilityMemory: boolean;
+  capabilitySkills: boolean;
+  learningEnabled: boolean;
+  learningIdle: string;
+  learningMinInterval: string;
+  learningMaxPending: string;
+  learningInstructions: string;
+  learningSourcesMode: 'all' | 'selected';
+  learningSourceIds: string[];
 }
 
 const emptyForm: PreconfigForm = {
@@ -97,6 +109,15 @@ const emptyForm: PreconfigForm = {
   allowSelfAsSubagent: false,
   skills: [],
   isDefault: false,
+  capabilityMemory: true,
+  capabilitySkills: true,
+  learningEnabled: true,
+  learningIdle: '',
+  learningMinInterval: '',
+  learningMaxPending: '',
+  learningInstructions: '',
+  learningSourcesMode: 'all' as const,
+  learningSourceIds: [],
 };
 
 export function PreconfigsPanel({ sdkClient }: PanelProps) {
@@ -122,7 +143,20 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
   const [subagentInput, setSubagentInput] = useState('');
   const [skillInput, setSkillInput] = useState('');
 
+  const agentsData = useAgentsQuery(sdkClient);
+  const demoteMut = useDemoteAgent(sdkClient);
+  const agentIds = new Set((agentsData.data?.agents ?? []).map(agent => agent.id));
+  const isMaterialized = editingPreconfig ? agentIds.has(editingPreconfig.id) : false;
+  const [demoteTarget, setDemoteTarget] = useState<string | null>(null);
+  const [demoting, setDemoting] = useState(false);
+  const [homeLoading, setHomeLoading] = useState(false);
+  const [homeError, setHomeError] = useState<string | null>(null);
+  const [homeSaving, setHomeSaving] = useState(false);
+  const [homeDraft, setHomeDraft] = useState({ user: '', memory: '' });
+  const [homeSkills, setHomeSkills] = useState<Array<{ name: string; description: string }>>([]);
+
   const models = useServerDataStore((s) => s.models);
+  const workspaces = useServerDataStore((s) => s.workspaces);
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
 
   const selectedModelObj = form.model ? models.find(m => m.id === form.model) : null;
@@ -152,6 +186,36 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
     }
   }, [toolsData]);
 
+  // Load the materialized agent's memory files and personal skills for the
+  // Home section. Local draft state; saving goes through the memory API.
+  useEffect(() => {
+    if (!editingPreconfig || !isMaterialized || !sdkClient) {
+      setHomeDraft({ user: '', memory: '' });
+      setHomeSkills([]);
+      setHomeError(null);
+      return;
+    }
+    let cancelled = false;
+    setHomeLoading(true);
+    setHomeError(null);
+    Promise.all([
+      sdkClient.http.agents.getMemory(editingPreconfig.id),
+      sdkClient.http.agents.listSkills(editingPreconfig.id),
+    ])
+      .then(([memory, skills]) => {
+        if (cancelled) return;
+        setHomeDraft({ user: memory.user ?? '', memory: memory.memory ?? '' });
+        setHomeSkills(skills.skills ?? []);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setHomeError(err instanceof Error ? err.message : 'Failed to load agent home');
+      })
+      .finally(() => {
+        if (!cancelled) setHomeLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [editingPreconfig?.id, isMaterialized, sdkClient]);
+
   const handleCreate = () => {
     setIsCreating(true);
     setEditingPreconfig(null);
@@ -165,6 +229,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
   const handleEdit = (preconfig: Preconfig) => {
     setEditingPreconfig(preconfig);
     setIsCreating(false);
+    const learning = parseAgentLearningSettings(preconfig.settings);
     setForm({
       name: preconfig.name,
       description: preconfig.description || '',
@@ -185,6 +250,15 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
       allowSelfAsSubagent: preconfig.allowSelfAsSubagent ?? false,
       skills: preconfig.skills ?? [],
       isDefault: preconfig.isDefault,
+      capabilityMemory: preconfig.capabilities?.memory !== false,
+      capabilitySkills: preconfig.capabilities?.skills !== false,
+      learningEnabled: learning?.enabled ?? true,
+      learningIdle: learning?.cadence ? String(learning.cadence.idleMinutes) : '',
+      learningMinInterval: learning?.cadence ? String(learning.cadence.minimumIntervalMinutes) : '',
+      learningMaxPending: learning?.cadence ? String(learning.cadence.maximumPendingMinutes) : '',
+      learningInstructions: learning?.instructions ?? '',
+      learningSourcesMode: learning?.sources.mode === 'selected' ? 'selected' : 'all',
+      learningSourceIds: learning?.sources.mode === 'selected' ? learning.sources.workspaceIds : [],
     });
     setCustomToolInput('');
     setSubagentInput('');
@@ -196,7 +270,9 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
     setSaving(true);
     setError(null);
     try {
-      let settings: Record<string, unknown> | null = null;
+      // Preserve settings keys owned elsewhere (e.g. learning) instead of
+      // replacing the whole bag with temperature only.
+      const settings: Record<string, unknown> = { ...(editingPreconfig?.settings ?? {}) };
       if (form.temperature.trim()) {
         const temp = parseFloat(form.temperature);
         if (isNaN(temp) || temp < 0.1 || temp > 0.9) {
@@ -204,7 +280,40 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
           setSaving(false);
           return;
         }
-        settings = { temperature: temp };
+        settings.temperature = temp;
+      } else {
+        delete settings.temperature;
+      }
+
+      if (form.mode !== 'subagent') {
+        const idle = form.learningIdle.trim();
+        const minInterval = form.learningMinInterval.trim();
+        const maxPending = form.learningMaxPending.trim();
+        let cadence: { idleMinutes: number; minimumIntervalMinutes: number; maximumPendingMinutes: number } | null = null;
+        if (idle || minInterval || maxPending) {
+          const minutes = (value: string) => Number.parseInt(value, 10);
+          if (!idle || !minInterval || !maxPending
+            || ![idle, minInterval, maxPending].every(value => /^\d+$/.test(value))
+            || minutes(idle) < 1 || minutes(minInterval) < 1
+            || minutes(maxPending) < minutes(minInterval)) {
+            setError('Learning cadence needs three positive minute values (idle, minimum interval, maximum window), with the maximum at least the minimum');
+            setSaving(false);
+            return;
+          }
+          cadence = {
+            idleMinutes: minutes(idle),
+            minimumIntervalMinutes: minutes(minInterval),
+            maximumPendingMinutes: minutes(maxPending),
+          };
+        }
+        settings.learning = {
+          enabled: form.learningEnabled,
+          cadence,
+          instructions: form.learningInstructions,
+          sources: form.learningSourcesMode === 'all'
+            ? { mode: 'all' }
+            : { mode: 'selected', workspaceIds: form.learningSourceIds },
+        };
       }
 
       let canSpawnSubagents: boolean | string[] | null = null;
@@ -225,10 +334,13 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
         provider: form.provider.trim() || null,
         variant: selectedModelVariants.length > 0 ? (form.variant.trim() || selectedModelVariants[0]) : null,
         tools: form.tools.length > 0 ? form.tools : null,
-        settings,
+        settings: Object.keys(settings).length > 0 ? settings : null,
         canSpawnSubagents,
         allowSelfAsSubagent: form.allowSelfAsSubagent,
         skills: form.skills.length > 0 ? form.skills : null,
+        ...(form.mode !== 'subagent'
+          ? { capabilities: { memory: form.capabilityMemory, skills: form.capabilitySkills } }
+          : {}),
         isDefault: form.isDefault,
         format: 'md',
       };
@@ -291,6 +403,36 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
       toast.error('Failed to delete agent', { description: message });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleSaveHomeMemory = async () => {
+    if (!editingPreconfig || !sdkClient) return;
+    setHomeSaving(true);
+    setHomeError(null);
+    try {
+      await sdkClient.http.agents.updateMemory(editingPreconfig.id, { target: 'user', content: homeDraft.user });
+      await sdkClient.http.agents.updateMemory(editingPreconfig.id, { target: 'memory', content: homeDraft.memory });
+      toast.success('Agent memory saved');
+    } catch (err) {
+      setHomeError(err instanceof Error ? err.message : 'Failed to save agent memory');
+    } finally {
+      setHomeSaving(false);
+    }
+  };
+
+  const handleDemote = async () => {
+    if (!demoteTarget) return;
+    setDemoting(true);
+    try {
+      await demoteMut.mutateAsync(demoteTarget);
+      setDemoteTarget(null);
+      toast.success('Removed agent home and memory');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to remove agent home';
+      toast.error('Failed to remove agent home', { description: message });
+    } finally {
+      setDemoting(false);
     }
   };
 
@@ -460,6 +602,117 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
               onCheckedChange={(checked) => setForm({ ...form, isDefault: checked })}
             />
           </div>
+
+          {form.mode !== 'subagent' && (
+            <>
+              <Separator className="my-1" />
+
+              <div className="space-y-2">
+                <Label className="text-sm">Capabilities</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm">Memory</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Personal memory (agent_memory) that travels with this agent across all workspaces.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={form.capabilityMemory}
+                    onCheckedChange={(checked) => setForm({ ...form, capabilityMemory: checked })}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm">Skill management</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Lets this agent maintain its own skills (agent_skill_manage).
+                    </p>
+                  </div>
+                  <Switch
+                    checked={form.capabilitySkills}
+                    onCheckedChange={(checked) => setForm({ ...form, capabilitySkills: checked })}
+                  />
+                </div>
+              </div>
+
+              <Separator className="my-1" />
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <Label className="text-sm">Learning</Label>
+                    <p className="text-[10px] text-muted-foreground">
+                      Reviews this agent's sessions when idle and saves durable lessons to its personal memory.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={form.learningEnabled}
+                    onCheckedChange={(checked) => setForm({ ...form, learningEnabled: checked })}
+                  />
+                </div>
+                {form.learningEnabled && (
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Cadence in minutes (leave empty for defaults)</p>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={form.learningIdle}
+                          onChange={(e) => setForm({ ...form, learningIdle: e.target.value })}
+                          placeholder="Idle"
+                          className="h-8 text-xs"
+                        />
+                        <Input
+                          type="number"
+                          min={1}
+                          value={form.learningMinInterval}
+                          onChange={(e) => setForm({ ...form, learningMinInterval: e.target.value })}
+                          placeholder="Min interval"
+                          className="h-8 text-xs"
+                        />
+                        <Input
+                          type="number"
+                          min={1}
+                          value={form.learningMaxPending}
+                          onChange={(e) => setForm({ ...form, learningMaxPending: e.target.value })}
+                          placeholder="Max window"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Reviewer instructions</p>
+                      <textarea
+                        value={form.learningInstructions}
+                        onChange={(e) => setForm({ ...form, learningInstructions: e.target.value })}
+                        className="w-full h-16 p-2 rounded-md border bg-background text-xs resize-y"
+                        placeholder="What this agent should focus on when learning..."
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Which workspaces feed this agent's learning</p>
+                      <select
+                        value={form.learningSourcesMode}
+                        onChange={(e) => setForm({ ...form, learningSourcesMode: e.target.value as 'all' | 'selected' })}
+                        className="w-full h-9 rounded-md border bg-background px-3 text-sm"
+                      >
+                        <option value="all">All workspaces</option>
+                        <option value="selected">Selected workspaces</option>
+                      </select>
+                      {form.learningSourcesMode === 'selected' && (
+                        <LearningSourcePicker
+                          workspaces={workspaces}
+                          selectedIds={form.learningSourceIds}
+                          onChange={(ids) => setForm({ ...form, learningSourceIds: ids })}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           <Separator className="my-1" />
 
@@ -734,6 +987,88 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
               placeholder="System prompt content..."
             />
           </div>
+
+          {editingPreconfig && isMaterialized && (
+            <>
+              <Separator className="my-1" />
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Home & Memory</Label>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => {
+                      // Re-run the loader by toggling the dependency through a refetch of agents.
+                      agentsData.refetch();
+                    }}
+                    title="Reload home data"
+                  >
+                    <RefreshCw className="size-3" />
+                  </Button>
+                </div>
+                {homeError && (
+                  <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{homeError}</div>
+                )}
+                {homeLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">User preferences (USER.md)</p>
+                      <textarea
+                        value={homeDraft.user}
+                        onChange={(e) => setHomeDraft({ ...homeDraft, user: e.target.value })}
+                        className="w-full h-20 p-2 rounded-md border bg-background text-xs font-mono resize-y"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Memory (MEMORY.md)</p>
+                      <textarea
+                        value={homeDraft.memory}
+                        onChange={(e) => setHomeDraft({ ...homeDraft, memory: e.target.value })}
+                        className="w-full h-28 p-2 rounded-md border bg-background text-xs font-mono resize-y"
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <Button size="sm" variant="outline" onClick={handleSaveHomeMemory} disabled={homeSaving}>
+                        {homeSaving ? <Loader2 className="size-3 animate-spin" /> : 'Save memory'}
+                      </Button>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Personal skills ({homeSkills.length}) — read-only; the agent manages them at runtime.
+                      </p>
+                      {homeSkills.length > 0 && (
+                        <div className="rounded-md border divide-y">
+                          {homeSkills.map((skill) => (
+                            <div key={skill.name} className="px-2.5 py-1.5">
+                              <p className="font-mono text-xs truncate">{skill.name}</p>
+                              {skill.description && (
+                                <p className="text-[10px] text-muted-foreground line-clamp-1">{skill.description}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setDemoteTarget(editingPreconfig.id)}
+                      >
+                        <Trash2 className="size-3" />
+                        Remove home & memory
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -843,6 +1178,17 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
         variant="destructive"
         onConfirm={handleDelete}
         loading={deleting}
+      />
+
+      <ConfirmDialog
+        open={demoteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDemoteTarget(null); }}
+        title="Remove Home & Memory"
+        description="This removes the agent directory and its home workspace. Sessions created in the home workspace will be deleted. The agent definition is preserved."
+        confirmLabel="Remove"
+        variant="destructive"
+        onConfirm={handleDemote}
+        loading={demoting}
       />
     </div>
   );

@@ -583,6 +583,11 @@ export interface UpdateAgentMemoryResponse {
   success: boolean;
 }
 
+/** GET /api/agents/:id/skills */
+export interface ListAgentSkillsResponse {
+  skills: Array<{ name: string; description: string }>;
+}
+
 // =============================================================================
 // Tool Env Vars Responses
 // =============================================================================

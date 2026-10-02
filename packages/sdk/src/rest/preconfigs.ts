@@ -6,7 +6,7 @@ import type {
   UpdatePreconfigResponse,
   DeletePreconfigResponse,
 } from '../types/rest-responses';
-import type { PreconfigMode } from '../shared';
+import type { PreconfigCapabilities, PreconfigMode } from '../shared';
 
 interface ListOptions {
   signal?: AbortSignal;
@@ -26,6 +26,8 @@ interface CreateOptions {
   canSpawnSubagents?: boolean | string[] | null;
   allowSelfAsSubagent?: boolean;
   skills?: string[] | null;
+  /** Agent-level capability switches. Absent or null means all enabled. */
+  capabilities?: PreconfigCapabilities | null;
   /** Storage format for the preconfig. If 'md', stores as markdown file. */
   format?: 'md';
   signal?: AbortSignal;
@@ -45,6 +47,8 @@ interface UpdateOptions {
   canSpawnSubagents?: boolean | string[] | null;
   allowSelfAsSubagent?: boolean;
   skills?: string[] | null;
+  /** Agent-level capability switches. Omit to keep the stored value. */
+  capabilities?: PreconfigCapabilities | null;
 }
 
 interface GetOptions {

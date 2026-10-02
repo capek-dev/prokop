@@ -1,6 +1,6 @@
 import { readdir, readFile, writeFile, unlink, mkdir, rename } from 'fs/promises';
 import { join } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import matter from 'gray-matter';
 import type { Preconfig, PreconfigMode } from '@prokopai/sdk';
 import { getPreconfigsDir as getPreconfigsDirPath } from '@/infrastructure/runtime/paths';
@@ -193,6 +193,7 @@ function parsePreconfigMd(content: string): Preconfig {
     canSpawnSubagents: data.canSpawnSubagents,
     allowSelfAsSubagent: data.allowSelfAsSubagent ?? false,
     skills: data.skills ?? null,
+    capabilities: data.capabilities ?? null,
   };
 }
 
@@ -316,6 +317,40 @@ export async function listPreconfigs(): Promise<Preconfig[]> {
     if (b.isDefault) return 1;
     return a.name.localeCompare(b.name);
   });
+}
+
+/** Synchronous preconfig read for hot paths that cannot await file I/O
+ * (agent learning source resolution inside the evidence reader). Reads the
+ * `.md` then `.json` file directly; no alias resolution (aliases only cover
+ * migrated UUID ids, which learning never sees). */
+export function getPreconfigSync(id: string): Preconfig | null {
+  const mdPath = getPreconfigMdPath(id);
+  try {
+    if (existsSync(mdPath)) {
+      return parsePreconfigMd(readFileSync(mdPath, 'utf-8'));
+    }
+    const jsonPath = getPreconfigJsonPath(id);
+    if (existsSync(jsonPath)) {
+      return JSON.parse(readFileSync(jsonPath, 'utf-8')) as Preconfig;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/** Cheap change signal for the sync-read caches: the mtime of the
+ * preconfig file that would be read, or 0 when none exists. */
+export function preconfigFileMtimeMs(id: string): number {
+  try {
+    const mdPath = getPreconfigMdPath(id);
+    if (existsSync(mdPath)) return statSync(mdPath).mtimeMs;
+    const jsonPath = getPreconfigJsonPath(id);
+    if (existsSync(jsonPath)) return statSync(jsonPath).mtimeMs;
+  } catch {
+    return 0;
+  }
+  return 0;
 }
 
 export async function getPreconfig(id: string): Promise<Preconfig | null> {

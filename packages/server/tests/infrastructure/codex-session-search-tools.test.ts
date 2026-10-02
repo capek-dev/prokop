@@ -23,15 +23,15 @@ beforeEach(() => {
 });
 afterEach(() => resetTestDatabase());
 
-test('session search uses the Prokop definition and stays hidden when disabled', async () => {
+test('session search uses the Prokop definition and is always available', async () => {
   expect(sessionSearchDomainTools.definitions().map(def => def.name)).toEqual(['session_search']);
   const tools = createCodexSessionSearchTools({ bridge: sessionSearchDomainTools, sessionId: 's', workspaceId: 'ws',
     preconfigId: 'agent', agentDir: null, isActive: () => true, authorizeRoot: () => true });
-  expect(tools.definitions).toEqual([]);
-  expect((await tools.call(call('disabled', { action: 'list' }))).success).toBe(false);
+  expect(tools.definitions.map(def => def.name)).toEqual(['session_search']);
+  expect((await tools.call(call('enabled', { action: 'list' }))).success).toBe(true);
 });
 
-test('execution always runs without an ask and passes captured settings', async () => {
+test('execution always runs without an ask and captures the always-on policy', async () => {
   updateWorkspace('ws', { settings: { sessionSearch: settings } });
   let active = true;
   let root = true;
@@ -50,9 +50,11 @@ test('execution always runs without an ask and passes captured settings', async 
   expect(tools.definitions.map(def => def.name)).toEqual(['session_search']);
   expect((await tools.call(call('list', { action: 'list' }))).success).toBe(true);
   expect((await tools.call(call('search', { query: 'hello' }))).success).toBe(true);
+  // The read policy pins risk 'none' and includeToolResults false; the
+  // per-call roleFilter input covers the tool-results need.
   expect(contexts).toEqual([
-    { workspaceId: 'ws', sessionId: 's', risk: 'none', agentId: null, includeTools: true },
-    { workspaceId: 'ws', sessionId: 's', risk: 'none', agentId: null, includeTools: true },
+    { workspaceId: 'ws', sessionId: 's', risk: 'none', agentId: null, includeTools: false },
+    { workspaceId: 'ws', sessionId: 's', risk: 'none', agentId: null, includeTools: false },
   ]);
   expect((await tools.call(call('bad', { scope: 'other', query: 'hello' }))).success).toBe(false);
   expect((await tools.call(call('shell', { action: 'list' }, 'shell'))).success).toBe(false);
@@ -62,8 +64,10 @@ test('execution always runs without an ask and passes captured settings', async 
   root = false;
   expect((await tools.call(call('root', { action: 'list' }))).success).toBe(false);
   root = true;
+  // Stored session-search values are ignored: search stays on after a
+  // stored disable.
   updateWorkspace('ws', { settings: { sessionSearch: { ...settings, enabled: false } } });
-  expect((await tools.call(call('disabled', { action: 'list' }))).success).toBe(false);
+  expect((await tools.call(call('disabled', { action: 'list' }))).success).toBe(true);
 });
 
 test('execution rechecks current settings and selected agent scope', async () => {

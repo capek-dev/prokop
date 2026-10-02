@@ -98,6 +98,28 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   const agents = createRuntime();
   const application = createWiredApplication(agents);
   installWireApplication({ session: application.session, control: application.control, providers: application.providers, notifications: application.notifications, permissions: application.permissions });
+  // Every primary/both preconfig becomes an agent on boot: fresh installs
+  // ship prokop-code as a real agent and existing installs gain agents for
+  // their preconfigs without any user action. Non-fatal: a failed
+  // materialization logs and the server still starts.
+  try {
+    const materialized = await application.agents.ensureAgentsMaterialized();
+    if (materialized.length > 0) {
+      console.log(`[startup] Materialized ${materialized.length} agent(s): ${materialized.join(', ')}`);
+    }
+  } catch (error: unknown) {
+    console.warn('[startup] Agent materialization failed:', error);
+  }
+  // One-time migration of home-workspace learning settings into the agent
+  // preconfigs, before the learning service starts reading them.
+  try {
+    const migrated = await application.learning.migrateAgentLearning();
+    if (migrated > 0) {
+      console.log(`[startup] Migrated learning config for ${migrated} agent(s)`);
+    }
+  } catch (error: unknown) {
+    console.warn('[startup] Agent learning migration failed:', error);
+  }
   cleanupRunningSessionsOnStartup();
   const stuckRunningSessions = reconcileStuckRunningSessions();
   if (stuckRunningSessions > 0) {

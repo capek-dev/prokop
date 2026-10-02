@@ -10,7 +10,7 @@ import { createLearningEvidenceReader } from '@/infrastructure/sqlite/learning-e
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedSession, seedWorkspace } from '#tests/seed';
-import { enableLearning } from '@/domains/learning/settings';
+import { enableLearning, parseLearningSettings } from '@/domains/learning/settings';
 
 let root: string | undefined;
 afterEach(async () => { resetTestDatabase(); if (root) await rm(root, { recursive: true, force: true }); });
@@ -52,6 +52,10 @@ test.each([false, true])('runner integrates scoped history and rechecks supporti
   });
   const runner = createLearningReviewRunner({
     repository, workspace: getWorkspace,
+    learningSettings: async (candidate) => {
+      const learning = parseLearningSettings(candidate.settings.learning);
+      return learning?.enabled && candidate.settings.memory?.enabled ? learning : null;
+    },
     preconfig: async () => ({ id: 'dev', model: 'model', provider: 'provider', systemPrompt: 'Developer' } as Preconfig),
     modelAvailable: () => true, eligible: (_workspace, id) => evidence.eligible(id), execute, now: Date.now,
   });

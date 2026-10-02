@@ -63,18 +63,15 @@ export function agentMemoryFilename(target: AgentMemoryTarget): 'USER.md' | 'MEM
   return target === 'user' ? AGENT_MEMORY_USER_FILENAME : AGENT_MEMORY_MEMORY_FILENAME;
 }
 
-/** The exact home workspace settings applied on promotion. Fixed policy:
- * memory, skills, session search, and scheduling are enabled and always
- * allowed (risk 'none'); session search starts without tool results; the
- * workspace is flagged as the agent home. */
+/** The exact home workspace settings applied on materialization. The home
+ * is only where the agent's own sessions live: memory/skills belong to the
+ * agent-scoped tools (workspace surfaces are suppressed in homes by
+ * read-time normalization) and session search is always on, so no
+ * capability values are seeded here. */
 export function agentHomeWorkspaceSettings(agentId: string): WorkspaceSettings {
   return {
     isAgentHome: true,
     agentId,
-    memory: { enabled: true, permissionRisk: 'none' },
-    skills: { managementEnabled: true, permissionRisk: 'none' },
-    sessionSearch: { enabled: true, permissionRisk: 'none', includeToolResults: false },
-    scheduling: { enabled: true, permissionRisk: 'none' },
   };
 }
 

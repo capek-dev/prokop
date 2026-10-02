@@ -51,6 +51,57 @@ export const sessionLearningSettingsSchema = z.object({
   includeAutomated: z.boolean().default(false),
 }).strict();
 
+/** Agent learning config stored in the agent preconfig's `settings.learning`.
+ * Absent or null means enabled with defaults: agents learn out of the box. */
+export const agentLearningConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  cadence: learningCadenceSchema.nullable().default(null),
+  instructions: instructions.default(''),
+  sources: z.discriminatedUnion('mode', [
+    z.object({ mode: z.literal('all') }).strict(),
+    z.object({
+      mode: z.literal('selected'),
+      workspaceIds: z.array(identifier).max(1000).refine(ids => new Set(ids).size === ids.length, {
+        message: 'Source workspace IDs must be unique',
+      }),
+    }).strict(),
+  ]).default({ mode: 'all' }),
+}).strict();
+
+export type AgentLearningConfig = z.infer<typeof agentLearningConfigSchema>;
+
+/** Parse the agent config from a preconfig `settings` bag; malformed input
+ * falls back to disabled, never to enabled (fail closed like the workspace
+ * parser). Absent or null config means enabled defaults. */
+export function parseAgentLearningConfig(settings: Record<string, unknown> | null | undefined): AgentLearningConfig | null {
+  const raw = settings?.learning;
+  if (raw === undefined || raw === null) {
+    return agentLearningConfigSchema.parse({});
+  }
+  const result = agentLearningConfigSchema.safeParse(raw);
+  return result.success ? result.data : null;
+}
+
+/** The effective learning settings for an agent home: the owning agent is
+ * the single reviewer; cadence, instructions, and sources come from the
+ * agent config. improveSkills follows the agent skills capability (default
+ * on). */
+export function agentHomeLearningSettings(config: AgentLearningConfig, agentId: string): WorkspaceLearningSettings {
+  return {
+    enabled: config.enabled,
+    reviewers: [{
+      id: agentId,
+      preconfigId: agentId,
+      instructions: config.instructions,
+      modelOverride: null,
+      cadence: config.cadence,
+    }],
+    improveSkills: true,
+    instructions: '',
+    sources: config.sources,
+  };
+}
+
 /** Read persisted or external settings without treating malformed input as enabled. */
 export function parseLearningSettings(value: unknown): WorkspaceLearningSettings | null {
   const result = learningSettingsSchema.safeParse(value);
@@ -93,8 +144,11 @@ export function enableLearning(
   };
 }
 
-/** Do not silently restore dependencies the user explicitly disabled. */
+/** Do not silently restore dependencies the user explicitly disabled.
+ * Agent homes are exempt: their workspace memory surface is force-off by
+ * the read policy and learning reads its config from the owning agent. */
 export function enforceLearningDependencies(settings: WorkspaceSettings): WorkspaceSettings {
+  if (settings.isAgentHome) return settings;
   if (!settings.learning?.enabled || (settings.memory?.enabled && settings.sessionSearch?.enabled)) {
     return settings;
   }

@@ -190,7 +190,10 @@ describe('workspaces store', () => {
       const ws = getWorkspace('ws1');
 
       expect(ws).not.toBeNull();
-      expect(ws!.settings).toEqual({ permissionMode: 'standard' });
+      expect(ws!.settings).toEqual({
+        permissionMode: 'standard',
+        sessionSearch: { enabled: true, permissionRisk: 'none', includeToolResults: false },
+      });
     });
 
     test('creates workspace with memory settings coerced to always allowed', () => {
