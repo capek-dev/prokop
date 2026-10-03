@@ -39,6 +39,9 @@ export const queryKeys = {
     providers: {
       all: ['providers'] as const,
       credentials: ['providers', 'credentials'] as const,
+      usage: (provider: string) => ['providers', 'usage', provider] as const,
+      codexAccountUsage: (accountId: string, connectionId: string, reauthRequired: boolean) =>
+        ['providers', 'usage', 'codex', accountId, connectionId, reauthRequired] as const,
     },
     responseFormats: ['config', 'responseFormats'] as const,
     agents: ['config', 'agents'] as const,

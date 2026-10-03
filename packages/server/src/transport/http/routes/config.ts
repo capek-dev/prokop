@@ -170,6 +170,20 @@ export function registerConfigRoutes(
     return c.json({ status });
   });
 
+  app.get('/api/providers/:providerId/accounts/:accountId/usage', async (c) => {
+    c.header('Cache-Control', 'no-store');
+    return c.json({ usage: await providers.accountUsage(c.req.param('providerId'), c.req.param('accountId')) });
+  });
+
+  app.get('/api/providers/:providerId/usage', async (c) => {
+    const id = c.req.param('providerId');
+    if (id !== 'deepseek' && id !== 'zhipu-coding' && id !== 'minimax') {
+      return c.json({ error: 'not_found', message: 'Provider usage not available' }, 404);
+    }
+    c.header('Cache-Control', 'no-store');
+    return c.json({ usage: await providers.usage(id) });
+  });
+
   app.get('/api/providers/:providerId/status', async (c) => {
     const providerId = c.req.param('providerId');
     const status = providers.status(providerId);

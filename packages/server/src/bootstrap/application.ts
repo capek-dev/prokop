@@ -89,6 +89,10 @@ import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
 import { getDataDir } from '@/infrastructure/runtime/paths';
 import { codexAccounts } from '@/infrastructure/providers/codex-accounts';
+import { codexAccountRuntime } from '@/infrastructure/providers/codex';
+import { createCodexAccountUsagePort } from '@/infrastructure/providers/codex-usage';
+import { createProviderUsagePort } from '@/infrastructure/providers/usage';
+import { getLLMApiKeys } from '@/infrastructure/runtime/environment';
 import { createProkopHarness } from '@/harnesses/prokop';
 import { prokopAskResolution } from '@/harnesses/prokop/composition/contracts';
 import { createProkopLearningRuntime } from '@/harnesses/prokop/learning';
@@ -394,10 +398,12 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     reauthRequired: status.reauthRequired,
   }));
   const providers = createProvidersApplication({
+    usage: createProviderUsagePort({ getKey: provider => getLLMApiKeys()[provider] }),
     registry: createJean2ProviderRegistryPort(),
     oauth: createJean2OAuthFlowPort(),
     credentials: createJean2ProviderCredentialPort(),
     accounts: codexAccounts,
+    codexUsage: createCodexAccountUsagePort({ accounts: codexAccounts, runtime: codexAccountRuntime }),
   });
 
   const notifications = getJean2NotificationsApplication();

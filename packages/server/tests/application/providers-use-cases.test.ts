@@ -8,6 +8,7 @@ import type {
   OAuthFlowPort,
   ProviderCredentialPort,
   ProviderRegistryPort,
+  ProviderUsagePort,
 } from '@/application/ports/provider-accounts';
 
 interface FakeState {
@@ -33,7 +34,7 @@ function makeState(): FakeState {
   };
 }
 
-function makeApplication(state: FakeState): ProvidersApplication {
+function makeApplication(state: FakeState, usage?: ProviderUsagePort): ProvidersApplication {
   const registry: ProviderRegistryPort = {
     list() {
       state.log.push('list');
@@ -97,10 +98,21 @@ function makeApplication(state: FakeState): ProvidersApplication {
     },
   };
 
-  return createProvidersApplication({ registry, oauth, credentials });
+  return createProvidersApplication({ registry, oauth, credentials, usage });
 }
 
 describe('providers application use cases', () => {
+  test('usage delegates and successful credential mutations invalidate the provider snapshot', async () => {
+    const state = makeState();
+    const application = makeApplication(state, {
+      read: async provider => ({ provider, checkedAt: '', plan: null, windows: [], balances: [] }),
+      invalidate: provider => { state.log.push(`invalidate:${provider}`); },
+    });
+    expect((await application.usage('deepseek')).provider).toBe('deepseek');
+    await application.setCredential('deepseek', 'fake');
+    await application.clearCredential('deepseek');
+    expect(state.log).toEqual(['credentials:set:deepseek:fake', 'invalidate:deepseek', 'credentials:clear:deepseek', 'invalidate:deepseek']);
+  });
   test('list spreads each descriptor over its status', () => {
     const state = makeState();
     const application = makeApplication(state);

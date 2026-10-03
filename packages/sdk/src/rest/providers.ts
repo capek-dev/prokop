@@ -1,4 +1,5 @@
 import type { HttpClient } from '../transport/http';
+import type { CodexAccountUsage, ProviderUsage, UsageProvider } from '../shared-types/provider-usage';
 import type {
   ListProvidersResponse,
   GetProviderStatusResponse,
@@ -46,6 +47,14 @@ interface CompleteOAuthOptions {
 
 export class ProvidersRestNamespace {
   constructor(private http: HttpClient) {}
+
+  async codexAccountUsage(accountId: string, options?: GetStatusOptions): Promise<{ usage: CodexAccountUsage }> {
+    return this.http.get(`/providers/codex/accounts/${encodeURIComponent(accountId)}/usage`, { signal: options?.signal });
+  }
+
+  async usage(provider: UsageProvider, options?: GetStatusOptions): Promise<{ usage: ProviderUsage }> {
+    return this.http.get(`/providers/${encodeURIComponent(provider)}/usage`, { signal: options?.signal });
+  }
 
   /**
    * GET /api/providers - List all connectable providers with status and metadata

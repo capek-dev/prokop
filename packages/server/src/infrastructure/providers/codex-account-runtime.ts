@@ -53,8 +53,8 @@ export class CodexAccountRuntime {
     return saved;
   }
 
-  async createFetch(): Promise<typeof globalThis.fetch> {
-    const selected = this.store.get();
+  async createFetch(accountId?: string): Promise<typeof globalThis.fetch> {
+    const selected = this.store.get(accountId);
     if (!selected) throw new Error('Codex not connected. Select an account in Settings > LLM providers.');
     await this.credentials(selected.id);
     const codexFetch = async (input: Parameters<typeof globalThis.fetch>[0], init?: Parameters<typeof globalThis.fetch>[1]) => {

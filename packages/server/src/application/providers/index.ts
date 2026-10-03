@@ -1,15 +1,20 @@
 import type {
+  CodexAccountUsage,
   ProviderCredentialStatus,
   ProviderCredentialsResponse,
   ProviderDescriptor,
   ProviderStatus,
   ProviderAccountStatus,
+  ProviderUsage,
+  UsageProvider,
 } from '@prokopai/sdk';
 import { NotFoundError } from '@/application/http-errors';
 import type {
+  CodexAccountUsagePort,
   OAuthFlowPort,
   OAuthServerCallbackResult,
   ProviderCredentialPort,
+  ProviderUsagePort,
   ProviderRegistryPort,
   SubscriptionAccountsPort,
 } from '@/application/ports/provider-accounts';
@@ -28,6 +33,8 @@ export interface ProvidersApplicationDeps {
   oauth: OAuthFlowPort;
   credentials: ProviderCredentialPort;
   accounts?: SubscriptionAccountsPort;
+  usage?: ProviderUsagePort;
+  codexUsage?: CodexAccountUsagePort;
 }
 
 export type ProviderConnectOutcome = {
@@ -36,6 +43,8 @@ export type ProviderConnectOutcome = {
 };
 
 export interface ProvidersApplication {
+  accountUsage(providerId: string, accountId: string): Promise<CodexAccountUsage>;
+  usage(provider: UsageProvider): Promise<ProviderUsage>;
   list(): Array<ProviderDescriptor & ProviderAccountStatus>;
   status(providerId: string): ProviderAccountStatus;
   activateAccount(providerId: string, accountId: string): ProviderAccountStatus;
@@ -65,6 +74,17 @@ export function createProvidersApplication(
     return deps.accounts;
   };
   return {
+    accountUsage(providerId, accountId) {
+      const accounts = accountsFor(providerId);
+      if (!deps.codexUsage || !accounts.status().accounts?.some(account => account.id === accountId)) {
+        throw new NotFoundError('Provider account usage not available');
+      }
+      return deps.codexUsage.read(accountId);
+    },
+    usage(provider) {
+      if (!deps.usage || !['deepseek', 'zhipu-coding', 'minimax'].includes(provider)) throw new NotFoundError('Provider usage not available');
+      return deps.usage.read(provider);
+    },
     list() {
       return deps.registry.list().map(provider => provider.provider === 'codex' && deps.accounts
         ? { ...provider, ...deps.accounts.status() }
@@ -109,12 +129,16 @@ export function createProvidersApplication(
       return deps.credentials.list();
     },
 
-    setCredential(provider, apiKey) {
-      return deps.credentials.set(provider, apiKey);
+    async setCredential(provider, apiKey) {
+      const result = await deps.credentials.set(provider, apiKey);
+      deps.usage?.invalidate(provider);
+      return result;
     },
 
-    clearCredential(provider) {
-      return deps.credentials.clear(provider);
+    async clearCredential(provider) {
+      const result = await deps.credentials.clear(provider);
+      deps.usage?.invalidate(provider);
+      return result;
     },
   };
 }

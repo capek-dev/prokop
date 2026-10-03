@@ -1,10 +1,13 @@
 import type {
+  CodexAccountUsage,
   OAuthRedirectStrategy,
   ProviderCredentialStatus,
   ProviderCredentialsResponse,
   ProviderDescriptor,
   ProviderStatus,
   ProviderAccountStatus,
+  ProviderUsage,
+  UsageProvider,
 } from '@prokopai/sdk';
 
 /**
@@ -14,6 +17,15 @@ import type {
  * credential store. The Jean2 and Capek adapters wrap the current
  * implementations.
  */
+
+export interface CodexAccountUsagePort {
+  read(accountId: string): Promise<CodexAccountUsage>;
+}
+
+export interface ProviderUsagePort {
+  read(provider: UsageProvider): Promise<ProviderUsage>;
+  invalidate(provider: string): void;
+}
 
 export interface SubscriptionAccountsPort {
   status(): ProviderAccountStatus;

@@ -35,6 +35,8 @@ function fakeConfiguration(): ConfigurationApplication {
 
 function fakeProviders() {
   return {
+    accountUsage: async () => { throw new Error('Unused account usage probe'); },
+    usage: async () => { throw new Error('Unused usage probe'); },
     list: () => [],
     status: () => ({ provider: '', connected: false }),
     activateAccount: () => ({ provider: '', connected: false }),

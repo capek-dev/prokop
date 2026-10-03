@@ -2,6 +2,28 @@ import { afterEach, expect, spyOn, test } from 'bun:test';
 import { HttpClient } from '../src/transport/http';
 import { ProvidersRestNamespace } from '../src/rest/providers';
 
+test('Codex usage encodes the local account ID and forwards cancellation', async () => {
+  const controller = new AbortController();
+  fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    expect(String(input)).toBe('https://test.invalid/api/providers/codex/accounts/account%2Fone/usage');
+    expect(init?.signal).toBe(controller.signal);
+    return Response.json({ usage: { accountId: 'account/one', checkedAt: '', plan: 'plus', windows: [] } });
+  });
+  const providers = new ProvidersRestNamespace(new HttpClient({ url: 'https://test.invalid', token: 'test-token' }));
+  expect((await providers.codexAccountUsage('account/one', { signal: controller.signal })).usage.accountId).toBe('account/one');
+});
+
+test('usage reads the provider snapshot and forwards cancellation', async () => {
+  const controller = new AbortController();
+  fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    expect(String(input)).toBe('https://test.invalid/api/providers/deepseek/usage');
+    expect(init?.signal).toBe(controller.signal);
+    return Response.json({ usage: { provider: 'deepseek', checkedAt: '', plan: null, windows: [], balances: [] } });
+  });
+  const providers = new ProvidersRestNamespace(new HttpClient({ url: 'https://test.invalid', token: 'test-token' }));
+  expect((await providers.usage('deepseek', { signal: controller.signal })).usage.provider).toBe('deepseek');
+});
+
 let fetchSpy: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>> | undefined;
 afterEach(() => { fetchSpy?.mockRestore(); });
 

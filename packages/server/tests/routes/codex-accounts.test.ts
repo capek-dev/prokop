@@ -36,6 +36,7 @@ describe('Codex account HTTP and application boundary', () => {
         clear: async provider => ({ provider, configured: false }),
       },
       accounts: store,
+      codexUsage: { read: async accountId => ({ accountId, checkedAt: '', plan: 'plus', windows: [] }) },
     });
     app = new Hono();
     app.onError((error, c) => {
@@ -45,6 +46,22 @@ describe('Codex account HTTP and application boundary', () => {
     registerConfigRoutes(app, providers, {} as ConfigurationApplication);
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  test('reads inactive account usage without switching and rejects unknown accounts/providers', async () => {
+    const before = store.status();
+    const id = before.accounts![1].id;
+    const response = await app.request(`/api/providers/codex/accounts/${id}/usage`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(await response.json()).toEqual({ usage: { accountId: id, checkedAt: '', plan: 'plus', windows: [] } });
+    for (const provider of ['openai', '__proto__']) {
+      expect((await app.request(`/api/providers/${provider}/accounts/${id}/usage`)).status).toBe(404);
+    }
+    for (const missing of ['missing', '%00', '%2E%2E%2Fcodex']) {
+      expect((await app.request(`/api/providers/codex/accounts/${missing}/usage`)).status).toBe(404);
+    }
+    expect(store.status()).toEqual(before);
+  });
 
   test('lists safe metadata, switches, persists, and removes one account', async () => {
     const b = store.status().accounts![1].id;

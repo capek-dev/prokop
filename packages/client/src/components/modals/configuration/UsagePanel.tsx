@@ -1,4 +1,5 @@
-import type { HarnessStatus, HarnessUsageLimits, HarnessUsageWindow, ProkopaiClient } from '@prokopai/sdk';
+import type { HarnessStatus, HarnessUsageLimits, ProviderAccountSummary, ProviderUsageWindow, UsageProvider, ProkopaiClient } from '@prokopai/sdk';
+import { useCodexAccountUsageQuery, useProvidersQuery, useProviderCredentialsQuery, useProviderUsageQuery } from '@/hooks/queries/useProvidersQueries';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { useHarnessesQuery, useHarnessUsageQuery, isHarnessEnabled } from '@/hooks/queries';
 import { Badge } from '@/components/ui/badge';
@@ -29,7 +30,15 @@ export function formatResetIn(resetsAt: string, now: number): string {
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
 }
 
-function UsageWindowRow({ window, now }: { window: HarnessUsageWindow; now: number }) {
+function UsageWindowRow({ window, now }: { window: ProviderUsageWindow; now: number }) {
+  if (window.unlimited) {
+    return (
+      <div className="flex items-baseline justify-between gap-2 text-xs">
+        <span className="font-medium">{window.label}</span>
+        <span className="text-muted-foreground">Unlimited</span>
+      </div>
+    );
+  }
   const used = Math.round(window.usedPercent);
   return (
     <div className="space-y-1">
@@ -48,6 +57,20 @@ function UsageWindowRow({ window, now }: { window: HarnessUsageWindow; now: numb
         className={cn(used >= 90 && '[&_[data-slot=progress-indicator]]:bg-destructive')}
       />
     </div>
+  );
+}
+
+function UsageRefreshButton({ label, fetching, disabled = false, onRefresh }: {
+  label: string;
+  fetching: boolean;
+  disabled?: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <Button variant="ghost" size="icon" className="ml-auto size-7 shrink-0 text-muted-foreground"
+      aria-label={label} disabled={fetching || disabled} onClick={onRefresh}>
+      <RefreshCw className={cn('size-3.5', fetching && 'animate-spin')} />
+    </Button>
   );
 }
 
@@ -87,16 +110,8 @@ function HarnessUsageCard({ sdkClient, harness, status }: {
           <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 capitalize">{data.plan}</Badge>
         )}
         {ready && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="ml-auto size-7 text-muted-foreground"
-            aria-label={`Refresh ${harness.name} usage`}
-            disabled={isFetching}
-            onClick={() => void refetch()}
-          >
-            <RefreshCw className={cn('size-3.5', isFetching && 'animate-spin')} />
-          </Button>
+          <UsageRefreshButton label={`Refresh ${harness.name} usage`} fetching={isFetching}
+            onRefresh={() => void refetch()} />
         )}
       </div>
       {body}
@@ -104,8 +119,75 @@ function HarnessUsageCard({ sdkClient, harness, status }: {
   );
 }
 
+const USAGE_PROVIDERS: { id: UsageProvider; name: string }[] = [
+  { id: 'deepseek', name: 'DeepSeek' },
+  { id: 'zhipu-coding', name: 'Z.AI Coding Plan' },
+  { id: 'minimax', name: 'MiniMax' },
+];
+
+function ProviderUsageCard({ sdkClient, provider }: UsagePanelProps & { provider: (typeof USAGE_PROVIDERS)[number] }) {
+  const { data, isLoading, isFetching, isError, refetch, dataUpdatedAt } = useProviderUsageQuery(sdkClient, provider.id);
+  return (
+    <div className="flex flex-col gap-2.5 rounded-lg border p-2.5">
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium">{provider.name}</span>
+        {data?.plan && <Badge variant="secondary">{data.plan}</Badge>}
+        <UsageRefreshButton label={`Refresh ${provider.name} usage`} fetching={isFetching}
+          onRefresh={() => void refetch()} />
+      </div>
+      {isLoading ? <Loader2 className="size-4 animate-spin text-muted-foreground" />
+        : isError || !data ? <p className="text-xs text-muted-foreground">Could not read usage from the server.</p>
+        : data.unavailable ? <p className="text-xs text-muted-foreground">{data.unavailable.message}</p>
+        : <div className="flex flex-col gap-2.5">
+          {data.balances.map(balance => (
+            <div key={balance.currency} className="flex flex-col gap-1 text-xs">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-medium">Balance</span>
+                <span className="tabular-nums">{balance.remaining} {balance.currency} remaining</span>
+              </div>
+              {(balance.granted != null || balance.toppedUp != null) && (
+                <p className="text-muted-foreground">
+                  {balance.granted != null && `Granted: ${balance.granted} ${balance.currency}`}
+                  {balance.granted != null && balance.toppedUp != null && ' · '}
+                  {balance.toppedUp != null && `Topped up: ${balance.toppedUp} ${balance.currency}`}
+                </p>
+              )}
+            </div>
+          ))}
+          {data.windows.map(window => <UsageWindowRow key={window.id} window={window} now={dataUpdatedAt} />)}
+        </div>}
+    </div>
+  );
+}
+
+function CodexAccountUsageCard({ sdkClient, account, active }: UsagePanelProps & { account: ProviderAccountSummary; active: boolean }) {
+  const { data, isLoading, isFetching, isError, refetch, dataUpdatedAt } = useCodexAccountUsageQuery(sdkClient, account);
+  return (
+    <section aria-label={`Codex · ${account.label}`} className="flex flex-col gap-2.5 rounded-lg border p-2.5">
+      <div className="flex items-center gap-2">
+        <OpenAIMark className="size-5 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 flex-1 truncate text-sm font-medium" title={account.label}>Codex · {account.label}</span>
+        {active && <Badge variant="outline">Active</Badge>}
+        {data?.plan && !account.reauthRequired && <Badge variant="secondary">{data.plan}</Badge>}
+        <UsageRefreshButton label={`Refresh Codex ${account.label} usage`} fetching={isFetching}
+          disabled={account.reauthRequired} onRefresh={() => void refetch()} />
+      </div>
+      {account.reauthRequired ? <p className="text-xs text-muted-foreground">Reconnect this Codex account in LLM providers.</p>
+        : isLoading ? <Loader2 className="size-4 animate-spin text-muted-foreground" />
+        : isError || !data ? <p className="text-xs text-muted-foreground">Could not read usage for this Codex account.</p>
+        : data.unavailable ? <p className="text-xs text-muted-foreground">{data.unavailable.message}</p>
+        : data.windows.map(window => <UsageWindowRow key={window.id} window={window} now={dataUpdatedAt} />)}
+    </section>
+  );
+}
+
 export function UsagePanel({ sdkClient }: UsagePanelProps) {
   const { data, isLoading } = useHarnessesQuery(sdkClient);
+  const credentials = useProviderCredentialsQuery(sdkClient);
+  const providers = useProvidersQuery(sdkClient);
+  const codex = providers.data?.providers.find(provider => provider.provider === 'codex');
+  const configuredProviders = USAGE_PROVIDERS.filter(provider =>
+    credentials.data?.providers.some(entry => entry.provider === provider.id && entry.configured));
 
   if (isLoading) {
     return (
@@ -118,10 +200,16 @@ export function UsagePanel({ sdkClient }: UsagePanelProps) {
   return (
     <div className="p-3 sm:p-4 space-y-4">
       <p className="text-sm text-muted-foreground">
-        Plan limits as reported by each CLI's own login on this host. Prokop sessions are not
-        covered yet.
+        Account balances and limits, including usage outside Prokop.
       </p>
-      <div className="space-y-2">
+      {credentials.isLoading && <p className="text-xs text-muted-foreground">Loading provider accounts…</p>}
+      {credentials.isError && <p className="text-xs text-muted-foreground">Could not load configured provider accounts.</p>}
+      {providers.isLoading && <p className="text-xs text-muted-foreground">Loading Codex accounts…</p>}
+      {providers.isError && <p className="text-xs text-muted-foreground">Could not load Codex accounts.</p>}
+      <div className="flex flex-col gap-2">
+        {codex?.accounts?.map(account => <CodexAccountUsageCard key={`${account.id}:${account.connectionId}`} sdkClient={sdkClient}
+          account={account} active={codex.activeAccountId === account.id} />)}
+        {configuredProviders.map(provider => <ProviderUsageCard key={provider.id} sdkClient={sdkClient} provider={provider} />)}
         {USAGE_HARNESSES.map((harness) => (
           <HarnessUsageCard
             key={harness.id}

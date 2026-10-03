@@ -43,6 +43,8 @@ const descriptor: ProviderDescriptor = {
 
 function makeFakeApplication(overrides: Partial<ProvidersApplication> = {}): ProvidersApplication {
   return {
+    accountUsage: async () => { throw new Error('Unused account usage probe'); },
+    usage: async (provider) => ({ provider, checkedAt: '', plan: null, windows: [], balances: [] }),
     list: () => [{ ...descriptor, provider: 'codex', connected: true, accountId: 'acct' }],
     status: () => ({ provider: 'codex', connected: true }),
     activateAccount: () => ({ provider: 'codex', connected: true }),
@@ -81,6 +83,23 @@ async function json(res: Response): Promise<Record<string, unknown>> {
 }
 
 describe('provider route contract', () => {
+  test('usage accepts only supported providers and prevents HTTP caching', async () => {
+    const calls: string[] = [];
+    const app = makeApp(makeFakeApplication({ usage: async provider => {
+      calls.push(provider);
+      return { provider, checkedAt: '', plan: null, windows: [], balances: [] };
+    } }));
+    for (const provider of ['deepseek', 'zhipu-coding', 'minimax']) {
+      const response = await app.request(`/api/providers/${provider}/usage`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect(await response.json()).toMatchObject({ usage: { provider } });
+    }
+    for (const provider of ['codex', 'prokop', 'unknown', '__proto__']) {
+      expect((await app.request(`/api/providers/${provider}/usage`)).status).toBe(404);
+    }
+    expect(calls).toEqual(['deepseek', 'zhipu-coding', 'minimax']);
+  });
   afterEach(() => {
     mock.restore();
   });

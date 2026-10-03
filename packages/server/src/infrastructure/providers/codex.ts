@@ -34,7 +34,7 @@ registerOAuthConfig('codex', {
   },
 });
 
-const runtime = new CodexAccountRuntime(codexAccounts, token => refreshTokens('codex', token));
+export const codexAccountRuntime = new CodexAccountRuntime(codexAccounts, token => refreshTokens('codex', token));
 
 export { OAUTH_DUMMY_KEY, getDefaultRedirectUri as CODEX_REDIRECT_URI };
 
@@ -71,7 +71,7 @@ const codexProvider: ConnectableProvider = {
   },
 
   async createModel(options) {
-    const codexFetch = await runtime.createFetch();
+    const codexFetch = await codexAccountRuntime.createFetch();
     return createOpenAiResponsesModel({
       modelId: options.modelId,
       apiKey: OAUTH_DUMMY_KEY,

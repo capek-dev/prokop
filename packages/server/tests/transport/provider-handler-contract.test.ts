@@ -55,6 +55,8 @@ function makeNotifications(): NotificationsApplication {
 
 function makeProviders(overrides: Partial<ProvidersApplication> = {}): ProvidersApplication {
   return {
+    accountUsage: async () => { throw new Error('Unused account usage probe'); },
+    usage: async provider => ({ provider, checkedAt: '', plan: null, windows: [], balances: [] }),
     list: () => [],
     status: () => ({ provider: '', connected: false }),
     activateAccount: () => ({ provider: '', connected: false }),
