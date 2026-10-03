@@ -104,12 +104,14 @@ import {
   createCodexExecution,
   getCodexModelSelection,
   listCachedCodexModels,
+  readCachedCodexUsageLimits,
   saveCodexModelSelection,
 } from '@/harnesses/codex-cli';
 import { createHarnessExecution, type HarnessRegistration } from '@/application/sessions/harness-execution';
 import { installHeadlessExecutionPort } from '@/application/ports/headless-execution';
 import { claudeCliAvailable, claudeCliVersion, createClaudeCliHarness, createClaudeExecution,
-  getClaudeModelSelection, listCachedClaudeModels, saveClaudeModelSelection } from '@/harnesses/claude-cli';
+  getClaudeModelSelection, listCachedClaudeModels, readCachedClaudeUsageLimits,
+  saveClaudeModelSelection } from '@/harnesses/claude-cli';
 import { createHarnessSettingsApplication } from '@/application/harnesses/settings';
 import { createServerSettingsRepository } from '@/infrastructure/sqlite/server-settings';
 
@@ -312,7 +314,8 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     { list: listCachedClaudeModels, get: getClaudeModelSelection, save: saveClaudeModelSelection,
       isActive: claudeExecution.isSessionActive },
     codexWorkspaceAvailable,
-    { settings: harnessSettings, codexVersion: codexCliVersion, claudeVersion: claudeCliVersion },
+    { settings: harnessSettings, codexVersion: codexCliVersion, claudeVersion: claudeCliVersion,
+      usage: { 'codex-cli': readCachedCodexUsageLimits, 'claude-cli': readCachedClaudeUsageLimits } },
   );
 
   const schedulingRepository = createJean2ScheduledJobRepository();

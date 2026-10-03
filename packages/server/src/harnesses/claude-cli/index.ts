@@ -5,6 +5,7 @@ import { runHeadlessTurn } from '@/application/ports/headless-execution';
 export { createClaudeExecution } from './execution';
 export { claudeCliAvailable, claudeCliVersion } from './version';
 export { listClaudeModels, listCachedClaudeModels, getClaudeModelSelection, saveClaudeModelSelection } from './models';
+export { readCachedClaudeUsageLimits } from './usage-limits';
 
 /** Claude CLI owns turns and model choice; titles use the universal
  * server-side regeneration supplied by the composition root. */

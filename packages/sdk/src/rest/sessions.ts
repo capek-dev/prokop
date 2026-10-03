@@ -12,6 +12,7 @@ import type {
   SessionWorktreeResponse,
 } from '../types/rest-responses';
 import type { SessionStatus, SessionListFilter, SessionCategoryCounts, SessionHarness, HarnessStatus, CodexModel, CodexModelSelection, PermissionMode } from '../shared-types/session';
+import type { HarnessUsageLimits } from '../shared-types/harness-usage';
 
 interface ListOptions {
   status?: SessionStatus;
@@ -63,6 +64,10 @@ export class SessionsRestNamespace {
 
   async setHarnessEnabled(harness: SessionHarness, enabled: boolean): Promise<{ harnesses: HarnessStatus[] }> {
     return this.http.put(`/harnesses/${encodeURIComponent(harness)}`, { enabled });
+  }
+
+  async harnessUsage(harness: HarnessUsageLimits['harness']): Promise<{ usage: HarnessUsageLimits }> {
+    return this.http.get(`/harnesses/${encodeURIComponent(harness)}/usage`);
   }
 
   async claudeCatalog(): Promise<{ models: CodexModel[] }> {

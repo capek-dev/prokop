@@ -1,8 +1,12 @@
-import { query, type ModelInfo } from '@anthropic-ai/claude-agent-sdk';
+import { query, type ModelInfo, type Query } from '@anthropic-ai/claude-agent-sdk';
 import { claudeCliVersion } from './version';
 
-/** Initialize the installed CLI without yielding a prompt or creating a conversation. */
-export async function probeClaudeModels(): Promise<ModelInfo[]> {
+/**
+ * Start the installed CLI without yielding a prompt or creating a conversation,
+ * run one control read, and tear the process down. `label` names the read in
+ * timeout errors.
+ */
+export async function runClaudeControlProbe<T>(label: string, read: (q: Query) => Promise<T>): Promise<T> {
   claudeCliVersion();
   const executable = Bun.which('claude');
   if (!executable) throw new Error('Claude CLI is unavailable on this host');
@@ -12,7 +16,7 @@ export async function probeClaudeModels(): Promise<ModelInfo[]> {
   const abort = new AbortController();
   const timeout = setTimeout(() => abort.abort(), 25_000);
   const q = query({
-    // A never-yielding prompt is intentional: discovery must not send a model request.
+    // A never-yielding prompt is intentional: probes must not send a model request.
     // eslint-disable-next-line require-yield
     prompt: (async function* () { await new Promise<void>(resolve => {
       if (abort.signal.aborted) resolve();
@@ -32,19 +36,22 @@ export async function probeClaudeModels(): Promise<ModelInfo[]> {
     },
   });
   try {
-    const initialized = await Promise.race([
-      q.initializationResult(),
+    const result = await Promise.race([
+      read(q),
       new Promise<never>((_, reject) => {
-        const expired = () => reject(new Error('Claude model discovery timed out'));
+        const expired = () => reject(new Error(`${label} timed out`));
         if (abort.signal.aborted) expired();
         else abort.signal.addEventListener('abort', expired, { once: true });
       }),
     ]);
-    const models = initialized.models;
-    if (abort.signal.aborted) throw new Error('Claude model discovery timed out');
-    return models;
+    if (abort.signal.aborted) throw new Error(`${label} timed out`);
+    return result;
   } finally {
     clearTimeout(timeout);
     abort.abort();
   }
+}
+
+export async function probeClaudeModels(): Promise<ModelInfo[]> {
+  return runClaudeControlProbe('Claude model discovery', async q => (await q.initializationResult()).models);
 }

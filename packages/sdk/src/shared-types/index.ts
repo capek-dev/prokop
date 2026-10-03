@@ -29,6 +29,7 @@ export * from './goal';
 export * from './codex-goal';
 export * from './claude-goal';
 export * from './codex-usage';
+export * from './harness-usage';
 export * from './scheduled-job';
 export * from './notification';
 export * from './worktree';

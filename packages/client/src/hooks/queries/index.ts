@@ -1,5 +1,5 @@
 export { useToolsQuery, useToolDisplayCatalog, useToolEnvVarsQuery, useToolSetEnvVar, useToolClearEnvVar } from './useToolsQueries';
-export { useHarnessesQuery, useSetHarnessEnabled, isHarnessEnabled } from './useHarnessesQueries';
+export { useHarnessesQuery, useSetHarnessEnabled, isHarnessEnabled, useHarnessUsageQuery } from './useHarnessesQueries';
 export { useToolDebugQuery } from './useToolDebugQuery';
 export { useAgentsQuery, usePromoteAgent, useDemoteAgent } from './useAgentsQueries';
 export { useModelsConfigQuery, useCreateModel, useUpdateModel, useDeleteModel, useSetModelDefaults, useSyncModels } from './useModelsQueries';

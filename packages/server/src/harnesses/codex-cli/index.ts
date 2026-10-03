@@ -4,6 +4,7 @@ import { runHeadlessTurn } from '@/application/ports/headless-execution';
 
 export { codexCliAvailable, codexCliVersion, createCodexExecution } from './execution';
 export { getCodexModelSelection, listCodexModels, listCachedCodexModels, saveCodexModelSelection } from './models';
+export { readCachedCodexUsageLimits } from './usage-limits';
 
 /** Codex CLI owns turns and model choice; titles use the universal
  * server-side regeneration supplied by the composition root. */

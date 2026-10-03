@@ -256,6 +256,28 @@ describe('HTTP session route contract', () => {
     })).status).toBe(400);
   });
 
+  test('harness usage reads only installed native harnesses', async () => {
+    const usage = { harness: 'claude-cli' as const, checkedAt: '2026-10-03T00:00:00.000Z', plan: 'pro',
+      windows: [{ id: 'five_hour', kind: 'session' as const, label: '5-hour', usedPercent: 18 }] };
+    let reads = 0;
+    const application = createSessionHttpApplication(makeRepository(), undefined, undefined, undefined,
+      () => false, () => false, undefined, () => true, undefined, () => false,
+      {
+        settings: createHarnessSettingsApplication({ read: () => null, write: () => {} }),
+        usage: { 'claude-cli': async () => { reads++; return usage; }, 'codex-cli': async () => { reads++; return usage; } },
+      });
+    const app = new Hono();
+    app.onError((err, c) => err instanceof HttpError
+      ? c.json({ message: err.message }, err.status as never) : c.json({ message: 'error' }, 500));
+    registerSessionRoutes(app, application);
+    const claude = await app.request('/api/harnesses/claude-cli/usage');
+    expect(claude.status).toBe(200);
+    expect(await json(claude)).toEqual({ usage });
+    expect((await app.request('/api/harnesses/codex-cli/usage')).status).toBe(400);
+    expect((await app.request('/api/harnesses/prokop/usage')).status).toBe(404);
+    expect(reads).toBe(1);
+  });
+
   test('catalog is unavailable when the host has no Codex CLI', async () => {
     const { app } = makeApp();
     expect((await app.request('/api/harnesses/codex-cli/models')).status).toBe(400);

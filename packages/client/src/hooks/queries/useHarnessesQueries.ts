@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ProkopaiClient, SessionHarness, HarnessStatus } from '@prokopai/sdk';
+import type { ProkopaiClient, SessionHarness, HarnessStatus, HarnessUsageLimits } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
 
 export function useHarnessesQuery(sdkClient: ProkopaiClient | null) {
@@ -29,4 +29,14 @@ export function useSetHarnessEnabled(sdkClient: ProkopaiClient | null) {
 /** Enabled helper that treats an absent field (older server) as enabled. */
 export function isHarnessEnabled(status: HarnessStatus | undefined): boolean {
   return status === undefined || status.enabled !== false;
+}
+
+/** Plan usage for one native harness. Each uncached server read starts the CLI, so the panel only fetches while open. */
+export function useHarnessUsageQuery(sdkClient: ProkopaiClient | null, harness: HarnessUsageLimits['harness'], enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.harnesses.usage(harness),
+    queryFn: async (): Promise<HarnessUsageLimits> => (await sdkClient!.http.sessions.harnessUsage(harness)).usage,
+    enabled: !!sdkClient && enabled,
+    staleTime: 30_000,
+  });
 }

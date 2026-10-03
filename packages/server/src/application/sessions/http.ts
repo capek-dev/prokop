@@ -5,6 +5,7 @@ import type {
   SessionHarness,
   CodexModel,
   CodexModelSelection,
+  HarnessUsageLimits,
   SessionStatus,
   SessionListFilter,
 } from '@prokopai/sdk';
@@ -71,6 +72,8 @@ export interface SessionHarnessSettingsDeps {
   settings: HarnessSettingsApplication;
   codexVersion?: () => string;
   claudeVersion?: () => string;
+  /** Plan usage reads per native harness; Prokop has none. */
+  usage?: Partial<Record<HarnessUsageLimits['harness'], () => Promise<HarnessUsageLimits>>>;
 }
 
 export interface SessionHttpApplication {
@@ -78,6 +81,8 @@ export interface SessionHttpApplication {
   claudeAvailable(): boolean;
   listHarnessStatuses(): HarnessStatusEntry[];
   setHarnessEnabled(harness: SessionHarness, enabled: boolean): 'ok' | 'not_found' | 'prokop_immutable';
+  /** Null when the harness CLI is not installed or has no usage reader. */
+  harnessUsage(harness: HarnessUsageLimits['harness']): Promise<HarnessUsageLimits> | null;
   claudeCatalog(): Promise<CodexModel[]> | null;
   claudeModels(sessionId: string): Promise<{ models: CodexModel[]; selection: CodexModelSelection | null }> | null;
   setClaudeModel(sessionId: string, selection: CodexModelSelection): Promise<'ok' | 'not_found' | 'invalid' | 'active'>;
@@ -174,6 +179,11 @@ export function createSessionHttpApplication(
     setHarnessEnabled(harness, enabled) {
       if (!harnessSettings) return 'not_found';
       return harnessSettings.settings.setEnabled(harness, enabled).kind;
+    },
+    harnessUsage(harness) {
+      const available = harness === 'codex-cli' ? codexAvailable() : claudeAvailable();
+      const read = harnessSettings?.usage?.[harness];
+      return available && read ? read() : null;
     },
     claudeCatalog() {
       return claudeAvailable() && claudeModels ? claudeModels.list() : null;

@@ -1,11 +1,12 @@
 import { Suspense, lazy } from 'react';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { Boxes, FileText, Layers, Braces, MonitorCog, Palette, Keyboard, Wrench, CircuitBoard } from 'lucide-react';
+import { Boxes, FileText, Layers, Braces, MonitorCog, Palette, Keyboard, Wrench, CircuitBoard, Gauge } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import type { ConfigurationSection } from '@/stores/uiStore';
 import { SettingsDialogShell, PanelLoadingFallback, type SettingsSection } from './SettingsDialogShell';
 
 const HarnessesPanel = lazy(() => import('./configuration/HarnessesPanel').then((m) => ({ default: m.HarnessesPanel })));
+const UsagePanel = lazy(() => import('./configuration/UsagePanel').then((m) => ({ default: m.UsagePanel })));
 const ProvidersModelsPanel = lazy(() => import('./configuration/ProvidersModelsPanel').then((m) => ({ default: m.ProvidersModelsPanel })));
 const PromptsPanel = lazy(() => import('./configuration/PromptsPanel').then((m) => ({ default: m.PromptsPanel })));
 const PreconfigsPanel = lazy(() => import('./configuration/PreconfigsPanel').then((m) => ({ default: m.PreconfigsPanel })));
@@ -30,6 +31,7 @@ const SECTIONS: SettingsSection[] = [
   { value: 'keybinds', label: 'Keybinds', icon: Keyboard, group: 'preferences' },
   // Server: shared across harnesses (prompts are client-level text shortcuts, harness-agnostic)
   { value: 'harnesses', label: 'Harnesses', icon: CircuitBoard, group: 'server' },
+  { value: 'usage', label: 'Usage', icon: Gauge, group: 'server' },
   { value: 'preconfigs', label: 'Agents', icon: Layers, group: 'server' },
   { value: 'prompts', label: 'Prompts', icon: FileText, group: 'server' },
   // Prokop runtime
@@ -70,6 +72,8 @@ export function ConfigurationDialog({
             return <KeybindsPanel />;
           case 'harnesses':
             return <HarnessesPanel sdkClient={sdkClient} />;
+          case 'usage':
+            return <UsagePanel sdkClient={sdkClient} />;
           case 'preconfigs':
             return <PreconfigsPanel sdkClient={sdkClient} />;
           case 'providers-models':

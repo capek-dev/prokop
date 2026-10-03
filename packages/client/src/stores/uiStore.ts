@@ -11,6 +11,7 @@ export type ConfigurationSection =
   | 'keybinds'
   // Server (shared across harnesses; prompts are client-level shortcuts)
   | 'harnesses'
+  | 'usage'
   | 'preconfigs'
   | 'prompts'
   // Prokop runtime

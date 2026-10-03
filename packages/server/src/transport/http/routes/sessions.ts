@@ -39,6 +39,14 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
     return c.json({ harnesses: application.listHarnessStatuses() });
   });
 
+  app.get('/api/harnesses/:id/usage', async c => {
+    const id = c.req.param('id');
+    if (id !== 'codex-cli' && id !== 'claude-cli') throw new NotFoundError('Usage limits are unavailable for this harness');
+    const usage = application.harnessUsage(id);
+    if (!usage) throw new BadRequestError(`${id === 'codex-cli' ? 'Codex' : 'Claude'} CLI is unavailable on this host`);
+    return c.json({ usage: await usage });
+  });
+
   app.get('/api/harnesses/claude-cli/models', async c => {
     const catalog = application.claudeCatalog();
     if (!catalog) throw new BadRequestError('Claude CLI is unavailable on this host');

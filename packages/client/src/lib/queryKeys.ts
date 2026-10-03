@@ -30,6 +30,7 @@ export const queryKeys = {
   },
   harnesses: {
     all: ['harnesses'] as const,
+    usage: (harness: string) => ['harnesses', 'usage', harness] as const,
   },
   config: {
     models: ['config', 'models'] as const,
