@@ -503,18 +503,19 @@ interface EditFailureResult {
 }
 
 /** String-mode item: { oldString, newString, strategy? }.
- * Range-mode item: { startLine, endLine, newString }. */
+ * Range-mode item: { startLine, endLine, newString }.
+ * Null represents omitted fields for providers requiring every property. */
 interface Edit {
-  oldString?: string;
+  oldString?: string | null;
   newString: string;
-  strategy?: Strategy;
-  startLine?: number;
-  endLine?: number;
+  strategy?: Strategy | null;
+  startLine?: number | null;
+  endLine?: number | null;
 }
 
 interface Input {
   path: string;
-  revision?: string;
+  revision?: string | null;
   edits: Edit[];
 }
 
@@ -572,18 +573,22 @@ Every edit is either a string replacement (find oldString, replace with newStrin
 ## Parameters
 
 - path (required): Absolute path to the file to edit
-- revision (optional): The revision (sha256:...) returned by read-file for this file. The edit fails before writing when the file changed since that read.
+- revision (optional): The revision (sha256:...) returned by read-file for this file. The edit fails before writing when the file changed since that read. Omit or use null when no revision is available; never use an empty string.
 - edits (required): At least one edit object. Each edit is one of:
 
 String mode:
 - oldString (required): The text to find and replace, copied VERBATIM from the file. Exact matching supports both one-line and multi-line text.
 - newString (required): The replacement text. May be empty to delete the matched text.
-- strategy (optional): Omit for safe formatting-tolerant passes, or use 'exact'. 'line_start', 'line_end', 'partial', and 'multi_line' are compatibility strategies.
+- strategy (optional): Omit or use null for safe formatting-tolerant passes, or use 'exact'. 'line_start', 'line_end', 'partial', and 'multi_line' are compatibility strategies.
+- startLine and endLine: Omit or set both to null. Never supply line numbers in string mode.
 
 Range mode:
 - startLine (required): 1-based start line (inclusive), referring to the content as it stands when this edit applies (after preceding edits in the same call).
 - endLine (required): 1-based end line (inclusive).
 - newString (required): The replacement text. Empty string deletes the range.
+- oldString and strategy: Omit or set both to null. Never supply text or a strategy in range mode.
+
+If your provider requires every field, supply null for unused fields. Do not invent placeholder text or line numbers.
 
 ## Matching behavior (string mode)
 
@@ -599,8 +604,8 @@ Each edit independently uses safe ordered passes: exact, then line-endings norma
 
 \`\`\`
 edits: [
-  { oldString: "const x = 1;", newString: "const x = 10;" },
-  { startLine: 5, endLine: 7, newString: "// replaced block" }
+  { oldString: "const x = 1;", newString: "const x = 10;", strategy: null, startLine: null, endLine: null },
+  { oldString: null, newString: "// replaced block", strategy: null, startLine: 5, endLine: 7 }
 ]
 \`\`\`
 
@@ -620,19 +625,19 @@ This tool requires explicit permission for:
         description: 'Absolute path to the file to edit',
       },
       revision: {
-        type: 'string',
-        description: 'The revision (sha256:...) returned by read-file for this file; the edit fails before writing when the file changed since that read',
+        type: ['string', 'null'],
+        description: 'The revision (sha256:...) returned by read-file, or null to omit the revision check. Never use an empty string.',
       },
       edits: {
         type: 'array',
-        description: 'Array of edits to apply atomically; each item is a string replacement (oldString/newString) or a range replacement (startLine/endLine/newString)',
+        description: 'Array of edits to apply atomically; use either string or range mode per item. Omit unused mode fields or set them to null.',
         minItems: 1,
         items: {
           type: 'object',
           properties: {
             oldString: {
-              type: 'string',
-              description: 'String mode: the text to find and replace',
+              type: ['string', 'null'],
+              description: 'String mode: non-empty text to find. Range mode: omit or null.',
               minLength: 1,
             },
             newString: {
@@ -640,19 +645,19 @@ This tool requires explicit permission for:
               description: 'The replacement text (both modes)',
             },
             strategy: {
-              type: 'string',
-              description: "String mode matching strategy: omit for safe ordered passes, or use 'exact'.",
-              enum: ['exact', 'line_start', 'line_end', 'partial', 'multi_line'],
+              type: ['string', 'null'],
+              description: "String mode: omit or null for safe ordered passes, or use 'exact'. Range mode: omit or null.",
+              enum: ['exact', 'line_start', 'line_end', 'partial', 'multi_line', null],
             },
             startLine: {
-              type: 'integer',
+              type: ['integer', 'null'],
               minimum: 1,
-              description: 'Range mode: 1-based start line (inclusive)',
+              description: 'Range mode: 1-based start line (inclusive). String mode: omit or null.',
             },
             endLine: {
-              type: 'integer',
+              type: ['integer', 'null'],
               minimum: 1,
-              description: 'Range mode: 1-based end line (inclusive)',
+              description: 'Range mode: 1-based end line (inclusive). String mode: omit or null.',
             },
           },
           required: ['newString'],
@@ -764,38 +769,46 @@ function applyRangeEdit(
 
 export async function execute(input: Input, ctx: ToolContext): Promise<ToolResult> {
   try {
-    // Runtime validation
+    // Runtime validation treats null fields as omitted for strict provider schemas.
     if (!Array.isArray(input.edits) || input.edits.length === 0) {
       return failure('INVALID_INPUT', input.path, 'edits must be a non-empty array.');
     }
     for (let i = 0; i < input.edits.length; i++) {
       const e = input.edits[i];
-      const isRange = typeof e?.startLine === 'number';
+      if (!e || typeof e !== 'object' || Array.isArray(e)) {
+        return failure('INVALID_INPUT', input.path, `edits[${i}] must be an edit object.`, { editIndex: i });
+      }
+      const isRange = e.startLine != null || e.endLine != null;
       if (isRange) {
-        if (!Number.isInteger(e.startLine) || e.startLine! < 1
-          || !Number.isInteger(e.endLine) || e.endLine! < e.startLine!) {
+        if (e.oldString != null) {
+          return failure('INVALID_INPUT', input.path,
+            `edits[${i}] mixes oldString with startLine/endLine. For string mode, omit both line bounds or set them to null. For range mode, omit oldString or set it to null.`, { editIndex: i });
+        }
+        if (typeof e.startLine !== 'number' || typeof e.endLine !== 'number'
+          || !Number.isInteger(e.startLine) || e.startLine < 1
+          || !Number.isInteger(e.endLine) || e.endLine < e.startLine) {
           return failure('INVALID_INPUT', input.path,
             `edits[${i}] requires integer startLine >= 1 and endLine >= startLine.`, { editIndex: i });
         }
-        if (typeof e?.oldString === 'string') {
+        if (e.strategy != null) {
           return failure('INVALID_INPUT', input.path,
-            `edits[${i}] mixes oldString with startLine; provide either string mode or range mode, not both.`, { editIndex: i });
+            `edits[${i}].strategy is only valid in string mode; omit it or set it to null for range mode.`, { editIndex: i });
         }
       } else {
-        if (typeof e?.oldString !== 'string' || e.oldString.length === 0) {
+        if (typeof e.oldString !== 'string' || e.oldString.length === 0) {
           return failure('INVALID_INPUT', input.path,
             `edits[${i}].oldString must be a non-empty string (or provide startLine/endLine for range mode).`, { editIndex: i });
         }
-        if (e.strategy !== undefined && !KNOWN_STRATEGIES.has(e.strategy)) {
+        if (e.strategy != null && !KNOWN_STRATEGIES.has(e.strategy)) {
           return failure('INVALID_INPUT', input.path, `edits[${i}].strategy is unknown: ${String(e.strategy)}.`, { editIndex: i });
         }
       }
-      if (typeof e?.newString !== 'string') {
+      if (typeof e.newString !== 'string') {
         return failure('INVALID_INPUT', input.path, `edits[${i}].newString must be a string.`, { editIndex: i });
       }
     }
-    if (input.revision !== undefined && !REVISION_RE.test(input.revision)) {
-      return failure('INVALID_INPUT', input.path, 'revision must be an sha256:... value from read-file.');
+    if (input.revision != null && (typeof input.revision !== 'string' || !REVISION_RE.test(input.revision))) {
+      return failure('INVALID_INPUT', input.path, 'revision must be an sha256:... value from read-file, omitted, or null.');
     }
 
     const resolvedPath = ctx.resolvePath(input.path);
@@ -848,7 +861,7 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
       return failure('INVALID_INPUT', resolvedPath, `Cannot edit a binary file: ${resolvedPath}`);
     }
 
-    if (input.revision !== undefined && contentRevision(content) !== input.revision) {
+    if (input.revision != null && contentRevision(content) !== input.revision) {
       return failure('STALE_REVISION', resolvedPath,
         'The file changed since the revision was read. Re-read the file and retry.');
     }
@@ -884,7 +897,7 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
       }
 
       // String mode
-      const { matches, usedMode, attempts, ambiguous } = findMatches(contentToEdit, edit.oldString!, edit.strategy);
+      const { matches, usedMode, attempts, ambiguous } = findMatches(contentToEdit, edit.oldString!, edit.strategy ?? undefined);
 
       if (matches.length === 0) {
         const newCount = edit.newString.length > 0 ? countExactOccurrences(contentToEdit, edit.newString) : undefined;
