@@ -17,7 +17,6 @@ describe('built-in tool catalog', () => {
       'question',
       'read-file',
       'shell',
-      'tavily-search',
       'terminal',
       'todo',
       'webfetch',
@@ -26,7 +25,7 @@ describe('built-in tool catalog', () => {
   });
 
   test('every tool has a valid definition and executor', () => {
-    expect(builtinTools).toHaveLength(18);
+    expect(builtinTools).toHaveLength(17);
     for (const tool of builtinTools) {
       expect(tool.definition.name).toBeTruthy();
       expect(tool.definition.description).toBeTruthy();
@@ -46,7 +45,6 @@ describe('built-in tool catalog', () => {
     expect(isBuiltinToolName('browser_navigate')).toBe(true);
     expect(isBuiltinToolName('file-to-markdown')).toBe(true);
     expect(isBuiltinToolName('shell')).toBe(true);
-    expect(isBuiltinToolName('tavily-search')).toBe(true);
     expect(isBuiltinToolName('todo')).toBe(true);
     expect(isBuiltinToolName('')).toBe(false);
   });

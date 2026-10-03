@@ -23,7 +23,6 @@ tools:
   - glob
   - grep
   - shell
-  - tavily-search
   - terminal
   - question
   - todo

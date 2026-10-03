@@ -26,7 +26,6 @@ export const queryKeys = {
   },
   tools: {
     all: ['tools'] as const,
-    envVars: ['tools', 'envVars'] as const,
   },
   harnesses: {
     all: ['harnesses'] as const,

@@ -17,8 +17,7 @@ export type ConfigurationSection =
   | 'prompts'
   // Prokop runtime
   | 'providers-models'
-  | 'response-formats'
-  | 'tools-env';
+  | 'response-formats';
 
 // --- Default File Open Mode ---
 export type DefaultFileOpenMode = 'preview' | 'edit';

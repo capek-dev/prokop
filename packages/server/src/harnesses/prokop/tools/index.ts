@@ -21,7 +21,6 @@ import * as grep from '@/harnesses/prokop/tools/grep/tool';
 import * as question from '@/harnesses/prokop/tools/question/tool';
 import * as readFile from '@/harnesses/prokop/tools/read-file/tool';
 import * as shell from '@/harnesses/prokop/tools/shell/tool';
-import * as tavilySearch from '@/harnesses/prokop/tools/tavily-search/tool';
 import * as terminal from '@/harnesses/prokop/tools/terminal/tool';
 import * as todo from '@/harnesses/prokop/tools/todo/tool';
 import * as webfetch from '@/harnesses/prokop/tools/webfetch/tool';
@@ -56,7 +55,6 @@ const modules = [
   question,
   readFile,
   shell,
-  tavilySearch,
   terminal,
   todo,
   webfetch,

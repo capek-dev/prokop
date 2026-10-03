@@ -4,7 +4,7 @@ Tools give the agent the ability to interact with your filesystem, run commands,
 
 ## Built-in tools
 
-A fresh `prokop init` can use the filesystem, shell, web fetch, web search, task, question, and worktree tools immediately. Built-in tools take precedence over optional extensions with the same name.
+A fresh `prokop init` can use the filesystem, shell, web fetch, task, question, and worktree tools immediately. Built-in tools take precedence over optional extensions with the same name.
 
 ### File Tools
 
@@ -33,9 +33,8 @@ The shell tool enforces safety: dangerous commands (`rm`, `sudo`, `curl`), files
 | Tool | Description |
 |------|-------------|
 | **webfetch** | Fetch and convert web pages to readable text |
-| **tavily-search** | Search the web with topic, date, and domain filters (requires `TAVILY_API_KEY`) |
 
-Configure your own Tavily API key in Settings before using `tavily-search`. The server does not provide an API key.
+For web search, connect a search service in **Settings → MCP Servers** for access across workspaces, or in a workspace's MCP settings for that workspace only.
 
 ### Browser
 

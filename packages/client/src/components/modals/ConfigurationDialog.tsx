@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { Boxes, FileText, Layers, Braces, MonitorCog, Palette, Keyboard, Wrench, CircuitBoard, Gauge } from 'lucide-react';
+import { Boxes, FileText, Layers, Braces, MonitorCog, Palette, Keyboard, CircuitBoard, Gauge } from 'lucide-react';
 import { useUIStore } from '@/stores/uiStore';
 import type { ConfigurationSection } from '@/stores/uiStore';
 import { SettingsDialogShell, PanelLoadingFallback, type SettingsSection } from './SettingsDialogShell';
@@ -12,7 +12,6 @@ const ProvidersModelsPanel = lazy(() => import('./configuration/ProvidersModelsP
 const PromptsPanel = lazy(() => import('./configuration/PromptsPanel').then((m) => ({ default: m.PromptsPanel })));
 const PreconfigsPanel = lazy(() => import('./configuration/PreconfigsPanel').then((m) => ({ default: m.PreconfigsPanel })));
 const ResponseFormatsPanel = lazy(() => import('./configuration/ResponseFormatsPanel').then((m) => ({ default: m.ResponseFormatsPanel })));
-const ToolsEnvironmentPanel = lazy(() => import('./configuration/ToolsEnvironmentPanel').then((m) => ({ default: m.ToolsEnvironmentPanel })));
 const SystemPanel = lazy(() => import('./configuration/SystemPanel').then((m) => ({ default: m.SystemPanel })));
 const AppearancePanel = lazy(() => import('./configuration/AppearancePanel').then((m) => ({ default: m.AppearancePanel })));
 const KeybindsPanel = lazy(() => import('./configuration/KeybindsPanel').then((m) => ({ default: m.KeybindsPanel })));
@@ -39,7 +38,6 @@ const SECTIONS: SettingsSection[] = [
   // Prokop runtime
   { value: 'providers-models', label: 'Providers & Models', icon: Boxes, group: 'prokop' },
   { value: 'response-formats', label: 'Formats', icon: Braces, group: 'prokop' },
-  { value: 'tools-env', label: 'Tools & Environment', icon: Wrench, group: 'prokop' },
   // System: connection/version, pinned to the bottom
   { value: 'system', label: 'System', icon: MonitorCog, group: 'system' },
 ];
@@ -86,8 +84,6 @@ export function ConfigurationDialog({
             return <PromptsPanel sdkClient={sdkClient} />;
           case 'response-formats':
             return <ResponseFormatsPanel sdkClient={sdkClient} />;
-          case 'tools-env':
-            return <ToolsEnvironmentPanel sdkClient={sdkClient} />;
         }
       })()}
     </Suspense>

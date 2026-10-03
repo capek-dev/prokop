@@ -1,4 +1,4 @@
-export { useToolsQuery, useToolDisplayCatalog, useToolEnvVarsQuery, useToolSetEnvVar, useToolClearEnvVar } from './useToolsQueries';
+export { useToolsQuery, useToolDisplayCatalog } from './useToolsQueries';
 export { useHarnessesQuery, useSetHarnessEnabled, isHarnessEnabled, useHarnessUsageQuery } from './useHarnessesQueries';
 export { useToolDebugQuery } from './useToolDebugQuery';
 export { useAgentsQuery, usePromoteAgent, useDemoteAgent } from './useAgentsQueries';
