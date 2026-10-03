@@ -90,7 +90,7 @@ export function subscribeToServerEvents(
     if (typeof workspaceId === 'string') void queryClient.invalidateQueries({ queryKey: ['learning', workspaceId] });
   });
   add('mcp.changed', (workspaceId: unknown) => {
-    if (typeof workspaceId !== 'string') return;
+    if (workspaceId !== null && typeof workspaceId !== 'string') return;
     void queryClient.invalidateQueries({ queryKey: queryKeys.mcp.status(workspaceId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.mcp.tools(workspaceId) });
   });

@@ -25,7 +25,8 @@ export interface LearningChangedMessage {
 
 export interface McpChangedMessage {
   type: 'mcp.changed';
-  workspaceId: string;
+  /** Null denotes global MCP configuration. */
+  workspaceId: string | null;
 }
 
 export interface WorkspaceConversationActivityMessage {

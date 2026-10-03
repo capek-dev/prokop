@@ -65,6 +65,14 @@ function makeApplication(state: FakeState): McpHttpApplication {
 }
 
 describe('mcp application use cases', () => {
+  test('global scope uses the shared lifecycle without a workspace lookup', async () => {
+    const state = makeState();
+    const application = makeApplication(state);
+    expect((await application.status(null)).kind).toBe('ok');
+    expect((await application.connect(null, 'alpha')).kind).toBe('ok');
+    expect((await application.restart(null)).kind).toBe('ok');
+    expect(state.log).toEqual(['status:null', 'servers:null', 'connect:null:alpha', 'shutdown:null', 'initialize:null', 'status:null']);
+  });
   test('status returns the server map or workspace_not_found', async () => {
     const state = makeState();
     const application = makeApplication(state);

@@ -3,9 +3,10 @@ import { CallToolResultSchema, type Tool as MCPToolDef } from '@modelcontextprot
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { getWorkspaceTools } from './manager';
 
-export async function getTools(path: string, _sessionId: string): Promise<Record<string, CapabilityTool>> {
+export async function getTools(path: string, _sessionId: string, authorized?: () => Promise<boolean>): Promise<Record<string, CapabilityTool>> {
   return Object.fromEntries((await getWorkspaceTools(path)).map(tool => [tool.name, createCapabilityTool({
     description: tool.description, inputSchema: tool.inputSchema, execute: async input => {
+      if (authorized && !await authorized()) throw new Error('MCP access is not allowed for this agent');
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid MCP arguments');
       return tool.execute(input as Record<string, unknown>);
     },

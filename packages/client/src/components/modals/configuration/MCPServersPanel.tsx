@@ -11,18 +11,18 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { McpServerForm } from './McpServerForm';
 
-interface Props { workspaceId: string | undefined; sdkClient: ProkopaiClient | null }
+interface Props { workspaceId: string | null | undefined; sdkClient: ProkopaiClient | null }
 const statusLabels: Record<McpStatus['status'], string> = {
   connected: 'Connected', disabled: 'Disconnected', failed: 'Connection failed',
   needs_auth: 'Sign-in required', needs_client_registration: 'Client registration required',
 };
 
 export function MCPServersPanel({ workspaceId, sdkClient }: Props) {
-  if (!workspaceId || !sdkClient) return <p className="p-4 text-sm text-muted-foreground">Connect to a server to manage MCP.</p>;
-  return <McpSettings key={workspaceId} workspaceId={workspaceId} client={sdkClient} />;
+  if (workspaceId === undefined || !sdkClient) return <p className="p-4 text-sm text-muted-foreground">Connect to a server to manage MCP.</p>;
+  return <McpSettings key={workspaceId ?? 'global'} workspaceId={workspaceId} client={sdkClient} />;
 }
 
-function McpSettings({ workspaceId, client }: { workspaceId: string; client: ProkopaiClient }) {
+function McpSettings({ workspaceId, client }: { workspaceId: string | null; client: ProkopaiClient }) {
   const cache = useQueryClient();
   const [editing, setEditing] = useState<{ name?: string; config?: McpServerConfig }>();
   const [search, setSearch] = useState('');
@@ -41,7 +41,7 @@ function McpSettings({ workspaceId, client }: { workspaceId: string; client: Pro
   const error = action.error ?? status.error;
   return <div className="flex flex-col gap-4 p-3 sm:p-4">
     <div className="flex items-start justify-between gap-3">
-      <p className="text-sm text-muted-foreground">Connect services and choose which tools this workspace can use.</p>
+      <p className="text-sm text-muted-foreground">{workspaceId === null ? 'Tools available across all workspaces.' : 'Workspace connections override global connections with the same name.'}</p>
       <Button size="sm" variant="outline" disabled={!!editing || action.isPending} onClick={() => setEditing({})}>
         <Plus data-icon="inline-start" />Add server
       </Button>
@@ -102,7 +102,7 @@ function McpSettings({ workspaceId, client }: { workspaceId: string; client: Pro
   </div>;
 }
 
-function McpTools({ workspaceId, name, client }: { workspaceId: string; name: string; client: ProkopaiClient }) {
+function McpTools({ workspaceId, name, client }: { workspaceId: string | null; name: string; client: ProkopaiClient }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const cache = useQueryClient();

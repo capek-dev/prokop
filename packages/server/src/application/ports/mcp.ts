@@ -11,26 +11,27 @@ import type { McpServerConfig, McpStatus, McpToolInfo } from '@prokopai/sdk';
 export type McpToolMap = Record<string, unknown>;
 
 export interface McpLifecyclePort {
-  initializeWorkspace(workspacePath: string): Promise<void>;
-  shutdownWorkspace(workspacePath: string): Promise<void>;
+  /** A null workspacePath addresses global configuration and connections. */
+  initializeWorkspace(workspacePath: string | null): Promise<void>;
+  shutdownWorkspace(workspacePath: string | null): Promise<void>;
   connectServer(
-    workspacePath: string,
+    workspacePath: string | null,
     name: string,
     config: McpServerConfig,
   ): Promise<McpStatus>;
-  disconnectServer(workspacePath: string, name: string): Promise<void>;
-  getServerStatus(workspacePath: string, name: string): Promise<McpStatus | undefined>;
+  disconnectServer(workspacePath: string | null, name: string): Promise<void>;
+  getServerStatus(workspacePath: string | null, name: string): Promise<McpStatus | undefined>;
   getAllServerStatus(
-    workspacePath: string,
+    workspacePath: string | null,
   ): Promise<Record<string, { config: McpServerConfig | undefined; status: McpStatus }>>;
   getTools(workspacePath: string, sessionId: string): Promise<McpToolMap>;
-  startAuth(workspacePath: string, name: string, redirectUrl: string): Promise<{ authorizationUrl: string }>;
-  finishAuth(state: string, code: string, expected?: { path: string; name: string }): Promise<{ path: string; status: McpStatus }>;
-  saveServer(workspacePath: string, name: string, config: McpServerConfig): Promise<void>;
-  removeServer(workspacePath: string, name: string): Promise<void>;
-  getServerTools(workspacePath: string, name: string): Promise<McpToolInfo[]>;
-  setToolEnabled(workspacePath: string, name: string, toolName: string, enabled: boolean): Promise<void>;
-  getMcpServers(workspacePath: string): Promise<Record<string, McpServerConfig>>;
+  startAuth(workspacePath: string | null, name: string, redirectUrl: string): Promise<{ authorizationUrl: string }>;
+  finishAuth(state: string, code: string, expected?: { path: string | null; name: string }): Promise<{ path: string | null; status: McpStatus }>;
+  saveServer(workspacePath: string | null, name: string, config: McpServerConfig): Promise<void>;
+  removeServer(workspacePath: string | null, name: string): Promise<void>;
+  getServerTools(workspacePath: string | null, name: string): Promise<McpToolInfo[]>;
+  setToolEnabled(workspacePath: string | null, name: string, toolName: string, enabled: boolean): Promise<void>;
+  getMcpServers(workspacePath: string | null): Promise<Record<string, McpServerConfig>>;
 }
 
 /** Workspace path lookup for MCP use cases; the Jean2 adapter reads the

@@ -47,8 +47,8 @@ export const queryKeys = {
     agents: ['config', 'agents'] as const,
   },
   mcp: {
-    status: (workspaceId: string) => ['mcp', 'status', workspaceId] as const,
-    tools: (workspaceId: string, name?: string) => ['mcp', 'tools', workspaceId, ...(name === undefined ? [] : [name])] as const,
+    status: (workspaceId: string | null) => ['mcp', 'status', workspaceId] as const,
+    tools: (workspaceId: string | null, name?: string) => ['mcp', 'tools', workspaceId, ...(name === undefined ? [] : [name])] as const,
   },
   files: {
     // Prefix keys for targeted invalidation (prefix-matched by TanStack Query)

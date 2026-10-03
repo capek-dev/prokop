@@ -94,7 +94,7 @@ export interface SdkEventMap {
   'session.renamed': [session: SessionRenamedMessage['session']];
   'workspace.conversation_activity': [workspaceId: string, lastConversationAt: number | null];
   'learning.changed': [workspaceId: string];
-  'mcp.changed': [workspaceId: string];
+  'mcp.changed': [workspaceId: string | null];
   'git.changed': [workspaceId: string, root: string];
   'files.changed': [workspaceId: FilesChangedMessage['workspaceId']];
   'worktree.updated': [worktree: WorktreeUpdatedMessage['worktree']];

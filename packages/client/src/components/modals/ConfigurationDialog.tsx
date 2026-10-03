@@ -5,6 +5,7 @@ import { useUIStore } from '@/stores/uiStore';
 import type { ConfigurationSection } from '@/stores/uiStore';
 import { SettingsDialogShell, PanelLoadingFallback, type SettingsSection } from './SettingsDialogShell';
 
+const MCPServersPanel = lazy(() => import('./configuration/MCPServersPanel').then(m => ({ default: m.MCPServersPanel })));
 const HarnessesPanel = lazy(() => import('./configuration/HarnessesPanel').then((m) => ({ default: m.HarnessesPanel })));
 const UsagePanel = lazy(() => import('./configuration/UsagePanel').then((m) => ({ default: m.UsagePanel })));
 const ProvidersModelsPanel = lazy(() => import('./configuration/ProvidersModelsPanel').then((m) => ({ default: m.ProvidersModelsPanel })));
@@ -30,6 +31,7 @@ const SECTIONS: SettingsSection[] = [
   { value: 'appearance', label: 'Appearance', icon: Palette, group: 'preferences' },
   { value: 'keybinds', label: 'Keybinds', icon: Keyboard, group: 'preferences' },
   // Server: shared across harnesses (prompts are client-level text shortcuts, harness-agnostic)
+  { value: 'mcp', label: 'MCP Servers', icon: Boxes, group: 'server' },
   { value: 'harnesses', label: 'Harnesses', icon: CircuitBoard, group: 'server' },
   { value: 'usage', label: 'Usage', icon: Gauge, group: 'server' },
   { value: 'preconfigs', label: 'Agents', icon: Layers, group: 'server' },
@@ -70,6 +72,8 @@ export function ConfigurationDialog({
             return <AppearancePanel />;
           case 'keybinds':
             return <KeybindsPanel />;
+          case 'mcp':
+            return <MCPServersPanel workspaceId={null} sdkClient={sdkClient} />;
           case 'harnesses':
             return <HarnessesPanel sdkClient={sdkClient} />;
           case 'usage':

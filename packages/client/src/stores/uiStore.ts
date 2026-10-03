@@ -5,6 +5,7 @@ import type { UseBoundStore, StoreApi } from 'zustand';
 
 // --- Configuration Section (deep-linking) ---
 export type ConfigurationSection =
+  | 'mcp'
   // Preferences
   | 'system'
   | 'appearance'

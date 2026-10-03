@@ -4,7 +4,7 @@ import { NotFoundError } from '@/application/http-errors';
 export { mcpNameSchema, mcpServerConfigSchema } from '@/domains/mcp/config';
 
 /**
- * Workspace MCP settings and lifecycle use cases. Connection management,
+ * Global and workspace MCP settings. A null workspaceId selects global scope. Connection management,
  * tool policy and OAuth stay behind the host lifecycle port.
  */
 
@@ -27,24 +27,25 @@ export type McpDisconnectResult =
   | { kind: 'workspace_not_found' };
 
 export interface McpHttpApplication {
-  status(workspaceId: string): Promise<McpStatusResult>;
-  connect(workspaceId: string, name: string): Promise<McpConnectResult>;
-  disconnect(workspaceId: string, name: string): Promise<McpDisconnectResult>;
-  restart(workspaceId: string): Promise<McpStatusResult>;
-  save(workspaceId: string, name: string, config: McpServerConfig): Promise<void>;
-  remove(workspaceId: string, name: string): Promise<void>;
-  tools(workspaceId: string, name: string): Promise<McpToolInfo[]>;
-  setToolEnabled(workspaceId: string, name: string, toolName: string, enabled: boolean): Promise<void>;
-  startAuth(workspaceId: string, name: string, redirectUrl: string): Promise<{ authorizationUrl: string }>;
+  status(workspaceId: string | null): Promise<McpStatusResult>;
+  connect(workspaceId: string | null, name: string): Promise<McpConnectResult>;
+  disconnect(workspaceId: string | null, name: string): Promise<McpDisconnectResult>;
+  restart(workspaceId: string | null): Promise<McpStatusResult>;
+  save(workspaceId: string | null, name: string, config: McpServerConfig): Promise<void>;
+  remove(workspaceId: string | null, name: string): Promise<void>;
+  tools(workspaceId: string | null, name: string): Promise<McpToolInfo[]>;
+  setToolEnabled(workspaceId: string | null, name: string, toolName: string, enabled: boolean): Promise<void>;
+  startAuth(workspaceId: string | null, name: string, redirectUrl: string): Promise<{ authorizationUrl: string }>;
   finishAuth(state: string, code: string): Promise<{ status: McpStatus }>;
-  finishWorkspaceAuth(workspaceId: string, name: string, state: string, code: string): Promise<{ status: McpStatus }>;
+  finishWorkspaceAuth(workspaceId: string | null, name: string, state: string, code: string): Promise<{ status: McpStatus }>;
 }
 
 export function createMcpHttpApplication(deps: McpApplicationDeps): McpHttpApplication {
-  async function workspacePathOr(workspaceId: string): Promise<string | null> {
-    return deps.workspaces.getWorkspacePath(workspaceId);
+  async function workspacePathOr(workspaceId: string | null): Promise<string | null | undefined> {
+    return workspaceId === null ? null : deps.workspaces.getWorkspacePath(workspaceId) ?? undefined;
   }
-  function requirePath(workspaceId: string): string {
+  function requirePath(workspaceId: string | null): string | null {
+    if (workspaceId === null) return null;
     const path = deps.workspaces.getWorkspacePath(workspaceId);
     if (path === null) throw new NotFoundError('Workspace not found');
     return path;
@@ -66,7 +67,7 @@ export function createMcpHttpApplication(deps: McpApplicationDeps): McpHttpAppli
     },
     async status(workspaceId) {
       const workspacePath = await workspacePathOr(workspaceId);
-      if (workspacePath === null) {
+      if (workspacePath === undefined) {
         return { kind: 'workspace_not_found' };
       }
       const status = await deps.lifecycle.getAllServerStatus(workspacePath);
@@ -75,7 +76,7 @@ export function createMcpHttpApplication(deps: McpApplicationDeps): McpHttpAppli
 
     async connect(workspaceId, name) {
       const workspacePath = await workspacePathOr(workspaceId);
-      if (workspacePath === null) {
+      if (workspacePath === undefined) {
         return { kind: 'workspace_not_found' };
       }
       const config = await deps.lifecycle.getMcpServers(workspacePath);
@@ -89,7 +90,7 @@ export function createMcpHttpApplication(deps: McpApplicationDeps): McpHttpAppli
 
     async disconnect(workspaceId, name) {
       const workspacePath = await workspacePathOr(workspaceId);
-      if (workspacePath === null) {
+      if (workspacePath === undefined) {
         return { kind: 'workspace_not_found' };
       }
       await deps.lifecycle.disconnectServer(workspacePath, name);
@@ -98,7 +99,7 @@ export function createMcpHttpApplication(deps: McpApplicationDeps): McpHttpAppli
 
     async restart(workspaceId) {
       const workspacePath = await workspacePathOr(workspaceId);
-      if (workspacePath === null) {
+      if (workspacePath === undefined) {
         return { kind: 'workspace_not_found' };
       }
       await deps.lifecycle.shutdownWorkspace(workspacePath);

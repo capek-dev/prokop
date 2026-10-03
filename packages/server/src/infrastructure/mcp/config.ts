@@ -2,12 +2,18 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { McpConfig, McpServerConfig, McpLocalServerConfig, McpRemoteServerConfig } from '@prokopai/sdk';
 import { resolveWorkspaceDir } from '@/infrastructure/runtime/workspace-dirs';
+import { getDataDir } from '@/infrastructure/runtime/paths';
 import { mcpConfigSchema, mcpNameSchema, mcpServerConfigSchema } from '@/domains/mcp/config';
 
 const writes = new Map<string, Promise<unknown>>();
 
-export async function loadMcpConfig(workspacePath: string): Promise<McpConfig> {
-  const path = join(resolveWorkspaceDir(workspacePath), 'mcp.json');
+/** Null addresses server-wide MCP; a path addresses only that workspace. */
+function configDirectory(workspacePath: string | null): string {
+  return workspacePath === null ? getDataDir() : resolveWorkspaceDir(workspacePath);
+}
+
+export async function loadMcpConfig(workspacePath: string | null): Promise<McpConfig> {
+  const path = join(configDirectory(workspacePath), 'mcp.json');
   let content: string;
   try { content = await readFile(path, 'utf8'); }
   catch (error: unknown) {
@@ -19,10 +25,10 @@ export async function loadMcpConfig(workspacePath: string): Promise<McpConfig> {
 }
 
 /** Serialize read-modify-write operations and replace only complete, validated files. */
-export async function updateMcpConfig(workspacePath: string, name: string, config: McpServerConfig | null): Promise<void> {
+export async function updateMcpConfig(workspacePath: string | null, name: string, config: McpServerConfig | null): Promise<void> {
   mcpNameSchema.parse(name);
   if (config !== null) mcpServerConfigSchema.parse(config);
-  const directory = resolveWorkspaceDir(workspacePath);
+  const directory = configDirectory(workspacePath);
   const previous = writes.get(directory) ?? Promise.resolve();
   const next = previous.catch(() => {}).then(async () => {
     const current = await loadMcpConfig(workspacePath);
@@ -37,7 +43,7 @@ export async function updateMcpConfig(workspacePath: string, name: string, confi
   try { await next; } finally { if (writes.get(directory) === next) writes.delete(directory); }
 }
 
-export async function getMcpServers(workspacePath: string): Promise<Record<string, McpServerConfig>> {
+export async function getMcpServers(workspacePath: string | null): Promise<Record<string, McpServerConfig>> {
   return (await loadMcpConfig(workspacePath)).servers;
 }
 

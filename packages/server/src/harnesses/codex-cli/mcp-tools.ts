@@ -12,9 +12,9 @@ export function createCodexMcpTools(options: {
   const seen = new Set<string>();
   return {
     definitions: [
-      { type: 'function', name: 'mcp_list_tools', description: 'List allowed workspace MCP tools with their server, name, description and JSON input schema. Call before mcp_call_tool.',
+      { type: 'function', name: 'mcp_list_tools', description: 'List allowed global and workspace MCP tools with their server, name, description and JSON input schema. Call before mcp_call_tool.',
         inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
-      { type: 'function', name: 'mcp_call_tool', description: 'Call an allowed workspace MCP tool. Get the exact tool ID and argument schema from mcp_list_tools first.',
+      { type: 'function', name: 'mcp_call_tool', description: 'Call an allowed global or workspace MCP tool. Get the exact tool ID and argument schema from mcp_list_tools first.',
         inputSchema: { type: 'object', properties: { tool: { type: 'string' }, arguments: { type: 'object', additionalProperties: true } },
           required: ['tool', 'arguments'], additionalProperties: false } },
     ],

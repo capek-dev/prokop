@@ -180,6 +180,10 @@ export function createWiredAgentsApplication(): AgentsApplication {
 
 export function createWiredApplication(existingAgents?: AgentsApplication): WiredApplication {
   setMcpChangeListener(path => {
+    if (path === null) {
+      broadcastEvent({ type: 'mcp.changed', workspaceId: null });
+      return;
+    }
     for (const workspace of listWorkspaces()) {
       if (workspace.path === path) broadcastEvent({ type: 'mcp.changed', workspaceId: workspace.id });
     }

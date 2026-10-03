@@ -51,6 +51,27 @@ async function json(res: Response): Promise<Record<string, unknown>> {
 }
 
 describe('mcp route contract', () => {
+  test('global routes pass null scope, validate input, and share the OAuth callback', async () => {
+    const scopes: Array<string | null> = [];
+    const app = makeApp(makeFakeApplication({
+      save: async (id) => { scopes.push(id); },
+      tools: async (id) => { scopes.push(id); return []; },
+      startAuth: async (id, _name, redirectUrl) => {
+        scopes.push(id);
+        expect(redirectUrl).toBe('http://localhost/api/mcp/oauth/callback');
+        return { authorizationUrl: 'https://auth.example/authorize' };
+      },
+    }));
+    const post = (path: string, body: unknown) => app.request(path, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    expect((await post('/api/mcp/servers', { name: 'crm', config: { type: 'remote', url: 'https://crm.example/mcp' } })).status).toBe(200);
+    expect((await app.request('/api/mcp/tools?name=crm')).status).toBe(200);
+    expect((await post('/api/mcp/auth', { name: 'crm' })).status).toBe(200);
+    expect(scopes).toEqual([null, null, null]);
+    expect((await post('/api/mcp/servers', { name: 'crm', config: { type: 'local', command: [] } })).status).toBe(400);
+    expect(scopes).toHaveLength(3);
+  });
   test('GET status returns the server map and the exact workspace 404', async () => {
     const ok = await makeApp(makeFakeApplication()).request('/api/workspaces/ws-1/mcp/status');
     expect(ok.status).toBe(200);
@@ -66,7 +87,7 @@ describe('mcp route contract', () => {
   });
 
   test('POST connect returns the status and maps the exact 404s', async () => {
-    const connectedApp: Array<{ id: string; name: string }> = [];
+    const connectedApp: Array<{ id: string | null; name: string }> = [];
     const app = makeApp(makeFakeApplication({
       connect: async (id, name) => {
         connectedApp.push({ id, name });
@@ -104,7 +125,7 @@ describe('mcp route contract', () => {
   });
 
   test('POST disconnect returns the pre-S5 empty body shape', async () => {
-    const disconnects: Array<{ id: string; name: string }> = [];
+    const disconnects: Array<{ id: string | null; name: string }> = [];
     const app = makeApp(makeFakeApplication({
       disconnect: async (id, name) => {
         disconnects.push({ id, name });
@@ -133,7 +154,7 @@ describe('mcp route contract', () => {
   });
 
   test('POST restart returns the fresh status map', async () => {
-    const restarts: string[] = [];
+    const restarts: Array<string | null> = [];
     const app = makeApp(makeFakeApplication({
       restart: async (id) => {
         restarts.push(id);

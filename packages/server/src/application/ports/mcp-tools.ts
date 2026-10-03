@@ -13,5 +13,6 @@ export interface WorkspaceMcpResult {
   isError?: boolean;
 }
 export interface WorkspaceMcpToolsPort {
+  /** Effective global and workspace tools, with workspace server names taking precedence. */
   tools(workspacePath: string): Promise<WorkspaceMcpTool[]>;
 }

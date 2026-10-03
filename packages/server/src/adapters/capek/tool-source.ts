@@ -3,7 +3,6 @@ import {
   configureWorkspaceToolDiscovery,
   getTool as capekGetTool,
   listTools as capekListTools,
-  type WorkspaceToolDiscovery,
 } from '@capekai/core/tools';
 import { listDomainToolFallbackDefinitions } from '@capekai/core/tools';
 import { resolveToolsPath } from '@/config';
@@ -15,6 +14,8 @@ import type { LoadedTool } from '@capekai/tool';
 import { getBuiltinToolsPort } from '@/application/ports/builtin-tools';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
+import { jean2PreconfigSource } from './context-sources';
+import { createProkopMcpDiscovery } from './mcp-discovery';
 
 /** Harness-owned built-ins, read through the installed port at call time
  * so this adapter never imports harness internals. */
@@ -24,15 +25,14 @@ function exposedBuiltinTools(): readonly LoadedTool[] {
 
 /** The Jean2 workspace tool discovery: the MCP manager's per-workspace
  * client lifecycle and tool listing. */
-export const jean2WorkspaceToolDiscovery: WorkspaceToolDiscovery = {
-  // Discovery has the session identity needed to resolve a managed worktree's owner.
-  initializeWorkspace: async () => {},
-  discoverTools: async (path, sessionId) => {
-    const session = sessionId ? getSession(sessionId) : null;
-    const workspace = session && getWorkspace(session.workspaceId);
-    return getTools(workspace?.path ?? path, sessionId ?? '');
-  },
-};
+export const jean2WorkspaceToolDiscovery = createProkopMcpDiscovery({
+  session: getSession,
+  workspacePath: id => getWorkspace(id)?.path ?? null,
+  preconfig: async id => id
+    ? await jean2PreconfigSource.getForAgent?.(id) ?? await jean2PreconfigSource.get(id)
+    : jean2PreconfigSource.getDefault(),
+  tools: getTools,
+});
 
 /** Capek tool catalog seam for the tools route (S4): the Jean2 tools
  * adapter consumes this so no non-Capek adapter imports the compat

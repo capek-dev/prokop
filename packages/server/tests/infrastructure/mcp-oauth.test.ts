@@ -13,12 +13,13 @@ beforeEach(async () => {
   Paths.configure({ dataDir: join(root, 'data') });
 });
 afterEach(async () => {
-  await manager?.shutdownWorkspace(root); manager = undefined;
+  await manager?.shutdownWorkspace(root); await manager?.shutdownWorkspace(null); manager = undefined;
   Paths.reset();
   await rm(root, { recursive: true, force: true });
 });
 
-test('OAuth uses PKCE and single-use state, exchanges the code, and reconnects with a usable client', async () => {
+test.each(['workspace', 'global'] as const)('%s OAuth uses PKCE, isolated single-use state, and reconnects with a usable client', async scope => {
+  const path = scope === 'global' ? null : root;
   let expectedChallenge = '';
   let exchanges = 0;
   const registeredRedirects: string[] = [];
@@ -66,9 +67,9 @@ test('OAuth uses PKCE and single-use state, exchanges the code, and reconnects w
       return new Response(null, { status: 404 });
   });
   const { saveServer, startAuth, finishAuth, getWorkspaceTools, shutdownWorkspace } = manager;
-  await saveServer(root, 'crm', { type: 'remote', url: base + '/mcp', timeout: 2000 });
+  await saveServer(path, 'crm', { type: 'remote', url: base + '/mcp', timeout: 2000 });
   expect(registeredRedirects).toEqual([]);
-  const { authorizationUrl } = await startAuth(root, 'crm', 'http://127.0.0.1:9999/api/mcp/oauth/callback');
+  const { authorizationUrl } = await startAuth(path, 'crm', 'http://127.0.0.1:9999/api/mcp/oauth/callback');
   const authorization = new URL(authorizationUrl);
   expect(authorization.pathname).toBe('/authorize');
   expect(registeredRedirects).toEqual(['http://127.0.0.1:9999/api/mcp/oauth/callback']);
@@ -78,15 +79,16 @@ test('OAuth uses PKCE and single-use state, exchanges the code, and reconnects w
   const state = authorization.searchParams.get('state')!;
   expect(state).toBeTruthy();
   await expect(finishAuth('wrong-state', 'valid-code')).rejects.toThrow('invalid');
-  await expect(finishAuth(state, 'valid-code', { path: root, name: 'different-server' })).rejects.toThrow('does not belong');
-  expect((await finishAuth(state, 'valid-code')).status.status).toBe('connected');
+  await expect(finishAuth(state, 'valid-code', { path, name: 'different-server' })).rejects.toThrow('does not belong');
+  await expect(finishAuth(state, 'valid-code', { path: path === null ? root : null, name: 'crm' })).rejects.toThrow('does not belong');
+  expect((await finishAuth(state, 'valid-code', { path, name: 'crm' })).status.status).toBe('connected');
   expect(exchanges).toBe(1);
   const tools = await getWorkspaceTools(root);
   expect(tools).toHaveLength(1);
   expect((await tools[0]!.execute({})).content[0]?.text).toBe('Authenticated result');
   await expect(finishAuth(state, 'valid-code')).rejects.toThrow('invalid');
   expect(exchanges).toBe(1);
-  await shutdownWorkspace(root);
+  await shutdownWorkspace(path);
   expect(await getWorkspaceTools(root)).toHaveLength(1);
   const other = join(root, 'other-workspace');
   try {

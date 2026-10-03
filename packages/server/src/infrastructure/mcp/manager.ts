@@ -9,6 +9,7 @@ import type { McpServerConfig, McpRemoteServerConfig, McpStatus, McpToolInfo } f
 import type { WorkspaceMcpTool } from '@/application/ports/mcp-tools';
 import type { McpLifecyclePort } from '@/application/ports/mcp';
 import { BadRequestError, NotFoundError } from '@/application/http-errors';
+import { getDataDir } from '@/infrastructure/runtime/paths';
 import { VERSION } from '@/version';
 import { StdioTransport } from './stdio-transport';
 import { McpOAuthProvider } from './oauth-provider';
@@ -18,22 +19,22 @@ import { removeAuth } from './auth';
 const TIMEOUT = 30_000;
 interface State { client: Client | null; status: McpStatus; config: McpServerConfig }
 interface PendingAuth {
-  path: string; name: string; config: McpRemoteServerConfig;
+  path: string | null; name: string; config: McpRemoteServerConfig;
   provider: McpOAuthProvider; expiresAt: number;
 }
 export interface McpManager extends Omit<McpLifecyclePort, 'getTools' | 'getMcpServers'> {
   getWorkspaceTools(path: string): Promise<WorkspaceMcpTool[]>;
-  setMcpChangeListener(listener: (path: string) => void): void;
+  setMcpChangeListener(listener: (path: string | null) => void): void;
 }
 
 /** One host owns its connections; tests can supply HTTP without replacing global fetch. */
 export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
-  const workspaces = new Map<string, Map<string, State>>();
-  const operations = new Map<string, Promise<unknown>>();
+  const workspaces = new Map<string | null, Map<string, State>>();
+  const operations = new Map<string | null, Promise<unknown>>();
   const pendingAuth = new Map<string, PendingAuth>();
-  let onChange: (path: string) => void = () => {};
-  function setMcpChangeListener(listener: (path: string) => void): void { onChange = listener; }
-  function credentialKey(path: string, name: string, url: string): string {
+  let onChange: (path: string | null) => void = () => {};
+  function setMcpChangeListener(listener: (path: string | null) => void): void { onChange = listener; }
+  function credentialKey(path: string | null, name: string, url: string): string {
     return createHash('sha256').update(JSON.stringify([path, name, url])).digest('hex');
   }
   function transportIdentity(config: McpServerConfig): string {
@@ -43,17 +44,17 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     return JSON.stringify(['remote', config.url, pairs(config.headers), config.timeout ?? TIMEOUT,
       config.oauth === false ? false : [oauth.clientId ?? '', oauth.clientSecret ?? '', oauth.scope ?? '']]);
   }
-  async function serialized<T>(path: string, action: () => Promise<T>): Promise<T> {
+  async function serialized<T>(path: string | null, action: () => Promise<T>): Promise<T> {
     const next = (operations.get(path) ?? Promise.resolve()).catch(() => {}).then(action);
     operations.set(path, next);
     try { return await next; } finally { if (operations.get(path) === next) operations.delete(path); }
   }
-  function cancelAuth(path: string, name: string): void {
+  function cancelAuth(path: string | null, name: string): void {
     for (const [state, pending] of pendingAuth) {
       if (pending.expiresAt < Date.now() || pending.path === path && pending.name === name) pendingAuth.delete(state);
     }
   }
-  async function disconnect(path: string, name: string): Promise<void> {
+  async function disconnect(path: string | null, name: string): Promise<void> {
     cancelAuth(path, name);
     const state = workspaces.get(path)?.get(name);
     if (!state) return;
@@ -62,14 +63,14 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     state.status = { status: 'disabled' };
     await client?.close().catch(() => {});
   }
-  function provider(path: string, name: string, config: McpRemoteServerConfig,
+  function provider(path: string | null, name: string, config: McpRemoteServerConfig,
     redirectUrl = 'http://127.0.0.1/api/mcp/oauth/callback', state = crypto.randomUUID(),
     onRedirect?: (url: URL) => void): McpOAuthProvider {
     return new McpOAuthProvider(credentialKey(path, name, config.url), config.url,
       typeof config.oauth === 'object' ? config.oauth : {}, { redirectUrl, state, interactive: !!onRedirect,
         onRedirect: onRedirect ?? (() => { throw new UnauthorizedError('MCP sign-in required'); }) });
   }
-  async function connect(path: string, name: string, config: McpServerConfig): Promise<McpStatus> {
+  async function connect(path: string | null, name: string, config: McpServerConfig): Promise<McpStatus> {
     await disconnect(path, name);
     let clients = workspaces.get(path);
     if (!clients) { clients = new Map(); workspaces.set(path, clients); }
@@ -79,7 +80,7 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     const timeout = config.timeout ?? TIMEOUT;
     const transports = config.type === 'local'
       ? [(_signal: AbortSignal) => new StdioTransport({ command: config.command[0]!, args: config.command.slice(1),
-        env: config.env, cwd: path, stderr: 'ignore' })]
+        env: config.env, cwd: path ?? getDataDir(), stderr: 'ignore' })]
       : [
         (signal: AbortSignal) => new StreamableHTTPClientTransport(new URL(config.url), {
           fetch: (url, init) => fetchMcp(url, { ...init, signal: AbortSignal.any([signal, ...(init?.signal ? [init.signal] : [])]) }),
@@ -120,7 +121,7 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     onChange(path);
     return state.status;
   }
-  async function initializeWorkspace(path: string): Promise<void> {
+  async function initializeWorkspace(path: string | null): Promise<void> {
     await serialized(path, async () => {
       const configs = await getMcpServers(path);
       for (const name of workspaces.get(path)?.keys() ?? []) {
@@ -133,19 +134,19 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
       }
     });
   }
-  async function shutdownWorkspace(path: string): Promise<void> {
+  async function shutdownWorkspace(path: string | null): Promise<void> {
     await serialized(path, async () => {
       for (const name of workspaces.get(path)?.keys() ?? []) await disconnect(path, name);
       workspaces.delete(path);
     });
   }
-  async function connectServer(path: string, name: string, config: McpServerConfig): Promise<McpStatus> {
+  async function connectServer(path: string | null, name: string, config: McpServerConfig): Promise<McpStatus> {
     return serialized(path, () => connect(path, name, config));
   }
-  async function disconnectServer(path: string, name: string): Promise<void> {
+  async function disconnectServer(path: string | null, name: string): Promise<void> {
     await serialized(path, () => disconnect(path, name)); onChange(path);
   }
-  async function saveServer(path: string, name: string, config: McpServerConfig): Promise<void> {
+  async function saveServer(path: string | null, name: string, config: McpServerConfig): Promise<void> {
     await serialized(path, async () => {
       const old = (await getMcpServers(path))[name];
       await updateMcpConfig(path, name, config);
@@ -158,7 +159,7 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     });
     onChange(path);
   }
-  async function removeServer(path: string, name: string): Promise<void> {
+  async function removeServer(path: string | null, name: string): Promise<void> {
     await serialized(path, async () => {
       const old = (await getMcpServers(path))[name];
       await updateMcpConfig(path, name, null);
@@ -168,7 +169,7 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     });
     onChange(path);
   }
-  async function setToolEnabled(path: string, name: string, toolName: string, enabled: boolean): Promise<void> {
+  async function setToolEnabled(path: string | null, name: string, toolName: string, enabled: boolean): Promise<void> {
     await serialized(path, async () => {
       const config = (await getMcpServers(path))[name];
       if (!config) throw new NotFoundError('MCP server not found');
@@ -178,10 +179,10 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     });
     onChange(path);
   }
-  async function getServerStatus(path: string, name: string): Promise<McpStatus | undefined> {
+  async function getServerStatus(path: string | null, name: string): Promise<McpStatus | undefined> {
     return workspaces.get(path)?.get(name)?.status;
   }
-  async function getAllServerStatus(path: string): Promise<Record<string, { config: McpServerConfig; status: McpStatus }>> {
+  async function getAllServerStatus(path: string | null): Promise<Record<string, { config: McpServerConfig; status: McpStatus }>> {
     const configs = await getMcpServers(path);
     return Object.fromEntries(Object.entries(configs).map(([name, config]) => [name, {
       config, status: config.enabled === false ? { status: 'disabled' } : workspaces.get(path)?.get(name)?.status ?? { status: 'disabled' },
@@ -201,7 +202,7 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     } while (cursor);
     return tools;
   }
-  async function getServerTools(path: string, name: string): Promise<McpToolInfo[]> {
+  async function getServerTools(path: string | null, name: string): Promise<McpToolInfo[]> {
     await initializeWorkspace(path);
     const config = (await getMcpServers(path))[name];
     if (!config) throw new NotFoundError('MCP server not found');
@@ -212,7 +213,7 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     return tools.map(tool => ({ name: tool.name, description: tool.description,
       enabled: !config.disabledTools?.includes(tool.name) }));
   }
-  async function getWorkspaceTools(path: string): Promise<WorkspaceMcpTool[]> {
+  async function getScopeTools(path: string | null): Promise<WorkspaceMcpTool[]> {
     await initializeWorkspace(path);
     const configs = await getMcpServers(path);
     const result: WorkspaceMcpTool[] = [];
@@ -225,7 +226,7 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
       for (const definition of definitions) {
         if (config.disabledTools?.includes(definition.name)) continue;
         // Stable, bounded identifiers avoid collisions after name sanitization.
-        const suffix = createHash('sha256').update(JSON.stringify([name, definition.name])).digest('hex').slice(0, 16);
+        const suffix = createHash('sha256').update(JSON.stringify(path === null ? ['global', name, definition.name] : [name, definition.name])).digest('hex').slice(0, 16);
         const key = 'mcp_' + definition.name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40) + '_' + suffix;
         result.push({ name: key, serverName: name, toolName: definition.name,
           description: definition.description ?? 'Tool from ' + name, inputSchema: definition.inputSchema,
@@ -245,7 +246,23 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     }
     return result;
   }
-  async function startAuth(path: string, name: string, redirectUrl: string): Promise<{ authorizationUrl: string }> {
+  async function getWorkspaceTools(path: string): Promise<WorkspaceMcpTool[]> {
+    const [globalTools, workspaceTools, workspaceServers] = await Promise.all([
+      getScopeTools(null), getScopeTools(path), getMcpServers(path),
+    ]);
+    const inherited = globalTools.filter(tool => !Object.hasOwn(workspaceServers, tool.serverName));
+    return [...inherited.map(tool => ({
+      ...tool,
+      async execute(input: Record<string, unknown>, signal?: AbortSignal, authorized?: () => boolean) {
+        // A newly added workspace override also revokes handles already exposed to a turn.
+        if (Object.hasOwn(await getMcpServers(path), tool.serverName)) {
+          throw new Error('Global MCP server is overridden by this workspace');
+        }
+        return tool.execute(input, signal, authorized);
+      },
+    })), ...workspaceTools];
+  }
+  async function startAuth(path: string | null, name: string, redirectUrl: string): Promise<{ authorizationUrl: string }> {
     return serialized(path, async () => {
       const config = (await getMcpServers(path))[name];
       if (!config || config.type !== 'remote' || config.oauth === false || config.enabled === false) {
@@ -269,10 +286,10 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
       return { authorizationUrl };
     });
   }
-  async function finishAuth(state: string, code: string, expected?: { path: string; name: string }): Promise<{ path: string; status: McpStatus }> {
+  async function finishAuth(state: string, code: string, expected?: { path: string | null; name: string }): Promise<{ path: string | null; status: McpStatus }> {
     const pending = pendingAuth.get(state);
     if (pending && expected && (pending.path !== expected.path || pending.name !== expected.name)) {
-      throw new BadRequestError('OAuth request does not belong to this workspace and server');
+      throw new BadRequestError('OAuth request does not belong to this scope and server');
     }
     pendingAuth.delete(state);
     if (!pending || pending.expiresAt < Date.now() || !code) throw new BadRequestError('OAuth request expired or is invalid. Start sign-in again.');
