@@ -1,139 +1,65 @@
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-import type {
-  OAuthClientMetadata,
-  OAuthTokens,
-  OAuthClientInformation,
-  OAuthClientInformationFull,
-} from '@modelcontextprotocol/sdk/shared/auth.js';
+import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
+import type { OAuthClientMetadata, OAuthTokens, OAuthClientInformation, OAuthClientInformationFull } from '@modelcontextprotocol/sdk/shared/auth.js';
 import type { McpOAuthConfig } from '@prokopai/sdk';
 import * as auth from './auth';
 
-const OAUTH_CALLBACK_PORT = 19876;
-const OAUTH_CALLBACK_PATH = '/mcp/oauth/callback';
-
 export interface McpOAuthCallbacks {
+  redirectUrl: string;
+  state: string;
   onRedirect: (url: URL) => void | Promise<void>;
+  interactive?: boolean;
 }
 
+/** The credential key is scoped to workspace, server name and URL by the manager. */
 export class McpOAuthProvider implements OAuthClientProvider {
-  constructor(
-    private mcpName: string,
-    private serverUrl: string,
-    private config: McpOAuthConfig,
-    private callbacks: McpOAuthCallbacks,
-  ) {}
-
-  get redirectUrl(): string {
-    return `http://127.0.0.1:${OAUTH_CALLBACK_PORT}${OAUTH_CALLBACK_PATH}`;
-  }
-
+  private verifier?: string;
+  constructor(private key: string, private serverUrl: string,
+    private config: McpOAuthConfig, private callbacks: McpOAuthCallbacks) {}
+  get redirectUrl(): string { return this.callbacks.redirectUrl; }
   get clientMetadata(): OAuthClientMetadata {
-    return {
-      redirect_uris: [this.redirectUrl],
-      client_name: 'Jean2',
-      client_uri: 'https://jean2.ai',
-      grant_types: ['authorization_code', 'refresh_token'],
-      response_types: ['code'],
+    return { redirect_uris: [this.redirectUrl], client_name: 'Prokop',
+      grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'],
       token_endpoint_auth_method: this.config.clientSecret ? 'client_secret_post' : 'none',
-    };
+      ...(this.config.scope ? { scope: this.config.scope } : {}) };
   }
-
-  async clientInformation(): Promise<OAuthClientInformation | undefined> {
-    const stored = await auth.getAuthForUrl(this.mcpName, this.serverUrl);
-    if (!stored?.clientInfo) {
-      return undefined;
-    }
-    return {
-      client_id: stored.clientInfo.clientId,
-      client_secret: stored.clientInfo.clientSecret,
-    };
+  async clientInformation(): Promise<(OAuthClientInformation & Pick<OAuthClientMetadata, 'token_endpoint_auth_method'>) | undefined> {
+    if (this.config.clientId) return { client_id: this.config.clientId, client_secret: this.config.clientSecret };
+    const info = (await auth.getAuthForUrl(this.key, this.serverUrl))?.clientInfo;
+    if (!info && !this.callbacks.interactive) throw new UnauthorizedError('MCP sign-in required');
+    if (info && this.callbacks.interactive && info.redirectUri !== this.redirectUrl) return undefined;
+    return info ? { client_id: info.clientId, client_secret: info.clientSecret,
+      token_endpoint_auth_method: info.tokenEndpointAuthMethod } : undefined;
   }
-
   async saveClientInformation(info: OAuthClientInformationFull): Promise<void> {
-    await auth.updateClientInfo(this.mcpName, {
-      clientId: info.client_id,
-      clientSecret: info.client_secret,
-      clientIdIssuedAt: info.client_id_issued_at,
-      clientSecretExpiresAt: info.client_secret_expires_at,
-    }, this.serverUrl);
+    await auth.updateClientInfo(this.key, { clientId: info.client_id, clientSecret: info.client_secret,
+      redirectUri: this.redirectUrl, tokenEndpointAuthMethod: info.token_endpoint_auth_method }, this.serverUrl);
   }
-
   async tokens(): Promise<OAuthTokens | undefined> {
-    const stored = await auth.getAuthForUrl(this.mcpName, this.serverUrl);
-    if (!stored?.tokens) {
-      return undefined;
-    }
-    const tokens: OAuthTokens = {
-      access_token: stored.tokens.accessToken,
-      refresh_token: stored.tokens.refreshToken,
-      expires_in: stored.tokens.expiresAt ? Math.floor((stored.tokens.expiresAt - Date.now()) / 1000) : undefined,
-      token_type: 'Bearer',
-      scope: stored.tokens.scope,
-    };
-    return tokens;
+    const tokens = (await auth.getAuthForUrl(this.key, this.serverUrl))?.tokens;
+    return tokens ? { access_token: tokens.accessToken, refresh_token: tokens.refreshToken,
+      expires_in: tokens.expiresAt ? Math.floor((tokens.expiresAt - Date.now()) / 1000) : undefined,
+      token_type: 'Bearer', scope: tokens.scope } : undefined;
   }
-
   async saveTokens(tokens: OAuthTokens): Promise<void> {
-    await auth.updateTokens(this.mcpName, {
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-      expiresAt: tokens.expires_in ? Date.now() + tokens.expires_in * 1000 : undefined,
-      scope: tokens.scope,
-    }, this.serverUrl);
+    await auth.updateTokens(this.key, { accessToken: tokens.access_token, refreshToken: tokens.refresh_token,
+      expiresAt: tokens.expires_in ? Date.now() + tokens.expires_in * 1000 : undefined, scope: tokens.scope }, this.serverUrl);
   }
-
-  async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
-    await this.callbacks.onRedirect(authorizationUrl);
-  }
-
-  async saveCodeVerifier(codeVerifier: string): Promise<void> {
-    await auth.updateCodeVerifier(this.mcpName, codeVerifier);
-  }
-
+  async redirectToAuthorization(url: URL): Promise<void> { await this.callbacks.onRedirect(url); }
+  async saveCodeVerifier(value: string): Promise<void> { this.verifier = value; }
   async codeVerifier(): Promise<string> {
-    const stored = await auth.getAuthForUrl(this.mcpName, this.serverUrl);
-    if (!stored?.codeVerifier) {
-      throw new Error('No code verifier found');
-    }
-    return stored.codeVerifier;
+    if (!this.verifier) throw new Error('No pending OAuth verifier');
+    return this.verifier;
   }
-
-  async saveState(state: string): Promise<void> {
-    await auth.updateOAuthState(this.mcpName, state);
-  }
-
-  async state(): Promise<string> {
-    const stored = await auth.getAuthForUrl(this.mcpName, this.serverUrl);
-    if (stored?.oauthState) {
-      return stored.oauthState;
-    }
-    const newState = crypto.randomUUID();
-    await this.saveState(newState);
-    return newState;
-  }
-
-  async invalidateCredentials(type: 'all' | 'client' | 'tokens'): Promise<void> {
-    if (type === 'all') {
-      await auth.removeAuth(this.mcpName);
-      return;
-    }
-    if (type === 'client') {
-      const stored = await auth.getAuthForUrl(this.mcpName, this.serverUrl);
-      if (stored) {
-        const { clientInfo: _clientInfo, ...rest } = stored;
-        await auth.setAuth(this.mcpName, rest, this.serverUrl);
-      }
-      return;
-    }
-    if (type === 'tokens') {
-      const stored = await auth.getAuthForUrl(this.mcpName, this.serverUrl);
-      if (stored) {
-        const { tokens: _tokens, ...rest } = stored;
-        await auth.setAuth(this.mcpName, rest, this.serverUrl);
-      }
-      return;
-    }
+  async state(): Promise<string> { return this.callbacks.state; }
+  async invalidateCredentials(type: 'all' | 'client' | 'tokens' | 'verifier' | 'discovery'): Promise<void> {
+    if (type === 'verifier') { this.verifier = undefined; return; }
+    if (type === 'discovery') return;
+    if (type === 'all') { await auth.removeAuth(this.key); return; }
+    const stored = await auth.getAuthForUrl(this.key, this.serverUrl);
+    if (!stored) return;
+    if (type === 'client') delete stored.clientInfo;
+    if (type === 'tokens') delete stored.tokens;
+    await auth.setAuth(this.key, stored, this.serverUrl);
   }
 }
-
-export { OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_PATH };

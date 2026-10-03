@@ -1,6 +1,16 @@
 import { createCapabilityTool, type CapabilityTool } from '@/adapters/capek/contracts';
 import { CallToolResultSchema, type Tool as MCPToolDef } from '@modelcontextprotocol/sdk/types.js';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { getWorkspaceTools } from './manager';
+
+export async function getTools(path: string, _sessionId: string): Promise<Record<string, CapabilityTool>> {
+  return Object.fromEntries((await getWorkspaceTools(path)).map(tool => [tool.name, createCapabilityTool({
+    description: tool.description, inputSchema: tool.inputSchema, execute: async input => {
+      if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid MCP arguments');
+      return tool.execute(input as Record<string, unknown>);
+    },
+  })]));
+}
 
 type TextContent = { type: 'text'; text: string };
 type ImageContent = { type: 'image'; data: string; mimeType: string };

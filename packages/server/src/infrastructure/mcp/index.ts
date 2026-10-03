@@ -6,11 +6,16 @@ export {
   disconnectServer,
   getServerStatus,
   getAllServerStatus,
-  getTools,
   startAuth,
   finishAuth,
+  saveServer,
+  removeServer,
+  getServerTools,
+  setToolEnabled,
+  getWorkspaceTools,
+  setMcpChangeListener,
 } from './manager';
-export { convertMcpTool, sanitizeToolName } from './converter';
+export { convertMcpTool, sanitizeToolName, getTools } from './converter';
 export type { McpAuthTokens, McpClientInfo, McpAuthEntry } from './auth';
-export { McpOAuthProvider, OAUTH_CALLBACK_PORT, OAUTH_CALLBACK_PATH } from './oauth-provider';
+export { McpOAuthProvider } from './oauth-provider';
 export type { McpOAuthCallbacks } from './oauth-provider';

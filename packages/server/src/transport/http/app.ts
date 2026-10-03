@@ -59,7 +59,8 @@ export function createApp(application?: WiredApplication, options?: CreateAppOpt
 
   // Middleware
   app.use('*', cors());
-  app.use('*', logger());
+  const requestLogger = logger();
+  app.use('*', (c, next) => c.req.path === '/api/mcp/oauth/callback' ? next() : requestLogger(c, next));
   app.use('*', prettyJSON());
 
   // Authentication middleware for all API routes

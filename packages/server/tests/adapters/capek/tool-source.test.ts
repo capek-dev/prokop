@@ -4,7 +4,6 @@ import { getWorkspaceToolDiscovery } from '@capekai/core/tools';
 const realBarrel = await import('@capekai/core/tools');
 const realConfig = await import('@/config');
 const realPaths = await import('@/infrastructure/runtime/paths');
-const realMcp = await import('@/infrastructure/mcp');
 
 const realConfigureToolsPath = realBarrel.configureToolsPath;
 const realConfigureWorkspaceToolDiscovery = realBarrel.configureWorkspaceToolDiscovery;
@@ -56,10 +55,9 @@ describe('Čapek workspace tool discovery adapter', () => {
     realConfigureWorkspaceToolDiscovery();
   });
 
-  test('wraps the exact workspace tool discovery operations by identity', () => {
+  test('defers MCP initialization until discovery can resolve the session workspace', async () => {
     expect(Object.keys(adapter.jean2WorkspaceToolDiscovery).sort()).toEqual(['discoverTools', 'initializeWorkspace'].sort());
-    expect(adapter.jean2WorkspaceToolDiscovery.initializeWorkspace).toBe(realMcp.initializeWorkspace);
-    expect(adapter.jean2WorkspaceToolDiscovery.discoverTools).toBe(realMcp.getTools);
+    await expect(adapter.jean2WorkspaceToolDiscovery.initializeWorkspace!('/unavailable/worktree')).resolves.toBeUndefined();
   });
 
   test('lists the harness built-ins through the installed port', async () => {

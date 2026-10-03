@@ -15,6 +15,7 @@ import { handleFilesChanged } from '@/handlers/serverMessage/fileHandlers';
 import { useChatRetryStore } from '@/stores/chatRetryStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { handleWorkspaceActivity } from '@/handlers/serverMessage/workspaceActivity';
+import { queryKeys } from '@/lib/queryKeys';
 
 type CtxRef = RefObject<SessionHandlersContext | null>;
 
@@ -87,6 +88,11 @@ export function subscribeToServerEvents(
   add('workspace.conversation_activity', handleWorkspaceActivity);
   add('learning.changed', (workspaceId: unknown) => {
     if (typeof workspaceId === 'string') void queryClient.invalidateQueries({ queryKey: ['learning', workspaceId] });
+  });
+  add('mcp.changed', (workspaceId: unknown) => {
+    if (typeof workspaceId !== 'string') return;
+    void queryClient.invalidateQueries({ queryKey: queryKeys.mcp.status(workspaceId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.mcp.tools(workspaceId) });
   });
   add('git.changed', (workspaceId: unknown) => {
     if (typeof workspaceId === 'string') handleGitChanged(workspaceId);

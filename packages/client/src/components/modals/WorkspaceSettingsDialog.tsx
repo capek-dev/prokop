@@ -20,7 +20,7 @@ type Section = 'sessions' | 'learning' | 'mcp' | 'permissions' | 'paths' | 'agen
 
 const SECTIONS: Omit<SettingsSection, 'icon'>[] = [
   { value: 'sessions', label: 'Sessions', group: 'general' },
-  { value: 'mcp', label: 'MCP Servers · Prokop', group: 'general' },
+  { value: 'mcp', label: 'MCP Servers', group: 'general' },
   { value: 'permissions', label: 'Permissions', group: 'general' },
   { value: 'paths', label: 'Additional Paths', group: 'general' },
   { value: 'learning', label: 'Learning', group: 'capabilities' },

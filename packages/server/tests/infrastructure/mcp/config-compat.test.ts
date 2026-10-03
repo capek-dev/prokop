@@ -22,7 +22,7 @@ describe('mcp config workspace-dir fallback', () => {
     mkdirSync(join(root, PROKOPAI_DIR_NAME));
     writeFileSync(
       join(root, PROKOPAI_DIR_NAME, 'mcp.json'),
-      JSON.stringify({ servers: { canonical: { type: 'local', command: 'echo' } } }),
+      JSON.stringify({ servers: { canonical: { type: 'local', command: ['echo'] } } }),
     );
 
     const config = await loadMcpConfig(root);
@@ -33,7 +33,7 @@ describe('mcp config workspace-dir fallback', () => {
     mkdirSync(join(root, LEGACY_JEAN2_DIR_NAME));
     writeFileSync(
       join(root, LEGACY_JEAN2_DIR_NAME, 'mcp.json'),
-      JSON.stringify({ servers: { legacy: { type: 'local', command: 'echo' } } }),
+      JSON.stringify({ servers: { legacy: { type: 'local', command: ['echo'] } } }),
     );
 
     const config = await loadMcpConfig(root);
@@ -45,11 +45,11 @@ describe('mcp config workspace-dir fallback', () => {
     mkdirSync(join(root, LEGACY_JEAN2_DIR_NAME));
     writeFileSync(
       join(root, PROKOPAI_DIR_NAME, 'mcp.json'),
-      JSON.stringify({ servers: { fromCanonical: { type: 'local', command: 'echo' } } }),
+      JSON.stringify({ servers: { fromCanonical: { type: 'local', command: ['echo'] } } }),
     );
     writeFileSync(
       join(root, LEGACY_JEAN2_DIR_NAME, 'mcp.json'),
-      JSON.stringify({ servers: { fromLegacy: { type: 'local', command: 'echo' } } }),
+      JSON.stringify({ servers: { fromLegacy: { type: 'local', command: ['echo'] } } }),
     );
 
     const config = await loadMcpConfig(root);

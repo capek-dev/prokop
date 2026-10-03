@@ -83,6 +83,8 @@ import {
 } from '@/adapters/jean2';
 import { getTerminalManager, installTerminalSessionStore } from '@/transport/terminal';
 import { broadcastEvent, broadcastSessionUpdated } from '@/transport/websocket/broadcast';
+import { getWorkspaceTools, setMcpChangeListener } from '@/infrastructure/mcp';
+import { listWorkspaces } from '@/infrastructure/sqlite/workspaces';
 import { createJean2TerminalSessionPort } from '@/adapters/jean2/terminal';
 import { createTransportControllerPorts } from '@/transport/websocket/control-port';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
@@ -177,6 +179,11 @@ export function createWiredAgentsApplication(): AgentsApplication {
 }
 
 export function createWiredApplication(existingAgents?: AgentsApplication): WiredApplication {
+  setMcpChangeListener(path => {
+    for (const workspace of listWorkspaces()) {
+      if (workspace.path === path) broadcastEvent({ type: 'mcp.changed', workspaceId: workspace.id });
+    }
+  });
   const agents = existingAgents ?? createWiredAgentsApplication();
   configureJean2PreconfigSource(agents);
   configureJean2AgentSource(agents);
@@ -201,6 +208,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   // land in the same composed permission runtime execution enters.
   installAskResolutionPort(prokopAskResolution);
   const codexExecution = createCodexExecution({
+    mcp: { tools: getWorkspaceTools },
     connect: spawnCodexAppServer,
     version: codexCliVersion,
     prepareHook: createPretoolChannel,
@@ -215,6 +223,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     },
   });
   const claudeExecution = createClaudeExecution({
+    mcp: { tools: getWorkspaceTools },
     instructions: {
       listPreconfigs,
       getPreconfig: id => agents.getPreconfigOrAgent(id),

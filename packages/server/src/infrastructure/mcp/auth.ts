@@ -1,156 +1,59 @@
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { getMcpAuthPath, getDataDir } from '@/infrastructure/runtime/paths';
 
-export interface McpAuthTokens {
-  accessToken: string;
-  refreshToken?: string;
-  expiresAt?: number;
-  scope?: string;
-}
-
+export interface McpAuthTokens { accessToken: string; refreshToken?: string; expiresAt?: number; scope?: string }
 export interface McpClientInfo {
   clientId: string;
   clientSecret?: string;
+  redirectUri?: string;
+  tokenEndpointAuthMethod?: string;
   clientIdIssuedAt?: number;
   clientSecretExpiresAt?: number;
 }
+export interface McpAuthEntry { tokens?: McpAuthTokens; clientInfo?: McpClientInfo; serverUrl?: string }
+let pending: Promise<unknown> = Promise.resolve();
 
-export interface McpAuthEntry {
-  tokens?: McpAuthTokens;
-  clientInfo?: McpClientInfo;
-  codeVerifier?: string;
-  oauthState?: string;
-  serverUrl?: string;
-}
-
-function getAuthFile(): string {
-  return getMcpAuthPath();
-}
-
-async function ensureDir(): Promise<void> {
+async function read(): Promise<Record<string, McpAuthEntry>> {
   try {
+    const data: unknown = JSON.parse(await readFile(getMcpAuthPath(), 'utf8'));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid credential file');
+    return data as Record<string, McpAuthEntry>;
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {};
+    throw new Error('Unable to read MCP credentials', { cause: error });
+  }
+}
+async function mutate(change: (data: Record<string, McpAuthEntry>) => void): Promise<void> {
+  const next = pending.catch(() => {}).then(async () => {
+    const data = await read();
+    change(data);
     await mkdir(getDataDir(), { recursive: true });
-  } catch (_e) {
-    // Directory exists
-  }
+    const path = getMcpAuthPath();
+    const temporary = path + '.' + crypto.randomUUID() + '.tmp';
+    await writeFile(temporary, JSON.stringify(data), { mode: 0o600, flag: 'wx' });
+    await rename(temporary, path);
+  });
+  pending = next;
+  await next;
 }
-
-async function readAuthFile(): Promise<Record<string, McpAuthEntry>> {
-  try {
-    const content = await readFile(getAuthFile(), 'utf-8');
-    return JSON.parse(content) as Record<string, McpAuthEntry>;
-  } catch (_e) {
-    return {};
-  }
+const key = (name: string, url: string): string => JSON.stringify([name, url]);
+export async function getAuthForUrl(name: string, url: string): Promise<McpAuthEntry | undefined> {
+  await pending.catch(() => {});
+  return (await read())[key(name, url)];
 }
-
-async function writeAuthFile(data: Record<string, McpAuthEntry>): Promise<void> {
-  await ensureDir();
-  await writeFile(getAuthFile(), JSON.stringify(data, null, 2), { mode: 0o600 });
+export async function setAuth(name: string, entry: McpAuthEntry, url: string): Promise<void> {
+  await mutate(data => { data[key(name, url)] = entry; });
 }
-
-function getEntryKey(mcpName: string, serverUrl?: string): string {
-  return serverUrl ? `${mcpName}::${serverUrl}` : mcpName;
+export async function removeAuth(name: string): Promise<void> {
+  await mutate(data => {
+    for (const entry of Object.keys(data)) {
+      try { if (JSON.parse(entry)[0] === name) delete data[entry]; } catch { /* Legacy entries remain isolated. */ }
+    }
+  });
 }
-
-export async function getAuth(mcpName: string): Promise<McpAuthEntry | undefined> {
-  const data = await readAuthFile();
-  return data[mcpName];
+export async function updateTokens(name: string, tokens: McpAuthTokens, url: string): Promise<void> {
+  await mutate(data => { const id = key(name, url); data[id] = { ...data[id], tokens }; });
 }
-
-export async function getAuthForUrl(mcpName: string, serverUrl: string): Promise<McpAuthEntry | undefined> {
-  const data = await readAuthFile();
-  const key = getEntryKey(mcpName, serverUrl);
-  return data[key];
-}
-
-export async function getAllAuth(): Promise<Record<string, McpAuthEntry>> {
-  return readAuthFile();
-}
-
-export async function setAuth(mcpName: string, entry: McpAuthEntry, serverUrl?: string): Promise<void> {
-  const data = await readAuthFile();
-  const key = getEntryKey(mcpName, serverUrl);
-  data[key] = entry;
-  await writeAuthFile(data);
-}
-
-export async function removeAuth(mcpName: string): Promise<void> {
-  const data = await readAuthFile();
-  delete data[mcpName];
-  
-  // Also remove any URL-specific entries
-  const keysToRemove = Object.keys(data).filter(k => k.startsWith(`${mcpName}::`));
-  for (const key of keysToRemove) {
-    delete data[key];
-  }
-  
-  await writeAuthFile(data);
-}
-
-export async function updateTokens(mcpName: string, tokens: McpAuthTokens, serverUrl?: string): Promise<void> {
-  const data = await readAuthFile();
-  const key = getEntryKey(mcpName, serverUrl);
-  const existing = data[key] || {};
-  data[key] = { ...existing, tokens };
-  await writeAuthFile(data);
-}
-
-export async function updateClientInfo(mcpName: string, clientInfo: McpClientInfo, serverUrl?: string): Promise<void> {
-  const data = await readAuthFile();
-  const key = getEntryKey(mcpName, serverUrl);
-  const existing = data[key] || {};
-  data[key] = { ...existing, clientInfo };
-  await writeAuthFile(data);
-}
-
-export async function updateCodeVerifier(mcpName: string, codeVerifier: string): Promise<void> {
-  const data = await readAuthFile();
-  const existing = data[mcpName] || {};
-  data[mcpName] = { ...existing, codeVerifier };
-  await writeAuthFile(data);
-}
-
-export async function clearCodeVerifier(mcpName: string): Promise<void> {
-  const data = await readAuthFile();
-  const existing = data[mcpName];
-  if (existing) {
-    const { codeVerifier: _codeVerifier, ...rest } = existing;
-    data[mcpName] = rest;
-    await writeAuthFile(data);
-  }
-}
-
-export async function updateOAuthState(mcpName: string, oauthState: string): Promise<void> {
-  const data = await readAuthFile();
-  const existing = data[mcpName] || {};
-  data[mcpName] = { ...existing, oauthState };
-  await writeAuthFile(data);
-}
-
-export async function getOAuthState(mcpName: string): Promise<string | undefined> {
-  const data = await readAuthFile();
-  return data[mcpName]?.oauthState;
-}
-
-export async function clearOAuthState(mcpName: string): Promise<void> {
-  const data = await readAuthFile();
-  const existing = data[mcpName];
-  if (existing) {
-    const { oauthState: _oauthState, ...rest } = existing;
-    data[mcpName] = rest;
-    await writeAuthFile(data);
-  }
-}
-
-export async function isTokenExpired(mcpName: string): Promise<boolean | null> {
-  const data = await readAuthFile();
-  const entry = data[mcpName];
-  
-  if (!entry?.tokens?.expiresAt) {
-    return null;
-  }
-  
-  const now = Date.now();
-  return now >= entry.tokens.expiresAt;
+export async function updateClientInfo(name: string, clientInfo: McpClientInfo, url: string): Promise<void> {
+  await mutate(data => { const id = key(name, url); data[id] = { ...data[id], clientInfo }; });
 }

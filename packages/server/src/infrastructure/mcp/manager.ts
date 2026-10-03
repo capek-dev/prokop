@@ -1,419 +1,298 @@
+import { createHash } from 'node:crypto';
+import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioTransport } from './stdio-transport';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
-import type {
-  McpServerConfig,
-  McpLocalServerConfig,
-  McpRemoteServerConfig,
-  McpStatus,
-} from '@prokopai/sdk';
-import type { CapabilityTool as Tool } from '@/adapters/capek/contracts';
-import { convertMcpTool } from './converter';
-import { McpOAuthProvider } from './oauth-provider';
-import { getMcpServers } from './config';
+import { auth, UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
+import { CallToolResultSchema, type Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { McpServerConfig, McpRemoteServerConfig, McpStatus, McpToolInfo } from '@prokopai/sdk';
+import type { WorkspaceMcpTool } from '@/application/ports/mcp-tools';
+import type { McpLifecyclePort } from '@/application/ports/mcp';
+import { BadRequestError, NotFoundError } from '@/application/http-errors';
 import { VERSION } from '@/version';
+import { StdioTransport } from './stdio-transport';
+import { McpOAuthProvider } from './oauth-provider';
+import { getMcpServers, updateMcpConfig } from './config';
+import { removeAuth } from './auth';
 
-const DEFAULT_TIMEOUT = 30_000;
-
-interface McpClientState {
-  client: Client | null;
-  status: McpStatus;
+const TIMEOUT = 30_000;
+interface State { client: Client | null; status: McpStatus; config: McpServerConfig }
+interface PendingAuth {
+  path: string; name: string; config: McpRemoteServerConfig;
+  provider: McpOAuthProvider; expiresAt: number;
+}
+export interface McpManager extends Omit<McpLifecyclePort, 'getTools' | 'getMcpServers'> {
+  getWorkspaceTools(path: string): Promise<WorkspaceMcpTool[]>;
+  setMcpChangeListener(listener: (path: string) => void): void;
 }
 
-interface ConnectResult {
-  status: McpStatus;
-  client: Client | null;
-}
-
-interface PendingAuthTransport {
-  transport: StreamableHTTPClientTransport | SSEClientTransport;
-  serverName: string;
-  serverUrl: string;
-}
-
-interface PendingOAuth {
-  serverName: string;
-  serverUrl: string;
-  config: McpRemoteServerConfig;
-  onRedirect: (url: URL) => void | Promise<void>;
-}
-
-const workspaceClients = new Map<string, Map<string, McpClientState>>();
-const pendingAuthTransports = new Map<string, PendingAuthTransport>();
-const pendingOAuth = new Map<string, PendingOAuth>();
-
-export async function initializeWorkspace(workspacePath: string): Promise<void> {
-  if (workspaceClients.has(workspacePath)) {
-    return;
+/** One host owns its connections; tests can supply HTTP without replacing global fetch. */
+export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
+  const workspaces = new Map<string, Map<string, State>>();
+  const operations = new Map<string, Promise<unknown>>();
+  const pendingAuth = new Map<string, PendingAuth>();
+  let onChange: (path: string) => void = () => {};
+  function setMcpChangeListener(listener: (path: string) => void): void { onChange = listener; }
+  function credentialKey(path: string, name: string, url: string): string {
+    return createHash('sha256').update(JSON.stringify([path, name, url])).digest('hex');
   }
-
-  workspaceClients.set(workspacePath, new Map());
-
-  const servers = await getMcpServers(workspacePath);
-
-  for (const [name, config] of Object.entries(servers)) {
-    try {
-      await connectServer(workspacePath, name, config);
-    } catch (err) {
-      console.error(`Failed to connect to MCP server ${name}:`, err);
+  function transportIdentity(config: McpServerConfig): string {
+    const pairs = (values: Record<string, string> = {}) => Object.entries(values).sort(([a], [b]) => a.localeCompare(b));
+    if (config.type === 'local') return JSON.stringify(['local', config.command, pairs(config.env), config.timeout ?? TIMEOUT]);
+    const oauth = typeof config.oauth === 'object' ? config.oauth : {};
+    return JSON.stringify(['remote', config.url, pairs(config.headers), config.timeout ?? TIMEOUT,
+      config.oauth === false ? false : [oauth.clientId ?? '', oauth.clientSecret ?? '', oauth.scope ?? '']]);
+  }
+  async function serialized<T>(path: string, action: () => Promise<T>): Promise<T> {
+    const next = (operations.get(path) ?? Promise.resolve()).catch(() => {}).then(action);
+    operations.set(path, next);
+    try { return await next; } finally { if (operations.get(path) === next) operations.delete(path); }
+  }
+  function cancelAuth(path: string, name: string): void {
+    for (const [state, pending] of pendingAuth) {
+      if (pending.expiresAt < Date.now() || pending.path === path && pending.name === name) pendingAuth.delete(state);
     }
   }
-}
-
-export async function shutdownWorkspace(workspacePath: string): Promise<void> {
-  const clients = workspaceClients.get(workspacePath);
-  if (!clients) {
-    return;
+  async function disconnect(path: string, name: string): Promise<void> {
+    cancelAuth(path, name);
+    const state = workspaces.get(path)?.get(name);
+    if (!state) return;
+    const client = state.client;
+    state.client = null;
+    state.status = { status: 'disabled' };
+    await client?.close().catch(() => {});
   }
-
-  for (const [name, state] of clients) {
-    if (state.client) {
+  function provider(path: string, name: string, config: McpRemoteServerConfig,
+    redirectUrl = 'http://127.0.0.1/api/mcp/oauth/callback', state = crypto.randomUUID(),
+    onRedirect?: (url: URL) => void): McpOAuthProvider {
+    return new McpOAuthProvider(credentialKey(path, name, config.url), config.url,
+      typeof config.oauth === 'object' ? config.oauth : {}, { redirectUrl, state, interactive: !!onRedirect,
+        onRedirect: onRedirect ?? (() => { throw new UnauthorizedError('MCP sign-in required'); }) });
+  }
+  async function connect(path: string, name: string, config: McpServerConfig): Promise<McpStatus> {
+    await disconnect(path, name);
+    let clients = workspaces.get(path);
+    if (!clients) { clients = new Map(); workspaces.set(path, clients); }
+    const state: State = { client: null, status: { status: 'disabled' }, config };
+    clients.set(name, state);
+    if (config.enabled === false) return state.status;
+    const timeout = config.timeout ?? TIMEOUT;
+    const transports = config.type === 'local'
+      ? [(_signal: AbortSignal) => new StdioTransport({ command: config.command[0]!, args: config.command.slice(1),
+        env: config.env, cwd: path, stderr: 'ignore' })]
+      : [
+        (signal: AbortSignal) => new StreamableHTTPClientTransport(new URL(config.url), {
+          fetch: (url, init) => fetchMcp(url, { ...init, signal: AbortSignal.any([signal, ...(init?.signal ? [init.signal] : [])]) }),
+          requestInit: { headers: config.headers }, authProvider: config.oauth === false ? undefined : provider(path, name, config) }),
+        (signal: AbortSignal) => new SSEClientTransport(new URL(config.url), {
+          fetch: (url, init) => fetchMcp(url, { ...init, signal: AbortSignal.any([signal, ...(init?.signal ? [init.signal] : [])]) }),
+          requestInit: { headers: config.headers }, authProvider: config.oauth === false ? undefined : provider(path, name, config) }),
+      ];
+    for (const createTransport of transports) {
+      const client = new Client({ name: 'prokop', version: VERSION }, { capabilities: {} });
+      const controller = new AbortController();
+      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
-        await state.client.close();
-      } catch (err) {
-        console.error(`Error closing MCP client ${name}:`, err);
-      }
-    }
-  }
-
-  workspaceClients.delete(workspacePath);
-}
-
-export async function connectServer(
-  workspacePath: string,
-  name: string,
-  config: McpServerConfig,
-): Promise<McpStatus> {
-  let clients = workspaceClients.get(workspacePath);
-  if (!clients) {
-    clients = new Map();
-    workspaceClients.set(workspacePath, clients);
-  }
-
-  const existingState = clients.get(name);
-  if (existingState?.client) {
-    try {
-      await existingState.client.close();
-    } catch (_e) {
-      // Ignore close errors
-    }
-  }
-
-  let result: ConnectResult;
-
-  try {
-    if (config.type === 'local') {
-      result = await connectLocalServer(workspacePath, name, config);
-    } else {
-      result = await connectRemoteServer(workspacePath, name, config);
-    }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (err instanceof UnauthorizedError) {
-      result = { status: { status: 'needs_auth' }, client: null };
-    } else {
-      result = { status: { status: 'failed', error: message }, client: null };
-    }
-  }
-
-  clients.set(name, { client: result.client, status: result.status });
-  return result.status;
-}
-
-async function connectLocalServer(
-  workspacePath: string,
-  name: string,
-  config: McpLocalServerConfig,
-): Promise<ConnectResult> {
-  const transport = new StdioTransport({
-    command: config.command[0],
-    args: config.command.slice(1),
-    env: config.env,
-    cwd: workspacePath,
-  });
-
-  const client = new Client(
-    { name, version: VERSION },
-    {
-      capabilities: {},
-    },
-  );
-
-  try {
-    await client.connect(transport, { timeout: config.timeout ?? DEFAULT_TIMEOUT });
-    return { status: { status: 'connected' }, client };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { status: { status: 'failed', error: message }, client: null };
-  }
-}
-
-async function connectRemoteServer(
-  workspacePath: string,
-  name: string,
-  config: McpRemoteServerConfig,
-): Promise<ConnectResult> {
-  const serverUrl = config.url;
-  const timeout = config.timeout ?? DEFAULT_TIMEOUT;
-  const headers = config.headers ?? {};
-
-  const oauthEnabled = config.oauth !== false;
-  let oauthProvider: McpOAuthProvider | undefined;
-
-  if (oauthEnabled) {
-    oauthProvider = new McpOAuthProvider(
-      name,
-      serverUrl,
-      typeof config.oauth === 'object' ? config.oauth : {},
-      {
-        onRedirect: (url: URL) => {
-          console.log(`OAuth redirect for ${name}:`, url.toString());
-        },
-      },
-    );
-  }
-
-  // Try StreamableHTTP first
-  let transport: StreamableHTTPClientTransport | SSEClientTransport = new StreamableHTTPClientTransport(new URL(serverUrl), {
-    requestInit: {
-      headers,
-    },
-  });
-
-  let client = new Client(
-    { name, version: VERSION },
-    {
-      capabilities: {},
-    },
-  );
-
-  try {
-    await client.connect(transport, { timeout });
-
-    if (oauthProvider) {
-      pendingAuthTransports.set(`${workspacePath}:${name}`, {
-        transport: transport as StreamableHTTPClientTransport,
-        serverName: name,
-        serverUrl,
-      });
-    }
-
-    return { status: { status: 'connected' }, client };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-
-    if (err instanceof UnauthorizedError) {
-      if (oauthEnabled) {
-        pendingOAuth.set(`${workspacePath}:${name}`, {
-          serverName: name,
-          serverUrl,
-          config,
-          onRedirect: (url: URL) => {
-            console.log(`OAuth redirect for ${name}:`, url.toString());
-          },
-        });
-      }
-      return { status: { status: 'needs_auth' }, client: null };
-    }
-
-    // Try SSE fallback
-    try {
-      transport = new SSEClientTransport(new URL(serverUrl), {
-        requestInit: {
-          headers,
-        },
-      });
-
-      client = new Client(
-        { name, version: VERSION },
-        {
-          capabilities: {},
-        },
-      );
-
-      await client.connect(transport, { timeout });
-
-      if (oauthProvider) {
-        pendingAuthTransports.set(`${workspacePath}:${name}`, {
-          transport: transport as SSEClientTransport,
-          serverName: name,
-          serverUrl,
-        });
-      }
-
-      return { status: { status: 'connected' }, client };
-    } catch (_e) {
-      return { status: { status: 'failed', error: message }, client: null };
-    }
-  }
-}
-
-export async function disconnectServer(workspacePath: string, name: string): Promise<void> {
-  const clients = workspaceClients.get(workspacePath);
-  if (!clients) {
-    return;
-  }
-
-  const state = clients.get(name);
-  if (state?.client) {
-    try {
-      await state.client.close();
-    } catch (err) {
-      console.error(`Error closing MCP client ${name}:`, err);
-    }
-  }
-
-  clients.set(name, { client: null, status: { status: 'disabled' } });
-  pendingAuthTransports.delete(`${workspacePath}:${name}`);
-  pendingOAuth.delete(`${workspacePath}:${name}`);
-}
-
-export async function getServerStatus(
-  workspacePath: string,
-  name: string,
-): Promise<McpStatus | undefined> {
-  const clients = workspaceClients.get(workspacePath);
-  if (!clients) {
-    return undefined;
-  }
-
-  const state = clients.get(name);
-  return state?.status;
-}
-
-export async function getAllServerStatus(workspacePath: string): Promise<Record<string, { config: McpServerConfig | undefined; status: McpStatus }>> {
-  const clients = workspaceClients.get(workspacePath);
-  const servers = await getMcpServers(workspacePath);
-  
-  const statusMap: Record<string, { config: McpServerConfig | undefined; status: McpStatus }> = {};
-  
-  // Include all configured servers, not just connected ones
-  for (const [name, config] of Object.entries(servers)) {
-    const state = clients?.get(name);
-    statusMap[name] = {
-      config,
-      status: state?.status ?? { status: 'disabled' as const },
-    };
-  }
-  
-  // Also include any connected servers that might not be in the current config
-  if (clients) {
-    for (const [name, state] of clients) {
-      if (!statusMap[name]) {
-        statusMap[name] = {
-          config: undefined,
-          status: state.status,
+        await Promise.race([
+          client.connect(createTransport(controller.signal), { timeout }),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => { controller.abort(); reject(new Error('MCP connection timed out')); }, timeout);
+          }),
+        ]);
+        state.client = client;
+        state.status = { status: 'connected' };
+        client.onclose = () => {
+          if (state.client !== client) return;
+          state.client = null;
+          state.status = { status: 'failed', error: 'Connection closed. Reconnect to try again.' };
+          onChange(path);
         };
+        break;
+      } catch (error: unknown) {
+        await client.close().catch(() => {});
+        if (error instanceof UnauthorizedError) { state.status = { status: 'needs_auth' }; break; }
+        // Provider/server error bodies can contain credentials. Keep public errors bounded and generic.
+        state.status = { status: 'failed', error: 'Unable to connect. Check the address, command and credentials.' };
+      } finally {
+        clearTimeout(timer);
       }
     }
+    onChange(path);
+    return state.status;
   }
-
-  return statusMap;
-}
-
-export async function getTools(workspacePath: string, sessionId: string): Promise<Record<string, Tool>> {
-  const clients = workspaceClients.get(workspacePath);
-  if (!clients) {
-    return {};
-  }
-
-  const tools: Record<string, Tool> = {};
-
-  for (const [serverName, state] of clients) {
-    if (state.status.status !== 'connected' || !state.client) {
-      continue;
-    }
-
-    try {
-      const listResult = await state.client.listTools();
-
-      const mcpTools = listResult.tools ?? [];
-
-      for (const mcpTool of mcpTools) {
-        const sanitizedServerName = serverName.replace(/[^a-zA-Z0-9_-]/g, '_');
-        const sanitizedToolName = mcpTool.name.replace(/[^a-zA-Z0-9_-]/g, '_');
-        const toolKey = `${sanitizedServerName}_${sanitizedToolName}`;
-        const tool = await convertMcpTool(mcpTool, state.client, serverName, DEFAULT_TIMEOUT, sessionId);
-        tools[toolKey] = tool;
+  async function initializeWorkspace(path: string): Promise<void> {
+    await serialized(path, async () => {
+      const configs = await getMcpServers(path);
+      for (const name of workspaces.get(path)?.keys() ?? []) {
+        if (!Object.hasOwn(configs, name)) { await disconnect(path, name); workspaces.get(path)?.delete(name); }
       }
-    } catch (err) {
-      console.error(`Failed to list tools for MCP server ${serverName}:`, err);
-    }
-  }
-
-  return tools;
-}
-
-export async function startAuth(
-  workspacePath: string,
-  name: string,
-): Promise<{ authorizationUrl: string }> {
-  const clients = workspaceClients.get(workspacePath);
-  if (!clients) {
-    throw new Error(`Workspace ${workspacePath} not initialized`);
-  }
-
-  const pending = pendingOAuth.get(`${workspacePath}:${name}`);
-  if (!pending) {
-    const state = clients.get(name);
-    if (!state) {
-      throw new Error(`Server ${name} not found`);
-    }
-    if (state.status.status !== 'needs_auth') {
-      throw new Error(`Server ${name} does not need authentication`);
-    }
-    throw new Error(`No pending OAuth for ${name}`);
-  }
-
-  const oauthProvider = new McpOAuthProvider(
-    pending.serverName,
-    pending.serverUrl,
-    typeof pending.config.oauth === 'object' ? pending.config.oauth : {},
-    {
-      onRedirect: pending.onRedirect,
-    },
-  );
-
-  const authUrl = await oauthProvider.redirectUrl;
-
-  return { authorizationUrl: authUrl };
-}
-
-export async function finishAuth(
-  workspacePath: string,
-  name: string,
-  _code: string,
-): Promise<McpStatus> {
-  const pendingTransport = pendingAuthTransports.get(`${workspacePath}:${name}`);
-
-  if (!pendingTransport) {
-    throw new Error(`No pending authentication for ${name}`);
-  }
-
-  try {
-    const { serverUrl } = pendingTransport;
-
-    const _oauthProvider = new McpOAuthProvider(name, serverUrl, {}, {
-      onRedirect: (url: URL) => {
-        console.log(`OAuth redirect for ${name}:`, url.toString());
-      },
+      for (const [name, config] of Object.entries(configs)) {
+        const state = workspaces.get(path)?.get(name);
+        if (!state || transportIdentity(state.config) !== transportIdentity(config)
+          || (state.config.enabled !== false) !== (config.enabled !== false)) await connect(path, name, config);
+      }
     });
-
-    // The transport should handle the OAuth flow internally
-    // If successful, update the status
-    pendingAuthTransports.delete(`${workspacePath}:${name}`);
-    pendingOAuth.delete(`${workspacePath}:${name}`);
-
-    const clients = workspaceClients.get(workspacePath);
-    if (clients) {
-      clients.set(name, { client: null, status: { status: 'connected' } });
-    }
-
-    return { status: 'connected' };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { status: 'failed', error: message };
   }
+  async function shutdownWorkspace(path: string): Promise<void> {
+    await serialized(path, async () => {
+      for (const name of workspaces.get(path)?.keys() ?? []) await disconnect(path, name);
+      workspaces.delete(path);
+    });
+  }
+  async function connectServer(path: string, name: string, config: McpServerConfig): Promise<McpStatus> {
+    return serialized(path, () => connect(path, name, config));
+  }
+  async function disconnectServer(path: string, name: string): Promise<void> {
+    await serialized(path, () => disconnect(path, name)); onChange(path);
+  }
+  async function saveServer(path: string, name: string, config: McpServerConfig): Promise<void> {
+    await serialized(path, async () => {
+      const old = (await getMcpServers(path))[name];
+      await updateMcpConfig(path, name, config);
+      if (old?.type === 'remote' && transportIdentity(old) !== transportIdentity(config)) {
+        await removeAuth(credentialKey(path, name, old.url));
+      }
+      const state = workspaces.get(path)?.get(name);
+      if (!state || transportIdentity(state.config) !== transportIdentity(config)
+        || (state.config.enabled !== false) !== (config.enabled !== false)) await connect(path, name, config);
+    });
+    onChange(path);
+  }
+  async function removeServer(path: string, name: string): Promise<void> {
+    await serialized(path, async () => {
+      const old = (await getMcpServers(path))[name];
+      await updateMcpConfig(path, name, null);
+      await disconnect(path, name);
+      workspaces.get(path)?.delete(name);
+      if (old?.type === 'remote') await removeAuth(credentialKey(path, name, old.url));
+    });
+    onChange(path);
+  }
+  async function setToolEnabled(path: string, name: string, toolName: string, enabled: boolean): Promise<void> {
+    await serialized(path, async () => {
+      const config = (await getMcpServers(path))[name];
+      if (!config) throw new NotFoundError('MCP server not found');
+      const disabled = new Set(config.disabledTools);
+      if (enabled) disabled.delete(toolName); else disabled.add(toolName);
+      await updateMcpConfig(path, name, { ...config, disabledTools: [...disabled] });
+    });
+    onChange(path);
+  }
+  async function getServerStatus(path: string, name: string): Promise<McpStatus | undefined> {
+    return workspaces.get(path)?.get(name)?.status;
+  }
+  async function getAllServerStatus(path: string): Promise<Record<string, { config: McpServerConfig; status: McpStatus }>> {
+    const configs = await getMcpServers(path);
+    return Object.fromEntries(Object.entries(configs).map(([name, config]) => [name, {
+      config, status: config.enabled === false ? { status: 'disabled' } : workspaces.get(path)?.get(name)?.status ?? { status: 'disabled' },
+    }]));
+  }
+  async function listTools(state: State): Promise<Tool[]> {
+    if (!state.client || state.status.status !== 'connected') return [];
+    const tools: Tool[] = [];
+    const cursors = new Set<string>();
+    let cursor: string | undefined;
+    do {
+      const page = await state.client.listTools(cursor ? { cursor } : {}, { timeout: state.config.timeout ?? TIMEOUT });
+      tools.push(...page.tools);
+      cursor = page.nextCursor;
+      if (cursor && cursors.has(cursor) || tools.length > 10_000) throw new Error('Invalid MCP tool pagination');
+      if (cursor) cursors.add(cursor);
+    } while (cursor);
+    return tools;
+  }
+  async function getServerTools(path: string, name: string): Promise<McpToolInfo[]> {
+    await initializeWorkspace(path);
+    const config = (await getMcpServers(path))[name];
+    if (!config) throw new NotFoundError('MCP server not found');
+    const state = workspaces.get(path)?.get(name);
+    let tools: Tool[];
+    try { tools = state ? await listTools(state) : []; }
+    catch { throw new Error('Unable to list MCP tools. Reconnect and try again.'); }
+    return tools.map(tool => ({ name: tool.name, description: tool.description,
+      enabled: !config.disabledTools?.includes(tool.name) }));
+  }
+  async function getWorkspaceTools(path: string): Promise<WorkspaceMcpTool[]> {
+    await initializeWorkspace(path);
+    const configs = await getMcpServers(path);
+    const result: WorkspaceMcpTool[] = [];
+    for (const [name, state] of workspaces.get(path) ?? []) {
+      const config = configs[name];
+      const client = state.client;
+      if (!config || config.enabled === false || !client) continue;
+      let definitions: Tool[];
+      try { definitions = await listTools(state); } catch { continue; }
+      for (const definition of definitions) {
+        if (config.disabledTools?.includes(definition.name)) continue;
+        // Stable, bounded identifiers avoid collisions after name sanitization.
+        const suffix = createHash('sha256').update(JSON.stringify([name, definition.name])).digest('hex').slice(0, 16);
+        const key = 'mcp_' + definition.name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40) + '_' + suffix;
+        result.push({ name: key, serverName: name, toolName: definition.name,
+          description: definition.description ?? 'Tool from ' + name, inputSchema: definition.inputSchema,
+          async execute(input, signal, authorized) {
+            signal?.throwIfAborted();
+            const current = (await getMcpServers(path))[name];
+            if (!current || current.enabled === false || current.disabledTools?.includes(definition.name)
+              || transportIdentity(current) !== transportIdentity(config)
+              || workspaces.get(path)?.get(name)?.client !== client) throw new Error('MCP tool is disabled or its connection changed');
+            if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid MCP arguments');
+            if (authorized && !authorized()) throw new Error('MCP tool unavailable');
+            signal?.throwIfAborted();
+            return CallToolResultSchema.parse(await client.callTool({ name: definition.name, arguments: input }, CallToolResultSchema,
+              { timeout: current.timeout ?? TIMEOUT, signal }));
+          } });
+      }
+    }
+    return result;
+  }
+  async function startAuth(path: string, name: string, redirectUrl: string): Promise<{ authorizationUrl: string }> {
+    return serialized(path, async () => {
+      const config = (await getMcpServers(path))[name];
+      if (!config || config.type !== 'remote' || config.oauth === false || config.enabled === false) {
+        throw new BadRequestError('Enable a remote OAuth server before signing in');
+      }
+      await disconnect(path, name);
+      let clients = workspaces.get(path);
+      if (!clients) { clients = new Map(); workspaces.set(path, clients); }
+      clients.set(name, { client: null, config, status: { status: 'needs_auth' } });
+      onChange(path);
+      const state = crypto.randomUUID();
+      let authorizationUrl: string | undefined;
+      const oauth = provider(path, name, config, redirectUrl, state, url => { authorizationUrl = url.toString(); });
+      await oauth.invalidateCredentials('tokens');
+      try {
+        await auth(oauth, { serverUrl: config.url, scope: typeof config.oauth === 'object' ? config.oauth.scope : undefined,
+          fetchFn: (url, init) => fetchMcp(url, { ...init, signal: AbortSignal.timeout(TIMEOUT) }) });
+      } catch { throw new BadRequestError('Unable to start OAuth. Check whether this server requires a registered client ID.'); }
+      if (!authorizationUrl) throw new BadRequestError('The server did not provide an authorization URL');
+      pendingAuth.set(state, { path, name, config, provider: oauth, expiresAt: Date.now() + 10 * 60_000 });
+      return { authorizationUrl };
+    });
+  }
+  async function finishAuth(state: string, code: string, expected?: { path: string; name: string }): Promise<{ path: string; status: McpStatus }> {
+    const pending = pendingAuth.get(state);
+    if (pending && expected && (pending.path !== expected.path || pending.name !== expected.name)) {
+      throw new BadRequestError('OAuth request does not belong to this workspace and server');
+    }
+    pendingAuth.delete(state);
+    if (!pending || pending.expiresAt < Date.now() || !code) throw new BadRequestError('OAuth request expired or is invalid. Start sign-in again.');
+    return serialized(pending.path, async () => {
+      const { path, name, config, provider: oauth } = pending;
+      const current = (await getMcpServers(path))[name];
+      if (!current || current.enabled === false || transportIdentity(current) !== transportIdentity(config)) {
+        throw new BadRequestError('MCP configuration changed. Start sign-in again.');
+      }
+      try {
+        const result = await auth(oauth, { serverUrl: config.url, authorizationCode: code,
+          fetchFn: (url, init) => fetchMcp(url, { ...init, signal: AbortSignal.timeout(TIMEOUT) }) });
+        if (result !== 'AUTHORIZED') throw new Error('Authorization incomplete');
+      } catch { throw new BadRequestError('OAuth token exchange failed. Start sign-in again.'); }
+      const status = await connect(path, name, current);
+      onChange(path);
+      return { path, status };
+    });
+  }
+  return { setMcpChangeListener, initializeWorkspace, shutdownWorkspace, connectServer, disconnectServer, saveServer, removeServer, setToolEnabled, getServerStatus, getAllServerStatus, getServerTools, getWorkspaceTools, startAuth, finishAuth };
 }
+
+export const { setMcpChangeListener, initializeWorkspace, shutdownWorkspace, connectServer, disconnectServer, saveServer, removeServer, setToolEnabled, getServerStatus, getAllServerStatus, getServerTools, getWorkspaceTools, startAuth, finishAuth } = createMcpManager();

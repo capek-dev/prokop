@@ -17,6 +17,7 @@ export interface McpLocalServerConfig {
   env?: Record<string, string>;
   timeout?: number;
   enabled?: boolean;
+  disabledTools?: string[];
 }
 
 export interface McpRemoteServerConfig {
@@ -26,6 +27,7 @@ export interface McpRemoteServerConfig {
   headers?: Record<string, string>;
   timeout?: number;
   enabled?: boolean;
+  disabledTools?: string[];
 }
 
 export type McpServerConfig = McpLocalServerConfig | McpRemoteServerConfig;
@@ -46,4 +48,10 @@ export interface McpServerInfo {
   config: McpServerConfig;
   status: McpStatus;
   toolCount?: number;
+}
+
+export interface McpToolInfo {
+  name: string;
+  description?: string;
+  enabled: boolean;
 }

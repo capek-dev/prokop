@@ -28,6 +28,8 @@ import { notifySessionFilesChanged } from '@/harnesses/shared/files-changed';
 import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
 import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
 import { ensureSessionTempDir, sessionTempInstructions } from '@/infrastructure/filesystem/session-temp';
+import type { WorkspaceMcpToolsPort } from '@/application/ports/mcp-tools';
+import { createClaudeWorkspaceMcp } from './mcp-tools';
 
 interface Binding {
   native_session_id: string;
@@ -45,6 +47,7 @@ export interface ClaudeExecutionDependencies extends ClaudeRollbackDependencies 
   memoryTools?: MemoryDomainBridge;
   sessionSearch?: SessionSearchDomainBridge;
   agentSkills?: AgentSkillsDomainBridge;
+  mcp?: WorkspaceMcpToolsPort;
 }
 
 export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
@@ -208,6 +211,11 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         const selectedRoot = path?.path ?? workspace.path;
         if (!existsSync(selectedRoot)) throw new Error('Claude workspace root unavailable');
         const root = realpathSync(selectedRoot);
+        const workspaceMcp = deps.mcp ? createClaudeWorkspaceMcp(await deps.mcp.tools(workspace.path), controller.signal, () => {
+          const current = getSession(sessionId);
+          return active.get(sessionId) === controller && current?.harness === 'claude-cli' && current.workspaceId === session.workspaceId
+            && current.status === 'active' && current.workspaceRootId === session.workspaceRootId;
+        }) : undefined;
         const version = (deps.version ?? claudeCliVersion)();
         const selection = getClaudeModelSelection(sessionId);
         if (!selection) throw new Error('Choose a Claude model and effort before sending');
@@ -323,7 +331,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           openSegment = { part: { ...openSegment.part, text: next }, text: next };
         };
         for await (const event of runClaudeTurn({ cwd: root, prompt: content, images,
-          userMessageId: user.id, instructions: [developerInstructions, sessionTempInstructions(tempDirectory)].filter(Boolean).join('\n\n'), dynamicTools, tempDirectory,
+          userMessageId: user.id, instructions: [developerInstructions, sessionTempInstructions(tempDirectory)].filter(Boolean).join('\n\n'), dynamicTools, workspaceMcp, tempDirectory,
           goalCondition, sessionId: nativeId, resume: !!binding,
           model: selection.model, effort: selection.effort,
           controller, canUseTool: approvals.request(sessionId, session.workspaceId, root, wire.delivery,

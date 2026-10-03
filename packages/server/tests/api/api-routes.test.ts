@@ -829,7 +829,7 @@ describe('API Routes', () => {
       const res = await app.request('/api/workspaces/nonexistent/mcp/auth/callback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'test', code: 'abc' }),
+        body: JSON.stringify({ name: 'test', code: 'abc', state: '00000000-0000-4000-8000-000000000001' }),
       });
       expect(res.status).toBe(404);
     });

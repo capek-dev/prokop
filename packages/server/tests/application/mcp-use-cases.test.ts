@@ -46,7 +46,11 @@ function makeApplication(state: FakeState): McpHttpApplication {
     },
     getTools: async () => ({}),
     startAuth: async () => ({ authorizationUrl: 'https://auth' }),
-    finishAuth: async () => connected,
+    finishAuth: async () => ({ path: '/ws/path', status: connected }),
+    saveServer: async () => {},
+    removeServer: async () => {},
+    getServerTools: async () => [],
+    setToolEnabled: async () => {},
     getMcpServers: async (workspacePath) => {
       state.log.push(`servers:${workspacePath}`);
       return state.servers;

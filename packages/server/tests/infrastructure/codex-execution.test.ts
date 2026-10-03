@@ -73,6 +73,8 @@ function fakeCodex(readThread?: () => unknown, rejectMethod?: string, trustedHoo
         const capabilities = (init?.params as { capabilities?: { experimentalApi?: boolean } })?.capabilities;
         queueMicrotask(() => send(tools !== undefined && capabilities?.experimentalApi !== true
           ? { id: message.id, error: { code: -32600, message: 'Experimental API is not enabled' } }
+          : Array.isArray(tools) && tools.some(tool => tool.type !== 'function' && tool.type !== 'namespace')
+          ? { id: message.id, error: { code: -32602, message: 'Missing dynamic tool type' } }
           : { id: message.id, result: { thread: { id: 'thread-1', status: { type: message.method === 'thread/resume'
             ? resumeStatus : 'idle' } }, model: 'gpt-5-codex' } }));
       }
@@ -2277,4 +2279,41 @@ test('Codex pushes a permission ask and the finished reply through the notificat
   } finally {
     installHarnessNotificationPort({ notifyTerminalMessage: () => {}, notifyPermissionRequired: () => {} });
   }
+});
+
+test('Codex registers workspace MCP entrypoints and routes current policy on resumed turns', async () => {
+  create();
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  let enabled = true;
+  let calls = 0;
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => { const fake = fakeCodex(); processes.push(fake); return fake.connection; },
+    mcp: { tools: async path => {
+      expect(path).toBe(process.cwd());
+      return enabled ? [{ name: 'fixture_read', serverName: 'crm', toolName: 'read', description: 'Read',
+        inputSchema: { type: 'object' }, execute: async () => {
+          calls++; return { content: [{ type: 'text', text: 'record' }] };
+        } }] : [];
+    } },
+  });
+  const messages: ServerMessage[] = [];
+  for (let index = 0; index < 2; index++) {
+    const turn = execution.sendMessage(wire(messages), 'origin', 's', 'Use MCP');
+    await waitFor(() => processes[index]?.sent.some(message => message.method === 'turn/start') ?? false);
+    const fake = processes[index]!;
+    if (index === 0) {
+      expect(fake.sent.find(message => message.method === 'thread/start')?.params).toMatchObject({
+        dynamicTools: [{ type: 'function', name: 'mcp_list_tools' }, { type: 'function', name: 'mcp_call_tool' }],
+      });
+    }
+    fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+    fake.send({ id: 501, method: 'item/tool/call', params: { threadId: 'thread-1', turnId: 'turn-1',
+      callId: 'mcp-call', namespace: null, tool: 'mcp_call_tool', arguments: { tool: 'fixture_read', arguments: {} } } });
+    await waitFor(() => fake.sent.some(message => message.id === 501));
+    expect(fake.sent.find(message => message.id === 501)?.result).toMatchObject({ success: index === 0 });
+    fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+    await turn;
+    enabled = false;
+  }
+  expect(calls).toBe(1);
 });

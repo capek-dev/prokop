@@ -1,16 +1,13 @@
-import type { McpServerConfig, McpStatus } from '@prokopai/sdk';
+import type { McpServerConfig, McpStatus, McpToolInfo } from '@prokopai/sdk';
 
 /**
- * Inward-facing MCP lifecycle port (S5). The MCP process, discovery,
- * stdio/HTTP/SSE, OAuth, and AI SDK conversion implementations stay at
- * their current paths (the conversion move is S7 work); this port carries
- * the lifecycle seam so routes and use cases never import the
- * implementation directly. The converted tool map stays opaque here: the
- * AI SDK tool type remains an implementation concern until S7.
+ * Workspace configuration, connections and OAuth owned by the host.
+ * Routes depend on application use cases; harnesses consume neutral tools
+ * through WorkspaceMcpToolsPort. Runtime-specific conversion stays outside
+ * the connection manager.
  */
 
-/** Opaque converted-tool map; the concrete AI SDK tool shape stays with
- * the MCP implementation until S7. */
+/** Compatibility seam for the Prokop tool conversion adapter. */
 export type McpToolMap = Record<string, unknown>;
 
 export interface McpLifecyclePort {
@@ -27,8 +24,12 @@ export interface McpLifecyclePort {
     workspacePath: string,
   ): Promise<Record<string, { config: McpServerConfig | undefined; status: McpStatus }>>;
   getTools(workspacePath: string, sessionId: string): Promise<McpToolMap>;
-  startAuth(workspacePath: string, name: string): Promise<{ authorizationUrl: string }>;
-  finishAuth(workspacePath: string, name: string, code: string): Promise<McpStatus>;
+  startAuth(workspacePath: string, name: string, redirectUrl: string): Promise<{ authorizationUrl: string }>;
+  finishAuth(state: string, code: string, expected?: { path: string; name: string }): Promise<{ path: string; status: McpStatus }>;
+  saveServer(workspacePath: string, name: string, config: McpServerConfig): Promise<void>;
+  removeServer(workspacePath: string, name: string): Promise<void>;
+  getServerTools(workspacePath: string, name: string): Promise<McpToolInfo[]>;
+  setToolEnabled(workspacePath: string, name: string, toolName: string, enabled: boolean): Promise<void>;
   getMcpServers(workspacePath: string): Promise<Record<string, McpServerConfig>>;
 }
 

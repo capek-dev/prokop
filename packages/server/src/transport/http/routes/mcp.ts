@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
+import { z } from 'zod';
 import { validate } from './validate';
-import type { McpHttpApplication } from '@/application/mcp';
+import { mcpNameSchema, mcpServerConfigSchema, type McpHttpApplication } from '@/application/mcp';
 import { NotFoundError } from '@/application/http-errors';
 import { mcpServerNameSchema } from './schemas';
 
@@ -10,6 +11,49 @@ import { mcpServerNameSchema } from './schemas';
  * store or MCP implementation modules.
  */
 export function registerMcpRoutes(app: Hono, application: McpHttpApplication): void {
+  app.post('/api/workspaces/:id/mcp/servers', validate('json', z.object({
+    name: mcpNameSchema, config: mcpServerConfigSchema,
+  }).strict()), async c => {
+    const { name, config } = c.req.valid('json');
+    await application.save(c.req.param('id'), name, config);
+    return c.json({ success: true });
+  });
+  app.post('/api/workspaces/:id/mcp/remove', validate('json', mcpServerNameSchema), async c => {
+    await application.remove(c.req.param('id'), c.req.valid('json').name);
+    return c.json({ success: true });
+  });
+  app.get('/api/workspaces/:id/mcp/tools', validate('query', z.object({ name: mcpNameSchema })), async c => {
+    return c.json({ tools: await application.tools(c.req.param('id'), c.req.valid('query').name) });
+  });
+  app.post('/api/workspaces/:id/mcp/tools', validate('json', z.object({
+    name: mcpNameSchema, toolName: z.string().min(1).max(256), enabled: z.boolean(),
+  }).strict()), async c => {
+    const { name, toolName, enabled } = c.req.valid('json');
+    await application.setToolEnabled(c.req.param('id'), name, toolName, enabled);
+    return c.json({ success: true });
+  });
+  app.post('/api/workspaces/:id/mcp/auth', validate('json', mcpServerNameSchema), async c => {
+    const redirectUrl = new URL('/api/mcp/oauth/callback', c.req.url).toString();
+    return c.json(await application.startAuth(c.req.param('id'), c.req.valid('json').name, redirectUrl));
+  });
+  app.post('/api/workspaces/:id/mcp/auth/callback', validate('json', z.object({
+    name: mcpNameSchema, state: z.string().uuid(), code: z.string().min(1).max(8192),
+  }).strict()), async c => {
+    const { name, state, code } = c.req.valid('json');
+    return c.json(await application.finishWorkspaceAuth(c.req.param('id'), name, state, code));
+  });
+  // This browser redirect is authenticated by expiring, single-use OAuth state.
+  app.get('/api/mcp/oauth/callback', validate('query', z.object({
+    state: z.string().uuid(), code: z.string().min(1).max(8192),
+  })), async c => {
+    const { state, code } = c.req.valid('query');
+    const result = await application.finishAuth(state, code);
+    c.header('Cache-Control', 'no-store');
+    c.header('Referrer-Policy', 'no-referrer');
+    return c.html('<!doctype html><title>MCP sign-in</title><p>' +
+      (result.status.status === 'connected' ? 'Connected. You can close this tab and return to Prokop.'
+        : 'Sign-in completed, but the connection failed. Return to MCP settings to reconnect.') + '</p>');
+  });
   app.get('/api/workspaces/:id/mcp/status', async (c) => {
     const workspaceId = c.req.param('id');
     const result = await application.status(workspaceId);

@@ -8,11 +8,13 @@ import {
 import { listDomainToolFallbackDefinitions } from '@capekai/core/tools';
 import { resolveToolsPath } from '@/config';
 import type { ToolCatalogEntry } from '@/application/ports/tool-catalog';
-import { getTools, initializeWorkspace } from '@/infrastructure/mcp';
+import { getTools } from '@/infrastructure/mcp';
 import { getToolsDir } from '@/infrastructure/runtime/paths';
 import { readEnv } from '@/infrastructure/runtime/env-compat';
 import type { LoadedTool } from '@capekai/tool';
 import { getBuiltinToolsPort } from '@/application/ports/builtin-tools';
+import { getSession } from '@/infrastructure/sqlite/session-store';
+import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 
 /** Harness-owned built-ins, read through the installed port at call time
  * so this adapter never imports harness internals. */
@@ -23,8 +25,13 @@ function exposedBuiltinTools(): readonly LoadedTool[] {
 /** The Jean2 workspace tool discovery: the MCP manager's per-workspace
  * client lifecycle and tool listing. */
 export const jean2WorkspaceToolDiscovery: WorkspaceToolDiscovery = {
-  initializeWorkspace,
-  discoverTools: getTools,
+  // Discovery has the session identity needed to resolve a managed worktree's owner.
+  initializeWorkspace: async () => {},
+  discoverTools: async (path, sessionId) => {
+    const session = sessionId ? getSession(sessionId) : null;
+    const workspace = session && getWorkspace(session.workspaceId);
+    return getTools(workspace?.path ?? path, sessionId ?? '');
+  },
 };
 
 /** Capek tool catalog seam for the tools route (S4): the Jean2 tools

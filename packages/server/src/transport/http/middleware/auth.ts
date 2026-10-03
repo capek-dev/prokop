@@ -76,6 +76,7 @@ export const PUBLIC_ROUTES = [
   '/',              // Root health check
   '/api/health',    // Health check endpoint
   '/api/info',      // Server info endpoint
+  '/api/mcp/oauth/callback', // Validated by expiring, single-use OAuth state.
 ];
 
 /**

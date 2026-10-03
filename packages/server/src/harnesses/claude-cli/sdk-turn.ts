@@ -3,6 +3,7 @@ import type { ClaudeImage } from './images';
 import { claudeCliVersion } from './version';
 import { parseClaudeUsage, type ClaudeTurnUsage } from './usage';
 import { sessionTempEnvironment } from '@/infrastructure/filesystem/session-temp';
+import type { McpSdkServerConfigWithInstance } from '@anthropic-ai/claude-agent-sdk';
 
 export type ClaudeTurnEvent = (
   | { type: 'text-delta'; text: string }
@@ -27,6 +28,7 @@ export interface ClaudeTurnInput {
   instructions?: string;
   /** In-process Prokop tools (memory) registered under the prokop MCP server for this turn. */
   dynamicTools?: SdkMcpToolDefinition[];
+  workspaceMcp?: McpSdkServerConfigWithInstance;
   goalCondition?: string;
   images?: ClaudeImage[];
   sessionId: string;
@@ -123,9 +125,10 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
     strictMcpConfig: true,
     // The in-process server hosts per-turn dynamic tools (memory); strict config
     // keeps every other external MCP server out.
-    mcpServers: input.dynamicTools?.length
-      ? { prokop: createSdkMcpServer({ name: 'prokop', tools: input.dynamicTools, alwaysLoad: true }) }
-      : {},
+    mcpServers: {
+      ...(input.dynamicTools?.length ? { prokop: createSdkMcpServer({ name: 'prokop', tools: input.dynamicTools, alwaysLoad: true }) } : {}),
+      ...(input.workspaceMcp ? { workspace: input.workspaceMcp } : {}),
+    },
     env: { ...env, ...(input.tempDirectory ? sessionTempEnvironment(input.tempDirectory) : {}), ENABLE_CLAUDEAI_MCP_SERVERS: 'false', CLAUDE_CODE_AUTO_CONNECT_IDE: '0' },
   };
   let releaseInput!: () => void;

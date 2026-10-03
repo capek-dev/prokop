@@ -35,6 +35,8 @@ import { forkCodexSession } from './fork';
 import { codexCliVersion } from './version';
 import { ensureSessionTempDir, sessionTempInstructions } from '@/infrastructure/filesystem/session-temp';
 import { isWithinRoot } from '@/domains/permissions';
+import type { WorkspaceMcpToolsPort } from '@/application/ports/mcp-tools';
+import { createCodexMcpTools } from './mcp-tools';
 
 export { codexCliVersion } from './version';
 
@@ -77,6 +79,7 @@ export interface CodexExecutionDependencies {
   memoryTools?: MemoryDomainBridge;
   sessionSearch?: SessionSearchDomainBridge;
   agentSkills?: AgentSkillsDomainBridge;
+  mcp?: WorkspaceMcpToolsPort;
 }
 
 export function codexCliAvailable(): boolean {
@@ -821,8 +824,16 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
             } catch { return false; }
           },
         });
+        const mcp = deps.mcp && createCodexMcpTools({ bridge: deps.mcp, path: workspace.path,
+          authorized: turnId => {
+            const current = getSession(sessionId);
+            return !!run && active.get(sessionId) === run && run.turnId === turnId && !completed && !run.stopRequested
+              && current?.harness === 'codex-cli' && current.status === 'active' && current.workspaceId === session.workspaceId
+              && current.workspaceRootId === session.workspaceRootId;
+          },
+        });
         const dynamicTools = [...(memoryTools?.definitions ?? []), ...(sessionSearch?.definitions ?? []),
-          ...(agentSkills?.definitions ?? [])];
+          ...(agentSkills?.definitions ?? []), ...(mcp?.definitions ?? [])];
         phase = 'Codex permission hook';
         if (!connection) {
           connection = { client: undefined as unknown as CodexAppServer, children: null, parentTurnId: null,
@@ -949,6 +960,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
           }
           if (request.tool === 'session_search' && sessionSearch) return sessionSearch.call(params);
           if (request.tool === 'agent_skill_manage' && agentSkills) return agentSkills.call(params);
+          if ((request.tool === 'mcp_list_tools' || request.tool === 'mcp_call_tool') && mcp) return mcp.call(params);
           if (memoryTools) return memoryTools.call(params);
           return { success: false, contentItems: [{ type: 'inputText', text: 'Dynamic tool unavailable' }] };
         };

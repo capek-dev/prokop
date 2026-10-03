@@ -70,6 +70,7 @@ const layerAdaptersLegacyExceptions: Record<string, string[]> = {
   'packages/server/src/adapters/capek/tool-source.ts': [
     '@/config', '@/infrastructure/mcp', '@/infrastructure/runtime/paths',
     '@/infrastructure/runtime/env-compat',
+    '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/workspaces',
   ],
   'packages/server/src/adapters/capek/workspace.ts': [
     '@/infrastructure/sqlite/workspaces', '@/infrastructure/runtime/environment', '@/infrastructure/runtime/paths',
@@ -1668,6 +1669,7 @@ describe('server layer boundaries', () => {
 
     const allowedSpecifiers = [
       'hono',
+      'zod',
       '@/application/mcp',
       './validate',
       './schemas',

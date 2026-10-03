@@ -1,4 +1,5 @@
 import type { HttpClient } from '../transport/http';
+import type { McpServerConfig, McpToolInfo } from '../shared-types/mcp';
 import type {
   GetMcpStatusResponse,
   ConnectMcpServerResponse,
@@ -25,10 +26,27 @@ interface StartMcpAuthOptions {
 
 interface FinishMcpAuthOptions {
   signal?: AbortSignal;
+  state: string;
 }
 
 export class McpRestNamespace {
   constructor(private http: HttpClient) {}
+
+  async save(workspaceId: string, name: string, config: McpServerConfig): Promise<{ success: boolean }> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/mcp/servers`, { name, config });
+  }
+
+  async remove(workspaceId: string, name: string): Promise<{ success: boolean }> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/mcp/remove`, { name });
+  }
+
+  async getTools(workspaceId: string, name: string, options?: { signal?: AbortSignal }): Promise<{ tools: McpToolInfo[] }> {
+    return this.http.get(`/workspaces/${encodeURIComponent(workspaceId)}/mcp/tools?name=${encodeURIComponent(name)}`, options);
+  }
+
+  async setToolEnabled(workspaceId: string, name: string, toolName: string, enabled: boolean): Promise<{ success: boolean }> {
+    return this.http.post(`/workspaces/${encodeURIComponent(workspaceId)}/mcp/tools`, { name, toolName, enabled });
+  }
 
   /**
    * GET /api/workspaces/:id/mcp/status - Get MCP server status for a workspace
@@ -98,12 +116,12 @@ export class McpRestNamespace {
     workspaceId: string,
     name: string,
     code: string,
-    options?: FinishMcpAuthOptions,
+    options: FinishMcpAuthOptions,
   ): Promise<FinishMcpAuthResponse> {
     const { signal } = options ?? {};
     return this.http.post(
       `/workspaces/${encodeURIComponent(workspaceId)}/mcp/auth/callback`,
-      { name, code },
+      { name, code, state: options.state },
       { signal },
     );
   }

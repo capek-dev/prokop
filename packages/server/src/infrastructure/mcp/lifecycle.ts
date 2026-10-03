@@ -12,6 +12,10 @@ export function createMcpLifecycle(): McpLifecyclePort {
     getTools: mcp.getTools as unknown as McpLifecyclePort['getTools'],
     startAuth: mcp.startAuth,
     finishAuth: mcp.finishAuth,
+    saveServer: mcp.saveServer,
+    removeServer: mcp.removeServer,
+    getServerTools: mcp.getServerTools,
+    setToolEnabled: mcp.setToolEnabled,
     getMcpServers: mcp.getMcpServers,
   };
 }

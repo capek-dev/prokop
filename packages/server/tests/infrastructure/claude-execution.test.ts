@@ -1049,3 +1049,41 @@ test('early child events attach only to their Agent, and Stop closes the child t
   expect(listMessagesWithParts(childId)[0]).toMatchObject({ message: { status: 'interrupted' },
     parts: [{ type: 'text', text: 'early child' }] });
 });
+
+test('Claude mounts host MCP tools for the workspace and closes execution access at turn completion', async () => {
+  const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+  const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js');
+  const client = new Client({ name: 'fixture', version: '1' });
+  const paths: string[] = [];
+  let calls = 0;
+  let server: import('@modelcontextprotocol/sdk/server/mcp.js').McpServer | undefined;
+  const { wire } = wireFixture();
+  const execution = createClaudeExecution({ version: () => '2.1.274',
+    mcp: { tools: async path => {
+      paths.push(path);
+      return [{ name: 'fixture_read', serverName: 'crm', toolName: 'read', description: 'Read',
+        inputSchema: { type: 'object', properties: {} }, execute: async () => {
+          calls++; return { content: [{ type: 'text', text: 'record' }] };
+        } }];
+    } },
+    start: (_prompt, options) => (async function* (): AsyncGenerator<SDKMessage> {
+      const mounted = options.mcpServers?.workspace;
+      if (!mounted || !('instance' in mounted)) throw new Error('Missing workspace MCP');
+      server = mounted.instance;
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+      expect(await client.callTool({ name: 'fixture_read', arguments: {} })).toMatchObject({
+        content: [{ type: 'text', text: 'record' }],
+      });
+      yield* fakeTurn(_prompt, options, []);
+    })(),
+  });
+  try {
+    await execution.sendMessage(wire, 'origin', 'session', 'Use MCP');
+    expect(paths).toEqual([process.cwd()]);
+    expect(calls).toBe(1);
+    expect(await client.callTool({ name: 'fixture_read', arguments: {} })).toMatchObject({ isError: true });
+    expect(calls).toBe(1);
+  } finally { await client.close(); await server?.close(); }
+});

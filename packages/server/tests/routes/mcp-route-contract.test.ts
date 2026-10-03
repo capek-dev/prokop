@@ -9,6 +9,13 @@ const connected: McpStatus = { status: 'connected' };
 
 function makeFakeApplication(overrides: Partial<McpHttpApplication> = {}): McpHttpApplication {
   return {
+    save: async () => {},
+    remove: async () => {},
+    tools: async () => [],
+    setToolEnabled: async () => {},
+    startAuth: async () => ({ authorizationUrl: 'https://auth.example/authorize' }),
+    finishAuth: async () => ({ status: connected }),
+    finishWorkspaceAuth: async () => ({ status: connected }),
     status: async () => ({
       kind: 'ok',
       status: { alpha: { config: undefined, status: connected } },
@@ -154,5 +161,50 @@ describe('mcp route contract', () => {
     });
     expect(res.status).toBe(400);
     expect((await json(res)).error).toBe('bad_request');
+  });
+});
+
+describe('MCP settings and OAuth routes', () => {
+  test('validates server configuration and fails closed on malformed tool policy', async () => {
+    const saved: unknown[] = [];
+    const app = makeApp(makeFakeApplication({ save: async (...args) => { saved.push(args); } }));
+    const post = (path: string, body: unknown) => app.request('/api/workspaces/ws-1/mcp/' + path, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    expect((await post('servers', { name: 'crm', config: { type: 'remote', url: 'https://crm.test/mcp', enabled: false } })).status).toBe(200);
+    expect(saved).toEqual([['ws-1', 'crm', { type: 'remote', url: 'https://crm.test/mcp', enabled: false }]]);
+    for (const config of [
+      { type: 'remote', url: 'file:///etc/passwd' },
+      { type: 'local', command: [] },
+      { type: 'remote', url: 'https://crm.test/mcp', disabledTools: 'write' },
+      { type: 'remote', url: 'https://crm.test/mcp', enabled: 'false' },
+    ]) expect((await post('servers', { name: 'crm', config })).status).toBe(400);
+    expect((await post('tools', { name: 'crm', toolName: 'write', enabled: 'false' })).status).toBe(400);
+    expect(saved).toHaveLength(1);
+  });
+  test('requires state and returns an OAuth completion page without caching the code', async () => {
+    const completions: unknown[] = [];
+    const app = makeApp(makeFakeApplication({ finishAuth: async (...args) => {
+      completions.push(args); return { status: connected };
+    } }));
+    expect((await app.request('/api/mcp/oauth/callback?code=test')).status).toBe(400);
+    expect(completions).toHaveLength(0);
+    const state = '00000000-0000-4000-8000-000000000001';
+    const response = await app.request('/api/mcp/oauth/callback?state=' + state + '&code=test');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.text()).toContain('Connected');
+    expect(completions).toEqual([[state, 'test']]);
+  });
+  test('uses the API origin for OAuth, including remote browser clients', async () => {
+    const requests: unknown[] = [];
+    const app = makeApp(makeFakeApplication({ startAuth: async (...args) => {
+      requests.push(args); return { authorizationUrl: 'https://crm.test/authorize' };
+    } }));
+    const response = await app.request('https://prokop.example/api/workspaces/ws-1/mcp/auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'crm' }),
+    });
+    expect(response.status).toBe(200);
+    expect(requests).toEqual([['ws-1', 'crm', 'https://prokop.example/api/mcp/oauth/callback']]);
   });
 });
