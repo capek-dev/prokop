@@ -8,6 +8,7 @@ import {
   shouldAutoApproveAsk,
 } from '@/domains/permissions';
 import { sessionPermissionRoots } from '@/harnesses/shared/permission-roots';
+import { notifyHarnessPermissionRequired } from '@/harnesses/shared/notifications';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { createPendingAsk, expirePermissionRequest,
@@ -98,6 +99,7 @@ export class CodexApprovals {
         delivery.sendToAskTargets(controllerSessionId, AUTHORITY, { type: 'ask.request',
           sessionId: controllerSessionId, toolCallId, toolName, requestId, authority: AUTHORITY,
           ask: deliveredAsk });
+        notifyHarnessPermissionRequired(requestId, controllerSessionId);
       } catch {
         this.settle(requestId, DECLINE, 'expired');
       }

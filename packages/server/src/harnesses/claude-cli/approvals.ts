@@ -2,6 +2,7 @@ import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sd
 import { shouldAutoApproveAsk } from '@/domains/permissions';
 import { classifyClaudeTool } from './tool-policy';
 import { sessionPermissionRoots } from '@/harnesses/shared/permission-roots';
+import { notifyHarnessPermissionRequired } from '@/harnesses/shared/notifications';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { createPendingAsk, expirePermissionRequest, resolvePermissionRequestByRequestId } from '@/infrastructure/sqlite/pending-asks';
@@ -114,6 +115,7 @@ export class ClaudeApprovals {
             toolCallId, toolName: `claude-cli:${toolName}`, requestId, authority: AUTHORITY,
             ask: deliveredAsk });
           if (signal.aborted || options.signal.aborted) abort();
+          else notifyHarnessPermissionRequired(requestId, sessionId);
         } catch { abort(); }
       });
     };

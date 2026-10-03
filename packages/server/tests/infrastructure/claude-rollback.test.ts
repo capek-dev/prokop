@@ -11,6 +11,7 @@ import { createSession } from '@/infrastructure/sqlite/session-store';
 import { createPart, listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
 import { saveClaudeModelSelection } from '@/harnesses/claude-cli/models';
 import { createClaudeExecution } from '@/harnesses/claude-cli/execution';
+import { installHarnessNotificationPort } from '@/application/ports/harness-notifications';
 
 let dataDir: string;
 beforeEach(() => {
@@ -301,4 +302,20 @@ test('Edit after stopping a later reply forks at the last completed turn', async
   expect(after).toHaveLength(4);
   expect(after[2]?.parts[0]).toMatchObject({ type: 'text', text: 'replacement' });
   expect(after[3]?.message).toMatchObject({ status: 'completed' });
+});
+
+test('finished and stopped Claude replies reach the notification port once each', async () => {
+  const terminal: string[] = [];
+  installHarnessNotificationPort({ notifyPermissionRequired: () => {},
+    notifyTerminalMessage: (message, sessionId) => { terminal.push(`${sessionId}:${message.status}`); } });
+  try {
+    const f = fixture();
+    await f.exec.sendMessage(f.wire, 'origin', 'session', 'first');
+    f.stopTurn();
+    await f.exec.sendMessage(f.wire, 'origin', 'session', 'second');
+    // The notification policy drops `interrupted`; the harness reports every terminal reply.
+    expect(terminal).toEqual(['session:completed', 'session:interrupted']);
+  } finally {
+    installHarnessNotificationPort({ notifyTerminalMessage: () => {}, notifyPermissionRequired: () => {} });
+  }
 });

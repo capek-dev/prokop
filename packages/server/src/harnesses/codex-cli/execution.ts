@@ -1,12 +1,13 @@
 import { existsSync, lstatSync, realpathSync } from 'node:fs';
 import { relative, isAbsolute, sep } from 'node:path';
-import type { AssistantMessage, Session, TextPart } from '@prokopai/sdk';
+import type { AssistantMessage, Message, Session, TextPart } from '@prokopai/sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import type { SessionExecutionPort, InterruptExecutionResult } from '@/application/ports/execution';
 import { getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { createMessage, createPart, deleteMessage, getMessageWithParts, listMessagesWithParts, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
 import { cliWorkspaceAvailable } from '@/harnesses/shared/cli-workspace';
 import { notifySessionFilesChanged } from '@/harnesses/shared/files-changed';
+import { notifyHarnessTurnFinished } from '@/harnesses/shared/notifications';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { getDatabase } from '@/infrastructure/sqlite/database';
@@ -236,6 +237,7 @@ async function reconcileTurn<Origin>(
       ...(turn.status === 'failed' ? { error: 'Codex turn failed' } : { error: undefined }),
     });
     if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'message.updated', message: updated });
+    notifyHarnessTurnFinished(updated);
     if (recoveredGoal) publishCodexGoal(getSession(sessionId)!, recoveredGoal, wire.delivery);
     else if (pendingGoal) {
       const latest = getSession(sessionId);
@@ -757,14 +759,17 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
             if (status !== 'completed' && status !== 'interrupted' && status !== 'failed') {
               rejectDone(new Error('Invalid Codex turn status'));
             } else {
+              let finished: Message | null = null;
               if (assistant) {
-                const updated = updateMessage(assistant.id, {
+                finished = updateMessage(assistant.id, {
                   status: status === 'failed' ? 'error' : status, completedAt: Date.now(),
                 });
-                if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'message.updated', message: updated });
+                if (finished) wire.delivery.broadcastToSession(sessionId, { type: 'message.updated', message: finished });
               }
               if (goalTokenBudget === undefined || (goalStatus !== 'active' && goalStatus !== null)) {
                 markCodexTurnCompleted(sessionId);
+                // An active goal continues with another turn; only the run's last reply pushes.
+                notifyHarnessTurnFinished(finished);
                 if (status === 'failed') rejectDone(new Error('Codex turn failed'));
                 else resolveDone();
               } else if (goalStatus === 'active') {
@@ -1050,6 +1055,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         if (currentAssistant?.role === 'assistant' && currentAssistant.status === 'streaming') {
           const updated = updateMessage(currentAssistant.id, { status: 'error', error: 'Codex turn failed', completedAt: Date.now() });
           if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'message.updated', message: updated });
+          notifyHarnessTurnFinished(updated);
         }
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session',
           message: getCodexBinding(sessionId)?.pendingTurn

@@ -24,6 +24,7 @@ import type { CodexHookCall } from '@/harnesses/codex-cli/hook-policy';
 import type { CodexConnection } from '@/harnesses/codex-cli/app-server';
 import type { PermissionAsk, ServerMessage } from '@prokopai/sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
+import { installHarnessNotificationPort } from '@/application/ports/harness-notifications';
 
 beforeEach(() => { setupTestDatabase(); seedWorkspace({ id: 'ws', path: process.cwd() }); });
 afterEach(() => resetTestDatabase());
@@ -2231,4 +2232,39 @@ test('Codex manual compaction rejects busy and uncertain sessions without replay
   await execution.sendMessage(wire(messages), 'origin', 's', 'hello');
   expect(messages).toContainEqual(expect.objectContaining({ type: 'error', message: expect.stringContaining('uncertain') }));
   expect(processes).toHaveLength(1);
+});
+
+test('Codex pushes a permission ask and the finished reply through the notification port', async () => {
+  create();
+  const terminal: Array<{ status: string; sessionId: string }> = [];
+  const permissions: Array<[string, string]> = [];
+  installHarnessNotificationPort({
+    notifyTerminalMessage: (message, sessionId) => { terminal.push({ status: message.status!, sessionId }); },
+    notifyPermissionRequired: (requestId, rootSessionId) => { permissions.push([requestId, rootSessionId]); },
+  });
+  try {
+    const processes: ReturnType<typeof fakeCodex>[] = [];
+    const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+      const fake = fakeCodex(); processes.push(fake); return fake.connection;
+    } });
+    const messages: ServerMessage[] = [];
+    const turn = execution.sendMessage(wire(messages), 'origin', 's', 'hello');
+    await waitFor(() => processes[0]?.sent.some(message => message.method === 'turn/start') ?? false);
+    const fake = processes[0]!;
+    fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+    fake.send({ id: 90, method: 'item/commandExecution/requestApproval', params: {
+      threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command: 'cat /outside/a.txt', cwd: process.cwd(),
+    } });
+    await waitFor(() => messages.some(message => message.type === 'ask.request'));
+    const ask = messages.find(message => message.type === 'ask.request')!;
+    expect(permissions).toEqual([[ask.requestId!, 's']]);
+    expect(await codexApprovals.resolve(ask.toolCallId, { type: 'permission', grant: 'once' }, ask.requestId)).toBe(true);
+    await waitFor(() => fake.sent.some(message => message.id === 90));
+    expect(terminal).toEqual([]);
+    fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+    await turn;
+    expect(terminal).toEqual([{ status: 'completed', sessionId: 's' }]);
+  } finally {
+    installHarnessNotificationPort({ notifyTerminalMessage: () => {}, notifyPermissionRequired: () => {} });
+  }
 });

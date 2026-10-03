@@ -23,6 +23,7 @@ import { forkClaudeSession } from './fork';
 import { claudeDeveloperInstructions, defaultClaudePreconfigId, type ClaudeInstructionSources } from './instructions';
 import { createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools } from './dynamic-tools';
 import { cliWorkspaceAvailable } from '@/harnesses/shared/cli-workspace';
+import { notifyHarnessTurnFinished } from '@/harnesses/shared/notifications';
 import { notifySessionFilesChanged } from '@/harnesses/shared/files-changed';
 import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
 import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
@@ -480,6 +481,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           db.run('UPDATE claude_session_bindings SET pending = 0 WHERE session_id = ?', [sessionId]);
           if (resubmit) db.run('DELETE FROM claude_rollback_intents WHERE session_id = ?', [sessionId]);
         })();
+        notifyHarnessTurnFinished(completed);
       } catch (error) {
         if (goalCondition !== undefined && assistant) {
           const previous = getSession(sessionId);
@@ -495,6 +497,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
             ...(controller.signal.aborted ? {} : { error: error instanceof Error ? error.message : 'Claude CLI turn failed' }),
             completedAt: Date.now() });
           if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'message.updated', message: updated });
+          notifyHarnessTurnFinished(updated);
         }
         if (!controller.signal.aborted) reject(error instanceof Error ? error.message : 'Claude CLI turn failed');
       } finally {

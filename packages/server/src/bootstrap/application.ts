@@ -94,6 +94,7 @@ import { prokopAskResolution } from '@/harnesses/prokop/composition/contracts';
 import { createProkopLearningRuntime } from '@/harnesses/prokop/learning';
 import { codexApprovals } from '@/harnesses/codex-cli/approvals';
 import { installCodexApprovalPort } from '@/application/ports/codex-approval';
+import { installHarnessNotificationPort } from '@/application/ports/harness-notifications';
 import { claudeApprovals } from '@/harnesses/claude-cli/approvals';
 import { installClaudeApprovalPort } from '@/application/ports/claude-approval';
 import { installAskResolutionPort } from '@/application/ports/ask-resolution';
@@ -185,6 +186,12 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     changed: (worktreeId: string): void => refreshWorktreeAttachments?.(worktreeId),
   };
   installCodexApprovalPort(codexApprovals);
+  const notificationApplication = getJean2NotificationsApplication();
+  installHarnessNotificationPort({
+    notifyTerminalMessage: (message, sessionId) => notificationApplication.notifyTerminalMessage(message, sessionId),
+    notifyPermissionRequired: (requestId, rootSessionId) =>
+      notificationApplication.notifyPermissionRequired(requestId, rootSessionId),
+  });
   installClaudeApprovalPort(claudeApprovals);
   // The prokop composition owns the ask waiters; wire-side resolution must
   // land in the same composed permission runtime execution enters.

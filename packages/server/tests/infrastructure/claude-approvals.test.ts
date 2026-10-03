@@ -8,6 +8,7 @@ import { ClaudeApprovals } from '@/harnesses/claude-cli/approvals';
 import { handleClientRegistration, registerConnection, unregisterConnection } from '@/transport/websocket/connection-registry';
 import { handleClaim, removeSessionControl } from '@/transport/websocket/control-registry';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
+import { installHarnessNotificationPort } from '@/application/ports/harness-notifications';
 
 let connection: ReturnType<typeof registerConnection>;
 let socket: object;
@@ -228,4 +229,29 @@ test('unclassified SDK tools run without a risk ask, with or without a controlle
   // low-risk floor needs no controller by design.
   expect(await use('Read', { file_path: '.env' }, options(signal))).toMatchObject({ behavior: 'deny' });
   expect(requests).toHaveLength(0);
+});
+
+test('a waiting ask pushes a permission notification, except in learning review sessions', async () => {
+  const pushed: Array<[string, string]> = [];
+  installHarnessNotificationPort({ notifyTerminalMessage: () => {},
+    notifyPermissionRequired: (requestId, rootSessionId) => { pushed.push([requestId, rootSessionId]); } });
+  try {
+    const approvals = new ClaudeApprovals(() => 2000);
+    const { requests, delivery } = fixture();
+    const controller = new AbortController();
+    const wait = approvals.request('session', 'ws', root, delivery, controller.signal)('Read',
+      { file_path: '.env' }, options(controller.signal));
+    expect(pushed).toEqual([[requests[0]!.requestId, 'session']]);
+    await approvals.resolve(requests[0]!.toolCallId, { type: 'permission', grant: 'once' }, requests[0]!.requestId);
+    await wait;
+    updateSession('session', { metadata: { learningRunId: 'run-1' } });
+    const learning = approvals.request('session', 'ws', root, delivery, controller.signal)('Read',
+      { file_path: '.env' }, options(controller.signal));
+    expect(requests).toHaveLength(2);
+    expect(pushed).toHaveLength(1);
+    await approvals.resolve(requests[1]!.toolCallId, { type: 'permission', grant: 'once' }, requests[1]!.requestId);
+    await learning;
+  } finally {
+    installHarnessNotificationPort({ notifyTerminalMessage: () => {}, notifyPermissionRequired: () => {} });
+  }
 });
