@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { MessageWithParts } from '@prokopai/sdk';
 import type { ToolCatalogEntry, ToolCatalogPort } from '@/application/ports/tool-catalog';
-import { projectMessagesForClient } from '@/application/sessions/tool-debug';
+import { getToolDebugData, projectMessagesForClient } from '@/application/sessions/tool-debug';
 
 function makeTranscript(): MessageWithParts[] {
   return [{
@@ -101,6 +101,30 @@ describe('tool debug transcript projection', () => {
     expect(JSON.stringify(projected)).not.toContain('example.com/p.png');
     expect(part.state.output).toMatchObject({ content: '<img src="https://example.com/p.png">' });
   });
+
+  test.each(['web-search', 'mcp_list_tools', 'mcp_call_tool', 'crm: read', 'unknown-plugin'])(
+    'hides old Codex %s Markdown fallbacks while preserving explicit raw inspection', async name => {
+      const original = makeTranscript();
+      const part = original[0].parts[0];
+      if (part.type !== 'tool' || part.state.status !== 'completed') throw new Error('Expected completed tool');
+      part.name = name;
+      part.callId = 'codex-item:turn:old';
+      part.presentation = { summary: name, debugAvailable: false };
+      part.state.output = { _visualization: { type: 'markdown', content: 'private-result' } };
+      const projected = await projectMessagesForClient(original);
+      const visible = projected[0].parts[0];
+      if (visible.type !== 'tool') throw new Error('Expected tool');
+      expect(visible.presentation).toEqual({ summary: '', debugAvailable: true,
+        visualization: { type: 'none', message: 'Completed' } });
+      expect(JSON.stringify(projected)).not.toContain('private-result');
+      expect(JSON.stringify(getToolDebugData(part))).toContain('private-result');
+
+      // Other harnesses and tools may deliberately supply Markdown visualizations.
+      part.callId = 'non-codex-call';
+      const other = await projectMessagesForClient(original);
+      expect(JSON.stringify(other)).toContain('private-result');
+    },
+  );
 
   test('falls back to a bounded input summary when the catalog is unavailable', async () => {
     const projected = await projectMessagesForClient(makeTranscript());

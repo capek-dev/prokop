@@ -429,7 +429,7 @@ test('Codex tool items appear in the transcript and settle on completion or proc
       message: 'Memory (memory)' } } },
   });
   expect(tools.find(part => part.callId === 'codex-item:turn-1:other-1')?.state).toMatchObject({
-    output: { _visualization: { type: 'markdown', content: 'plain result' } },
+    output: { result: 'plain result', _visualization: { type: 'none', message: 'Completed' } },
   });
   expect(messages.filter(message => message.type === 'part.created' && message.part.type === 'tool')).toHaveLength(7);
   expect(messages.filter(message => message.type === 'part.updated' && message.part.type === 'tool')).toHaveLength(7);

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { ServerMessage, ToolPart } from '@prokopai/sdk';
 import type { ToolCatalogEntry } from '@/application/ports/tool-catalog';
-import { projectMessagesForClient } from '@/application/sessions/tool-debug';
+import { getToolDebugData, projectMessagesForClient } from '@/application/sessions/tool-debug';
 import { CodexToolItems } from '@/harnesses/codex-cli/tool-items';
 import { createMessage, createPart, listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
 import { createSession } from '@/infrastructure/sqlite/session-store';
@@ -40,17 +40,72 @@ test('unclassified native tool items get bounded generic rows on live events and
   const stored = listMessagesWithParts('s');
   const parts = stored[0]!.parts.filter((part): part is ToolPart => part.type === 'tool');
   expect(parts).toHaveLength(2);
-  expect(parts[0]).toMatchObject({ name: 'user-plugin: lookup',
+  const lookup = parts.find(part => part.callId === 'codex-item:turn:external-1');
+  expect(lookup).toMatchObject({ name: 'user-plugin: lookup',
     presentation: { summary: 'user-plugin: lookup' }, state: { status: 'completed' } });
-  expect(parts[1]).toMatchObject({ presentation: { summary: 'search' }, state: { status: 'error' } });
-  expect(JSON.stringify(parts[0])).not.toContain(long);
+  expect(parts.find(part => part.callId === 'codex-item:turn:external-2'))
+    .toMatchObject({ presentation: { summary: 'search' }, state: { status: 'error' } });
+  expect(JSON.stringify(lookup)).not.toContain(long);
   expect(JSON.stringify(sent)).not.toContain(long);
   expect(sent.filter(message => message.type === 'part.created')).toHaveLength(2);
   expect(sent.filter(message => message.type === 'part.updated')).toHaveLength(2);
   const visible = await projectMessagesForClient(stored);
-  expect((visible[0]!.parts[0] as ToolPart).presentation).toMatchObject({
-    summary: 'user-plugin: lookup', visualization: { type: 'markdown' },
+  expect((visible[0]!.parts.find(part => part.id === lookup?.id) as ToolPart).presentation).toMatchObject({
+    summary: '', visualization: { type: 'none', message: 'Completed' },
   });
+});
+
+test('Codex web search and MCP results stay in raw data on live events and reload', async () => {
+  const assistant = createMessage(createTestAssistantMessage('s'));
+  const sent: ServerMessage[] = [];
+  const items = new CodexToolItems('s', assistant.id, 'turn', {
+    send: (_origin, message) => { sent.push(message); },
+    broadcast: message => { sent.push(message); },
+    broadcastToSession: (_id, message) => { sent.push(message); },
+    sendToController: (_id, message) => { sent.push(message); },
+    sendToAskTargets: (_id, _authority, message) => { sent.push(message); },
+  });
+  const cases = [
+    { id: 'web', type: 'webSearch', query: 'MCP authorization',
+      action: { type: 'search', query: 'MCP authorization', queries: null } },
+    { id: 'list', type: 'dynamicToolCall', namespace: null, tool: 'mcp_list_tools', arguments: {},
+      contentItems: [{ type: 'inputText', text: '[{"name":"private_schema","inputSchema":{}}]' }] },
+    { id: 'call', type: 'dynamicToolCall', namespace: null, tool: 'mcp_call_tool',
+      arguments: { tool: 'crm_read', arguments: { token: 'private-input' } },
+      contentItems: [{ type: 'inputText', text: '{"content":[{"type":"text","text":"private-result"}]}' }] },
+    { id: 'native', type: 'mcpToolCall', server: 'crm', tool: 'read', arguments: {},
+      result: { content: [{ type: 'text', text: '![private-result](https://example.com/image.png)' }] } },
+    { id: 'unknown', type: 'extensionToolCall', tool: 'lookup',
+      arguments: { token: 'private-input' }, result: 'private-result' },
+  ];
+  for (const item of cases) {
+    items.started({ ...item, status: 'inProgress' });
+    items.completed({ ...item, status: 'completed' });
+  }
+  const stored = listMessagesWithParts('s');
+  const projected = await projectMessagesForClient(stored);
+  const visible = projected[0]!.parts.filter((part): part is ToolPart => part.type === 'tool');
+  expect(visible).toHaveLength(cases.length);
+  expect(projected[0]!.parts.some(part => part.type === 'text')).toBe(false);
+  for (const part of visible) {
+    expect(part.presentation).toMatchObject({ debugAvailable: true,
+      summary: part.name === 'web-search' ? 'MCP authorization' : '',
+      visualization: { type: 'none', message: 'Completed' } });
+    const live = sent.find(event => event.type === 'part.updated' && event.part.id === part.id);
+    if (live?.type !== 'part.updated') throw new Error('Expected live part');
+    expect(live.part).toEqual(part);
+  }
+  for (const serialized of [JSON.stringify(sent), JSON.stringify(projected)]) {
+    expect(serialized).not.toContain('private-input');
+    expect(serialized).not.toContain('private-result');
+    expect(serialized).not.toContain('private_schema');
+    expect(serialized).not.toContain('"queries":null');
+  }
+  const rawCall = stored[0]!.parts.find((part): part is ToolPart => part.type === 'tool'
+    && part.callId === 'codex-item:turn:call');
+  expect(rawCall).toBeDefined();
+  expect(JSON.stringify(getToolDebugData(rawCall!))).toContain('private-result');
+  expect(getToolDebugData(rawCall!).input).toHaveProperty('arguments');
 });
 
 test('Codex command rows with JSON-encoded empty output render no stdout body', () => {
@@ -72,7 +127,7 @@ test('Codex command rows with JSON-encoded empty output render no stdout body', 
   command('real', 'clean output');
   const stored = listMessagesWithParts('s');
   const viz = (id: string) => {
-    const part = stored[0]!.parts.find(part => part.type === 'tool' && part.callId === `codex-item:turn:${id}`);
+    const part = stored[0]!.parts.find((part): part is ToolPart => part.type === 'tool' && part.callId === `codex-item:turn:${id}`);
     return part?.state.status === 'completed'
       ? (part.state.output as { _visualization: Record<string, unknown> })._visualization : null;
   };

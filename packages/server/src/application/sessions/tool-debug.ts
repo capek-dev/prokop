@@ -109,31 +109,38 @@ export async function projectMessagesForClient(
   const templates = await getSummaryTemplates(catalog);
   return messages.map(({ message, parts }) => ({
     message,
-    parts: parts.map((part) => {
-      if (part.type !== 'tool') return part;
-      const storedVisualization = part.state.status === 'completed'
-        ? extractVisualization(part.state.output)
-        : undefined;
-      // Old webfetch rows stored the entire fetched page as a Markdown preview.
-      // Preserve the original output for on-demand debug, but do not re-embed it.
-      const visualization = part.name === 'webfetch' && storedVisualization?.type === 'markdown'
-        ? { type: 'none' as const, badge: storedVisualization.badge,
-          message: 'Fetched page (open raw data to inspect)' }
-        : storedVisualization;
-      return {
-        ...part,
-        state: projectState(part, visualization),
-        presentation: {
-          summary: part.name === 'agent_skill_manage' && !templates.has(part.name)
-            ? part.presentation?.summary ?? 'Agent skill management'
-            : part.presentation?.summary
-              ?? resolveToolSummary(part.state.input, templates.get(part.name)),
-          ...(visualization && { visualization }),
-          debugAvailable: true,
-        },
-      } satisfies ToolPart;
-    }),
+    parts: parts.map(part => part.type === 'tool' ? projectToolPartForClient(part, templates) : part),
   }));
+}
+
+/** Shared by live tool events and history so raw debug output stays opt-in. */
+export function projectToolPartForClient(part: ToolPart, templates: ReadonlyMap<string, string> = new Map()): ToolPart {
+  const storedVisualization = part.state.status === 'completed'
+    ? extractVisualization(part.state.output)
+    : undefined;
+  // Codex previously manufactured Markdown previews for unclassified tool results.
+  // Keep those persisted results inspectable without displaying them as chat text.
+  const codexRawPreview = part.callId.startsWith('codex-item:') && storedVisualization?.type === 'markdown';
+  // Old webfetch rows stored the entire fetched page as a Markdown preview.
+  // Preserve the original output for on-demand debug, but do not re-embed it.
+  const visualization = codexRawPreview ? { type: 'none' as const, message: 'Completed' }
+    : part.name === 'webfetch' && storedVisualization?.type === 'markdown'
+      ? { type: 'none' as const, badge: storedVisualization.badge,
+        message: 'Fetched page (open raw data to inspect)' }
+      : storedVisualization;
+  return {
+    ...part,
+    state: projectState(part, visualization),
+    presentation: {
+      summary: part.callId.startsWith('codex-item:') && part.presentation?.summary === part.name
+        ? '' : part.name === 'agent_skill_manage' && !templates.has(part.name)
+          ? part.presentation?.summary ?? 'Agent skill management'
+          : part.presentation?.summary
+            ?? resolveToolSummary(part.state.input, templates.get(part.name)),
+      ...(visualization && { visualization }),
+      debugAvailable: true,
+    },
+  };
 }
 
 export function getToolDebugData(part: ToolPart): ToolDebugData {

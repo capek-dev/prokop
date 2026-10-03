@@ -1,5 +1,6 @@
 import { resolveToolSummary, type AnyVisualization, type ToolPart } from '@prokopai/sdk';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
+import { projectToolPartForClient } from '@/application/sessions/tool-debug';
 import { createPart, getToolPartByCallId, transitionToolToCompleted,
   transitionToolToError, transitionToolToInterrupted, updatePart } from '@/infrastructure/sqlite/message-store';
 import { codexObject } from './app-server';
@@ -159,7 +160,8 @@ export class CodexToolItems {
       presentation: { summary: identity.summary, debugAvailable: false } };
     createPart(part, this.sessionId);
     this.open.add(part.id);
-    this.delivery.broadcastToSession(this.sessionId, { type: 'part.created', sessionId: this.sessionId, part });
+    this.delivery.broadcastToSession(this.sessionId, { type: 'part.created', sessionId: this.sessionId,
+      part: projectToolPartForClient(part) });
   }
 
   completed(raw: unknown): void {
@@ -179,18 +181,21 @@ export class CodexToolItems {
         : preview(item.type === 'dynamicToolCall'
           ? dynamicContent(item) ?? item.result ?? item.action ?? item.status ?? 'Completed'
           : item.result ?? item.contentItems ?? item.action ?? item.status ?? 'Completed');
+      const fallback: AnyVisualization = { type: 'none', message: 'Completed' };
+      const visualization: AnyVisualization = item.type === 'commandExecution'
+        ? { type: 'shell-output', command: preview(item.command), stdout: content,
+          exitCode: typeof item.exitCode === 'number' ? item.exitCode : -1 }
+        : item.type === 'fileChange' ? fileChangeVisualization(item.changes)
+          : domainVisualization(item)
+            ?? ((item.type === 'collabAgentToolCall' || item.type === 'subAgentActivity')
+              ? { type: 'none' as const,
+                message: `Subagent ${typeof item.tool === 'string' && item.tool ? item.tool : 'task'} completed` }
+              : (item.type === 'webSearch' ? webSearchVisualization(item) : null) ?? fallback);
       updated = transitionToolToCompleted(part.id, { status: typeof status === 'string' ? status : 'completed',
         ...(typeof item.exitCode === 'number' ? { exitCode: item.exitCode } : {}),
-        _visualization: item.type === 'commandExecution'
-          ? { type: 'shell-output', command: preview(item.command), stdout: content,
-            exitCode: typeof item.exitCode === 'number' ? item.exitCode : -1 }
-          : item.type === 'fileChange' ? fileChangeVisualization(item.changes)
-            : domainVisualization(item)
-              ?? ((item.type === 'collabAgentToolCall' || item.type === 'subAgentActivity')
-                ? { type: 'none' as const,
-                  message: `Subagent ${typeof item.tool === 'string' && item.tool ? item.tool : 'task'} completed` }
-                : item.type === 'webSearch' ? webSearchVisualization(item, content)
-                  : { type: 'markdown', content }) });
+        // Unclassified output is inspectable through raw data, never an automatic preview.
+        ...(visualization === fallback ? { result: content } : {}),
+        _visualization: visualization });
     }
     this.open.delete(part.id);
     if (updated) {
@@ -198,20 +203,22 @@ export class CodexToolItems {
       const final = summary !== part.presentation?.summary
         ? updatePart(updated.id, { presentation: { summary, debugAvailable: false } }) as ToolPart | null
         : updated;
-      if (final) this.delivery.broadcastToSession(this.sessionId, { type: 'part.updated', sessionId: this.sessionId, part: final });
+      if (final) this.delivery.broadcastToSession(this.sessionId, { type: 'part.updated', sessionId: this.sessionId,
+        part: projectToolPartForClient(final) });
     }
   }
 
   finish(): void {
     for (const id of this.open) {
       const updated = transitionToolToInterrupted(id, 'error');
-      if (updated) this.delivery.broadcastToSession(this.sessionId, { type: 'part.updated', sessionId: this.sessionId, part: updated });
+      if (updated) this.delivery.broadcastToSession(this.sessionId, { type: 'part.updated', sessionId: this.sessionId,
+        part: projectToolPartForClient(updated) });
     }
     this.open.clear();
   }
 }
 
-function webSearchVisualization(item: Record<string, unknown>, content: string): AnyVisualization {
+function webSearchVisualization(item: Record<string, unknown>): AnyVisualization | null {
   const result = dynamicResult(item);
   if (result && Array.isArray(result.results)) {
     const entries = result.results as unknown[];
@@ -219,10 +226,10 @@ function webSearchVisualization(item: Record<string, unknown>, content: string):
       singularLabel: 'result', pluralLabel: 'results',
       title: typeof item.query === 'string' ? preview(item.query) : 'Web search',
       files: entries.slice(0, 20).map(entry => {
-        const row = entry as Record<string, unknown>;
-        return { path: preview(typeof row.title === 'string' ? row.title
-          : typeof row.url === 'string' ? row.url : '') };
+        const row = codexObject(entry);
+        return { path: preview(typeof row?.title === 'string' ? row.title
+          : typeof row?.url === 'string' ? row.url : '') };
       }), total: entries.length };
   }
-  return { type: 'markdown', content };
+  return null;
 }
