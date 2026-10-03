@@ -55,11 +55,11 @@ function entryInvalid(entry: SessionMessage, nativeId: string, seen: Set<string>
 
 /** Groups native history into user→assistant turns. Refuses anything but main-thread plain text/thinking messages. */
 export function groupClaudeTurns(native: SessionMessage[], nativeId: string,
-  options?: { allowTrailingUser?: boolean }): NativeTurn[] {
+  options?: { allowTrailingUser?: boolean; limit?: number }): NativeTurn[] {
   const turns: NativeTurn[] = [];
   const seen = new Set<string>();
   let index = 0;
-  while (index < native.length) {
+  while (index < native.length && turns.length < (options?.limit ?? Infinity)) {
     const user = native[index]!;
     const userText = user.type === 'user' && !entryInvalid(user, nativeId, seen) ? plainUserText(user) : null;
     if (userText === null) throw new Error(UNAVAILABLE);
@@ -95,6 +95,26 @@ export function matchClaudeHistory(local: MessageWithParts[], native: SessionMes
   if (!local.length || local.length % 2 !== 0) throw new Error(UNAVAILABLE);
   const turns = groupClaudeTurns(native, nativeId);
   if (turns.length !== local.length / 2) throw new Error(UNAVAILABLE);
+  verifyLocalTurns(local, turns);
+  return turns;
+}
+
+/**
+ * Edit and Undo keep only the first `turnCount` turns, so only those must
+ * match. Later turns (an interrupted reply, tool output) are discarded with
+ * the rollback and may be unverifiable without blocking it.
+ */
+export function matchClaudeHistoryPrefix(local: MessageWithParts[], native: SessionMessage[], nativeId: string,
+  turnCount: number): NativeTurn[] {
+  if (turnCount * 2 > local.length) throw new Error(UNAVAILABLE);
+  if (turnCount === 0) return [];
+  const turns = groupClaudeTurns(native, nativeId, { limit: turnCount });
+  if (turns.length !== turnCount) throw new Error(UNAVAILABLE);
+  verifyLocalTurns(local.slice(0, turnCount * 2), turns);
+  return turns;
+}
+
+function verifyLocalTurns(local: MessageWithParts[], turns: NativeTurn[]): void {
   const inherited = getDatabase().query<{ native_user_id: string }, [string]>(
     'SELECT native_user_id FROM claude_inherited_user_ids WHERE message_id = ?',
   );
@@ -112,7 +132,6 @@ export function matchClaudeHistory(local: MessageWithParts[], native: SessionMes
       throw new Error(UNAVAILABLE);
     }
   }
-  return turns;
 }
 
 export function rollbackResult(local: MessageWithParts[], firstRemoved: number, edit: boolean): RevertExecutionResult {

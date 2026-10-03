@@ -38,6 +38,7 @@ function fixture() {
   let badCopy = false;
   let failNextTurn = false;
   let splitReplies = false;
+  let stopNextTurn = false;
   const exec = createClaudeExecution({ version: () => '2.1.274',
     start: (prompt, options) => {
       const sessionId = options.sessionId ?? options.resume!;
@@ -49,6 +50,19 @@ function fixture() {
         const native = histories.get(sessionId) ?? [];
         native.push({ type: 'user', uuid: userId, session_id: sessionId, parent_tool_use_id: null,
           parent_agent_id: null, message: { role: 'user', content } });
+        if (stopNextTurn) {
+          // Stop lands mid-reply: native history keeps the prompt and a partial tool turn.
+          stopNextTurn = false;
+          native.push({ type: 'assistant', uuid: crypto.randomUUID(), session_id: sessionId,
+            parent_tool_use_id: null, parent_agent_id: null, message: { role: 'assistant',
+              content: [{ type: 'tool_use', id: 'tool-1', name: 'Read', input: {} }] } });
+          histories.set(sessionId, native);
+          yield { type: 'system', subtype: 'init', session_id: sessionId } as SDKMessage;
+          await exec.interruptSession('session');
+          yield { type: 'stream_event', session_id: sessionId, parent_tool_use_id: null,
+            event: { type: 'message_start' } } as unknown as SDKMessage;
+          return;
+        }
         if (splitReplies) native.push({ type: 'assistant', uuid: crypto.randomUUID(), session_id: sessionId,
           parent_tool_use_id: null, parent_agent_id: null,
           message: { role: 'assistant', content: [{ type: 'thinking', thinking: 'private' }] } });
@@ -79,7 +93,8 @@ function fixture() {
   const pending = () => getDatabase().query<{ phase: string }, []>('SELECT phase FROM claude_rollback_intents').get();
   return { exec, wire, events, histories, forkCalls, binding, pending,
     failFork: () => { forkError = true; }, badFork: () => { badCopy = true; },
-    failTurn: () => { failNextTurn = true; }, splitReplies: () => { splitReplies = true; } };
+    failTurn: () => { failNextTurn = true; }, splitReplies: () => { splitReplies = true; },
+    stopTurn: () => { stopNextTurn = true; } };
 }
 
 async function twoTurns(f: ReturnType<typeof fixture>) {
@@ -250,4 +265,40 @@ test('native consecutive user messages refuse Undo before any fork', async () =>
   expect(f.pending()).toBeNull();
   expect(f.forkCalls).toEqual([]);
   expect(listMessagesWithParts('session')).toHaveLength(4);
+});
+
+test('Edit after stopping the first reply resubmits on a fresh native session', async () => {
+  const f = fixture();
+  f.stopTurn();
+  await f.exec.sendMessage(f.wire, 'origin', 'session', 'first');
+  const stopped = listMessagesWithParts('session');
+  expect(stopped.map(item => item.message.status ?? null)).toEqual([null, 'interrupted']);
+  const oldId = f.binding()!.native_session_id;
+  await f.exec.editMessage(f.wire, 'origin', { sessionId: 'session', messageId: stopped[0]!.message.id,
+    content: 'revised first' });
+  expect(f.events).not.toContainEqual(expect.objectContaining({ code: 'edit_error' }));
+  const after = listMessagesWithParts('session');
+  expect(after).toHaveLength(2);
+  expect(after[0]?.parts[0]).toMatchObject({ text: 'revised first' });
+  expect(after[1]?.message).toMatchObject({ role: 'assistant', status: 'completed' });
+  expect(f.binding()?.native_session_id).not.toBe(oldId);
+  expect(f.forkCalls).toEqual([]);
+  expect(f.pending()).toBeNull();
+});
+
+test('Edit after stopping a later reply forks at the last completed turn', async () => {
+  const f = fixture();
+  await f.exec.sendMessage(f.wire, 'origin', 'session', 'first');
+  f.stopTurn();
+  await f.exec.sendMessage(f.wire, 'origin', 'session', 'second');
+  const local = listMessagesWithParts('session');
+  const native = f.histories.get(f.binding()!.native_session_id)!;
+  await f.exec.editMessage(f.wire, 'origin', { sessionId: 'session', messageId: local[2]!.message.id,
+    content: 'replacement' });
+  expect(f.events).not.toContainEqual(expect.objectContaining({ code: 'edit_error' }));
+  expect(f.forkCalls).toEqual([native[1]!.uuid]);
+  const after = listMessagesWithParts('session');
+  expect(after).toHaveLength(4);
+  expect(after[2]?.parts[0]).toMatchObject({ type: 'text', text: 'replacement' });
+  expect(after[3]?.message).toMatchObject({ status: 'completed' });
 });

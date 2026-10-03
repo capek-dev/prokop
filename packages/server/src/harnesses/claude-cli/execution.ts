@@ -18,7 +18,7 @@ import { claudeApprovals, type ClaudeApprovals } from './approvals';
 import { ClaudeChildTimelines } from './child-timelines';
 import { resolveClaudeImages } from './images';
 import type { ClaudeTurnUsage } from './usage';
-import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistory, type ClaudeRollbackDependencies } from './rollback';
+import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistory, matchClaudeHistoryPrefix, type ClaudeRollbackDependencies } from './rollback';
 import { forkClaudeSession } from './fork';
 import { claudeDeveloperInstructions, defaultClaudePreconfigId, type ClaudeInstructionSources } from './instructions';
 import { createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools } from './dynamic-tools';
@@ -89,9 +89,16 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         || operation === 'revert' && targetIndex !== 0 && local[targetIndex]?.message.role !== 'assistant') {
         throw new Error('Invalid Claude history target');
       }
-      const history = await (deps.readHistory ?? getSessionMessages)(binding.native_session_id, { dir: root });
-      const turns = matchClaudeHistory(local, history, binding.native_session_id);
       const turnCount = firstRemoved / 2;
+      // A stopped or failed turn leaves native history Claude may have written
+      // only partly. When such a turn is discarded by this rollback, verify only
+      // the kept turns; otherwise the whole history must still match.
+      const discardsUnfinished = local.length % 2 !== 0 || local.slice(firstRemoved)
+        .some(entry => entry.message.role === 'assistant' && entry.message.status !== 'completed');
+      const readNative = () => (deps.readHistory ?? getSessionMessages)(binding.native_session_id, { dir: root });
+      const turns = !discardsUnfinished
+        ? matchClaudeHistory(local, await readNative(), binding.native_session_id)
+        : turnCount === 0 ? [] : matchClaudeHistoryPrefix(local, await readNative(), binding.native_session_id, turnCount);
       const cutoffTurn = turnCount === 0 ? null : turns[turnCount - 1]!;
       if (cutoffTurn && cutoffTurn.assistantId === null) {
         throw new Error('Claude conversation history is not available for Edit or Undo');
