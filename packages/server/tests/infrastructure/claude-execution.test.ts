@@ -349,12 +349,15 @@ test('Stop retains already streamed text without a duplicate part', async () => 
   expect(events.filter(event => (event as { type?: string }).type === 'error')).toHaveLength(0);
 });
 
-test('Stop interrupts the tool row without sending a Claude turn error to the origin', async () => {
+test('Stop interrupts the tool row and permits a new message in the same native session', async () => {
   const { wire, events } = wireFixture();
   let signal: AbortSignal | undefined;
   let started!: () => void;
   const toolStarted = new Promise<void>(resolve => { started = resolve; });
-  const exec = createClaudeExecution({ version: () => '2.1.274', start: (_prompt, options) => {
+  const calls: Options[] = [];
+  const exec = createClaudeExecution({ version: () => '2.1.274', start: (prompt, options) => {
+    if (calls.length) return fakeTurn(prompt, options, calls);
+    calls.push(options);
     signal = options.abortController?.signal;
     const id = options.sessionId!;
     async function* stream(): AsyncGenerator<SDKMessage> {
@@ -377,7 +380,49 @@ test('Stop interrupts the tool row without sending a Claude turn error to the or
     message: { status: 'interrupted' },
     parts: [expect.objectContaining({ type: 'tool', state: expect.objectContaining({ status: 'interrupted' }) })],
   });
+  expect(getDatabase().query<{ pending: number }, []>('SELECT pending FROM claude_session_bindings').get()?.pending).toBe(0);
+  await exec.sendMessage(wire, 'origin', 'session', 'new instruction');
+  expect(calls).toHaveLength(2);
+  expect(calls[1]?.resume).toBe(calls[0]?.sessionId);
+  expect(listMessagesWithParts('session')).toMatchObject([
+    { message: { role: 'user' }, parts: [{ text: 'check repo' }] },
+    { message: { status: 'interrupted' } },
+    { message: { role: 'user' }, parts: [{ text: 'new instruction' }] },
+    { message: { status: 'completed' } },
+  ]);
+  expect(events.filter(event => (event as { type?: string }).type === 'error')).toEqual([]);
+});
+
+test.each([false, true])('Stop releases an ordinary turn only after stream cleanup, keeping goals locked: %s', async goal => {
+  const { wire } = wireFixture();
+  let started!: () => void;
+  let finish!: () => void;
+  const ready = new Promise<void>(resolve => { started = resolve; });
+  const cleanup = new Promise<void>(resolve => { finish = resolve; });
+  const exec = createClaudeExecution({ version: () => '2.1.274', start: (_prompt, options) => {
+    async function* stream(): AsyncGenerator<SDKMessage> {
+      yield { type: 'system', subtype: 'init', session_id: options.sessionId } as SDKMessage;
+      started();
+      await new Promise<void>(resolve => options.abortController!.signal.addEventListener('abort', () => resolve(), { once: true }));
+      await cleanup;
+      throw new Error('interrupted');
+    }
+    return stream();
+  } });
+  const turn = exec.sendMessage(wire, 'origin', 'session', 'hello', undefined, undefined, goal ? 'hello' : undefined);
+  await ready;
+  await exec.interruptSession('session');
+  expect(exec.isSessionActive('session')).toBe(true);
   expect(getDatabase().query<{ pending: number }, []>('SELECT pending FROM claude_session_bindings').get()?.pending).toBe(1);
+  finish();
+  await turn;
+  expect(exec.isSessionActive('session')).toBe(false);
+  expect(getDatabase().query<{ pending: number }, []>('SELECT pending FROM claude_session_bindings').get()?.pending).toBe(goal ? 1 : 0);
+  if (goal) expect(getSession('session')?.metadata?.claudeGoal).toMatchObject({ status: 'uncertain' });
+  const calls: Options[] = [];
+  const restarted = createClaudeExecution({ version: () => '2.1.274', start: (prompt, options) => fakeTurn(prompt, options, calls) });
+  await restarted.sendMessage(wire, 'origin', 'session', 'next');
+  expect(calls).toHaveLength(goal ? 0 : 1);
 });
 
 test('failed turns retain partial text without replaying it', async () => {

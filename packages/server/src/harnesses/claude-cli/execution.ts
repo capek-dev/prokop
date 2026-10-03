@@ -187,6 +187,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
       const openText = (): string => openSegment?.text ?? '';
       const approvals = deps.approvals ?? claudeApprovals;
       let children: ClaudeChildTimelines | null = null;
+      let ownedNativeId: string | null = null;
       try {
         const workspace = getWorkspace(session.workspaceId);
         if (!cliWorkspaceAvailable(workspace)) throw new Error('Claude workspace unavailable');
@@ -246,6 +247,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         if (binding && (binding.workspace_root !== root || binding.cli_version !== version || binding.pending)) {
           throw new Error('Claude turn requires reconciliation or its workspace/CLI changed');
         }
+        controller.signal.throwIfAborted();
         const nativeId = binding?.native_session_id ?? crypto.randomUUID();
         const goalStartedAt = Date.now();
         children = new ClaudeChildTimelines(session, nativeId, wire.delivery);
@@ -257,6 +259,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           [sessionId, nativeId, root, version]);
           if (resubmit) db.run("UPDATE claude_rollback_intents SET phase = 'sent' WHERE session_id = ? AND phase = 'ready'", [sessionId]);
         })();
+        ownedNativeId = nativeId;
         if (goalCondition !== undefined) {
           const updated = updateSession(sessionId, { metadata: { ...(session.metadata ?? {}),
             claudeGoal: { condition: goalCondition, status: 'active', iterations: 0 } } });
@@ -493,6 +496,13 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         for (const id of openTools) {
           const part = transitionToolToInterrupted(id, 'error');
           if (part) wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part });
+        }
+        // Explicit Stop ends this ordinary turn, not the native conversation.
+        // Release only our own binding after stream/tool cleanup, never replay
+        // the prompt or unlock uncertain goals, history edits, or earlier failures.
+        if (controller.signal.aborted && ownedNativeId && goalCondition === undefined && !resubmit) {
+          getDatabase().run(`UPDATE claude_session_bindings SET pending = 0
+            WHERE session_id = ? AND native_session_id = ? AND pending = 1`, [sessionId, ownedNativeId]);
         }
         active.delete(sessionId);
         if (resubmit) resubmitting.delete(sessionId);
