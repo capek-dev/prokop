@@ -97,6 +97,9 @@ export async function runClaudeCompact(input: CompactInput): Promise<{
         invalidStream = true;
         throw new Error('Claude CLI session identity changed');
       }
+      // The CLI reloads its command list when another Claude Code process touches
+      // shared config; the notice carries no compaction evidence.
+      if (message.type === 'system' && message.subtype === 'commands_changed') continue;
       // Slash-command status can change from compacting to idle before init.
       // Neither status nor compact_result:success confirms completion.
       if (!initialized && message.type === 'system' && message.subtype === 'status'

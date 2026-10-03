@@ -397,6 +397,19 @@ test('tracks a foreground agent moved to the background by task ID', async () =>
   ]);
 });
 
+test('content-free CLI notices before init do not fail the turn', async () => {
+  const collected = [];
+  for await (const item of runClaudeTurn({ ...base,
+    canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
+    start: async function* () {
+      yield event({ type: 'system', subtype: 'commands_changed', session_id: base.sessionId });
+      yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+      yield event({ type: 'result', subtype: 'success', session_id: base.sessionId, result: 'done' });
+    },
+  })) collected.push(item);
+  expect(collected).toEqual([{ type: 'result', text: 'done', success: true, usage: null }]);
+});
+
 test('pre-init events still fail closed', async () => {
   await expect(async () => {
     for await (const _message of runClaudeTurn({ ...base,

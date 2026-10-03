@@ -43,6 +43,14 @@ function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
+/**
+ * CLI notices that carry no turn content. The CLI watches its own config,
+ * commands, and plugins, so activity elsewhere (another Claude Code window)
+ * can surface one before this turn's init.
+ */
+const PRE_INIT_NOTICES = new Set(['commands_changed', 'background_tasks_changed', 'session_state_changed',
+  'status', 'notification', 'informational', 'plugin_install', 'files_persisted']);
+
 function outsideTurn(message: SDKMessage): Error {
   // Only expose SDK event discriminants, never message content or arbitrary subtype text.
   const subtype = message.type === 'system' && /^[a-z_]{1,48}$/.test(message.subtype)
@@ -206,7 +214,10 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
       finished = false;
       continue;
     }
-    if (!initialized) throw outsideTurn(message);
+    if (!initialized) {
+      if (message.type === 'system' && PRE_INIT_NOTICES.has(message.subtype)) continue;
+      throw outsideTurn(message);
+    }
     if (message.type === 'system' && message.subtype === 'task_started'
       && message.task_type === 'local_agent'
       && typeof message.tool_use_id === 'string' && message.tool_use_id) {
