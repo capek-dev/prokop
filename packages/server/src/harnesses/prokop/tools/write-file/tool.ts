@@ -1,7 +1,7 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 import type { CodeVisualization } from '@prokopai/sdk';
 import { createFilePermissionAsk, SENSITIVE_FILE_PATTERNS } from '@prokopai/sdk';
-import { fileConcernAsk } from '../file-permission';
+import { fileConcernAsk, isToolPathAllowed } from '../file-permission';
 
 interface Input {
   path: string;
@@ -53,7 +53,7 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
     }
 
     // Permission check for outside workspace and sensitive files
-    const outsideWorkspace = !ctx.isWithinWorkspace(resolvedPath);
+    const outsideWorkspace = !isToolPathAllowed(ctx, resolvedPath, 'write');
     const sensitive = isSensitivePath(resolvedPath);
 
     // Outside workspace permission ask

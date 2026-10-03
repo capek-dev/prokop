@@ -10,8 +10,8 @@
  * shouldAutoApproveAsk / requiresHumanReview; the ask's legacy risk is derived
  * from the Finding (ask.ts), so every severity consumer agrees.
  *
- * Catastrophic detection stays in the shell analyzer (destructive-command
- * bases); file deletions surface as the destructive concern.
+ * File deletions surface as the destructive concern. Device mutations are
+ * catastrophic even when requested through a native file editor.
  */
 
 import type { Concern, Finding } from './concerns';
@@ -81,7 +81,7 @@ export function classifyFileOperation(params: {
   const evidence: string[] = [];
   const effective = paths.map(effectivePath);
 
-  if (effective.some((target) => roots.every((root) => isOutsideRoot(target, root)))) {
+  if (effective.some((target) => roots.every((root) => isOutsideRoot(target, effectivePath(root))))) {
     concerns.push('escape');
     evidence.push('touches paths outside the allowed roots');
   }
@@ -100,7 +100,8 @@ export function classifyFileOperation(params: {
 
   const finding: Finding = {
     concerns,
-    catastrophic: false,
+    catastrophic: OPERATION_ACTIONS[params.operation] !== 'read'
+      && effective.some(target => target === '/dev' || target.startsWith('/dev/')),
     evidence,
     resolvedPaths: [...paths],
   };
@@ -113,7 +114,7 @@ export function classifyFileOperation(params: {
     action: OPERATION_ACTIONS[params.operation],
     risk: concernRisk(finding),
     concerns,
-    catastrophic: false,
+    catastrophic: finding.catastrophic,
     evidence,
     allowedScopes: grantScopesForFinding(finding),
     paths: [...paths],

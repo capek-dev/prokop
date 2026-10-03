@@ -48,6 +48,22 @@ function send(socketPath: string, body: string): Promise<string> {
 
 afterEach(() => { connections.length = 0; });
 
+test.skipIf(process.platform === 'win32')('Codex channel retains only its session temp environment on reconnect', async () => {
+  const hostTemp = process.env.TMPDIR;
+  const channel = await createPretoolChannel(async () => false, fakeSpawn, '/scratch/session-a');
+  try {
+    channel.connect().kill();
+    channel.connect().kill();
+    for (const { args, env } of connections) {
+      expect(env).toMatchObject({ TMPDIR: '/scratch/session-a', TEMP: '/scratch/session-a', TMP: '/scratch/session-a' });
+      expect(args).toContain('sandbox_workspace_write.writable_roots=["/scratch/session-a"]');
+      expect(args).toContain('sandbox_workspace_write.exclude_slash_tmp=true');
+      expect(args).toContain('sandbox_workspace_write.exclude_tmpdir_env_var=true');
+    }
+    expect(process.env.TMPDIR).toBe(hostTemp);
+  } finally { await channel.close(); }
+});
+
 test.skipIf(process.platform === 'win32')('private hook socket rejects invalid payloads and closes after the turn', async () => {
   const seen: CodexHookCall[] = [];
   const channel = await createPretoolChannel(async value => { seen.push(value); return true; }, fakeSpawn);

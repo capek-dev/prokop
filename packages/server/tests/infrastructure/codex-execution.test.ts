@@ -488,10 +488,12 @@ test('trusted hook asks through the turn, denies invalid identity, and hands an 
   const messages: ServerMessage[] = [];
   let onCall!: (call: CodexHookCall) => Promise<HookDecision>;
   let closed = false;
+  let tempDirectory: string | undefined;
   const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
     connect: () => { throw new Error('Protected turns must not use the bare connection'); },
-    prepareHook: async callback => {
+    prepareHook: async (callback, _spawn, directory) => {
       onCall = callback;
+      tempDirectory = directory;
       return { connect: () => fake.connection, close: async () => { closed = true; } };
     },
   });
@@ -501,6 +503,14 @@ test('trusted hook asks through the turn, denies invalid identity, and hands an 
   await waitFor(() => execution.isSessionActive('s'));
   const call: CodexHookCall = { session_id: 'thread-1', turn_id: 'turn-1', tool_use_id: 'item-1',
     hook_event_name: 'PreToolUse', tool_name: 'Bash', cwd: process.cwd(), tool_input: { command: 'rm -rf ./generated' } };
+  expect(tempDirectory).toBeDefined();
+  expect(await onCall({ ...call, cwd: tempDirectory!, tool_input: { command: 'echo ok > /dev/null' } })).toBe(true);
+  expect(await onCall({ ...call, cwd: '/missing-temp-root', tool_input: { command: 'echo ok' } })).toBe('working-directory');
+  fake.send({ id: 87, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'temp-item', cwd: tempDirectory, command: 'echo ok > scratch.txt',
+  } });
+  await waitFor(() => fake.sent.some(message => message.id === 87));
+  expect(fake.sent.find(message => message.id === 87)?.result).toEqual({ decision: 'accept' });
   expect(await onCall({ ...call, turn_id: 'other' })).toBe('no-active-turn');
   expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(0);
   const denied = onCall(call);

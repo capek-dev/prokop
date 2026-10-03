@@ -10,6 +10,16 @@ beforeEach(() => {
   ctx = createMockContext(vfs);
 });
 
+test('session temp writes skip escape approval and foreign temp writes do not execute after denial', async () => {
+  const path = `${ctx.fs.tempDir}/scratch.txt`;
+  expect((await execute({ path, content: 'scratch' }, ctx)).success).toBe(true);
+  expect(ctx.ask).not.toHaveBeenCalled();
+  const foreign = '/tmp/jean2/another-session/scratch.txt';
+  const denied = createMockContext(vfs, { ask: mock(async () => false) as unknown as typeof ctx.ask });
+  expect((await execute({ path: foreign, content: 'bad' }, denied)).success).toBe(false);
+  expect(vfs.hasFile(foreign)).toBe(false);
+});
+
 // ══════════════════════════════════════════════════════════════════
 // Tool Definition
 // ══════════════════════════════════════════════════════════════════

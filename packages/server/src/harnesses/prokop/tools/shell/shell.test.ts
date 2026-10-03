@@ -9,7 +9,7 @@ const FAKE_STDOUT = Buffer.from('mock-output');
 const FAKE_STDERR = Buffer.from('');
 
 const originalSpawn = Bun.spawn;
-let spawnSyncCalls: { shell: string[]; cwd: string }[] = [];
+let spawnSyncCalls: { shell: string[]; cwd: string; env?: Record<string, string> }[] = [];
 let spawnSyncBehavior: 'success' | 'fail' = 'success';
 
 function createMockProcess(stdout: Buffer, stderr: Buffer, exitCode: number): ReturnType<typeof Bun.spawn> {
@@ -29,9 +29,9 @@ function createMockProcess(stdout: Buffer, stderr: Buffer, exitCode: number): Re
 
 function mockSpawn(
   cmd: string[],
-  opts?: { cwd?: string },
+  opts?: { cwd?: string; env?: Record<string, string> },
 ): ReturnType<typeof Bun.spawn> {
-  spawnSyncCalls.push({ shell: cmd, cwd: opts?.cwd ?? '' });
+  spawnSyncCalls.push({ shell: cmd, cwd: opts?.cwd ?? '', env: opts?.env });
   return spawnSyncBehavior === 'success'
     ? createMockProcess(FAKE_STDOUT, FAKE_STDERR, 0)
     : createMockProcess(Buffer.from(''), Buffer.from('mock-error'), 1);
@@ -946,5 +946,34 @@ describe('edge cases', () => {
     const result = await execute({ command: 'cat normal.txt' }, ctx);
     expect(ctx.ask).not.toHaveBeenCalled();
     expect(result).toBeDefined();
+  });
+});
+
+describe('session temp and null policy', () => {
+  test('ordinary null I/O runs without an ask and gets a session environment', async () => {
+    const ctx = createMockContext();
+    const result = await execute({ command: 'echo ok > /dev/null' }, ctx);
+    expect(result.success).toBe(true);
+    expect(ctx.ask).not.toHaveBeenCalled();
+    expect(spawnSyncCalls[0]?.env).toMatchObject({ TMPDIR: ctx.fs.tempDir });
+  });
+
+  test('session temp cwd runs without asking for workspace escape', async () => {
+    const ctx = createMockContext();
+    expect((await execute({ command: 'echo ok', cwd: ctx.fs.tempDir }, ctx)).success).toBe(true);
+    expect(ctx.ask).not.toHaveBeenCalled();
+  });
+
+  test('malformed commands never dispatch a process', async () => {
+    const ctx = createMockContext();
+    expect((await execute({ command: 'echo\0ok' }, ctx)).success).toBe(false);
+    expect(spawnSyncCalls).toHaveLength(0);
+  });
+
+  test('a refused destructive command never dispatches despite its null redirect', async () => {
+    const ctx = createMockContext({ ask: mock(async () => false) as unknown as ToolContext['ask'] });
+    expect((await execute({ command: 'rm -rf / > /dev/null' }, ctx)).success).toBe(false);
+    expect(ctx.ask).toHaveBeenCalled();
+    expect(spawnSyncCalls).toHaveLength(0);
   });
 });

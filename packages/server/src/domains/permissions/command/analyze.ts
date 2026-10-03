@@ -24,8 +24,10 @@
  * full mode auto-runs everything except catastrophic findings.
  */
 
-import { isAbsolute, resolve } from 'node:path';
-import { effectivePath } from '../paths';
+import { lstatSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { isAbsolute, join, resolve } from 'node:path';
+import { effectivePath, isWithinRoot } from '../paths';
 import type { Concern, Finding } from '../concerns';
 import {
   CATASTROPHIC_BASES,
@@ -59,6 +61,7 @@ interface Token {
   kind: TokenKind;
   text: string;
   inner: string;
+  joined?: boolean;
 }
 
 const OPERATOR_STARTS = new Set(['&', '|', ';', '<', '>']);
@@ -68,6 +71,11 @@ function tokenize(input: string): Token[] {
   const tokens: Token[] = [];
   const n = input.length;
   let i = 0;
+  const add = (token: Token): void => {
+    const previous = tokens.at(-1);
+    tokens.push({ ...token, joined: !!previous && previous.kind !== 'operator'
+      && token.kind !== 'operator' && i > 0 && !/\s/.test(input[i - 1]!) });
+  };
   while (i < n) {
     const ch = input[i]!;
     if (/\s/.test(ch)) {
@@ -76,15 +84,15 @@ function tokenize(input: string): Token[] {
     }
     if (OPERATOR_STARTS.has(ch)) {
       const two = input.slice(i, i + 2);
-      const text = two === '&&' || two === '||' || two === '>>' ? two : ch;
-      tokens.push({ kind: 'operator', text, inner: text });
+      const text = ['&&', '||', '>>', '>&', '<&', '&>'].includes(two) ? two : ch;
+      add({ kind: 'operator', text, inner: text });
       i += text.length;
       continue;
     }
     if (ch === "'") {
       const end = input.indexOf("'", i + 1);
       const stop = end === -1 ? n : end;
-      tokens.push({ kind: 'single', text: input.slice(i, stop + 1), inner: input.slice(i + 1, stop) });
+      add({ kind: 'single', text: input.slice(i, stop + 1), inner: input.slice(i + 1, stop) });
       i = stop + 1;
       continue;
     }
@@ -94,14 +102,14 @@ function tokenize(input: string): Token[] {
         if (input[j] === '\\') j += 1;
         j += 1;
       }
-      tokens.push({ kind: 'double', text: input.slice(i, j + 1), inner: input.slice(i + 1, j) });
+      add({ kind: 'double', text: input.slice(i, j + 1), inner: input.slice(i + 1, j) });
       i = j + 1;
       continue;
     }
     if (ch === '`') {
       const end = input.indexOf('`', i + 1);
       const stop = end === -1 ? n : end;
-      tokens.push({ kind: 'substitution', text: input.slice(i, stop + 1), inner: input.slice(i + 1, stop) });
+      add({ kind: 'substitution', text: input.slice(i, stop + 1), inner: input.slice(i + 1, stop) });
       i = stop + 1;
       continue;
     }
@@ -114,7 +122,7 @@ function tokenize(input: string): Token[] {
         j += 1;
       }
       const innerEnd = depth === 0 ? j - 1 : j;
-      tokens.push({ kind: 'substitution', text: input.slice(i, j), inner: input.slice(i + 2, innerEnd) });
+      add({ kind: 'substitution', text: input.slice(i, j), inner: input.slice(i + 2, innerEnd) });
       i = j;
       continue;
     }
@@ -124,7 +132,9 @@ function tokenize(input: string): Token[] {
       if (input[j] === '\\') j += 1;
       j += 1;
     }
-    tokens.push({ kind: 'word', text: input.slice(i, j), inner: input.slice(i, j) });
+    if (!(/^\d+$/.test(input.slice(i, j)) && (input[j] === '>' || input[j] === '<'))) {
+      add({ kind: 'word', text: input.slice(i, j), inner: input.slice(i, j) });
+    }
     i = j;
   }
   return tokens;
@@ -235,7 +245,7 @@ function isLikelyUrl(arg: string): boolean {
 /** Resolves an operand to an absolute path; null when it cannot be seen
  * through (environment variables). Globs resolve via their static prefix. */
 function resolveOperand(raw: string, cwd: string, home: string): string | null {
-  if (raw === '' || raw.includes('$')) return null;
+  if (raw === '' || /[$`]/.test(raw)) return null;
   const globIndex = [raw.indexOf('*'), raw.indexOf('?')].filter(index => index >= 0);
   const hasGlob = globIndex.length > 0;
   let candidate = raw;
@@ -253,7 +263,7 @@ function resolveOperand(raw: string, cwd: string, home: string): string | null {
 }
 
 function withinAny(path: string, roots: readonly string[]): boolean {
-  return roots.some(root => path === root || path.startsWith(root + '/'));
+  return roots.some(root => isWithinRoot(path, effectivePath(root)));
 }
 
 /** True when an effective path sits inside the allowed roots for the access. */
@@ -264,11 +274,7 @@ function isAllowedTarget(path: string, ctx: CommandAnalyzeContext, access: 'read
 
 /** Symlink-resolved path; missing tails keep their literal spelling. */
 function toEffective(path: string): string {
-  try {
-    return effectivePath(path);
-  } catch {
-    return path;
-  }
+  return effectivePath(path);
 }
 
 // ── Segment analysis ────────────────────────────────────────────────────────
@@ -288,21 +294,47 @@ function baseNameOf(word: string): string {
   return word.replace(/.*\//, '').toLowerCase();
 }
 
-function collectWords(tokens: Token[]): Array<{ text: string; redirect: 'none' | 'write' | 'read' }> {
-  const words: Array<{ text: string; redirect: 'none' | 'write' | 'read' }> = [];
-  let pending: 'none' | 'write' | 'read' = 'none';
+interface CommandWord {
+  text: string;
+  redirect: 'none' | 'write' | 'read';
+  quoted: boolean;
+}
+
+function collectWords(tokens: Token[]): CommandWord[] {
+  const words: CommandWord[] = [];
+  let pending: CommandWord['redirect'] | 'descriptor' = 'none';
   for (const token of tokens) {
     if (token.kind === 'operator') {
-      pending = token.text === '>' || token.text === '>>' ? 'write'
-        : token.text === '<' ? 'read' : 'none';
+      pending = ['>', '>>', '&>'].includes(token.text) ? 'write'
+        : token.text === '<' ? 'read'
+          : token.text === '>&' || token.text === '<&' ? 'descriptor' : 'none';
       continue;
     }
-    if (token.kind === 'word') {
-      words.push({ text: token.text, redirect: pending });
+    const text = token.kind === 'single' || token.kind === 'double' ? token.inner : token.text;
+    if (pending === 'descriptor' && /^(?:\d+|-)$/.test(text)) {
       pending = 'none';
+      continue;
     }
+    if (token.joined && pending === 'none' && words.length) {
+      words[words.length - 1]!.text += text;
+      continue;
+    }
+    words.push({ text, redirect: pending === 'descriptor' ? 'write' : pending,
+      quoted: token.kind === 'single' || token.kind === 'double' });
+    pending = 'none';
   }
   return words;
+}
+
+function isNullDevice(path: string): boolean {
+  if (process.platform === 'win32' || path !== '/dev/null') return false;
+  try { return lstatSync(path).isCharacterDevice(); }
+  catch { return false; }
+}
+
+function isSharedTempTarget(path: string): boolean {
+  return ['/tmp', '/private/tmp', tmpdir()].some(base =>
+    path === effectivePath(base) || path === effectivePath(join(base, 'jean2')));
 }
 
 function analyzeSegment(
@@ -333,8 +365,9 @@ function analyzeSegment(
     }
   }
 
-  const firstWord = words[0];
-  if (!firstWord) {
+  const commandWords = words.filter(word => word.redirect === 'none');
+  const firstWord = commandWords[0];
+  if (!firstWord && !words.some(word => word.redirect !== 'none')) {
     // A segment made only of substitutions: we cannot see the command.
     if (segment.tokens.some(token => token.kind === 'substitution')) {
       result.concerns.add('opaque');
@@ -343,13 +376,13 @@ function analyzeSegment(
     return { ...result, nextCwd };
   }
 
-  const base = baseNameOf(firstWord.text);
-  const args = words.slice(1).map(word => word.text);
-  const redirectTargets = words.slice(1).filter(word => word.redirect !== 'none');
+  const base = baseNameOf(firstWord?.text ?? ':');
+  const args = commandWords.slice(1).map(word => word.text);
+  const redirectTargets = words.filter(word => word.redirect !== 'none');
 
   // Token screen on active text: bare words always; quoted strings only when
   // the base executes its arguments as code.
-  const activeParts = words.map(word => word.text);
+  const activeParts = words.filter(word => !word.quoted).map(word => word.text);
   const isExecBase = EXEC_BASES.has(base);
   if (isExecBase) {
     for (const token of segment.tokens) {
@@ -386,7 +419,9 @@ function analyzeSegment(
   const sub = gitSubcommand(base, args);
   const invocation: InvocationShape = { base, sub, args };
   const destructive = matchDestructiveRule(invocation);
-  let destructiveConfirmed = false;
+  const findDeletes = base === 'find' && args.includes('-delete');
+  let destructiveConfirmed = findDeletes;
+  if (findDeletes) result.evidence.push('find deletes matching files');
   if (destructive) {
     if (destructive.rule.kind === 'selector') {
       const operands = args.filter(arg => !arg.startsWith('-'));
@@ -429,7 +464,7 @@ function analyzeSegment(
       result.evidence.push('dd writes to a device');
     }
   }
-  if (destructiveConfirmed && CATASTROPHIC_ELIGIBLE.has(base)) {
+  if (findDeletes || CATASTROPHIC_ELIGIBLE.has(base) && (destructiveConfirmed || base === 'rm')) {
     const targets = args.filter(arg => !arg.startsWith('-'));
     for (const raw of targets) {
       const resolved = resolveOperand(raw, cwdAtStart, ctx.home);
@@ -439,7 +474,7 @@ function analyzeSegment(
         continue;
       }
       const effective = toEffective(resolved);
-      if (isProtectedTarget(effective, ctx.home)) {
+      if (isProtectedTarget(effective, ctx.home) || isSharedTempTarget(effective)) {
         result.catastrophic = true;
         result.evidence.push(`destructive target ${effective} is protected`);
       }
@@ -458,7 +493,9 @@ function analyzeSegment(
     const resolved = resolveOperand(raw, cwdAtStart, ctx.home);
     operandCandidates.push({ raw, resolved, access });
   };
-  for (const word of words.slice(1)) pushOperand(word.text, word.redirect === 'write' ? 'write' : operandAccess);
+  for (const word of commandWords.slice(1)) {
+    if (!word.quoted || isFileCommand || /^(?:\/|~|\$)/.test(word.text)) pushOperand(word.text, operandAccess);
+  }
   if (isFileCommand && operandCandidates.length === 0 && (base === 'ls' || base === 'find')) {
     operandCandidates.push({ raw: cwdAtStart, resolved: resolve(cwdAtStart), access: operandAccess });
   }
@@ -466,13 +503,23 @@ function analyzeSegment(
     const resolved = resolveOperand(target.text, cwdAtStart, ctx.home);
     if (resolved !== null) {
       const effective = toEffective(resolved);
-      if (!isAllowedTarget(effective, ctx, target.redirect === 'read' ? 'read' : 'write')) {
+      if (target.redirect === 'write' && isWithinRoot(effective, '/dev') && !isNullDevice(resolved)) {
+        result.catastrophic = true;
+        result.evidence.push('redirect writes to a device');
+      }
+      if (isSensitiveFilename(effective) || isSensitiveFilename(target.text)) {
+        result.concerns.add('sensitive');
+        result.evidence.push(`${target.text} references sensitive material`);
+      }
+      result.resolvedPaths.push(effective);
+      if (!isNullDevice(resolved) && !isAllowedTarget(effective, ctx, target.redirect === 'read' ? 'read' : 'write')) {
         result.concerns.add('escape');
         result.evidence.push(`redirect target ${effective} is outside the allowed roots`);
       }
     } else {
       result.concerns.add('opaque');
       result.evidence.push(`unresolvable redirect target ${target.text}`);
+      if (/\$\{?(?:TMPDIR|TEMP|TMP)\b/.test(target.text)) result.concerns.add('escape');
     }
   }
   for (const { raw, resolved, access } of operandCandidates) {
@@ -480,12 +527,17 @@ function analyzeSegment(
       if (raw.includes('$')) {
         result.concerns.add('opaque');
         result.evidence.push(`unresolvable operand ${raw}`);
+        if (/\$\{?(?:TMPDIR|TEMP|TMP)\b/.test(raw)) result.concerns.add('escape');
       }
       continue;
     }
     const effective = toEffective(resolved);
     result.resolvedPaths.push(effective);
-    if (!isAllowedTarget(effective, ctx, access)) {
+    if (access === 'write' && isWithinRoot(effective, '/dev')) {
+      result.catastrophic = true;
+      result.evidence.push('operation can replace or modify a device');
+    }
+    if (!(access === 'read' && isNullDevice(resolved)) && !isAllowedTarget(effective, ctx, access)) {
       result.concerns.add('escape');
       result.evidence.push(`path ${effective} is outside the allowed roots`);
     }

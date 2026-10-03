@@ -165,6 +165,7 @@ export class TerminalManager {
     cols?: number;
     rows?: number;
     origin?: 'user' | 'agent';
+    agentEnv?: Record<string, string>;
     title?: string;
     managedWorktreeId?: string;
   }): string | null {
@@ -188,6 +189,7 @@ export class TerminalManager {
       cols?: number;
       rows?: number;
       origin?: 'user' | 'agent';
+      agentEnv?: Record<string, string>;
       initialClient?: TerminalSocket;
       managedWorktreeId?: string;
     }
@@ -213,7 +215,7 @@ export class TerminalManager {
         cols,
         rows,
         cwd,
-        env: getTerminalEnv(origin),
+        env: { ...getTerminalEnv(origin), ...(origin === 'agent' ? options.agentEnv : {}) },
       });
 
       pty.onData((data: string) => {

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 import type { DiffsVisualization, DiffVisualization } from '@prokopai/sdk';
-import { fileConcernAsk } from '../file-permission';
+import { fileConcernAsk, isToolPathAllowed } from '../file-permission';
 
 // ---------------------------------------------------------------------------
 // Local safe matching engine
@@ -817,7 +817,7 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
       return failure('FILE_NOT_FOUND', input.path, `Editing system directories is not allowed: ${input.path}`);
     }
 
-    if (!ctx.isWithinWorkspace(resolvedPath)) {
+    if (!isToolPathAllowed(ctx, resolvedPath, 'write')) {
       const approved = await ctx.ask(fileConcernAsk({
         operation: 'edit', path: resolvedPath, root: ctx.workspacePath, concern: 'escape',
         ask: {

@@ -22,6 +22,8 @@ import {
   type ShellRiskContext,
 } from '@/domains/permissions';
 import { getTerminalManager } from '@/transport/terminal';
+import { sessionTempEnvironment } from '@/infrastructure/filesystem/session-temp';
+import { isToolPathAllowed } from '@/harnesses/prokop/tools/file-permission';
 
 interface TerminalInput {
   action?: 'create' | 'send' | 'output' | 'list' | 'kill';
@@ -107,7 +109,8 @@ async function requestPermission(
   const classification = classifyShellCommand(effectiveCommand,
     [ctx.workspacePath, ctx.fs.tempDir], executionCwd,
     { readRoots: ctx.allowedPaths, isWithinRoots: path => ctx.isWithinWorkspace(path) });
-  if (!classification || !requiresHumanReview(classification.finding)) return true;
+  if (!classification) return false;
+  if (!requiresHumanReview(classification.finding)) return true;
 
   return (await ctx.ask(classification.ask)) === true;
 }
@@ -250,7 +253,7 @@ export async function execute(input: TerminalInput, ctx: ToolContext): Promise<T
 async function handleCreate(input: TerminalInput, ctx: ToolContext): Promise<ToolResult> {
   const resolvedCwd = input.cwd ? ctx.resolvePath(input.cwd) : ctx.workspacePath;
 
-  if (input.cwd && !ctx.isWithinWorkspace(resolvedCwd)) {
+  if (input.cwd && !isToolPathAllowed(ctx, resolvedCwd, 'write')) {
     const ask: ConcernsPermissionAsk = {
       ...createOutsideWorkspaceAsk({
         command: `terminal create ${input.cwd}`,
@@ -270,6 +273,7 @@ async function handleCreate(input: TerminalInput, ctx: ToolContext): Promise<Too
     cwd: resolvedCwd,
     workspaceId: ctx.workspaceId ?? resolvedCwd,
     origin: 'agent',
+    agentEnv: sessionTempEnvironment(ctx.fs.tempDir),
   });
 
   if (!sessionId) {

@@ -6,6 +6,7 @@ import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { spawnCodexAppServer, CodexAppServer, codexObject, type CodexConnection } from './app-server';
 import { validHookCall, type CodexHookCall } from './hook-policy';
 import { logCodexPermissionDenial } from './permission-diagnostics';
+import { sessionTempEnvironment } from '@/infrastructure/filesystem/session-temp';
 
 const MAX_INPUT = 128 * 1024;
 // The hook runs in Codex's shell. Keep its code inline for compiled Prokop binaries.
@@ -61,6 +62,7 @@ export interface PretoolChannel {
 export async function createPretoolChannel(
   onCall: (call: CodexHookCall) => Promise<HookDecision>,
   spawn: typeof spawnCodexAppServer = spawnCodexAppServer,
+  tempDirectory?: string,
 ): Promise<PretoolChannel> {
   if (process.platform === 'win32') throw new Error('Codex PreToolUse channel requires a Unix socket');
   if (!Bun.which('node')) throw new Error('Node.js is required for Codex PreToolUse');
@@ -109,9 +111,12 @@ export async function createPretoolChannel(
   });
   try {
     await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(socketPath, resolve); });
-    const env = { ...process.env, PROKOPAI_CODEX_HOOK_SOCKET: socketPath,
+    const env = { ...process.env, ...(tempDirectory ? sessionTempEnvironment(tempDirectory) : {}), PROKOPAI_CODEX_HOOK_SOCKET: socketPath,
       PROKOPAI_CODEX_HOOK_TOKEN: token, PROKOPAI_CODEX_HOOK_TIMEOUT_MS: String(getPermissionTimeoutMs() + 30_000) };
-    const args = ['--enable', 'hooks', '-c', hookConfig()];
+    const args = ['--enable', 'hooks', '-c', hookConfig(),
+      ...(tempDirectory ? ['-c', `sandbox_workspace_write.writable_roots=${JSON.stringify([tempDirectory])}`,
+        '-c', 'sandbox_workspace_write.exclude_tmpdir_env_var=true',
+        '-c', 'sandbox_workspace_write.exclude_slash_tmp=true'] : [])];
     const discover = new CodexAppServer(spawn(args, env), () => {});
     let key: string;
     let currentHash: string;

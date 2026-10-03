@@ -1,4 +1,4 @@
-import { realpathSync } from 'node:fs';
+import { lstatSync, readlinkSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, relative, sep } from 'node:path';
 import { resolve as resolvePath } from 'node:path';
 import { SENSITIVE_FILE_PATTERNS } from '@prokopai/sdk';
@@ -31,11 +31,30 @@ export function isOutsideRoot(path: string, root: string): boolean {
  * low-risk read/write into an outside-root operation; missing tail segments
  * keep their literal spelling. */
 export function effectivePath(path: string): string {
+  return resolveEffectivePath(path, 0);
+}
+
+function resolveEffectivePath(path: string, depth: number): string {
+  if (depth > 40) throw new Error('Cannot resolve permission path: too many symlinks');
   let ancestor = path;
   while (true) {
     try {
       return resolvePath(realpathSync(ancestor), relative(ancestor, path));
-    } catch {
+    } catch (error: unknown) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT' && code !== 'ENOTDIR' && code !== 'ELOOP') throw error;
+      // realpath fails for dangling links. Resolve the link itself before
+      // walking upward, otherwise a missing outside target looks contained.
+      let link: string | undefined;
+      try {
+        if (lstatSync(ancestor).isSymbolicLink()) link = readlinkSync(ancestor);
+      } catch (statError: unknown) {
+        const statCode = (statError as NodeJS.ErrnoException).code;
+        if (statCode !== 'ENOENT' && statCode !== 'ENOTDIR') throw statError;
+      }
+      if (link !== undefined) {
+        return resolveEffectivePath(resolvePath(dirname(ancestor), link, relative(ancestor, path)), depth + 1);
+      }
       const parent = dirname(ancestor);
       if (parent === ancestor) return path;
       ancestor = parent;

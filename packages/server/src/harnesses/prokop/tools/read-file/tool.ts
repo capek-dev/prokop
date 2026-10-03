@@ -1,7 +1,7 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 import type { NoneVisualization } from '@prokopai/sdk';
 import { createFilePermissionAsk, SENSITIVE_FILE_PATTERNS } from '@prokopai/sdk';
-import { fileConcernAsk } from '../file-permission';
+import { fileConcernAsk, isToolPathAllowed } from '../file-permission';
 import { createHash } from 'node:crypto';
 
 const DEFAULT_READ_LIMIT = 2000;
@@ -79,48 +79,41 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
       return { success: false, error: `Reading from system directories is not allowed: ${input.path}` };
     }
 
-    const tempDir = ctx.env.get('JEAN2_TEMP_DIR') || ctx.env.get('TMPDIR') || '';
-    const jean2TempPrefix = tempDir ? `${tempDir.replace(/[/\\]$/, '')}/jean2/` : '';
-    const isJean2Temp = jean2TempPrefix && resolvedPath.startsWith(jean2TempPrefix);
+    const outsideWorkspace = !isToolPathAllowed(ctx, resolvedPath, 'read');
+    const sensitive = isSensitivePath(resolvedPath);
 
-    if (!isJean2Temp && ctx.allowedPaths && !ctx.allowedPaths.some(p => resolvedPath.startsWith(p))) {
-      const outsideWorkspace = !ctx.isWithinWorkspace(resolvedPath);
-      const sensitive = isSensitivePath(resolvedPath);
+    // Outside workspace permission ask
+    if (outsideWorkspace) {
+      const permAsk = fileConcernAsk({
+        operation: 'read', path: resolvedPath, root: ctx.workspacePath, concern: 'escape',
+        ask: createFilePermissionAsk({
+          path: input.path,
+          operation: 'read',
+          risk: 'medium',
+          isOutsideWorkspace: true,
+        }),
+      });
 
-      // Outside workspace permission ask
-      if (outsideWorkspace) {
-        const permAsk = fileConcernAsk({
-          operation: 'read', path: resolvedPath, root: ctx.workspacePath, concern: 'escape',
-          ask: createFilePermissionAsk({
-            path: input.path,
-            operation: 'read',
-            risk: 'medium',
-            isOutsideWorkspace: true,
-          }),
-        });
-
-        const approved = await ctx.ask(permAsk);
-        if (!approved) return { success: false, error: 'USER_REJECTION' };
-      }
-
-      // Sensitive file permission ask (separate ask for clarity)
-      if (sensitive) {
-        const permAsk = fileConcernAsk({
-          operation: 'read', path: resolvedPath, root: ctx.workspacePath, concern: 'sensitive',
-          ask: createFilePermissionAsk({
-            path: input.path,
-            operation: 'read',
-            risk: 'medium',
-            isSensitiveFile: true,
-            reason: 'This file may contain credentials or secrets.',
-          }),
-        });
-
-        const approved = await ctx.ask(permAsk);
-        if (!approved) return { success: false, error: 'USER_REJECTION' };
-      }
+      const approved = await ctx.ask(permAsk);
+      if (!approved) return { success: false, error: 'USER_REJECTION' };
     }
 
+    // Sensitive file permission ask (separate ask for clarity)
+    if (sensitive) {
+      const permAsk = fileConcernAsk({
+        operation: 'read', path: resolvedPath, root: ctx.workspacePath, concern: 'sensitive',
+        ask: createFilePermissionAsk({
+          path: input.path,
+          operation: 'read',
+          risk: 'medium',
+          isSensitiveFile: true,
+          reason: 'This file may contain credentials or secrets.',
+        }),
+      });
+
+      const approved = await ctx.ask(permAsk);
+      if (!approved) return { success: false, error: 'USER_REJECTION' };
+    }
     const stat = await ctx.fs.stat(resolvedPath);
     if (!stat) {
       return { success: false, error: `File not found: ${resolvedPath}` };

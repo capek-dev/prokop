@@ -53,10 +53,11 @@ class FakePty {
   }
 }
 
-const ptyState = { instances: [] as FakePty[] };
+const ptyState = { instances: [] as FakePty[], options: [] as SpawnOptions[] };
 
 mock.module('bun-pty', () => ({
-  spawn: (_shell: string, _args: string[], _options: SpawnOptions): FakePty => {
+  spawn: (_shell: string, _args: string[], options: SpawnOptions): FakePty => {
+    ptyState.options.push(options);
     const pty = new FakePty();
     ptyState.instances.push(pty);
     return pty;
@@ -129,7 +130,20 @@ async function createSession(ctx: ToolContext): Promise<string> {
 }
 
 beforeEach(() => {
+  ptyState.options = [];
   installTerminalSessionStore(makeNoopStore());
+});
+
+test('agent terminal inherits session temp and rejected commands never reach the PTY', async () => {
+  const { ctx } = makeWorkspaceCtx();
+  const sessionId = await createSession(ctx);
+  expect(ptyState.options.at(-1)?.env).toMatchObject({ TMPDIR: ctx.fs.tempDir });
+  const pty = ptyState.instances.at(-1)!;
+  const before = pty.writeCalls.length;
+  const denied = { ...ctx, ask: async () => false } as unknown as ToolContext;
+  const result = await execute({ action: 'send', sessionId, command: 'echo\0bad' }, denied);
+  expect(result.success).toBe(false);
+  expect(pty.writeCalls.length).toBe(before);
 });
 
 afterEach(() => {

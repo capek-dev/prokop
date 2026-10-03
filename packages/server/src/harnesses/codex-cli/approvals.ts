@@ -18,6 +18,8 @@ import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { logCodexPermissionDenial, type CodexPermissionReason } from './permission-diagnostics';
 import { unwrapCodexApprovalCommand } from './approval-command';
+import { ensureSessionTempDir } from '@/infrastructure/filesystem/session-temp';
+import { isWithinRoot } from '@/domains/permissions';
 
 const AUTHORITY = { visibilityScope: 'controller_only', resolutionMode: 'controller_only' } as const;
 const COMMAND_TOOL = 'codex-cli:command';
@@ -148,23 +150,25 @@ export class CodexApprovals {
     if (command && (typeof params.command !== 'string' || !params.command.trim()
       || typeof params.cwd !== 'string')) return decline('malformed-request');
     if (command && params.cwd !== root) {
-      if (!childOnceOnly) return decline('working-directory');
       try {
+        const temp = ensureSessionTempDir(controllerSessionId);
+        if (!childOnceOnly && !isWithinRoot(realpathSync(params.cwd as string), temp)) return decline('working-directory');
         const offset = relative(root, realpathSync(params.cwd as string));
-        if (offset === '..' || offset.startsWith(`..${sep}`) || isAbsolute(offset)) return decline('working-directory');
+        if ((offset === '..' || offset.startsWith(`..${sep}`) || isAbsolute(offset))
+          && !isWithinRoot(realpathSync(params.cwd as string), temp)) return decline('working-directory');
       } catch { return decline('working-directory'); }
     }
     if (!command && params.grantRoot != null) return decline('unsupported-permissions');
 
-    const key = command && !childOnceOnly ? JSON.stringify([root, params.command]) : null;
-    if (command && params.cwd === root) {
+    const key = command && !childOnceOnly ? JSON.stringify([params.cwd, params.command]) : null;
+    if (command) {
       const approved = this.hookApprovedCommands.get(sessionId);
       const nativeCommand = params.command as string;
       // PreToolUse carries args.cmd; native approval carries the shell argv joined
       // for display. Unwrap one known shell layer, preserving the script verbatim.
       const script = unwrapCodexApprovalCommand(nativeCommand);
       for (const candidate of script === null ? [nativeCommand] : [nativeCommand, script]) {
-        if (approved?.delete(this.hookKey(threadId, turnId, root, candidate, params.itemId as string))) {
+        if (approved?.delete(this.hookKey(threadId, turnId, params.cwd as string, candidate, params.itemId as string))) {
           return { decision: 'accept' };
         }
       }
@@ -183,7 +187,8 @@ export class CodexApprovals {
     const ask: PermissionAsk = command ? (() => {
       // Permissions v2: the native approval ask carries the classified
       // concerns, so the mode ceiling decides exactly like the hook path.
-      const allowed = session ? sessionPermissionRoots(session, root) : { roots: [root], readRoots: [] };
+      const permissionSession = getSession(controllerSessionId) ?? session;
+      const allowed = permissionSession ? sessionPermissionRoots(permissionSession, root) : { roots: [root], readRoots: [] };
       const classification = classifyShellCommand(params.command as string, allowed.roots, params.cwd as string,
         { readRoots: allowed.readRoots });
       return classification ? { ...classification.ask,

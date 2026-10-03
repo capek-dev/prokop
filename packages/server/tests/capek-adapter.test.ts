@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { realpathSync } from 'node:fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { getRuntimeConfiguration } from '@capekai/core/configuration';
@@ -56,7 +57,7 @@ describe('Čapek Jean2 adapter', () => {
     expect(host.additionalRoots).toEqual(['/workspace/shared']);
     expect(host.allowedRoots).toHaveLength(1);
     expect(host.allowedRoots?.[0]).toContain('upload');
-    expect(host.tempDir).toBe(join(tmpdir(), 'jean2', 'session-1'));
+    expect(host.tempDir).toBe(join(realpathSync(tmpdir()), 'jean2', 'session-1'));
     expect(host.getEnvironmentValue).toBeDefined();
     expect(host.addAdditionalRoot).toBeUndefined();
     expect(host.removeAdditionalRoot).toBeUndefined();

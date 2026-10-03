@@ -2,6 +2,7 @@ import { createSdkMcpServer, query, type CanUseTool, type Options, type SDKActiv
 import type { ClaudeImage } from './images';
 import { claudeCliVersion } from './version';
 import { parseClaudeUsage, type ClaudeTurnUsage } from './usage';
+import { sessionTempEnvironment } from '@/infrastructure/filesystem/session-temp';
 
 export type ClaudeTurnEvent = (
   | { type: 'text-delta'; text: string }
@@ -18,6 +19,7 @@ export type ClaudeTurnEvent = (
 
 export interface ClaudeTurnInput {
   cwd: string;
+  tempDirectory?: string;
   prompt: string;
   /** Stable host ID for a new user turn, used to verify native history before undo. */
   userMessageId?: string;
@@ -124,7 +126,7 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
     mcpServers: input.dynamicTools?.length
       ? { prokop: createSdkMcpServer({ name: 'prokop', tools: input.dynamicTools, alwaysLoad: true }) }
       : {},
-    env: { ...env, ENABLE_CLAUDEAI_MCP_SERVERS: 'false', CLAUDE_CODE_AUTO_CONNECT_IDE: '0' },
+    env: { ...env, ...(input.tempDirectory ? sessionTempEnvironment(input.tempDirectory) : {}), ENABLE_CLAUDEAI_MCP_SERVERS: 'false', CLAUDE_CODE_AUTO_CONNECT_IDE: '0' },
   };
   let releaseInput!: () => void;
   const inputReleased = new Promise<void>(resolve => { releaseInput = resolve; });

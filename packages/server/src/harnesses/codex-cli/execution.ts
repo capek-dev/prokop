@@ -33,6 +33,8 @@ import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBr
 import { applyRollback, clearRollbackIntent, getRollbackIntent, readRollbackHistory, readTurnIds, sameTurns, saveRollbackIntent, setRollbackPhase } from './rollback';
 import { forkCodexSession } from './fork';
 import { codexCliVersion } from './version';
+import { ensureSessionTempDir, sessionTempInstructions } from '@/infrastructure/filesystem/session-temp';
+import { isWithinRoot } from '@/domains/permissions';
 
 export { codexCliVersion } from './version';
 
@@ -555,9 +557,14 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         const skillDefinitions = agentDir ? deps.agentSkills?.definitions() ?? [] : [];
         const skillToolNames = skillDefinitions.filter(definition =>
           definition.type === 'function' && definition.name === 'agent_skill_manage').map(definition => definition.name);
+        const tempDirectory = ensureSessionTempDir(sessionId);
+        const isTempCwd = (cwd: string): boolean => {
+          try { return isWithinRoot(realpathSync(cwd), tempDirectory); }
+          catch { return false; }
+        };
         const instructions = await codexDeveloperInstructions(workspace, root, preconfig, {
           ...sources, getAgentDirectory: async () => agentDir,
-        }, [...memoryToolNames, ...searchToolNames, ...skillToolNames]);
+        }, [...memoryToolNames, ...searchToolNames, ...skillToolNames]) + '\n\n' + sessionTempInstructions(tempDirectory);
         if (!session.preconfigId) {
           const updated = updateSession(sessionId, { preconfigId,
             agentId: agentDir ? preconfigId : null });
@@ -840,7 +847,8 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
               try {
                 const cwd = realpathSync(call.cwd);
                 const offset = relative(root, cwd);
-                if (offset === '..' || offset.startsWith(`..${sep}`) || isAbsolute(offset)) return 'working-directory';
+                if ((offset === '..' || offset.startsWith(`..${sep}`) || isAbsolute(offset))
+                  && !isWithinRoot(cwd, tempDirectory)) return 'working-directory';
               } catch { return 'working-directory'; }
               const childId = children.childSessionId(childThreadId);
               if (!childId) return 'unknown-turn';
@@ -850,16 +858,16 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
               const input = codexObject(call.tool_input);
               const approved = await codexApprovals.requestHook({ ...ask, allowedScopes: ['once'] },
                 call.tool_name as 'Bash' | 'apply_patch', input?.command as string, call.tool_use_id,
-                childThreadId, call.turn_id, childId, root, session.workspaceId, wire.delivery, sessionId);
+                childThreadId, call.turn_id, childId, call.cwd, session.workspaceId, wire.delivery, sessionId);
               return approved && connections.get(sessionId) === current && rootStillSelected()
                 && children.accepts(childThreadId, call.turn_id) ? true : 'permission-denied';
             }
             if (call.session_id === getCodexBinding(sessionId)?.threadId) {
-              if (call.cwd !== root) return 'working-directory';
+              if (call.cwd !== root && !isTempCwd(call.cwd)) return 'working-directory';
               return await current.parentHook?.(call) ?? 'no-active-turn';
             }
             return 'unknown-turn';
-          });
+          }, undefined, tempDirectory);
           current.hookChannel = hookChannel;
           phase = 'app-server initialization';
           client = new CodexAppServer(hookChannel ? hookChannel.connect() : deps.connect(), event => {
@@ -911,7 +919,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         }
         connection.parentNotify = notify;
         connection.parentHook = async call => {
-          if (!run?.turnId || completed || run.stopRequested || call.cwd !== root
+          if (!run?.turnId || completed || run.stopRequested || (call.cwd !== root && !isTempCwd(call.cwd))
             || call.session_id !== run.threadId || call.turn_id !== run.turnId) return 'no-active-turn';
           const ask = classifyCodexHook(call, sessionPermissionRoots(getSession(sessionId) ?? session, root));
           if (ask === undefined) return 'unsupported-command';
@@ -919,7 +927,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
           const input = codexObject(call.tool_input);
           const approved = await codexApprovals.requestHook({ ...ask, allowedScopes: ['once'] },
             call.tool_name as 'Bash' | 'apply_patch', input?.command as string, call.tool_use_id,
-            call.session_id, call.turn_id, sessionId, root, session.workspaceId, wire.delivery);
+            call.session_id, call.turn_id, sessionId, call.cwd, session.workspaceId, wire.delivery);
           return approved && !!run && !completed && !run.stopRequested
             && active.get(sessionId) === run && call.turn_id === run.turnId ? true : 'permission-denied';
         };

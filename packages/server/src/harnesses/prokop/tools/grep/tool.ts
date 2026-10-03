@@ -2,8 +2,7 @@ import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 import type { FileListVisualization } from '@prokopai/sdk';
 import ignore from 'ignore';
 import picomatch from 'picomatch';
-import { isWithinRoot } from '@/domains/permissions';
-import { fileConcernAsk } from '../file-permission';
+import { fileConcernAsk, isToolPathAllowed } from '../file-permission';
 
 interface Input {
   pattern: string;
@@ -196,13 +195,7 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
       return { success: false, error: `Searching in system directories is not allowed: ${targetPath}` };
     }
 
-    const tempDir = ctx.env.get('JEAN2_TEMP_DIR') || ctx.env.get('TMPDIR') || '';
-    const jean2TempPrefix = tempDir ? `${tempDir.replace(/[/\\]$/, '')}/jean2/` : '';
-    const isJean2Temp = jean2TempPrefix && normalizedPath.startsWith(jean2TempPrefix);
-
-    const isAllowedPath = ctx.allowedPaths?.some(root => isWithinRoot(normalizedPath, root)) ?? false;
-
-    if (!isJean2Temp && !isAllowedPath && !ctx.isWithinWorkspace(normalizedPath)) {
+    if (!isToolPathAllowed(ctx, normalizedPath, 'read')) {
       const approved = await ctx.ask(fileConcernAsk({
         operation: 'search', path: normalizedPath, root: ctx.workspacePath, concern: 'escape',
         ask: {

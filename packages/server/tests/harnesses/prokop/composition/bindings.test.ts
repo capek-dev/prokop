@@ -151,14 +151,17 @@ describe('Čapek binding group adapters', () => {
     })).rejects.toThrow('not available');
   });
 
-  test('the tool policy is identity now that the divergent git-worktree lifecycle is removed', async () => {
-    const readFile = { name: 'read-file' } as ToolDefinition;
+  test('the tool policy adds session temp guidance only to filesystem tools', async () => {
+    const readFile = { name: 'read-file', description: 'Read files' } as ToolDefinition;
     const customTool = { name: 'custom-tool' } as ToolDefinition;
 
-    expect(await jean2ToolPolicy.resolveDefinition?.({
+    const resolved = await jean2ToolPolicy.resolveDefinition?.({
       sessionId: 'session-1',
       definition: readFile,
-    })).toBe(readFile);
+    });
+    expect(resolved?.description).toContain('Read files');
+    expect(resolved?.description).toContain('jean2/session-1');
+    expect(readFile.description).toBe('Read files');
     expect(await jean2ToolPolicy.resolveDefinition?.({
       sessionId: 'session-1',
       definition: customTool,

@@ -7,6 +7,24 @@ function event(value: unknown): SDKMessage { return value as SDKMessage; }
 const base = { cwd: process.cwd(), prompt: 'read a file', sessionId: crypto.randomUUID(),
   resume: false, model: 'claude-sonnet-5', effort: 'medium', controller: new AbortController() };
 
+test('Claude temp environment is per turn and leaves the host environment intact', async () => {
+  const hostTemp = process.env.TMPDIR;
+  for (const tempDirectory of ['/scratch/first', '/scratch/second']) {
+    for await (const _item of runClaudeTurn({ ...base, tempDirectory,
+      canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
+      start: (_prompt, options) => {
+        expect(options.env).toMatchObject({ TMPDIR: tempDirectory, TEMP: tempDirectory, TMP: tempDirectory });
+        async function* stream(): AsyncGenerator<SDKMessage> {
+          yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+          yield event({ type: 'result', subtype: 'success', session_id: base.sessionId, result: 'done' });
+        }
+        return stream();
+      },
+    })) { /* Consume only fake events. */ }
+  }
+  expect(process.env.TMPDIR).toBe(hostTemp);
+});
+
 test('Claude chat sends its local user UUID as the native prompt UUID', async () => {
   const userMessageId = crypto.randomUUID();
   for await (const _item of runClaudeTurn({ ...base, userMessageId,

@@ -27,6 +27,7 @@ import { notifyHarnessTurnFinished } from '@/harnesses/shared/notifications';
 import { notifySessionFilesChanged } from '@/harnesses/shared/files-changed';
 import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
 import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
+import { ensureSessionTempDir, sessionTempInstructions } from '@/infrastructure/filesystem/session-temp';
 
 interface Binding {
   native_session_id: string;
@@ -212,6 +213,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         if (!selection) throw new Error('Choose a Claude model and effort before sending');
         // Mirror Codex's developer instructions: agent identity, workspace
         // context, and opted-in memory appended to Claude Code's own prompt.
+        const tempDirectory = ensureSessionTempDir(sessionId);
         let developerInstructions: string | undefined;
         let dynamicTools: SdkMcpToolDefinition[] = [];
         const sources = deps.instructions;
@@ -321,7 +323,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           openSegment = { part: { ...openSegment.part, text: next }, text: next };
         };
         for await (const event of runClaudeTurn({ cwd: root, prompt: content, images,
-          userMessageId: user.id, instructions: developerInstructions, dynamicTools,
+          userMessageId: user.id, instructions: [developerInstructions, sessionTempInstructions(tempDirectory)].filter(Boolean).join('\n\n'), dynamicTools, tempDirectory,
           goalCondition, sessionId: nativeId, resume: !!binding,
           model: selection.model, effort: selection.effort,
           controller, canUseTool: approvals.request(sessionId, session.workspaceId, root, wire.delivery,

@@ -9,6 +9,8 @@ import {
   stripRedundantCd,
   type ShellRiskContext,
 } from '@/domains/permissions';
+import { sessionTempEnvironment } from '@/infrastructure/filesystem/session-temp';
+import { isToolPathAllowed } from '@/harnesses/prokop/tools/file-permission';
 
 interface Input {
   command: string;
@@ -82,12 +84,13 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
     // Permissions v2: classify, then ask only when a real concern exists.
     // Clean and opaque-only findings skip the ask flow entirely; the mode
     // ceiling (server-side) decides the rest through the ask's derived risk.
-    const outsideWorkspaceCwd = !!input.cwd && !ctx.isWithinWorkspace(resolvedCwd);
+    const outsideWorkspaceCwd = !!input.cwd && !isToolPathAllowed(ctx, resolvedCwd, 'write');
     const classification = classifyShellCommand(effectiveCommand,
       [ctx.workspacePath, ctx.fs.tempDir], resolvedCwd, { cwdOutsideRoots: outsideWorkspaceCwd,
         readRoots: ctx.allowedPaths, isWithinRoots: path => ctx.isWithinWorkspace(path) });
 
-    if (classification && requiresHumanReview(classification.finding)) {
+    if (!classification) return { success: false, error: 'INVALID_COMMAND: permission classification failed' };
+    if (requiresHumanReview(classification.finding)) {
       const approved = await ctx.ask(classification.ask);
       if (!approved) return { success: false, error: 'USER_REJECTION' };
     }
@@ -101,6 +104,7 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
     const proc = Bun.spawn(shell, {
       cwd,
+      env: { ...process.env, ...sessionTempEnvironment(ctx.fs.tempDir) },
       stdout: 'pipe',
       stderr: 'pipe',
       ...(platform === 'windows' ? { windowsHide: true } : {}),

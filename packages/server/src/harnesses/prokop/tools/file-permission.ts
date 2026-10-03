@@ -10,9 +10,12 @@
  * and the client card chrome (concern chips, severity colors) see one truth.
  */
 
-import type { PermissionAsk } from '@prokopai/sdk';
+import { dirname } from 'node:path';
+import type { PermissionAsk, ToolContext } from '@prokopai/sdk';
 import {
   classifyFileOperation,
+  effectivePath,
+  isWithinRoot,
   concernRisk,
   type Concern,
   type ConcernsPermissionAsk,
@@ -45,16 +48,35 @@ export function fileConcernAsk(params: {
     ...params.ask,
     risk: concernRisk({
       concerns: [params.concern],
-      catastrophic: false,
+      catastrophic: classification?.finding.catastrophic ?? false,
       evidence: [],
       resolvedPaths: [],
     }),
     concerns: [params.concern],
-    catastrophic: false,
+    catastrophic: classification?.finding.catastrophic ?? false,
     evidence: [evidenceLine],
     ...(classification
       ? { paths: classification.ask.paths, action: classification.ask.action }
       : {}),
     resource: 'file',
   };
+}
+
+/** Shared path access for Prokop tools; temp never bypasses sensitive checks. */
+export function isToolPathAllowed(ctx: ToolContext, path: string, access: 'read' | 'write'): boolean {
+  const target = effectivePath(path);
+  // Additional roots are exposed only through a predicate. Find the allowed
+  // lexical boundary before resolving it, so OS aliases work without letting
+  // a symlink inside an allowed tree turn its outside target into a root.
+  let workspaceAllowed = ctx.isWithinWorkspace(target);
+  if (!workspaceAllowed && ctx.isWithinWorkspace(path)) {
+    let boundary = path;
+    while (dirname(boundary) !== boundary && ctx.isWithinWorkspace(dirname(boundary))) {
+      boundary = dirname(boundary);
+    }
+    workspaceAllowed = isWithinRoot(target, effectivePath(boundary));
+  }
+  return workspaceAllowed
+    || !!ctx.fs.tempDir && isWithinRoot(target, effectivePath(ctx.fs.tempDir))
+    || access === 'read' && (ctx.allowedPaths ?? []).some(root => isWithinRoot(target, effectivePath(root)));
 }

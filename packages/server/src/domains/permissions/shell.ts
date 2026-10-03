@@ -104,7 +104,7 @@ export function classifyShellCommand(
     isWithinRoots?: (path: string) => boolean;
   },
 ): ShellClassification | undefined {
-  if (typeof command !== 'string' || !command.trim() || command.length > 64 * 1024) return undefined;
+  if (typeof command !== 'string' || !command.trim() || command.includes('\0') || command.length > 64 * 1024) return undefined;
   // Native harnesses wrap unified exec in a login shell; inspect the inner command if present.
   const match = command.match(/^\/(?:bin\/)?(?:zsh|bash|sh)\s+-lc\s+'([\s\S]*)'$/);
   const effective = match ? match[1]!.replace(/'\\''/g, "'") : command;

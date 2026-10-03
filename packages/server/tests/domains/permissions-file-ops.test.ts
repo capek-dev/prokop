@@ -90,7 +90,7 @@ describe('classifyFileOperation (shared file-op analysis)', () => {
 
   test('concerns compose and the ask carries the full v2 shape', () => {
     const result = classifyFileOperation({
-      operation: 'delete', paths: ['/home/u/.ssh/config'], roots: [root],
+      operation: 'delete', paths: ['/outside/u/.ssh/config'], roots: [root],
     });
     expect(result?.finding.concerns).toEqual(['escape', 'sensitive', 'destructive']);
     expect(result?.ask.risk).toBe('high');

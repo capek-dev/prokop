@@ -1,6 +1,4 @@
 import { existsSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
 import { getJean2EnvValue } from '@/infrastructure/runtime/environment';
 import { agentDirectoryPath } from '@/domains/agents/home';
 import { getDataDir, getUploadDir } from '@/infrastructure/runtime/paths';
@@ -12,6 +10,7 @@ import {
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import type { Jean2CompatibilityBindings } from './types';
+import { ensureSessionTempDir } from '@/infrastructure/filesystem/session-temp';
 
 const managedWorktrees = createManagedWorktreeRepository(getDatabase);
 
@@ -49,7 +48,7 @@ export const jean2WorkspaceBindings: Jean2CompatibilityBindings['workspace'] = {
     // Read-only roots: uploads and the session agent's own directory (skills,
     // home, memory files), matching harnesses/shared/permission-roots.ts.
     allowedRoots: [getUploadDir(), ...agentDirectoryRoots(sessionId)],
-    tempDir: join(tmpdir(), 'jean2', sessionId),
+    tempDir: ensureSessionTempDir(sessionId),
     getEnvironmentValue: getJean2EnvValue,
     addAdditionalRoot: workspaceId
       ? (path: string) => addWorkspaceAdditionalPath(workspaceId, path)

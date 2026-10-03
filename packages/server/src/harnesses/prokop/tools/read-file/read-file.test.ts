@@ -10,6 +10,26 @@ beforeEach(() => {
   ctx = createMockContext(vfs);
 });
 
+test('session temp reads skip only escape approval, never sensitive approval', async () => {
+  const path = `${ctx.fs.tempDir}/scratch.txt`;
+  vfs.writeFile(path, 'scratch');
+  expect((await execute({ path }, ctx)).success).toBe(true);
+  expect(ctx.ask).not.toHaveBeenCalled();
+  const secret = `${ctx.fs.tempDir}/.env`;
+  vfs.writeFile(secret, 'fake');
+  const denied = createMockContext(vfs, { ask: mock(async () => false) as unknown as typeof ctx.ask });
+  expect((await execute({ path: secret }, denied)).success).toBe(false);
+  expect(denied.ask).toHaveBeenCalled();
+});
+
+test('another session temp directory requires approval', async () => {
+  const path = '/tmp/jean2/another-session/scratch.txt';
+  vfs.writeFile(path, 'scratch');
+  const denied = createMockContext(vfs, { ask: mock(async () => false) as unknown as typeof ctx.ask });
+  expect((await execute({ path }, denied)).success).toBe(false);
+  expect(denied.ask).toHaveBeenCalled();
+});
+
 // ══════════════════════════════════════════════════════════════════
 // Tool Definition
 // ══════════════════════════════════════════════════════════════════
