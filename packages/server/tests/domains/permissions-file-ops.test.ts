@@ -18,6 +18,17 @@ describe('classifyFileOperation (shared file-op analysis)', () => {
     expect(requiresHumanReview(result!.finding)).toBe(false);
   });
 
+  test('read-only roots satisfy reads and searches but not writes or deletes', () => {
+    const readRoots = ['/agent'];
+    const concernsFor = (operation: 'read' | 'search' | 'edit' | 'delete') => classifyFileOperation({
+      operation, paths: ['/agent/skills/x/SKILL.md'], roots: [root], readRoots,
+    })?.finding.concerns;
+    expect(concernsFor('read')).toEqual([]);
+    expect(concernsFor('search')).toEqual([]);
+    expect(concernsFor('edit')).toEqual(['escape']);
+    expect(concernsFor('delete')).toEqual(['escape', 'destructive']);
+  });
+
   test('sensitive paths raise the sensitive concern and high risk', () => {
     const result = classifyFileOperation({
       operation: 'read', paths: [`${root}/.env`], roots: [root],

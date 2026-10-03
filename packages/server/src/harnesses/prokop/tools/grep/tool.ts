@@ -2,6 +2,7 @@ import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 import type { FileListVisualization } from '@prokopai/sdk';
 import ignore from 'ignore';
 import picomatch from 'picomatch';
+import { isWithinRoot } from '@/domains/permissions';
 import { fileConcernAsk } from '../file-permission';
 
 interface Input {
@@ -199,7 +200,9 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
     const jean2TempPrefix = tempDir ? `${tempDir.replace(/[/\\]$/, '')}/jean2/` : '';
     const isJean2Temp = jean2TempPrefix && normalizedPath.startsWith(jean2TempPrefix);
 
-    if (!isJean2Temp && !ctx.isWithinWorkspace(normalizedPath)) {
+    const isAllowedPath = ctx.allowedPaths?.some(root => isWithinRoot(normalizedPath, root)) ?? false;
+
+    if (!isJean2Temp && !isAllowedPath && !ctx.isWithinWorkspace(normalizedPath)) {
       const approved = await ctx.ask(fileConcernAsk({
         operation: 'search', path: normalizedPath, root: ctx.workspacePath, concern: 'escape',
         ask: {

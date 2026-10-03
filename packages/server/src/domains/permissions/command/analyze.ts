@@ -39,6 +39,12 @@ import {
 export interface CommandAnalyzeContext {
   /** Allowed roots (session root, workspace `.prokopai`, `~/.prokopai`, temp). */
   readonly roots: readonly string[];
+  /** Read-only roots (agent directory, uploads): operands of read-only
+   * commands and `<` redirects may sit here without escaping. */
+  readonly readRoots?: readonly string[];
+  /** Extra containment check the caller owns (the Prokop tool context knows
+   * its additional workspace roots only as a predicate). */
+  readonly isWithinRoots?: (path: string) => boolean;
   /** Directory the command runs in. */
   readonly cwd: string;
   /** Current user's home, for `~` expansion and protected-target checks. */
@@ -186,6 +192,20 @@ const FILE_ORIENTED_COMMANDS = new Set([
   'rm', 'mv', 'cp', 'ln', 'cd', 'pushd',
 ]);
 
+/** Bases that only read their path operands, so read-only roots satisfy
+ * them. Commands with write forms (sort -o, uniq OUT, sed -i, tee, xxd -r)
+ * stay out; find qualifies only without its acting predicates. */
+const READ_ONLY_COMMANDS = new Set([
+  'cat', 'head', 'tail', 'less', 'more', 'wc', 'file', 'stat', 'ls', 'tree',
+  'grep', 'egrep', 'fgrep', 'rg', 'diff', 'comm', 'cut', 'nl', 'du',
+  'realpath', 'readlink', 'md5', 'md5sum', 'shasum', 'sha1sum', 'sha256sum',
+  'find', 'cd', 'pushd',
+]);
+
+const FIND_ACTIONS = new Set([
+  '-delete', '-exec', '-execdir', '-ok', '-okdir', '-fprint', '-fprint0', '-fprintf', '-fls',
+]);
+
 /** Bases whose arguments are executed as code (so quoted strings are active
  * for the token screen, and screened tokens escalate even without flags). */
 const EXEC_BASES = new Set([
@@ -230,6 +250,16 @@ function resolveOperand(raw: string, cwd: string, home: string): string | null {
   if (isAbsolute(candidate)) return resolve(candidate);
   if (hasGlob) return resolve(candidate);
   return resolve(cwd, candidate);
+}
+
+function withinAny(path: string, roots: readonly string[]): boolean {
+  return roots.some(root => path === root || path.startsWith(root + '/'));
+}
+
+/** True when an effective path sits inside the allowed roots for the access. */
+function isAllowedTarget(path: string, ctx: CommandAnalyzeContext, access: 'read' | 'write'): boolean {
+  return withinAny(path, ctx.roots) || ctx.isWithinRoots?.(path) === true
+    || access === 'read' && withinAny(path, ctx.readRoots ?? []);
 }
 
 /** Symlink-resolved path; missing tails keep their literal spelling. */
@@ -418,22 +448,25 @@ function analyzeSegment(
 
   // Path operands: escape, sensitive, unresolvable-opaque.
   const isFileCommand = FILE_ORIENTED_COMMANDS.has(base);
-  const operandCandidates: Array<{ raw: string; resolved: string | null }> = [];
-  const pushOperand = (raw: string): void => {
+  // Read-only roots satisfy operands only when the whole invocation reads.
+  const operandAccess: 'read' | 'write' = READ_ONLY_COMMANDS.has(base)
+    && !(base === 'find' && args.some(arg => FIND_ACTIONS.has(arg))) ? 'read' : 'write';
+  const operandCandidates: Array<{ raw: string; resolved: string | null; access: 'read' | 'write' }> = [];
+  const pushOperand = (raw: string, access: 'read' | 'write'): void => {
     if (raw === '' || raw.startsWith('-')) return;
     if (isLikelyUrl(raw)) return;
     const resolved = resolveOperand(raw, cwdAtStart, ctx.home);
-    operandCandidates.push({ raw, resolved });
+    operandCandidates.push({ raw, resolved, access });
   };
-  for (const word of words.slice(1)) pushOperand(word.text);
+  for (const word of words.slice(1)) pushOperand(word.text, word.redirect === 'write' ? 'write' : operandAccess);
   if (isFileCommand && operandCandidates.length === 0 && (base === 'ls' || base === 'find')) {
-    operandCandidates.push({ raw: cwdAtStart, resolved: resolve(cwdAtStart) });
+    operandCandidates.push({ raw: cwdAtStart, resolved: resolve(cwdAtStart), access: operandAccess });
   }
   for (const target of redirectTargets) {
     const resolved = resolveOperand(target.text, cwdAtStart, ctx.home);
     if (resolved !== null) {
       const effective = toEffective(resolved);
-      if (!ctx.roots.some(root => effective === root || effective.startsWith(root + '/'))) {
+      if (!isAllowedTarget(effective, ctx, target.redirect === 'read' ? 'read' : 'write')) {
         result.concerns.add('escape');
         result.evidence.push(`redirect target ${effective} is outside the allowed roots`);
       }
@@ -442,7 +475,7 @@ function analyzeSegment(
       result.evidence.push(`unresolvable redirect target ${target.text}`);
     }
   }
-  for (const { raw, resolved } of operandCandidates) {
+  for (const { raw, resolved, access } of operandCandidates) {
     if (resolved === null) {
       if (raw.includes('$')) {
         result.concerns.add('opaque');
@@ -452,7 +485,7 @@ function analyzeSegment(
     }
     const effective = toEffective(resolved);
     result.resolvedPaths.push(effective);
-    if (!ctx.roots.some(root => effective === root || effective.startsWith(root + '/'))) {
+    if (!isAllowedTarget(effective, ctx, access)) {
       result.concerns.add('escape');
       result.evidence.push(`path ${effective} is outside the allowed roots`);
     }

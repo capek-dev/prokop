@@ -22,6 +22,7 @@ import { CodexChildTimelines } from './child-timelines';
 import { logCodexPermissionDenial } from './permission-diagnostics';
 import { createPretoolChannel, verifyPretoolHook, type PretoolChannel, type HookDecision } from './pretool-hook';
 import { classifyCodexHook } from './hook-policy';
+import { sessionPermissionRoots } from '@/harnesses/shared/permission-roots';
 import { parseCodexGoal, publishCodexGoal, validGoalBudget } from './goal';
 import { parseCodexContextUsage, publishCodexContextUsage } from './usage';
 import { createCodexMemoryTools } from './memory-tools';
@@ -838,7 +839,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
               } catch { return 'working-directory'; }
               const childId = children.childSessionId(childThreadId);
               if (!childId) return 'unknown-turn';
-              const ask = classifyCodexHook(call, root);
+              const ask = classifyCodexHook(call, sessionPermissionRoots(getSession(sessionId) ?? session, root));
               if (ask === undefined) return 'unsupported-command';
               if (ask === null) return true;
               const input = codexObject(call.tool_input);
@@ -907,7 +908,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         connection.parentHook = async call => {
           if (!run?.turnId || completed || run.stopRequested || call.cwd !== root
             || call.session_id !== run.threadId || call.turn_id !== run.turnId) return 'no-active-turn';
-          const ask = classifyCodexHook(call, root);
+          const ask = classifyCodexHook(call, sessionPermissionRoots(getSession(sessionId) ?? session, root));
           if (ask === undefined) return 'unsupported-command';
           if (ask === null) return true;
           const input = codexObject(call.tool_input);

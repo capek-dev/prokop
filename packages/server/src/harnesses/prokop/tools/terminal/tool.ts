@@ -105,7 +105,8 @@ async function requestPermission(
   // Permissions v2: ask only when a real concern exists; the mode ceiling
   // decides through the ask's risk (derived from the Finding).
   const classification = classifyShellCommand(effectiveCommand,
-    [ctx.workspacePath, ctx.fs.tempDir], executionCwd);
+    [ctx.workspacePath, ctx.fs.tempDir], executionCwd,
+    { readRoots: ctx.allowedPaths, isWithinRoots: path => ctx.isWithinWorkspace(path) });
   if (!classification || !requiresHumanReview(classification.finding)) return true;
 
   return (await ctx.ask(classification.ask)) === true;

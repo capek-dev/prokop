@@ -84,7 +84,8 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
     // ceiling (server-side) decides the rest through the ask's derived risk.
     const outsideWorkspaceCwd = !!input.cwd && !ctx.isWithinWorkspace(resolvedCwd);
     const classification = classifyShellCommand(effectiveCommand,
-      [ctx.workspacePath, ctx.fs.tempDir], resolvedCwd, { cwdOutsideRoots: outsideWorkspaceCwd });
+      [ctx.workspacePath, ctx.fs.tempDir], resolvedCwd, { cwdOutsideRoots: outsideWorkspaceCwd,
+        readRoots: ctx.allowedPaths, isWithinRoots: path => ctx.isWithinWorkspace(path) });
 
     if (classification && requiresHumanReview(classification.finding)) {
       const approved = await ctx.ask(classification.ask);

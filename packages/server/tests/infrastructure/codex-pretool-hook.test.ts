@@ -6,13 +6,14 @@ import type { CodexConnection } from '@/harnesses/codex-cli/app-server';
 import { logCodexPermissionDenial } from '@/harnesses/codex-cli/permission-diagnostics';
 
 const root = '/workspace';
+const allowed = { roots: [root], readRoots: [] };
 const base: CodexHookCall = {
   session_id: 'thread-1', turn_id: 'turn-1', tool_use_id: 'call-1',
   hook_event_name: 'PreToolUse', cwd: root, tool_name: 'Bash', tool_input: { command: 'ls' },
 };
 
 function shell(command: string): ReturnType<typeof classifyCodexHook> {
-  return classifyCodexHook({ ...base, tool_input: { command } }, root);
+  return classifyCodexHook({ ...base, tool_input: { command } }, allowed);
 }
 
 test('classifies sensitive reads, outside paths and recognizable deletion, but not ordinary reads', () => {
@@ -24,7 +25,7 @@ test('classifies sensitive reads, outside paths and recognizable deletion, but n
 });
 
 test('classifies patch edits, sensitive paths, outside writes and deletions', () => {
-  const patch = (command: string) => classifyCodexHook({ ...base, tool_name: 'apply_patch', tool_input: { command } }, root);
+  const patch = (command: string) => classifyCodexHook({ ...base, tool_name: 'apply_patch', tool_input: { command } }, allowed);
   expect(patch('*** Begin Patch\n*** Update File: src/app.ts\n*** End Patch')).toBeNull();
   expect(patch('*** Begin Patch\n*** Update File: .env\n*** End Patch')).toMatchObject({ resource: 'file' });
   expect(patch('*** Begin Patch\n*** Add File: ../outside.txt\n*** End Patch')).toMatchObject({ resource: 'file' });
@@ -32,10 +33,26 @@ test('classifies patch edits, sensitive paths, outside writes and deletions', ()
   expect(patch('not a patch')).toBeUndefined();
 });
 
+test('allowed roots: additional paths read and write, agent directory reads only', () => {
+  const agent = '/data/agents/coder';
+  const roots = { roots: [root, '/extra'], readRoots: [agent] };
+  const run = (command: string) => classifyCodexHook({ ...base, tool_input: { command } }, roots);
+  const patch = (path: string) => classifyCodexHook({ ...base, tool_name: 'apply_patch',
+    tool_input: { command: `*** Begin Patch\n*** Update File: ${path}\n*** End Patch` } }, roots);
+  expect(run(`cat ${agent}/skills/frontend/SKILL.md .agents/skills/shadcn/SKILL.md`)).toBeNull();
+  expect(run('cat /extra/README.md && touch /extra/notes.txt')).toBeNull();
+  expect(patch('/extra/src/app.ts')).toBeNull();
+  expect(run(`cp a.txt ${agent}/skills/x.md`)).toMatchObject({ concerns: ['escape'] });
+  expect(run(`cat a.txt > ${agent}/MEMORY.md`)).toMatchObject({ concerns: ['escape'] });
+  expect(run(`find ${agent} -delete`)).toMatchObject({ concerns: expect.arrayContaining(['escape']) });
+  expect(patch(`${agent}/skills/x/SKILL.md`)).toMatchObject({ concerns: ['escape'] });
+  expect(run('cat /elsewhere/file.txt')).toMatchObject({ concerns: ['escape'] });
+});
+
 test('rejects malformed hook calls and does not classify unknown tools', () => {
   expect(validHookCall({ ...base, tool_name: 'WebSearch' })).toBe(false);
   expect(validHookCall({ ...base, turn_id: '' })).toBe(false);
-  expect(classifyCodexHook({ ...base, tool_input: { command: '' } }, root)).toBeUndefined();
+  expect(classifyCodexHook({ ...base, tool_input: { command: '' } }, allowed)).toBeUndefined();
 });
 
 const hash = `sha256:${'a'.repeat(64)}`;

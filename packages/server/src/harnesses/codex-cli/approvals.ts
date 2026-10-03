@@ -4,8 +4,10 @@ import type { PermissionAsk } from '@prokopai/sdk';
 import {
   classifyShellCommand,
   grantScopesForFinding,
+  readAskConcerns,
   shouldAutoApproveAsk,
 } from '@/domains/permissions';
+import { sessionPermissionRoots } from '@/harnesses/shared/permission-roots';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { createPendingAsk, expirePermissionRequest,
@@ -175,10 +177,13 @@ export class CodexApprovals {
       }
     }
 
+    const session = getSession(sessionId);
     const ask: PermissionAsk = command ? (() => {
       // Permissions v2: the native approval ask carries the classified
       // concerns, so the mode ceiling decides exactly like the hook path.
-      const classification = classifyShellCommand(params.command as string, root, params.cwd as string);
+      const allowed = session ? sessionPermissionRoots(session, root) : { roots: [root], readRoots: [] };
+      const classification = classifyShellCommand(params.command as string, allowed.roots, params.cwd as string,
+        { readRoots: allowed.readRoots });
       return classification ? { ...classification.ask,
         question: 'Allow Codex to run this command?',
         description: typeof params.reason === 'string' ? params.reason : `Working directory: ${root}`,
@@ -195,6 +200,10 @@ export class CodexApprovals {
       description: typeof params.reason === 'string' ? params.reason : 'Codex did not provide file paths for this request.',
       resource: 'file', action: 'write', risk: 'critical', allowedScopes: ['once'],
     };
+    // Classified commands follow the session mode like the hook path; file
+    // changes (no paths) and unclassifiable commands carry no concerns and ask.
+    if (command && readAskConcerns(ask) && session?.harness === 'codex-cli'
+      && shouldAutoApproveAsk(ask, session.permissionMode ?? 'standard')) return { decision: 'accept' };
     const decision = await this.enqueue(ask, command ? COMMAND_TOOL : FILE_TOOL, key, sessionId, workspaceId,
       delivery, controllerSessionId);
     if (decision.decision === 'decline') logCodexPermissionDenial('native', 'ask-declined');

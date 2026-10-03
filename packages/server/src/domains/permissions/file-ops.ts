@@ -61,6 +61,9 @@ export function classifyFileOperation(params: {
   paths: readonly string[];
   /** Allowed roots (workspace root and any additional allowed paths). */
   roots: readonly string[];
+  /** Read-only roots (agent directory, uploads) that satisfy read and search
+   * operations but never writes or deletes. */
+  readRoots?: readonly string[];
   /** Optional search pattern (grep/glob) analyzed for sensitive content. */
   pattern?: string;
 }): FileOperationClassification | undefined {
@@ -68,8 +71,11 @@ export function classifyFileOperation(params: {
     (path) => typeof path === 'string' && path.length > 0 && !path.includes('\0') && path.length <= 4096,
   );
   if (paths.length === 0 || paths.length > 100) return undefined;
-  const roots = params.roots.filter((root) => typeof root === 'string' && root.length > 0);
-  if (roots.length === 0) return undefined;
+  const writeRoots = params.roots.filter((root) => typeof root === 'string' && root.length > 0);
+  if (writeRoots.length === 0) return undefined;
+  const roots = OPERATION_ACTIONS[params.operation] === 'read'
+    ? [...writeRoots, ...(params.readRoots ?? []).filter((root) => typeof root === 'string' && root.length > 0)]
+    : writeRoots;
 
   const concerns: Concern[] = [];
   const evidence: string[] = [];

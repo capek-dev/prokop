@@ -1,6 +1,7 @@
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import { shouldAutoApproveAsk } from '@/domains/permissions';
 import { classifyClaudeTool } from './tool-policy';
+import { sessionPermissionRoots } from '@/harnesses/shared/permission-roots';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { createPendingAsk, expirePermissionRequest, resolvePermissionRequestByRequestId } from '@/infrastructure/sqlite/pending-asks';
@@ -66,7 +67,8 @@ export class ClaudeApprovals {
         }
         return { behavior: 'allow' };
       }
-      const ask = classifyClaudeTool(toolName, input as Record<string, unknown>, root);
+      const ask = classifyClaudeTool(toolName, input as Record<string, unknown>, root,
+        sessionPermissionRoots(session, root));
       if (ask === null) return denied('Malformed Claude tool');
       // Tools without a Prokop risk rule use the SDK's native behavior, regardless of the session ceiling.
       if (ask === undefined) return { behavior: 'allow' };

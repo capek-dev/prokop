@@ -96,7 +96,13 @@ export function classifyShellCommand(
   command: string,
   root: string | readonly string[],
   cwd: string,
-  options?: { cwdOutsideRoots?: boolean },
+  options?: {
+    cwdOutsideRoots?: boolean;
+    /** Read-only roots (agent directory, uploads); see CommandAnalyzeContext. */
+    readRoots?: readonly string[];
+    /** Caller-owned containment check for additional workspace roots. */
+    isWithinRoots?: (path: string) => boolean;
+  },
 ): ShellClassification | undefined {
   if (typeof command !== 'string' || !command.trim() || command.length > 64 * 1024) return undefined;
   // Native harnesses wrap unified exec in a login shell; inspect the inner command if present.
@@ -104,7 +110,9 @@ export function classifyShellCommand(
   const effective = match ? match[1]!.replace(/'\\''/g, "'") : command;
 
   const roots = typeof root === 'string' ? [root] : root;
-  const analyzed = analyzeCommand(effective, { roots, cwd, home: homedir() });
+  const analyzed = analyzeCommand(effective, {
+    roots, readRoots: options?.readRoots, isWithinRoots: options?.isWithinRoots, cwd, home: homedir(),
+  });
   const finding: Finding = options?.cwdOutsideRoots && !analyzed.concerns.includes('escape')
     ? {
         ...analyzed,

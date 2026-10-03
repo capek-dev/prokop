@@ -5,6 +5,7 @@ import {
   requiresHumanReview,
   type ConcernsPermissionAsk,
 } from '@/domains/permissions';
+import type { SessionPermissionRoots } from '@/harnesses/shared/permission-roots';
 
 export interface CodexHookCall {
   session_id: string;
@@ -29,7 +30,9 @@ export function validHookCall(value: unknown): value is CodexHookCall {
  * malformed input. The ask carries the permissions-v2 concern fields, so the
  * approval decision (shouldAutoApproveAsk) follows the session mode. Only the
  * native apply_patch format is Codex-specific. */
-export function classifyCodexHook(call: CodexHookCall, root: string): ConcernsPermissionAsk | null | undefined {
+export function classifyCodexHook(
+  call: CodexHookCall, allowed: SessionPermissionRoots,
+): ConcernsPermissionAsk | null | undefined {
   const input = call.tool_input;
   if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined;
   const command = (input as Record<string, unknown>).command;
@@ -43,14 +46,14 @@ export function classifyCodexHook(call: CodexHookCall, root: string): ConcernsPe
     const classification = classifyFileOperation({
       operation: deleting ? 'delete' : 'edit',
       paths: resolved,
-      roots: [root],
+      roots: allowed.roots,
     });
     if (!classification) return undefined;
     if (!requiresHumanReview(classification.finding)) return null;
     return { ...classification.ask,
       question: `Allow Codex to ${deleting ? 'delete or change' : 'change'} ${resolved.length} file(s)?` };
   }
-  const classification = classifyShellCommand(command, root, call.cwd);
+  const classification = classifyShellCommand(command, allowed.roots, call.cwd, { readRoots: allowed.readRoots });
   if (!classification) return undefined;
   if (!requiresHumanReview(classification.finding)) return null;
   return { ...classification.ask,

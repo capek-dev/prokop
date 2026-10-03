@@ -6,6 +6,7 @@ import {
   type ConcernsPermissionAsk,
   type FileOperation,
 } from '@/domains/permissions';
+import type { SessionPermissionRoots } from '@/harnesses/shared/permission-roots';
 
 const valid = (value: unknown): value is string => typeof value === 'string'
   && !!value.trim() && value.length <= 64 * 1024 && !value.includes('\0');
@@ -20,10 +21,12 @@ export function classifyClaudeTool(
   toolName: string,
   input: Record<string, unknown>,
   root: string,
+  allowed: SessionPermissionRoots = { roots: [root], readRoots: [] },
 ): ConcernsPermissionAsk | null | undefined {
   if (toolName === 'Bash') {
     if (!valid(input.command)) return null;
-    const classification = classifyShellCommand(input.command, root, root);
+    const classification = classifyShellCommand(input.command, allowed.roots, root,
+      { readRoots: allowed.readRoots });
     if (!classification) return null;
     if (!requiresHumanReview(classification.finding)) return undefined;
     return { ...classification.ask,
@@ -70,7 +73,8 @@ export function classifyClaudeTool(
   const classification = classifyFileOperation({
     operation: operation!,
     paths: [path!],
-    roots: [root],
+    roots: allowed.roots,
+    readRoots: allowed.readRoots,
     pattern,
   });
   if (!classification) return null;

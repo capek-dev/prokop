@@ -443,13 +443,21 @@ test('Codex command approval uses ask UI, exact session grants and one-time repl
   await waitFor(() => processes[0]?.sent.some(message => message.method === 'turn/start') ?? false);
   const fake = processes[0]!;
   fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  // Clean escalations follow the standard mode without an ask.
+  fake.send({ id: 87, method: 'item/commandExecution/requestApproval', params: {
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-0', command: 'git add src/a.ts', cwd: process.cwd(),
+    reason: 'Allow staging?',
+  } });
+  await waitFor(() => fake.sent.some(message => message.id === 87));
+  expect(fake.sent.find(message => message.id === 87)?.result).toEqual({ decision: 'accept' });
+  expect(messages.some(message => message.type === 'ask.request')).toBe(false);
   fake.send({ id: 88, method: 'item/commandExecution/requestApproval', params: {
-    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command: 'git status', cwd: process.cwd(),
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command: 'cat /outside/a.txt', cwd: process.cwd(),
   } });
   await waitFor(() => messages.some(message => message.type === 'ask.request'));
   const ask = messages.find(message => message.type === 'ask.request')!;
-  expect(ask.ask).toMatchObject({ risk: 'low', concerns: [], allowedScopes: ['once', 'session', 'workspace'],
-    metadata: { command: 'git status' } });
+  expect(ask.ask).toMatchObject({ risk: 'medium', concerns: ['escape'], allowedScopes: ['once', 'session', 'workspace'],
+    metadata: { command: 'cat /outside/a.txt' } });
   expect(codexApprovals.getSessionId(ask.toolCallId, ask.requestId)).toBe('s');
   expect(codexApprovals.getSessionId(ask.toolCallId, 'wrong')).toBeNull();
   expect(await codexApprovals.resolve(ask.toolCallId, { type: 'permission', grant: 'session' }, ask.requestId)).toBe(true);
@@ -457,13 +465,13 @@ test('Codex command approval uses ask UI, exact session grants and one-time repl
   expect(fake.sent.find(message => message.id === 88)?.result).toEqual({ decision: 'accept' });
   expect(getPermissionRequestByRequestId(ask.requestId!)?.status).toBe('approved');
   fake.send({ id: 89, method: 'item/commandExecution/requestApproval', params: {
-    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-2', command: 'git status', cwd: process.cwd(),
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-2', command: 'cat /outside/a.txt', cwd: process.cwd(),
   } });
   await waitFor(() => fake.sent.some(message => message.id === 89));
   expect(fake.sent.find(message => message.id === 89)?.result).toEqual({ decision: 'accept' });
   expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(1);
   fake.send({ id: 90, method: 'item/commandExecution/requestApproval', params: {
-    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-3', command: 'git diff', cwd: process.cwd(),
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-3', command: 'cat /outside/b.txt', cwd: process.cwd(),
   } });
   await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 2);
   const other = messages.filter(message => message.type === 'ask.request')[1]!;
@@ -597,7 +605,7 @@ test('Codex hook accepts only spawned child threads in the selected root for the
   expect(fake.sent.find(entry => entry.id === 201)?.result).toEqual({ decision: 'accept' });
   fake.send({ id: 203, method: 'item/commandExecution/requestApproval', params: {
     threadId: 'child-1', turnId: 'child-turn', itemId: 'nested',
-    cwd: join(process.cwd(), 'src'), command: 'rg --files',
+    cwd: join(process.cwd(), 'src'), command: 'cat /outside/a.txt',
   } });
   await waitFor(() => messages.filter(message => message.type === 'ask.request').length === 4);
   const nestedAsk = messages.filter(message => message.type === 'ask.request')[3]!;
@@ -830,7 +838,8 @@ test('Codex hook auto-approval follows the current session risk and remains once
 
   updateSession('s', { permissionMode: 'full' });
   expect(await request('high', 'item-3')).toBe(true);
-  const nativeCritical = approvals.request('item/commandExecution/requestApproval', { ...native, itemId: 'other' },
+  const nativeCritical = approvals.request('item/commandExecution/requestApproval',
+    { ...native, itemId: 'other', command: 'rm -rf /' },
     'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
   expect(asks()).toBe(2);
   approvals.cancelSession('s');
@@ -1032,7 +1041,7 @@ test('grant persistence failure declines and rolls back the approval', async () 
   await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
   fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
   fake.send({ id: 91, method: 'item/commandExecution/requestApproval', params: {
-    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command: 'git status', cwd: process.cwd(),
+    threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command: 'cat /outside/a.txt', cwd: process.cwd(),
   } });
   await waitFor(() => messages.some(message => message.type === 'ask.request'));
   const ask = messages.find(message => message.type === 'ask.request')!;
