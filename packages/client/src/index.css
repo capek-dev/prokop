@@ -980,13 +980,19 @@ main {
 
 /* Inline tool-output previews (terminal output, written files): cap the
    height so a single large output (e.g. cat of a long file) cannot dominate
-   the transcript; the body scrolls inside instead. dvh term keeps the cap
-   proportional on short/mobile viewports, overscroll-contain stops wheel/
-   touch scrolls from chaining into the transcript while inside the cap. */
+   the transcript; the body scrolls inside instead. Desktop/sm-viewports
+   only: on phones the nested scroller intercepts touch scroll before it can
+   chain to the transcript, so mobile renders the output fully and uncapped.
+   640px matches the sm: breakpoint used across the app. */
+@media (min-width: 640px) {
+  .tool-output-scroll {
+    max-height: min(24rem, 45dvh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 .tool-output-scroll {
-  max-height: min(24rem, 45dvh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent) transparent;
 }

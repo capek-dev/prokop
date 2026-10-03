@@ -252,13 +252,13 @@ function resolveOperand(raw: string, cwd: string, home: string): string | null {
   if (hasGlob) {
     const prefix = raw.slice(0, Math.min(...globIndex));
     // Resolve the glob-free prefix as a directory (`*.log` -> cwd, `/tmp/x*` -> /tmp).
-    candidate = prefix === '' || prefix.endsWith('/') ? prefix || '.' : prefix.slice(0, prefix.lastIndexOf('/')) || '/';
-    if (candidate === '.' && !raw.startsWith('/')) return resolve(cwd);
+    const lastSlash = prefix.lastIndexOf('/');
+    candidate = prefix.endsWith('/') ? prefix
+      : lastSlash < 0 ? '.' : prefix.slice(0, lastSlash) || '/';
   }
   if (candidate === '~') return home;
   if (candidate.startsWith('~/')) return resolve(home, candidate.slice(2));
   if (isAbsolute(candidate)) return resolve(candidate);
-  if (hasGlob) return resolve(candidate);
   return resolve(cwd, candidate);
 }
 
