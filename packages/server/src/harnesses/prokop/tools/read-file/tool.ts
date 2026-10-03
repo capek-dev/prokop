@@ -1,6 +1,7 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 import type { NoneVisualization } from '@prokopai/sdk';
 import { createFilePermissionAsk, SENSITIVE_FILE_PATTERNS } from '@prokopai/sdk';
+import { fileConcernAsk } from '../file-permission';
 import { createHash } from 'node:crypto';
 
 const DEFAULT_READ_LIMIT = 2000;
@@ -88,11 +89,14 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
       // Outside workspace permission ask
       if (outsideWorkspace) {
-        const permAsk = createFilePermissionAsk({
-          path: input.path,
-          operation: 'read',
-          risk: 'medium',
-          isOutsideWorkspace: true,
+        const permAsk = fileConcernAsk({
+          operation: 'read', path: resolvedPath, root: ctx.workspacePath, concern: 'escape',
+          ask: createFilePermissionAsk({
+            path: input.path,
+            operation: 'read',
+            risk: 'medium',
+            isOutsideWorkspace: true,
+          }),
         });
 
         const approved = await ctx.ask(permAsk);
@@ -101,12 +105,15 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
       // Sensitive file permission ask (separate ask for clarity)
       if (sensitive) {
-        const permAsk = createFilePermissionAsk({
-          path: input.path,
-          operation: 'read',
-          risk: 'medium',
-          isSensitiveFile: true,
-          reason: 'This file may contain credentials or secrets.',
+        const permAsk = fileConcernAsk({
+          operation: 'read', path: resolvedPath, root: ctx.workspacePath, concern: 'sensitive',
+          ask: createFilePermissionAsk({
+            path: input.path,
+            operation: 'read',
+            risk: 'medium',
+            isSensitiveFile: true,
+            reason: 'This file may contain credentials or secrets.',
+          }),
         });
 
         const approved = await ctx.ask(permAsk);

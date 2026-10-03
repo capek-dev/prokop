@@ -1,6 +1,7 @@
 // MIT License — https://github.com/jojomondag/FileToMarkdown
 // Adapted from jojomondag/FileToMarkdown (MIT) — converted per-converter logic ported to TypeScript + Jean2 wrapper
 import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
+import { fileConcernAsk } from '../file-permission';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const DEFAULT_READ_LIMIT = 2000;
@@ -531,24 +532,30 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
     const isAllowedPath = ctx.allowedPaths && ctx.allowedPaths.some((p) => resolvedPath.startsWith(p));
 
     if (!isJean2Temp && !isAllowedPath && !ctx.isWithinWorkspace(resolvedPath)) {
-      const approved = await ctx.ask({
-        target: 'permission',
-        type: 'permission',
-        question: 'Reading from files outside the workspace requires approval.',
-        risk: 'medium',
-        metadata: { permissionKey: 'path:outside_workspace', permissionType: 'action' },
-      });
+      const approved = await ctx.ask(fileConcernAsk({
+        operation: 'read', path: resolvedPath, root: ctx.workspacePath, concern: 'escape',
+        ask: {
+          target: 'permission',
+          type: 'permission',
+          question: 'Reading from files outside the workspace requires approval.',
+          risk: 'medium',
+          metadata: { permissionKey: 'path:outside_workspace', permissionType: 'action' },
+        },
+      }));
       if (!approved) return { success: false, error: 'USER_REJECTION' };
     }
 
     if (ctx.isSensitivePath(resolvedPath)) {
-      const approved = await ctx.ask({
-        target: 'permission',
-        type: 'permission',
-        question: 'Reading from sensitive files requires approval.',
-        risk: 'medium',
-        metadata: { permissionKey: 'file_pattern:sensitive', permissionType: 'action' },
-      });
+      const approved = await ctx.ask(fileConcernAsk({
+        operation: 'read', path: resolvedPath, root: ctx.workspacePath, concern: 'sensitive',
+        ask: {
+          target: 'permission',
+          type: 'permission',
+          question: 'Reading from sensitive files requires approval.',
+          risk: 'medium',
+          metadata: { permissionKey: 'file_pattern:sensitive', permissionType: 'action' },
+        },
+      }));
       if (!approved) return { success: false, error: 'USER_REJECTION' };
     }
 

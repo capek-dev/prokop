@@ -1,13 +1,10 @@
 import { memo, useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, ExternalLink, Copy, Check, Loader2, CheckCircle, XCircle, Clock, Pause } from 'lucide-react';
-import type { ToolPart, AnyVisualization, AskResponse, Session } from '@prokopai/sdk';
+import type { ToolPart, AnyVisualization } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { VisualizationRenderer } from '@/components/visualizations';
 import { TerminalOutput } from '@/components/visualizations/TerminalOutput';
-import { AskQuestion } from './AskQuestion';
-import type { PendingAskRequest } from '@/stores/askStore';
-import { useSessionStore } from '@/stores/sessionStore';
 import { RENDER_BUDGETS } from '@/lib/renderBudgets';
 import { getToolRowInfo, showToolRawData } from '@/lib/toolSummaries';
 import type { ToolRowChip } from '@/lib/toolSummaries';
@@ -55,8 +52,6 @@ interface ToolCallProps {
   collapsePreview?: boolean;
   sessionId: string;
   part: ToolPart;
-  pendingAskRequests: PendingAskRequest[];
-  onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   onNavigateToSubagent?: (sessionId: string) => void;
 }
 
@@ -102,23 +97,6 @@ function extractVisualization(output: unknown): AnyVisualization | undefined {
   return undefined;
 }
 
-function getDescendantSessionIds(parentId: string, sessions: Session[]): Set<string> {
-  const descendants = new Set<string>();
-  const queue = [parentId];
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    for (const session of sessions) {
-      if (session.parentId === current && !descendants.has(session.id)) {
-        descendants.add(session.id);
-        queue.push(session.id);
-      }
-    }
-  }
-
-  return descendants;
-}
-
 const chipToneClass: Record<ToolRowChip['tone'], string> = {
   neutral: 'bg-muted text-muted-foreground',
   success: 'bg-success/15 text-success',
@@ -133,8 +111,6 @@ const areToolCallPropsEqual = (
   if (prev.collapsePreview !== next.collapsePreview) return false;
   if (prev.part !== next.part) return false;
   if (prev.onNavigateToSubagent !== next.onNavigateToSubagent) return false;
-  if (prev.onAskResponse !== next.onAskResponse) return false;
-  if (prev.pendingAskRequests !== next.pendingAskRequests) return false;
 
   return true;
 };
@@ -143,8 +119,6 @@ export const ToolCall = memo(function ToolCall({
   collapsePreview = false,
   sessionId,
   part,
-  pendingAskRequests,
-  onAskResponse,
   onNavigateToSubagent,
 }: ToolCallProps) {
   const serverUrl = useServerUrl();
@@ -193,35 +167,9 @@ export const ToolCall = memo(function ToolCall({
 
   const taskSessionId = extractTaskSessionId(part);
 
-  const sessions = useSessionStore((s) => s.sessions);
   const catalog = useToolDisplayCatalog(sdkClient);
 
   const { summary, chips } = useMemo(() => getToolRowInfo(part, catalog), [part, catalog]);
-
-  const allPendingAsks: PendingAskRequest[] = [];
-
-  if (status === 'pending' || status === 'running') {
-    const directAsk = pendingAskRequests.find((r) => r.toolCallId === part.callId);
-    if (directAsk) {
-      allPendingAsks.push(directAsk);
-    }
-
-    if (taskSessionId) {
-      const descendantIds = getDescendantSessionIds(taskSessionId, sessions);
-      descendantIds.add(taskSessionId);
-      const childAsks = pendingAskRequests.filter(
-        (r) => {
-          const isChildOrDescendant = r.originSessionId && descendantIds.has(r.originSessionId);
-          const isDirectChildSession = r.sessionId === taskSessionId;
-          return (isChildOrDescendant || isDirectChildSession)
-            && r.toolCallId !== part.callId
-            && !r.toolCallId.startsWith('codex-approval:')
-            && !r.toolCallId.startsWith('claude-approval:');
-        },
-      );
-      allPendingAsks.push(...childAsks);
-    }
-  }
 
   const handleCopyOutput = async () => {
     if (rawOutput !== undefined) {
@@ -396,19 +344,6 @@ export const ToolCall = memo(function ToolCall({
           </div>
         </CollapsibleContent>}
       </Collapsible>
-
-      {/* Ask Questions (direct + child session asks) */}
-      {allPendingAsks.length > 0 && (
-        <div className="mt-2 flex flex-col gap-2">
-          {allPendingAsks.map((request) => (
-            <AskQuestion
-              key={request.requestId ?? request.toolCallId}
-              request={request}
-              onRespond={onAskResponse}
-            />
-          ))}
-        </div>
-      )}
 
       {/* Older previews mount inside the existing expandable row, not hidden DOM. */}
       {status === 'completed' && visualization && !visualization.collapsed && !collapsePreview && visualization.type !== 'none' && (

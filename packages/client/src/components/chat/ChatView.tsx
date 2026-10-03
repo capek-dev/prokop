@@ -6,7 +6,7 @@ import { MessageInput } from './MessageInput';
 import type { MessageInputHandle } from './MessageInput';
 import { Button } from '@/components/ui/button';
 import { VirtualizedTranscript } from './VirtualizedTranscript';
-import { AskQuestion } from './AskQuestion';
+import { PendingAskDock } from './PendingAskDock';
 import type { PendingAskRequest } from '@/stores/askStore';
 import { useSessionControlStore, type ActionRejection } from '@/stores/sessionControlStore';
 import { useClientIdentityStore } from '@/stores/clientIdentityStore';
@@ -210,6 +210,15 @@ function ChatViewContent({
   const [rejectionNotice, setRejectionNotice] = useState<string | null>(null);
   const rejectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Native harness approvals stay answerable only by the controlling client,
+  // keyed by the session the approval belongs to.
+  const canAnswerNative = useCallback((requestSessionId: string) => {
+    const control = askControls[requestSessionId];
+    return myClientId !== null
+      && control?.status === 'controlled'
+      && control.controllerClientId === myClientId;
+  }, [askControls, myClientId]);
+
   const showRejectionNotice = useCallback((message: string) => {
     if (rejectionTimerRef.current) {
       clearTimeout(rejectionTimerRef.current);
@@ -290,12 +299,10 @@ function ChatViewContent({
           messagesWithParts={messagesWithParts}
           sessionId={session.id}
           sessionStatus={session.status}
-          pendingAskRequests={pendingAskRequests}
           isCompacting={compactBusy}
           compactedAfterMessageId={harnessState?.compaction.boundaryMessageId ?? undefined}
           compactionSuccess={compactionSuccess}
           onClearCompactionSuccess={onClearCompactionSuccess}
-          onAskResponse={onAskResponse}
           onNavigateToSubagent={onNavigateToSubagent}
           onRemoveFromQueue={onRemoveFromQueueForMode}
           onRevert={onRevertForMode}
@@ -345,16 +352,13 @@ function ChatViewContent({
         </button>
       </div>
 
-      {nativeApprovalPrefix != null && pendingAskRequests.filter(request =>
-        request.toolCallId.startsWith(nativeApprovalPrefix)
-          && (request.sessionId === session.id || request.originSessionId === session.id)
-          && myClientId !== null && askControls[request.sessionId]?.status === 'controlled'
-          && askControls[request.sessionId]?.controllerClientId === myClientId
-      ).map(request => (
-        <div key={request.requestId ?? request.toolCallId} className="mx-auto w-full max-w-3xl overflow-y-auto px-4 py-3">
-          <AskQuestion request={request} onRespond={onAskResponse} />
-        </div>
-      ))}
+      <PendingAskDock
+        sessionId={session.id}
+        requests={pendingAskRequests}
+        nativeApprovalPrefix={nativeApprovalPrefix}
+        canAnswerNative={canAnswerNative}
+        onRespond={onAskResponse}
+      />
 
       {session.status === 'active' && <RetryStatus sessionId={session.id} />}
 

@@ -4,6 +4,7 @@ import type { Session } from '@prokopai/sdk';
 import { ChatView } from '@/components/chat/ChatView';
 import { useSessionControlStore } from '@/stores/sessionControlStore';
 import { useClientIdentityStore } from '@/stores/clientIdentityStore';
+import { useSessionStore } from '@/stores/sessionStore';
 import type { PendingAskRequest } from '@/stores/askStore';
 
 vi.mock('@/components/chat/VirtualizedTranscript', () => ({ VirtualizedTranscript: () => null }));
@@ -16,8 +17,24 @@ vi.mock('@/components/chat/AskQuestion', () => ({ AskQuestion: ({ request, onRes
   { type: 'permission', grant: 'once' }, request.requestId)}>{request.toolCallId}</button> }));
 vi.mock('@/hooks/useTranscriptPagination', () => ({ useTranscriptPagination: () => ({ loadOlder: () => {} }) }));
 
+function harnessState(nativeApprovalPrefix?: string): Session['harnessState'] {
+  return {
+    compaction: { pending: false, uncertain: false, boundaryMessageId: null },
+    fork: { mode: 'any' },
+    goal: null,
+    usage: null,
+    goalUncertain: false,
+    ...(nativeApprovalPrefix != null ? { nativeApprovalPrefix } : {}),
+    capabilities: {
+      canRemoveQueuedMessages: true,
+      canInterruptSubagent: true,
+      subagentActivityPropagates: false,
+    },
+  };
+}
+
 const parent = { id: 'parent', workspaceId: 'ws', harness: 'codex-cli', status: 'active',
-  parentId: null, metadata: null } as Session;
+  parentId: null, metadata: null, harnessState: harnessState('codex-approval:') } as Session;
 const child = { ...parent, id: 'child', parentId: 'parent', subagentStatus: 'running' } as Session;
 const pendingAskRequests: PendingAskRequest[] = [{
   sessionId: 'parent', originSessionId: 'child', requestId: 'ask-1', toolCallId: 'codex-approval:1',
@@ -25,9 +42,9 @@ const pendingAskRequests: PendingAskRequest[] = [{
     resource: 'file', action: 'read', risk: 'high' },
 }];
 
-function view(session: Session) {
+function view(session: Session, requests: PendingAskRequest[] = pendingAskRequests) {
   return render(<ChatView session={session} messagesWithParts={[]} queuedMessages={[]}
-    pendingAskRequests={pendingAskRequests} onAskResponse={() => {}}
+    pendingAskRequests={requests} onAskResponse={() => {}}
     onSendMessage={() => {}} onRemoveFromQueue={() => {}} />);
 }
 
@@ -35,6 +52,7 @@ afterEach(() => {
   act(() => {
     useSessionControlStore.setState({ controlBySessionId: {} });
     useClientIdentityStore.setState({ clientId: null });
+    useSessionStore.setState({ sessions: [] });
   });
 });
 
@@ -50,8 +68,9 @@ test('the parent controller can see a child approval while viewing either sessio
   expect(screen.getAllByTestId('codex-ask')).toHaveLength(1);
 });
 
-test('the Claude controller sees pending approval in the chat panel, observers do not', () => {
-  const claude = { ...parent, id: 'claude', harness: 'claude-cli' } as Session;
+test('the Claude controller sees pending approval in the dock, observers do not', () => {
+  const claude = { ...parent, id: 'claude', harness: 'claude-cli',
+    harnessState: harnessState('claude-approval:') } as Session;
   const approval: PendingAskRequest = {
     sessionId: 'claude', requestId: 'claude-ask-1', toolCallId: 'claude-approval:1',
     toolName: 'claude-cli:Bash', ask: { type: 'permission', question: 'Allow Claude to use Bash?',
@@ -78,8 +97,10 @@ test('the Claude controller sees pending approval in the chat panel, observers d
 });
 
 test('Claude child approval is visible from both timelines only to the parent controller', () => {
-  const claudeParent = { ...parent, harness: 'claude-cli' } as Session;
-  const claudeChild = { ...child, harness: 'claude-cli' } as Session;
+  const claudeParent = { ...parent, harness: 'claude-cli',
+    harnessState: harnessState('claude-approval:') } as Session;
+  const claudeChild = { ...child, harness: 'claude-cli',
+    harnessState: harnessState('claude-approval:') } as Session;
   const requests = [{ ...pendingAskRequests[0]!, toolCallId: 'claude-approval:1' }];
   useClientIdentityStore.setState({ clientId: 'owner' });
   useSessionControlStore.setState({ controlBySessionId: { parent: {
@@ -105,4 +126,34 @@ test('a viewer without parent control cannot answer from the child session', () 
   expect(screen.queryByTestId('codex-ask')).not.toBeInTheDocument();
   act(() => useClientIdentityStore.setState({ clientId: null }));
   expect(screen.queryByTestId('codex-ask')).not.toBeInTheDocument();
+});
+
+test('a capek child ask surfaces in the parent dock through the session tree', () => {
+  useSessionStore.setState({ sessions: [parent, child] });
+  const childAsk: PendingAskRequest = {
+    sessionId: 'child', toolCallId: 'call-child-1', requestId: 'capek-ask-1',
+    toolName: 'shell', ask: { type: 'permission', question: 'Run tests?',
+      resource: 'shell-command', action: 'execute', risk: 'high' },
+  };
+  const capekParent = { ...parent, harness: undefined, harnessState: harnessState() } as Session;
+  // No control gate applies to capek asks; observers still see the card.
+  useClientIdentityStore.setState({ clientId: 'viewer' });
+  view(capekParent, [childAsk]);
+  expect(screen.getByTestId('codex-ask')).toHaveTextContent('call-child-1');
+});
+
+test('stacked approvals page through the dock instead of stacking cards', () => {
+  useClientIdentityStore.setState({ clientId: 'owner' });
+  useSessionControlStore.setState({ controlBySessionId: { parent: {
+    status: 'controlled', controllerClientId: 'owner', sessionId: 'parent',
+  } as never } });
+  const second = { ...pendingAskRequests[0]!, toolCallId: 'codex-approval:2', requestId: 'ask-2' };
+  view(parent, [pendingAskRequests[0]!, second]);
+  // Follow-the-newest shows the latest card only.
+  expect(screen.getAllByTestId('codex-ask')).toHaveLength(1);
+  expect(screen.getByTestId('codex-ask')).toHaveTextContent('codex-approval:2');
+  expect(screen.getByText('2 / 2 pending')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Previous pending request' }));
+  expect(screen.getByTestId('codex-ask')).toHaveTextContent('codex-approval:1');
+  expect(screen.getByText('1 / 2 pending')).toBeInTheDocument();
 });

@@ -2,6 +2,7 @@ import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 import type { FileListVisualization } from '@prokopai/sdk';
 import picomatch from 'picomatch';
 import { scan as scanGlob } from 'picomatch';
+import { fileConcernAsk } from '../file-permission';
 
 interface Input {
   pattern: string;
@@ -136,13 +137,32 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
     const isJean2Temp = jean2TempPrefix && normalizedPath.startsWith(jean2TempPrefix);
 
     if (!isJean2Temp && !ctx.isWithinWorkspace(normalizedPath)) {
-      const approved = await ctx.ask({
-        target: 'permission',
-        type: 'permission',
-        question: 'Globbing outside the workspace requires approval.',
-        risk: 'medium',
-        metadata: { permissionKey: 'path:outside_workspace', permissionType: 'action' }
-      });
+      const approved = await ctx.ask(fileConcernAsk({
+        operation: 'search', path: normalizedPath, root: ctx.workspacePath, concern: 'escape',
+        ask: {
+          target: 'permission',
+          type: 'permission',
+          question: 'Globbing outside the workspace requires approval.',
+          risk: 'medium',
+          metadata: { permissionKey: 'path:outside_workspace', permissionType: 'action' }
+        },
+      }));
+      if (!approved) return { success: false, error: 'USER_REJECTION' };
+    }
+
+    // Parity with grep and Claude Glob: sensitive directories ask even inside
+    // the workspace (unified file-operation analysis, one concern vocabulary).
+    if (ctx.isSensitivePath(normalizedPath)) {
+      const approved = await ctx.ask(fileConcernAsk({
+        operation: 'search', path: normalizedPath, root: ctx.workspacePath, concern: 'sensitive',
+        ask: {
+          target: 'permission',
+          type: 'permission',
+          question: 'Globbing in sensitive directories requires approval.',
+          risk: 'medium',
+          metadata: { permissionKey: 'file_pattern:sensitive', permissionType: 'action' }
+        },
+      }));
       if (!approved) return { success: false, error: 'USER_REJECTION' };
     }
 

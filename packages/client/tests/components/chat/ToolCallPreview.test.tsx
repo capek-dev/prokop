@@ -34,13 +34,10 @@ function makePart(id: string, collapsed = false): ToolPart {
     },
   };
 }
-const pendingAskRequests: [] = [];
-const onAskResponse = () => {};
 function view(part: ToolPart, collapsePreview: boolean) {
   return (
     <ServerClientProvider value={{ sdkClient: null, serverUrl: 'https://preview.test', apiToken: null, connected: false }}>
-      <ToolCall sessionId="preview-session" part={part} collapsePreview={collapsePreview}
-        pendingAskRequests={pendingAskRequests} onAskResponse={onAskResponse} />
+      <ToolCall sessionId="preview-session" part={part} collapsePreview={collapsePreview} />
     </ServerClientProvider>
   );
 }

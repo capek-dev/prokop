@@ -17,9 +17,9 @@ function shell(command: string): ReturnType<typeof classifyCodexHook> {
 
 test('classifies sensitive reads, outside paths and recognizable deletion, but not ordinary reads', () => {
   expect(shell('ls')).toBeNull();
-  expect(shell("/bin/zsh -lc 'cat .env'")).toMatchObject({ resource: 'file', action: 'read' });
-  expect(shell('cat ../private.txt')).toMatchObject({ resource: 'file', action: 'read' });
-  expect(shell('rm -rf ./generated')).toMatchObject({ resource: 'file', action: 'delete' });
+  expect(shell("/bin/zsh -lc 'cat .env'")).toMatchObject({ concerns: ['sensitive'] });
+  expect(shell('cat ../private.txt')).toMatchObject({ concerns: ['escape'] });
+  expect(shell('rm -rf ./generated')).toMatchObject({ concerns: ['destructive'] });
   expect(shell('printf hello')).toBeNull();
 });
 

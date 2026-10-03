@@ -1,36 +1,26 @@
 import { resolve } from 'node:path';
-import type { PermissionRiskLevel } from '@prokopai/sdk';
 import {
+  classifyFileOperation,
   classifyShellCommand,
-  concernRisk,
-  effectivePath,
-  grantScopesForFinding,
-  isOutsideRoot,
-  isSensitivePath,
   requiresHumanReview,
-  type Concern,
   type ConcernsPermissionAsk,
+  type FileOperation,
 } from '@/domains/permissions';
 
 const valid = (value: unknown): value is string => typeof value === 'string'
   && !!value.trim() && value.length <= 64 * 1024 && !value.includes('\0');
 
 /** Undefined means no local classification needed (the tool runs); null means
- * a known tool has invalid input (deny). Shell policy comes from the shared
- * permissions domain; only the native file/web tool shapes are
- * Claude-specific. Asks carry the permissions-v2 concern fields, so the
- * approval decision (shouldAutoApproveAsk) follows the session mode. */
+ *  a known tool has invalid input (deny). Shell and file policy both come
+ *  from the shared permissions domain (classifyShellCommand,
+ *  classifyFileOperation); only the native tool input shapes are
+ *  Claude-specific. Asks carry the permissions-v2 concern fields, so the
+ *  approval decision (shouldAutoApproveAsk) follows the session mode. */
 export function classifyClaudeTool(
   toolName: string,
   input: Record<string, unknown>,
   root: string,
 ): ConcernsPermissionAsk | null | undefined {
-  const concerns: Concern[] = [];
-  let description: string;
-  let path: string | undefined;
-  const resource = 'file';
-  let action = 'read';
-
   if (toolName === 'Bash') {
     if (!valid(input.command)) return null;
     const classification = classifyShellCommand(input.command, root, root);
@@ -42,22 +32,23 @@ export function classifyClaudeTool(
       metadata: { command: input.command.slice(0, 1000), toolName } };
   }
 
+  let operation: FileOperation | undefined;
+  let path: string | undefined;
+  let description: string | undefined;
+  let pattern: string | undefined;
+
   if (toolName === 'Read' || toolName === 'Edit' || toolName === 'Write') {
     if (!valid(input.file_path)
       || toolName === 'Edit' && (!valid(input.old_string) || typeof input.new_string !== 'string')
       || toolName === 'Write' && typeof input.content !== 'string') return null;
+    operation = toolName === 'Read' ? 'read' : toolName === 'Write' ? 'write' : 'edit';
     path = resolve(root, input.file_path);
-    const target = effectivePath(path);
-    action = toolName === 'Read' ? 'read' : 'write';
-    if (isSensitivePath(path) || isSensitivePath(target)) concerns.push('sensitive');
-    if (isOutsideRoot(target, root)) concerns.push('escape');
     description = path;
   } else if (toolName === 'Glob' || toolName === 'Grep') {
     if (!valid(input.pattern) || input.path !== undefined && !valid(input.path)) return null;
+    operation = 'search';
+    pattern = input.pattern;
     path = resolve(root, typeof input.path === 'string' ? input.path : '.');
-    const target = effectivePath(path);
-    if (isSensitivePath(path) || isSensitivePath(target) || isSensitivePath(input.pattern)) concerns.push('sensitive');
-    if (isOutsideRoot(target, root)) concerns.push('escape');
     description = `${input.pattern} in ${path}`;
   } else if (toolName === 'WebFetch') {
     if (!valid(input.url)) return null;
@@ -73,16 +64,19 @@ export function classifyClaudeTool(
     return undefined;
   } else return undefined;
 
-  // Clean workspace file operations run without an ask at every mode; only
-  // sensitive or outside-workspace targets ask.
-  if (concerns.length === 0) return undefined;
-
-  const finding = { concerns, catastrophic: false, evidence: [], resolvedPaths: [] };
-  const risk: PermissionRiskLevel = concernRisk(finding);
-  const ask: ConcernsPermissionAsk = { type: 'permission', question: `Allow Claude to use ${toolName}?`,
-    description: description.slice(0, 1000), resource, action, risk,
-    concerns, catastrophic: false,
-    allowedScopes: grantScopesForFinding(finding),
-    ...(path ? { paths: [path] } : {}), metadata: { toolName } };
-  return ask;
+  // Shared file-operation classification: clean workspace file operations run
+  // without an ask at every mode; only sensitive or outside-workspace targets
+  // (or sensitive search patterns) ask.
+  const classification = classifyFileOperation({
+    operation: operation!,
+    paths: [path!],
+    roots: [root],
+    pattern,
+  });
+  if (!classification) return null;
+  if (!requiresHumanReview(classification.finding)) return undefined;
+  return { ...classification.ask,
+    question: `Allow Claude to use ${toolName}?`,
+    description: description!.slice(0, 1000),
+    metadata: { ...classification.ask.metadata, toolName } };
 }

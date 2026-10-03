@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk';
 import type { DiffsVisualization, DiffVisualization } from '@prokopai/sdk';
+import { fileConcernAsk } from '../file-permission';
 
 // ---------------------------------------------------------------------------
 // Local safe matching engine
@@ -804,20 +805,26 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
     }
 
     if (!ctx.isWithinWorkspace(resolvedPath)) {
-      const approved = await ctx.ask({
-        target: 'permission', type: 'permission',
-        question: 'Editing files outside the workspace requires approval.', risk: 'medium',
-        metadata: { permissionKey: 'path:outside_workspace', permissionType: 'action' },
-      });
+      const approved = await ctx.ask(fileConcernAsk({
+        operation: 'edit', path: resolvedPath, root: ctx.workspacePath, concern: 'escape',
+        ask: {
+          target: 'permission', type: 'permission',
+          question: 'Editing files outside the workspace requires approval.', risk: 'medium',
+          metadata: { permissionKey: 'path:outside_workspace', permissionType: 'action' },
+        },
+      }));
       if (!approved) return { success: false, error: 'USER_REJECTION' };
     }
 
     if (ctx.isSensitivePath(resolvedPath)) {
-      const approved = await ctx.ask({
-        target: 'permission', type: 'permission',
-        question: 'Editing sensitive files requires approval.', risk: 'medium',
-        metadata: { permissionKey: 'file_pattern:sensitive', permissionType: 'action' },
-      });
+      const approved = await ctx.ask(fileConcernAsk({
+        operation: 'edit', path: resolvedPath, root: ctx.workspacePath, concern: 'sensitive',
+        ask: {
+          target: 'permission', type: 'permission',
+          question: 'Editing sensitive files requires approval.', risk: 'medium',
+          metadata: { permissionKey: 'file_pattern:sensitive', permissionType: 'action' },
+        },
+      }));
       if (!approved) return { success: false, error: 'USER_REJECTION' };
     }
 

@@ -37,23 +37,19 @@ function assistant(id: string, running = false): DisplayItem {
     }],
   };
 }
-const pendingAskRequests: [] = [];
-const onAskResponse = () => {};
 function transcript(items: DisplayItem[]) {
   return <VirtualizedTranscript displayItems={items} messagesWithParts={items} sessionId="s"
-    pendingAskRequests={pendingAskRequests} onAskResponse={onAskResponse} autoFollow={false} />;
+    autoFollow={false} />;
 }
 
 test('Codex compaction divider remains anchored after its message as later turns arrive', () => {
   const items = [user('before'), user('after')];
   const view = render(<VirtualizedTranscript displayItems={items} messagesWithParts={items} sessionId="s"
-    compactedAfterMessageId="before" pendingAskRequests={pendingAskRequests}
-    onAskResponse={onAskResponse} autoFollow={false} />);
+    compactedAfterMessageId="before" autoFollow={false} />);
   expect(screen.getByText('Context compacted')).toBeInTheDocument();
   expect(screen.getAllByRole('status')).toHaveLength(1);
   view.rerender(<VirtualizedTranscript displayItems={[...items, user('later')]} messagesWithParts={items}
-    sessionId="s" compactedAfterMessageId="before" pendingAskRequests={pendingAskRequests}
-    onAskResponse={onAskResponse} autoFollow={false} />);
+    sessionId="s" compactedAfterMessageId="before" autoFollow={false} />);
   expect(screen.getAllByRole('status')).toHaveLength(1);
 });
 

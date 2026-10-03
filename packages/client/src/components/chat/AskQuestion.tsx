@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { HelpCircle, Shield, Monitor } from 'lucide-react';
+import { HelpCircle, Shield, ShieldAlert, Monitor } from 'lucide-react';
 import type { HumanQuestion, FormQuestion, PermissionAsk, ClientCapabilityAsk, AskFormResponse, AskPermissionResponse, AskResponse } from '@prokopai/sdk';
 import type { SingleSelectQuestion, MultiSelectQuestion, TextQuestion, ConfirmQuestion } from '@prokopai/sdk';
 import { readPermissionAskDetails, type PermissionAskConcern } from '@prokopai/sdk';
@@ -474,6 +474,37 @@ const CONCERN_CHIPS: Record<PermissionAskConcern, { label: string; className: st
   opaque: { label: 'Complex command', className: 'text-muted-foreground' },
 };
 
+/** Card chrome (border, tint, icon) per permission risk level. */
+const PERMISSION_SEVERITY_STYLES = {
+  unknown: { icon: Shield, borderClass: 'border-warning/30 bg-warning/5', iconClass: 'text-warning' },
+  none: { icon: Shield, borderClass: 'border-border bg-muted/40', iconClass: 'text-muted-foreground' },
+  low: { icon: Shield, borderClass: 'border-success/30 bg-success/5', iconClass: 'text-success' },
+  medium: { icon: Shield, borderClass: 'border-warning/30 bg-warning/5', iconClass: 'text-warning' },
+  high: { icon: ShieldAlert, borderClass: 'border-destructive/30 bg-destructive/5', iconClass: 'text-destructive' },
+  critical: { icon: ShieldAlert, borderClass: 'border-destructive/50 bg-destructive/10', iconClass: 'text-destructive' },
+} as const;
+
+/** Card severity for a permission ask. Classified asks (permissions v2)
+ *  derive severity from their concerns — mirroring the server's single
+ *  riskOfConcerns mapping — because some ask builders pin a hard-coded legacy
+ *  risk that disagrees with the classification (codex approvals pin
+ *  'critical'; several file tools pin 'medium'). Legacy asks without concern
+ *  fields keep the authored risk; unknown risk keeps the historical amber so
+ *  unclassified asks never look downgraded. */
+function permissionSeverityStyle(ask: PermissionAsk) {
+  const details = readPermissionAskDetails(ask);
+  if (details) {
+    if (details.catastrophic) return PERMISSION_SEVERITY_STYLES.critical;
+    if (details.concerns.includes('sensitive') || details.concerns.includes('destructive')) {
+      return PERMISSION_SEVERITY_STYLES.high;
+    }
+    if (details.concerns.includes('escape')) return PERMISSION_SEVERITY_STYLES.medium;
+    return PERMISSION_SEVERITY_STYLES.low;
+  }
+  if (ask.risk == null) return PERMISSION_SEVERITY_STYLES.unknown;
+  return PERMISSION_SEVERITY_STYLES[ask.risk];
+}
+
 function PermissionAskView({
   ask,
   onRespond,
@@ -775,12 +806,12 @@ export function AskQuestion({ request, onRespond }: AskQuestionProps) {
         case 'form':
           return { icon: HelpCircle, borderClass: 'border-primary/30 bg-primary/5', iconClass: 'text-primary' };
         case 'permission':
-          return { icon: Shield, borderClass: 'border-warning/30 bg-warning/5', iconClass: 'text-warning' };
+          return permissionSeverityStyle(ask);
         case 'client_capability':
           return { icon: Monitor, borderClass: 'border-info/30 bg-info/5', iconClass: 'text-info' };
       }
     }
-    return { icon: Shield, borderClass: 'border-warning/30 bg-warning/5', iconClass: 'text-warning' };
+    return permissionSeverityStyle(ask as PermissionAsk);
   })();
   const Icon = config.icon;
 

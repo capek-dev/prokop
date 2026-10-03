@@ -87,8 +87,6 @@ const meta = {
   decorators: [withSessionStore()],
   args: {
     sessionId: 'session-1',
-    pendingAskRequests: [],
-    onAskResponse: fn(),
     onNavigateToSubagent: fn(),
   },
 } as Meta<typeof ToolCall>;
@@ -159,8 +157,6 @@ export const TaskCompletedWithVisualization: Story = {
 export const MultipleToolCalls: Story = {
   args: {
     part: completedPart,
-    pendingAskRequests: [],
-    onAskResponse: fn(),
     onNavigateToSubagent: fn(),
   },
   render: (args) => (

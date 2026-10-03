@@ -42,6 +42,11 @@ export {
   type ShellRiskContext,
 } from './shell';
 export {
+  classifyFileOperation,
+  type FileOperation,
+  type FileOperationClassification,
+} from './file-ops';
+export {
   concernRisk,
   grantScopesForFinding,
   readAskConcerns,

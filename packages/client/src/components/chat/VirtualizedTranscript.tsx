@@ -10,7 +10,6 @@ import type {
   Message,
   CompactionPart,
   AssistantMessage,
-  AskResponse,
   StructuredOutputData,
 } from '@prokopai/sdk';
 import { isAssistantMessage } from '@prokopai/sdk';
@@ -24,7 +23,6 @@ import { ToolCall } from './ToolCall';
 import { cn } from '@/lib/utils';
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 import { StructuredResponse } from '@/components/visualizations';
-import type { PendingAskRequest } from '@/stores/askStore';
 import { splitStreamingText } from './streamingText';
 import { getToolPreviewCutoff } from '@/lib/toolPreviewPolicy';
 
@@ -43,8 +41,6 @@ interface VirtualizedTranscriptProps {
   messagesWithParts: MessageWithParts[];
   sessionId: string;
   sessionStatus?: string;
-  pendingAskRequests: PendingAskRequest[];
-  onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   onNavigateToSubagent?: (sessionId: string) => void;
   onRemoveFromQueue?: (queueId: string) => void;
   onRevert?: (sessionId: string, stepPartId: string) => void;
@@ -302,8 +298,6 @@ const MessageParts = memo(function MessageParts({
   collapseToolPreviews = false,
   sessionId,
   parts,
-  pendingAskRequests,
-  onAskResponse,
   onNavigateToSubagent,
   inverted = false,
   isStreaming = false,
@@ -311,8 +305,6 @@ const MessageParts = memo(function MessageParts({
 }: {
   sessionId: string;
   parts: Part[];
-  pendingAskRequests: PendingAskRequest[];
-  onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   onNavigateToSubagent?: (sessionId: string) => void;
   inverted?: boolean;
   isStreaming?: boolean;
@@ -360,8 +352,6 @@ const MessageParts = memo(function MessageParts({
                 sessionId={sessionId}
                 part={part}
                 collapsePreview={collapseToolPreviews && part.state.status === 'completed'}
-                pendingAskRequests={pendingAskRequests}
-                onAskResponse={onAskResponse}
                 onNavigateToSubagent={onNavigateToSubagent}
               />
             );
@@ -433,9 +423,7 @@ const MessageParts = memo(function MessageParts({
   if (prev.onNavigateToSubagent !== next.onNavigateToSubagent) return false;
   if (prev.serverUrl !== next.serverUrl) return false;
 
-  return prev.pendingAskRequests === next.pendingAskRequests;
-
-
+  return true;
 });
 
 const StructuredOutputMessage = memo(function StructuredOutputMessage({
@@ -443,8 +431,6 @@ const StructuredOutputMessage = memo(function StructuredOutputMessage({
   sessionId,
   parts,
   structuredOutput,
-  pendingAskRequests,
-  onAskResponse,
   onNavigateToSubagent,
   serverUrl,
 }: {
@@ -452,8 +438,6 @@ const StructuredOutputMessage = memo(function StructuredOutputMessage({
   parts: Part[];
   structuredOutput: StructuredOutputData;
   collapseToolPreviews?: boolean;
-  pendingAskRequests: PendingAskRequest[];
-  onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   onNavigateToSubagent?: (sessionId: string) => void;
   serverUrl?: string;
 }) {
@@ -484,8 +468,6 @@ const StructuredOutputMessage = memo(function StructuredOutputMessage({
               <MessageParts
                 sessionId={sessionId}
                 parts={parts}
-                pendingAskRequests={pendingAskRequests}
-                onAskResponse={onAskResponse}
                 onNavigateToSubagent={onNavigateToSubagent}
                 inverted={false}
                 collapseToolPreviews={collapseToolPreviews}
@@ -511,8 +493,6 @@ interface MessageRowProps {
   item: DisplayItem;
   revertMessageId: string | null;
   sessionId: string;
-  pendingAskRequests: PendingAskRequest[];
-  onAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   onNavigateToSubagent?: (sessionId: string) => void;
   onRemoveFromQueue?: (queueId: string) => void;
   onRevert?: (sessionId: string, stepPartId: string) => void;
@@ -534,8 +514,6 @@ const MessageRow = memo(function MessageRow({
   item,
   revertMessageId,
   sessionId,
-  pendingAskRequests,
-  onAskResponse,
   onNavigateToSubagent,
   onRemoveFromQueue,
   onRevert,
@@ -618,8 +596,6 @@ const MessageRow = memo(function MessageRow({
             parts={item.parts}
             structuredOutput={item.message.structuredOutput}
             collapseToolPreviews={item.collapseToolPreviews}
-            pendingAskRequests={pendingAskRequests}
-            onAskResponse={onAskResponse}
             onNavigateToSubagent={onNavigateToSubagent}
             serverUrl={serverUrl}
           />
@@ -627,8 +603,6 @@ const MessageRow = memo(function MessageRow({
           <MessageParts
             sessionId={sessionId}
             parts={item.parts}
-            pendingAskRequests={pendingAskRequests}
-            onAskResponse={onAskResponse}
             onNavigateToSubagent={onNavigateToSubagent}
             inverted={item.message.role === 'user' && !item.isQueued}
             isStreaming={isAssistantMessage(item.message) && item.message.status === 'streaming'}
@@ -653,8 +627,6 @@ function areMessageRowPropsEqual(prev: MessageRowProps, next: MessageRowProps): 
     prev.item.collapseToolPreviews === next.item.collapseToolPreviews &&
     prev.revertMessageId === next.revertMessageId &&
     prev.sessionId === next.sessionId &&
-    prev.pendingAskRequests === next.pendingAskRequests &&
-    prev.onAskResponse === next.onAskResponse &&
     prev.onNavigateToSubagent === next.onNavigateToSubagent &&
     prev.onRemoveFromQueue === next.onRemoveFromQueue &&
     prev.onRevert === next.onRevert &&
@@ -691,12 +663,10 @@ export function VirtualizedTranscript({
   messagesWithParts,
   sessionId,
   sessionStatus,
-  pendingAskRequests,
   isCompacting = false,
   compactedAfterMessageId,
   compactionSuccess = false,
   onClearCompactionSuccess,
-  onAskResponse,
   onNavigateToSubagent,
   onRemoveFromQueue,
   onRevert,
@@ -996,8 +966,6 @@ export function VirtualizedTranscript({
         item={item}
         revertMessageId={revertMessageIds.get(item.message.id) ?? null}
         sessionId={sessionId}
-        pendingAskRequests={pendingAskRequests}
-        onAskResponse={onAskResponse}
         onNavigateToSubagent={onNavigateToSubagent}
         onRemoveFromQueue={onRemoveFromQueue}
         onRevert={onRevert}
@@ -1030,8 +998,6 @@ export function VirtualizedTranscript({
   ), [
     revertMessageIds,
     sessionId,
-    pendingAskRequests,
-    onAskResponse,
     onNavigateToSubagent,
     onRemoveFromQueue,
     onRevert,
@@ -1054,7 +1020,6 @@ export function VirtualizedTranscript({
   // mounted rows on extraData identity change only, so a control-state flip
   // (callbacks withheld/restored) would otherwise leave stale row buttons.
   const listExtraData = useMemo(() => ({
-    pendingAskRequests,
     pinnedMessageIds,
     isPinningMessage,
     onRemoveFromQueue,
@@ -1064,7 +1029,6 @@ export function VirtualizedTranscript({
     onCompact,
     compactedAfterMessageId,
   }), [
-    pendingAskRequests,
     pinnedMessageIds,
     isPinningMessage,
     onRemoveFromQueue,

@@ -1,9 +1,7 @@
 import { isAbsolute, resolve } from 'node:path';
-import { createFilePermissionAsk } from '@prokopai/sdk';
 import {
+  classifyFileOperation,
   classifyShellCommand,
-  isSensitivePath,
-  isWithinRoot,
   requiresHumanReview,
   type ConcernsPermissionAsk,
 } from '@/domains/permissions';
@@ -41,27 +39,16 @@ export function classifyCodexHook(call: CodexHookCall, root: string): ConcernsPe
     if (!paths.length || paths.length > 100) return undefined;
     if (paths.some(candidate => !candidate || candidate.includes('\0'))) return undefined;
     const resolved = paths.map(candidate => resolve(call.cwd, candidate));
-    const outside = resolved.some(candidate => !isWithinRoot(candidate, root));
-    const isSensitiveFile = resolved.some(isSensitivePath);
     const deleting = /^\*\*\* Delete File:/m.test(command);
-    if (outside || isSensitiveFile || deleting) {
-      const path = resolved.find(candidate => !isWithinRoot(candidate, root) || isSensitivePath(candidate)) ?? resolved[0]!;
-      const concerns = [
-        ...(outside ? ['escape'] as const : []),
-        ...(isSensitiveFile ? ['sensitive'] as const : []),
-        ...(deleting ? ['destructive'] as const : []),
-      ];
-      return { ...createFilePermissionAsk({ path, operation: 'edit', risk: 'high',
-        isOutsideWorkspace: outside, isSensitiveFile, reason: deleting ? 'Codex is deleting a file.' : undefined }),
-      paths: resolved, question: `Allow Codex to ${deleting ? 'delete or change' : 'change'} ${resolved.length} file(s)?`,
-      concerns, catastrophic: false,
-      evidence: [
-        ...(outside ? ['patch touches files outside the workspace'] : []),
-        ...(isSensitiveFile ? ['patch touches sensitive files'] : []),
-        ...(deleting ? ['patch deletes files'] : []),
-      ] };
-    }
-    return null;
+    const classification = classifyFileOperation({
+      operation: deleting ? 'delete' : 'edit',
+      paths: resolved,
+      roots: [root],
+    });
+    if (!classification) return undefined;
+    if (!requiresHumanReview(classification.finding)) return null;
+    return { ...classification.ask,
+      question: `Allow Codex to ${deleting ? 'delete or change' : 'change'} ${resolved.length} file(s)?` };
   }
   const classification = classifyShellCommand(command, root, call.cwd);
   if (!classification) return undefined;

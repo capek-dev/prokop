@@ -14,6 +14,7 @@ import { createGrantFromOptions, matchGrant } from '@/infrastructure/sqlite/perm
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { logCodexPermissionDenial, type CodexPermissionReason } from './permission-diagnostics';
+import { unwrapCodexApprovalCommand } from './approval-command';
 
 const AUTHORITY = { visibilityScope: 'controller_only', resolutionMode: 'controller_only' } as const;
 const COMMAND_TOOL = 'codex-cli:command';
@@ -125,10 +126,21 @@ export class CodexApprovals {
     }
     const command = method === 'item/commandExecution/requestApproval';
     if (!command && method !== 'item/fileChange/requestApproval') return decline('unsupported-request');
-    if (command && (params.kind !== undefined && params.kind !== 'command'
-      || params.additionalPermissions != null || params.proposedExecpolicyAmendment != null
-      || params.proposedNetworkPolicyAmendments != null || params.networkApprovalContext != null
-      || params.approvalId != null)) return decline('unsupported-permissions');
+    if (command) {
+      if (params.kind !== undefined && params.kind !== 'command') return decline('unsupported-permissions:kind');
+      // A prefix proposal is optional, not a permission overlay. Plain `accept`
+      // approves execution without applying it; never return acceptWithExecpolicyAmendment.
+      const proposal = params.proposedExecpolicyAmendment;
+      if (proposal != null && (!Array.isArray(proposal) || proposal.length === 0
+        || !proposal.every(token => typeof token === 'string' && token.length > 0 && !token.includes('\0')))) {
+        return decline('unsupported-permissions:proposedExecpolicyAmendment');
+      }
+      // Log fixed field names only, never their potentially sensitive values.
+      for (const field of ['additionalPermissions',
+        'proposedNetworkPolicyAmendments', 'networkApprovalContext', 'approvalId'] as const) {
+        if (params[field] != null) return decline(`unsupported-permissions:${field}`);
+      }
+    }
     if (command && (typeof params.command !== 'string' || !params.command.trim()
       || typeof params.cwd !== 'string')) return decline('malformed-request');
     if (command && params.cwd !== root) {
@@ -141,9 +153,17 @@ export class CodexApprovals {
     if (!command && params.grantRoot != null) return decline('unsupported-permissions');
 
     const key = command && !childOnceOnly ? JSON.stringify([root, params.command]) : null;
-    const hookKey = command ? this.hookKey(threadId, turnId, root, params.command as string, params.itemId as string) : null;
-    if (hookKey && this.hookApprovedCommands.get(sessionId)?.delete(hookKey)) {
-      return { decision: 'accept' };
+    if (command && params.cwd === root) {
+      const approved = this.hookApprovedCommands.get(sessionId);
+      const nativeCommand = params.command as string;
+      // PreToolUse carries args.cmd; native approval carries the shell argv joined
+      // for display. Unwrap one known shell layer, preserving the script verbatim.
+      const script = unwrapCodexApprovalCommand(nativeCommand);
+      for (const candidate of script === null ? [nativeCommand] : [nativeCommand, script]) {
+        if (approved?.delete(this.hookKey(threadId, turnId, root, candidate, params.itemId as string))) {
+          return { decision: 'accept' };
+        }
+      }
     }
     if (key) {
       const matched = matchGrant({ workspaceId, toolName: COMMAND_TOOL, resource: 'shell-command',

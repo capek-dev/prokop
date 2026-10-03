@@ -3,7 +3,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 import type { GetToolDebugResponse, ProkopaiClient, ToolPart } from '@prokopai/sdk';
 import { ToolCall } from '@/components/chat/ToolCall';
-import type { PendingAskRequest } from '@/stores/askStore';
 import { ServerClientProvider } from '@/contexts/ServerClientContext';
 
 function makeProjectedPart(): ToolPart {
@@ -63,8 +62,6 @@ describe('ToolCall debug loading', () => {
           <ToolCall
             sessionId="session-1"
             part={makeProjectedPart()}
-            pendingAskRequests={[]}
-            onAskResponse={() => {}}
           />
         </ServerClientProvider>
       </QueryClientProvider>,
@@ -89,29 +86,21 @@ describe('ToolCall debug loading', () => {
     });
   });
 
-  test('does not repeat harness child approvals inside the parent Agent tool row', () => {
+  test('running tool rows render no inline ask cards; asks live in the dock', () => {
     const childId = '11111111-1111-4111-8111-111111111111';
     const part: ToolPart = { ...makeProjectedPart(), name: 'subagent',
       state: { status: 'running', input: {}, startedAt: 1, childSessionId: childId },
       presentation: { summary: 'explorer', debugAvailable: false } };
-    const ask = (toolCallId: string): PendingAskRequest => ({
-      sessionId: 'session-1', originSessionId: childId, toolCallId, requestId: toolCallId,
-      toolName: 'claude-cli:Bash', ask: { type: 'permission', question: toolCallId,
-        resource: 'shell-command', action: 'execute', risk: 'high' },
-    });
     const sdkClient = { http: { tools: { list: async () => ({ tools: [] }) } } } as unknown as ProkopaiClient;
     render(
       <QueryClientProvider client={new QueryClient()}>
         <ServerClientProvider value={{ sdkClient, serverUrl: 'http://localhost', apiToken: null, connected: true }}>
-          <ToolCall sessionId="session-1" part={part} pendingAskRequests={[
-            ask('claude-approval:1'), ask('codex-approval:1'), ask('ordinary-child-ask'),
-          ]} onAskResponse={() => {}} />
+          <ToolCall sessionId="session-1" part={part} />
         </ServerClientProvider>
       </QueryClientProvider>,
     );
-    expect(screen.queryByText('claude-approval:1')).not.toBeInTheDocument();
-    expect(screen.queryByText('codex-approval:1')).not.toBeInTheDocument();
-    expect(screen.getByText('ordinary-child-ask')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /allow/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/permission/i)).not.toBeInTheDocument();
   });
 
   test.each(['subagent', 'task'])('opens a linked %s child timeline from the agent row', (name) => {
@@ -125,8 +114,8 @@ describe('ToolCall debug loading', () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <ServerClientProvider value={{ sdkClient, serverUrl: 'http://localhost', apiToken: null, connected: true }}>
-          <ToolCall sessionId="session-1" part={part} pendingAskRequests={[]}
-            onAskResponse={() => {}} onNavigateToSubagent={id => opened.push(id)} />
+          <ToolCall sessionId="session-1" part={part}
+            onNavigateToSubagent={id => opened.push(id)} />
         </ServerClientProvider>
       </QueryClientProvider>,
     );

@@ -779,12 +779,21 @@ test('native approval denials log fixed categories without request content', asy
     const ask = (params: unknown) => approvals.request('item/commandExecution/requestApproval',
       params, 'thread-1', 'turn-1', 's', process.cwd(), 'ws', wire([]).delivery);
     expect(await ask({ ...request, cwd: '/other' })).toEqual({ decision: 'decline' });
-    expect(await ask({ ...request, additionalPermissions: { sensitive: secret } }))
-      .toEqual({ decision: 'decline' });
+    const unsupported = {
+      kind: secret,
+      additionalPermissions: { sensitive: secret },
+      proposedExecpolicyAmendment: { command: [secret] },
+      proposedNetworkPolicyAmendments: [{ host: secret }],
+      networkApprovalContext: { host: secret },
+      approvalId: secret,
+    };
+    for (const [field, value] of Object.entries(unsupported)) {
+      expect(await ask({ ...request, [field]: value })).toEqual({ decision: 'decline' });
+    }
     expect(await ask({ ...request, itemId: '' })).toEqual({ decision: 'decline' });
     expect(warning.mock.calls.map(args => args.join(' '))).toEqual([
       '[codex-permission] native denied: working-directory',
-      '[codex-permission] native denied: unsupported-permissions',
+      ...Object.keys(unsupported).map(field => `[codex-permission] native denied: unsupported-permissions:${field}`),
       '[codex-permission] native denied: malformed-request',
     ]);
     expect(JSON.stringify(warning.mock.calls)).not.toContain(secret);
@@ -898,6 +907,84 @@ test('hook approval suppresses only a matching native command prompt for that tu
   expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(2);
   approvals.cancelSession('s');
   expect(await next).toEqual({ decision: 'decline' });
+});
+
+test('native shell wrapper reuses hook approval once for the exact invocation', async () => {
+  create();
+  const messages: ServerMessage[] = [];
+  const approvals = new CodexApprovals(() => 1000);
+  const delivery = wire(messages).delivery;
+  const command = 'rm -rf ./test';
+  try {
+    const hook = approvals.requestHook({ type: 'permission', question: 'Allow?',
+      resource: 'shell-command', action: 'execute', risk: 'high', allowedScopes: ['once'] },
+    'Bash', command, 'item-1', 'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
+    const ask = messages.find(message => message.type === 'ask.request')!;
+    await approvals.resolve(ask.toolCallId, { type: 'permission', grant: 'once' }, ask.requestId);
+    expect(await hook).toBe(true);
+    const params = { threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1',
+      command: `/bin/zsh -lc '${command}'`, cwd: process.cwd(), proposedExecpolicyAmendment: ['rm', '-rf'] };
+    const request = (extra: Record<string, unknown> = {}) => approvals.request('item/commandExecution/requestApproval',
+      { ...params, ...extra }, 'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
+    // Neither a different item nor a changed script may consume the hook approval.
+    for (const extra of [{ itemId: 'item-2' }, { command: `/bin/zsh -lc '${command}; echo changed'` }]) {
+      const pending = request(extra);
+      const asks = messages.filter(message => message.type === 'ask.request');
+      const latest = asks[asks.length - 1]!;
+      await approvals.resolve(latest.toolCallId, { type: 'permission', grant: 'deny' }, latest.requestId);
+      expect(await pending).toEqual({ decision: 'decline' });
+    }
+    const count = messages.filter(message => message.type === 'ask.request').length;
+    expect(await request()).toEqual({ decision: 'accept' });
+    expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(count);
+    const repeated = request();
+    expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(count + 1);
+    approvals.cancelSession('s');
+    expect(await repeated).toEqual({ decision: 'decline' });
+  } finally { approvals.cancelSession('s'); }
+});
+
+test('exec-policy proposals preserve exact once-only hook approval without applying the proposal', async () => {
+  create();
+  const messages: ServerMessage[] = [];
+  const approvals = new CodexApprovals(() => 1000);
+  const delivery = wire(messages).delivery;
+  const command = 'rm -rf ./generated';
+  const pending = approvals.requestHook({ type: 'permission', question: 'Allow deletion?',
+    resource: 'shell-command', action: 'execute', risk: 'high', allowedScopes: ['once'] },
+  'Bash', command, 'item-1', 'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
+  const hookAsk = messages.find(message => message.type === 'ask.request')!;
+  expect(await approvals.resolve(hookAsk.toolCallId, { type: 'permission', grant: 'once' }, hookAsk.requestId)).toBe(true);
+  expect(await pending).toBe(true);
+  const params = { threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command,
+    cwd: process.cwd(), proposedExecpolicyAmendment: ['rm', '-rf'] };
+  const request = (extra: Record<string, unknown> = {}) => approvals.request('item/commandExecution/requestApproval',
+    { ...params, ...extra }, 'thread-1', 'turn-1', 's', process.cwd(), 'ws', delivery);
+  try {
+    for (const proposal of ['rm', [], [42], [''], ['rm\0'], { command: ['rm'] }]) {
+      expect(await request({ proposedExecpolicyAmendment: proposal })).toEqual({ decision: 'decline' });
+    }
+    for (const field of ['additionalPermissions', 'networkApprovalContext', 'proposedNetworkPolicyAmendments', 'approvalId']) {
+      expect(await request({ [field]: 'unsupported' })).toEqual({ decision: 'decline' });
+    }
+    expect(await request({ cwd: '/other' })).toEqual({ decision: 'decline' });
+    expect(await request({ turnId: 'other' })).toEqual({ decision: 'decline' });
+    expect(await request()).toEqual({ decision: 'accept' });
+    expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(1);
+
+    // The consumed hook approval does not approve another call sharing the prefix.
+    const next = request({ itemId: 'item-2', command: 'rm -rf ./other' });
+    const asks = messages.filter(message => message.type === 'ask.request');
+    expect(asks).toHaveLength(2);
+    const nativeAsk = asks[1]!;
+    expect(await approvals.resolve(nativeAsk.toolCallId, { type: 'permission', grant: 'once' }, nativeAsk.requestId)).toBe(true);
+    expect(await next).toEqual({ decision: 'accept' });
+
+    const repeated = request({ itemId: 'item-3', command: 'rm -rf ./other' });
+    expect(messages.filter(message => message.type === 'ask.request')).toHaveLength(3);
+    approvals.cancelSession('s');
+    expect(await repeated).toEqual({ decision: 'decline' });
+  } finally { approvals.cancelSession('s'); }
 });
 
 test('Codex malformed requests decline and interrupted file approvals cannot be reused', async () => {

@@ -10,14 +10,11 @@ import {
   createReasonedAssistantMessageWithParts,
   createConversation,
   createTypicalConversation,
-  createToolStateCompleted,
-  createToolPart,
   createTextPart,
   createAssistantMessage,
   createCompactionPart,
 } from '../../../.storybook/mocks/mockMessage';
 import { mockId } from '../../../.storybook/mocks/mockHelpers';
-import { createPermissionAsk } from '../../../.storybook/mocks/mockPermission';
 import { createSession } from '../../../.storybook/mocks/mockSession';
 
 const session = createSession({ title: 'Transcript Session' });
@@ -48,8 +45,6 @@ const meta = {
     messagesWithParts: createTypicalConversation(session.id),
     sessionId: session.id,
     sessionStatus: 'active',
-    pendingAskRequests: [],
-    onAskResponse: () => {},
     onRemoveFromQueue: () => {},
     isMainActiveSession: true,
     autoFollow: true,
@@ -219,39 +214,6 @@ export const WithQueuedMessages: Story = {
         parts: [createTextPart({}, 'Follow-up question in the queue')],
         isQueued: true,
         queueId: mockId('queued'),
-      },
-    ],
-  },
-};
-
-export const WithPendingPermission: Story = {
-  args: {
-    messagesWithParts: [
-      createUserMessageWithParts('Deploy to staging', session.id),
-      {
-        message: createAssistantMessage({ sessionId: session.id, status: 'streaming' }),
-        parts: [
-          createTextPart({}, 'I need permission to run the deploy command.'),
-          createToolPart({ name: 'shell' }, createToolStateCompleted()),
-        ],
-      },
-    ],
-    displayItems: [
-      { message: createUserMessageWithParts('Deploy to staging', session.id).message, parts: createUserMessageWithParts('Deploy to staging', session.id).parts },
-      {
-        message: createAssistantMessage({ sessionId: session.id, status: 'streaming' }),
-        parts: [
-          createTextPart({}, 'I need permission to run the deploy command.'),
-          createToolPart({ name: 'shell' }, createToolStateCompleted()),
-        ],
-      },
-    ],
-    pendingAskRequests: [
-      {
-        toolCallId: mockId('call'),
-        sessionId: session.id,
-        toolName: 'shell',
-        ask: createPermissionAsk() as import('@prokopai/sdk').Ask,
       },
     ],
   },
