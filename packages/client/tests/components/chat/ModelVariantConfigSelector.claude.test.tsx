@@ -20,6 +20,23 @@ function picker(onChangeClaude: (model: string, effort: string) => void, claudeS
     onChangeClaude={onChangeClaude} />;
 }
 
+test.each([
+  { harness: 'claude', model: 'claude-opus-5', name: 'Opus 5', compact: false },
+  { harness: 'claude', model: 'claude-opus-5', name: 'Opus 5', compact: true },
+  { harness: 'codex', model: 'gpt-5-codex', name: 'GPT-5 Codex', compact: false },
+  { harness: 'codex', model: 'gpt-5-codex', name: 'GPT-5 Codex', compact: true },
+])('$harness selected label omits harness prefix (compact=$compact)', ({ harness, model, name, compact }) => {
+  const catalog = [{ model, name, isDefault: true, defaultEffort: 'high', supportedEfforts: ['high'] }];
+  render(<ModelVariantConfigSelector models={[]} selectedModelId={null} selectedVariant={null}
+    onChangeModel={vi.fn()} onChangeVariant={vi.fn()} preconfigs={[]}
+    selectedPreconfigId={null} onChangePreconfig={vi.fn()} compact={compact}
+    claudeSession={harness === 'claude'} claudeModels={catalog} claudeSelectedModel={model}
+    codexSession={harness === 'codex'} codexModels={catalog} codexSelectedModel={model} />);
+  const trigger = screen.getByRole('combobox');
+  expect(trigger).toHaveTextContent(compact ? name : `${name} · high`);
+  expect(trigger).not.toHaveTextContent(/^(Claude|Codex) ·/);
+});
+
 test('empty-session picker sends Claude model with default effort', async () => {
   const onChangeClaude = vi.fn();
   render(picker(onChangeClaude));

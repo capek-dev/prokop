@@ -169,8 +169,8 @@ export function ModelVariantConfigSelector({
   const selectedClaude = claudeModels.find(model => model.model === claudeSelectedModel)
     ?? (claudeSession ? claudeModels.find(model => model.isDefault) : undefined);
   const modelDisplayName = claudeSession
-    ? `Claude · ${selectedClaude?.name ?? claudeSelectedModel ?? 'Select model'}`
-    : codexSession ? `Codex · ${selectedCodex?.name ?? codexSelectedModel ?? 'Select model'}`
+    ? selectedClaude?.name ?? claudeSelectedModel ?? 'Select model'
+    : codexSession ? selectedCodex?.name ?? codexSelectedModel ?? 'Select model'
       : selectedModel?.name || fallbackModelName || 'Select model';
   const variantDisplayName = claudeSession ? claudeEffort ?? selectedClaude?.defaultEffort ?? null
     : codexSession ? codexEffort ?? selectedCodex?.defaultEffort ?? null
