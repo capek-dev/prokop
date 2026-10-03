@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ToolContext, ToolResult } from '@prokopai/sdk';
+import { resolveToolSummary, type ToolContext, type ToolResult } from '@prokopai/sdk';
 import { execute, definition } from './tool';
 
 type Ask = Parameters<ToolContext['ask']>[0];
@@ -105,5 +105,12 @@ describe('todo tool (merged read + write)', () => {
     const schema = definition.inputSchema as { properties: Record<string, unknown>; required?: string[] };
     expect(schema.properties.todos).toBeDefined();
     expect(schema.required).toBeUndefined();
+  });
+
+  test('display summary resolves for both read and write calls', () => {
+    const template = definition.display?.summary;
+    expect(resolveToolSummary({}, template)).toBe('todos');
+    expect(resolveToolSummary({ todos: [{ content: 'a', status: 'pending' }, { content: 'b', status: 'pending' }] }, template))
+      .toBe('2 todos');
   });
 });

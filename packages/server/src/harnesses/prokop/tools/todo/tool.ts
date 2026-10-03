@@ -91,7 +91,8 @@ When to use:
 When NOT to use:
 - Simple single tasks that don't need tracking
 - Replace the list unnecessarily`,
-  display: { summary: '{todos ? todos.length + " todos" : "todos"}' },
+  // Templates only substitute `{path}`; a missing list resolves to "todos".
+  display: { summary: '{todos.length} todos' },
   inputSchema: {
     type: 'object',
     properties: {

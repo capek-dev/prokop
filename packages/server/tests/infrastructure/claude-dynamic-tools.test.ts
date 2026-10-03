@@ -11,7 +11,7 @@ import { installMemoryToolFallback, installSessionSearchToolFallback, installSki
 import { agentSkillsDomainTools, memoryDomainTools, sessionSearchDomainTools } from '@/adapters/capek/domain-tools';
 import { claudeMemoryShape, claudeSessionSearchShape, claudeSkillManageShape,
   createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools } from '@/harnesses/claude-cli/dynamic-tools';
-import { claudeToolName, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
+import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
 import { createClaudeExecution } from '@/harnesses/claude-cli/execution';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
@@ -418,4 +418,26 @@ test('Claude completions synthesize real visualizations per canonical name', () 
     .toEqual({ type: 'none', message: 'Subagent task completed' });
   expect(claudeToolVisualization('NotebookEdit', {}, 'ok', false))
     .toEqual({ type: 'none', message: 'NotebookEdit completed' });
+});
+
+test('stored Claude inputs keep todo and multi-edit arrays for visualizations', () => {
+  const todoInput = claudeToolInput({ todos: [
+    { content: 'Trace bug', status: 'completed', activeForm: 'Tracing bug' },
+    { content: 'Fix bug', status: 'in_progress', activeForm: 'Fixing bug' },
+    'not an object',
+  ] });
+  expect(claudeToolSummary('todo', todoInput)).toBe('2 todos');
+  expect(claudeToolVisualization('todo', todoInput, 'Todos updated', false)).toEqual({ type: 'todo-list', items: [
+    { content: 'Trace bug', status: 'completed', priority: 'medium' },
+    { content: 'Fix bug', status: 'in_progress', priority: 'medium' },
+  ] });
+
+  const editInput = claudeToolInput({ file_path: 'src/a.ts', edits: [
+    { old_string: 'one', new_string: 'two' },
+    { old_string: 'three', new_string: 'four\nfive' },
+  ] });
+  expect(claudeToolVisualization('edit', editInput, 'done', false))
+    .toMatchObject({ type: 'diff', path: 'src/a.ts', additions: 3, deletions: 2 });
+
+  expect(claudeToolInput({ nested: { deep: true }, list: [1, 2] })).toEqual({ nested: '[omitted]', list: '[omitted]' });
 });

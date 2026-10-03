@@ -58,12 +58,28 @@ export function preview(value: unknown): string {
 const VIZ_INPUT_KEYS = new Set(['command', 'content', 'old_string', 'new_string']);
 const MAX_VIZ_INPUT = 50_000;
 
+/** Array-of-object inputs the visualizations read (TodoWrite, MultiEdit). */
+const VIZ_ARRAY_KEYS = new Set(['todos', 'edits']);
+const MAX_VIZ_ARRAY = 100;
+
+function cappedScalar(key: string, value: unknown): unknown {
+  return typeof value === 'string' ? value.slice(0, VIZ_INPUT_KEYS.has(key) ? MAX_VIZ_INPUT : 1000)
+    : typeof value === 'number' || typeof value === 'boolean' ? value : '[omitted]';
+}
+
+/** Keeps object entries as flat, length-capped scalar records. */
+function cappedEntries(value: unknown[]): Record<string, unknown>[] {
+  return value.slice(0, MAX_VIZ_ARRAY)
+    .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object' && !Array.isArray(entry))
+    .map(entry => Object.fromEntries(Object.entries(entry).slice(0, 16)
+      .map(([key, field]) => [key.slice(0, 80), cappedScalar(key, field)])));
+}
+
 /** Length-caps a Claude tool input for the transcript; viz-critical string
- * fields keep far more text so diffs and code views survive. */
+ * fields and arrays keep enough content so diffs, code views and todo lists survive. */
 export function claudeToolInput(input: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(input).slice(0, 16).map(([key, value]) => [key.slice(0, 80),
-    typeof value === 'string' ? value.slice(0, VIZ_INPUT_KEYS.has(key) ? MAX_VIZ_INPUT : 1000)
-      : typeof value === 'number' || typeof value === 'boolean' ? value : '[omitted]']));
+    VIZ_ARRAY_KEYS.has(key) && Array.isArray(value) ? cappedEntries(value) : cappedScalar(key, value)]));
 }
 
 function firstString(input: Record<string, unknown>, keys: string[]): string | null {
@@ -84,7 +100,7 @@ export function claudeToolSummary(name: string, input: Record<string, unknown>):
       case 'glob': case 'grep': return firstString(input, ['pattern', 'path']);
       case 'webfetch': return firstString(input, ['url']);
       case 'web-search': return firstString(input, ['query']);
-      case 'todo': return firstString(input, ['todos']) ? 'Update todos' : null;
+      case 'todo': return Array.isArray(input.todos) ? `${input.todos.length} todos` : 'todos';
       case 'subagent': return firstString(input, ['description', 'subagent_type']);
       case 'memory': case 'agent_memory':
         return [input.action, input.target].filter(value => typeof value === 'string').join(' ');
