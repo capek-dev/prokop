@@ -8,6 +8,18 @@ export function isAgentHomeWorkspace(
   return workspace?.settings?.isAgentHome === true;
 }
 
+export function getSelectableWorkspaces(
+  workspaces: Workspace[],
+  agents: Pick<Agent, 'id'>[],
+): Workspace[] {
+  const agentIds = new Set(agents.map(agent => agent.id));
+  // Preserve orphaned homes and their history, but omit them from navigation choices.
+  return workspaces.filter(workspace =>
+    !isAgentHomeWorkspace(workspace)
+    || (workspace.settings?.agentId != null && agentIds.has(workspace.settings.agentId)),
+  );
+}
+
 export function getWorkspaceDisplayName(
   workspace: Pick<Workspace, 'name' | 'settings'>,
   agents: Pick<Agent, 'id' | 'name'>[],

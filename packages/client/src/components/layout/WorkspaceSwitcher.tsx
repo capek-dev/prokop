@@ -25,7 +25,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { getWorkspaceDisplayName, isAgentHomeWorkspace } from '@/lib/workspaceKind';
+import { getSelectableWorkspaces, getWorkspaceDisplayName, isAgentHomeWorkspace } from '@/lib/workspaceKind';
 import { cn } from '@/lib/utils';
 import { sortWorkspaces } from '@/lib/workspaceOrder';
 import { useUIStore } from '@/stores/uiStore';
@@ -68,8 +68,9 @@ export function WorkspaceSwitcher({
   const order = useUIStore(s => s.workspaceOrder);
   const [activitySnapshot, setActivitySnapshot] = useState<Record<string, number | null>>({});
   // Keep conversation-driven movement out of an open menu, but retain live names/deletions.
+  const selectableWorkspaces = getSelectableWorkspaces(workspaces, agents);
   const orderedWorkspaces = sortWorkspaces(
-    open ? workspaces.map(workspace => ({ ...workspace, lastConversationAt: activitySnapshot[workspace.id] ?? null })) : workspaces,
+    open ? selectableWorkspaces.map(workspace => ({ ...workspace, lastConversationAt: activitySnapshot[workspace.id] ?? null })) : selectableWorkspaces,
     agents,
     order,
   );

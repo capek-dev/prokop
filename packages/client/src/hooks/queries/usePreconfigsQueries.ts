@@ -44,8 +44,15 @@ export function useDeletePreconfig(sdkClient: ProkopaiClient | null) {
   return useMutation({
     mutationFn: (id: string) =>
       sdkClient!.http.preconfigs.delete(id),
-    onSuccess: () => {
-      if (sdkClient) syncPreconfigsToStoreAndCache(sdkClient, queryClient);
+    onSuccess: async () => {
+      if (!sdkClient) return;
+      await Promise.all([
+        syncPreconfigsToStoreAndCache(sdkClient, queryClient),
+        sdkClient.http.agents.list().then(data => {
+          useServerDataStore.getState().updateAgents(data.agents);
+          queryClient.setQueryData(queryKeys.config.agents, data);
+        }),
+      ]);
     },
   });
 }
