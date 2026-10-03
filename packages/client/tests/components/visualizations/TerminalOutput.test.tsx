@@ -59,9 +59,37 @@ describe('TerminalOutput', () => {
     expect(outputSection).not.toBeInTheDocument();
   });
 
+  it('renders nothing for whitespace-only output (no header)', () => {
+    const { container } = render(<TerminalOutput stdout="   " />);
+    expect(container.querySelector('pre')).not.toBeInTheDocument();
+  });
+
+  it('renders no output body for whitespace-only stdout with header', () => {
+    const { container } = render(<TerminalOutput command="silent-cmd" exitCode={0} stdout="   " />);
+    expect(screen.getByText('silent-cmd')).toBeInTheDocument();
+    expect(container.querySelector('pre')).not.toBeInTheDocument();
+  });
+
   it('applies font-mono to command area', () => {
     render(<TerminalOutput command="test" exitCode={0} />);
     const commandArea = screen.getByText('test').closest('div');
     expect(commandArea?.className).toContain('font-mono');
+  });
+
+  it('caps output body height with an inner scroll area (header variant)', () => {
+    const { container } = render(
+      <TerminalOutput command="cat big-file.ts" exitCode={0} stdout={'line\n'.repeat(200)} />,
+    );
+    const scrollBody = container.querySelector('.tool-output-scroll');
+    expect(scrollBody).toBeInTheDocument();
+    // Command header stays outside the scroll area.
+    expect(screen.getByText('cat big-file.ts').closest('.tool-output-scroll')).toBeNull();
+  });
+
+  it('caps output body height with an inner scroll area (no header variant)', () => {
+    const { container } = render(
+      <TerminalOutput stdout={'line\n'.repeat(200)} />,
+    );
+    expect(container.querySelector('.tool-output-scroll')).toBeInTheDocument();
   });
 });

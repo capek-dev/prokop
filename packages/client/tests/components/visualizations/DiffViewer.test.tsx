@@ -115,4 +115,20 @@ describe('DiffViewer', () => {
     const pathButton = screen.getByTitle('src/app-title.tsx');
     expect(pathButton).toBeInTheDocument();
   });
+
+  it('wraps the expanded diff body in the capped scroll area', () => {
+    render(<DiffViewer hunks={sampleHunks} path="src/app-scroll.tsx" />);
+    const patchEl = screen.getByTestId('patch-diff');
+    expect(patchEl.parentElement?.className).toContain('tool-output-scroll');
+    // Header row stays outside the scroll area.
+    expect(screen.getByTitle('src/app-scroll.tsx').closest('.tool-output-scroll')).toBeNull();
+  });
+
+  it('renders no scroll area when collapsed', async () => {
+    const { container } = render(<DiffViewer hunks={sampleHunks} path="src/app-noscroll.tsx" />);
+    const expandBtn = screen.getAllByRole('button')[0];
+    await userEvent.click(expandBtn);
+
+    expect(container.querySelector('.tool-output-scroll')).not.toBeInTheDocument();
+  });
 });

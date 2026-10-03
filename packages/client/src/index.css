@@ -978,6 +978,37 @@ main {
   animation: none !important;
 }
 
+/* Inline tool-output previews (terminal output, written files): cap the
+   height so a single large output (e.g. cat of a long file) cannot dominate
+   the transcript; the body scrolls inside instead. dvh term keeps the cap
+   proportional on short/mobile viewports, overscroll-contain stops wheel/
+   touch scrolls from chaining into the transcript while inside the cap. */
+.tool-output-scroll {
+  max-height: min(24rem, 45dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent) transparent;
+}
+
+.tool-output-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.tool-output-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tool-output-scroll::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+  border-radius: 3px;
+  border: none;
+}
+
+.tool-output-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in oklch, var(--muted-foreground) 55%, transparent);
+}
+
 /* Pierre diffs host: font is inherited into the shadow-DOM renderer. */
 .pierre-diffs-host {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

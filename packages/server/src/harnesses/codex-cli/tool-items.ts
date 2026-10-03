@@ -23,6 +23,18 @@ function dynamicContent(item: Record<string, unknown>): string | null {
   return texts.length ? texts.join('\n') : null;
 }
 
+/**
+ * Codex reports command output as a JSON-encoded string; commands without
+ * output arrive as the bare encoded empty (`""`, sometimes `[]`). Keep those
+ * contentless so the transcript shows the command header only, never a body
+ * of literal quotes. Everything else passes through untrimmed.
+ */
+function commandStdout(value: unknown): string {
+  const text = preview(value);
+  const bare = text.trim();
+  return bare === '' || bare === '""' || bare === '[]' ? '' : text;
+}
+
 function dynamicResult(item: Record<string, unknown>): Record<string, unknown> | null {
   const text = dynamicContent(item);
   try { return text ? codexObject(JSON.parse(text)) : null; } catch { return null; }
@@ -163,7 +175,7 @@ export class CodexToolItems {
     } else if (status === 'failed' || status === 'error' || status === 'inProgress') {
       updated = transitionToolToError(part.id, 'Codex tool failed');
     } else {
-      const content = item.type === 'commandExecution' ? preview(item.aggregatedOutput)
+      const content = item.type === 'commandExecution' ? commandStdout(item.aggregatedOutput)
         : preview(item.type === 'dynamicToolCall'
           ? dynamicContent(item) ?? item.result ?? item.action ?? item.status ?? 'Completed'
           : item.result ?? item.contentItems ?? item.action ?? item.status ?? 'Completed');

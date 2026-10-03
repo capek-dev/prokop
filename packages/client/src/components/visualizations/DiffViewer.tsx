@@ -136,7 +136,15 @@ export const DiffViewer = memo(function DiffViewer({
           </div>
         </div>
 
-        {expanded && <PatchDiff patch={patch} options={options} className="pierre-viz-host" />}
+        {/* Capped scroll body: an expanded long diff stays a preview the user
+            scrolls inside, never a full-screen block in the transcript or
+            modal. Collapsed mode renders no diff body at all, so the cap
+            applies whenever the body is visible. */}
+        {expanded && (
+          <div className="tool-output-scroll">
+            <PatchDiff patch={patch} options={options} className="pierre-viz-host" />
+          </div>
+        )}
       </div>
     </div>
   );

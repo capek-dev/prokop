@@ -153,4 +153,20 @@ describe('CodeBlock', () => {
     render(<CodeBlock content="hello" path="src/noselect.ts" />);
     expect(screen.getByTestId('pierre-file')).toHaveAttribute('data-selected', 'none');
   });
+
+  it('wraps the file body in the capped scroll area', () => {
+    render(<CodeBlock content={makeContent(200)} path="src/long.ts" />);
+    const fileEl = screen.getByTestId('pierre-file');
+    const scrollBody = fileEl.parentElement;
+    expect(scrollBody?.className).toContain('tool-output-scroll');
+    // Header row stays outside the scroll area.
+    expect(screen.getByText('src/long.ts').closest('.tool-output-scroll')).toBeNull();
+  });
+
+  it('does not cap the collapsed preview', async () => {
+    render(<CodeBlock content={makeContent(200)} path="src/long.ts" />);
+    await collapseCurrent();
+    const fileEl = screen.getByTestId('pierre-file');
+    expect(fileEl.parentElement?.className).not.toContain('tool-output-scroll');
+  });
 });

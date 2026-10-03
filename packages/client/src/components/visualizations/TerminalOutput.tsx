@@ -12,13 +12,16 @@ interface TerminalOutputProps {
 export function TerminalOutput({ command, stdout, stderr, exitCode }: TerminalOutputProps) {
   const hasHeader = command !== undefined || exitCode !== undefined;
   const isSuccess = (exitCode ?? 0) === 0;
+  // Whitespace-only output renders nothing: an empty body block is noise.
+  const hasStdout = !!stdout?.trim();
+  const hasStderr = !!stderr?.trim();
 
   if (!hasHeader) {
-    if (!stdout && !stderr) return null;
+    if (!hasStdout && !hasStderr) return null;
     return (
-      <div className="visualization-container rounded-md border border-border/60 bg-muted/50 px-3 py-2 font-mono text-xs overflow-x-auto">
-        {stdout && <pre className="whitespace-pre-wrap text-foreground/80">{stdout}</pre>}
-        {stderr && <pre className="whitespace-pre-wrap mt-1 text-destructive">{stderr}</pre>}
+      <div className="visualization-container tool-output-scroll rounded-md border border-border/60 bg-muted/50 px-3 py-2 font-mono text-xs overflow-x-auto">
+        {hasStdout && <pre className="whitespace-pre-wrap text-foreground/80">{stdout}</pre>}
+        {hasStderr && <pre className="whitespace-pre-wrap mt-1 text-destructive">{stderr}</pre>}
       </div>
     );
   }
@@ -41,12 +44,12 @@ export function TerminalOutput({ command, stdout, stderr, exitCode }: TerminalOu
         </span>
       </div>
 
-      {(stdout || stderr) && (
-        <div className="bg-muted/50 px-3 py-2 font-mono text-xs overflow-x-auto">
-          {stdout && (
+      {(hasStdout || hasStderr) && (
+        <div className="tool-output-scroll bg-muted/50 px-3 py-2 font-mono text-xs overflow-x-auto">
+          {hasStdout && (
             <pre className="whitespace-pre-wrap text-foreground/80">{stdout}</pre>
           )}
-          {stderr && (
+          {hasStderr && (
             <pre className="whitespace-pre-wrap mt-1 text-destructive">{stderr}</pre>
           )}
         </div>

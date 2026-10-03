@@ -150,12 +150,17 @@ export const CodeBlock: FC<CodeBlockProps> = memo(({
           </div>
         </div>
 
-        <PierreFile
-          file={file}
-          options={options}
-          selectedLines={selectedLines}
-          className="pierre-viz-host"
-        />
+        {/* Capped scroll body: an expanded long file stays a preview the user
+            scrolls inside, never a full-screen block in the transcript. The
+            collapsed 20-line budget never needs the cap, so it stays uncapped. */}
+        <div className={expanded ? 'tool-output-scroll' : undefined}>
+          <PierreFile
+            file={file}
+            options={options}
+            selectedLines={selectedLines}
+            className="pierre-viz-host"
+          />
+        </div>
       </div>
     </div>
   );

@@ -53,6 +53,37 @@ test('unclassified native tool items get bounded generic rows on live events and
   });
 });
 
+test('Codex command rows with JSON-encoded empty output render no stdout body', () => {
+  const assistant = createMessage(createTestAssistantMessage('s'));
+  const sent: ServerMessage[] = [];
+  const items = new CodexToolItems('s', assistant.id, 'turn', {
+    send: (_origin, message) => { sent.push(message); },
+    broadcast: message => { sent.push(message); },
+    broadcastToSession: (_id, message) => { sent.push(message); },
+    sendToController: (_id, message) => { sent.push(message); },
+    sendToAskTargets: (_id, _authority, message) => { sent.push(message); },
+  });
+  const command = (id: string, aggregatedOutput: unknown) =>
+    items.completed({ id, type: 'commandExecution', command: `cmd-${id}`, status: 'completed',
+      aggregatedOutput, exitCode: 0 });
+  command('empty-quoted', '""');
+  command('empty-array', '[]');
+  command('whitespace', '   ');
+  command('real', 'clean output');
+  const stored = listMessagesWithParts('s');
+  const viz = (id: string) => {
+    const part = stored[0]!.parts.find(part => part.type === 'tool' && part.callId === `codex-item:turn:${id}`);
+    return part?.state.status === 'completed'
+      ? (part.state.output as { _visualization: Record<string, unknown> })._visualization : null;
+  };
+  // Bare encoded empties collapse to an empty stdout: the client renders the
+  // command header with exit code only, never a body of literal quotes.
+  expect(viz('empty-quoted')).toEqual({ type: 'shell-output', command: 'cmd-empty-quoted', stdout: '', exitCode: 0 });
+  expect(viz('empty-array')).toEqual({ type: 'shell-output', command: 'cmd-empty-array', stdout: '', exitCode: 0 });
+  expect(viz('whitespace')).toEqual({ type: 'shell-output', command: 'cmd-whitespace', stdout: '', exitCode: 0 });
+  expect(viz('real')).toEqual({ type: 'shell-output', command: 'cmd-real', stdout: 'clean output', exitCode: 0 });
+});
+
 test('Codex memory and session search use the Prokop row shapes on live events and reload', async () => {
   const assistant = createMessage(createTestAssistantMessage('s'));
   const sent: ServerMessage[] = [];
