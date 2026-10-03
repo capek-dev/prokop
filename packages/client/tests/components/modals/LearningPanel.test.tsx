@@ -98,6 +98,8 @@ test('tuning stays collapsed by default and recaps custom values on the triggers
   expect(screen.getByRole('button', { name: /^Learning focus/ }).textContent).toBe('Learning focus');
   expect(screen.queryByRole('textbox', { name: 'Learning focus' })).toBeNull();
   expect(screen.queryByLabelText('Quiet period')).toBeNull();
+  expect(screen.getByRole('button', { name: /^Timing/ })).toHaveTextContent('30m · 2h · 1d');
+  expect(screen.getByRole('button', { name: /^Timing/ })).toHaveAttribute('data-state', 'closed');
   await user.click(screen.getByRole('button', { name: /^Timing/ }));
   expect(screen.getByLabelText('Quiet period')).toHaveValue(30);
   first.unmount();

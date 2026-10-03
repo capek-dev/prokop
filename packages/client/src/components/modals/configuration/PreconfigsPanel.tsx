@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { parseAgentLearningSettings } from '@prokopai/sdk';
+import { defaultLearningCadence, parseAgentLearningSettings } from '@prokopai/sdk';
 import { usePreconfigsQuery, useCreatePreconfig, useUpdatePreconfig, useDeletePreconfig, useToolsQuery, useAgentsQuery, useDemoteAgent } from '@/hooks/queries';
 import { Layers, Plus, Pencil, Copy, Trash2, ArrowLeft, Loader2, Star, Check, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,13 @@ const MODE_OPTIONS = [
   { value: 'subagent', label: 'Subagent' },
   { value: 'both', label: 'Both' },
 ];
+
+const LEARNING_DEFAULTS = defaultLearningCadence('agent');
+const LEARNING_FIELDS = [
+  { key: 'learningIdle', label: 'Quiet period', defaultValue: LEARNING_DEFAULTS.idleMinutes },
+  { key: 'learningMinInterval', label: 'Min interval', defaultValue: LEARNING_DEFAULTS.minimumIntervalMinutes },
+  { key: 'learningMaxPending', label: 'Max pending age', defaultValue: LEARNING_DEFAULTS.maximumPendingMinutes },
+] as const;
 
 function getDuplicateName(name: string, existingNames: string[]): string {
   const names = new Set(existingNames);
@@ -285,20 +292,18 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
         const maxPending = form.learningMaxPending.trim();
         let cadence: { idleMinutes: number; minimumIntervalMinutes: number; maximumPendingMinutes: number } | null = null;
         if (idle || minInterval || maxPending) {
-          const minutes = (value: string) => Number.parseInt(value, 10);
-          if (!idle || !minInterval || !maxPending
-            || ![idle, minInterval, maxPending].every(value => /^\d+$/.test(value))
-            || minutes(idle) < 1 || minutes(minInterval) < 1
-            || minutes(maxPending) < minutes(minInterval)) {
-            setError('Learning cadence needs three positive minute values (idle, minimum interval, maximum window), with the maximum at least the minimum');
+          cadence = {
+            idleMinutes: idle ? Number(idle) : LEARNING_DEFAULTS.idleMinutes,
+            minimumIntervalMinutes: minInterval ? Number(minInterval) : LEARNING_DEFAULTS.minimumIntervalMinutes,
+            maximumPendingMinutes: maxPending ? Number(maxPending) : LEARNING_DEFAULTS.maximumPendingMinutes,
+          };
+          if (![idle, minInterval, maxPending].every(value => !value || /^\d+$/.test(value))
+            || !Object.values(cadence).every(value => Number.isInteger(value) && value >= 1 && value <= 10080)
+            || cadence.maximumPendingMinutes < cadence.minimumIntervalMinutes) {
+            setError('Learning timing must be whole minutes from 1 to 10080, with max pending age at least the minimum interval. Empty fields use defaults.');
             setSaving(false);
             return;
           }
-          cadence = {
-            idleMinutes: minutes(idle),
-            minimumIntervalMinutes: minutes(minInterval),
-            maximumPendingMinutes: minutes(maxPending),
-          };
         }
         settings.learning = {
           enabled: form.learningEnabled,
@@ -605,30 +610,21 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
                       <div>
                         <p className="text-[10px] text-muted-foreground">Cadence in minutes (leave empty for defaults)</p>
                         <div className="grid grid-cols-3 gap-1.5">
-                          <Input
-                            type="number"
-                            min={1}
-                            value={form.learningIdle}
-                            onChange={(e) => setForm({ ...form, learningIdle: e.target.value })}
-                            placeholder="Idle"
-                            className="h-8 text-xs"
-                          />
-                          <Input
-                            type="number"
-                            min={1}
-                            value={form.learningMinInterval}
-                            onChange={(e) => setForm({ ...form, learningMinInterval: e.target.value })}
-                            placeholder="Min interval"
-                            className="h-8 text-xs"
-                          />
-                          <Input
-                            type="number"
-                            min={1}
-                            value={form.learningMaxPending}
-                            onChange={(e) => setForm({ ...form, learningMaxPending: e.target.value })}
-                            placeholder="Max window"
-                            className="h-8 text-xs"
-                          />
+                          {LEARNING_FIELDS.map(field => (
+                            <div key={field.key} className="space-y-1">
+                              <Label htmlFor={field.key} className="text-[10px] font-normal text-muted-foreground">{field.label}</Label>
+                              <Input
+                                id={field.key}
+                                type="number"
+                                min={1}
+                                max={10080}
+                                value={form[field.key]}
+                                onChange={(e) => setForm({ ...form, [field.key]: e.target.value })}
+                                placeholder={String(field.defaultValue)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                          ))}
                         </div>
                       </div>
                       <div>

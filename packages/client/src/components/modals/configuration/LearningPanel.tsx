@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Plus, X } from 'lucide-react';
 import type { LearningCadence, LearningReviewer, Preconfig, Workspace, WorkspaceLearningSettings } from '@prokopai/sdk';
+import { defaultLearningCadence } from '@prokopai/sdk';
 import { useSdkClient } from '@/contexts/ServerClientContext';
 import { LearningHistory } from './LearningHistory';
 import { AgentModelPicker, type AgentModelSelection } from './AgentModelPicker';
@@ -26,9 +27,6 @@ export interface LearningPanelProps {
   onChange(value: WorkspaceLearningSettings): void;
   onPersonalLearningChange(value: boolean): void;
 }
-
-/** Server defaults for a null cadence. */
-const DEFAULT_CADENCE: LearningCadence = { idleMinutes: 30, minimumIntervalMinutes: 120, maximumPendingMinutes: 1440 };
 
 const CADENCE_FIELDS = [
   { key: 'idleMinutes', label: 'Quiet period' },
@@ -81,7 +79,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
     staleTime: 60_000,
     retry: false,
   });
-  const defaults = DEFAULT_CADENCE;
+  const defaults = defaultLearningCadence('workspace');
   const settings: WorkspaceLearningSettings = value ?? {
     enabled: false,
     reviewers: [],
@@ -151,9 +149,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
   /** Focus and timing are rare tuning: collapsed by default, with the custom value recapped on the trigger. */
   const learnerTuning = (item: LearningReviewer, bordered: boolean) => {
     const cadence = { ...defaults, ...item.cadence };
-    const timingSummary = item.cadence
-      ? CADENCE_FIELDS.map(field => formatMinutes(cadence[field.key])).join(' · ')
-      : null;
+    const timingSummary = CADENCE_FIELDS.map(field => formatMinutes(cadence[field.key])).join(' · ');
     return (
       <>
         <DisclosureRow label="Learning focus" summary={item.instructions.trim() || null} bordered={bordered}>
@@ -162,7 +158,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
             onChange={event => update(item.id, { instructions: event.target.value })} />
         </DisclosureRow>
 
-        <DisclosureRow label="Timing" summary={timingSummary} bordered={bordered}>
+        <DisclosureRow label="Timing" summary={timingSummary} defaultOpen={item.cadence !== null} bordered={bordered}>
           <div className="space-y-1.5">
             <div className="grid grid-cols-3 gap-2">
               {CADENCE_FIELDS.map(field => (

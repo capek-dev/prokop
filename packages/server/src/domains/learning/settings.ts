@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import type { LearningCadence, LearningScope, WorkspaceLearningSettings, WorkspaceSettings } from '@prokopai/sdk';
+import type { WorkspaceLearningSettings, WorkspaceSettings } from '@prokopai/sdk';
+
+export { defaultLearningCadence } from '@prokopai/sdk';
 
 const identifier = z.string().trim().min(1).max(200);
 const instructions = z.string().max(20_000);
@@ -112,14 +114,6 @@ export function agentHomeLearningSettings(config: AgentLearningConfig, agentId: 
 export function parseLearningSettings(value: unknown): WorkspaceLearningSettings | null {
   const result = learningSettingsSchema.safeParse(value);
   return result.success ? result.data : null;
-}
-
-export function defaultLearningCadence(scope: LearningScope): LearningCadence {
-  return {
-    idleMinutes: scope === 'workspace' ? 30 : 60,
-    minimumIntervalMinutes: scope === 'workspace' ? 120 : 1440,
-    maximumPendingMinutes: 1440,
-  };
 }
 
 /** Explicit enable action only. Capability dependencies are force-enabled
