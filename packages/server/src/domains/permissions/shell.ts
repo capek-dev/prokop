@@ -18,6 +18,7 @@
 import { homedir } from 'node:os';
 import { isAbsolute, resolve } from 'node:path';
 import { analyzeCommand } from './command/analyze';
+import { unwrapShellCommand } from './command/shell-wrapper';
 import type { Concern, Finding } from './concerns';
 import {
   concernRisk,
@@ -106,8 +107,7 @@ export function classifyShellCommand(
 ): ShellClassification | undefined {
   if (typeof command !== 'string' || !command.trim() || command.includes('\0') || command.length > 64 * 1024) return undefined;
   // Native harnesses wrap unified exec in a login shell; inspect the inner command if present.
-  const match = command.match(/^\/(?:bin\/)?(?:zsh|bash|sh)\s+-lc\s+'([\s\S]*)'$/);
-  const effective = match ? match[1]!.replace(/'\\''/g, "'") : command;
+  const effective = unwrapShellCommand(command) ?? command;
 
   const roots = typeof root === 'string' ? [root] : root;
   const analyzed = analyzeCommand(effective, {

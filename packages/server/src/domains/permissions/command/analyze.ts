@@ -29,6 +29,7 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { effectivePath, isWithinRoot } from '../paths';
 import type { Concern, Finding } from '../concerns';
+import { unwrapShellCommand } from './shell-wrapper';
 import {
   CATASTROPHIC_BASES,
   containsScreenedToken,
@@ -612,14 +613,6 @@ function gitSubcommand(base: string, args: readonly string[]): string | undefine
 
 // ── Entry point ─────────────────────────────────────────────────────────────
 
-const LOGIN_SHELL_WRAP = /^\/(?:bin\/)?(?:zsh|bash|sh)\s+-lc\s+'([\s\S]*)'$/;
-
-function unwrapLoginShell(command: string): string {
-  const match = command.match(LOGIN_SHELL_WRAP);
-  if (!match) return command;
-  return match[1]!.replace(/'\\''/g, "'");
-}
-
 export function analyzeCommand(
   command: string,
   ctx: CommandAnalyzeContext,
@@ -631,7 +624,7 @@ export function analyzeCommand(
   const resolvedPaths: string[] = [];
   let catastrophic = false;
 
-  const unwrapped = unwrapLoginShell(command);
+  const unwrapped = unwrapShellCommand(command) ?? command;
   if (!unwrapped.trim()) {
     return { concerns: [], catastrophic: false, evidence: [], resolvedPaths: [] };
   }

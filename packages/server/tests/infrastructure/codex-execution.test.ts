@@ -822,6 +822,27 @@ test('native approval denials log fixed categories without request content', asy
   } finally { warning.mockRestore(); }
 });
 
+test('native Codex approval treats a double-quoted commit wrapper like the plain command', async () => {
+  create();
+  updateSession('s', { permissionMode: 'standard' });
+  const messages: ServerMessage[] = [];
+  const approvals = new CodexApprovals();
+  const request = (command: string, itemId: string) => approvals.request('item/commandExecution/requestApproval',
+    { threadId: 'thread-1', turnId: 'turn-1', itemId, command, cwd: process.cwd() },
+    'thread-1', 'turn-1', 's', process.cwd(), 'ws', wire(messages).delivery);
+  try {
+    expect(await request('/bin/zsh -lc "git commit -m \'mcp: workspace settings, oauth and shared harness tools\'"', 'commit'))
+      .toEqual({ decision: 'accept' });
+    expect(messages.some(message => message.type === 'ask.request')).toBe(false);
+    const reset = request('/bin/zsh -lc "git reset --hard"', 'reset');
+    await waitFor(() => messages.some(message => message.type === 'ask.request'));
+    const ask = messages.find(message => message.type === 'ask.request');
+    expect(ask).toMatchObject({ ask: { concerns: ['destructive'], allowedScopes: ['once'] } });
+    approvals.cancelSession('s');
+    expect(await reset).toEqual({ decision: 'decline' });
+  } finally { approvals.cancelSession('s'); }
+});
+
 test('Codex hook auto-approval follows the current session risk and remains once-only', async () => {
   create();
   const messages: ServerMessage[] = [];

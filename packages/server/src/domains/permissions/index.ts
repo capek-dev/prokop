@@ -32,6 +32,7 @@ export {
   analyzeCommand,
   type CommandAnalyzeContext,
 } from './command/analyze';
+export { unwrapShellCommand } from './command/shell-wrapper';
 export {
   classifyShellCommand,
   parseCommand,

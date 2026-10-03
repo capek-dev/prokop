@@ -57,6 +57,17 @@ describe('golden: ordinary work runs clean at standard', () => {
   test('login-shell wrappers are unwrapped before analysis', () => {
     expect(concernsOf("/bin/zsh -lc 'bun test'")).toEqual([]);
     expect(standardDecision("/bin/zsh -lc 'rm notes.txt'")).toBe('auto');
+    expect(concernsOf('/bin/zsh -lc "git commit -m \'mcp: workspace settings, oauth and shared harness tools\'"')).toEqual([]);
+    expect(concernsOf('/bin/zsh -lc "git commit -m \'document rm -rf\'"')).toEqual([]);
+    expect(concernsOf('/bin/zsh -lc "git reset --hard"')).toContain('destructive');
+    expect(concernsOf('/bin/zsh -lc "cat .env"')).toContain('sensitive');
+  });
+
+  test('wrapper parsing preserves substitutions and commands after the script', () => {
+    expect(concernsOf('/bin/zsh -lc "git status" && rm -rf build')).toContain('destructive');
+    expect(concernsOf('/bin/zsh -lc "git commit -m \'$(cat .env)\'"')).toContain('sensitive');
+    expect(concernsOf('/bin/zsh -lc "git commit -m \'`rm -rf build`\'"')).toContain('destructive');
+    expect(isCatastrophic('/bin/zsh -lc "git status"; rm -rf /')).toBe(true);
   });
 });
 

@@ -45,6 +45,23 @@ describe('shell classification (permissions v2)', () => {
     expect(destructive.ask.allowedScopes).toEqual(['once']);
   });
 
+  test('double-quoted Codex wrappers classify the script, not the shell token screen', () => {
+    const commands = [
+      "git commit -m 'mcp: workspace settings, oauth and shared harness tools'",
+      "git commit -m 'document rm -rf and git reset --hard'",
+      'git status', 'git reset --hard', 'rm -rf build', 'cat .env',
+      'cat ../outside.txt', 'rm -rf /', 'git status && rm -rf build',
+    ];
+    for (const command of commands) {
+      const wrapped = `/bin/zsh -lc "${command}"`;
+      const plain = classifyShellCommand(command, root, root)!;
+      const classified = classifyShellCommand(wrapped, root, root)!;
+      expect(classified.finding, wrapped).toEqual(plain.finding);
+      expect(classified.ask.metadata).toEqual(plain.ask.metadata);
+      expect(classified.ask.allowedScopes).toEqual(plain.ask.allowedScopes);
+    }
+  });
+
   test('escape-only asks may be remembered; workspace writes stay clean', () => {
     const escape = classifyShellCommand('cat /etc/passwd', root, root)!;
     expect(escape.ask.allowedScopes).toEqual(['once', 'session', 'workspace']);
