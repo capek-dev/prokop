@@ -983,12 +983,16 @@ main {
    the transcript; the body scrolls inside instead. Desktop/sm-viewports
    only: on phones the nested scroller intercepts touch scroll before it can
    chain to the transcript, so mobile renders the output fully and uncapped.
-   640px matches the sm: breakpoint used across the app. */
+   640px matches the sm: breakpoint used across the app.
+   No overscroll-behavior: contain — it blocks scroll chaining even on blocks
+   shorter than the cap (a non-overflowing scroller is always at its
+   boundary), which traps the wheel and stops the transcript from
+   scrolling. Default chaining lets the block scroll to its end, then the
+   session continues. */
 @media (min-width: 640px) {
   .tool-output-scroll {
     max-height: min(24rem, 45dvh);
     overflow-y: auto;
-    overscroll-behavior: contain;
   }
 }
 
