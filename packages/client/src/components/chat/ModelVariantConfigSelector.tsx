@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Check, ChevronsUpDown, Brain, Bot, Cog } from 'lucide-react';
+import { Check, ChevronsUpDown, Brain, Bot, Cog, Cpu } from 'lucide-react';
 import type { CodexModel, Preconfig } from '@prokopai/sdk';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { AnthropicMark, OpenAIMark, ProkopMark } from '@/components/branding/BrandMarks';
@@ -509,7 +509,7 @@ export function ModelVariantConfigSelector({
             aria-label={'Model and configuration: ' + fullSelectionLabel}
             disabled={disabled}
           >
-            <HarnessMark className="size-5" />
+            <Cpu />
           </Button>
         </SheetTrigger>
         <SheetContent
@@ -543,7 +543,7 @@ export function ModelVariantConfigSelector({
             title={fullSelectionLabel}
             disabled={disabled}
           >
-            <HarnessMark className="size-5" />
+            <Cpu />
           </Button>
         </PopoverTrigger>
         {popoverContent}
