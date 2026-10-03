@@ -264,9 +264,11 @@ export function claudeToolVisualization(
     case 'write-file':
       return { type: 'code', path: typeof input.file_path === 'string' ? input.file_path : 'File',
         content: typeof input.content === 'string' ? preview(input.content) : content, created: true };
+    // Reads render as a path chip like the Prokop read-file tool, never as
+    // file contents (a code block would label the read as "Overwrote").
     case 'read-file':
-      return { type: 'code', path: typeof input.file_path === 'string' ? input.file_path : 'File',
-        content, created: false };
+      return { type: 'none',
+        message: `Read: ${firstString(input, ['file_path', 'notebook_path']) ?? 'file'}` };
     case 'glob': return fileListFromLines(output, 'file');
     case 'grep': return fileListFromLines(output, 'match');
     case 'webfetch':

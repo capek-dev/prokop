@@ -414,6 +414,9 @@ test('Claude completions synthesize real visualizations per canonical name', () 
     JSON.stringify({ success: true, action: 'list', target: 'memory', entries: [], usage: { chars: 0, limit: 2500 } }), false);
   expect(memory).toEqual({ type: 'none', badge: '0 entries · 0/2500 chars', message: 'Memory (memory)' });
 
+  expect(claudeToolVisualization('read-file', { file_path: '/repo/src/a.ts' }, '1\tconst a = 1;', false))
+    .toEqual({ type: 'none', message: 'Read: /repo/src/a.ts' });
+
   expect(claudeToolVisualization('subagent', { prompt: 'go' }, 'summary', false))
     .toEqual({ type: 'none', message: 'Subagent task completed' });
   expect(claudeToolVisualization('NotebookEdit', {}, 'ok', false))
