@@ -136,7 +136,7 @@ describe('sensitive filename matching', () => {
     expect(isSensitiveFilename('/workspace/.env.local')).toBe(true);
     expect(isSensitiveFilename('/workspace/certs/server.pem')).toBe(true);
     expect(isSensitiveFilename('/workspace/keys/deploy.key')).toBe(true);
-    expect(isSensitiveFilename('/workspace/credentials.json')).toBe(true);
+    expect(isSensitiveFilename('/workspace/.git-credentials')).toBe(true);
     expect(isSensitiveFilename('/workspace/src/secrets.json')).toBe(true);
   });
 
@@ -149,6 +149,8 @@ describe('sensitive filename matching', () => {
   });
 
   test('does not match legacy substring false positives', () => {
+    expect(isSensitiveFilename('/workspace/credentials.json')).toBe(false);
+    expect(isSensitiveFilename('/workspace/src/credentials.ts')).toBe(false);
     expect(isSensitiveFilename('/workspace/src/password-reset.ts')).toBe(false);
     expect(isSensitiveFilename('/workspace/src/environment.ts')).toBe(false);
     expect(isSensitiveFilename('/workspace/mysecrets.ts')).toBe(false);

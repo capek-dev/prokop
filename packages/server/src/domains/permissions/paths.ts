@@ -3,9 +3,16 @@ import { dirname, isAbsolute, relative, sep } from 'node:path';
 import { resolve as resolvePath } from 'node:path';
 import { SENSITIVE_FILE_PATTERNS } from '@prokopai/sdk';
 
+// Credentials is a common source-code name, not evidence of secret material.
+export const SENSITIVE_PATH_PATTERNS = [
+  ...SENSITIVE_FILE_PATTERNS.filter(pattern => pattern !== 'credentials'),
+  '.git-credentials',
+  '.aws/credentials',
+];
+
 /** True when a path references sensitive material (.env, .key, .pem, ...). */
 export function isSensitivePath(path: string): boolean {
-  return SENSITIVE_FILE_PATTERNS.some(pattern => path.toLowerCase().includes(pattern));
+  return SENSITIVE_PATH_PATTERNS.some(pattern => path.toLowerCase().includes(pattern));
 }
 
 /** True when path equals or sits inside root. */

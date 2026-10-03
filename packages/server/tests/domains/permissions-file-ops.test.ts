@@ -39,6 +39,25 @@ describe('classifyFileOperation (shared file-op analysis)', () => {
     expect(result?.ask.action).toBe('read');
   });
 
+  test('credentials source names and search patterns do not require sensitive-file approval', () => {
+    for (const path of ['credentials', 'credentials.json', 'src/credentials.ts', 'src/provider-credentials.ts', 'credentials/index.ts']) {
+      for (const operation of ['read', 'edit', 'write', 'search'] as const) {
+        const result = classifyFileOperation({
+          operation, paths: [`${root}/${path}`], roots: [root], pattern: '**/*credentials*',
+        });
+        expect(result?.finding.concerns).toEqual([]);
+      }
+    }
+  });
+
+  test('known credential stores remain sensitive', () => {
+    for (const path of ['.git-credentials', '.aws/credentials']) {
+      expect(classifyFileOperation({
+        operation: 'read', paths: [`${root}/${path}`], roots: [root],
+      })?.finding.concerns).toEqual(['sensitive']);
+    }
+  });
+
   test('escape means outside every provided root', () => {
     const inside = classifyFileOperation({
       operation: 'read', paths: ['/allowed/notes.txt'], roots: [root, '/allowed'],

@@ -613,7 +613,7 @@ edits: [
 
 This tool requires explicit permission for:
 - Files outside the workspace
-- Sensitive files (.env, .pem, .key, credentials, etc.)
+- Sensitive files (.env, .pem, .key, etc.)
 - More than ${MAX_EDITS_WITHOUT_APPROVAL} edits at once
 - Editing system directories is blocked entirely`,
   display: { summary: '{path} ({edits.length} edits)' },

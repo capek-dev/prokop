@@ -32,6 +32,8 @@ describe('golden: ordinary work runs clean at standard', () => {
       'bun run build',
       'npm install',
       'cat README.md',
+      'cat credentials.json',
+      'cat src/credentials.ts',
       'ls',
       'mkdir docs',
       'touch notes.txt',
@@ -96,7 +98,7 @@ describe('golden: the three concern families ask at standard', () => {
       'cat .env',
       'cat ~/.ssh/id_rsa',
       'cat certs/server.pem',
-      'cat credentials.json',
+      'cat .git-credentials',
     ]) {
       expect(concernsOf(command), command).toContain('sensitive');
       expect(standardDecision(command), command).toBe('ask');

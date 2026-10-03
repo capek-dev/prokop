@@ -155,7 +155,7 @@ export function containsScreenedToken(text: string): boolean {
 
 const SENSITIVE_BASENAMES_EXACT = new Set([
   '.env', '.netrc', '.git-credentials', '.npmrc', '.htpasswd',
-  'credentials.json', 'secrets.json',
+  'secrets.json',
   'id_rsa', 'id_dsa', 'id_ecdsa', 'id_ed25519',
 ]);
 

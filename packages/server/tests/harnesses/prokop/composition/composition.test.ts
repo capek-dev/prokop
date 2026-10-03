@@ -155,6 +155,7 @@ describe('Čapek composition root', () => {
       '/etc/', '/usr/', '/bin/', '/sbin/', '/boot/', '/dev/', '/proc/', '/sys/', '/root/',
     ]);
     expect(focused.jean2WorkspacePolicyOptions.sensitivePatterns).toContain('.env');
+    expect(focused.jean2WorkspacePolicyOptions.sensitivePatterns).not.toContain('credentials');
 
     const processCapability = createWorkspaceCapability({
       root: '/workspace',
@@ -164,6 +165,8 @@ describe('Čapek composition root', () => {
     });
     expect(processCapability.isBlockedPath('/etc/passwd')).toBe(true);
     expect(processCapability.isSensitivePath('/workspace/.env')).toBe(true);
+    expect(processCapability.isSensitivePath('/workspace/src/credentials.ts')).toBe(false);
+    expect(processCapability.isSensitivePath('/workspace/.aws/credentials')).toBe(true);
   });
 
   test('the runtime and HTTP composition reuse one AgentsApplication identity', () => {

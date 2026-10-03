@@ -3,7 +3,7 @@ import {
   configureWorkspacePolicy,
   type WorkspacePolicyOptions,
 } from '@capekai/core/workspace';
-import { SENSITIVE_FILE_PATTERNS } from '@capekai/types';
+import { SENSITIVE_PATH_PATTERNS } from '@/domains/permissions/paths';
 
 export const JEAN2_BLOCKED_PATHS = [
   '/etc/',
@@ -19,7 +19,7 @@ export const JEAN2_BLOCKED_PATHS = [
 
 export const jean2WorkspacePolicyOptions: WorkspacePolicyOptions = {
   blockedPaths: JEAN2_BLOCKED_PATHS,
-  sensitivePatterns: SENSITIVE_FILE_PATTERNS,
+  sensitivePatterns: SENSITIVE_PATH_PATTERNS,
   homeDir: homedir(),
 };
 
