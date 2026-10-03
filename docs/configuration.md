@@ -116,7 +116,7 @@ Some models support reasoning effort variants (`low`, `medium`, `high`, `xhigh`,
 
 ## Workspace Capabilities
 
-Capabilities are optional features enabled per workspace. All off by default. Configure through the client (**Workspace Settings > Capabilities**) or by updating workspace settings via the REST API.
+Capabilities are optional features enabled per workspace. All off by default. Configure through the client (**Settings > Workspace > Agent Tools**) or by updating workspace settings via the REST API. The workspace selector defaults to the workspace you opened Settings from.
 
 | Capability | Settings Key | Purpose |
 |---|---|---|

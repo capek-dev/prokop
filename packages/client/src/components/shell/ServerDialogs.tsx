@@ -1,7 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { useParams } from '@tanstack/react-router';
 import { useShallow } from 'zustand/react/shallow';
-import type { ProkopaiClient, WorkspaceSettings, PermissionGrant } from '@prokopai/sdk';
+import type { ProkopaiClient } from '@prokopai/sdk';
 import { useUIStore } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useFileEditorStore } from '@/stores/fileEditorStore';
@@ -9,9 +9,6 @@ import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 
 const ConfigurationDialog = lazy(() =>
   import('@/components/modals/ConfigurationDialog').then((m) => ({ default: m.ConfigurationDialog })),
-);
-const WorkspaceSettingsDialog = lazy(() =>
-  import('@/components/modals/WorkspaceSettingsDialog').then((m) => ({ default: m.WorkspaceSettingsDialog })),
 );
 const SchedulerJobModal = lazy(() =>
   import('@/components/modals/SchedulerJobModal').then((m) => ({ default: m.SchedulerJobModal })),
@@ -26,13 +23,6 @@ interface ServerDialogsProps {
   sdkClient: ProkopaiClient | null;
   onLogout: () => void;
   onConfigurationClose: () => void;
-  permissions: PermissionGrant[];
-  onRefreshPermissions: () => void;
-  onRevokePermission: (permissionId: string) => void;
-  onRevokeAllPermissions: (workspaceId: string) => void;
-  onUpdateWorkspacePaths: (workspaceId: string, additionalPaths: string[]) => void;
-  onUpdateWorkspaceSettings: (workspaceId: string, settings: WorkspaceSettings) => void;
-  isUpdatingWorkspace?: Record<string, boolean>;
 }
 
 function DialogLoadingFallback() {
@@ -45,13 +35,6 @@ export function ServerDialogs({
   sdkClient,
   onLogout,
   onConfigurationClose,
-  permissions,
-  onRefreshPermissions,
-  onRevokePermission,
-  onRevokeAllPermissions,
-  onUpdateWorkspacePaths,
-  onUpdateWorkspaceSettings,
-  isUpdatingWorkspace = {},
 }: ServerDialogsProps) {
   const params = useParams({
     from: '/server/$serverId',
@@ -63,8 +46,6 @@ export function ServerDialogs({
   const {
     showConfiguration,
     setShowConfiguration,
-    showWorkspaceSettings,
-    setShowWorkspaceSettings,
     showSchedulerJob,
     editingSchedulerJob,
     setShowSchedulerJob,
@@ -72,8 +53,6 @@ export function ServerDialogs({
     useShallow((s) => ({
       showConfiguration: s.showConfiguration,
       setShowConfiguration: s.setShowConfiguration,
-      showWorkspaceSettings: s.showWorkspaceSettings,
-      setShowWorkspaceSettings: s.setShowWorkspaceSettings,
       showSchedulerJob: s.showSchedulerJob,
       editingSchedulerJob: s.editingSchedulerJob,
       setShowSchedulerJob: s.setShowSchedulerJob,
@@ -89,7 +68,7 @@ export function ServerDialogs({
 
   return (
     <>
-      {(showConfiguration || showWorkspaceSettings || showSchedulerJob || filePreviewTarget !== null) && (
+      {(showConfiguration || showSchedulerJob || filePreviewTarget !== null) && (
         <Suspense fallback={<DialogLoadingFallback />}>
           {showConfiguration && (
             <ConfigurationDialog
@@ -104,22 +83,6 @@ export function ServerDialogs({
               apiToken={apiToken}
               isConnected={isConnected}
               onLogout={onLogout}
-            />
-          )}
-
-          {activeWorkspace && showWorkspaceSettings && (
-            <WorkspaceSettingsDialog
-              open={showWorkspaceSettings}
-              onOpenChange={setShowWorkspaceSettings}
-              workspace={activeWorkspace}
-              onSave={onUpdateWorkspaceSettings}
-              sdkClient={sdkClient}
-              permissions={permissions}
-              onRefreshPermissions={onRefreshPermissions}
-              onRevokePermission={onRevokePermission}
-              onRevokeAllPermissions={() => onRevokeAllPermissions(activeWorkspace.id)}
-              onUpdateWorkspacePaths={onUpdateWorkspacePaths}
-              isSaving={!!isUpdatingWorkspace[activeWorkspace.id]}
             />
           )}
 

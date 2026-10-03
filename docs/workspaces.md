@@ -37,7 +37,7 @@ Each workspace has its own permission state. When you approve a tool "always" in
 
 ## Workspace Capabilities
 
-Capabilities are optional features you enable per workspace. All are off by default. Enable them through the client: **three dots (top right) > Workspace Settings > Capabilities**.
+Capabilities are optional features you enable per workspace. All are off by default. Enable them through the client: **Settings > Workspace > Agent Tools**. Use the workspace selector to configure another workspace without changing your active conversation.
 
 Each capability that lets the agent write files has a **permission risk level** controlling when the agent must ask before acting:
 

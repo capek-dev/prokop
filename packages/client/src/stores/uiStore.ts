@@ -6,6 +6,12 @@ import type { UseBoundStore, StoreApi } from 'zustand';
 // --- Configuration Section (deep-linking) ---
 export type ConfigurationSection =
   | 'mcp'
+  | 'workspace-sessions'
+  | 'workspace-mcp'
+  | 'workspace-permissions'
+  | 'workspace-paths'
+  | 'workspace-learning'
+  | 'workspace-agentTools'
   // Preferences
   | 'system'
   | 'appearance'
@@ -34,13 +40,11 @@ interface ConfigurationSectionActions {
 interface DialogState {
   showSettings: boolean;
   showConfiguration: boolean;
-  showWorkspaceSettings: boolean;
 }
 
 interface DialogActions {
   setShowSettings: (show: boolean) => void;
   setShowConfiguration: (show: boolean) => void;
-  setShowWorkspaceSettings: (show: boolean) => void;
 }
 
 // --- File Preview ---
@@ -136,12 +140,10 @@ export const useUIStore: UseBoundStore<StoreApi<UIStore>> = create<UIStore>((set
   // --- Dialogs ---
   showSettings: false,
   showConfiguration: false,
-  showWorkspaceSettings: false,
 
   // Open the unified settings dialog (preference or server section)
   setShowSettings: (show: boolean) => set({ showConfiguration: show, showSettings: show }),
-  setShowConfiguration: (show) => set({ showConfiguration: show }),
-  setShowWorkspaceSettings: (show) => set({ showWorkspaceSettings: show }),
+  setShowConfiguration: (show) => set({ showConfiguration: show, showSettings: show }),
 
   // --- Configuration Section ---
   configurationSection: 'appearance',

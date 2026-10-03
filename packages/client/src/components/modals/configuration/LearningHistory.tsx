@@ -51,7 +51,6 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
   const { sdkClient: client, serverUrl } = useServerClient();
   const { resumeSession } = useSessionManager();
   const setShowConfiguration = useUIStore(s => s.setShowConfiguration);
-  const setShowWorkspaceSettings = useUIStore(s => s.setShowWorkspaceSettings);
   const cache = useQueryClient();
   const [runId, setRunId] = useState<string | null>(null);
   const key = ['learning', workspaceId, serverUrl];
@@ -104,7 +103,6 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
    * board pane — a plain route link shows an empty view for those. */
   const openSession = (sessionId: string): void => {
     setShowConfiguration(false);
-    setShowWorkspaceSettings(false);
     resumeSession(sessionId);
   };
 

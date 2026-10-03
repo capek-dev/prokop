@@ -213,13 +213,6 @@ export default function ServerShell() {
             sdkClient={sessionManager.sdkClient}
             onLogout={sessionManager.handleLogout}
             onConfigurationClose={() => router.invalidate()}
-            permissions={sessionManager.permissions}
-            onRefreshPermissions={sessionManager.refreshPermissions}
-            onRevokePermission={sessionManager.revokePermission}
-            onRevokeAllPermissions={sessionManager.revokeAllPermissions}
-            onUpdateWorkspacePaths={sessionManager.updateWorkspacePaths}
-            onUpdateWorkspaceSettings={sessionManager.updateWorkspaceSettings}
-            isUpdatingWorkspace={sessionManager.isUpdatingWorkspace}
           />
           </SessionManagerContext.Provider>
         </SidebarProvider>

@@ -32,7 +32,6 @@ export function AppHeader() {
   const updateVersion = useServerUpdate();
 
   const setShowSettings = useUIStore((s) => s.setShowSettings);
-  const setShowWorkspaceSettings = useUIStore((s) => s.setShowWorkspaceSettings);
   const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
 
   const { toggleSidebar, state: sidebarState } = useSidebar();
@@ -79,7 +78,6 @@ export function AppHeader() {
       terminalActive={showTerminalPanel}
       onToggleTerminal={() => setShowTerminalPanel(!showTerminalPanel)}
       hasWorkspace={Boolean(activeWorkspace)}
-      onOpenWorkspaceSettings={() => setShowWorkspaceSettings(true)}
       onOpenSettings={() => setShowSettings(true)}
       updateVersion={updateVersion}
     />

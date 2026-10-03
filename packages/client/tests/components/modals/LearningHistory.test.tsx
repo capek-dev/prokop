@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, test, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), undo: vi.fn(), keep: vi.fn(), store: vi.fn() }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), undo: vi.fn(), keep: vi.fn(), store: vi.fn(), resume: vi.fn(), close: vi.fn() }));
+vi.mock('@/contexts/SessionManagerContext', () => ({ useSessionManager: () => ({ resumeSession: mocks.resume }) }));
 vi.mock('@/contexts/ServerClientContext', () => ({ useServerClient: () => ({ serverUrl: 'test-server', sdkClient: { http: { workspaces: {
   learningRuns: mocks.list, learningRun: mocks.detail, undoLearningChange: mocks.undo, keepLearningFiles: mocks.keep,
 } } } }) }));
@@ -15,7 +16,7 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 vi.mock('@/stores/serverDataStore', () => ({ useServerDataStore: (selector: (state: unknown) => unknown) => selector(mocks.store()) }));
 vi.mock('@/stores/uiStore', () => ({
-  useUIStore: (selector: (s: Record<string, unknown>) => unknown) => selector({ openFilePreview: vi.fn() }),
+  useUIStore: (selector: (s: Record<string, unknown>) => unknown) => selector({ openFilePreview: vi.fn(), setShowConfiguration: mocks.close }),
 }));
 // Pierre renders into shadow DOM, invisible to light-DOM queries; the mock surfaces the serialized patch.
 vi.mock('@pierre/diffs/react', () => ({
@@ -49,7 +50,9 @@ test('opens the review transcript when available', async () => {
   mocks.detail.mockResolvedValue({ run: { id: 'run', reviewerId: 'reviewer', status: 'completed' }, sessionId: 'review-session', sources: [], changes: [] });
   const user = userEvent.setup(); mount();
   await user.click(await screen.findByRole('button', { name: /failed/i }));
-  expect(await screen.findByRole('link', { name: 'Open learning session' })).toHaveAttribute('href', '/server/server/workspace/session/review-session');
+  await user.click(await screen.findByRole('button', { name: 'Open learning session' }));
+  expect(mocks.close).toHaveBeenCalledWith(false);
+  expect(mocks.resume).toHaveBeenCalledWith('review-session');
 });
 
 test('a run opens as its own screen and back returns to the list', async () => {
@@ -65,7 +68,7 @@ test('hides the transcript button for older responses without a session', async 
   const user = userEvent.setup(); mount();
   await user.click(await screen.findByRole('button', { name: /failed/i }));
   await screen.findByRole('button', { name: /back to runs/i });
-  expect(screen.queryByRole('link', { name: 'Open learning session' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Open learning session' })).toBeNull();
 });
 
 test('groups source messages by conversation and stays collapsed until opened', async () => {
@@ -73,11 +76,13 @@ test('groups source messages by conversation and stays collapsed until opened', 
   await user.click(await screen.findByRole('button', { name: /failed/i }));
   const trigger = await screen.findByRole('button', { name: /^Source conversations/ });
   expect(trigger).toHaveTextContent('3 conversations · 4 messages');
-  expect(screen.queryByRole('link', { name: /Fix retry handling/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: /Fix retry handling/ })).toBeNull();
   await user.click(trigger);
-  expect(screen.getByRole('link', { name: /Fix retry handling/ })).toHaveAttribute('href', '/server/server/workspace/session/source-uuid');
-  expect(screen.getByRole('link', { name: /Fix retry handling/ })).toHaveTextContent('2 messages');
-  expect(screen.getAllByRole('link', { name: 'Untitled conversation' })).toHaveLength(2);
+  expect(screen.getByRole('button', { name: /Fix retry handling/ })).toHaveTextContent('2 messages');
+  expect(screen.getAllByRole('button', { name: 'Untitled conversation' })).toHaveLength(2);
+  await user.click(screen.getByRole('button', { name: /Fix retry handling/ }));
+  expect(mocks.close).toHaveBeenCalledWith(false);
+  expect(mocks.resume).toHaveBeenCalledWith('source-uuid');
   expect(screen.queryByText('source-uuid')).toBeNull();
 });
 

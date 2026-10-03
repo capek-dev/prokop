@@ -31,22 +31,30 @@ import { sortWorkspaces } from '@/lib/workspaceOrder';
 import { useUIStore } from '@/stores/uiStore';
 import { WorkspaceOrderControl } from './WorkspaceOrderControl';
 
-interface WorkspaceSwitcherProps {
+interface WorkspaceSelectionProps {
   workspaces: Workspace[];
   agents: Agent[];
   activeWorkspace: Workspace | null;
   onSelectWorkspace: (workspace: Workspace) => void;
+  sdkClient?: ProkopaiClient | null;
+  isCreatingWorkspace?: boolean;
+  deletingWorkspaceId?: string | null;
+  isUpdatingWorkspace?: Record<string, boolean>;
+}
+
+interface WorkspaceManagementActions {
   onCreateVirtualWorkspace: () => void;
   onCreatePhysicalWorkspace: (path: string) => void;
   onDeleteWorkspace: (id: string) => void;
   onRenameWorkspace: (id: string, name: string) => void;
   onUpdateWorkspacePath: (workspaceId: string, path: string) => void;
   onUpdateWorkspacePaths: (workspaceId: string, additionalPaths: string[]) => void;
-  sdkClient: ProkopaiClient | null;
-  isCreatingWorkspace?: boolean;
-  deletingWorkspaceId?: string | null;
-  isUpdatingWorkspace?: Record<string, boolean>;
 }
+
+type WorkspaceSwitcherProps = WorkspaceSelectionProps & (
+  | ({ selectionOnly?: false } & WorkspaceManagementActions)
+  | ({ selectionOnly: true } & Partial<Record<keyof WorkspaceManagementActions, never>>)
+);
 
 export function WorkspaceSwitcher({
   workspaces,
@@ -59,7 +67,8 @@ export function WorkspaceSwitcher({
   onRenameWorkspace,
   onUpdateWorkspacePath,
   onUpdateWorkspacePaths,
-  sdkClient,
+  sdkClient = null,
+  selectionOnly = false,
   isCreatingWorkspace = false,
   deletingWorkspaceId = null,
   isUpdatingWorkspace = {},
@@ -101,7 +110,7 @@ export function WorkspaceSwitcher({
   const handleRenameCommit = () => {
     const trimmed = renameValue.trim();
     if (trimmed && renamingWorkspaceId) {
-      onRenameWorkspace(renamingWorkspaceId, trimmed);
+      onRenameWorkspace?.(renamingWorkspaceId, trimmed);
     }
     setRenamingWorkspaceId(null);
   };
@@ -214,7 +223,7 @@ export function WorkspaceSwitcher({
                           : 'opacity-0'
                       )}
                     />
-                     {!isAgentHomeWorkspace(workspace) && (
+                     {!selectionOnly && !isAgentHomeWorkspace(workspace) && (
                      <DropdownMenu>
                        <DropdownMenuTrigger asChild>
                          <button
@@ -274,13 +283,13 @@ export function WorkspaceSwitcher({
               </CommandGroup>
             ))}
           </CommandList>
-          <CommandList className="max-h-none shrink-0 overflow-visible border-t">
+          {!selectionOnly && <CommandList className="max-h-none shrink-0 overflow-visible border-t">
             <CommandGroup heading="Workspace actions">
               <CommandItem
                 disabled={isCreatingWorkspace}
                 onSelect={() => {
                   if (isCreatingWorkspace) return;
-                  onCreateVirtualWorkspace();
+                  onCreateVirtualWorkspace?.();
                   setOpen(false);
                 }}
               >
@@ -300,10 +309,11 @@ export function WorkspaceSwitcher({
                 Add existing folder
               </CommandItem>
             </CommandGroup>
-          </CommandList>
+          </CommandList>}
         </Command>
       </PopoverContent>
     </Popover>
+    {!selectionOnly && <>
     <FolderPickerDialog
       open={showFolderPicker || workspaceToMove !== null}
       onOpenChange={(nextOpen) => {
@@ -314,10 +324,10 @@ export function WorkspaceSwitcher({
       }}
       onSelect={(path) => {
         if (workspaceToMove) {
-          onUpdateWorkspacePath(workspaceToMove.id, path);
+          onUpdateWorkspacePath?.(workspaceToMove.id, path);
           setWorkspaceToMove(null);
         } else if (!isCreatingWorkspace) {
-          onCreatePhysicalWorkspace(path);
+          onCreatePhysicalWorkspace?.(path);
           setShowFolderPicker(false);
         }
       }}
@@ -329,7 +339,7 @@ export function WorkspaceSwitcher({
       open={!!editingPathsWorkspace}
       onOpenChange={(o) => { if (!o) setEditingPathsWorkspace(null); }}
       workspace={editingPathsWorkspace ?? { id: '', name: '', path: '', isVirtual: false, additionalPaths: [], settings: {}, createdAt: '', updatedAt: '' }}
-      onSave={onUpdateWorkspacePaths}
+      onSave={(id, paths) => onUpdateWorkspacePaths?.(id, paths)}
       sdkClient={sdkClient}
       isSaving={editingPathsWorkspace ? !!isUpdatingWorkspace[editingPathsWorkspace.id] : false}
     />
@@ -347,10 +357,11 @@ export function WorkspaceSwitcher({
       loading={workspaceToDelete !== null && deletingWorkspaceId === workspaceToDelete.id}
       onConfirm={() => {
         if (workspaceToDelete) {
-          onDeleteWorkspace(workspaceToDelete.id);
+          onDeleteWorkspace?.(workspaceToDelete.id);
         }
       }}
     />
+    </>}
     </>
   );
 }

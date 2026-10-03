@@ -12,7 +12,6 @@ function renderToggles(overrides: Partial<Parameters<typeof HeaderPanelToggles>[
     terminalActive: false,
     onToggleTerminal: vi.fn(),
     hasWorkspace: true,
-    onOpenWorkspaceSettings: vi.fn(),
     onOpenSettings: vi.fn(),
     ...overrides,
   };
@@ -21,14 +20,14 @@ function renderToggles(overrides: Partial<Parameters<typeof HeaderPanelToggles>[
 }
 
 describe('HeaderPanelToggles', () => {
-  test('shows a quiet update dot and exposes the command without hover', async () => {
+  test('shows a quiet update dot and opens settings directly', async () => {
     const user = userEvent.setup();
-    renderToggles({ updateVersion: '1.15.0' });
+    const props = renderToggles({ updateVersion: '1.15.0' });
     const button = screen.getByRole('button', { name: 'Settings, Prokop v1.15.0 update available' });
     expect(button.querySelector('[data-update-available]')).not.toBeNull();
     await user.click(button);
-    expect(screen.getByText('Prokop v1.15.0 available')).toBeInTheDocument();
-    expect(screen.getByText('prokop update')).toBeInTheDocument();
+    expect(props.onOpenSettings).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
   test('has no update marker when no newer version is known', () => {
@@ -49,7 +48,7 @@ describe('HeaderPanelToggles', () => {
     expect(props.onToggleTerminal).toHaveBeenCalledTimes(1);
   });
 
-  test('hides the Files toggle and Workspace Settings entry without a workspace', async () => {
+  test('opens settings directly even without a workspace', async () => {
     const user = userEvent.setup();
     const props = renderToggles({ hasWorkspace: false });
 
@@ -57,7 +56,6 @@ describe('HeaderPanelToggles', () => {
 
     await user.click(screen.getByRole('button', { name: /settings/i }));
     expect(screen.queryByRole('menuitem', { name: /workspace settings/i })).toBeNull();
-    await user.click(screen.getByRole('menuitem', { name: /^settings$/i }));
     expect(props.onOpenSettings).toHaveBeenCalledTimes(1);
   });
 });

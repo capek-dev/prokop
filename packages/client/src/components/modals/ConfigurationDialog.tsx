@@ -1,11 +1,17 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { Boxes, FileText, Layers, Braces, MonitorCog, Palette, Keyboard, CircuitBoard, Gauge } from 'lucide-react';
+import { Boxes, FileText, Cog, FolderSymlink, GraduationCap, Shield, Wrench, Layers, Braces, MonitorCog, Palette, Keyboard, CircuitBoard, Gauge } from 'lucide-react';
+import { getSelectableWorkspaces } from '@/lib/workspaceKind';
+import { useServerDataStore } from '@/stores/serverDataStore';
+import { useServerUpdate } from '@/hooks/useServerUpdate';
 import { useUIStore } from '@/stores/uiStore';
 import type { ConfigurationSection } from '@/stores/uiStore';
-import { SettingsDialogShell, PanelLoadingFallback, type SettingsSection } from './SettingsDialogShell';
+import { SettingsDialogShell, PanelLoadingFallback, type SettingsGroup, type SettingsSection } from './SettingsDialogShell';
+import type { WorkspaceSettingsDraft, WorkspaceSettingsSection } from './configuration/WorkspaceSettingsEditor';
+import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
 
 const MCPServersPanel = lazy(() => import('./configuration/MCPServersPanel').then(m => ({ default: m.MCPServersPanel })));
+const WorkspacesPanel = lazy(() => import('./configuration/WorkspacesPanel').then(m => ({ default: m.WorkspacesPanel })));
 const HarnessesPanel = lazy(() => import('./configuration/HarnessesPanel').then((m) => ({ default: m.HarnessesPanel })));
 const UsagePanel = lazy(() => import('./configuration/UsagePanel').then((m) => ({ default: m.UsagePanel })));
 const ProvidersModelsPanel = lazy(() => import('./configuration/ProvidersModelsPanel').then((m) => ({ default: m.ProvidersModelsPanel })));
@@ -42,8 +48,27 @@ const SECTIONS: SettingsSection[] = [
   { value: 'system', label: 'System', icon: MonitorCog, group: 'system' },
 ];
 
-const GROUPS = [
+const WORKSPACE_SECTIONS: SettingsSection[] = [
+  { value: 'workspace-sessions', label: 'Sessions', icon: Cog, group: 'workspace' },
+  { value: 'workspace-mcp', label: 'MCP Servers', icon: Boxes, group: 'workspace' },
+  { value: 'workspace-permissions', label: 'Permissions', icon: Shield, group: 'workspace' },
+  { value: 'workspace-paths', label: 'Additional Paths', icon: FolderSymlink, group: 'workspace' },
+  { value: 'workspace-learning', label: 'Learning', icon: GraduationCap, group: 'workspace' },
+  { value: 'workspace-agentTools', label: 'Agent Tools', icon: Wrench, group: 'workspace' },
+];
+
+const WORKSPACE_DESCRIPTIONS: Record<WorkspaceSettingsSection, string> = {
+  sessions: 'Set the session order and default agent for the selected workspace.',
+  mcp: 'Manage MCP servers and tool access for the selected workspace.',
+  permissions: 'Manage the permission mode and saved approvals for the selected workspace.',
+  paths: 'Choose additional folders the agent can access from the selected workspace.',
+  learning: 'Configure automatic learning and review its history for the selected workspace.',
+  agentTools: 'Control memory and skill management for the selected workspace.',
+};
+
+const GROUPS: SettingsGroup[] = [
   { key: 'preferences', label: 'Preferences' },
+  { key: 'workspace', label: 'Workspace' },
   { key: 'server', label: 'Server' },
   { key: 'prokop', label: 'Prokop' },
   { key: 'system' },
@@ -59,10 +84,40 @@ export function ConfigurationDialog({
 }: ConfigurationDialogProps) {
   const section = useUIStore((s) => s.configurationSection);
   const setSection = useUIStore((s) => s.setConfigurationSection);
+  // The dialog mounts on open, capturing the workspace it was opened from.
+  const [workspaceId, setWorkspaceId] = useState(() => useServerDataStore.getState().activeWorkspace?.id ?? null);
+  const [workspaceDrafts, setWorkspaceDrafts] = useState<Record<string, WorkspaceSettingsDraft>>({});
+  const updateVersion = useServerUpdate();
+  const workspaces = useServerDataStore(s => s.workspaces);
+  const agents = useServerDataStore(s => s.agents);
+  const selectable = getSelectableWorkspaces(workspaces, agents);
+  const workspace = selectable.find(item => item.id === workspaceId) ?? selectable[0];
+  const workspaceSections = workspace ? WORKSPACE_SECTIONS.filter(item =>
+    !(workspace.settings?.isAgentHome && item.value === 'workspace-learning')) : [];
+  const sections = [...SECTIONS, ...workspaceSections];
+  const activeSection = sections.some(item => item.value === section) ? section
+    : workspace ? 'workspace-sessions' : 'appearance';
+  const groups = GROUPS.map(group => group.key === 'workspace' && !workspace ? {
+    ...group,
+    control: <p className="px-3 text-xs text-muted-foreground">No workspaces on this server yet.</p>,
+  } : group);
 
   const renderPanel = (value: string) => (
     <Suspense fallback={<PanelLoadingFallback />}>
       {(() => {
+        if (value.startsWith('workspace-') && workspace) {
+          const workspaceSection = value.slice('workspace-'.length) as WorkspaceSettingsSection;
+          return <>
+            <div role="group" aria-label="Workspace settings scope" className="flex flex-col gap-2 border-b p-3 sm:p-4">
+              <span className="text-sm font-medium">Workspace to configure</span>
+              <WorkspaceSwitcher selectionOnly workspaces={selectable} agents={agents} activeWorkspace={workspace}
+                onSelectWorkspace={selected => setWorkspaceId(selected.id)} />
+              <p className="text-sm text-muted-foreground">{WORKSPACE_DESCRIPTIONS[workspaceSection]}</p>
+            </div>
+            <WorkspacesPanel workspace={workspace} section={workspaceSection}
+              sdkClient={sdkClient} drafts={workspaceDrafts} setDrafts={setWorkspaceDrafts} />
+          </>;
+        }
         switch (value) {
           case 'system':
             return <SystemPanel apiToken={apiToken} isConnected={isConnected} onLogout={onLogout} sdkClient={sdkClient} open={open} />;
@@ -95,11 +150,16 @@ export function ConfigurationDialog({
       onOpenChange={onOpenChange}
       title="Settings"
       description="Manage preferences, harnesses, agents, and the Prokop runtime"
-      sections={SECTIONS}
-      groups={GROUPS}
-      value={section}
+      sections={sections}
+      groups={groups}
+      value={activeSection}
       onValueChange={(v) => setSection(v as ConfigurationSection)}
       renderPanel={renderPanel}
+      footer={updateVersion ? (
+        <p className="text-xs text-muted-foreground">
+          Prokop v{updateVersion} available. Run <code>prokop update</code> on the machine hosting this server.
+        </p>
+      ) : undefined}
     />
   );
 }

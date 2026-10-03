@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectSeparator,
   SelectTrigger,
@@ -28,6 +29,7 @@ export interface SettingsGroup {
   key: string;
   /** Omit for an unlabeled group (e.g. a trailing section pinned to the bottom). */
   label?: string;
+  control?: ReactNode;
 }
 
 interface SettingsDialogShellProps {
@@ -69,6 +71,7 @@ export function SettingsDialogShell({
   footer,
 }: SettingsDialogShellProps) {
   const sectionsFor = (group: string) => sections.filter((s) => s.group === group);
+  const activeGroup = groups.find(group => group.key === sections.find(item => item.value === value)?.group);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -80,7 +83,7 @@ export function SettingsDialogShell({
 
         {/* Mobile: Select dropdown */}
         <Select value={value} onValueChange={onValueChange}>
-          <SelectTrigger className="sm:hidden w-full shrink-0" size="sm">
+          <SelectTrigger aria-label="Settings section" className="sm:hidden w-full shrink-0" size="sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -90,6 +93,7 @@ export function SettingsDialogShell({
           </SelectContent>
         </Select>
 
+
         <Tabs
           value={value}
           onValueChange={onValueChange}
@@ -97,9 +101,9 @@ export function SettingsDialogShell({
           className="mt-2 flex-1 min-h-0"
         >
           {/* Desktop sidebar */}
-          <TabsList className="hidden sm:flex flex-col h-fit w-44 lg:w-48 shrink-0 items-stretch gap-0.5 bg-transparent p-1 rounded-lg">
+          <div aria-label="Settings navigation" className="dialog-scrollbar hidden sm:flex flex-col w-44 lg:w-48 shrink-0 min-h-0 overflow-y-auto p-1">
             {groups.map((group, groupIndex) => (
-              <div key={group.key} className="contents">
+              <div key={group.key} className="flex shrink-0 flex-col" role="group" aria-label={group.label ?? 'System'}>
                 {group.label ? (
                   <span className={groupIndex === 0 ? 'px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground' : 'px-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'}>
                     {group.label}
@@ -107,23 +111,26 @@ export function SettingsDialogShell({
                 ) : (
                   groupIndex > 0 && <div className="mx-2 my-1 border-t" aria-hidden="true" />
                 )}
-                {sectionsFor(group.key).map((s) => (
-                  <TabsTrigger
-                    key={s.value}
-                    value={s.value}
-                    className="justify-start px-3 py-1.5 text-sm"
-                  >
-                    <s.icon className="size-4" data-icon="inline-start" />
-                    <span>{s.label}</span>
-                  </TabsTrigger>
-                ))}
+                {group.control}
+                <TabsList aria-label={group.label ?? 'System'} className="w-full items-stretch gap-0.5 bg-transparent p-0">
+                  {sectionsFor(group.key).map((s) => (
+                    <TabsTrigger
+                      key={s.value}
+                      value={s.value}
+                      className="justify-start px-3 py-1.5 text-sm"
+                    >
+                      <s.icon className="size-4" data-icon="inline-start" />
+                      <span>{s.label}</span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
               </div>
             ))}
-          </TabsList>
+          </div>
 
           {/* Shared content area - only mount the selected panel */}
           <div className="dialog-scrollbar flex-1 min-w-0 min-h-0 overflow-y-auto overscroll-contain rounded-lg border">
-            <TabsContent key={value} value={value} className="mt-0">
+            <TabsContent key={activeGroup?.key ?? value} value={value} className="mt-0">
               {renderPanel(value)}
             </TabsContent>
           </div>
@@ -137,7 +144,7 @@ export function SettingsDialogShell({
 
 function SectionSelectItems({ group, groupIndex, sections }: { group: SettingsGroup; groupIndex: number; sections: SettingsSection[] }) {
   return (
-    <>
+    <SelectGroup>
       {group.label ? (
         <SelectItem value={`_${group.key}_group`} disabled className="text-xs font-semibold text-muted-foreground">
           {group.label}
@@ -151,6 +158,6 @@ function SectionSelectItems({ group, groupIndex, sections }: { group: SettingsGr
           {s.label}
         </SelectItem>
       ))}
-    </>
+    </SelectGroup>
   );
 }
