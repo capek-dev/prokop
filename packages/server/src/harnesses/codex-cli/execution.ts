@@ -1,8 +1,9 @@
 import { existsSync, lstatSync, realpathSync } from 'node:fs';
 import { relative, isAbsolute, sep } from 'node:path';
-import type { AssistantMessage, Message, Session, TextPart } from '@prokopai/sdk';
+import type { AssistantMessage, Message, Part, Session, TextPart } from '@prokopai/sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
-import type { SessionExecutionPort, InterruptExecutionResult } from '@/application/ports/execution';
+import type { InterruptExecutionResult } from '@/application/ports/execution';
+import { withCliMessageQueue, type CliTurnExecution, type QueuedCliExecution, type QueuedTurnInput } from '@/harnesses/shared/message-queue';
 import { getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { createMessage, createPart, deleteMessage, getMessageWithParts, listMessagesWithParts, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
 import { cliWorkspaceAvailable } from '@/harnesses/shared/cli-workspace';
@@ -281,8 +282,7 @@ const SAFE_FORK_ERRORS = new Set([
 ]);
 
 /** A parent-session connection owns native child threads across parent turns. */
-export function createCodexExecution(deps: CodexExecutionDependencies): Pick<SessionExecutionPort,
-  'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork' | 'compact'> {
+export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCliExecution {
   const active = new Map<string, ActiveTurn>();
   const connections = new Map<string, CodexSessionConnection>();
   const starting = new Set<string>();
@@ -394,7 +394,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
       if (client) await client.close();
     }
   }
-  const execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork' | 'compact'> = {
+  const execution: CliTurnExecution = {
     isSessionActive: (sessionId) => active.has(sessionId) || starting.has(sessionId)
       || [...connections.values()].some(connection => connection.children?.isLiveSession(sessionId)),
     async interruptSession(sessionId): Promise<InterruptExecutionResult> {
@@ -476,7 +476,8 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
     },
     async sendMessage<Origin>(wire: SessionWirePorts<Origin>, origin: Origin, sessionId: string,
       content: string, attachments?: Array<{ id: string; kind: string }>, responseFormatId?: string,
-      goalCondition?: string, goalMaxTurns?: number, goalTokenBudget?: number): Promise<void> {
+      goalCondition?: string, goalMaxTurns?: number, goalTokenBudget?: number,
+      queued?: QueuedTurnInput): Promise<'drainable' | void> {
       const session = getSession(sessionId);
       if (!session || session.harness !== 'codex-cli' || session.parentId) {
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Not a Codex CLI session', sessionId });
@@ -595,20 +596,24 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         } else if (persistedGoal?.status === 'active' || binding?.goalRequested) {
           throw new Error('An active Codex goal requires recovery before another send');
         }
+        if (queued && !queued.isPending()) return 'drainable';
         const user = existingUser?.message ?? createMessage({ id: crypto.randomUUID(), sessionId, role: 'user', createdAt: Date.now() });
-        if (!reuseId) wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: user });
+        const userParts: Part[] = [];
         if (!reuseId && content.trim()) {
           const userPart = createPart({ id: crypto.randomUUID(), messageId: user.id,
             type: 'text', text: content, createdAt: Date.now() }, sessionId);
-          wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part: userPart });
+          userParts.push(userPart);
         }
         const imagePartStart = Date.now() + (content.trim() ? 1 : 0);
         for (const [index, image] of (reuseId ? [] : images).entries()) {
           const part = createPart({ id: crypto.randomUUID(), messageId: user.id, type: 'image',
             url: `/api/sessions/${sessionId}/attachments/${image.id}/content?key=${image.accessKey}`,
             mimeType: image.mimeType, createdAt: imagePartStart + index }, sessionId);
-          wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part });
+          userParts.push(part);
         }
+        queued?.accepted();
+        if (!reuseId) wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: user });
+        for (const part of userParts) wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part });
         wire.actor.attachOriginToSession(origin, sessionId);
         assistant = createMessage({ id: crypto.randomUUID(), sessionId, role: 'assistant',
           status: 'streaming', modelId: 'codex-cli', providerId: 'codex-cli', agent: session.agentId ?? undefined,
@@ -1103,6 +1108,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
           if (hookChannel) await hookChannel.close();
         }
       }
+      if (succeeded) return 'drainable';
     },
     async compact(sessionId, _reason, delivery) {
       const session = getSession(sessionId);
@@ -1253,7 +1259,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
         }
         if (getRollbackIntent(input.sessionId)?.phase === 'ready') {
           resubmitting.set(input.sessionId, input.messageId);
-          await execution.sendMessage(wire, origin, input.sessionId, input.content);
+          await queuedExecution.sendMessage(wire, origin, input.sessionId, input.content);
         }
       } catch (error: unknown) {
         // Never surface upstream RPC text, file paths, or database errors to the client.
@@ -1269,5 +1275,6 @@ export function createCodexExecution(deps: CodexExecutionDependencies): Pick<Ses
       }
     },
   };
-  return execution;
+  const queuedExecution = withCliMessageQueue(execution);
+  return queuedExecution;
 }

@@ -18,6 +18,24 @@ const session = { id: 'claude-text-input-test', workspaceId: 'ws',
   harness: 'claude-cli', status: 'active' } as Session;
 afterEach(() => clearDraft(session.id));
 
+test.each(['codex-cli', 'claude-cli'] as const)('%s composer queues during a turn and keeps Stop when empty', harness => {
+  const onSendMessage = vi.fn();
+  const onStopStreaming = vi.fn();
+  const view = render(<MessageInput session={{ ...session, harness }} sessionId={session.id} workspaceId="ws"
+    isStreaming onStopStreaming={onStopStreaming} onSendMessage={onSendMessage} />);
+  expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
+  const textarea = view.container.querySelector('textarea')!;
+  fireEvent.change(textarea, { target: { value: '  next instruction  ' } });
+  expect(screen.getByRole('button', { name: 'Queue message' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Queue message' }));
+  expect(onSendMessage).toHaveBeenCalledExactlyOnceWith('next instruction', undefined);
+  fireEvent.change(textarea, { target: { value: 'another instruction' } });
+  fireEvent.keyDown(textarea, { key: 'Enter' });
+  expect(onSendMessage).toHaveBeenLastCalledWith('another instruction', undefined);
+  expect(onSendMessage).toHaveBeenCalledTimes(2);
+  expect(onStopStreaming).not.toHaveBeenCalled();
+});
+
 test('Claude composer sends a trimmed text message with no extra options', () => {
   const onSendMessage = vi.fn();
   render(<MessageInput session={session} sessionId={session.id} workspaceId="ws"
@@ -28,7 +46,7 @@ test('Claude composer sends a trimmed text message with no extra options', () =>
   fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
   expect(onSendMessage).toHaveBeenCalledExactlyOnceWith('Hello Claude', undefined);
 });
-test('Claude composer accepts only images and sends image-only input after upload', async () => {
+test.each(['codex-cli', 'claude-cli'] as const)('%s composer queues image-only input after upload', async harness => {
   const originalCreate = URL.createObjectURL;
   const originalRevoke = URL.revokeObjectURL;
   URL.createObjectURL = vi.fn(() => 'blob:image');
@@ -39,15 +57,15 @@ test('Claude composer accepts only images and sends image-only input after uploa
     }));
     const client = { http: { attachments: { upload } } } as unknown as ProkopaiClient;
     const onSendMessage = vi.fn();
-    const view = render(<MessageInput session={session} sessionId={session.id} workspaceId="ws"
-      sdkClient={client} onSendMessage={onSendMessage} />);
+    const view = render(<MessageInput session={{ ...session, harness }} sessionId={session.id} workspaceId="ws"
+      isStreaming onStopStreaming={vi.fn()} sdkClient={client} onSendMessage={onSendMessage} />);
     const input = view.container.querySelector('input[type="file"]') as HTMLInputElement;
     expect(input.accept).toBe('image/png,image/jpeg,image/webp,image/gif');
     await act(async () => {
       fireEvent.change(input, { target: { files: [new File(['image'], 'photo.png', { type: 'image/png' })] } });
     });
     expect(upload).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Queue message' }));
     expect(onSendMessage).toHaveBeenCalledExactlyOnceWith('', [{ id: 'uploaded-image', kind: 'image' }]);
   } finally {
     URL.createObjectURL = originalCreate;

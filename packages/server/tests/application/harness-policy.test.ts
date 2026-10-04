@@ -67,7 +67,7 @@ test('Čapek-only operations deny unknown owners and retain Codex refusal messag
   for (const owner of [null, '', 'other', 12, '__proto__']) {
     expect(unknownHarnessError(owner)).toBe('Unknown session harness');
   }
-  for (const feature of ['queue', 'modelSelection'] as const) {
+  for (const feature of ['modelSelection'] as const) {
     expect(prokopFeatureError('prokop', feature)).toBeNull();
     expect(prokopFeatureError(undefined, feature)).toBeNull();
     expect(prokopFeatureError('other', feature)).toBe('Unknown session harness');

@@ -344,7 +344,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const goal = session?.harnessState?.goal ?? null;
   const goalActive = goal?.status === 'active';
   const budgetValid = Number.isSafeInteger(goalTokenBudget) && goalTokenBudget > 0 && goalTokenBudget <= 1_000_000;
-  const effectiveDisabled = disabled || goalActive || ((codexSession || claudeSession) && isStreaming);
+  const effectiveDisabled = disabled || goalActive || ((codexSession || claudeSession) && sendMode === 'goal' && isStreaming);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -504,10 +504,9 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const trimmed = input.trim();
   const hasUploadingAttachment = pendingAttachments.some(a => a.isUploading);
   const canSend = trimmed || pendingAttachments.length > 0;
-  const isDisabled = !canSend || disabled || hasUploadingAttachment || goalActive
+  const isDisabled = !canSend || effectiveDisabled || hasUploadingAttachment
     || (sendMode === 'goal' && (!trimmed || pendingAttachments.length > 0
-      || claudeSession && (trimmed.length > 4000 || /[\r\n]/.test(trimmed)) || codexSession && !budgetValid))
-    || ((codexSession || claudeSession) && isStreaming);
+      || claudeSession && (trimmed.length > 4000 || /[\r\n]/.test(trimmed)) || codexSession && !budgetValid));
   const effectivePlaceholder = goalActive
     ? 'Goal active'
     : claudeSession && sendMode !== 'goal' ? 'Message Claude CLI (text and images)'
@@ -763,7 +762,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {isStreaming && onStopStreaming && (codexSession || claudeSession || !canSend) ? (
+            {isStreaming && onStopStreaming && (!canSend || goalActive) ? (
               <button
                 type="button"
                 onClick={onStopStreaming}
@@ -785,7 +784,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
                       ? 'text-warning'
                       : 'text-primary',
                 )}
-                aria-label={isStreaming && !claudeSession ? 'Queue message' : sendMode === 'goal' ? 'Set goal' : 'Send message'}
+                aria-label={isStreaming ? 'Queue message' : sendMode === 'goal' ? 'Set goal' : 'Send message'}
                 title={isStreaming ? 'Queue message' : undefined}
               >
                 <ArrowUp className="size-4" />

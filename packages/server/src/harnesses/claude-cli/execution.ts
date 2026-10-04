@@ -1,8 +1,8 @@
 import { existsSync, realpathSync } from 'node:fs';
-import type { AssistantMessage, TextPart, ToolPart } from '@prokopai/sdk';
+import type { AssistantMessage, Part, TextPart, ToolPart } from '@prokopai/sdk';
 import { forkSession, getSessionMessages, type SDKMessage, type SDKUserMessage, type Options, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
-import type { SessionExecutionPort } from '@/application/ports/execution';
+import { withCliMessageQueue, type QueuedCliExecution, type QueuedTurnInput } from '@/harnesses/shared/message-queue';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
@@ -50,8 +50,7 @@ export interface ClaudeExecutionDependencies extends ClaudeRollbackDependencies 
   mcp?: WorkspaceMcpToolsPort;
 }
 
-export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
-  Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'compact' | 'editMessage' | 'revert' | 'fork'> {
+export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): QueuedCliExecution {
   const active = new Map<string, AbortController>();
   const rollingBack = new Set<string>();
   const resubmitting = new Map<string, string>();
@@ -141,7 +140,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         originalNativeId: binding.native_session_id, newNativeId: forkedId, firstRemoved, inheritedUsers });
     } finally { rollingBack.delete(sessionId); }
   }
-  return {
+  return withCliMessageQueue({
     isSessionActive: id => active.has(id) || rollingBack.has(id),
     async interruptSession(id) {
       const controller = active.get(id);
@@ -151,7 +150,8 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
     },
     async sendMessage<Origin>(wire: SessionWirePorts<Origin>, origin: Origin, sessionId: string,
       content: string, attachments?: Array<{ id: string; kind: string }>, responseFormatId?: string,
-      goalCondition?: string, goalMaxTurns?: number, goalTokenBudget?: number): Promise<void> {
+      goalCondition?: string, goalMaxTurns?: number, goalTokenBudget?: number,
+      queued?: QueuedTurnInput): Promise<'drainable' | void> {
       const reject = (message: string): void => wire.delivery.send(origin,
         { type: 'error', code: 'invalid_session', message, sessionId });
       const session = getSession(sessionId);
@@ -200,6 +200,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
       const approvals = deps.approvals ?? claudeApprovals;
       let children: ClaudeChildTimelines | null = null;
       let ownedNativeId: string | null = null;
+      let drainable = false;
       try {
         const workspace = getWorkspace(session.workspaceId);
         if (!cliWorkspaceAvailable(workspace)) throw new Error('Claude workspace unavailable');
@@ -266,6 +267,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           throw new Error('Claude turn requires reconciliation or its workspace/CLI changed');
         }
         controller.signal.throwIfAborted();
+        if (queued && !queued.isPending()) return 'drainable';
         const nativeId = binding?.native_session_id ?? crypto.randomUUID();
         const goalStartedAt = Date.now();
         children = new ClaudeChildTimelines(session, nativeId, wire.delivery);
@@ -287,18 +289,21 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         const user = resubmit ? listMessagesWithParts(sessionId).find(entry => entry.message.id === resubmit)?.message
           : createMessage({ id: crypto.randomUUID(), sessionId, role: 'user', createdAt: Date.now() });
         if (!user || user.role !== 'user') throw new Error('Claude edit message is unavailable');
-        if (!resubmit) wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: user });
+        const userParts: Part[] = [];
         if (content.trim() && !resubmit) {
           const inputPart = createPart({ id: crypto.randomUUID(), messageId: user.id, type: 'text',
             text: content, createdAt: Date.now() }, sessionId);
-          wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part: inputPart });
+          userParts.push(inputPart);
         }
         for (const [index, image] of images.entries()) {
           const part = createPart({ id: crypto.randomUUID(), messageId: user.id, type: 'image',
             url: `/api/sessions/${sessionId}/attachments/${image.id}/content?key=${image.accessKey}`,
             mimeType: image.mimeType, createdAt: Date.now() + index + 1 }, sessionId);
-          wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part });
+          userParts.push(part);
         }
+        queued?.accepted();
+        if (!resubmit) wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: user });
+        for (const part of userParts) wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part });
         wire.actor.attachOriginToSession(origin, sessionId);
         assistant = createMessage({ id: crypto.randomUUID(), sessionId, role: 'assistant', status: 'streaming',
           modelId: selection.model, providerId: 'claude-cli', agent: session.agentId ?? undefined,
@@ -492,6 +497,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
           if (resubmit) db.run('DELETE FROM claude_rollback_intents WHERE session_id = ?', [sessionId]);
         })();
         notifyHarnessTurnFinished(completed);
+        drainable = true;
       } catch (error) {
         if (goalCondition !== undefined && assistant) {
           const previous = getSession(sessionId);
@@ -523,10 +529,12 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         if (controller.signal.aborted && ownedNativeId && goalCondition === undefined && !resubmit) {
           getDatabase().run(`UPDATE claude_session_bindings SET pending = 0
             WHERE session_id = ? AND native_session_id = ? AND pending = 1`, [sessionId, ownedNativeId]);
+          drainable = true;
         }
         active.delete(sessionId);
         if (resubmit) resubmitting.delete(sessionId);
       }
+      if (drainable) return 'drainable';
     },
     async revert(input) {
       try {
@@ -662,5 +670,5 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}):
         active.delete(sessionId);
       }
     },
-  };
+  });
 }

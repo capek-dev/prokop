@@ -1,12 +1,14 @@
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import type { ControllerGatePort } from '@/application/ports/control';
 import type { SessionRepositoryPort } from '@/application/ports/session';
+import type { SessionExecutionPort } from '@/application/ports/execution';
 import { sendGateRejection } from './chat';
-import { prokopFeatureError } from './harness-policy';
+import { unknownHarnessError } from './harness-policy';
 
 export interface SessionQueueDeps<Origin> {
   repository: SessionRepositoryPort;
   gate: ControllerGatePort<Origin>;
+  execution?: Pick<SessionExecutionPort, 'drainQueue'>;
 }
 
 export interface SessionQueueApplication<Origin> {
@@ -29,7 +31,7 @@ export function createSessionQueueApplication<Origin>(
         wire.delivery.send(origin, { type: 'error', code: 'not_found', message: 'Session not found' });
         return;
       }
-      const featureError = prokopFeatureError(session.harness, 'queue');
+      const featureError = unknownHarnessError(session.harness);
       if (featureError) {
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: featureError, sessionId });
         return;
@@ -40,7 +42,22 @@ export function createSessionQueueApplication<Origin>(
         return;
       }
 
-      if (!input.content || !input.content.trim()) {
+      const cli = session.harness === 'codex-cli' || session.harness === 'claude-cli';
+      if (cli && (session.parentId || session.status !== 'active' || session.compacting)) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Session cannot accept queued messages', sessionId });
+        return;
+      }
+      if (cli && input.attachments?.length) {
+        const records = deps.repository.attachments.listForSession(sessionId);
+        if (session.harness === 'claude-cli' && input.attachments.length > 10 || input.attachments.some(attachment =>
+          attachment.kind !== 'image' || !records.some(record => record.id === attachment.id
+            && record.kind === 'image' && record.workspaceId === session.workspaceId
+            && deps.repository.attachments.validateImageMime(record.mimeType)))) {
+          wire.delivery.send(origin, { type: 'error', code: 'invalid_content', message: 'CLI queues support session image attachments only', sessionId });
+          return;
+        }
+      }
+      if (!input.content?.trim() && !(cli && input.attachments?.length)) {
         wire.delivery.send(origin, { type: 'error', code: 'invalid_content', message: 'Content cannot be empty' });
         return;
       }
@@ -52,6 +69,11 @@ export function createSessionQueueApplication<Origin>(
         type: 'queue.added',
         sessionId,
         message: queuedMessage,
+      });
+      // A client's running state may lag behind turn completion. Wake idle queues too.
+      if (cli) void deps.execution?.drainQueue?.(wire, origin, sessionId).catch(() => {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', sessionId,
+          message: 'Queued message could not be sent' });
       });
     },
 

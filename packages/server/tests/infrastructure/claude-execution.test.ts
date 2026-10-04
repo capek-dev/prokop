@@ -12,6 +12,8 @@ import { runClaudeCompact } from '@/harnesses/claude-cli/compact';
 import { saveClaudeModelSelection } from '@/harnesses/claude-cli/models';
 import type { Options, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
+import { addMessageToQueue, deleteQueuedMessage, listQueuedMessages } from '@/infrastructure/sqlite/queued-messages';
+import { createAttachment } from '@/infrastructure/sqlite/attachments';
 
 let dataDir: string;
 beforeEach(() => {
@@ -56,6 +58,80 @@ function fakeTurn(_prompt: string | AsyncIterable<SDKUserMessage>, options: Opti
   }
   return messages();
 }
+
+test.each(['success', 'failure', 'stop'] as const)('Claude queue after %s', async outcome => {
+  const { wire, events } = wireFixture();
+  const calls: Options[] = [];
+  let started!: () => void;
+  const ready = new Promise<void>(resolve => { started = resolve; });
+  let finish!: () => void;
+  const wait = new Promise<void>(resolve => { finish = resolve; });
+  const exec = createClaudeExecution({ version: () => '2.1.274', start: (prompt, options) => {
+    if (calls.length) return fakeTurn(prompt, options, calls);
+    async function* first(): AsyncGenerator<SDKMessage> {
+      calls.push(options);
+      started();
+      await wait;
+      if (outcome === 'stop') throw new Error('interrupted');
+      yield { type: 'system', subtype: 'init', session_id: options.sessionId } as SDKMessage;
+      yield { type: 'result', subtype: outcome, session_id: options.sessionId,
+        is_error: outcome === 'failure', result: 'reply' } as SDKMessage;
+    }
+    return first();
+  } });
+  const turn = exec.sendMessage(wire, 'origin', 'session', 'first');
+  await ready;
+  const second = addMessageToQueue('session', 'second');
+  const removed = addMessageToQueue('session', 'remove me');
+  const third = addMessageToQueue('session', 'third');
+  deleteQueuedMessage(removed.id);
+  await exec.drainQueue?.(wire, 'origin', 'session');
+  expect(calls).toHaveLength(1);
+  if (outcome === 'stop') await exec.interruptSession('session');
+  finish();
+  await turn;
+  expect(calls).toHaveLength(outcome === 'failure' ? 1 : 3);
+  expect(listQueuedMessages('session').map(message => message.id)).toEqual(outcome === 'failure' ? [second.id, third.id] : []);
+  expect(events.filter(event => (event as { type: string }).type === 'queue.sending')).toEqual(outcome === 'failure' ? [] : [
+    { type: 'queue.sending', sessionId: 'session', queueId: second.id },
+    { type: 'queue.sending', sessionId: 'session', queueId: third.id },
+  ]);
+  expect(listMessagesWithParts('session').filter(entry => entry.message.role === 'user')
+    .map(entry => entry.parts.filter(part => part.type === 'text').map(part => part.text)))
+    .toEqual(outcome === 'failure' ? [['first']] : [['first'], ['second'], ['third']]);
+  expect(exec.isSessionActive('session')).toBe(false);
+});
+
+test('Claude wakes an idle image-only queue and keeps rejected images queued', async () => {
+  const { wire } = wireFixture();
+  const image = createAttachment({ sessionId: 'session', workspaceId: 'ws', filename: 'photo.png',
+    mimeType: 'image/png', sizeBytes: 4, data: new Uint8Array([137, 80, 78, 71]).buffer });
+  addMessageToQueue('session', '', [{ id: image.id, kind: 'image' }]);
+  const invalid = addMessageToQueue('session', '', [{ id: 'missing', kind: 'image' }]);
+  const calls: Options[] = [];
+  const exec = createClaudeExecution({ version: () => '2.1.274',
+    start: (prompt, options) => fakeTurn(prompt, options, calls) });
+  await exec.drainQueue?.(wire, 'origin', 'session');
+  expect(calls).toHaveLength(1);
+  expect(listMessagesWithParts('session')[0]?.parts).toMatchObject([{ type: 'image' }]);
+  expect(listQueuedMessages('session')).toEqual([invalid]);
+});
+
+test('a failed queued Claude turn is consumed once and leaves later messages queued', async () => {
+  const { wire } = wireFixture();
+  const first = addMessageToQueue('session', 'first queued');
+  const second = addMessageToQueue('session', 'second queued');
+  const calls: Options[] = [];
+  const exec = createClaudeExecution({ version: () => '2.1.274',
+    start: (prompt, options) => fakeTurn(prompt, options, calls, 'failure') });
+  await exec.drainQueue?.(wire, 'origin', 'session');
+  expect(calls).toHaveLength(1);
+  expect(listQueuedMessages('session')).toEqual([second]);
+  expect(listQueuedMessages('session').some(message => message.id === first.id)).toBe(false);
+  await exec.drainQueue?.(wire, 'origin', 'session');
+  expect(calls).toHaveLength(1);
+  expect(listQueuedMessages('session')).toEqual([second]);
+});
 
 test('selected Claude model and effort deliver a persisted reply through the fake CLI', async () => {
   const initial = createSession({ id: 'from-picker', workspaceId: 'ws', title: 'Empty', status: 'active',

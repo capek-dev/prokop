@@ -620,15 +620,18 @@ describe('application session use cases', () => {
       expect(spy.sent).toEqual([expect.objectContaining({ type: 'queue.added', sessionId: 'sess-1' })]);
     });
 
-    test('add rejects Codex CLI sessions before enqueueing', () => {
+    test.each(['codex-cli', 'claude-cli'] as const)('add accepts %s queues and wakes execution', async harness => {
+      const drained: string[] = [];
       const repository = makeRepository({
-        getSession: () => makeSession({ harness: 'codex-cli' }),
-        addMessageToQueue: () => { throw new Error('must not enqueue'); },
+        getSession: () => makeSession({ harness }),
       });
       const spy = makeSpy();
-      createSessionQueueApplication({ repository, gate: noGate() }).add(makeWire(spy), origin,
+      createSessionQueueApplication({ repository, gate: noGate(), execution: {
+        drainQueue: async (_wire, _origin, id) => { drained.push(id); },
+      } }).add(makeWire(spy), origin,
         { sessionId: 'sess-1', content: 'queued' });
-      expect(spy.sent).toEqual([expect.objectContaining({ type: 'error', code: 'invalid_session' })]);
+      expect(spy.sent).toEqual([expect.objectContaining({ type: 'queue.added' })]);
+      expect(drained).toEqual(['sess-1']);
     });
 
     test('add rejects empty content with invalid_content before enqueueing', () => {
@@ -640,6 +643,40 @@ describe('application session use cases', () => {
       app.add(wire, origin, { sessionId: 'sess-1', content: '   ' });
 
       expect(spy.sent).toEqual([{ type: 'error', code: 'invalid_content', message: 'Content cannot be empty' }]);
+    });
+
+    test.each(['codex-cli', 'claude-cli'] as const)('%s queue keeps controller checks and validates images', harness => {
+      const repository = makeRepository({ getSession: () => makeSession({ harness }) });
+      const spy = makeSpy();
+      const wire = makeWire(spy);
+      createSessionQueueApplication({ repository, gate: rejectGate() }).add(wire, origin,
+        { sessionId: 'sess-1', content: 'queued' });
+      expect(spy.sent).toEqual([expect.objectContaining({ type: 'session.action_rejected', action: 'queue.add' })]);
+      spy.sent.length = 0;
+      const app = createSessionQueueApplication({ repository, gate: noGate() });
+      for (const kind of ['image', 'file']) {
+        app.add(wire, origin, { sessionId: 'sess-1', content: '', attachments: [{ id: 'foreign', kind }] });
+      }
+      expect(spy.sent).toEqual(Array.from({ length: 2 }, () => expect.objectContaining({ type: 'error', code: 'invalid_content' })));
+      repository.attachments.listForSession = () => [{ id: 'image', sessionId: 'sess-1', workspaceId: 'ws-1',
+        kind: 'image', filename: 'photo.png', mimeType: 'image/png', sizeBytes: 4,
+        accessKey: 'key', absolutePath: '/unused', createdAt: new Date().toISOString() }];
+      spy.sent.length = 0;
+      app.add(wire, origin, { sessionId: 'sess-1', content: '', attachments: [{ id: 'image', kind: 'image' }] });
+      expect(spy.sent).toEqual([expect.objectContaining({ type: 'queue.added' })]);
+    });
+
+    test('queue rejects unknown harnesses, closed CLI sessions and CLI children', () => {
+      for (const session of [makeSession({ harness: 'invalid' as Session['harness'] }),
+        makeSession({ harness: 'codex-cli', status: 'closed' }),
+        makeSession({ harness: 'claude-cli', parentId: 'parent' })]) {
+        const repository = makeRepository({ getSession: () => session,
+          addMessageToQueue: () => { throw new Error('must not enqueue'); } });
+        const spy = makeSpy();
+        createSessionQueueApplication({ repository, gate: noGate() }).add(makeWire(spy), origin,
+          { sessionId: 'sess-1', content: 'queued' });
+        expect(spy.sent).toEqual([expect.objectContaining({ type: 'error', code: 'invalid_session' })]);
+      }
     });
 
     test('remove gates on the queued message session and reports the removed session', () => {

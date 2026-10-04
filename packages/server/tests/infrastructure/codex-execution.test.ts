@@ -25,6 +25,7 @@ import type { CodexConnection } from '@/harnesses/codex-cli/app-server';
 import type { PermissionAsk, ServerMessage } from '@prokopai/sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import { installHarnessNotificationPort } from '@/application/ports/harness-notifications';
+import { addMessageToQueue, deleteQueuedMessage, listQueuedMessages } from '@/infrastructure/sqlite/queued-messages';
 
 beforeEach(() => { setupTestDatabase(); seedWorkspace({ id: 'ws', path: process.cwd() }); });
 afterEach(() => resetTestDatabase());
@@ -134,6 +135,75 @@ async function waitFor(predicate: () => boolean): Promise<void> {
   expect(predicate()).toBe(true);
 }
 
+test.each(['completed', 'interrupted', 'failed'] as const)('Codex queue after a %s turn', async status => {
+  create();
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(); processes.push(fake); return fake.connection;
+  } });
+  const messages: ServerMessage[] = [];
+  const ports = wire(messages);
+  const turn = execution.sendMessage(ports, 'origin', 's', 'first');
+  await waitFor(() => processes[0]?.sent.some(message => message.method === 'turn/start') ?? false);
+  const second = addMessageToQueue('s', 'second');
+  const removed = addMessageToQueue('s', 'remove me');
+  const third = addMessageToQueue('s', 'third');
+  deleteQueuedMessage(removed.id);
+  await execution.drainQueue?.(ports, 'origin', 's');
+  expect(processes).toHaveLength(1);
+  processes[0]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  processes[0]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status } } });
+  if (status !== 'failed') {
+    for (const [index, content] of ['second', 'third'].entries()) {
+      await waitFor(() => processes[index + 1]?.sent.some(message => message.method === 'turn/start') ?? false);
+      const process = processes[index + 1]!;
+      expect(process.sent.find(message => message.method === 'turn/start')?.params).toMatchObject({
+        input: [{ type: 'text', text: content }],
+      });
+      process.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+      process.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+    }
+  }
+  await turn;
+  expect(listQueuedMessages('s').map(message => message.id)).toEqual(status === 'failed' ? [second.id, third.id] : []);
+  expect(messages.filter(message => message.type === 'queue.sending').map(message => message.queueId))
+    .toEqual(status === 'failed' ? [] : [second.id, third.id]);
+  expect(execution.isSessionActive('s')).toBe(false);
+});
+
+test('Codex rejects invalid queued images without consuming or replaying the queue', async () => {
+  create();
+  const queued = addMessageToQueue('s', '', [{ id: 'missing', kind: 'image' }]);
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => { throw new Error('must not connect'); } });
+  const messages: ServerMessage[] = [];
+  await execution.drainQueue?.(wire(messages), 'origin', 's');
+  expect(listQueuedMessages('s')).toEqual([queued]);
+  expect(listMessagesWithParts('s')).toEqual([]);
+  expect(messages).toEqual([expect.objectContaining({ type: 'error' })]);
+});
+
+test('Codex skips a queued message removed while instructions are loading', async () => {
+  create();
+  const queued = addMessageToQueue('s', 'removed during startup');
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => { throw new Error('must not connect'); },
+    instructions: {
+      listPreconfigs: async () => [],
+      getPreconfig: async id => {
+        deleteQueuedMessage(queued.id);
+        return { id, systemPrompt: 'Test' } as import('@prokopai/sdk').Preconfig;
+      },
+      getAgentDirectory: async () => null,
+      readAgentMemoryFile: async () => null,
+    },
+  });
+  const messages: ServerMessage[] = [];
+  await execution.drainQueue?.(wire(messages), 'origin', 's');
+  expect(listMessagesWithParts('s')).toEqual([]);
+  expect(messages).toEqual([]);
+});
+
 test('Codex sends session images as localImage inputs and persists image-only thumbnails', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'codex-images-'));
   Paths.configure({ dataDir: dir });
@@ -164,7 +234,8 @@ test('Codex sends session images as localImage inputs and persists image-only th
     processes[0]!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
     processes[0]!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
     await turn;
-    const imageOnly = send('', [first.id]);
+    addMessageToQueue('s', '', [{ id: first.id, kind: 'image' }]);
+    const imageOnly = execution.drainQueue?.(wire(messages), 'origin', 's');
     await waitFor(() => processes[1]?.sent.some(message => message.method === 'turn/start') ?? false);
     expect(processes[1]!.sent.find(message => message.method === 'turn/start')?.params).toMatchObject({
       input: [{ type: 'localImage', path: realpathSync(first.absolutePath) }],

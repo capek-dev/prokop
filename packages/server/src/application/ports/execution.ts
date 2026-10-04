@@ -50,6 +50,8 @@ export interface EditMessageInput {
  * origin bookkeeping through the wire ports.
  */
 export interface SessionExecutionPort {
+  /** Wake an idle host-owned queue; active turns drain after their own cleanup. */
+  drainQueue?<Origin>(wire: SessionWirePorts<Origin>, origin: Origin, sessionId: string): Promise<void>;
   sendMessage<Origin>(
     wire: SessionWirePorts<Origin>,
     origin: Origin,

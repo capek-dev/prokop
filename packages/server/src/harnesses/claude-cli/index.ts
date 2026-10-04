@@ -10,7 +10,7 @@ export { readCachedClaudeUsageLimits } from './usage-limits';
 /** Claude CLI owns turns and model choice; titles use the universal
  * server-side regeneration supplied by the composition root. */
 export function createClaudeCliHarness(
-  execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'compact' | 'editMessage' | 'revert' | 'fork'>,
+  execution: Pick<SessionExecutionPort, 'sendMessage' | 'drainQueue' | 'interruptSession' | 'isSessionActive' | 'compact' | 'editMessage' | 'revert' | 'fork'>,
   regenerateTitle: SessionExecutionPort['regenerateTitle'],
 ): HarnessRegistration {
   return {

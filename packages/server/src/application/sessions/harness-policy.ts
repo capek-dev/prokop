@@ -63,17 +63,14 @@ export function unknownHarnessError(harness: unknown): string | null {
     ? null : 'Unknown session harness';
 }
 
-export type ProkopFeature = 'queue' | 'modelSelection';
+export type ProkopFeature = 'modelSelection';
 
 /** These operations use Čapek semantics; other harnesses must opt in deliberately. */
 export function prokopFeatureError(harness: unknown, feature: ProkopFeature): string | null {
   if (harness === undefined || harness === 'prokop') return null;
-  if (harness === 'claude-cli') return feature === 'queue'
-    ? 'Message queue is not supported for Claude CLI sessions'
-    : 'Model selection is owned by Claude CLI for this session';
+  if (harness === 'claude-cli') return 'Model selection is owned by Claude CLI for this session';
   if (harness !== 'codex-cli') return 'Unknown session harness';
   const messages: Record<ProkopFeature, string> = {
-    queue: 'Message queue is not supported for Codex CLI sessions',
     modelSelection: 'Model selection is owned by Codex CLI for this session',
   };
   return messages[feature];

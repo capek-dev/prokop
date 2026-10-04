@@ -35,6 +35,7 @@ function fixture() {
   const codex: HarnessRegistration = {
     execution: {
       sendMessage: codexBase.sendMessage,
+      drainQueue: async () => { calls.push('codex:queue'); },
       interruptSession: codexBase.interruptSession,
       isSessionActive: codexBase.isSessionActive,
       compact: codexBase.compact,
@@ -50,6 +51,7 @@ function fixture() {
     prokop: { execution: prokop }, 'codex-cli': codex,
     'claude-cli': createClaudeCliHarness({
       sendMessage: async () => { calls.push('claude:send'); },
+      drainQueue: async () => { calls.push('claude:queue'); },
       interruptSession: codexBase.interruptSession,
       isSessionActive: codexBase.isSessionActive,
       compact: codexBase.compact,
@@ -61,6 +63,14 @@ function fixture() {
   });
   return { execution, calls, messages, wire };
 }
+
+test('queue wakes dispatch by stored harness and leave Prokop queue ownership unchanged', async () => {
+  const { execution, calls, wire } = fixture();
+  for (const id of ['prokop', 'legacy', 'codex', 'claude', 'unknown', 'missing']) {
+    await execution.drainQueue?.(wire, 'origin', id);
+  }
+  expect(calls).toEqual(['codex:queue', 'claude:queue']);
+});
 
 test('dispatches each operation by stored harness, including legacy Prokop identity', async () => {
   const { execution, calls, wire } = fixture();

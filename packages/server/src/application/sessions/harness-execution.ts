@@ -7,7 +7,7 @@ export type HarnessOperation = 'editMessage' | 'regenerateTitle' | 'compact' | '
 
 /** An adapter must own sending, interruption and live status. Other operations are opt-in. */
 export type HarnessExecutor = Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive'>
-  & Partial<Pick<SessionExecutionPort, HarnessOperation>>;
+  & Partial<Pick<SessionExecutionPort, HarnessOperation | 'drainQueue'>>;
 
 export interface HarnessRegistration {
   execution: HarnessExecutor;
@@ -36,6 +36,9 @@ export function createHarnessExecution(
     target.adapter?.unsupportedMessages?.[operation]
       ?? (target.error || `${operation} is not supported for ${target.owner} sessions`);
   return {
+    async drainQueue(wire, origin, sessionId) {
+      await resolve(sessionId).adapter?.execution.drainQueue?.(wire, origin, sessionId);
+    },
     async sendMessage(wire, origin, sessionId, content, attachments, responseFormatId, goalCondition, goalMaxTurns, goalTokenBudget) {
       const target = resolve(sessionId);
       if (!target.adapter) {

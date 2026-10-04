@@ -9,7 +9,7 @@ export { readCachedCodexUsageLimits } from './usage-limits';
 /** Codex CLI owns turns and model choice; titles use the universal
  * server-side regeneration supplied by the composition root. */
 export function createCodexCliHarness(
-  execution: Pick<SessionExecutionPort, 'sendMessage' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork' | 'compact'>,
+  execution: Pick<SessionExecutionPort, 'sendMessage' | 'drainQueue' | 'interruptSession' | 'isSessionActive' | 'editMessage' | 'revert' | 'fork' | 'compact'>,
   regenerateTitle: SessionExecutionPort['regenerateTitle'],
 ): HarnessRegistration {
   return {
