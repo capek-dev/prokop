@@ -80,17 +80,6 @@ test('enabling seeds one reviewer with the default preconfig and exposes every s
   expect(screen.queryByRole('switch', { name: 'Use as personal learning source' })).not.toBeNull();
 });
 
-test('agent home points to the agent editor instead of the learning form', async () => {
-  render(<Harness workspace={workspace({ isAgentHome: true, agentId: 'home-agent' })} />);
-  // Agent learning is configured on the agent itself now; the workspace
-  // panel only points there and keeps the history browser reachable.
-  expect(screen.getByRole('alert')).toHaveTextContent('Agent learning is configured on the agent');
-  expect(screen.queryByRole('switch', { name: 'Automatic learning' })).toBeNull();
-  expect(screen.queryByRole('switch', { name: 'Use as personal learning source' })).toBeNull();
-  expect(screen.queryByText('Learners')).toBeNull();
-  expect(screen.getByRole('button', { name: 'Learning history' })).toBeInTheDocument();
-});
-
 test('tuning stays collapsed by default and recaps custom values on the triggers', async () => {
   const user = userEvent.setup();
   const initial = (reviewer: Partial<LearningReviewer>): WorkspaceLearningSettings => ({ enabled: true, reviewers: [{ id: 'r1', preconfigId: 'main', instructions: '', modelOverride: null, cadence: null, ...reviewer }], improveSkills: false, instructions: '', sources: { mode: 'all' } });
@@ -106,12 +95,16 @@ test('tuning stays collapsed by default and recaps custom values on the triggers
 
   render(<Harness workspace={workspace({})} initial={initial({ instructions: 'Focus on tests' })} />);
   expect(screen.getByRole('button', { name: /^Learning focus/ })).toHaveTextContent('Focus on tests');
-  expect(screen.getByRole('textbox', { name: 'Learning focus' })).toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: 'Learning focus' })).toBeNull();
+  await user.click(screen.getByRole('button', { name: /^Learning focus/ }));
+  expect(screen.getByRole('textbox', { name: 'Learning focus' })).toHaveValue('Focus on tests');
   expect(screen.queryByLabelText('Quiet period')).toBeNull();
   cleanup();
 
   render(<Harness workspace={workspace({})} initial={initial({ cadence: { idleMinutes: 5, minimumIntervalMinutes: 120, maximumPendingMinutes: 1440 } })} />);
   expect(screen.getByRole('button', { name: /^Timing/ })).toHaveTextContent('5m · 2h · 1d');
+  expect(screen.queryByLabelText('Quiet period')).toBeNull();
+  await user.click(screen.getByRole('button', { name: /^Timing/ }));
   expect(screen.getByLabelText('Quiet period')).toHaveValue(5);
 });
 

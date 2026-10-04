@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Check, ChevronsUpDown, Brain, Bot, Cog, Cpu } from 'lucide-react';
+import { Check, ChevronsUpDown, Brain, Bot, Cpu } from 'lucide-react';
 import type { CodexModel, Preconfig } from '@prokopai/sdk';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { AnthropicMark, OpenAIMark, ProkopMark } from '@/components/branding/BrandMarks';
@@ -325,7 +325,6 @@ export function ModelVariantConfigSelector({
     <>
       {preconfigs.map((preconfig) => {
         const isAgent = isAgentPreconfig(preconfig.id);
-        const Icon = isAgent ? Bot : Cog;
         return (
         <CommandItem
           key={preconfig.id}
@@ -333,7 +332,7 @@ export function ModelVariantConfigSelector({
           showCheck={false}
           onSelect={() => handleSelectPreconfig(preconfig.id)}
         >
-          <Icon className={cn('mr-2 size-4 shrink-0', isAgent ? 'text-primary' : 'text-muted-foreground')} />
+          <Bot className={cn('mr-2 size-4 shrink-0', isAgent ? 'text-primary' : 'text-muted-foreground')} />
           <span>
             {preconfig.name}
             {preconfig.isDefault && (
@@ -467,8 +466,7 @@ export function ModelVariantConfigSelector({
     ...(preconfigs.length > 0 && !lockPreconfig
       ? [{ icon: (() => {
             const isSelectedAgent = selectedPreconfig ? isAgentPreconfig(selectedPreconfig.id) : false;
-            const Icon = isSelectedAgent ? Bot : Cog;
-            return <Icon className={cn('size-3.5', isSelectedAgent && 'text-primary')} />;
+            return <Bot className={cn('size-3.5', isSelectedAgent && 'text-primary')} />;
           })(), label: 'Agent', value: selectedPreconfig ? preconfigDisplayName(selectedPreconfig.name) : 'None', section: 'config' as const }]
       : []),
   ];

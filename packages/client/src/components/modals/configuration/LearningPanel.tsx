@@ -152,13 +152,13 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
     const timingSummary = CADENCE_FIELDS.map(field => formatMinutes(cadence[field.key])).join(' · ');
     return (
       <>
-        <DisclosureRow label="Learning focus" summary={item.instructions.trim() || null} bordered={bordered}>
+        <DisclosureRow label="Learning focus" summary={item.instructions.trim() || null} defaultOpen={false} bordered={bordered}>
           <Textarea aria-label="Learning focus" value={item.instructions} maxLength={20_000}
             placeholder="Optional focus, e.g. 'prefer updating existing notes over creating new ones'"
             onChange={event => update(item.id, { instructions: event.target.value })} />
         </DisclosureRow>
 
-        <DisclosureRow label="Timing" summary={timingSummary} defaultOpen={item.cadence !== null} bordered={bordered}>
+        <DisclosureRow label="Timing" summary={timingSummary} defaultOpen={false} bordered={bordered}>
           <div className="space-y-1.5">
             <div className="grid grid-cols-3 gap-2">
               {CADENCE_FIELDS.map(field => (
@@ -195,7 +195,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
   };
 
   return (
-    <div className="flex flex-col gap-6 p-3 sm:p-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-0.5">
           <Label htmlFor="learning-enabled">Automatic learning</Label>
@@ -205,6 +205,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
           </p>
           <button
             type="button"
+            aria-label="Learning history"
             className="w-fit text-xs text-primary underline-offset-4 hover:underline"
             onClick={() => setHistoryOpen(true)}
           >
@@ -223,7 +224,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
         <Alert>
           <AlertTitle>Select a default agent first</AlertTitle>
           <AlertDescription>
-            Learning needs an agent to run. Pick one in the Sessions section.
+            Learning needs an agent to run. Pick one in General.
           </AlertDescription>
         </Alert>
       )}
@@ -232,7 +233,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
         <div className="space-y-0.5">
           <Label htmlFor="personal-learning">Use as personal learning source</Label>
           <p className="text-xs text-muted-foreground">
-            Allow agent-home workspaces to include this workspace's conversations when their agents learn.
+            Allow agents to learn from this workspace's conversations for their personal memory.
           </p>
         </div>
         <Switch id="personal-learning" checked={allowPersonalLearning} onCheckedChange={onPersonalLearningChange} />
@@ -314,7 +315,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
               onCheckedChange={improveSkills => onChange({ ...settings, improveSkills })} />
           </div>
 
-          <DisclosureRow label="Shared instructions" summary={settings.instructions.trim() || null} bordered={false}>
+          <DisclosureRow label="Shared instructions" summary={settings.instructions.trim() || null} defaultOpen={false} bordered={false}>
             <div className="space-y-1.5">
               <p className="text-xs text-muted-foreground">Appended to every learner's prompt.</p>
               <Textarea aria-label="Shared instructions" value={settings.instructions} maxLength={20_000}

@@ -4,9 +4,10 @@ import { toast } from 'sonner';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { defaultLearningCadence, parseAgentLearningSettings } from '@prokopai/sdk';
 import { usePreconfigsQuery, useCreatePreconfig, useUpdatePreconfig, useDeletePreconfig, useToolsQuery, useAgentsQuery, useDemoteAgent } from '@/hooks/queries';
-import { Layers, Plus, Pencil, Copy, Trash2, ArrowLeft, Loader2, Star, Check, RefreshCw } from 'lucide-react';
+import { Bot, Plus, Pencil, Copy, Trash2, ArrowLeft, Loader2, Star, Check, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -19,6 +20,7 @@ import { LearningSourcePicker } from './LearningSourcePicker';
 import { LearningHistory } from './LearningHistory';
 import { AgentModelPicker } from './AgentModelPicker';
 import { DisclosureRow } from './DisclosureRow';
+import { MemorySkillsControls } from './MemorySkillsControls';
 
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
@@ -535,7 +537,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
 
           {form.mode !== 'subagent' && (
             <DisclosureRow
-              label="Advanced Capabilities"
+              label="Memory & Learning"
               summary={
                 [
                   form.capabilityMemory && 'memory',
@@ -548,44 +550,24 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
               defaultOpen={false}
             >
               <div className="space-y-3">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm">Memory</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Personal memory (agent_memory) that travels with this agent across all workspaces.
-                      </p>
-                    </div>
-                    <Switch
-                      checked={form.capabilityMemory}
-                      onCheckedChange={(checked) => setForm({ ...form, capabilityMemory: checked })}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm">Skill management</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Lets this agent maintain its own skills (agent_skill_manage).
-                      </p>
-                    </div>
-                    <Switch
-                      checked={form.capabilitySkills}
-                      onCheckedChange={(checked) => setForm({ ...form, capabilitySkills: checked })}
-                    />
-                  </div>
-                </div>
+                <p className="text-xs text-muted-foreground">Personal memory, skills, and learning across workspaces.</p>
+                <MemorySkillsControls scope="agent"
+                  memoryEnabled={form.capabilityMemory} skillsEnabled={form.capabilitySkills}
+                  onChangeMemory={capabilityMemory => setForm({ ...form, capabilityMemory })}
+                  onChangeSkills={capabilitySkills => setForm({ ...form, capabilitySkills })} />
 
                 <Separator className="my-1" />
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <Label className="text-sm">Learning</Label>
+                      <Label htmlFor="agent-learning-enabled" className="text-sm">Automatic learning</Label>
                       <p className="text-[10px] text-muted-foreground">
                         Reviews this agent's sessions when idle and saves durable lessons to its personal memory.
                       </p>
                     </div>
                     <Switch
+                      id="agent-learning-enabled"
                       checked={form.learningEnabled}
                       onCheckedChange={(checked) => setForm({ ...form, learningEnabled: checked })}
                     />
@@ -594,6 +576,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
                     <button
                       type="button"
                       className="w-fit text-xs text-primary underline-offset-4 hover:underline"
+                      aria-label="Learning history"
                       onClick={() => setHistoryOpen(true)}
                     >
                       History
@@ -607,8 +590,9 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
                           agent's model pin) with that harness's own tools; harness reviews can't be undone from history.
                         </p>
                       )}
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Cadence in minutes (leave empty for defaults)</p>
+                      <DisclosureRow label="Timing" defaultOpen={false}
+                        summary={LEARNING_FIELDS.some(field => form[field.key].trim()) ? 'Customized' : 'Defaults'}>
+                        <p className="text-xs text-muted-foreground">Minutes. Leave empty for defaults.</p>
                         <div className="grid grid-cols-3 gap-1.5">
                           {LEARNING_FIELDS.map(field => (
                             <div key={field.key} className="space-y-1">
@@ -626,16 +610,15 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
                             </div>
                           ))}
                         </div>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Reviewer instructions</p>
-                        <textarea
+                      </DisclosureRow>
+                      <DisclosureRow label="Learning focus" summary={form.learningInstructions.trim() || null} defaultOpen={false}>
+                        <Textarea
+                          aria-label="Learning focus"
                           value={form.learningInstructions}
                           onChange={(e) => setForm({ ...form, learningInstructions: e.target.value })}
-                          className="w-full h-16 p-2 rounded-md border bg-background text-xs resize-y"
                           placeholder="What this agent should focus on when learning..."
                         />
-                      </div>
+                      </DisclosureRow>
                       <div>
                         <p className="text-[10px] text-muted-foreground">Which workspaces feed this agent's learning</p>
                         <select
@@ -965,7 +948,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
               onClick={() => handleEdit(preconfig)}
             >
               <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                <Layers className="size-4 text-muted-foreground shrink-0 hidden sm:block" />
+                <Bot className="size-4 text-muted-foreground shrink-0 hidden sm:block" />
                 <div className="flex flex-col flex-1 min-w-0 gap-0.5 sm:gap-1 overflow-hidden">
                   <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                     <span className="text-sm font-medium truncate">{preconfig.name}</span>

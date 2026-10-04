@@ -1,20 +1,20 @@
 import { Suspense, lazy } from 'react';
 import type { ProkopaiClient, Workspace, WorkspaceSettings } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { getSessionTagOrder, type SessionTagOrder } from '@/lib/sessionTagOrder';
 import { learningValidationError } from '@/lib/learningValidation';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useWorkspacePermissions } from '@/hooks/useWorkspacePermissions';
 import { PanelLoadingFallback } from '../SettingsDialogShell';
-import { WorkspaceSessionsPanel } from './WorkspaceSessionsPanel';
+import { WorkspaceGeneralPanel } from './WorkspaceGeneralPanel';
+import { MemorySkillsControls } from './MemorySkillsControls';
 
-const AgentToolsPanel = lazy(() => import('./AgentToolsPanel').then(m => ({ default: m.AgentToolsPanel })));
 const MCPServersPanel = lazy(() => import('./MCPServersPanel').then(m => ({ default: m.MCPServersPanel })));
 const PermissionsPanel = lazy(() => import('./PermissionsPanel').then(m => ({ default: m.PermissionsPanel })));
-const AdditionalPathsPanel = lazy(() => import('./AdditionalPathsPanel').then(m => ({ default: m.AdditionalPathsPanel })));
 const LearningPanel = lazy(() => import('./LearningPanel').then(m => ({ default: m.LearningPanel })));
 
-export type WorkspaceSettingsSection = 'sessions' | 'mcp' | 'permissions' | 'paths' | 'learning' | 'agentTools';
+export type WorkspaceSettingsSection = 'general' | 'mcp' | 'permissions' | 'learning';
 
 export interface WorkspaceSettingsDraft {
   memory: { enabled: boolean };
@@ -57,7 +57,7 @@ export function WorkspaceSettingsEditor({ section, workspace, sdkClient, draft, 
   const { permissions, refresh, revoke, revokeAll } = useWorkspacePermissions(sdkClient, workspace.id);
   const primaryPreconfigs = allPreconfigs.filter(p => p.mode !== 'subagent');
   const isAgentHome = workspace.settings?.isAgentHome === true;
-  const activeSection = isAgentHome && section === 'learning' ? 'agentTools' : section;
+  const activeSection = section;
   const isDirty = JSON.stringify(draft) !== JSON.stringify(workspaceSettingsDraft(workspace));
   const learningError = draft.memory.enabled
     ? learningValidationError(draft.learning, allPreconfigs.map(p => p.id)) : null;
@@ -79,27 +79,34 @@ export function WorkspaceSettingsEditor({ section, workspace, sdkClient, draft, 
   return (
     <div className="flex min-w-0 flex-col">
       <Suspense fallback={<PanelLoadingFallback />}>
-        {activeSection === 'sessions' && <WorkspaceSessionsPanel order={draft.sessionTagOrder}
+        {activeSection === 'general' && <WorkspaceGeneralPanel order={draft.sessionTagOrder}
           onChange={sessionTagOrder => setDraft({ sessionTagOrder })} preconfigs={primaryPreconfigs}
+          workspace={workspace} sdkClient={sdkClient} paths={draft.additionalPaths}
+          onPathsChange={additionalPaths => setDraft({ additionalPaths })}
           defaultAgentId={draft.defaultAgentId} onDefaultAgentChange={defaultAgentId => setDraft({ defaultAgentId })} />}
         {activeSection === 'mcp' && <MCPServersPanel workspaceId={workspace.id} sdkClient={sdkClient} />}
         {activeSection === 'permissions' && <PermissionsPanel mode={workspace.settings?.permissionMode ?? 'standard'}
           onModeChange={permissionMode => onSavePermissionMode({ ...workspace.settings, permissionMode })}
           permissions={permissions} onRefreshPermissions={refresh} onRevokePermission={revoke} onRevokeAllPermissions={revokeAll} />}
-        {activeSection === 'paths' && <AdditionalPathsPanel workspace={workspace} sdkClient={sdkClient}
-          paths={draft.additionalPaths} onChange={additionalPaths => setDraft({ additionalPaths })} />}
-        {activeSection === 'learning' && <LearningPanel workspace={workspace} preconfigs={allPreconfigs}
+        {activeSection === 'learning' && <div className="flex flex-col gap-3 p-3 sm:p-4">
+          <MemorySkillsControls scope="workspace" memoryEnabled={draft.memory.enabled} skillsEnabled={draft.skills.enabled}
+            onChangeMemory={enabled => setDraft({ memory: { enabled } })}
+            onChangeSkills={enabled => setDraft({ skills: { enabled } })} />
+          <Separator />
+          {isAgentHome ? (
+            <p className="text-xs text-muted-foreground">
+              Configure this agent's personal learning in Agents under Memory &amp; Learning.
+            </p>
+          ) : <LearningPanel workspace={workspace} preconfigs={allPreconfigs}
           value={draft.learning} allowPersonalLearning={draft.allowPersonalLearning}
           onPersonalLearningChange={allowPersonalLearning => setDraft({ allowPersonalLearning })}
           onChange={learning => setDraft({ learning,
             memory: learning.enabled ? { enabled: true } : draft.memory,
             skills: learning.enabled && learning.improveSkills ? { enabled: true } : draft.skills,
           })} />}
-        {activeSection === 'agentTools' && <AgentToolsPanel memoryEnabled={draft.memory.enabled} skillsEnabled={draft.skills.enabled}
-          onChangeMemory={enabled => setDraft({ memory: { enabled } })}
-          onChangeSkills={enabled => setDraft({ skills: { enabled } })} />}
+        </div>}
       </Suspense>
-      {(isDirty || ['sessions', 'learning', 'agentTools', 'paths'].includes(activeSection)) && (
+      {(isDirty || ['general', 'learning'].includes(activeSection)) && (
         <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 border-t bg-background p-3 sm:p-4">
           {learningError && <p role="alert" className="mr-auto text-xs text-destructive">{learningError}</p>}
           {isDirty && <Button variant="ghost" onClick={onDiscard} disabled={isSaving}>Discard changes</Button>}

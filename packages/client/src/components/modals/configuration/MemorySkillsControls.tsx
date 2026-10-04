@@ -1,7 +1,9 @@
+import { useId, type ReactElement } from 'react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 
-interface AgentToolsPanelProps {
+interface MemorySkillsControlsProps {
+  scope: 'workspace' | 'agent';
   memoryEnabled: boolean;
   skillsEnabled: boolean;
   onChangeMemory: (enabled: boolean) => void;
@@ -19,7 +21,7 @@ interface ToggleRowProps {
 function ToggleRow({ id, label, description, checked, onChange }: ToggleRowProps) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <div className="min-w-0 space-y-0.5">
+      <div className="flex min-w-0 flex-col gap-0.5">
         <Label htmlFor={id}>{label}</Label>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
@@ -33,27 +35,31 @@ function ToggleRow({ id, label, description, checked, onChange }: ToggleRowProps
   );
 }
 
-/** Workspace capability toggles. Session search is always on for every
- * workspace, so it has no toggle here. */
-export function AgentToolsPanel({
+export function MemorySkillsControls({
+  scope,
   memoryEnabled,
   skillsEnabled,
   onChangeMemory,
   onChangeSkills,
-}: AgentToolsPanelProps) {
+}: MemorySkillsControlsProps): ReactElement {
+  const id = useId();
   return (
-    <div className="space-y-6 p-3 sm:p-4">
+    <div className="flex flex-col gap-3">
       <ToggleRow
-        id="memory-enabled"
+        id={`${id}-memory`}
         label="Memory"
-        description="Load memory into context and expose the memory tool"
+        description={scope === 'workspace'
+          ? 'Use and maintain shared memory for this workspace.'
+          : 'Use and maintain personal memory across workspaces.'}
         checked={memoryEnabled}
         onChange={onChangeMemory}
       />
       <ToggleRow
-        id="skills-enabled"
-        label="Skills"
-        description="Expose the skill_manage tool so the agent can manage workspace skills"
+        id={`${id}-skills`}
+        label="Skill management"
+        description={scope === 'workspace'
+          ? 'Allow agents to create and update workspace skills.'
+          : 'Allow this agent to create and update its personal skills.'}
         checked={skillsEnabled}
         onChange={onChangeSkills}
       />

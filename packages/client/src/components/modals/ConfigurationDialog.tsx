@@ -1,6 +1,6 @@
 import { Suspense, lazy, useState } from 'react';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { Boxes, FileText, Cog, FolderSymlink, GraduationCap, Shield, Wrench, Layers, Braces, MonitorCog, Palette, Keyboard, CircuitBoard, Gauge } from 'lucide-react';
+import { Boxes, FileText, Cog, GraduationCap, Shield, Bot, Braces, MonitorCog, Palette, Keyboard, CircuitBoard, Gauge } from 'lucide-react';
 import { getSelectableWorkspaces } from '@/lib/workspaceKind';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useServerUpdate } from '@/hooks/useServerUpdate';
@@ -39,7 +39,7 @@ const SECTIONS: SettingsSection[] = [
   { value: 'mcp', label: 'MCP Servers', icon: Boxes, group: 'server' },
   { value: 'harnesses', label: 'Harnesses', icon: CircuitBoard, group: 'server' },
   { value: 'usage', label: 'Usage', icon: Gauge, group: 'server' },
-  { value: 'preconfigs', label: 'Agents', icon: Layers, group: 'server' },
+  { value: 'preconfigs', label: 'Agents', icon: Bot, group: 'server' },
   { value: 'prompts', label: 'Prompts', icon: FileText, group: 'server' },
   // Prokop runtime
   { value: 'providers-models', label: 'Providers & Models', icon: Boxes, group: 'prokop' },
@@ -49,21 +49,17 @@ const SECTIONS: SettingsSection[] = [
 ];
 
 const WORKSPACE_SECTIONS: SettingsSection[] = [
-  { value: 'workspace-sessions', label: 'Sessions', icon: Cog, group: 'workspace' },
+  { value: 'workspace-general', label: 'General', icon: Cog, group: 'workspace' },
   { value: 'workspace-mcp', label: 'MCP Servers', icon: Boxes, group: 'workspace' },
   { value: 'workspace-permissions', label: 'Permissions', icon: Shield, group: 'workspace' },
-  { value: 'workspace-paths', label: 'Additional Paths', icon: FolderSymlink, group: 'workspace' },
-  { value: 'workspace-learning', label: 'Learning', icon: GraduationCap, group: 'workspace' },
-  { value: 'workspace-agentTools', label: 'Agent Tools', icon: Wrench, group: 'workspace' },
+  { value: 'workspace-learning', label: 'Memory & Learning', icon: GraduationCap, group: 'workspace' },
 ];
 
 const WORKSPACE_DESCRIPTIONS: Record<WorkspaceSettingsSection, string> = {
-  sessions: 'Set the session order and default agent for the selected workspace.',
+  general: 'Set the default agent, session order, and additional paths for the selected workspace.',
   mcp: 'Manage MCP servers and tool access for the selected workspace.',
   permissions: 'Manage the permission mode and saved approvals for the selected workspace.',
-  paths: 'Choose additional folders the agent can access from the selected workspace.',
-  learning: 'Configure automatic learning and review its history for the selected workspace.',
-  agentTools: 'Control memory and skill management for the selected workspace.',
+  learning: 'Manage shared memory, skills, and learning for the selected workspace.',
 };
 
 const GROUPS: SettingsGroup[] = [
@@ -82,7 +78,10 @@ export function ConfigurationDialog({
   isConnected,
   onLogout,
 }: ConfigurationDialogProps) {
-  const section = useUIStore((s) => s.configurationSection);
+  const storedSection = useUIStore((s) => s.configurationSection);
+  const section = storedSection === 'workspace-agentTools' ? 'workspace-learning'
+    : storedSection === 'workspace-sessions' || storedSection === 'workspace-paths' ? 'workspace-general'
+      : storedSection;
   const setSection = useUIStore((s) => s.setConfigurationSection);
   // The dialog mounts on open, capturing the workspace it was opened from.
   const [workspaceId, setWorkspaceId] = useState(() => useServerDataStore.getState().activeWorkspace?.id ?? null);
@@ -92,11 +91,10 @@ export function ConfigurationDialog({
   const agents = useServerDataStore(s => s.agents);
   const selectable = getSelectableWorkspaces(workspaces, agents);
   const workspace = selectable.find(item => item.id === workspaceId) ?? selectable[0];
-  const workspaceSections = workspace ? WORKSPACE_SECTIONS.filter(item =>
-    !(workspace.settings?.isAgentHome && item.value === 'workspace-learning')) : [];
+  const workspaceSections = workspace ? WORKSPACE_SECTIONS : [];
   const sections = [...SECTIONS, ...workspaceSections];
   const activeSection = sections.some(item => item.value === section) ? section
-    : workspace ? 'workspace-sessions' : 'appearance';
+    : workspace ? 'workspace-general' : 'appearance';
   const groups = GROUPS.map(group => group.key === 'workspace' && !workspace ? {
     ...group,
     control: <p className="px-3 text-xs text-muted-foreground">No workspaces on this server yet.</p>,

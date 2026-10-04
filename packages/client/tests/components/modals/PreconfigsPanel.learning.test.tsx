@@ -36,7 +36,8 @@ async function editAgent() {
   const user = userEvent.setup();
   render(<QueryClientProvider client={new QueryClient()}><PreconfigsPanel sdkClient={null} /></QueryClientProvider>);
   await user.click(screen.getByText('Test agent'));
-  await user.click(screen.getByRole('button', { name: /^Advanced Capabilities/ }));
+  await user.click(screen.getByRole('button', { name: /^Memory & Learning/ }));
+  await user.click(screen.getByRole('button', { name: /^Timing/ }));
   return user;
 }
 
@@ -49,6 +50,27 @@ test('shows agent defaults as labeled placeholders and saves unchanged timing as
   await user.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({
     body: expect.objectContaining({ settings: expect.objectContaining({ learning: expect.objectContaining({ cadence: null }) }) }),
+  })));
+});
+
+test('groups personal controls and keeps timing and instructions collapsed with saved summaries', async () => {
+  mocks.settings = { learning: { enabled: true, cadence: { idleMinutes: 15, minimumIntervalMinutes: 120, maximumPendingMinutes: 720 }, instructions: 'Remember test conventions', sources: { mode: 'all' } } };
+  const user = userEvent.setup();
+  render(<QueryClientProvider client={new QueryClient()}><PreconfigsPanel sdkClient={null} /></QueryClientProvider>);
+  await user.click(screen.getByText('Test agent'));
+  await user.click(screen.getByRole('button', { name: /^Memory & Learning/ }));
+  expect(screen.getByRole('switch', { name: 'Memory' })).toBeChecked();
+  expect(screen.getByRole('switch', { name: 'Skill management' })).toBeChecked();
+  expect(screen.getByRole('switch', { name: 'Automatic learning' })).toBeChecked();
+  expect(screen.queryByLabelText('Quiet period')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /^Timing/ })).toHaveTextContent('Customized');
+  expect(screen.getByRole('button', { name: /^Learning focus/ })).toHaveTextContent('Remember test conventions');
+  expect(screen.queryByRole('textbox', { name: 'Learning focus' })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('switch', { name: 'Skill management' }));
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({
+    body: expect.objectContaining({ capabilities: { memory: true, skills: false },
+      settings: expect.objectContaining({ learning: expect.objectContaining({ instructions: 'Remember test conventions' }) }) }),
   })));
 });
 

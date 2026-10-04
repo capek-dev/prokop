@@ -6,12 +6,13 @@ import type { UseBoundStore, StoreApi } from 'zustand';
 // --- Configuration Section (deep-linking) ---
 export type ConfigurationSection =
   | 'mcp'
-  | 'workspace-sessions'
+  | 'workspace-general'
+  | 'workspace-sessions' // Legacy selection opens General.
   | 'workspace-mcp'
   | 'workspace-permissions'
-  | 'workspace-paths'
+  | 'workspace-paths' // Legacy selection opens General.
   | 'workspace-learning'
-  | 'workspace-agentTools'
+  | 'workspace-agentTools' // Legacy selection opens Memory & Learning.
   // Preferences
   | 'system'
   | 'appearance'

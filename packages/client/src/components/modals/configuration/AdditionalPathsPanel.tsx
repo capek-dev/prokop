@@ -32,8 +32,8 @@ export function AdditionalPathsPanel({
   };
 
   return (
-    <div className="flex flex-col gap-3 p-3 sm:p-4">
-      <p className="text-sm text-muted-foreground">
+    <div className="flex flex-col gap-3">
+      <p className="text-xs text-muted-foreground">
         Add directories the agent can access alongside {workspace.name}. The agent will use absolute paths for these directories.
       </p>
 
