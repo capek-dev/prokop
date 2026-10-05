@@ -199,9 +199,6 @@ export function UsagePanel({ sdkClient }: UsagePanelProps) {
 
   return (
     <div className="p-3 sm:p-4 space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Account balances and limits, including usage outside Prokop.
-      </p>
       {credentials.isLoading && <p className="text-xs text-muted-foreground">Loading provider accounts…</p>}
       {credentials.isError && <p className="text-xs text-muted-foreground">Could not load configured provider accounts.</p>}
       {providers.isLoading && <p className="text-xs text-muted-foreground">Loading Codex accounts…</p>}

@@ -5,6 +5,7 @@ import type { ProkopaiClient } from '@prokopai/sdk';
 import { useWorkspaceSessionTabs } from '@/hooks/useWorkspaceSessionTabs';
 import { FileEditorSurface, type FileEditorSurfaceHandle } from '@/components/editor/FileEditorSurface';
 import { WorkspaceViews } from '@/components/app/WorkspaceViews';
+import { WorkspaceUsageView } from '@/components/app/WorkspaceUsageView';
 import { FilesPanel } from '@/components/layout/FilesPanel';
 import { WorktreesPanel } from '@/components/worktrees/WorktreesPanel';
 import { useViewRefs } from '@/contexts/ViewRefsContext';
@@ -94,6 +95,7 @@ export function WorkspaceContentArea({
     <WorkspaceViews tabs={tabs} mobileEditorId={mobileEditorId} mobileSessionId={sessionTabs.mobileSessionId} views={{
       ...resourceViews,
       sessions: left ?? (sessionsContent ? <>{sessionsHeader}{sessionsContent}</> : undefined),
+      usage: <WorkspaceUsageView sdkClient={sdkClient} />,
       explorer: serverId && workspaceId ? <FilesPanel ref={filesPanelRef} sdkClient={sdkClient} view="explorer" embedded /> : undefined,
       changes: serverId && workspaceId ? <FilesPanel sdkClient={sdkClient} view="changes" embedded /> : undefined,
       branches: serverId && workspaceId ? <FilesPanel sdkClient={sdkClient} view="branches" embedded /> : undefined,

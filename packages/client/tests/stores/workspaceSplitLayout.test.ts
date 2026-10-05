@@ -13,7 +13,7 @@ describe('workspace splits', () => {
   test('restricts side and bottom directions and refuses to split a sole visible tab', () => {
     const store = useWorkspaceViewStore.getState();
     expect(store.splitView('explorer', 'right', WORKSPACE_VIEW_IDS)).toBeNull();
-    expect(store.splitView('sessions', 'down', WORKSPACE_VIEW_IDS)).toBeNull();
+    expect(store.splitView('sessions', 'down', ['sessions'])).toBeNull();
     expect(store.splitView('explorer', 'down', ['explorer'])).toBeNull();
     const lower = store.splitView('explorer', 'down', WORKSPACE_VIEW_IDS)!;
     expect(treeGroups(useWorkspaceViewStore.getState().layout.roots.right)).toEqual(['right', lower]);

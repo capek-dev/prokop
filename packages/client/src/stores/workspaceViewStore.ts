@@ -6,7 +6,8 @@ import { filterTree, mapTree, treeGroups, type SplitDirection, type ViewTree } f
 const LEGACY_VIEW_IDS = ['sessions', 'conversations', 'files', 'editor', 'terminals'] as const;
 export const REPOSITORY_VIEW_IDS = ['explorer', 'changes', 'branches', 'worktrees'] as const;
 export type RepositoryViewId = typeof REPOSITORY_VIEW_IDS[number];
-export const WORKSPACE_VIEW_IDS = ['sessions', 'conversations', ...REPOSITORY_VIEW_IDS, 'editor', 'terminals'] as const;
+const ORIGINAL_VIEW_IDS = ['sessions', 'conversations', ...REPOSITORY_VIEW_IDS, 'editor', 'terminals'] as const;
+export const WORKSPACE_VIEW_IDS = [...ORIGINAL_VIEW_IDS, 'usage'] as const;
 export type WorkspaceToolViewId = typeof WORKSPACE_VIEW_IDS[number];
 export type FileViewId = `file:${string}`;
 export type SessionViewId = `session:${string}:${string}`;
@@ -62,7 +63,7 @@ export function createDefaultViewLayout(): WorkspaceViewLayout {
   return {
     roots: { left: { kind: 'group', groupId: 'left' }, center: { kind: 'group', groupId: 'center' }, right: { kind: 'group', groupId: 'right' }, bottom: { kind: 'group', groupId: 'bottom' } },
     groups: {
-      left: { viewIds: ['sessions'], activeId: 'sessions' },
+      left: { viewIds: ['sessions', 'usage'], activeId: 'sessions' },
       center: { viewIds: ['conversations', 'editor'], activeId: 'conversations' },
       right: { viewIds: [...REPOSITORY_VIEW_IDS], activeId: 'explorer' },
       bottom: { viewIds: ['terminals'], activeId: 'terminals' },
@@ -80,13 +81,13 @@ export function isWorkspaceViewId(value: unknown): value is WorkspaceViewId {
 }
 
 export function parseViewLayout(value: unknown): WorkspaceViewLayout | null {
-  if (isRecord(value) && value.version === 5) return parseSplitLayout(value);
+  if (isRecord(value) && value.version === 5) return addUsageView(parseSplitLayout(value));
   if (!isRecord(value) || (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4) || !isRecord(value.groups)
     || !Array.isArray(value.hidden)) return null;
   const legacy = value.version === 1 || value.version === 2;
-  const requiredIds = legacy ? LEGACY_VIEW_IDS : WORKSPACE_VIEW_IDS;
+  const requiredIds = legacy ? LEGACY_VIEW_IDS : ORIGINAL_VIEW_IDS;
   const validId = (id: unknown): id is string => typeof id === 'string'
-    && (requiredIds.some((required) => required === id) || (value.version !== 1 && isFileViewId(id)) || (value.version === 4 && isSessionViewId(id)));
+    && (requiredIds.some((required) => required === id) || (!legacy && id === 'usage') || (value.version !== 1 && isFileViewId(id)) || (value.version === 4 && isSessionViewId(id)));
   if (!value.hidden.every(validId)) return null;
   const expand = (id: string): WorkspaceViewId[] => legacy && id === 'files'
     ? [...REPOSITORY_VIEW_IDS] : [id as WorkspaceViewId];
@@ -106,7 +107,15 @@ export function parseViewLayout(value: unknown): WorkspaceViewLayout | null {
     };
   }
   if (!requiredIds.every((id) => seen.has(id)) || value.hidden.some((id) => !seen.has(id))) return null;
-  return { groups, roots: createDefaultViewLayout().roots, hidden: [...new Set(value.hidden.flatMap(expand))] };
+  return addUsageView({ groups, roots: createDefaultViewLayout().roots, hidden: [...new Set(value.hidden.flatMap(expand))] });
+}
+
+/** Older layouts gain Usage without changing their splits, selections, or hidden views. */
+function addUsageView(layout: WorkspaceViewLayout | null): WorkspaceViewLayout | null {
+  if (!layout || Object.values(layout.groups).some((group) => group.viewIds.includes('usage'))) return layout;
+  const group = layout.groups[treeGroups(layout.roots.left)[0]];
+  group.viewIds.push('usage');
+  return layout;
 }
 
 function parseSplitLayout(value: Record<string, unknown>): WorkspaceViewLayout | null {
@@ -122,7 +131,7 @@ function parseSplitLayout(value: Record<string, unknown>): WorkspaceViewLayout |
     for (const view of group.viewIds) { if (seen.has(view)) return null; seen.add(view); }
     groups[id] = { viewIds: [...group.viewIds], activeId: group.activeId as WorkspaceViewId | null };
   }
-  if (!WORKSPACE_VIEW_IDS.every((id) => seen.has(id)) || !value.hidden.every((id) => isWorkspaceViewId(id) && seen.has(id))) return null;
+  if (!ORIGINAL_VIEW_IDS.every((id) => seen.has(id)) || !value.hidden.every((id) => isWorkspaceViewId(id) && seen.has(id))) return null;
   const leaves = new Set<string>();
   const splits = new Set<string>();
   const parseTree = (node: unknown, region: ViewRegion, depth: number): ViewTree | null => {

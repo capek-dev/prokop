@@ -6,6 +6,25 @@ import {
 } from '@/stores/workspaceViewStore';
 
 describe('workspace view placement', () => {
+  test('adds Usage to saved left splits without resetting selections or placement', () => {
+    const store = useWorkspaceViewStore.getState();
+    store.moveView('explorer', 'left');
+    store.splitView('explorer', 'down', WORKSPACE_VIEW_IDS);
+    const saved = structuredClone(useWorkspaceViewStore.getState().layout);
+    for (const group of Object.values(saved.groups)) group.viewIds = group.viewIds.filter((id) => id !== 'usage');
+    const migrated = parseViewLayout({ version: 5, ...saved })!;
+    expect(migrated.roots).toEqual(saved.roots);
+    expect(migrated.groups.left.activeId).toBe(saved.groups.left.activeId);
+    expect(migrated.groups.left.viewIds).toEqual([...saved.groups.left.viewIds, 'usage']);
+    expect(findViewRegion(migrated, 'usage')).toBe('left');
+    useWorkspaceViewStore.setState({ layout: migrated });
+    store.moveView('usage', 'bottom');
+    store.hideView('usage');
+    const restored = parseViewLayout({ version: 5, ...useWorkspaceViewStore.getState().layout })!;
+    expect(findViewRegion(restored, 'usage')).toBe('bottom');
+    expect(restored.hidden).toContain('usage');
+    expect(Object.values(restored.groups).flatMap((group) => group.viewIds).filter((id) => id === 'usage')).toHaveLength(1);
+  });
   beforeEach(() => {
     localStorage.clear();
     useWorkspaceViewStore.setState({ layout: createDefaultViewLayout() });
@@ -21,7 +40,7 @@ describe('workspace view placement', () => {
   test('moves a view exactly once, selects it, opens its destination and closes an empty source', () => {
     useWorkspaceViewStore.getState().moveView('terminals', 'left');
     const { layout } = useWorkspaceViewStore.getState();
-    expect(layout.groups.left).toEqual({ viewIds: ['sessions', 'terminals'], activeId: 'terminals' });
+    expect(layout.groups.left).toEqual({ viewIds: ['sessions', 'usage', 'terminals'], activeId: 'terminals' });
     expect(layout.groups.bottom).toEqual({ viewIds: [], activeId: null });
     expect(Object.values(layout.groups).flatMap((group) => group.viewIds).sort()).toEqual([...WORKSPACE_VIEW_IDS].sort());
     expect(useDockStore.getState().docks.left.open).toBe(true);

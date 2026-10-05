@@ -1,8 +1,21 @@
-import { beforeEach, expect, test, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { UsagePanel, formatResetIn } from '@/components/modals/configuration/UsagePanel';
+import { WorkspaceUsageView } from '@/components/app/WorkspaceUsageView';
+import { WorkspaceViews } from '@/components/app/WorkspaceViews';
+import { createDefaultViewLayout, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
+import { useDockStore } from '@/stores/dockStore';
+
+vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false, useIsCompact: () => false }));
+
+afterEach(() => {
+  cleanup();
+  useWorkspaceViewStore.setState({ layout: createDefaultViewLayout() });
+  useDockStore.setState(useDockStore.getInitialState());
+  localStorage.clear();
+});
 
 const sessions = { harnesses: vi.fn(), harnessUsage: vi.fn() };
 const providers = { listCredentials: vi.fn(), usage: vi.fn(), list: vi.fn(), codexAccountUsage: vi.fn() };
@@ -30,6 +43,29 @@ function setup() {
   const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={cache}><UsagePanel sdkClient={client} /></QueryClientProvider>);
 }
+
+test('Usage dock tab reuses settings data and refresh, and supports moving and restoring', async () => {
+  useWorkspaceViewStore.setState({ layout: createDefaultViewLayout() });
+  useDockStore.setState(useDockStore.getInitialState());
+  const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(<QueryClientProvider client={cache}><WorkspaceViews views={{
+    sessions: <div>Session list</div>, usage: <WorkspaceUsageView sdkClient={client} />,
+  }} /></QueryClientProvider>);
+  const tab = screen.getByRole('tab', { name: 'Usage' });
+  expect(tab.closest('[data-dock-position]')).toHaveAttribute('data-dock-position', 'left');
+  expect(sessions.harnesses).not.toHaveBeenCalled();
+  fireEvent.click(tab);
+  expect(await screen.findByText('18% used')).toBeInTheDocument();
+  expect(screen.getByText('95% used')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh Claude CLI usage' }));
+  await waitFor(() => expect(sessions.harnessUsage).toHaveBeenCalledTimes(2));
+  act(() => useWorkspaceViewStore.getState().moveView('usage', 'bottom'));
+  expect(screen.getByRole('tab', { name: 'Usage' }).closest('[data-dock-position]')).toHaveAttribute('data-dock-position', 'bottom');
+  act(() => useWorkspaceViewStore.getState().hideView('usage'));
+  expect(screen.queryByRole('tab', { name: 'Usage' })).toBeNull();
+  act(() => useWorkspaceViewStore.getState().activateView('usage'));
+  expect(await screen.findByText('18% used')).toBeInTheDocument();
+});
 
 test('shows windows for installed harnesses and never reads Prokop or missing CLIs', async () => {
   setup();

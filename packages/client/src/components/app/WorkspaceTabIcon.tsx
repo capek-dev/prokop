@@ -1,9 +1,10 @@
 import type { ReactElement } from 'react';
-import { FileText, FolderTree, GitBranch, GitCompareArrows, GitFork, List, MessageSquare, Terminal } from 'lucide-react';
+import { FileText, FolderTree, Gauge, GitBranch, GitCompareArrows, GitFork, List, MessageSquare, Terminal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { WorkspaceToolViewId, WorkspaceViewId } from '@/stores/workspaceViewStore';
 
 const VIEW_ICONS: Record<WorkspaceToolViewId, LucideIcon> = {
+  usage: Gauge,
   sessions: List,
   conversations: MessageSquare,
   explorer: FolderTree,

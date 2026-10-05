@@ -14,6 +14,7 @@ import { useDockStore } from '@/stores/dockStore';
 import { createDefaultViewLayout, fileViewId, findViewRegion, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
 
 const mocks = vi.hoisted(() => ({ mobile: false, compact: false, mount: vi.fn(), unmount: vi.fn(), gitDiff: vi.fn() }));
+vi.mock('@/components/app/WorkspaceUsageView', () => ({ WorkspaceUsageView: () => <div>Usage content</div> }));
 vi.mock('@tanstack/react-router', () => ({ useParams: () => ({ serverId: 'server-1' }), useNavigate: () => vi.fn(), useRouterState: ({ select }: { select: (state: unknown) => unknown }) => select({ location: { pathname: '/server/server-1/workspace/session/session-1' } }) }));
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => mocks.mobile, useIsCompact: () => mocks.compact }));
 vi.mock('@/components/board/SessionPane', () => ({ SessionPane: () => <div>Conversation content</div> }));

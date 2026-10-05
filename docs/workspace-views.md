@@ -6,6 +6,11 @@ and Terminals are movable tool views. Each open session and file is an independe
 resource tab that can share a group with those tools or occupy another dock.
 There is no Conversations wrapper, dedicated grid mode, or six-session limit.
 Terminals still owns its terminal tabs; separating that collection is future work.
+Usage is a server-scoped tool tab beside Sessions in the default left dock. It
+reuses Settings > Usage for account balances, limits, CLI usage, and refresh
+controls. Its content mounts only while visible and shares the query cache with
+settings. Existing saved layouts gain Usage in their first left group without
+changing selections or splits; moved and hidden Usage placements are retained.
 
 Each region can contain multiple independent tab groups. Left and right use
 vertical splits, bottom uses horizontal splits, and center supports nested splits
