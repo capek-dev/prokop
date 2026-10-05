@@ -1,6 +1,15 @@
+import { memoizeCliProbe } from '@/harnesses/shared/cli-version-cache';
+
 const MIN_VERSION = 'Claude CLI 2.1.259 or newer is required on this host';
 
+const cachedClaudeCliVersion = memoizeCliProbe('claude', probeClaudeCliVersion);
+
+/** Exact host CLI version, re-probed only when the `claude` binary changes. */
 export function claudeCliVersion(): string {
+  return cachedClaudeCliVersion();
+}
+
+function probeClaudeCliVersion(): string {
   const result = Bun.spawnSync(['claude', '--version'], { stdout: 'pipe', stderr: 'ignore' });
   if (result.exitCode !== 0) throw new Error(MIN_VERSION);
   const version = result.stdout.toString().trim();

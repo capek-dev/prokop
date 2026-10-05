@@ -1,3 +1,5 @@
+import { memoizeCliProbe } from '@/harnesses/shared/cli-version-cache';
+
 const MINIMUM_CODEX_VERSION = 'Codex CLI 0.156.0 or newer is required on the host';
 
 export function validateCodexCliVersion(version: string): string {
@@ -13,7 +15,14 @@ export function validateCodexCliVersion(version: string): string {
   return version;
 }
 
+const cachedCodexCliVersion = memoizeCliProbe('codex', probeCodexCliVersion);
+
+/** Exact host CLI version, re-probed only when the `codex` binary changes. */
 export function codexCliVersion(): string {
+  return cachedCodexCliVersion();
+}
+
+function probeCodexCliVersion(): string {
   const result = Bun.spawnSync(['codex', '--version'], { stdout: 'pipe', stderr: 'ignore' });
   if (result.exitCode !== 0) throw new Error(MINIMUM_CODEX_VERSION);
   return validateCodexCliVersion(result.stdout.toString().trim());

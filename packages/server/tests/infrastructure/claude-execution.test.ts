@@ -389,13 +389,44 @@ test('streams text before completion and reconciles the complete message without
   const turn = exec.sendMessage(wire, 'origin', 'session', 'hello');
   await partialReceived;
   // The stream has been yielded through the async generator before its next await.
-  expect(listMessagesWithParts('session')[1]?.parts).toMatchObject([{ type: 'text', text: 'Hello' }]);
+  // Storage is throttled: the first delta persists at once, later ones within the interval wait.
+  expect(listMessagesWithParts('session')[1]?.parts).toMatchObject([{ type: 'text', text: 'Hel' }]);
   expect(events.filter(event => (event as { type?: string }).type === 'part.append')).toHaveLength(2);
   resume();
   await turn;
   expect(listMessagesWithParts('session')[1]?.parts).toMatchObject([{ type: 'text', text: 'Hello! Bye.' }]);
   expect(events.filter(event => (event as { type?: string }).type === 'part.created')).toHaveLength(2);
   expect(events.filter(event => (event as { type?: string }).type === 'part.updated')).toHaveLength(2);
+});
+
+test('Stop stores throttled streamed text in full and re-sends it once', async () => {
+  const { wire, events } = wireFixture();
+  let started!: () => void;
+  const partialReceived = new Promise<void>(resolve => { started = resolve; });
+  const exec = createClaudeExecution({ version: () => '2.1.274', start: (_prompt, options) => {
+    const id = options.sessionId!;
+    const delta = (text: string) => ({ type: 'stream_event', session_id: id, parent_tool_use_id: null,
+      event: { type: 'content_block_delta', delta: { type: 'text_delta', text } } }) as SDKMessage;
+    async function* stream(): AsyncGenerator<SDKMessage> {
+      yield { type: 'system', subtype: 'init', session_id: id } as SDKMessage;
+      yield delta('Par');
+      yield delta('tial');
+      started();
+      await new Promise<void>(resolve => options.abortController!.signal.addEventListener('abort', () => resolve(), { once: true }));
+      throw new Error('Claude turn interrupted');
+    }
+    return stream();
+  } });
+  const turn = exec.sendMessage(wire, 'origin', 'session', 'hello');
+  await partialReceived;
+  // The second delta is inside the throttle interval and not stored yet.
+  expect(listMessagesWithParts('session')[1]?.parts).toMatchObject([{ type: 'text', text: 'Par' }]);
+  await exec.interruptSession('session');
+  await turn;
+  expect(listMessagesWithParts('session')[1]?.parts).toMatchObject([{ type: 'text', text: 'Partial' }]);
+  // The settled segment is re-sent in full so clients that loaded between snapshots converge.
+  const updated = events.filter(event => (event as { type?: string }).type === 'part.updated') as Array<{ part: { text: string } }>;
+  expect(updated.map(event => event.part.text)).toEqual(['Partial']);
 });
 
 test('Stop retains already streamed text without a duplicate part', async () => {

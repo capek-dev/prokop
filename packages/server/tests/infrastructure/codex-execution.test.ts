@@ -345,6 +345,31 @@ test('Codex turn applies selected model and effort, streams, and resumes its thr
   await second;
 });
 
+test('Codex stores throttled streamed text in full when the turn ends without item completion', async () => {
+  create();
+  saveCodexModelSelection('s', { model: 'gpt-5-codex', effort: 'low' });
+  let fake!: ReturnType<typeof fakeCodex>;
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+    fake = fakeCodex(); return fake.connection;
+  } });
+  const messages: ServerMessage[] = [];
+  const turn = execution.sendMessage(wire(messages), 'origin', 's', 'hello');
+  await waitFor(() => fake?.sent.some(message => message.method === 'turn/start') ?? false);
+  const delta = (text: string) => fake.send({ method: 'item/agentMessage/delta',
+    params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', delta: text } });
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  delta('Par');
+  delta('tial');
+  await waitFor(() => messages.filter(message => message.type === 'part.append').length === 2);
+  // The second delta is inside the throttle interval and not stored yet.
+  expect(listMessagesWithParts('s')[1]?.parts).toMatchObject([{ type: 'text', text: 'Par' }]);
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'interrupted' } } });
+  await turn;
+  expect(listMessagesWithParts('s')[1]?.parts).toMatchObject([{ type: 'text', text: 'Partial' }]);
+  expect(messages.filter(message => message.type === 'part.updated')
+    .map(message => (message.part as { text: string }).text)).toEqual(['Partial']);
+});
+
 test('workspace memory is opt-in and refreshed in Codex thread instructions on resume', async () => {
   const root = mkdtempSync(join(tmpdir(), 'codex-memory-'));
   try {

@@ -21,6 +21,7 @@ import { codexDeveloperInstructions, defaultCodexPreconfigId, type CodexInstruct
 import { codexApprovals } from './approvals';
 import { CodexToolItems } from './tool-items';
 import { CodexChildTimelines } from './child-timelines';
+import { StreamingTextWriter } from '@/harnesses/shared/streaming-text';
 import { logCodexPermissionDenial } from './permission-diagnostics';
 import { createPretoolChannel, verifyPretoolHook, type PretoolChannel, type HookDecision } from './pretool-hook';
 import { classifyCodexHook } from './hook-policy';
@@ -538,6 +539,12 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
       let idleTimer: ReturnType<typeof setTimeout> | undefined;
       let phase = 'workspace validation';
       let succeeded = false;
+      const streamText = new StreamingTextWriter();
+      const settleStreamedText = (): void => {
+        for (const { part } of streamText.settleAll()) {
+          wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part });
+        }
+      };
       try {
         const root = workspaceRoot(session);
         const workspace = getWorkspace(session.workspaceId);
@@ -704,6 +711,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
               codexApprovals.cancelSession(sessionId);
               toolItems?.finish();
               toolItems = undefined;
+              settleStreamedText();
               pendingDeltas.clear();
               assistant = createMessage({ id: crypto.randomUUID(), sessionId, role: 'assistant',
                 status: 'streaming', modelId: 'codex-cli', providerId: 'codex-cli', agent: session.agentId ?? undefined,
@@ -749,7 +757,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
               wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part });
             }
             entry.text += params.delta;
-            updatePart(entry.part.id, { text: entry.text });
+            streamText.append(sessionId, entry.part, entry.text);
             wire.delivery.broadcastToSession(sessionId, { type: 'part.append', sessionId,
               partId: entry.part.id, field: 'text', delta: params.delta });
           } else if (event.method === 'item/completed') {
@@ -757,7 +765,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
             if (item?.type === 'agentMessage' && id(item.id) && typeof item.text === 'string') {
               const entry = pendingDeltas.get(item.id as string);
               if (entry) {
-                updatePart(entry.part.id, { text: item.text });
+                streamText.settle(entry.part.id, item.text);
                 wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId,
                   part: { ...entry.part, text: item.text } });
               } else {
@@ -770,6 +778,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
           } else if (event.method === 'turn/completed') {
             completed = true;
             toolItems?.finish();
+            settleStreamedText();
             const status = turn?.status;
             if (status !== 'completed' && status !== 'interrupted' && status !== 'failed') {
               rejectDone(new Error('Invalid Codex turn status'));
@@ -1066,6 +1075,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
         if (reuseId && !getCodexBinding(sessionId)?.pendingTurn) clearRollbackIntent(sessionId);
         succeeded = true;
       } catch (error: unknown) {
+        settleStreamedText();
         if (reuseId && !getCodexBinding(sessionId)?.pendingTurn
           && getRollbackIntent(sessionId)?.phase === 'ready' && assistant) {
           // A failed setup before turn/start must not leave an orphan assistant

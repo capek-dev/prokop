@@ -2,7 +2,8 @@ import type { AssistantMessage, Session, TextPart, ToolPart } from '@prokopai/sd
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { createSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { createMessage, createPart, getToolPartByCallId, transitionToolToCompleted,
-  transitionToolToError, transitionToolToInterrupted, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
+  transitionToolToError, transitionToolToInterrupted, updateMessage } from '@/infrastructure/sqlite/message-store';
+import { StreamingTextWriter } from '@/harnesses/shared/streaming-text';
 import type { ClaudeTurnEvent } from './sdk-turn';
 import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
 
@@ -30,6 +31,7 @@ const MAX_CHILD_TEXT = 100_000;
 export class ClaudeChildTimelines {
   private readonly children = new Map<string, Child>();
   private readonly early = new Map<string, ClaudeTurnEvent[]>();
+  private readonly streamText = new StreamingTextWriter();
 
   constructor(private readonly parent: Session, private readonly nativeId: string,
     private readonly delivery: ApplicationDeliveryPort<unknown>) {}
@@ -100,16 +102,17 @@ export class ClaudeChildTimelines {
         child.segments.push(child.openSegment);
       }
       if (delta !== undefined) {
-        updatePart(child.openSegment.part.id, { text: next });
+        this.streamText.append(sessionId, child.openSegment.part, next);
         this.delivery.broadcastToSession(sessionId, { type: 'part.append', sessionId,
           partId: child.openSegment.part.id, field: 'text', delta });
       } else if (child.openSegment.part.text !== next) {
-        const updated = updatePart(child.openSegment.part.id, { text: next });
+        const updated = this.streamText.settle(child.openSegment.part.id, next);
         if (updated) this.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part: updated });
       }
       child.textLength = child.textLength - current.length + next.length;
       child.openSegment = { part: { ...child.openSegment.part, text: next }, text: next };
     } else if (event.type === 'tool-start') {
+      this.settleOpenSegment(child);
       child.openSegment = null;
       const callId = `claude-tool:${this.nativeId}:${event.id}`;
       if (getToolPartByCallId(sessionId, callId)) throw new Error('Duplicate Claude child tool identity');
@@ -140,6 +143,7 @@ export class ClaudeChildTimelines {
     const child = this.children.get(id);
     if (!child || child.status !== 'running') return;
     child.status = status;
+    this.settleOpenSegment(child);
     for (const partId of child.openTools) {
       const part = transitionToolToInterrupted(partId, 'error');
       if (part) this.delivery.broadcastToSession(child.sessionId,
@@ -158,6 +162,13 @@ export class ClaudeChildTimelines {
 
   private readonly owners = new Map<string, string>();
   private parentOf(id: string): string | undefined { return this.owners.get(id); }
+
+  private settleOpenSegment(child: Child): void {
+    if (!child.openSegment) return;
+    const updated = this.streamText.settle(child.openSegment.part.id);
+    if (updated) this.delivery.broadcastToSession(child.sessionId,
+      { type: 'part.updated', sessionId: child.sessionId, part: updated });
+  }
 
   close(status: 'error' | 'interrupted'): void {
     for (const id of this.children.keys()) this.finish(id, status);

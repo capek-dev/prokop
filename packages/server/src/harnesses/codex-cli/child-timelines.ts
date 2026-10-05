@@ -2,7 +2,8 @@ import type { AssistantMessage, Session, TextPart } from '@prokopai/sdk';
 import type { ApplicationDeliveryPort } from '@/application/ports/delivery';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { createSession, getSession, updateSession } from '@/infrastructure/sqlite/session-store';
-import { createMessage, createPart, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
+import { createMessage, createPart, updateMessage } from '@/infrastructure/sqlite/message-store';
+import { StreamingTextWriter } from '@/harnesses/shared/streaming-text';
 import { bindCodexThread, getCodexBinding } from './bindings';
 import { codexObject, type CodexNotification } from './app-server';
 import { CodexToolItems } from './tool-items';
@@ -36,6 +37,7 @@ function childTitle(path: unknown, role: unknown): string {
 export class CodexChildTimelines {
   private readonly children = new Map<string, Child>();
   private readonly early = new Map<string, CodexNotification[]>();
+  private readonly streamText = new StreamingTextWriter();
   private closed = false;
 
   constructor(private readonly parent: Session, private readonly parentThreadId: string,
@@ -189,7 +191,7 @@ export class CodexChildTimelines {
         && validId(item.id) && typeof item.text === 'string') {
         const entry = state.deltas.get(item.id);
         if (entry) {
-          updatePart(entry.part.id, { text: item.text });
+          this.streamText.settle(entry.part.id, item.text);
           this.delivery.broadcastToSession(child.sessionId, { type: 'part.updated', sessionId: child.sessionId,
             part: { ...entry.part, text: item.text } });
         } else {
@@ -209,7 +211,7 @@ export class CodexChildTimelines {
         this.delivery.broadcastToSession(child.sessionId, { type: 'part.created', sessionId: child.sessionId, part });
       }
       entry.text += params.delta;
-      updatePart(entry.part.id, { text: entry.text });
+      this.streamText.append(child.sessionId, entry.part, entry.text);
       this.delivery.broadcastToSession(child.sessionId, { type: 'part.append', sessionId: child.sessionId,
         partId: entry.part.id, field: 'text', delta: params.delta });
     } else if (event.method === 'turn/completed') {
@@ -220,6 +222,10 @@ export class CodexChildTimelines {
 
   private finishTurn(child: Child, state: ChildTurn, status: 'completed' | 'interrupted' | 'error'): void {
     state.tools.finish();
+    for (const entry of state.deltas.values()) {
+      const part = this.streamText.settle(entry.part.id);
+      if (part) this.delivery.broadcastToSession(child.sessionId, { type: 'part.updated', sessionId: child.sessionId, part });
+    }
     child.liveTurns.delete(state.id);
     this.onTurnFinished(child.sessionId);
     const updated = updateMessage(state.assistant.id, { status, completedAt: Date.now() });

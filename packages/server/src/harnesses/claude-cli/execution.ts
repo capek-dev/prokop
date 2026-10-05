@@ -8,9 +8,10 @@ import { getSession, updateSession } from '@/infrastructure/sqlite/session-store
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { createMessage, createPart, getToolPartByCallId, listMessagesWithParts, transitionToolToCompleted,
-  transitionToolToError, transitionToolToInterrupted, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
+  transitionToolToError, transitionToolToInterrupted, updateMessage } from '@/infrastructure/sqlite/message-store';
 import { getClaudeModelSelection } from './models';
 import { claudeCliVersion } from './version';
+import { StreamingTextWriter } from '@/harnesses/shared/streaming-text';
 import { runClaudeTurn } from './sdk-turn';
 import { readClaudeGoalVerdict } from './goal-transcript';
 import { runClaudeCompact } from './compact';
@@ -197,6 +198,12 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       };
       const openTools = new Set<string>();
       const openText = (): string => openSegment?.text ?? '';
+      const streamText = new StreamingTextWriter();
+      const settleOpenSegment = (): void => {
+        if (!openSegment) return;
+        const updated = streamText.settle(openSegment.part.id);
+        if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part: updated });
+      };
       const approvals = deps.approvals ?? claudeApprovals;
       let children: ClaudeChildTimelines | null = null;
       let ownedNativeId: string | null = null;
@@ -326,11 +333,11 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
             segments.push(openSegment);
           }
           if (delta !== undefined) {
-            updatePart(openSegment.part.id, { text: next });
+            streamText.append(sessionId, openSegment.part, next);
             wire.delivery.broadcastToSession(sessionId, { type: 'part.append', sessionId,
               partId: openSegment.part.id, field: 'text', delta });
           } else if (openSegment.part.text !== next) {
-            const updated = updatePart(openSegment.part.id, { text: next });
+            const updated = streamText.settle(openSegment.part.id, next);
             if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part: updated });
           }
           openSegment = { part: { ...openSegment.part, text: next }, text: next };
@@ -400,6 +407,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
             if (next || openSegment) saveText(next);
           }
           if (event.type === 'tool-start') {
+            settleOpenSegment();
             openSegment = null;
             const callId = `claude-tool:${nativeId}:${event.id}`;
             if (getToolPartByCallId(sessionId, callId)) throw new Error('Duplicate Claude tool identity');
@@ -444,6 +452,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
             contextUsage = { used: event.used, window: event.window };
           }
         }
+        settleOpenSegment();
         if (result === null) throw new Error('Claude CLI turn result is missing');
         if (goalCondition !== undefined && !controller.signal.aborted) {
           // CLI 2.1.274 persists evaluator verdicts as goal_status attachments, but
@@ -499,6 +508,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
         notifyHarnessTurnFinished(completed);
         drainable = true;
       } catch (error) {
+        settleOpenSegment();
         if (goalCondition !== undefined && assistant) {
           const previous = getSession(sessionId);
           if (previous) {
