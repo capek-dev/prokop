@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { RefCallback } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,8 @@ import {
 import { WorkspaceTabStrip, workspaceTabLabel } from '@/components/app/WorkspaceTabStrip';
 import type { WorkspaceTab } from '@/components/app/workspaceTab';
 import { treeGroups, type SplitDirection } from '@/stores/workspaceSplitLayout';
+import { useWorkspaceFocusStore } from '@/stores/workspaceFocusStore';
+import { cn } from '@/lib/utils';
 
 const REGION_LABELS: Record<ViewRegion, string> = { left: 'Left dock', center: 'Center', right: 'Right dock', bottom: 'Bottom dock' };
 
@@ -29,6 +31,25 @@ interface WorkspaceViewGroupProps {
 }
 
 export function WorkspaceViewGroup({ region, groupId = region, available, slotRef, tabs }: WorkspaceViewGroupProps) {
+  const groupRef = useRef<HTMLElement>(null);
+  const focused = useWorkspaceFocusStore((state) => state.groupId === groupId);
+  useLayoutEffect(() => {
+    const group = groupRef.current;
+    if (!group) return;
+    const focus = () => useWorkspaceFocusStore.getState().focusGroup(groupId);
+    const pointerDown = () => {
+      focus();
+      if (!group.contains(document.activeElement)) group.focus({ preventScroll: true });
+    };
+    // View content is portaled from a sibling React tree. Listen on the DOM
+    // boundary so transcript/editor interactions also select their dock.
+    group.addEventListener('pointerdown', pointerDown, true);
+    group.addEventListener('focusin', focus);
+    return () => {
+      group.removeEventListener('pointerdown', pointerDown, true);
+      group.removeEventListener('focusin', focus);
+    };
+  }, [groupId]);
   const focusDestination = useRef<string | null>(null);
   const restoreMenuFocus = (event: Event) => {
     const destination = focusDestination.current;
@@ -55,6 +76,8 @@ export function WorkspaceViewGroup({ region, groupId = region, available, slotRe
   const directions: SplitDirection[] = region === 'center' ? ['right', 'down'] : [region === 'bottom' ? 'right' : 'down'];
 
   const select = (id: WorkspaceViewId) => {
+    useWorkspaceFocusStore.getState().focusGroup(groupId);
+    if (!groupRef.current?.contains(document.activeElement)) groupRef.current?.focus({ preventScroll: true });
     activateView(id);
     tabs[id]?.onActivate?.();
   };
@@ -96,8 +119,8 @@ export function WorkspaceViewGroup({ region, groupId = region, available, slotRe
   };
 
   return (
-    <section data-view-group={groupId} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-sidebar">
-      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border/40 px-1">
+    <section ref={groupRef} tabIndex={-1} data-view-group={groupId} data-dock-focused={focused} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-sidebar outline-none">
+      <div className={cn('flex h-10 shrink-0 items-center gap-1 border-b border-border/40 px-1', focused && 'bg-muted/30')}>
         <WorkspaceTabStrip ids={ids} activeId={activeId} tabs={tabs} label={`${REGION_LABELS[region]} views`} onSelect={select} onClose={close}
           renderTabMenu={(id, trigger) => (
             <ContextMenu key={id}>

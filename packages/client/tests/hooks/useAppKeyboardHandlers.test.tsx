@@ -1,5 +1,5 @@
 import { createRef } from 'react';
-import { act, cleanup, render, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { KeyboardShortcutsConfig } from '@/hooks/useKeyboardShortcuts';
 import { useAppKeyboardHandlers } from '@/hooks/useAppKeyboardHandlers';
@@ -11,10 +11,12 @@ import {
 import { createDefaultViewLayout, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { DOCK_POSITIONS, useDockStore } from '@/stores/dockStore';
+import { useWorkspaceFocusStore } from '@/stores/workspaceFocusStore';
 
 const originalWidth = window.innerWidth;
 afterEach(() => {
   cleanup();
+  useWorkspaceFocusStore.setState(useWorkspaceFocusStore.getInitialState());
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
   useDockStore.setState(useDockStore.getInitialState());
   useWorkspaceViewStore.setState({ layout: createDefaultViewLayout() });
@@ -115,6 +117,32 @@ describe('useAppKeyboardHandlers positional docks', () => {
   beforeEach(() => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 });
     useDockStore.setState(useDockStore.getInitialState());
+  });
+
+  test('transcript clicks transfer focus from bottom to center, including through view portals', () => {
+    const store = useWorkspaceViewStore.getState();
+    store.activateView('conversations');
+    store.moveView('editor', 'center');
+    store.activateView('conversations');
+    store.moveView('usage', 'bottom');
+    store.activateView('terminals');
+    const { getByRole, getByText } = render(
+      <SessionPaneRegistryContext.Provider value={paneRegistry}>
+        <Harness />
+        <WorkspaceViews views={{ conversations: <p>Transcript</p>, editor: <p>File</p>, terminals: <input aria-label="Terminal" />, usage: <p>Usage content</p> }} />
+      </SessionPaneRegistryContext.Provider>,
+    );
+    const center = getByText('Transcript').closest('[data-view-group]')!;
+    const bottom = getByRole('textbox', { name: 'Terminal' }).closest('[data-view-group]')!;
+    act(() => getByRole('textbox', { name: 'Terminal' }).focus());
+    expect(bottom).toHaveAttribute('data-dock-focused', 'true');
+    fireEvent.pointerDown(getByText('Transcript'));
+    expect(center).toHaveAttribute('data-dock-focused', 'true');
+    expect(bottom).toHaveAttribute('data-dock-focused', 'false');
+    act(() => (document.activeElement as HTMLElement).blur());
+    act(() => mocks.keyboardConfig?.onFocusTab(1));
+    expect(getByRole('tab', { name: 'Editor' })).toHaveAttribute('aria-selected', 'true');
+    expect(getByRole('tab', { name: 'Terminals' })).toHaveAttribute('aria-selected', 'true');
   });
 
   test('number and cycle shortcuts follow mixed tab order in the focused split', () => {

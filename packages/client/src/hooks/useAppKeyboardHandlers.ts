@@ -10,6 +10,13 @@ import type {Preconfig, Workspace} from '@prokopai/sdk';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
 import { useSessionPaneRegistry } from '@/contexts/SessionPaneRegistryContext';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
+import { useWorkspaceFocusStore } from '@/stores/workspaceFocusStore';
+
+function focusedWorkspaceGroup(): HTMLElement | undefined {
+  const groupId = useWorkspaceFocusStore.getState().groupId;
+  return Array.from(document.querySelectorAll<HTMLElement>('[data-view-group]'))
+    .find((group) => group.dataset.viewGroup === groupId && !group.closest('[inert], [hidden], [aria-hidden="true"]'));
+}
 
 export interface AppKeyboardHandlersConfig {
   sidebarRef: React.RefObject<AppSidebarHandle | null>;
@@ -144,7 +151,7 @@ export function useAppKeyboardHandlers({
   const handleCloseFocusedDock = useCallback(() => {
     const activeEl = document.activeElement;
     if (window.innerWidth >= 640) {
-      const position = activeEl?.closest<HTMLElement>('[data-dock-position]')?.dataset.dockPosition;
+      const position = (focusedWorkspaceGroup() ?? activeEl)?.closest<HTMLElement>('[data-dock-position]')?.dataset.dockPosition;
       if (position === 'left' || position === 'right' || position === 'bottom') {
         useDockStore.getState().setDockOpen(position, false);
         requestAnimationFrame(() => {
@@ -175,7 +182,8 @@ export function useAppKeyboardHandlers({
   const getFocusedTabs = useCallback(() => {
     // Read the rendered strip so hidden views and unavailable resources never
     // consume an index. Clicking reuses each tab's session/file activation path.
-    const group = document.activeElement?.closest('[data-view-group], [data-mobile-tab-group]')
+    const group = focusedWorkspaceGroup()
+      ?? document.activeElement?.closest('[data-view-group], [data-mobile-tab-group]')
       ?? document.querySelector('[data-dock-position="center"] [data-view-group]')
       ?? document.querySelector('[data-mobile-tab-group]');
     return Array.from(group?.querySelectorAll<HTMLButtonElement>('[data-workspace-tab-id] > [role="tab"]') ?? [])

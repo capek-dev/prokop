@@ -105,14 +105,14 @@ export function WorkspaceViews({ views, tabs = {}, mobileEditorId, mobileSession
             </div>
           )}
           {mobileView === chatView && sessionIds.length > 0 && (
-            <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border/40 px-1">
+            <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border/40 px-1">
               <WorkspaceTabStrip ids={sessionIds} activeId={selectedSession ?? null} tabs={tabs} label="Open sessions"
                 onSelect={selectFile} onClose={(id) => tabs[id]?.onClose?.()} />
               <WorkspaceTabSearch ids={sessionIds} tabs={tabs} onSelect={selectFile} />
             </div>
           )}
           {isRepositoryView && (
-            <div className="flex h-11 shrink-0 items-center border-b border-border/40 px-1">
+            <div className="flex h-10 shrink-0 items-center border-b border-border/40 px-1">
               <WorkspaceTabStrip ids={repositoryIds} activeId={mobileView} tabs={tabs} label="Repository views"
                 onSelect={(id) => {
                   const view = REPOSITORY_VIEW_IDS.find((candidate) => candidate === id);
@@ -121,7 +121,7 @@ export function WorkspaceViews({ views, tabs = {}, mobileEditorId, mobileSession
             </div>
           )}
           {mobileView === 'editor' && fileIds.length > 0 && (
-            <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border/40 px-1">
+            <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border/40 px-1">
               <WorkspaceTabStrip ids={fileIds} activeId={selectedFile ?? null} tabs={tabs} label="Open files"
                 onSelect={selectFile} onClose={(id) => {
                   if (tabs[id]?.closeDisabled) return;

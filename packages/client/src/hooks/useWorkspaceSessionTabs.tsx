@@ -13,6 +13,7 @@ import { useConnectionStore } from '@/stores/connectionStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { navigateBoard } from '@/lib/boardNavigate';
 import { getWorkspaceDisplayName } from '@/lib/workspaceKind';
+import { useSessionPaneRegistry } from '@/contexts/SessionPaneRegistryContext';
 
 export function useWorkspaceSessionTabs(serverId: string | undefined, sdkClient: ProkopaiClient | null, serverUrl: string | null): {
   views: Partial<Record<WorkspaceViewId, ReactNode>>;
@@ -28,6 +29,7 @@ export function useWorkspaceSessionTabs(serverId: string | undefined, sdkClient:
   const workspaces = useServerDataStore((state) => state.workspaces);
   const agents = useServerDataStore((state) => state.agents);
   const focus = useBoardFocus();
+  const paneRegistry = useSessionPaneRegistry();
   const navigate = useNavigate();
   const viewPath = useRouterState({ select: (state) => state.location.pathname.includes('/overview') ? '/overview' : '/workspace' });
   useBoardSessionLoader(sdkClient, connected);
@@ -69,7 +71,17 @@ export function useWorkspaceSessionTabs(serverId: string | undefined, sdkClient:
     tabs[viewId] = {
       label,
       status,
-      onActivate: () => focus(id),
+      onActivate: () => {
+        focus(id);
+        requestAnimationFrame(() => {
+          const host = document.getElementById(`workspace-view-${viewId}`);
+          if (useSessionBoardStore.getState().focusedSessionId !== id || !host || host.closest('[inert], [aria-hidden="true"]')) return;
+          // Wait for the selected portal to become visible and register its pane.
+          // Do not steal focus if another dock was selected in the meantime.
+          const group = host.closest('[data-view-group], [data-mobile-tab-group]');
+          if (group?.contains(document.activeElement)) paneRegistry.getHandle(id)?.focusInput();
+        });
+      },
       onClose: () => {
         useSessionBoardStore.getState().removeFromBoard(id);
         navigateBoard(navigate, viewPath, serverId);

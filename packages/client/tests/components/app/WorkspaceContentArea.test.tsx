@@ -15,6 +15,11 @@ import { useDockStore } from '@/stores/dockStore';
 
 const viewport = vi.hoisted(() => ({ mobile: true, compact: true }));
 
+vi.mock('@/contexts/SessionPaneRegistryContext', () => ({
+  useSessionPaneRegistry: () => ({ getHandle: () => undefined }),
+}));
+vi.mock('@/components/app/WorkspaceUsageView', () => ({ WorkspaceUsageView: () => <div>Usage</div> }));
+
 vi.mock('@tanstack/react-router', () => ({
   useParams: () => ({ serverId: 'server-1' }),
   useNavigate: () => vi.fn(),

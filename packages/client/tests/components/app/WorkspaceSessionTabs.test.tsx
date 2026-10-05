@@ -1,6 +1,6 @@
-import { createRef, useEffect, useState } from 'react';
+import { createRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ComponentProps } from 'react';
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Agent, Message, Session, Workspace } from '@prokopai/sdk';
 import type { ChatView } from '@/components/chat/ChatView';
@@ -25,6 +25,7 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => mocks.mobile, useIsCompact: () => false }));
 vi.mock('@/components/layout/FilesPanel', () => ({ FilesPanel: () => <div>Repository tool</div> }));
+vi.mock('@/components/app/WorkspaceUsageView', () => ({ WorkspaceUsageView: () => <div>Usage</div> }));
 vi.mock('@/components/worktrees/WorktreesPanel', () => ({ WorktreesPanel: () => <div>Worktrees</div> }));
 vi.mock('@/components/app/WorkspaceHeader', () => ({ WorkspaceHeader: ({ sessionId }: { sessionId: string }) => <div>Header {sessionId}</div> }));
 vi.mock('@/contexts/SessionCommandsContext', () => ({ useSessionCommands: () => ({ sendChatMessageForSession: mocks.send, handleInterruptSessionById: mocks.interrupt, handleAskResponse: mocks.ask }) }));
@@ -35,9 +36,11 @@ vi.mock('@/hooks/queries', () => ({
 vi.mock('@/components/chat/ChatView', () => ({
   ChatView: function Chat(props: ComponentProps<typeof ChatView>) {
     const [draft, setDraft] = useState('');
+    const input = useRef<HTMLInputElement>(null);
+    useImperativeHandle(props.inputRef, () => ({ focus: () => input.current?.focus() }), []);
     useEffect(() => { mocks.mount(props.session.id); return () => mocks.unmount(props.session.id); }, [props.session.id]);
     return <div data-testid={`chat-${props.session.id}`}>
-      <input aria-label={`Draft ${props.session.id}`} value={draft} onChange={(event) => setDraft(event.target.value)} />
+      <input ref={input} aria-label={`Draft ${props.session.id}`} value={draft} onChange={(event) => setDraft(event.target.value)} />
       <button onClick={() => props.onSendMessage(draft)}>Send</button>
       <button onClick={props.onInterrupt}>Stop</button>
       <span>{props.messagesWithParts.length} messages</span>
@@ -75,6 +78,14 @@ describe('individual session tabs', () => {
     useSessionBoardStore.getState().hydrateFromRoute('s0', sessions.map((session) => session.id));
   });
   afterEach(() => { cleanup(); localStorage.clear(); });
+
+  test('selecting a new or retained session focuses its input after the portal is visible', async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Project / Session 1' }));
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Draft s1' })).toHaveFocus());
+    fireEvent.click(screen.getByRole('tab', { name: 'Project / Session 0' }));
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Draft s0' })).toHaveFocus());
+  });
 
   test('titles follow workspace and agent names, with readable fallbacks while metadata loads', () => {
     useServerDataStore.setState({ workspaces: [] });

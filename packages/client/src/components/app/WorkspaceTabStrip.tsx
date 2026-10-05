@@ -43,7 +43,7 @@ export function WorkspaceTabStrip({ ids, activeId, tabs, label, onSelect, onClos
 
   return (
     <div ref={scrollerRef} role="tablist" aria-label={label} {...drag.stripEvents} className={cn(
-      'board-tab-strip-scrollbar relative flex h-full min-w-0 flex-1 items-start overflow-x-auto overflow-y-hidden pt-1',
+      'board-tab-strip-scrollbar relative flex h-full min-w-0 flex-1 items-center overflow-x-auto overflow-y-hidden',
       drag.insertion && 'bg-primary/5 ring-1 ring-inset ring-primary/30',
     )}>
       {ids.map((id, index) => {
@@ -93,7 +93,7 @@ export function WorkspaceTabStrip({ ids, activeId, tabs, label, onSelect, onClos
         );
         return renderTabMenu ? renderTabMenu(id, trigger) : trigger;
       })}
-      {drag.insertion && <span data-tab-insertion-marker aria-hidden="true" className="pointer-events-none absolute top-1 h-8 w-0.5 rounded-full bg-primary" style={{ left: Math.max(0, drag.insertion.left - 1) }} />}
+      {drag.insertion && <span data-tab-insertion-marker aria-hidden="true" className="pointer-events-none absolute top-1/2 h-8 w-0.5 -translate-y-1/2 rounded-full bg-primary" style={{ left: Math.max(0, drag.insertion.left - 1) }} />}
     </div>
   );
 }

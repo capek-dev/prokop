@@ -63,7 +63,11 @@ Stored bindings for the old navigation/panel commands migrate to dock commands,
 including explicit unassignments. Alt+1 through Alt+9 select any visible tab in
 the focused group, in displayed order. Alt+Shift+Left/Right cycle that same group.
 Hidden and unavailable tabs do not consume a number; out-of-range numbers do
-nothing. Focus inside a view selects its owning group, including split groups.
+nothing. Pointer interaction or keyboard focus inside a view selects its owning
+group, including split groups. Native DOM listeners include content in stable
+portals. `workspaceFocusStore` remembers that group when DOM focus leaves it;
+its header tint shows the shortcut target. Selecting a session
+tab focuses its chat input after the selected portal becomes visible.
 Without a focused group, shortcuts use the first center group (or the mobile
 strip). Stored session-pane bindings migrate to the corresponding tab commands.
 
