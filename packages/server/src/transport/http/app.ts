@@ -9,6 +9,7 @@ import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import { activityLabel, stallMonitor } from '@/utils/stall-monitor';
 import { prettyJSON } from 'hono/pretty-json';
 import { ZodError } from 'zod';
 
@@ -58,6 +59,16 @@ export function createApp(application?: WiredApplication, options?: CreateAppOpt
   const app = new Hono();
 
   // Middleware
+  app.use('*', async (c, next) => {
+    // Stall diagnostics: in-flight request plus its synchronous handler segment.
+    const label = activityLabel(c.req.method, c.req.path);
+    const done = stallMonitor.begin(label);
+    try {
+      await stallMonitor.sync(label, next);
+    } finally {
+      done();
+    }
+  });
   app.use('*', cors());
   const requestLogger = logger();
   app.use('*', (c, next) => c.req.path === '/api/mcp/oauth/callback' ? next() : requestLogger(c, next));

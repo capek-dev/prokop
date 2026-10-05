@@ -58,6 +58,8 @@ When conversations grow too large for the context window, Prokop automatically c
 | `PROKOPAI_PRECONFIGS_PATH` | `~/.prokopai/preconfigs` | Preconfigs directory |
 | `PROKOPAI_MODELS_PATH` | (none) | Custom models.json path |
 | `PROKOPAI_CLIENT_ENABLED` | `true` | Set to `false` to disable the client embedded in the server binary |
+| `PROKOPAI_PERF_DIAGNOSTICS` | `false` | Set to `true` to log timing diagnostics, including `[perf] event-loop stall` lines naming the requests, WebSocket messages, and events that ran while the server was blocked |
+| `PROKOPAI_PERF_STALL_MS` | `50` | Minimum event-loop delay, in milliseconds, reported as a stall when diagnostics are on |
 
 ### TLS (HTTPS)
 

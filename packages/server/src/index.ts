@@ -59,6 +59,7 @@ import { getEmbeddedClientAssetsRoot } from '@/infrastructure/runtime/client-ass
 import { getOrCreateInstallationId } from '@/infrastructure/runtime/installation-id';
 import { startPushRetryScheduler, stopPushRetryScheduler, cleanupPushData } from '@/infrastructure/web-push/retry-scheduler';
 import { stopProviderAccountLifecycle } from '@/infrastructure/providers';
+import { startStallMonitor } from '@/utils/stall-monitor';
 
 export interface ServerOptions {
   port?: number;
@@ -218,6 +219,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   let server: ReturnType<typeof Bun.serve> | undefined;
   let localServer: ReturnType<typeof Bun.serve> | undefined;
   let cleanupPromise: Promise<void> | null = null;
+  const stopStallMonitor = startStallMonitor();
   let onSigterm: (() => void) | undefined;
   let onSigint: (() => void) | undefined;
 
@@ -237,6 +239,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
       try { await application.learning.stop(); }
       catch (error: unknown) { failures.push(error); }
       attempt(() => transport.shutdown());
+      attempt(() => stopStallMonitor());
       attempt(() => application.schedulerTicker.stop());
       attempt(() => stopPushRetryScheduler());
       attempt(() => stopProviderAccountLifecycle());

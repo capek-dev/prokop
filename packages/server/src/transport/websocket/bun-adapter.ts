@@ -10,6 +10,7 @@ import type { TerminalManager } from '@/transport/terminal/manager';
 import { readEnvInt } from '@/infrastructure/runtime/env-compat';
 import type { TerminalEventManager } from '@/transport/terminal/event-manager';
 import { encodeFrame, OPCODES } from '@/transport/terminal/frames';
+import { stallMonitor } from '@/utils/stall-monitor';
 
 export interface WsData {
   path: string;
@@ -85,13 +86,13 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
   function sendToConnection(connectionId: ConnectionId, message: ServerMessage): void {
     const socket = sockets.get(connectionId);
     if (!socket) return;
-    socket.send(JSON.stringify(message));
+    stallMonitor.sync(`out ${message.type}`, () => socket.send(JSON.stringify(message)));
   }
 
   function sendToOpenConnection(connectionId: ConnectionId, message: ServerMessage): void {
     const socket = sockets.get(connectionId);
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify(message));
+    stallMonitor.sync(`out ${message.type}`, () => socket.send(JSON.stringify(message)));
   }
 
   const delivery = createDeliveryPort({
@@ -390,7 +391,7 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
       if (!conn) return;
       try {
         const msg: ClientMessage = JSON.parse((message ?? '').toString());
-        await handleClientMessage(routerContext, conn.connectionId, msg);
+        await stallMonitor.sync(`ws ${msg.type}`, () => handleClientMessage(routerContext, conn.connectionId, msg));
       } catch (err) {
         console.error('WebSocket message error:', err);
         ws.send(JSON.stringify({ type: 'error', code: 'parse_error', message: String(err) }));
