@@ -3,7 +3,7 @@ import { relative, isAbsolute, sep } from 'node:path';
 import type { AssistantMessage, Message, Part, Session, TextPart } from '@prokopai/sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import type { InterruptExecutionResult } from '@/application/ports/execution';
-import { withCliMessageQueue, type CliTurnExecution, type QueuedCliExecution, type QueuedTurnInput } from '@/harnesses/shared/message-queue';
+import { persistCliSessionRunning, withCliMessageQueue, type CliTurnExecution, type QueuedCliExecution, type QueuedTurnInput } from '@/harnesses/shared/message-queue';
 import { getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { createMessage, createPart, deleteMessage, getMessageWithParts, listMessagesWithParts, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
 import { cliWorkspaceAvailable } from '@/harnesses/shared/cli-workspace';
@@ -481,7 +481,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
     async sendMessage<Origin>(wire: SessionWirePorts<Origin>, origin: Origin, sessionId: string,
       content: string, attachments?: Array<{ id: string; kind: string }>, responseFormatId?: string,
       goalCondition?: string, goalMaxTurns?: number, goalTokenBudget?: number,
-      queued?: QueuedTurnInput): Promise<'drainable' | void> {
+      queued?: QueuedTurnInput, onTurnStarted?: () => void): Promise<'drainable' | void> {
       const session = getSession(sessionId);
       if (!session || session.harness !== 'codex-cli' || session.parentId) {
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Not a Codex CLI session', sessionId });
@@ -626,6 +626,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
           userParts.push(part);
         }
         queued?.accepted();
+        onTurnStarted?.();
         if (!reuseId) wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: user });
         for (const part of userParts) wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part });
         wire.actor.attachOriginToSession(origin, sessionId);
@@ -1306,6 +1307,6 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
       }
     },
   };
-  const queuedExecution = withCliMessageQueue(execution, 'codex-cli');
+  const queuedExecution = withCliMessageQueue(execution, 'codex-cli', persistCliSessionRunning);
   return queuedExecution;
 }

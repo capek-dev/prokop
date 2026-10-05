@@ -329,11 +329,15 @@ test('Codex turn applies selected model and effort, streams, and resumes its thr
   expect(getCodexBinding('s')).toMatchObject({ threadId: 'thread-1', cliVersion: 'codex-cli 0.156.1' });
   expect(getSession('s')?.selectedModel).toBe('gpt-5.1-codex');
   expect(messages.map(message => message.type)).toEqual([
-    'message.created', 'part.created', 'message.created', 'session.updated', 'message.updated',
+    'session.updated', 'message.created', 'part.created', 'message.created', 'session.updated', 'message.updated',
     'session.updated', 'message.updated', 'part.created', 'part.append', 'part.updated', 'message.updated',
+    'session.updated',
   ]);
-  expect(messages.filter(message => message.type === 'session.updated').map(message => message.session.selectedModel))
-    .toEqual(['gpt-5-codex', 'gpt-5.1-codex']);
+  const sessionUpdates = messages.filter(message => message.type === 'session.updated').map(message => message.session);
+  expect(sessionUpdates.map(session => session.selectedModel))
+    .toEqual([null, 'gpt-5-codex', 'gpt-5.1-codex', 'gpt-5.1-codex']);
+  // Session lists on every client read runningAt: set when the turn starts, cleared when it ends.
+  expect(sessionUpdates.map(session => session.runningAt !== null)).toEqual([true, true, true, false]);
   expect(listMessagesWithParts('s')[1]?.message).toMatchObject({ modelId: 'gpt-5.1-codex' });
   expect(listMessagesWithParts('s').map(row => row.parts.filter(part => part.type === 'text').map(part => part.text)))
     .toEqual([['hello'], ['Hi!']]);

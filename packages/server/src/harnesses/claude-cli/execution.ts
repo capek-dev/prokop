@@ -2,7 +2,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import type { AssistantMessage, Part, TextPart, ToolPart } from '@prokopai/sdk';
 import { forkSession, getSessionMessages, type SDKMessage, type SDKUserMessage, type Options, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import type { SessionWirePorts } from '@/application/ports/delivery';
-import { withCliMessageQueue, type QueuedCliExecution, type QueuedTurnInput } from '@/harnesses/shared/message-queue';
+import { persistCliSessionRunning, withCliMessageQueue, type QueuedCliExecution, type QueuedTurnInput } from '@/harnesses/shared/message-queue';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { getSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
@@ -153,7 +153,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
     async sendMessage<Origin>(wire: SessionWirePorts<Origin>, origin: Origin, sessionId: string,
       content: string, attachments?: Array<{ id: string; kind: string }>, responseFormatId?: string,
       goalCondition?: string, goalMaxTurns?: number, goalTokenBudget?: number,
-      queued?: QueuedTurnInput): Promise<'drainable' | void> {
+      queued?: QueuedTurnInput, onTurnStarted?: () => void): Promise<'drainable' | void> {
       const reject = (message: string): void => wire.delivery.send(origin,
         { type: 'error', code: 'invalid_session', message, sessionId });
       const session = getSession(sessionId);
@@ -319,6 +319,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
           userParts.push(part);
         }
         queued?.accepted();
+        onTurnStarted?.();
         if (!resubmit) wire.delivery.broadcastToSession(sessionId, { type: 'message.created', message: user });
         for (const part of userParts) wire.delivery.broadcastToSession(sessionId, { type: 'part.created', sessionId, part });
         wire.actor.attachOriginToSession(origin, sessionId);
@@ -697,5 +698,5 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
         active.delete(sessionId);
       }
     },
-  }, 'claude-cli');
+  }, 'claude-cli', persistCliSessionRunning);
 }

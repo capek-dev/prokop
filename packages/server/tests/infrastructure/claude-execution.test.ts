@@ -149,8 +149,14 @@ test('selected Claude model and effort deliver a persisted reply through the fak
     permissionMode: 'default', permissionPrompts: 'host', allowedTools: [] });
   expect(calls[0]?.hooks?.PreToolUse).toHaveLength(1);
   expect(events.map(event => (event as { type: string }).type)).toEqual([
-    'message.created', 'part.created', 'message.created', 'part.created', 'session.updated', 'message.updated',
+    'session.updated', 'message.created', 'part.created', 'message.created', 'part.created', 'session.updated',
+    'message.updated', 'session.updated',
   ]);
+  // Session lists on every client read runningAt: set when the turn starts, cleared when it ends.
+  const runningAt = events.filter(event => (event as { type: string }).type === 'session.updated')
+    .map(event => (event as { session: { runningAt: string | null } }).session.runningAt);
+  expect(runningAt[0]).toEqual(expect.any(String));
+  expect(runningAt.at(-1)).toBeNull();
   expect(listMessagesWithParts(initial.id)).toMatchObject([
     { message: { role: 'user' }, parts: [{ type: 'text', text: 'hello Claude' }] },
     { message: { role: 'assistant', modelId: 'claude-opus-5', status: 'completed' },
