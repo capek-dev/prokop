@@ -32,6 +32,8 @@ export interface BunWebSocketAdapterDeps {
   };
   /** Ask-target resolution injected from bootstrap; authority policy stays outside transport. */
   resolveAskTargets(sessionId: string, authority: AskAuthority): ConnectionId[];
+  /** Releases per-connection application state (Git status subscriptions). */
+  onConnectionClosed?(connectionId: ConnectionId): void;
 }
 
 export interface BunWebSocketAdapter {
@@ -367,6 +369,11 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
       clients.delete(conn.connectionId);
       sockets.delete(conn.connectionId);
       handleConnectionDisconnect(conn.connectionId);
+      try {
+        deps.onConnectionClosed?.(conn.connectionId);
+      } catch (error: unknown) {
+        console.error('WebSocket close cleanup failed:', error);
+      }
       unregisterConnection(ws);
     },
 

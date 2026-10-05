@@ -2,12 +2,13 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ProkopaiClient } from '@prokopai/sdk';
+import { gitStatusFeedStub } from '../../helpers';
 import { BranchesPanel } from '@/components/files/BranchesPanel';
 const head = 'a'.repeat(40);
 const other = 'b'.repeat(40);
 const action = vi.fn();
 const branches = vi.fn();
-const client = { http: { files: { gitRebaseState: vi.fn(async () => ({ active: false, conflicts: [], token: null })), gitBranches: branches, gitBranchAction: action, gitHistory: vi.fn(async () => ({ commits: [], nextOffset: null })) } } } as unknown as ProkopaiClient;
+const client = { ...gitStatusFeedStub, http: { files: { gitRebaseState: vi.fn(async () => ({ active: false, conflicts: [], token: null })), gitBranches: branches, gitBranchAction: action, gitHistory: vi.fn(async () => ({ commits: [], nextOffset: null })) } } } as unknown as ProkopaiClient;
 function setup(localExists: boolean) {
   const local: Array<Record<string, unknown>> = [{ ref: 'refs/heads/main', name: 'main', head, kind: 'local', current: true, checkedOut: true, upstream: null, ahead: null, behind: null }];
   if (localExists) local.push({ ref: 'refs/heads/feature/x', name: 'feature/x', head: other, kind: 'local', current: false, checkedOut: false, upstream: 'refs/remotes/origin/feature/x', ahead: 0, behind: 0 });

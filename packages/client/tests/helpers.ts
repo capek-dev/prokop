@@ -39,3 +39,11 @@ export function mockLocalStorage() {
 
   return storage;
 }
+
+/** Disconnected Git status feed members for partial `ProkopaiClient` fakes. */
+export const gitStatusFeedStub = {
+  connected: false,
+  on: () => {},
+  off: () => {},
+  git: { subscribeStatus: () => {}, unsubscribeStatus: () => {}, refreshStatus: () => {} },
+};

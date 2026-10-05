@@ -2,6 +2,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ProkopaiClient } from '@prokopai/sdk';
+import { gitStatusFeedStub } from '../../helpers';
 import { RebasePanel } from '@/components/files/RebasePanel';
 import { BranchesPanel } from '@/components/files/BranchesPanel';
 vi.mock('@/components/editor/PierreCodeEditor', () => ({ PierreCodeEditor: ({ value, onChange, saving }: { value: string; onChange: (text: string) => void; saving: boolean }) => <textarea aria-label={saving ? 'Input code' : 'Result code'} readOnly={saving} value={value} onChange={(e) => onChange(e.target.value)} /> }));
@@ -10,7 +11,7 @@ const token = 'b'.repeat(64);
 const idle = { active: false, token: null, branch: null, originalHead: null, onto: null, conflicts: [] };
 const active = { active: true, token, branch: 'feature/1232', originalHead: head, onto: head, conflicts: ['file'] };
 const files = { gitRebaseState: vi.fn(), gitRebaseStart: vi.fn(), gitRebaseControl: vi.fn(), gitRebaseResolve: vi.fn(), gitRebaseConflict: vi.fn(), gitBranches: vi.fn(), gitHistory: vi.fn() };
-const client = { http: { files } } as unknown as ProkopaiClient;
+const client = { ...gitStatusFeedStub, http: { files } } as unknown as ProkopaiClient;
 const branch = (name: string, current = false) => ({ ref: `refs/heads/${name}`, name, head, kind: 'local' as const, current, checkedOut: current, upstream: null, ahead: null, behind: null });
 const branches = { repository: { branch: 'feature/1232', head, upstream: null, remotes: [] }, branches: [branch('feature/1232', true), branch('main'), { ...branch('origin/main'), kind: 'remote' as const }] };
 beforeEach(() => {

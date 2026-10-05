@@ -291,6 +291,30 @@ export interface PongMessage {
   type: 'pong';
 }
 
+// =============================================================================
+// Git Status Feed Messages
+// =============================================================================
+
+/** Start receiving `git.status` for a workspace root; the server replies with a snapshot. */
+export interface GitStatusSubscribeMessage {
+  type: 'git.status.subscribe';
+  workspaceId: string;
+  root?: string;
+}
+
+export interface GitStatusUnsubscribeMessage {
+  type: 'git.status.unsubscribe';
+  workspaceId: string;
+  root?: string;
+}
+
+/** Recompute now (window focus); pushes only if the status changed. */
+export interface GitStatusRefreshMessage {
+  type: 'git.status.refresh';
+  workspaceId: string;
+  root?: string;
+}
+
 export type ClientMessage = 
   | ClientRegisterMessage
   | SessionCreateMessage 
@@ -321,4 +345,7 @@ export type ClientMessage =
   | SessionControlClaimMessage
   | SessionControlReleaseMessage
   | NotificationAcknowledgeMessage
-  | PongMessage;
+  | PongMessage
+  | GitStatusSubscribeMessage
+  | GitStatusUnsubscribeMessage
+  | GitStatusRefreshMessage;

@@ -82,7 +82,8 @@ import {
   createJean2WorkspaceTerminalPort,
 } from '@/adapters/jean2';
 import { getTerminalManager, installTerminalSessionStore } from '@/transport/terminal';
-import { broadcastEvent, broadcastSessionUpdated } from '@/transport/websocket/broadcast';
+import { broadcastEvent, broadcastSessionUpdated, sendToConnectionEvent } from '@/transport/websocket/broadcast';
+import { addWorkspaceFilesChangedObserver } from '@/application/workspaces/files-changed';
 import { getWorkspaceTools, setMcpChangeListener } from '@/infrastructure/mcp';
 import { listWorkspaces } from '@/infrastructure/sqlite/workspaces';
 import { createJean2TerminalSessionPort } from '@/adapters/jean2/terminal';
@@ -427,7 +428,11 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
 
   const files = createFilesApplication(createJean2FilesApplicationPort({
     listAvailableWorktreePaths: worktreeRoots.listAvailablePaths,
-  }), (workspaceId, root) => broadcastEvent({ type: 'git.changed', workspaceId, root }));
+  }), (workspaceId, root) => broadcastEvent({ type: 'git.changed', workspaceId, root }), {
+    deliverGitStatus: (subscriber, message) => sendToConnectionEvent(subscriber as ConnectionId, message),
+  });
+  // Tool completions that may write files refresh subscribed Git status, throttled per root.
+  addWorkspaceFilesChangedObserver((workspaceId) => files.gitStatusFeed.filesChanged(workspaceId));
   const configuration = createConfigurationApplication({
     ...createJean2ConfigurationPorts(),
     // Primary/both preconfigs materialize as agents on save. Materialization

@@ -1,20 +1,23 @@
 import { queryClient } from '@/components/providers/QueryProvider';
 import { queryKeys } from '@/lib/queryKeys';
-import { handleGitChanged } from './gitHandlers';
 
 const FILES_CHANGED_DEBOUNCE_MS = 300;
 
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function invalidateWorkspaceFileQueries(workspaceId: string): void {
-  // A file-mutating tool completion can also move refs (an agent running git
-  // through the shell emits no git.changed, which only UI/workbench mutations
-  // emit), so reuse the full git invalidation set from the git.changed
-  // handler: status, history, branches, repository, rebase, worktree refs,
-  // plus browse/tree/git-diff. Search and preview are files-only additions.
-  handleGitChanged(workspaceId);
-  void queryClient.invalidateQueries({ queryKey: [...queryKeys.files.searchPrefix, workspaceId] });
-  void queryClient.invalidateQueries({ queryKey: ['files', 'preview', workspaceId] });
+  // File contents and listings only. Git status is pushed by the server's
+  // throttled status feed, and a moved HEAD (an agent committing through the
+  // shell) refreshes branch views from that push (`handleGitStatus`).
+  for (const prefix of [
+    queryKeys.files.browsePrefix,
+    queryKeys.files.treePrefix,
+    queryKeys.files.searchPrefix,
+    ['files', 'git-diff'],
+    ['files', 'preview'],
+  ]) {
+    void queryClient.invalidateQueries({ queryKey: [...prefix, workspaceId] });
+  }
 }
 
 /**

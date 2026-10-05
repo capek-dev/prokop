@@ -10,19 +10,27 @@
 
 import { relative, normalize, sep, resolve, join, extname, dirname, isAbsolute } from 'path';
 import { stat, readFile, lstat, realpath } from 'fs/promises';
-import type { FileEntry, GitAvailability, GitDiffSummary, GitFileStatus, GitFileDiffResponse, GitDiffHunk, GitDiffChange, GitFileDiffUnavailableReason } from '@prokopai/sdk';
+import type { FileEntry, GitAvailability, GitDiffSummary, GitFileStatus, GitFileDiffResponse, GitDiffHunk, GitDiffChange, GitFileDiffUnavailableReason, GitHead } from '@prokopai/sdk';
 import { isBinaryExtension, isBinaryFile, FILE_PREVIEW_MAX_BYTES } from './binary-detection';
 import { getLanguageForPath } from './file-preview';
 
 export interface GitStatusResult {
   availability: GitAvailability;
   files: Map<string, GitDiffSummary>;
+  head?: GitHead;
 }
 
 const inflight = new Map<string, Promise<GitStatusResult>>();
+// `git --version` cannot change under a running server in practice, and a
+// repository's top level only changes when it is deleted. Only successes are
+// cached, so installing Git or running `git init` is picked up on the next read.
+let gitInstalled = false;
+const toplevels = new Map<string, string>();
 
 export function clearGitStatusCache(): void {
   inflight.clear();
+  gitInstalled = false;
+  toplevels.clear();
 }
 
 function normalizePath(p: string): string {
@@ -138,17 +146,32 @@ async function execGit(args: string[]): Promise<{ stdout: string; exitCode: numb
 }
 
 async function detectGitAvailability(workspacePath: string): Promise<GitAvailability> {
-  const versionResult = await execGit(['--version']);
-  if (versionResult.exitCode !== 0) {
-    return { available: false, reason: 'git_not_installed' };
+  if (!gitInstalled) {
+    const versionResult = await execGit(['--version']);
+    if (versionResult.exitCode !== 0) {
+      return { available: false, reason: 'git_not_installed' };
+    }
+    gitInstalled = true;
   }
+
+  const cachedRoot = toplevels.get(workspacePath);
+  if (cachedRoot !== undefined) return { available: true, root: cachedRoot };
 
   const rootResult = await execGit(['-C', workspacePath, 'rev-parse', '--show-toplevel']);
   if (rootResult.exitCode !== 0) {
     return { available: false, reason: 'not_a_git_repo' };
   }
 
+  toplevels.set(workspacePath, rootResult.stdout);
   return { available: true, root: rootResult.stdout };
+}
+
+/** One `rev-parse` for both: the commit oid, then the short branch name (`HEAD` when detached). */
+function parseHead(result: { stdout: string; exitCode: number }): GitHead {
+  // An unborn branch has no HEAD commit; rev-parse fails before printing the name.
+  if (result.exitCode !== 0) return { oid: null, branch: null };
+  const [oid, branch] = result.stdout.split('\n');
+  return { oid: oid || null, branch: branch && branch !== 'HEAD' ? branch : null };
 }
 
 async function computeGitStatus(workspacePath: string): Promise<GitStatusResult> {
@@ -159,13 +182,16 @@ async function computeGitStatus(workspacePath: string): Promise<GitStatusResult>
   }
 
   try {
-    const [statusResult, numstatResult, cachedNumstatResult, additionsResult] = await Promise.all([
+    const [statusResult, numstatResult, cachedNumstatResult, additionsResult, headResult] = await Promise.all([
       execGit(['-C', workspacePath, 'status', '--porcelain=v1', '-z', '--untracked-files=all']),
       execGit(['-C', workspacePath, 'diff', '--numstat']),
       execGit(['-C', workspacePath, 'diff', '--cached', '--numstat']),
       execGit(['-C', workspacePath, 'diff', '--cached', '--no-renames', '--diff-filter=A', '--name-only', '-z']),
+      execGit(['-C', workspacePath, 'rev-parse', 'HEAD', '--abbrev-ref', 'HEAD']),
     ]);
 
+    // A removed repository keeps its cached top level; recheck it on the next read.
+    if (statusResult.exitCode !== 0) toplevels.delete(workspacePath);
     const stagedAdditions = new Set(additionsResult.exitCode === 0 ? additionsResult.stdout.split('\0') : []);
     const statusMap = parsePorcelainStatus(statusResult.stdout);
     const numstatMap = parseNumstat(numstatResult.stdout);
@@ -203,7 +229,7 @@ async function computeGitStatus(workspacePath: string): Promise<GitStatusResult>
       });
     }
 
-    return { availability, files };
+    return { availability, files, head: parseHead(headResult) };
   } catch {
     return {
       availability: { available: false, reason: 'git_error' },

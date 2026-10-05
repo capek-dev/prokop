@@ -1,9 +1,16 @@
 type FilesChangedListener = (workspaceId: string) => void;
 let listener: FilesChangedListener | undefined;
+const observers = new Set<FilesChangedListener>();
 
 /** Installed by the host transport. Persistence does not depend on WebSocket delivery. */
 export function installWorkspaceFilesChangedListener(next: FilesChangedListener | undefined): void {
   listener = next;
+}
+
+/** Server-side consumers (the Git status feed) alongside the transport listener. */
+export function addWorkspaceFilesChangedObserver(observer: FilesChangedListener): () => void {
+  observers.add(observer);
+  return () => observers.delete(observer);
 }
 
 /**
@@ -12,9 +19,11 @@ export function installWorkspaceFilesChangedListener(next: FilesChangedListener 
  * delivery is a workspace-scoped `files.changed` broadcast.
  */
 export function notifyWorkspaceFilesChanged(workspaceId: string): void {
-  try {
-    listener?.(workspaceId);
-  } catch (error: unknown) {
-    console.error('[workspace] Files-changed delivery failed', error);
+  for (const notify of [listener, ...observers]) {
+    try {
+      notify?.(workspaceId);
+    } catch (error: unknown) {
+      console.error('[workspace] Files-changed delivery failed', error);
+    }
   }
 }

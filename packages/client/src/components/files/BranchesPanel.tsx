@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { queryKeys } from '@/lib/queryKeys';
 import { cn } from '@/lib/utils';
+import { useGitStatusSubscription } from '@/hooks/queries/useFileQueries';
 import { branchLabelInGroup, groupBranchesByPrefix } from './branchGroups';
 
 interface Props {
@@ -30,6 +31,8 @@ type PushAction = Extract<GitBranchAction, { action: 'push' }>;
 
 export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props) {
   const cache = useQueryClient();
+  // HEAD moves (agent or terminal commits, branch switches) arrive through the status feed.
+  useGitStatusSubscription(sdkClient, workspaceId, root);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [rebaseOpen, setRebaseOpen] = useState(false);
   const rebase = useQuery({ queryKey: rebaseKey(serverId, workspaceId, root), queryFn: () => {

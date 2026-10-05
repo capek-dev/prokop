@@ -25,6 +25,12 @@ export interface GitAvailability {
   root?: string;
 }
 
+/** Checked-out commit and branch. Null oid for an unborn branch, null branch when detached. */
+export interface GitHead {
+  oid: string | null;
+  branch: string | null;
+}
+
 export interface FileEntry {
   name: string;
   type: 'file' | 'directory';

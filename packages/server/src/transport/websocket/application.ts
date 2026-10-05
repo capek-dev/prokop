@@ -6,6 +6,7 @@ import type {
   SessionControlApplication,
   SessionWirePorts,
 } from '@/application';
+import type { GitStatusFeed } from '@/application/files/git-status-feed';
 import type { RouterContext } from './router-context';
 import type { ConnectionId } from './connection-id';
 
@@ -15,6 +16,8 @@ export interface WireApplication {
   providers: ProvidersApplication;
   notifications: NotificationsApplication;
   permissions: PermissionsApplication;
+  /** Pushed Git status; absent in wire tests that do not exercise it. */
+  gitStatus?: GitStatusFeed<string>;
 }
 
 let installed: WireApplication | null = null;

@@ -30,6 +30,7 @@ export interface EditableFileWorkspaceLike {
 export interface GitStatusResult {
   availability: GitAvailability;
   files: Map<string, GitDiffSummary>;
+  head?: import('@prokopai/sdk').GitHead;
 }
 
 export interface FilesApplicationPort {

@@ -21,11 +21,14 @@ import type {
   RenameFileResponse,
   SaveFileResponse,
   Workspace,
+  GitHead,
+  GitStatusMessage,
 } from '@prokopai/sdk';
 import type {
   FilesApplicationPort,
   GitStatusResult,
 } from '@/application/ports/files';
+import { createGitStatusFeed, type GitStatusFeed } from './git-status-feed';
 
 export interface FilesListResult {
   files: FileEntry[];
@@ -40,6 +43,8 @@ export interface FilesGitStatusWire {
   availability: GitAvailability;
   files: Array<{ path: string; git: GitDiffSummary }>;
   root: string;
+  head?: GitHead;
+  revision?: number;
 }
 
 export interface FilesApplication {
@@ -71,6 +76,8 @@ export interface FilesApplication {
   gitPush(workspaceId: string, input: GitPushInput): Promise<GitPushResult>;
   gitPushPreview(workspaceId: string, input: GitPushPreviewInput): Promise<{ remoteHead: string | null }>;
   gitStatus(workspaceId: string, rootQuery?: string): Promise<FilesGitStatusWire>;
+  /** Pushed Git status per root; subscribers are opaque connection ids. */
+  gitStatusFeed: GitStatusFeed<string>;
   gitDiff(workspaceId: string, path: string, rootQuery?: string): Promise<GitFileDiffResponse>;
   gitAdd(workspaceId: string, path: string, rootQuery?: string): Promise<{ path: string }>;
   previewFile(workspaceId: string, path: string, rootQuery?: string): Promise<FilePreviewResponse>;
@@ -101,13 +108,52 @@ export interface FilesApplication {
   expandPathFor(inputPath: string): string;
 }
 
-export function createFilesApplication(port: FilesApplicationPort, onGitChanged?: (workspaceId: string, root: string) => void): FilesApplication {
+export interface FilesApplicationOptions {
+  /** Transport delivery for the Git status feed; without it the feed only serves reads. */
+  deliverGitStatus?(subscriber: string, message: GitStatusMessage): void;
+}
+
+export function createFilesApplication(
+  port: FilesApplicationPort,
+  onGitChanged?: (workspaceId: string, root: string) => void,
+  options: FilesApplicationOptions = {},
+): FilesApplication {
   function resolveWorkspace(workspaceId: string): Workspace {
     const workspace = port.getWorkspace(workspaceId);
     if (!workspace) {
       throw new Error('Workspace not found');
     }
     return workspace;
+  }
+
+  async function computeGitStatus(root: string): Promise<FilesGitStatusWire> {
+    try {
+      const gitStatus = await port.gitStatus(root);
+      return {
+        availability: gitStatus.availability,
+        files: toRootRelativeFiles(gitStatus, root),
+        root,
+        ...(gitStatus.head ? { head: gitStatus.head } : {}),
+      };
+    } catch {
+      return {
+        availability: { available: false, reason: 'git_error' } as GitAvailability,
+        files: [],
+        root,
+      };
+    }
+  }
+
+  const gitStatusFeed = createGitStatusFeed<string>({
+    resolveRoot: (workspaceId, rootQuery) => port.resolveRoot(resolveWorkspace(workspaceId), rootQuery).root,
+    compute: (_workspaceId, root) => computeGitStatus(root),
+    deliver: (subscriber, message) => options.deliverGitStatus?.(subscriber, message),
+  });
+
+  /** App Git mutations refresh the pushed status at once, then notify the other Git views. */
+  function gitChanged(workspaceId: string, root: string): void {
+    gitStatusFeed.refreshRoot(workspaceId, root);
+    onGitChanged?.(workspaceId, root);
   }
 
   /** The exact pre-slice repo-relative to selected-root-relative conversion
@@ -146,7 +192,7 @@ export function createFilesApplication(port: FilesApplicationPort, onGitChanged?
   async function rebaseMutation<T>(workspaceId: string, rootQuery: string | undefined, run: (root: string) => Promise<T>): Promise<T> {
     const root = writeRoot(workspaceId, rootQuery);
     try { return await run(root); }
-    finally { try { onGitChanged?.(workspaceId, root); } catch { /* Refresh on reconnect. */ } }
+    finally { try { gitChanged(workspaceId, root); } catch { /* Refresh on reconnect. */ } }
   }
 
   return {
@@ -158,7 +204,7 @@ export function createFilesApplication(port: FilesApplicationPort, onGitChanged?
     async gitRemoveStagedAddition(workspaceId, path, rootQuery) {
       const root = writeRoot(workspaceId, rootQuery);
       const result = await port.gitRemoveStagedAddition(root, path);
-      try { onGitChanged?.(workspaceId, root); } catch { /* Client also refreshes on success. */ }
+      try { gitChanged(workspaceId, root); } catch { /* Client also refreshes on success. */ }
       return result;
     },
     async gitRevertModifiedFile(workspaceId, path, rootQuery) {
@@ -166,7 +212,7 @@ export function createFilesApplication(port: FilesApplicationPort, onGitChanged?
       try {
         return await port.gitRevertModifiedFile(root, path);
       } finally {
-        try { onGitChanged?.(workspaceId, root); } catch { /* Refresh on reconnect. */ }
+        try { gitChanged(workspaceId, root); } catch { /* Refresh on reconnect. */ }
       }
     },
     gitBranches: (workspaceId, root) => port.gitBranches(writeRoot(workspaceId, root)),
@@ -179,7 +225,7 @@ export function createFilesApplication(port: FilesApplicationPort, onGitChanged?
       finally {
         // Fetch/switch hooks can fail after partial changes. Always invalidate,
         // and never turn a successful mutation into failure on delivery errors.
-        try { onGitChanged?.(workspaceId, root); } catch { /* Refresh on reconnect. */ }
+        try { gitChanged(workspaceId, root); } catch { /* Refresh on reconnect. */ }
       }
     },
     gitRepository: (workspaceId, rootQuery) => port.gitRepository(writeRoot(workspaceId, rootQuery)),
@@ -187,14 +233,14 @@ export function createFilesApplication(port: FilesApplicationPort, onGitChanged?
     async gitCommit(workspaceId, input) {
       const root = writeRoot(workspaceId, input.root);
       const result = await port.gitCommit(root, input);
-      try { onGitChanged?.(workspaceId, root); }
+      try { gitChanged(workspaceId, root); }
       catch { result.warning ??= 'Commit succeeded, but live refresh failed. Refresh Git state before continuing.'; }
       return result;
     },
     async gitPush(workspaceId, input) {
       const root = writeRoot(workspaceId, input.root);
       const result = await port.gitPush(root, input);
-      try { onGitChanged?.(workspaceId, root); }
+      try { gitChanged(workspaceId, root); }
       catch { result.warning ??= 'Push succeeded, but live refresh failed. Refresh Git state before continuing.'; }
       return result;
     },
@@ -247,24 +293,10 @@ export function createFilesApplication(port: FilesApplicationPort, onGitChanged?
     },
 
     async gitStatus(workspaceId, rootQuery) {
-      const workspace = resolveWorkspace(workspaceId);
-      const { root } = port.resolveRoot(workspace, rootQuery);
-
-      try {
-        const gitStatus = await port.gitStatus(root);
-        return {
-          availability: gitStatus.availability,
-          files: toRootRelativeFiles(gitStatus, root),
-          root,
-        };
-      } catch {
-        return {
-          availability: { available: false, reason: 'git_error' } as GitAvailability,
-          files: [],
-          root,
-        };
-      }
+      return gitStatusFeed.read(workspaceId, rootQuery);
     },
+
+    gitStatusFeed,
 
     async gitAdd(workspaceId, path, rootQuery) {
       const workspace = resolveWorkspace(workspaceId);
@@ -275,7 +307,9 @@ export function createFilesApplication(port: FilesApplicationPort, onGitChanged?
         && (!rootQuery || resolve(root) !== resolve(port.expandPathFor(rootQuery)))) {
         throw new Error('Path outside workspace');
       }
-      return port.gitAdd(root, path);
+      const result = await port.gitAdd(root, path);
+      gitStatusFeed.refreshRoot(workspaceId, root);
+      return result;
     },
 
     async gitDiff(workspaceId, path, rootQuery) {

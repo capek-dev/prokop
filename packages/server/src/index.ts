@@ -97,7 +97,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
 
   const agents = createRuntime();
   const application = createWiredApplication(agents);
-  installWireApplication({ session: application.session, control: application.control, providers: application.providers, notifications: application.notifications, permissions: application.permissions });
+  installWireApplication({ session: application.session, control: application.control, providers: application.providers, notifications: application.notifications, permissions: application.permissions, gitStatus: application.files.gitStatusFeed });
   // Every primary/both preconfig becomes an agent on boot: fresh installs
   // ship prokop-code as a real agent and existing installs gain agents for
   // their preconfigs without any user action. Non-fatal: a failed
@@ -151,6 +151,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     },
     resolveAskTargets: (sessionId: string, authority: AskAuthority): ConnectionId[] =>
       resolveAskTargetConnections(sessionId, authority).map((conn) => conn.connectionId),
+    onConnectionClosed: (connectionId) => application.files.gitStatusFeed.disconnect(connectionId),
   });
   installDeliveryPort(transport.delivery);
 

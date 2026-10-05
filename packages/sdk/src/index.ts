@@ -33,6 +33,7 @@ export { PermissionsNamespace } from './namespaces/permissions';
 export { QueueNamespace } from './namespaces/queue';
 export { ProvidersNamespace } from './namespaces/providers';
 export { ControlNamespace } from './namespaces/control';
+export { GitNamespace } from './namespaces/git';
 export { NotificationsNamespace } from './namespaces/notifications';
 
 export {
@@ -72,4 +73,4 @@ export { HttpNamespace } from './rest/http-namespace';
 export type { LoadAllResult, CriticalServerData, SecondaryServerData } from './rest/http-namespace';
 
 export type { ClientConfig, ConnectionState, SdkEvent } from './types';
-export type { GetToolDebugResponse } from './types/rest-responses';
+export type { GetToolDebugResponse, GitStatusFile, GitStatusResponse } from './types/rest-responses';

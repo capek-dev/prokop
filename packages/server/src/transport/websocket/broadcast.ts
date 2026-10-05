@@ -74,6 +74,10 @@ export function broadcastEvent(message: ServerMessage): void {
   installedPort?.broadcast(message);
 }
 
+export function sendToConnectionEvent(connectionId: ConnectionId, message: ServerMessage): void {
+  installedPort?.sendToConnection(connectionId, message);
+}
+
 export function sendToControllerEvent(sessionId: string, message: ServerMessage): void {
   if (installedPort) {
     installedPort.sendToController(sessionId, message);

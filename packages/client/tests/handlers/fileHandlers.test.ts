@@ -34,21 +34,16 @@ describe('handleFilesChanged', () => {
     expect(mockInvalidate).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(300);
-    // One batched invalidation set: the git.changed set (status, browse,
-    // git-diff, repository, branches, history, rebase, tree, worktree refs)
-    // plus search and preview.
-    expect(mockInvalidate).toHaveBeenCalledTimes(11);
-    const keys = invalidatedKeys();
-    expect(keys).toContainEqual(['files', 'browse', 'ws-1']);
-    expect(keys).toContainEqual(['files', 'tree', 'ws-1']);
-    expect(keys).toContainEqual(['files', 'search', 'ws-1']);
-    expect(keys).toContainEqual(['files', 'git-status', 'ws-1']);
-    expect(keys).toContainEqual(['files', 'git-diff', 'ws-1']);
-    expect(keys).toContainEqual(['files', 'preview', 'ws-1']);
-    expect(keys).toContainEqual(['git-history']);
-    expect(keys).toContainEqual(['git-branches']);
-    expect(keys).toContainEqual(['git-repository']);
-    expect(keys).toContainEqual(['git-rebase']);
+    // One batched set of file contents and listings. Git status and branch
+    // views come from the server's status feed, not from tool completions.
+    expect(mockInvalidate).toHaveBeenCalledTimes(5);
+    expect(invalidatedKeys()).toEqual([
+      ['files', 'browse', 'ws-1'],
+      ['files', 'tree', 'ws-1'],
+      ['files', 'search', 'ws-1'],
+      ['files', 'git-diff', 'ws-1'],
+      ['files', 'preview', 'ws-1'],
+    ]);
   });
 
   test('workspaces debounce independently', () => {
@@ -57,13 +52,13 @@ describe('handleFilesChanged', () => {
     handleFilesChanged('ws-2');
     vi.advanceTimersByTime(100);
 
-    expect(mockInvalidate).toHaveBeenCalledTimes(11);
+    expect(mockInvalidate).toHaveBeenCalledTimes(5);
     const fileKeys = invalidatedKeys().filter(k => k[0] === 'files');
     expect(fileKeys.length).toBeGreaterThan(0);
     expect(fileKeys.every(k => k.at(-1) === 'ws-1')).toBe(true);
 
     vi.advanceTimersByTime(200);
-    expect(mockInvalidate).toHaveBeenCalledTimes(22);
+    expect(mockInvalidate).toHaveBeenCalledTimes(10);
     expect(invalidatedKeys().some(k => k.at(-1) === 'ws-2')).toBe(true);
   });
 
@@ -75,7 +70,7 @@ describe('handleFilesChanged', () => {
     expect(mockInvalidate).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(100);
-    expect(mockInvalidate).toHaveBeenCalledTimes(11);
+    expect(mockInvalidate).toHaveBeenCalledTimes(5);
   });
 
   test('malformed workspace ids fail closed', () => {

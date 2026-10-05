@@ -1,6 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
-import type { ProkopaiClient } from '@prokopai/sdk';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { GitStatusResponse, ProkopaiClient } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
+import { retainGitStatus } from '@/lib/gitStatusSubscriptions';
+import { newerGitStatus } from '@/handlers/serverMessage/gitHandlers';
 
 const FILE_BROWSE_STALE_TIME_MS = 10_000;
 const FILE_CONTENT_STALE_TIME_MS = 5_000;
@@ -132,15 +135,34 @@ export function useEditorGitDiffQuery(
   });
 }
 
+/** Keeps the server's Git status feed for a root alive while mounted. */
+export function useGitStatusSubscription(
+  sdkClient: ProkopaiClient | null,
+  workspaceId: string | undefined,
+  root: string | undefined,
+  enabled = true,
+): void {
+  useEffect(() => {
+    if (!sdkClient || !workspaceId || !enabled) return;
+    return retainGitStatus(sdkClient, workspaceId, root);
+  }, [sdkClient, workspaceId, root, enabled]);
+}
+
 export function useGitStatusQuery(
   sdkClient: ProkopaiClient | null,
   workspaceId: string | undefined,
   root: string | undefined,
   enabled = true,
 ) {
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.files.gitStatus(workspaceId ?? '', root);
+  useGitStatusSubscription(sdkClient, workspaceId, root, enabled);
   return useQuery({
-    queryKey: queryKeys.files.gitStatus(workspaceId ?? '', root),
-    queryFn: () => sdkClient!.http.files.gitStatus(workspaceId!, { root }),
+    queryKey,
+    queryFn: async () => newerGitStatus(
+      queryClient.getQueryData<GitStatusResponse>(queryKey),
+      await sdkClient!.http.files.gitStatus(workspaceId!, { root }),
+    ),
     enabled: !!sdkClient && !!workspaceId && enabled,
     staleTime: FILE_CONTENT_STALE_TIME_MS,
   });

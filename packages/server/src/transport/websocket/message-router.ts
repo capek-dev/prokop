@@ -28,6 +28,11 @@ import {
   handleAskResponse,
   handleSandboxRespond,
 } from '@/transport/websocket/handlers/misc';
+import {
+  handleGitStatusSubscribe,
+  handleGitStatusUnsubscribe,
+  handleGitStatusRefresh,
+} from '@/transport/websocket/handlers/git';
 
 // Re-export for external consumers
 export type { RouterContext, ClientEntry } from './router-context';
@@ -89,6 +94,9 @@ const handlers: Record<string, Handler> = {
   'pong': cast(handlePong),
   'ask.response': cast(handleAskResponse),
   'sandbox.respond': cast(handleSandboxRespond),
+  'git.status.subscribe': cast(handleGitStatusSubscribe),
+  'git.status.unsubscribe': cast(handleGitStatusUnsubscribe),
+  'git.status.refresh': cast(handleGitStatusRefresh),
 };
 
 // Dispatcher

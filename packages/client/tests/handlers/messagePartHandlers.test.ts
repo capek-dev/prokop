@@ -188,9 +188,10 @@ describe('messagePartHandlers - file query invalidation', () => {
     expect(invalidatedKeys).toContainEqual(['files', 'browse', 'ws-1']);
     expect(invalidatedKeys).toContainEqual(['files', 'tree', 'ws-1']);
     expect(invalidatedKeys).toContainEqual(['files', 'search', 'ws-1']);
-    expect(invalidatedKeys).toContainEqual(['files', 'git-status', 'ws-1']);
     expect(invalidatedKeys).toContainEqual(['files', 'git-diff', 'ws-1']);
     expect(invalidatedKeys).toContainEqual(['files', 'preview', 'ws-1']);
+    // Git status is pushed by the server feed, not refetched per tool.
+    expect(invalidatedKeys).not.toContainEqual(['files', 'git-status', 'ws-1']);
   });
 
   test('a burst of completions coalesces into a single invalidation batch', () => {
@@ -202,8 +203,8 @@ describe('messagePartHandlers - file query invalidation', () => {
     }
     vi.advanceTimersByTime(300);
 
-    // One batched set: git.changed set plus search and preview.
-    expect(mockInvalidate).toHaveBeenCalledTimes(11);
+    // One batched set: browse, tree, search, diffs, previews.
+    expect(mockInvalidate).toHaveBeenCalledTimes(5);
   });
 
   test('error and interrupted terminal states invalidate the workspace', () => {

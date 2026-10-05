@@ -11,6 +11,7 @@ import { PermissionsNamespace } from './namespaces/permissions';
 import { QueueNamespace } from './namespaces/queue';
 import { ProvidersNamespace } from './namespaces/providers';
 import { ControlNamespace } from './namespaces/control';
+import { GitNamespace } from './namespaces/git';
 import { TerminalNamespace } from './namespaces/terminal';
 import { NotificationsNamespace } from './namespaces/notifications';
 import { HttpNamespace } from './rest/http-namespace';
@@ -29,6 +30,7 @@ export class ProkopaiClient extends TypedEventEmitter<SdkEventMap> {
   readonly queue: QueueNamespace;
   readonly providers: ProvidersNamespace;
   readonly control: ControlNamespace;
+  readonly git: GitNamespace;
   readonly notifications: NotificationsNamespace;
   readonly http: HttpNamespace;
   readonly terminal: TerminalNamespace;
@@ -55,6 +57,7 @@ export class ProkopaiClient extends TypedEventEmitter<SdkEventMap> {
     this.queue = new QueueNamespace(send);
     this.providers = new ProvidersNamespace(send);
     this.control = new ControlNamespace(send);
+    this.git = new GitNamespace(send);
     this.notifications = new NotificationsNamespace(send);
     this.http = new HttpNamespace(this._httpClient);
     this.terminal = new TerminalNamespace({

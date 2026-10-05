@@ -1518,10 +1518,17 @@ describe('server layer boundaries', () => {
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
       '@prokopai/sdk',
       '@/application/ports/files',
+      './git-status-feed',
       'path',
     ].sort());
     expect(file!.sourceText).not.toContain("@/store");
     expect(file!.sourceText).not.toContain("@/services");
+
+    // The Git status feed is pure scheduling over injected compute and delivery.
+    const feedPath = resolve(applicationDir, 'files/git-status-feed.ts');
+    const feed = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === feedPath);
+    expect(feed).toBeDefined();
+    expect(parseImports(feed!.sourceText, feed!.path).map((imp) => imp.specifier)).toEqual(['@prokopai/sdk']);
   });
 
   test('S5 gate: the filesystem infrastructure modules import only utilities, binaries, and their siblings', () => {
