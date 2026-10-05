@@ -68,6 +68,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   keepAlive = false,
   onClose,
 }, ref) {
+  const panelRef = useRef<HTMLDivElement>(null);
   const [lifetime, setLifetime] = useState({ workspaceId, sdkClient, started: isOpen });
   if (lifetime.workspaceId !== workspaceId || lifetime.sdkClient !== sdkClient) {
     setLifetime({ workspaceId, sdkClient, started: isOpen });
@@ -540,7 +541,13 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
   useEffect(() => {
     if (!isOpen || !activeTabServerId) return;
-    const timer = setTimeout(focusActiveTerminal, 300);
+    const timer = setTimeout(() => {
+      // A session/workspace switch can replace the terminal in an open dock.
+      // Visibility alone must not reclaim focus from the user's current dock.
+      const panel = panelRef.current;
+      const owner = panel?.closest('[data-view-group]') ?? panel;
+      if (owner?.contains(document.activeElement)) focusActiveTerminal();
+    }, 300);
     return () => clearTimeout(timer);
   }, [isOpen, activeTabServerId, focusActiveTerminal]);
 
@@ -689,6 +696,8 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     return (
       <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <SheetContent
+          ref={panelRef}
+          data-terminal-panel=""
           side="top"
           className="p-0 bg-sidebar [&>button]:hidden flex flex-col"
           style={{ height: sheetHeight }}
@@ -704,7 +713,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   }
 
   return (
-    <div data-terminal-panel="" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div ref={panelRef} data-terminal-panel="" className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Header with inline tabs; the panel itself toggles from the app header like the other panels */}
       <div className="flex items-center gap-1 bg-sidebar px-2 py-1 shrink-0">
         <TerminalIcon className="w-3 h-3 text-muted-foreground flex-shrink-0" />

@@ -10,14 +10,19 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
 vi.mock('@/hooks/queries', () => ({ useWorktreesQuery: () => ({ data: [] }) }));
 vi.mock('@/hooks/useVisualViewport', () => ({ useVisualViewport: () => ({ height: 900 }) }));
-vi.mock('@/components/layout/TerminalView', () => ({ TerminalView: () => <div data-testid="terminal-output" /> }));
 vi.mock('@/hooks/useTerminal', async (original) => {
   const actual = await original<typeof import('@/hooks/useTerminal')>();
   return {
     ...actual,
     createTerminalInstance: () => {
+      const element = document.createElement('div');
+      element.dataset.testid = 'terminal-output';
+      const input = document.createElement('textarea');
+      input.setAttribute('aria-label', 'Terminal input');
+      element.appendChild(input);
       const terminal = {
-        dispose: vi.fn(), write: vi.fn(), focus: vi.fn(), reset: vi.fn(), cols: 80, rows: 24,
+        element, open: (container: HTMLElement) => container.appendChild(element),
+        dispose: vi.fn(), write: vi.fn(), focus: vi.fn(() => input.focus()), reset: vi.fn(), cols: 80, rows: 24,
         onData: () => ({ dispose: vi.fn() }), onResize: () => ({ dispose: vi.fn() }),
       };
       mocks.instances.push(terminal);
@@ -65,6 +70,41 @@ describe('terminal view lifetime', () => {
   afterEach(() => {
     cleanup();
     useConnectionStore.setState(useConnectionStore.getInitialState());
+  });
+
+  test('terminal mount and delayed autofocus preserve center focus when the workspace changes', async () => {
+    const sdk = createClient();
+    const props = { workspacePath: '/work', workspaceName: 'Work', additionalPaths: [], sdkClient: sdk.client, onClose: vi.fn(), keepAlive: true };
+    const content = (workspaceId: string) => <>
+      <section data-view-group="center"><input aria-label="Chat draft" /></section>
+      <section data-view-group="bottom"><TerminalPanel {...props} workspaceId={workspaceId} isOpen /></section>
+    </>;
+    const { rerender } = render(content('w1'));
+    screen.getByRole('textbox', { name: 'Chat draft' }).focus();
+    await screen.findByTestId('terminal-output');
+    expect(screen.getByRole('textbox', { name: 'Chat draft' })).toHaveFocus();
+    // Switching center sessions can change the terminal's workspace as well.
+    rerender(content('w2'));
+    await waitFor(() => expect(sdk.connect).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('textbox', { name: 'Chat draft' })).toHaveFocus();
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)); });
+    expect(screen.getByRole('textbox', { name: 'Chat draft' })).toHaveFocus();
+  });
+
+  test('pending terminal autofocus cannot pull focus back after leaving its dock', async () => {
+    const sdk = createClient();
+    render(<>
+      <section data-view-group="center"><input aria-label="Chat draft" /></section>
+      <section data-view-group="bottom">
+        <button>Terminal tab</button>
+        <TerminalPanel workspaceId="w1" workspacePath="/work" workspaceName="Work" additionalPaths={[]} sdkClient={sdk.client} onClose={vi.fn()} isOpen keepAlive />
+      </section>
+    </>);
+    screen.getByRole('button', { name: 'Terminal tab' }).focus();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Terminal input' })).toHaveFocus());
+    screen.getByRole('textbox', { name: 'Chat draft' }).focus();
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)); });
+    expect(screen.getByRole('textbox', { name: 'Chat draft' })).toHaveFocus();
   });
 
   test('starts on first reveal, receives output while hidden, and disposes only on workspace change or unmount', async () => {
