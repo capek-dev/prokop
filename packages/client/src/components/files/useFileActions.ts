@@ -167,9 +167,6 @@ function openFileInEditor(options: UseFileActionsOptions, path: string, name: st
   const layout = useChatLayoutStore.getState();
   if (options.isMobile) {
     layout.setMobileSurface('editor');
-  } else {
-    layout.setWorkbenchSurface('editor');
-    layout.setShowFilesPanel(true);
   }
 }
 

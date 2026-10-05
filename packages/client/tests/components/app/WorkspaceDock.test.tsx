@@ -2,42 +2,34 @@ import { render } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 import { WorkspaceDock } from '@/components/app/WorkspaceDock';
 
-function renderDock() {
-  return render(
-    <WorkspaceDock
-      sessions={<div data-testid="sessions" />}
-      content={<div data-testid="content" />}
-      panels={<div data-testid="panels" />}
-    />,
-  );
-}
-
 describe('WorkspaceDock', () => {
-  test('renders Sessions and Primary in one flush dock surface', () => {
-    const { getByTestId } = renderDock();
-    const row = getByTestId('sessions').parentElement;
-    const shell = row?.parentElement;
+  test('places left beside the center, right beside center, and bottom below both', () => {
+    const { getByTestId } = render(
+      <WorkspaceDock
+        left={<div data-testid="left" />}
+        center={<div data-testid="center" />}
+        right={<div data-testid="right" />}
+        bottom={<div data-testid="bottom" />}
+      />,
+    );
+    const left = getByTestId('left');
+    const center = getByTestId('center');
+    const right = getByTestId('right');
+    const bottom = getByTestId('bottom');
+    const centerRow = center.parentElement;
+    const primary = centerRow?.parentElement;
 
-    expect(shell).toHaveAttribute('data-slot', 'workspace-dock');
-    expect(shell).toHaveClass('flex-col', 'overflow-hidden', 'bg-background');
-    expect(shell).not.toHaveClass('border-t', 'border-border');
-    expect(shell).not.toHaveClass('rounded-xl', 'shadow-sm', 'ring-1');
-    expect(shell?.parentElement).not.toHaveClass('p-2');
-    expect(row).toHaveAttribute('data-slot', 'workspace-dock-row');
-    expect(shell?.querySelector('[data-slot="workspace-bar"]')).toBeNull();
+    expect(centerRow).toHaveAttribute('data-slot', 'workspace-center-row');
+    expect(right.parentElement).toBe(centerRow);
+    expect(bottom.parentElement).toBe(primary);
+    expect(left.parentElement).toBe(primary?.parentElement);
+    expect((centerRow?.compareDocumentPosition(bottom) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(primary).not.toContainElement(left);
   });
 
-  test('keeps utility panels below primary content and outside Sessions', () => {
-    const { getByTestId } = renderDock();
-    const content = getByTestId('content');
-    const panels = getByTestId('panels');
-    const sessions = getByTestId('sessions');
-    const primaryDock = content.parentElement;
-
-    expect(primaryDock).toHaveAttribute('data-slot', 'workspace-primary-dock');
-    expect(primaryDock).toContainElement(panels);
-    expect(primaryDock).not.toContainElement(sessions);
-    expect(sessions.parentElement).toBe(primaryDock?.parentElement);
-    expect(content.compareDocumentPosition(panels) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  test('supports a center without peripheral docks', () => {
+    const { getByRole, getByText } = render(<WorkspaceDock center={<span>Conversation</span>} />);
+    expect(getByRole('main')).toContainElement(getByText('Conversation'));
+    expect(getByRole('main')).toHaveClass('min-h-0', 'min-w-0', 'overflow-hidden');
   });
 });

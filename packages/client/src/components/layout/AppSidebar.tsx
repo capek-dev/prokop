@@ -4,6 +4,7 @@ import { ResizablePanel } from './ResizablePanel';
 interface AppSidebarProps {
   children: React.ReactNode;
   header?: React.ReactNode;
+  embedded?: boolean;
   currentSessionId: string | null;
   onEscape?: () => void;
 }
@@ -13,7 +14,7 @@ export interface AppSidebarHandle {
 }
 
 export const AppSidebar = forwardRef<AppSidebarHandle, AppSidebarProps>((props, ref) => {
-  const { children, header, currentSessionId, onEscape } = props;
+  const { children, header, currentSessionId, onEscape, embedded } = props;
 
   const sessionListRef = useRef<HTMLDivElement>(null);
   const currentSessionIdRef = useRef<string | null>(null);
@@ -136,6 +137,7 @@ export const AppSidebar = forwardRef<AppSidebarHandle, AppSidebarProps>((props, 
   return (
     <ResizablePanel
       variant="shell"
+      embedded={embedded}
       header={header}
       contentRef={sessionListRef}
       onContentKeyDown={handleSessionListKeyDown}

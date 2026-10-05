@@ -143,7 +143,7 @@ const SessionActionsDropdown = React.memo(function SessionActionsDropdown({
         {onOpenAlongside && (
           <DropdownMenuItem onClick={onOpenAlongside}>
             <Columns2 className="size-4" />
-            Open alongside
+            Open tab
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={onRename}>

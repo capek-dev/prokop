@@ -2,14 +2,12 @@ import { useCallback, useMemo } from 'react';
 import { useViewRefs } from '@/contexts/ViewRefsContext';
 import { useSessionManager } from '@/contexts/SessionManagerContext';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { WorkspaceHeader } from '@/components/app/WorkspaceHeader';
 import { AppPanels } from '@/components/app/AppPanels';
 import { useSidebarData } from '@/hooks/useSidebarData';
 import { useOverviewSessions } from '@/hooks/useOverviewSessions';
 import { useOverviewGroups } from '@/hooks/useOverviewGroups';
 import { useInvalidateWorkspaceTags } from '@/hooks/queries';
 import { useSessionStore } from '@/stores/sessionStore';
-import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useMobileSessionSelection } from '@/hooks/useMobileSessionSelection';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useBoardRouteSync } from '@/hooks/useBoardRouteSync';
@@ -17,7 +15,6 @@ import { useFocusedSessionWorkspaceContext } from '@/hooks/useFocusedSessionWork
 import { useOverviewRouteSessionLoader } from '@/hooks/useOverviewRouteSessionLoader';
 import { WorkspaceOverview } from '@/components/layout/WorkspaceOverview';
 import { WorkspaceContentArea } from '@/components/app/WorkspaceContentArea';
-import { WorkspaceDock } from '@/components/app/WorkspaceDock';
 
 export default function OverviewView() {
   const sessionManager = useSessionManager();
@@ -44,9 +41,6 @@ export default function OverviewView() {
     [overviewGroups.isHydrated, overviewGroups.activeWorkspaceIds],
   );
 
-  const openSessionIds = useSessionBoardStore(s => s.openSessionIds);
-  const layoutMode = useSessionBoardStore(s => s.layoutMode);
-  const showBoardToolbar = openSessionIds.length > 1 && layoutMode !== 'focused';
 
   // Overview scope: sessions from any accessible workspace are valid.
   useBoardRouteSync({ scope: { kind: 'overview' } });
@@ -136,9 +130,13 @@ export default function OverviewView() {
   );
 
   return (
-    <WorkspaceDock
-      sessions={(
+    <WorkspaceContentArea
+      sdkClient={sessionManager.sdkClient}
+      serverUrl={sessionManager.serverUrl}
+      sessionsContent={sidebarContent}
+      left={(
         <AppSidebar
+          embedded
           ref={sidebarRef}
           currentSessionId={sidebarData.currentSessionId}
           onEscape={() => {
@@ -150,16 +148,9 @@ export default function OverviewView() {
           {sidebarContent}
         </AppSidebar>
       )}
-      content={(
-        <WorkspaceContentArea
-          primaryHeader={showBoardToolbar ? null : <WorkspaceHeader />}
-          sdkClient={sessionManager.sdkClient}
-          serverUrl={sessionManager.serverUrl}
-          sessionsContent={sidebarContent}
-        />
-      )}
-      panels={(
+      bottom={(
         <AppPanels
+          embedded
           sdkClient={sessionManager.sdkClient}
           terminalPanelRef={terminalPanelRef}
         />

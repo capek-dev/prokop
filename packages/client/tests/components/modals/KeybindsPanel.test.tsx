@@ -108,9 +108,9 @@ describe('KeybindsPanel', () => {
   test('supports explicitly unassigning a command', () => {
     render(<KeybindsPanel />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Unset Open files panel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Unset Focus right dock' }));
 
-    expect(useKeybindingStore.getState().overrides['navigation.files']).toBeNull();
+    expect(useKeybindingStore.getState().overrides['dock.focusRight']).toBeNull();
     expect(screen.getByText('No shortcut')).toBeInTheDocument();
   });
 
@@ -125,13 +125,13 @@ describe('KeybindsPanel', () => {
 
     expect(useKeybindingStore.getState().overrides).toMatchObject({
       'session.create': 'mod+1',
-      'navigation.sessions': null,
+      'dock.focusLeft': null,
     });
   });
 
   test('resets all overrides', () => {
     useKeybindingStore.setState({
-      overrides: { 'session.create': 'alt+n', 'navigation.files': null },
+      overrides: { 'session.create': 'alt+n', 'dock.focusRight': null },
     });
     render(<KeybindsPanel />);
 

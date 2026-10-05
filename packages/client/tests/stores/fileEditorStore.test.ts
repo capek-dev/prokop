@@ -209,6 +209,20 @@ describe('fileEditorStore', () => {
     });
   });
 
+  test('a completed save does not mark newer edits as saved', () => {
+    const store = useFileEditorStore.getState();
+    const id = store.openDoc(baseIdentity, 'index.ts');
+    store.hydrateSuccess(id, makeEditable({ content: 'original' }));
+    store.updateContent(id, 'submitted');
+    store.markSaving(id);
+    store.updateContent(id, 'newer draft');
+    store.saveSuccess(id, makeSaveResult({ revision: 'r2' }), 'submitted');
+    const doc = useFileEditorStore.getState().docs[id];
+    expect(doc.baseContent).toBe('submitted');
+    expect(doc.content).toBe('newer draft');
+    expect(isDocDirty(doc)).toBe(true);
+  });
+
   // --- Discard ---
   describe('discardChanges', () => {
     test('reverts content to base and clears conflict', () => {

@@ -17,6 +17,8 @@ interface WorkspaceWorkbenchProps {
   filesPanelRef: RefObject<FilesPanelHandle | null>;
   onClose: () => void;
   mobile?: boolean;
+  framed?: boolean;
+  includeEditor?: boolean;
 }
 
 export function WorkspaceWorkbench({
@@ -27,6 +29,8 @@ export function WorkspaceWorkbench({
   filesPanelRef,
   onClose,
   mobile = false,
+  framed = true,
+  includeEditor = true,
 }: WorkspaceWorkbenchProps) {
   const surface = useChatLayoutStore((state) => state.workbenchSurface);
   const setSurface = useChatLayoutStore((state) => state.setWorkbenchSurface);
@@ -35,11 +39,13 @@ export function WorkspaceWorkbench({
   const mobileSurface = useChatLayoutStore((state) => state.mobileSurface);
   const setMobileSurface = useChatLayoutStore((state) => state.setMobileSurface);
   const openDocCount = useFileEditorStore((state) => state.openDocIds.length);
-  const hasEditorDocs = openDocCount > 0 && hasOpenDocsForScope(serverId, workspaceId);
+  const hasEditorDocs = includeEditor && openDocCount > 0 && hasOpenDocsForScope(serverId, workspaceId);
   const { data: worktreesData } = useWorktreesQuery(sdkClient, workspaceId);
   const hasWorktrees = (worktreesData ?? []).length > 0;
 
-  const activeSurface = mobile
+  const activeSurface = !includeEditor
+    ? filesPanelTab === 'project' ? 'explorer' : filesPanelTab
+    : mobile
     ? mobileSurface === 'editor' && hasEditorDocs
       ? 'editor'
       : filesPanelTab === 'changes'
@@ -53,7 +59,10 @@ export function WorkspaceWorkbench({
 
   return (
     <section
-      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-sidebar md:rounded-xl md:border md:border-border/50"
+      className={cn(
+        'flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-sidebar',
+        framed && 'md:rounded-xl md:border md:border-border/50',
+      )}
       aria-label="Workspace workbench"
       data-workspace-workbench
     >

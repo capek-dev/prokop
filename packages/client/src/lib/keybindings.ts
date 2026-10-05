@@ -1,21 +1,24 @@
 export type KeybindingCommandId =
-  | 'navigation.sessions'
-  | 'navigation.files'
-  | 'navigation.terminal'
+  | 'dock.focusLeft'
+  | 'dock.focusRight'
+  | 'dock.focusBottom'
   | 'navigation.overview'
   | 'session.create'
-  | 'panel.closeFocused'
+  | 'dock.closeFocused'
   | 'chat.focusInput'
   | 'chat.stopStreaming'
   | 'chat.toggleAutoFollow'
-  | 'pane.focus.1'
-  | 'pane.focus.2'
-  | 'pane.focus.3'
-  | 'pane.focus.4'
-  | 'pane.focus.5'
-  | 'pane.focus.6'
-  | 'pane.focusPrevious'
-  | 'pane.focusNext'
+  | 'tab.focus.1'
+  | 'tab.focus.2'
+  | 'tab.focus.3'
+  | 'tab.focus.4'
+  | 'tab.focus.5'
+  | 'tab.focus.6'
+  | 'tab.focus.7'
+  | 'tab.focus.8'
+  | 'tab.focus.9'
+  | 'tab.focusPrevious'
+  | 'tab.focusNext'
   | 'editor.save'
   | 'editor.close';
 
@@ -24,7 +27,7 @@ export type KeybindingContext = 'global' | 'chat' | 'editor';
 export interface KeybindingCommand {
   id: KeybindingCommandId;
   label: string;
-  category: 'Navigation' | 'Chat' | 'Panes' | 'Editor';
+  category: 'Navigation' | 'Chat' | 'Tabs' | 'Editor';
   defaultBinding: string;
   context: KeybindingContext;
   allowInInputs?: boolean;
@@ -38,23 +41,26 @@ export interface StoredKeybindingSettings {
 }
 
 export const KEYBINDING_COMMANDS = [
-  { id: 'navigation.sessions', label: 'Open session list', category: 'Navigation', defaultBinding: 'mod+1', context: 'global', allowInInputs: true },
-  { id: 'navigation.files', label: 'Open files panel', category: 'Navigation', defaultBinding: 'mod+2', context: 'global', allowInInputs: true },
-  { id: 'navigation.terminal', label: 'Open terminal', category: 'Navigation', defaultBinding: 'mod+t', context: 'global', allowInInputs: true },
+  { id: 'dock.focusLeft', label: 'Focus left dock', category: 'Navigation', defaultBinding: 'mod+1', context: 'global', allowInInputs: true },
+  { id: 'dock.focusRight', label: 'Focus right dock', category: 'Navigation', defaultBinding: 'mod+2', context: 'global', allowInInputs: true },
+  { id: 'dock.focusBottom', label: 'Focus bottom dock', category: 'Navigation', defaultBinding: 'mod+t', context: 'global', allowInInputs: true },
   { id: 'navigation.overview', label: 'Toggle overview mode', category: 'Navigation', defaultBinding: 'mod+o', context: 'global', allowInInputs: true },
   { id: 'session.create', label: 'New session', category: 'Navigation', defaultBinding: 'mod+n', context: 'global', allowInInputs: true },
-  { id: 'panel.closeFocused', label: 'Close focused panel', category: 'Navigation', defaultBinding: 'shift+escape', context: 'global', allowInInputs: true },
+  { id: 'dock.closeFocused', label: 'Close focused dock', category: 'Navigation', defaultBinding: 'shift+escape', context: 'global', allowInInputs: true },
   { id: 'chat.focusInput', label: 'Focus chat input', category: 'Chat', defaultBinding: 'escape', context: 'global', allowInInputs: true },
   { id: 'chat.stopStreaming', label: 'Stop streaming', category: 'Chat', defaultBinding: 'escape>escape', context: 'chat', allowInInputs: true },
   { id: 'chat.toggleAutoFollow', label: 'Toggle follow/free mode', category: 'Chat', defaultBinding: 'mod+shift+f', context: 'global', allowInInputs: true },
-  { id: 'pane.focus.1', label: 'Focus pane 1', category: 'Panes', defaultBinding: 'alt+1', context: 'global', allowInInputs: true },
-  { id: 'pane.focus.2', label: 'Focus pane 2', category: 'Panes', defaultBinding: 'alt+2', context: 'global', allowInInputs: true },
-  { id: 'pane.focus.3', label: 'Focus pane 3', category: 'Panes', defaultBinding: 'alt+3', context: 'global', allowInInputs: true },
-  { id: 'pane.focus.4', label: 'Focus pane 4', category: 'Panes', defaultBinding: 'alt+4', context: 'global', allowInInputs: true },
-  { id: 'pane.focus.5', label: 'Focus pane 5', category: 'Panes', defaultBinding: 'alt+5', context: 'global', allowInInputs: true },
-  { id: 'pane.focus.6', label: 'Focus pane 6', category: 'Panes', defaultBinding: 'alt+6', context: 'global', allowInInputs: true },
-  { id: 'pane.focusPrevious', label: 'Focus previous pane', category: 'Panes', defaultBinding: 'alt+shift+left', context: 'global', allowInInputs: true },
-  { id: 'pane.focusNext', label: 'Focus next pane', category: 'Panes', defaultBinding: 'alt+shift+right', context: 'global', allowInInputs: true },
+  { id: 'tab.focus.1', label: 'Focus tab 1', category: 'Tabs', defaultBinding: 'alt+1', context: 'global', allowInInputs: true },
+  { id: 'tab.focus.2', label: 'Focus tab 2', category: 'Tabs', defaultBinding: 'alt+2', context: 'global', allowInInputs: true },
+  { id: 'tab.focus.3', label: 'Focus tab 3', category: 'Tabs', defaultBinding: 'alt+3', context: 'global', allowInInputs: true },
+  { id: 'tab.focus.4', label: 'Focus tab 4', category: 'Tabs', defaultBinding: 'alt+4', context: 'global', allowInInputs: true },
+  { id: 'tab.focus.5', label: 'Focus tab 5', category: 'Tabs', defaultBinding: 'alt+5', context: 'global', allowInInputs: true },
+  { id: 'tab.focus.6', label: 'Focus tab 6', category: 'Tabs', defaultBinding: 'alt+6', context: 'global', allowInInputs: true },
+  { id: 'tab.focus.7', label: 'Focus tab 7', category: 'Tabs', defaultBinding: 'alt+7', context: 'global', allowInInputs: true },
+  { id: 'tab.focus.8', label: 'Focus tab 8', category: 'Tabs', defaultBinding: 'alt+8', context: 'global', allowInInputs: true },
+  { id: 'tab.focus.9', label: 'Focus tab 9', category: 'Tabs', defaultBinding: 'alt+9', context: 'global', allowInInputs: true },
+  { id: 'tab.focusPrevious', label: 'Focus previous tab', category: 'Tabs', defaultBinding: 'alt+shift+left', context: 'global', allowInInputs: true },
+  { id: 'tab.focusNext', label: 'Focus next tab', category: 'Tabs', defaultBinding: 'alt+shift+right', context: 'global', allowInInputs: true },
   { id: 'editor.save', label: 'Save active file', category: 'Editor', defaultBinding: 'mod+s', context: 'editor', allowInInputs: true },
   { id: 'editor.close', label: 'Close active file', category: 'Editor', defaultBinding: 'mod+w', context: 'editor', allowInInputs: true },
 ] as const satisfies readonly KeybindingCommand[];
@@ -212,8 +218,24 @@ export function parseStoredKeybindingSettings(value: unknown): StoredKeybindingS
     return empty;
   }
 
+  const legacyCommands: Record<string, KeybindingCommandId> = {
+    'navigation.sessions': 'dock.focusLeft',
+    'navigation.files': 'dock.focusRight',
+    'navigation.terminal': 'dock.focusBottom',
+    'panel.closeFocused': 'dock.closeFocused',
+    'pane.focus.1': 'tab.focus.1',
+    'pane.focus.2': 'tab.focus.2',
+    'pane.focus.3': 'tab.focus.3',
+    'pane.focus.4': 'tab.focus.4',
+    'pane.focus.5': 'tab.focus.5',
+    'pane.focus.6': 'tab.focus.6',
+    'pane.focusPrevious': 'tab.focusPrevious',
+    'pane.focusNext': 'tab.focusNext',
+  };
   const overrides: KeybindingOverrides = {};
-  for (const [id, binding] of Object.entries(candidate.overrides)) {
+  for (const [storedId, binding] of Object.entries(candidate.overrides)) {
+    const id = legacyCommands[storedId] ?? storedId;
+    if (storedId !== id && Object.prototype.hasOwnProperty.call(candidate.overrides, id)) continue;
     if (!isKeybindingCommandId(id)) continue;
     if (binding === null) {
       overrides[id] = null;

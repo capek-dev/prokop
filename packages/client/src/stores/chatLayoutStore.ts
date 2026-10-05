@@ -1,16 +1,6 @@
 import { create } from 'zustand';
 import { useServerDataStore } from './serverDataStore';
 import { useSessionBoardStore } from './sessionBoardStore';
-import {
-  PANEL_DEFAULT_WIDTH,
-  clampPanelWidth,
-} from '@prokopai/sdk';
-import {
-  getSessionsPanelWidth,
-  saveSessionsPanelWidth,
-  getFilesPanelWidth,
-  saveFilesPanelWidth,
-} from '@/config/panelStorage';
 
 export type FilesPanelTab = 'project' | 'changes' | 'branches' | 'worktrees';
 export type WorkbenchSurface = 'explorer' | 'changes' | 'branches' | 'worktrees' | 'editor';
@@ -36,10 +26,6 @@ function updateSessionLayout(state: ChatLayoutState, patch: Partial<SessionFiles
 
 interface ChatLayoutState {
   sessionFilesLayouts: Record<string, SessionFilesLayout>;
-  showFilesPanel: boolean;
-  showTerminalPanel: boolean;
-  sessionsPanelWidth: number;
-  filesPanelWidth: number;
   filesPanelTab: FilesPanelTab;
   filesPanelRoot: string | null;
   filesPanelRootPinned: boolean;
@@ -48,10 +34,6 @@ interface ChatLayoutState {
 }
 
 interface ChatLayoutActions {
-  setShowFilesPanel: (show: boolean) => void;
-  setShowTerminalPanel: (show: boolean) => void;
-  setSessionsPanelWidth: (width: number) => void;
-  setFilesPanelWidth: (width: number) => void;
   setFilesPanelTab: (tab: FilesPanelTab) => void;
   setFilesPanelRoot: (root: string | null) => void;
   setFilesPanelRootPinned: (pinned: boolean) => void;
@@ -61,38 +43,14 @@ interface ChatLayoutActions {
 
 type ChatLayoutStore = ChatLayoutState & ChatLayoutActions;
 
-const getInitialSessionsPanelWidth = (): number => {
-  return getSessionsPanelWidth(PANEL_DEFAULT_WIDTH);
-};
-
-const getInitialFilesPanelWidth = (): number => {
-  return getFilesPanelWidth(PANEL_DEFAULT_WIDTH);
-};
-
 export const useChatLayoutStore = create<ChatLayoutStore>((set) => ({
   sessionFilesLayouts: {},
-  showFilesPanel: false,
-  showTerminalPanel: false,
-  sessionsPanelWidth: getInitialSessionsPanelWidth(),
-  filesPanelWidth: getInitialFilesPanelWidth(),
   filesPanelTab: 'project',
   filesPanelRoot: null,
   filesPanelRootPinned: false,
   workbenchSurface: 'explorer',
   mobileSurface: 'chat',
 
-  setShowFilesPanel: (show) => set({ showFilesPanel: show }),
-  setShowTerminalPanel: (show) => set({ showTerminalPanel: show }),
-  setSessionsPanelWidth: (width) => {
-    const clampedWidth = clampPanelWidth(width);
-    saveSessionsPanelWidth(clampedWidth);
-    set({ sessionsPanelWidth: clampedWidth });
-  },
-  setFilesPanelWidth: (width) => {
-    const clampedWidth = clampPanelWidth(width);
-    saveFilesPanelWidth(clampedWidth);
-    set({ filesPanelWidth: clampedWidth });
-  },
   setFilesPanelTab: (tab) => set((state) => updateSessionLayout(state, { filesPanelTab: tab })),
   setFilesPanelRoot: (root) => set((state) => updateSessionLayout(state, { filesPanelRoot: root })),
   setFilesPanelRootPinned: (filesPanelRootPinned) => set((state) => updateSessionLayout(state, { filesPanelRootPinned })),

@@ -27,7 +27,7 @@ export function useBoardSessionLoader(
       const contentMeta = useSessionStore.getState().contentMetaBySession[sessionId];
       const isLoaded = contentMeta?.status === 'ready' || hasMessages;
 
-      if (!isLoaded && !resumedRef.current.has(sessionId)) {
+      if (!isLoaded && contentMeta?.status !== 'loading' && !resumedRef.current.has(sessionId)) {
         resumedRef.current.add(sessionId);
         useSessionStore.getState().beginSessionContentLoad(sessionId);
         sdkClient.sessions.resume(sessionId);

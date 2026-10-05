@@ -10,19 +10,17 @@ import { useWorkspaceTagsQuery, useInvalidateWorkspaceTags } from '@/hooks/queri
 import { useScheduledJobs, usePauseScheduledJob, useResumeScheduledJob, useTriggerScheduledJob, useDeleteScheduledJob } from '@/hooks/queries';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useBoardRouteSync } from '@/hooks/useBoardRouteSync';
+import { useOverviewRouteSessionLoader } from '@/hooks/useOverviewRouteSessionLoader';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useUIStore } from '@/stores/uiStore';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { WorkspaceHeader } from '@/components/app/WorkspaceHeader';
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
 import { WorkspaceSessionContent } from '@/components/layout/WorkspaceSessionContent';
 import { PinnedMessagesPanel } from '@/components/layout/PinnedMessagesPanel';
 import { AppPanels } from '@/components/app/AppPanels';
 import { WorkspaceContentArea } from '@/components/app/WorkspaceContentArea';
-import { WorkspaceDock } from '@/components/app/WorkspaceDock';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useMobileSessionSelection } from '@/hooks/useMobileSessionSelection';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
 import { getCreateSessionOptions } from '@/lib/sessionCreate';
@@ -36,11 +34,9 @@ export default function WorkspaceView() {
   const agents = useServerDataStore(s => s.agents);
   const allPreconfigs = useServerDataStore(s => s.preconfigs);
 
-  const openSessionIds = useSessionBoardStore(s => s.openSessionIds);
-  const layoutMode = useSessionBoardStore(s => s.layoutMode);
-  const showBoardToolbar = openSessionIds.length > 1 && layoutMode !== 'focused';
   // Sync board state with URL search params
   useBoardRouteSync({ scope: { kind: 'workspace', workspaceId: activeWorkspace?.id ?? null } });
+  useOverviewRouteSessionLoader(sessionManager.sdkClient, sidebarData.connected);
 
   const {
     sdkClient,
@@ -255,9 +251,14 @@ export default function WorkspaceView() {
   );
 
   return (
-    <WorkspaceDock
-      sessions={(
+    <WorkspaceContentArea
+      sdkClient={sdkClient}
+      serverUrl={sessionManager.serverUrl}
+      sessionsHeader={sidebarHeader}
+      sessionsContent={sessionsPanelContent}
+      left={(
         <AppSidebar
+          embedded
           ref={sidebarRef}
           header={sidebarHeader}
           currentSessionId={sidebarData.currentSessionId}
@@ -270,17 +271,9 @@ export default function WorkspaceView() {
           {sessionsPanelContent}
         </AppSidebar>
       )}
-      content={(
-        <WorkspaceContentArea
-          primaryHeader={showBoardToolbar ? null : <WorkspaceHeader />}
-          sdkClient={sdkClient}
-          serverUrl={sessionManager.serverUrl}
-          sessionsHeader={sidebarHeader}
-          sessionsContent={sessionsPanelContent}
-        />
-      )}
-      panels={(
+      bottom={(
         <AppPanels
+          embedded
           sdkClient={sdkClient}
           terminalPanelRef={terminalPanelRef}
         />

@@ -14,7 +14,6 @@ import type { TerminalEvent } from '@prokopai/sdk';
 import type { TerminalEventsConnection } from '@prokopai/sdk';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useVisualViewport } from '@/hooks/useVisualViewport';
-import { usePointerDrag } from '@/hooks/usePointerDrag';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -55,12 +54,9 @@ interface TerminalPanelProps {
   additionalPaths: string[];
   sdkClient: ProkopaiClient | null;
   isOpen: boolean;
+  keepAlive?: boolean;
   onClose: () => void;
 }
-
-const DEFAULT_HEIGHT = 300;
-const MIN_HEIGHT = 200;
-const MAX_HEIGHT_RATIO = 0.7;
 
 export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(function TerminalPanel({
   workspaceId,
@@ -69,8 +65,16 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   additionalPaths,
   sdkClient,
   isOpen,
+  keepAlive = false,
   onClose,
 }, ref) {
+  const [lifetime, setLifetime] = useState({ workspaceId, sdkClient, started: isOpen });
+  if (lifetime.workspaceId !== workspaceId || lifetime.sdkClient !== sdkClient) {
+    setLifetime({ workspaceId, sdkClient, started: isOpen });
+  } else if (isOpen && !lifetime.started) {
+    setLifetime({ ...lifetime, started: true });
+  }
+  const enabled = isOpen || (keepAlive && lifetime.workspaceId === workspaceId && lifetime.sdkClient === sdkClient && lifetime.started);
   const isMobile = useIsMobile();
   const viewport = useVisualViewport();
   const connected = useConnectionStore((state) => state.connected);
@@ -88,11 +92,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
   const [activeTabServerId, setActiveTabServerId] = useState<string | null>(null);
-  const [panelHeight, setPanelHeight] = useState(DEFAULT_HEIGHT);
   const [connectionTarget, setConnectionTarget] = useState<CachedTerminal | null>(null);
-  const panelBodyRef = useRef<HTMLDivElement | null>(null);
-  const startYRef = useRef(0);
-  const startHeightRef = useRef(0);
   const reconnectAttemptRef = useRef(0);
 
   const terminalCacheRef = useRef<TerminalCache>(createTerminalCache());
@@ -227,14 +227,14 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   }, [handleTerminalEvent]);
 
   useEffect(() => {
-    if (!workspaceId || !isOpen) {
+    if (!workspaceId || !enabled) {
       setTabs([]);
       setActiveTabServerId(null);
       autoCreateRef.current = false;
       terminalCacheRef.current.disposeAll();
     }
 
-    if (!workspaceId || !isOpen || !sdkClient || !connected) {
+    if (!workspaceId || !enabled || !sdkClient || !connected) {
       if (activeConnectionRef.current) {
         activeConnectionRef.current.disconnect();
         activeConnectionRef.current = null;
@@ -334,7 +334,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       currentConn = null;
       eventsConnRef.current = null;
     };
-  }, [workspaceId, isOpen, sdkClient, connected]);
+  }, [workspaceId, enabled, sdkClient, connected]);
 
   const onOutput = useCallback((serverSessionId: string) => (data: string) => {
     const cached = terminalCacheRef.current.get(serverSessionId);
@@ -423,9 +423,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   }, [connected, activeTabServerId, sdkClient, workspacePath]);
 
   useEffect(() => {
-    if (!isOpen || !activeTabServerId) return;
+    if (!enabled || !activeTabServerId) return;
     attachActiveTerminal();
-  }, [isOpen, activeTabServerId, attachActiveTerminal]);
+  }, [enabled, activeTabServerId, attachActiveTerminal]);
 
   useEffect(() => {
     if (connectionTarget && connectionTarget.serverSessionId) {
@@ -447,7 +447,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   useEffect(() => {
     if (
       !connected ||
-      !isOpen ||
+      !enabled ||
       !activeTabServerId ||
       activeTabStatus !== 'disconnected' ||
       reconnectAttemptRef.current >= 5
@@ -460,7 +460,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     }, delay);
 
     return () => clearTimeout(retryTimer);
-  }, [workspaceId, connected, isOpen, activeTabServerId, activeTabStatus, connect]);
+  }, [workspaceId, connected, enabled, activeTabServerId, activeTabStatus, connect]);
 
   const selectTerminalTab = useCallback((serverSessionId: string) => {
     if (workspaceId) {
@@ -544,47 +544,14 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     return () => clearTimeout(timer);
   }, [isOpen, activeTabServerId, focusActiveTerminal]);
 
-  const resizeTerminal = useCallback((event: PointerEvent): number | null => {
-    const panelBody = panelBodyRef.current;
-    if (!panelBody) return null;
-
-    const delta = startYRef.current - event.clientY;
-    const maxHeight = window.innerHeight * MAX_HEIGHT_RATIO;
-    const nextHeight = Math.min(
-      Math.max(startHeightRef.current + delta, MIN_HEIGHT),
-      maxHeight,
-    );
-    panelBody.style.height = `${nextHeight}px`;
-    return nextHeight;
-  }, []);
-
-  const commitTerminalHeight = useCallback((nextHeight: number) => {
-    setPanelHeight(nextHeight);
-  }, []);
-
-  const beginTerminalResize = usePointerDrag({
-    cursor: 'ns-resize',
-    onMove: resizeTerminal,
-    onCommit: commitTerminalHeight,
-  });
-
-  const handleResizeStart = useCallback((event: React.PointerEvent<HTMLElement>) => {
-    startYRef.current = event.clientY;
-    startHeightRef.current = panelBodyRef.current?.getBoundingClientRect().height ?? panelHeight;
-    beginTerminalResize(event);
-  }, [beginTerminalResize, panelHeight]);
-
-
-  // Toggled from the app header like the sessions and files panels: nothing
-  // renders while closed (the component stays mounted, so terminals keep
-  // running and the cache survives; only the view is hidden).
-  if (!isOpen) {
+  // Keep the controller and cached terminal alive while another view is selected.
+  if (!enabled) {
     return null;
   }
 
   if (!workspaceId || !workspacePath) {
     return (
-      <div className="flex items-center justify-center h-[300px] bg-sidebar text-muted-foreground text-sm">
+      <div className={cn('flex items-center justify-center bg-sidebar text-muted-foreground text-sm', isMobile ? 'h-[300px]' : 'h-full')}>
         Select a workspace to use the terminal.
       </div>
     );
@@ -684,6 +651,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', statusIndicator(tab.status))} />
           <span>{shortName} {tab.title}</span>
           <button
+            aria-label={`Close terminal ${tab.title}`}
             className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity ml-0.5"
             onClick={(e) => { e.stopPropagation(); closeTab(tab.serverSessionId); }}
           >
@@ -701,6 +669,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         <TerminalView
           key={activeTabServerId}
           cachedTerminal={activeCached}
+          visible={isOpen}
         />
       ) : (
         <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -735,7 +704,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
   }
 
   return (
-    <div data-terminal-panel="" className="md:rounded-xl md:border md:border-border/50 md:overflow-hidden">
+    <div data-terminal-panel="" className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Header with inline tabs; the panel itself toggles from the app header like the other panels */}
       <div className="flex items-center gap-1 bg-sidebar px-2 py-1 shrink-0">
         <TerminalIcon className="w-3 h-3 text-muted-foreground flex-shrink-0" />
@@ -754,6 +723,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
               <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', statusIndicator(tab.status))} />
               <span>{shortName} {tab.title}</span>
               <button
+                aria-label={`Close terminal ${tab.title}`}
                 className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity ml-0.5"
                 onClick={(e) => { e.stopPropagation(); closeTab(tab.serverSessionId); }}
               >
@@ -765,19 +735,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         </div>
       </div>
 
-      {/* Resize handle and terminal body */}
-      <div
-        className="w-full touch-none cursor-ns-resize flex items-center justify-center bg-sidebar select-none shrink-0"
-        style={{ height: 4 }}
-        onPointerDown={handleResizeStart}
-      >
-        <div className="w-10 h-0.5 bg-muted-foreground/30 rounded-full" />
-      </div>
-      <div
-        ref={panelBodyRef}
-        className="flex flex-col bg-sidebar overflow-hidden shrink-0"
-        style={{ height: panelHeight }}
-      >
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-sidebar">
         {renderTerminalContent()}
       </div>
     </div>

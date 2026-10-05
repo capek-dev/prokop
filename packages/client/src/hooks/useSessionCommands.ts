@@ -126,7 +126,8 @@ export function useSessionCommands({
   const resumeSession = useCallback((sessionId: string, options?: ResumeSessionOptions) => {
     const client = clientRef.current;
     const store = useSessionStore.getState();
-    store.setNavigationIntentForSession(
+    const alreadyOpen = useSessionBoardStore.getState().openSessionIds.includes(sessionId);
+    if (!alreadyOpen || options?.targetMessageId) store.setNavigationIntentForSession(
       sessionId,
       options?.targetMessageId
         ? { mode: 'target-message', messageId: options.targetMessageId }
@@ -162,10 +163,10 @@ export function useSessionCommands({
       }).catch(() => {});
     }
 
-    if (client && client.connected) {
+    if (client && client.connected && (!alreadyOpen || !hasCachedContent)) {
       client.sessions.resume(sessionId);
     }
-    // Update board state: if already open, just focus; otherwise replace focused pane
+    // Opening always appends a tab or focuses its existing placement.
     const board = useSessionBoardStore.getState();
     if (board.openSessionIds.includes(sessionId)) {
       board.focusSession(sessionId);
@@ -190,41 +191,7 @@ export function useSessionCommands({
     });
   }, [clientRef, sessions, workspaces, activeWorkspace, setActiveWorkspace, navigate, serverId, viewPath]);
 
-  const openAlongside = useCallback((sessionId: string) => {
-    const client = clientRef.current;
-    const store = useSessionStore.getState();
-    const board = useSessionBoardStore.getState();
-
-    // If already open, just focus
-    if (board.openSessionIds.includes(sessionId)) {
-      board.focusSession(sessionId);
-    } else {
-      board.openAlongside(sessionId);
-    }
-
-    // Load content if needed
-    const contentMeta = store.contentMetaBySession[sessionId];
-    const hasCachedContent = contentMeta?.status === 'ready' && !!store.messagesBySession[sessionId];
-    if (!hasCachedContent) {
-      store.beginSessionContentLoad(sessionId);
-    }
-
-    if (client && client.connected) {
-      client.sessions.resume(sessionId);
-    }
-
-    // Navigate with open param
-    const newBoard = useSessionBoardStore.getState();
-    const openParam = newBoard.openSessionIds.length > 1
-      ? newBoard.openSessionIds.join(',')
-      : undefined;
-    navigate({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      to: `/server/$serverId${viewPath}/session/$sessionId` as any,
-      params: { serverId, sessionId: newBoard.focusedSessionId ?? sessionId },
-      ...(openParam ? { search: { open: openParam } as Record<string, unknown> } : {}),
-    });
-  }, [clientRef, navigate, serverId, viewPath]);
+  const openAlongside = useCallback((sessionId: string) => resumeSession(sessionId), [resumeSession]);
 
   const closeSession = useCallback((sessionId: string) => {
     const client = clientRef.current;

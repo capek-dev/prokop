@@ -1,116 +1,74 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
+import { useServerDataStore } from '@/stores/serverDataStore';
+import { createDefaultViewLayout, findViewRegion, sessionViewId, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
 
-describe('sessionBoardStore layout modes', () => {
+describe('session tab navigation', () => {
   beforeEach(() => {
-    useSessionBoardStore.setState({
-      openSessionIds: [],
-      focusedSessionId: null,
-      layoutMode: 'focused',
-    });
+    useServerDataStore.setState({ serverId: 'server' });
+    useSessionBoardStore.setState({ openSessionIds: [], focusedSessionId: null });
+    useWorkspaceViewStore.setState({ layout: createDefaultViewLayout() });
   });
+  afterEach(() => { localStorage.clear(); });
 
-  test('opens a normal session in the focused layout', () => {
-    useSessionBoardStore.getState().openInFocusedPane('session-a');
-
-    expect(useSessionBoardStore.getState()).toMatchObject({
-      openSessionIds: ['session-a'],
-      focusedSessionId: 'session-a',
-      layoutMode: 'focused',
-    });
-  });
-
-  test('open alongside preserves both sessions and reveals the board', () => {
+  test('normal opening appends tabs and reopening focuses a unique moved tab', () => {
     const store = useSessionBoardStore.getState();
-    store.openInFocusedPane('session-a');
-    store.openAlongside('session-b');
-
-    expect(useSessionBoardStore.getState()).toMatchObject({
-      openSessionIds: ['session-a', 'session-b'],
-      focusedSessionId: 'session-b',
-      layoutMode: 'board',
-    });
+    store.openInFocusedPane('a');
+    store.openInFocusedPane('b');
+    const first = sessionViewId('server', 'a');
+    useWorkspaceViewStore.getState().moveView(first, 'right');
+    store.openInFocusedPane('a');
+    expect(useSessionBoardStore.getState()).toMatchObject({ openSessionIds: ['a', 'b'], focusedSessionId: 'a' });
+    expect(findViewRegion(useWorkspaceViewStore.getState().layout, first)).toBe('right');
+    expect(Object.values(useWorkspaceViewStore.getState().layout.groups).flatMap((group) => group.viewIds).filter((id) => id === first)).toEqual([first]);
   });
 
-  test('switching to focused layout does not close other sessions', () => {
+  test('supports more than six sessions through both opening paths and route restoration', () => {
+    const ids = Array.from({ length: 12 }, (_, i) => 'session-' + i);
+    ids.forEach((id, index) => index % 2 ? useSessionBoardStore.getState().openAlongside(id) : useSessionBoardStore.getState().openInFocusedPane(id));
+    expect(useSessionBoardStore.getState().openSessionIds).toEqual(ids);
+    useSessionBoardStore.getState().clearBoard();
+    useSessionBoardStore.getState().hydrateFromRoute(ids[8], ids);
+    expect(useSessionBoardStore.getState()).toMatchObject({ openSessionIds: ids, focusedSessionId: ids[8] });
+  });
+
+  test('progressive route hydration preserves moved sessions and does not steal focus from a file', () => {
     const store = useSessionBoardStore.getState();
-    store.openInFocusedPane('session-a');
-    store.openAlongside('session-b');
-    store.setLayoutMode('focused');
-
-    expect(useSessionBoardStore.getState()).toMatchObject({
-      openSessionIds: ['session-a', 'session-b'],
-      focusedSessionId: 'session-b',
-      layoutMode: 'focused',
-    });
+    store.hydrateFromRoute('a', ['a']);
+    const first = sessionViewId('server', 'a');
+    useWorkspaceViewStore.getState().moveView(first, 'bottom');
+    useWorkspaceViewStore.getState().activateView('explorer');
+    store.hydrateFromRoute('a', ['a', 'b']);
+    expect(findViewRegion(useWorkspaceViewStore.getState().layout, first)).toBe('bottom');
+    expect(useWorkspaceViewStore.getState().layout.groups.right.activeId).toBe('explorer');
+    expect(useWorkspaceViewStore.getState().layout.groups.bottom.activeId).toBe(first);
   });
 
-  test('restores board layout when the initial route contains multiple sessions', () => {
-    useSessionBoardStore.getState().hydrateFromRoute(
-      'session-b',
-      ['session-a', 'session-b'],
-    );
-
-    expect(useSessionBoardStore.getState()).toMatchObject({
-      openSessionIds: ['session-a', 'session-b'],
-      focusedSessionId: 'session-b',
-      layoutMode: 'board',
-    });
-  });
-
-  test('reveals board when progressive hydration grows past one session', () => {
-    // Overview F5: the focused session validates first, other route `open`
-    // IDs join the store one fetch later. The second hydration pass must
-    // still reveal the board instead of keeping the focused tab layout.
-    useSessionBoardStore.getState().hydrateFromRoute(
-      'session-b',
-      ['session-b'],
-    );
-    expect(useSessionBoardStore.getState().layoutMode).toBe('focused');
-
-    useSessionBoardStore.getState().hydrateFromRoute(
-      'session-b',
-      ['session-a', 'session-b', 'session-c'],
-    );
-
-    expect(useSessionBoardStore.getState()).toMatchObject({
-      openSessionIds: ['session-a', 'session-b', 'session-c'],
-      focusedSessionId: 'session-b',
-      layoutMode: 'board',
-    });
-  });
-
-  test('restores the persisted tabs preference on route hydration', () => {
-    localStorage.setItem('prokopai_board_layout_preference', 'tabs');
-    useSessionBoardStore.getState().hydrateFromRoute(
-      'session-b',
-      ['session-a', 'session-b'],
-    );
-
-    expect(useSessionBoardStore.getState().layoutMode).toBe('tabs');
-  });
-
-  test('setLayoutMode persists multi-pane preferences but not focused', () => {
-    useSessionBoardStore.getState().setLayoutMode('tabs');
-    expect(localStorage.getItem('prokopai_board_layout_preference')).toBe('tabs');
-
-    useSessionBoardStore.getState().setLayoutMode('board');
-    expect(localStorage.getItem('prokopai_board_layout_preference')).toBe('board');
-
-    useSessionBoardStore.getState().setLayoutMode('focused');
-    expect(localStorage.getItem('prokopai_board_layout_preference')).toBe('board');
-  });
-
-  test('returns to focused layout when only one session remains', () => {
+  test('closing a session removes only its layout entry and selects its neighbor', () => {
     const store = useSessionBoardStore.getState();
-    store.openInFocusedPane('session-a');
-    store.openAlongside('session-b');
-    store.removeFromBoard('session-b');
+    store.hydrateFromRoute('b', ['a', 'b', 'c']);
+    store.removeFromBoard('b');
+    expect(useSessionBoardStore.getState()).toMatchObject({ openSessionIds: ['a', 'c'], focusedSessionId: 'a' });
+    expect(Object.values(useWorkspaceViewStore.getState().layout.groups).flatMap((group) => group.viewIds)).not.toContain(sessionViewId('server', 'b'));
+  });
 
-    expect(useSessionBoardStore.getState()).toMatchObject({
-      openSessionIds: ['session-a'],
-      focusedSessionId: 'session-a',
-      layoutMode: 'focused',
-    });
+  test('fork replacement preserves placement and deduplicates an already-open target', () => {
+    const store = useSessionBoardStore.getState();
+    store.openInFocusedPane('a');
+    useWorkspaceViewStore.getState().moveView(sessionViewId('server', 'a'), 'left');
+    store.replaceSessionId('a', 'fork');
+    expect(findViewRegion(useWorkspaceViewStore.getState().layout, sessionViewId('server', 'fork'))).toBe('left');
+    store.openInFocusedPane('b');
+    store.replaceSessionId('b', 'fork');
+    expect(useSessionBoardStore.getState().openSessionIds).toEqual(['fork']);
+  });
+
+  test('invalid-session removal and clear remove layout references', () => {
+    const store = useSessionBoardStore.getState();
+    store.hydrateFromRoute('b', ['a', 'b']);
+    store.removeInvalidSessions(new Set(['a']));
+    expect(useSessionBoardStore.getState()).toMatchObject({ openSessionIds: ['a'], focusedSessionId: 'a' });
+    store.clearBoard();
+    expect(useWorkspaceViewStore.getState().layout.groups.center.viewIds).toEqual(['conversations', 'editor']);
   });
 });

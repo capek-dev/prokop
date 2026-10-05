@@ -5,7 +5,6 @@ import { useServerDataStore } from '@/stores/serverDataStore';
 import {
   useSessionBoardStore,
   parseOpenSessionIds,
-  MAX_PANES,
 } from '@/stores/sessionBoardStore';
 
 export type BoardScope =
@@ -27,7 +26,6 @@ interface BoardRouteSyncOptions {
  * - Filter out IDs not in the valid session set
  * - Workspace scope: session must belong to scope.workspaceId
  * - Overview scope: session must belong to an accessible workspace
- * - Clamp to MAX_PANES
  * - Fall back to first valid session if focused is invalid
  */
 export function useBoardRouteSync({ scope }: BoardRouteSyncOptions): void {
@@ -49,6 +47,7 @@ export function useBoardRouteSync({ scope }: BoardRouteSyncOptions): void {
 
   const sessions = useSessionStore(s => s.sessions);
   const workspaces = useServerDataStore(s => s.workspaces);
+  const serverId = useServerDataStore(s => s.serverId);
 
   useEffect(() => {
     // Build the valid session set based on scope
@@ -90,23 +89,11 @@ export function useBoardRouteSync({ scope }: BoardRouteSyncOptions): void {
       focusedId = openIds[0] ?? null;
     }
 
-    // Clamp to MAX_PANES (but always keep focused session)
-    if (openIds.length > MAX_PANES) {
-      const idx = focusedId ? openIds.indexOf(focusedId) : -1;
-      if (idx !== -1) {
-        // Keep focused + first N-1 others
-        const withoutFocused = openIds.filter(id => id !== focusedId);
-        openIds = [focusedId, ...withoutFocused.slice(0, MAX_PANES - 1)];
-      } else {
-        openIds = openIds.slice(0, MAX_PANES);
-      }
-    }
-
     // Sync key to avoid redundant store writes
-    const syncKey = `${focusedId ?? ''}|${openIds.join(',')}`;
+    const syncKey = JSON.stringify([serverId, focusedId, openIds]);
     if (syncKey === lastSyncKey.current) return;
     lastSyncKey.current = syncKey;
 
     useSessionBoardStore.getState().hydrateFromRoute(focusedId, openIds);
-  }, [searchOpen, sessionIdFromUrl, sessions, workspaces, scope]);
+  }, [serverId, searchOpen, sessionIdFromUrl, sessions, workspaces, scope]);
 }

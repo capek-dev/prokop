@@ -5,13 +5,13 @@ import { HeaderPanelToggles } from '@/components/app/HeaderPanelToggles';
 
 function renderToggles(overrides: Partial<Parameters<typeof HeaderPanelToggles>[0]> = {}) {
   const props = {
-    sessionsActive: false,
-    onToggleSessions: vi.fn(),
-    filesActive: false,
-    onToggleFiles: vi.fn(),
-    terminalActive: false,
-    onToggleTerminal: vi.fn(),
-    hasWorkspace: true,
+    leftActive: false,
+    onToggleLeft: vi.fn(),
+    rightActive: false,
+    onToggleRight: vi.fn(),
+    bottomActive: false,
+    onToggleBottom: vi.fn(),
+    hasRightDock: true,
     onOpenSettings: vi.fn(),
     ...overrides,
   };
@@ -20,6 +20,13 @@ function renderToggles(overrides: Partial<Parameters<typeof HeaderPanelToggles>[
 }
 
 describe('HeaderPanelToggles', () => {
+  test('keeps content labels for the single-surface mobile navigation', () => {
+    renderToggles({ mobile: true });
+    expect(screen.getByRole('button', { name: 'Show Sessions' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show Files' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show Terminal' })).toBeInTheDocument();
+  });
+
   test('shows a quiet update dot and opens settings directly', async () => {
     const user = userEvent.setup();
     const props = renderToggles({ updateVersion: '1.15.0' });
@@ -37,22 +44,22 @@ describe('HeaderPanelToggles', () => {
 
   test('renders direct toggles for panels and settings, reflecting active state', async () => {
     const user = userEvent.setup();
-    const props = renderToggles({ sessionsActive: true });
+    const props = renderToggles({ leftActive: true });
 
-    const sessions = screen.getByRole('button', { name: /hide sessions/i });
+    const sessions = screen.getByRole('button', { name: /hide left dock/i });
     expect(sessions).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: /show files/i })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: /show terminal/i })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /show right dock/i })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: /show bottom dock/i })).toHaveAttribute('aria-pressed', 'false');
 
-    await user.click(screen.getByRole('button', { name: /show terminal/i }));
-    expect(props.onToggleTerminal).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: /show bottom dock/i }));
+    expect(props.onToggleBottom).toHaveBeenCalledTimes(1);
   });
 
   test('opens settings directly even without a workspace', async () => {
     const user = userEvent.setup();
-    const props = renderToggles({ hasWorkspace: false });
+    const props = renderToggles({ hasRightDock: false });
 
-    expect(screen.queryByRole('button', { name: /files/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /right dock/i })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: /settings/i }));
     expect(screen.queryByRole('menuitem', { name: /workspace settings/i })).toBeNull();

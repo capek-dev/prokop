@@ -443,7 +443,8 @@ export function handleSessionForked(
     cacheWriteTokens: 0,
     noCacheTokens: 0,
   });
-  ctx.navigateToSession(forkedSession.id);
+  const openIds = useSessionBoardStore.getState().openSessionIds;
+  ctx.navigateToSessionWithOpen(forkedSession.id, openIds.length > 1 ? openIds.join(',') : undefined);
   ctx.resumeSessionAfterCreate(forkedSession.id);
   sessionAccessTimesRef.current.set(forkedSession.id, Date.now());
   clearCompletion(forkedSession.id);

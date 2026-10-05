@@ -8,17 +8,17 @@ import { useKeybindingStore } from '@/stores/keybindingStore';
 
 function createConfig(): KeyboardShortcutsConfig {
   return {
-    onOpenSidebar: vi.fn(),
-    onOpenTerminal: vi.fn(),
-    onOpenFilesPanel: vi.fn(),
+    onFocusLeftDock: vi.fn(),
+    onFocusBottomDock: vi.fn(),
+    onFocusRightDock: vi.fn(),
     onNewSession: vi.fn(),
     onToggleViewMode: vi.fn(),
-    onCloseFocusedPanel: vi.fn(),
+    onCloseFocusedDock: vi.fn(),
     onFocusChatInput: vi.fn(),
     onStopStreaming: vi.fn(),
     onToggleAutoFollow: vi.fn(),
-    onFocusPane: vi.fn(),
-    onCyclePane: vi.fn(),
+    onFocusTab: vi.fn(),
+    onCycleTab: vi.fn(),
   };
 }
 
@@ -54,11 +54,24 @@ describe('useKeyboardShortcuts', () => {
     expect(config.onNewSession).toHaveBeenCalledTimes(1);
   });
 
+  test('dispatches the default dock commands', () => {
+    const config = createConfig();
+    render(<Harness config={config} />);
+    press(document.body, '1', 'Digit1', { ctrlKey: true });
+    press(document.body, '2', 'Digit2', { ctrlKey: true });
+    press(document.body, 't', 'KeyT', { ctrlKey: true });
+    press(document.body, 'Escape', 'Escape', { shiftKey: true });
+    expect(config.onFocusLeftDock).toHaveBeenCalledTimes(1);
+    expect(config.onFocusRightDock).toHaveBeenCalledTimes(1);
+    expect(config.onFocusBottomDock).toHaveBeenCalledTimes(1);
+    expect(config.onCloseFocusedDock).toHaveBeenCalledTimes(1);
+  });
+
   test('reacts to custom bindings and explicit unassignment', () => {
     useKeybindingStore.setState({
       overrides: {
         'session.create': 'alt+n',
-        'navigation.files': null,
+        'dock.focusRight': null,
       },
     });
     const config = createConfig();
@@ -68,18 +81,20 @@ describe('useKeyboardShortcuts', () => {
     press(document.body, '2', 'Digit2', { ctrlKey: true });
 
     expect(config.onNewSession).toHaveBeenCalledTimes(1);
-    expect(config.onOpenFilesPanel).not.toHaveBeenCalled();
+    expect(config.onFocusRightDock).not.toHaveBeenCalled();
   });
 
-  test('dispatches pane commands with their arguments', () => {
+  test('dispatches tab commands with their arguments', () => {
     const config = createConfig();
     render(<Harness config={config} />);
 
     press(document.body, '3', 'Digit3', { altKey: true });
     press(document.body, 'ArrowLeft', 'ArrowLeft', { altKey: true, shiftKey: true });
 
-    expect(config.onFocusPane).toHaveBeenCalledWith(2);
-    expect(config.onCyclePane).toHaveBeenCalledWith(-1);
+    expect(config.onFocusTab).toHaveBeenCalledWith(2);
+    expect(config.onCycleTab).toHaveBeenCalledWith(-1);
+    press(document.body, '9', 'Digit9', { altKey: true });
+    expect(config.onFocusTab).toHaveBeenLastCalledWith(8);
   });
 
   test('stops streaming once on double Escape in the chat input', () => {

@@ -5,16 +5,16 @@ const FIT_DEBOUNCE_MS = 120;
 
 interface TerminalViewProps {
   cachedTerminal: CachedTerminal;
+  visible?: boolean;
 }
 
-export function TerminalView({ cachedTerminal }: TerminalViewProps) {
+export function TerminalView({ cachedTerminal, visible = true }: TerminalViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
-    const { terminal, fitAddon } = cachedTerminal;
+    const { terminal } = cachedTerminal;
     if (!cachedTerminal.isOpened) {
       terminal.open(container);
       // eslint-disable-next-line react-hooks/immutability
@@ -22,66 +22,41 @@ export function TerminalView({ cachedTerminal }: TerminalViewProps) {
     } else if (terminal.element) {
       container.appendChild(terminal.element);
     }
+    return () => { terminal.element?.remove(); };
+  }, [cachedTerminal]);
 
-    requestAnimationFrame(() => {
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !visible) return;
+    const { terminal, fitAddon } = cachedTerminal;
+    let frame: number | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const fit = () => {
+      frame = null;
+      if (!container.clientWidth || !container.clientHeight) return;
       try {
         fitAddon.fit();
       } catch {
-        // Container might not be visible yet
+        // ResizeObserver retries when the container obtains usable dimensions.
       }
-
-      if (terminal.cols <= 1 || terminal.rows <= 1) {
-        const waitForDimensions = () => {
-          try {
-            fitAddon.fit();
-            if (terminal.cols > 1 && terminal.rows > 1) return;
-          } catch {
-            // Container might not be ready
-          }
-          requestAnimationFrame(waitForDimensions);
-        };
-        requestAnimationFrame(waitForDimensions);
-      }
-    });
-
-    terminal.focus();
-
-    let fitDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const runDebouncedFit = () => {
-      if (fitDebounceTimer !== null) clearTimeout(fitDebounceTimer);
-      fitDebounceTimer = setTimeout(() => {
-        fitDebounceTimer = null;
-        requestAnimationFrame(() => {
-          try {
-            fitAddon.fit();
-          } catch {
-            // Container might not be visible
-          }
-        });
-      }, FIT_DEBOUNCE_MS);
     };
-
-    const observer = new ResizeObserver(runDebouncedFit);
+    frame = requestAnimationFrame(fit);
+    terminal.focus();
+    const observer = new ResizeObserver(() => {
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        if (frame !== null) cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(fit);
+      }, FIT_DEBOUNCE_MS);
+    });
     observer.observe(container);
-
     return () => {
       observer.disconnect();
-      if (fitDebounceTimer !== null) {
-        clearTimeout(fitDebounceTimer);
-        fitDebounceTimer = null;
-      }
-      if (terminal.element && terminal.element.parentElement) {
-        terminal.element.parentElement.removeChild(terminal.element);
-      }
+      if (timer !== null) clearTimeout(timer);
+      if (frame !== null) cancelAnimationFrame(frame);
     };
-  }, [cachedTerminal]);
+  }, [cachedTerminal, visible]);
 
-  return (
-    <div
-      ref={containerRef}
-      className="w-full h-full"
-      onFocus={() => cachedTerminal.terminal.focus()}
-    />
-  );
+  return <div ref={containerRef} className="w-full h-full" onFocus={() => cachedTerminal.terminal.focus()} />;
 }

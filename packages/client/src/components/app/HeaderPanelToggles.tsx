@@ -1,18 +1,19 @@
-import { FolderOpen, PanelLeft, Settings, SquareTerminal } from 'lucide-react';
+import { PanelBottom, PanelLeft, PanelRight, Settings } from 'lucide-react';
 import { isWindows } from '@/lib/platform';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface HeaderPanelTogglesProps {
-  sessionsActive: boolean;
-  onToggleSessions: () => void;
-  filesActive: boolean;
-  onToggleFiles: () => void;
-  terminalActive: boolean;
-  onToggleTerminal: () => void;
-  /** True when a workspace is active; gates the Files toggle. */
-  hasWorkspace: boolean;
+  leftActive: boolean;
+  onToggleLeft: () => void;
+  rightActive: boolean;
+  onToggleRight: () => void;
+  bottomActive: boolean;
+  onToggleBottom: () => void;
+  /** Whether the right dock has content in the current scope. */
+  hasRightDock: boolean;
+  mobile?: boolean;
   onOpenSettings: () => void;
   updateVersion?: string | null;
 }
@@ -23,16 +24,20 @@ interface HeaderPanelTogglesProps {
  * in a collapsed menu on mobile.
  */
 export function HeaderPanelToggles({
-  sessionsActive,
-  onToggleSessions,
-  filesActive,
-  onToggleFiles,
-  terminalActive,
-  onToggleTerminal,
-  hasWorkspace,
+  leftActive,
+  onToggleLeft,
+  rightActive,
+  onToggleRight,
+  bottomActive,
+  onToggleBottom,
+  hasRightDock,
+  mobile = false,
   onOpenSettings,
   updateVersion,
 }: HeaderPanelTogglesProps) {
+  const leftLabel = mobile ? 'Sessions' : 'left dock';
+  const rightLabel = mobile ? 'Files' : 'right dock';
+  const bottomLabel = mobile ? 'Terminal' : 'bottom dock';
   const tooltipSide = isWindows() ? 'bottom' : undefined;
 
   return (
@@ -43,34 +48,34 @@ export function HeaderPanelToggles({
             <Button
               variant="ghost"
               size="icon-sm"
-              onClick={onToggleSessions}
-              aria-pressed={sessionsActive}
-              aria-label={sessionsActive ? 'Hide Sessions' : 'Show Sessions'}
-              className={sessionsActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
+              onClick={onToggleLeft}
+              aria-pressed={leftActive}
+              aria-label={`${leftActive ? 'Hide' : 'Show'} ${leftLabel}`}
+              className={leftActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
             >
-              <PanelLeft className="h-4 w-4" />
+              <PanelLeft />
             </Button>
           </TooltipTrigger>
           <TooltipContent side={tooltipSide}>
-            {sessionsActive ? 'Hide Sessions' : 'Show Sessions'}
+            {`${leftActive ? 'Hide' : 'Show'} ${leftLabel}`}
           </TooltipContent>
         </Tooltip>
-        {hasWorkspace && (
+        {hasRightDock && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon-sm"
-                onClick={onToggleFiles}
-                aria-pressed={filesActive}
-                aria-label={filesActive ? 'Hide Files' : 'Show Files'}
-                className={filesActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
+                onClick={onToggleRight}
+                aria-pressed={rightActive}
+                aria-label={`${rightActive ? 'Hide' : 'Show'} ${rightLabel}`}
+                className={rightActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
               >
-                <FolderOpen className="h-4 w-4" />
+                <PanelRight />
               </Button>
             </TooltipTrigger>
             <TooltipContent side={tooltipSide}>
-              {filesActive ? 'Hide Files' : 'Show Files'}
+              {`${rightActive ? 'Hide' : 'Show'} ${rightLabel}`}
             </TooltipContent>
           </Tooltip>
         )}
@@ -79,16 +84,16 @@ export function HeaderPanelToggles({
             <Button
               variant="ghost"
               size="icon-sm"
-              onClick={onToggleTerminal}
-              aria-pressed={terminalActive}
-              aria-label={terminalActive ? 'Hide Terminal' : 'Show Terminal'}
-              className={terminalActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
+              onClick={onToggleBottom}
+              aria-pressed={bottomActive}
+              aria-label={`${bottomActive ? 'Hide' : 'Show'} ${bottomLabel}`}
+              className={bottomActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
             >
-              <SquareTerminal className="h-4 w-4" />
+              <PanelBottom />
             </Button>
           </TooltipTrigger>
           <TooltipContent side={tooltipSide}>
-            {terminalActive ? 'Hide Terminal' : 'Show Terminal'}
+            {`${bottomActive ? 'Hide' : 'Show'} ${bottomLabel}`}
           </TooltipContent>
         </Tooltip>
         <div className={cn('w-px h-5 bg-border/60 mx-1')} />

@@ -11,7 +11,7 @@ import {
   type SessionPaneRegistry,
 } from '@/contexts/SessionPaneRegistryContext';
 import { useServerSessionManager } from '@/hooks/useServerSessionManager';
-import { useChatLayoutStore } from '@/stores/chatLayoutStore';
+import { useDockStore } from '@/stores/dockStore';
 import { SidebarProvider } from '@/components/ui/sidebar';
 
 import { AppHeader } from '@/components/app/AppHeader';
@@ -68,7 +68,8 @@ export default function ServerShell() {
     getHandle: (sessionId) => paneHandles.get(sessionId),
   }), [paneHandles]);
 
-  const sessionsPanelWidth = useChatLayoutStore((state) => state.sessionsPanelWidth);
+  const leftDock = useDockStore((state) => state.docks.left);
+  const setDockOpen = useDockStore((state) => state.setDockOpen);
 
   const viewRefs = useMemo(() => ({
     sidebarRef,
@@ -174,7 +175,7 @@ export default function ServerShell() {
   return (
     <SessionPaneRegistryContext.Provider value={paneRegistry}>
       <ServerClientProvider value={serverClientValue}>
-        <SidebarProvider panelId="sessions" defaultOpen={true} className="flex-col" style={{ '--sidebar-width': `${sessionsPanelWidth}px`, '--header-height': '2.75rem' } as React.CSSProperties}>
+        <SidebarProvider panelId="sessions" open={leftDock.open} onOpenChange={(open) => setDockOpen('left', open)} className="flex-col" style={{ '--sidebar-width': `${leftDock.size}px`, '--header-height': '2.75rem' } as React.CSSProperties}>
           <div className="relative bg-background">
             <AppHeader />
             {!sessionManager.connected && (

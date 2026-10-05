@@ -1,5 +1,9 @@
 import { Suspense, lazy } from 'react';
-import { useChatLayoutStore } from '@/stores/chatLayoutStore';
+import { useWorkspaceViewVisible } from '@/components/app/WorkspaceViewHost';
+import { useWorkspaceViewStore } from '@/stores/workspaceViewStore';
+import { useDockStore } from '@/stores/dockStore';
+import { DockRegion } from '@/components/layout/DockRegion';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import type { TerminalPanelHandle } from '@/components/layout/TerminalPanel';
 import type { ProkopaiClient } from '@prokopai/sdk';
@@ -9,6 +13,7 @@ const TerminalPanel = lazy(() =>
 );
 
 interface AppPanelsProps {
+  embedded?: boolean;
   sdkClient: ProkopaiClient | null;
   terminalPanelRef: React.RefObject<TerminalPanelHandle | null>;
 }
@@ -24,16 +29,19 @@ function TerminalLoadingFallback() {
 export function AppPanels({
   sdkClient,
   terminalPanelRef,
+  embedded = false,
 }: AppPanelsProps) {
-  const showTerminalPanel = useChatLayoutStore((s) => s.showTerminalPanel);
-  const setShowTerminalPanel = useChatLayoutStore((s) => s.setShowTerminalPanel);
+  const visible = useWorkspaceViewVisible();
+  const isMobile = useIsMobile();
+  const bottomOpen = useDockStore((s) => s.docks.bottom.open);
+  const setDockOpen = useDockStore((s) => s.setDockOpen);
   const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
 
   const workspaceId = activeWorkspace?.id;
   const workspacePath = activeWorkspace?.path;
   const workspaceName = activeWorkspace?.name;
 
-  return (
+  const terminal = (
     <Suspense fallback={<TerminalLoadingFallback />}>
       <TerminalPanel
         ref={terminalPanelRef}
@@ -42,9 +50,17 @@ export function AppPanels({
         workspaceName={workspaceName}
         additionalPaths={activeWorkspace?.additionalPaths ?? []}
         sdkClient={sdkClient}
-        isOpen={showTerminalPanel}
-        onClose={() => setShowTerminalPanel(false)}
+        isOpen={embedded ? visible : bottomOpen}
+        keepAlive={embedded}
+        onClose={() => {
+          if (!embedded) setDockOpen('bottom', false);
+          else if (isMobile) useWorkspaceViewStore.getState().setMobileTerminalOpen(false);
+          else useWorkspaceViewStore.getState().hideView('terminals');
+        }}
       />
     </Suspense>
   );
+
+  if (embedded) return terminal;
+  return <DockRegion position="bottom" overlay={isMobile}>{terminal}</DockRegion>;
 }

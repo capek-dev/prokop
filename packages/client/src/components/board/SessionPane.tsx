@@ -1,7 +1,6 @@
 import { useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import type { Part, Message, ProkopaiClient } from '@prokopai/sdk';
-import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
 import { ChatView } from '@/components/chat/ChatView';
 import type { MessageInputHandle } from '@/components/chat/MessageInput';
 import { ChatLoadingState } from '@/components/shared/LoadingSkeleton';
@@ -18,7 +17,7 @@ import {
   usePinMessageMutation,
   useUnpinMessageMutation,
 } from '@/hooks/queries';
-import { SessionPaneHeader } from './SessionPaneHeader';
+import { WorkspaceHeader } from '@/components/app/WorkspaceHeader';
 import { useSessionPaneRegistry } from '@/contexts/SessionPaneRegistryContext';
 import type { SessionPaneHandle } from '@/contexts/SessionPaneRegistryContext';
 import type { QueuedMessage } from '@prokopai/sdk';
@@ -31,30 +30,12 @@ export interface SessionPaneProps {
   sessionId: string;
   sdkClient: ProkopaiClient | null;
   serverUrl: string | null;
-  isFocused: boolean;
-  isCompact: boolean;
-  showPaneChrome: boolean;
-  onRemoveFromBoard?: (sessionId: string) => void;
-  onCloseOthers?: () => void;
-  onCloseAll?: () => void;
-  dragAttributes?: DraggableAttributes;
-  dragListeners?: DraggableSyntheticListeners;
-  setDragActivatorNode?: (element: HTMLButtonElement | null) => void;
 }
 
 export function SessionPane({
   sessionId,
   sdkClient,
   serverUrl,
-  isFocused,
-  isCompact: _isCompact,
-  showPaneChrome,
-  onRemoveFromBoard,
-  onCloseOthers,
-  onCloseAll,
-  dragAttributes,
-  dragListeners,
-  setDragActivatorNode,
 }: SessionPaneProps) {
   const commands = useSessionCommands();
 
@@ -132,10 +113,6 @@ export function SessionPane({
       registry.unregister(sessionId);
     };
   }, [sessionId, handle, registry]);
-
-  const handleRemove = useCallback(() => {
-    onRemoveFromBoard?.(sessionId);
-  }, [sessionId, onRemoveFromBoard]);
 
   const focusBoard = useBoardFocus();
 
@@ -234,36 +211,13 @@ export function SessionPane({
     </div>
   );
 
-  if (!showPaneChrome) {
-    return (
-      <div
-        className="flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden"
-        onMouseDown={handleFocusPane}
-      >
-        {content}
-      </div>
-    );
-  }
-
   return (
     <div
-      className={`flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden md:rounded-lg ${
-        isFocused
-          ? 'bg-card'
-          : 'bg-background/50'
-      }`}
-      onMouseDown={handleFocusPane}
+      className="flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden bg-card"
+      onPointerDownCapture={handleFocusPane}
+      onFocusCapture={handleFocusPane}
     >
-      <SessionPaneHeader
-        sessionId={sessionId}
-        isFocused={isFocused}
-        onRemove={handleRemove}
-        onCloseOthers={onCloseOthers}
-        onCloseAll={onCloseAll}
-        dragAttributes={dragAttributes}
-        dragListeners={dragListeners}
-        setDragActivatorNode={setDragActivatorNode}
-      />
+      <WorkspaceHeader sessionId={sessionId} />
       {content}
     </div>
   );

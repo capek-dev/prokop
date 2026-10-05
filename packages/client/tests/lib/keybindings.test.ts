@@ -11,6 +11,24 @@ import {
 } from '@/lib/keybindings';
 
 describe('keybindings', () => {
+  test('migrates panel shortcuts while preserving explicit dock overrides', () => {
+    expect(parseStoredKeybindingSettings({ version: 1, overrides: {
+      'navigation.sessions': 'alt+l',
+      'navigation.files': null,
+      'navigation.terminal': 'alt+t',
+      'panel.closeFocused': 'alt+x',
+      'dock.focusBottom': null,
+      'pane.focus.2': 'alt+k',
+      'pane.focusNext': null,
+    } }).overrides).toEqual({
+      'dock.focusLeft': 'alt+l',
+      'dock.focusRight': null,
+      'dock.focusBottom': null,
+      'dock.closeFocused': 'alt+x',
+      'tab.focus.2': 'alt+k',
+      'tab.focusNext': null,
+    });
+  });
   test('normalizes chords and unmodified sequences', () => {
     expect(normalizeKeybinding('Shift+MOD+KeyF')).toBe('mod+shift+f');
     expect(normalizeKeybinding('Esc > Escape')).toBe('escape>escape');
@@ -36,8 +54,8 @@ describe('keybindings', () => {
   });
 
   test('finds platform-equivalent conflicts', () => {
-    expect(findKeybindingConflict('navigation.files', 'meta+1', {}, true)?.id)
-      .toBe('navigation.sessions');
+    expect(findKeybindingConflict('dock.focusRight', 'meta+1', {}, true)?.id)
+      .toBe('dock.focusLeft');
   });
 
   test('parses persisted settings fail-closed', () => {
@@ -45,15 +63,15 @@ describe('keybindings', () => {
       version: 1,
       overrides: {
         'session.create': 'ALT+KeyN',
-        'navigation.files': null,
+        'dock.focusRight': null,
         unknown: 'mod+x',
-        'navigation.terminal': 42,
+        'dock.focusBottom': 42,
       },
     })).toEqual({
       version: 1,
       overrides: {
         'session.create': 'alt+n',
-        'navigation.files': null,
+        'dock.focusRight': null,
       },
     });
     expect(parseStoredKeybindingSettings({ version: 2, overrides: {} }))

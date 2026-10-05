@@ -118,9 +118,6 @@ export function ServerDialogs({
                 const layout = useChatLayoutStore.getState();
                 if (window.innerWidth < 640) {
                   layout.setMobileSurface('editor');
-                } else {
-                  layout.setWorkbenchSurface('editor');
-                  layout.setShowFilesPanel(true);
                 }
                 closeFilePreview();
               } : undefined}

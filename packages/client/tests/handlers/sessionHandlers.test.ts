@@ -6,8 +6,11 @@ vi.mock('@/components/providers/QueryProvider', () => ({
   queryClient: { invalidateQueries: vi.fn() },
 }));
 
-import { handleSessionUpdated } from '@/handlers/serverMessage/sessionHandlers';
+import { handleSessionCreated, handleSessionForked, handleSessionUpdated } from '@/handlers/serverMessage/sessionHandlers';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
+import { useSessionBoardStore } from '@/stores/sessionBoardStore';
+import { useServerDataStore } from '@/stores/serverDataStore';
+import { createDefaultViewLayout, findViewRegion, sessionViewId, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
 
 function createContext(): SessionHandlersContext {
   return {
@@ -44,5 +47,44 @@ describe('handleSessionUpdated', () => {
       sessionId: 'session-1',
       acknowledgedAt: 25_000,
     });
+  });
+});
+
+describe('session tab lifecycle navigation', () => {
+  beforeEach(() => {
+    useServerDataStore.setState({ serverId: 'server' });
+    useSessionBoardStore.setState({ openSessionIds: [], focusedSessionId: null });
+    useWorkspaceViewStore.setState({ layout: createDefaultViewLayout() });
+  });
+
+  function lifecycleContext(): SessionHandlersContext {
+    return {
+      ...createContext(),
+      replaceSessionContent: vi.fn(),
+      sessionAccessTimesRef: { current: new Map() },
+      partIdIndexRef: { current: new Map() },
+      clearCompletion: vi.fn(), setUsageForSession: vi.fn(),
+      navigateToSessionWithOpen: vi.fn(), navigateToSession: vi.fn(), resumeSessionAfterCreate: vi.fn(),
+      pendingSessionCreateRef: { current: { workspaceId: 'workspace', boardAction: 'replace-focused' } },
+    } as unknown as SessionHandlersContext;
+  }
+
+  test('ordinary session creation appends a tab and keeps the previous session in its URL', () => {
+    useSessionBoardStore.getState().openInFocusedPane('existing');
+    const context = lifecycleContext();
+    handleSessionCreated({ type: 'session.created', session: { id: 'created', workspaceId: 'workspace' } as Session }, context);
+    expect(useSessionBoardStore.getState().openSessionIds).toEqual(['existing', 'created']);
+    expect(context.navigateToSessionWithOpen).toHaveBeenCalledWith('created', 'existing,created');
+  });
+
+  test('fork keeps the replaced tab placement and preserves unrelated tabs in the URL', () => {
+    useSessionBoardStore.getState().hydrateFromRoute('original', ['original', 'other']);
+    useWorkspaceViewStore.getState().moveView(sessionViewId('server', 'original'), 'right');
+    const context = lifecycleContext();
+    handleSessionForked({ type: 'session.forked', originalSessionId: 'original', forkedSession: { id: 'fork', workspaceId: 'workspace' } as Session, messages: [] }, context);
+    expect(useSessionBoardStore.getState().openSessionIds).toEqual(['fork', 'other']);
+    expect(findViewRegion(useWorkspaceViewStore.getState().layout, sessionViewId('server', 'fork'))).toBe('right');
+    expect(context.navigateToSessionWithOpen).toHaveBeenCalledWith('fork', 'fork,other');
+    expect(context.navigateToSession).not.toHaveBeenCalled();
   });
 });

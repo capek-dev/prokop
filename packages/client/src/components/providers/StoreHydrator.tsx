@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useLoaderData, useParams } from '@tanstack/react-router';
 import { clearSessionState } from '@/stores/sessionStore';
+import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useOverviewGroupsStore } from '@/stores/overviewGroupsStore';
 import type { CriticalServerData } from '@/lib/fetchServerData';
@@ -116,6 +117,8 @@ export function StoreHydrator({ children }: StoreHydratorProps) {
   useEffect(() => {
     return () => {
       clearSessionState();
+      // Detach this server's open tabs while retaining saved dock placements.
+      useSessionBoardStore.setState({ openSessionIds: [], focusedSessionId: null });
       useServerDataStore.getState().clearAll();
       queryClient.removeQueries({ queryKey: ['sessions'] });
       queryClient.removeQueries({ queryKey: ['config'] });

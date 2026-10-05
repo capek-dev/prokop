@@ -13,7 +13,7 @@ import { getWorkspacePreconfigs } from '@/lib/workspacePreconfigs';
  * Slim per-session header inside the primary card. Shell-level panel toggles
  * live in the global AppHeader title bar.
  */
-export function WorkspaceHeader() {
+export function WorkspaceHeader({ sessionId }: { sessionId?: string } = {}) {
   const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
   const allPreconfigs = useServerDataStore(s => s.preconfigs);
   const models = useServerDataStore(s => s.models);
@@ -24,7 +24,7 @@ export function WorkspaceHeader() {
 
   const focusedSessionId = useSessionBoardStore(s => s.focusedSessionId);
   const openSessionIds = useSessionBoardStore(s => s.openSessionIds);
-  const displayedSessionId = focusedSessionId ?? openSessionIds[0] ?? null;
+  const displayedSessionId = sessionId ?? focusedSessionId ?? openSessionIds[0] ?? null;
   const allSessions = useSessionStore(s => s.sessions);
   const currentSession = useMemo(
     () => displayedSessionId ? allSessions.find(s => s.id === displayedSessionId) ?? null : null,

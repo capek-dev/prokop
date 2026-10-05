@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import type { Ref } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Loader2, AlertCircle, X, Save, RotateCcw, Eye, Code2, RefreshCw, GitBranch, EyeOff } from 'lucide-react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { toast } from 'sonner';
 import type { ProkopaiClient, FileRevisionConflictDetails } from '@prokopai/sdk';
 import { ApiError } from '@prokopai/sdk';
+import { useWorkspaceViewVisible } from '@/components/app/WorkspaceViewHost';
 import {
   useFileEditorStore,
   isDocDirty,
@@ -35,6 +38,14 @@ interface FileEditorSurfaceProps {
   sdkClient: ProkopaiClient | null;
   serverId: string;
   workspaceId: string | undefined;
+  /** A resource host renders exactly one document; legacy surfaces retain their strip. */
+  documentId?: string;
+  documentContext?: string;
+  ref?: Ref<FileEditorSurfaceHandle>;
+}
+
+export interface FileEditorSurfaceHandle {
+  requestClose: () => void;
 }
 
 const MARKDOWN_EXTS = new Set(['md', 'markdown', 'mdx']);
@@ -60,10 +71,13 @@ function isConflictDetails(details: unknown): details is FileRevisionConflictDet
   );
 }
 
-export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEditorSurfaceProps) {
-  const docs = useFileEditorStore((s) => s.docs);
+export function FileEditorSurface({ sdkClient, serverId, workspaceId, documentId, documentContext, ref }: FileEditorSurfaceProps) {
+  const visible = useWorkspaceViewVisible();
+  const docs = useFileEditorStore(useShallow((s) => documentId
+    ? s.docs[documentId] ? { [documentId]: s.docs[documentId] } : {}
+    : s.docs));
   const openDocIds = useFileEditorStore((s) => s.openDocIds);
-  const activeDocId = useFileEditorStore((s) => s.activeDocId);
+  const activeDocId = useFileEditorStore((s) => documentId ?? s.activeDocId);
   const setActiveDoc = useFileEditorStore((s) => s.setActiveDoc);
   const updateContent = useFileEditorStore((s) => s.updateContent);
   const markLoading = useFileEditorStore((s) => s.markLoading);
@@ -110,7 +124,7 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
   const activeRoot = scopedActiveDoc?.identity.root;
   const activeWsId = scopedActiveDoc?.identity.workspaceId;
   useEffect(() => {
-    if (!sdkClient || !workspaceId || !scopedActiveDocId || !activePath) return;
+    if (!visible || !sdkClient || !workspaceId || !scopedActiveDocId || !activePath) return;
     if (activeStatus !== 'loading') return;
     if (activeContent !== '' && activeRevision !== '') return;
 
@@ -145,6 +159,7 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
       controller.abort();
     };
   }, [
+    visible,
     sdkClient,
     workspaceId,
     scopedActiveDocId,
@@ -161,7 +176,7 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
     async (docId: string, opts?: { force?: boolean; actualRevision?: string }) => {
       const store = useFileEditorStore.getState();
       const doc = store.docs[docId];
-      if (!doc || !sdkClient || !workspaceId || doc.status === 'saving') return;
+      if (!doc || !sdkClient || doc.identity.serverId !== serverId || doc.status === 'saving') return;
       const identity = doc.identity;
 
       markSaving(docId);
@@ -175,19 +190,19 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
       };
 
       try {
-        const result = await sdkClient.http.files.save(workspaceId, request);
-        saveSuccess(docId, result);
+        const result = await sdkClient.http.files.save(identity.workspaceId, request);
+        saveSuccess(docId, result, request.content);
 
         // Invalidate Git status, Git diff for the path, and browse queries so
         // other surfaces reflect the saved file.
         queryClient.invalidateQueries({ queryKey: queryKeys.files.gitStatusPrefix });
         queryClient.invalidateQueries({
-          queryKey: queryKeys.files.gitDiff(workspaceId, normalizePath(identity.path), identity.root || undefined),
+          queryKey: queryKeys.files.gitDiff(identity.workspaceId, normalizePath(identity.path), identity.root || undefined),
         });
         queryClient.invalidateQueries({ queryKey: queryKeys.files.browsePrefix });
         queryClient.invalidateQueries({
           queryKey: queryKeys.files.preview(
-            workspaceId,
+            identity.workspaceId,
             identity.path,
             identity.root || undefined,
           ),
@@ -209,13 +224,14 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
         toast.error('Failed to save file', { description: message });
       }
     },
-    [sdkClient, workspaceId, markSaving, saveSuccess, setConflict, resetStatus],
+    [sdkClient, serverId, markSaving, saveSuccess, setConflict, resetStatus],
   );
 
   // --- Close with dirty guard ---
   const requestClose = useCallback(
     (docId: string) => {
       const doc = docs[docId];
+      if (doc?.status === 'saving') return;
       if (doc && isDocDirty(doc)) {
         setClosingDocId(docId);
       } else {
@@ -224,6 +240,10 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
     },
     [docs, closeDocAction],
   );
+
+  useImperativeHandle(ref, () => ({
+    requestClose: () => { if (scopedActiveDocId) requestClose(scopedActiveDocId); },
+  }), [scopedActiveDocId, requestClose]);
 
   // Single refresh entry point: re-read the doc from disk and invalidate its
   // Git diff so both reflect external writes (LLM edits, other editors).
@@ -277,7 +297,7 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
     await handleSave(docId);
     const after = useFileEditorStore.getState().docs[docId];
     // If save succeeded (content unchanged and no conflict), close.
-    if (after && !after.conflict && after.baseContent === before) {
+    if (after && after.status === 'loaded' && !after.conflict && after.baseContent === before && after.content === before) {
       closeDocAction(docId);
       setClosingDocId(null);
     } else {
@@ -374,9 +394,12 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
       ref={surfaceRef}
       className="flex h-full min-h-0 flex-col overflow-hidden"
       data-editor-surface
+      onFocusCapture={() => {
+        if (documentId && useFileEditorStore.getState().activeDocId !== documentId) setActiveDoc(documentId);
+      }}
     >
       {/* Tabs */}
-      <div className="flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border bg-muted/30 px-1">
+      {!documentId && <div className="flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border bg-muted/30 px-1">
         {scopedOpenDocIds.map((id) => {
           const doc = docs[id];
           if (!doc) return null;
@@ -412,7 +435,7 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
             </div>
           );
         })}
-      </div>
+      </div>}
 
       {/* All open docs stay mounted in the DOM; only the active one is shown.
           This preserves CodeMirror cursor position, scroll, and undo history
@@ -432,7 +455,8 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
           >
             <ActiveFileBody
               doc={doc}
-              isActive={isActive}
+              documentContext={documentContext}
+              isActive={isActive && visible}
               mdView={mdView}
               setMdView={setMdView}
               onChange={(content) => updateContent(id, content)}
@@ -498,6 +522,7 @@ export function FileEditorSurface({ sdkClient, serverId, workspaceId }: FileEdit
 
 interface ActiveFileBodyProps {
   doc: FileDocState;
+  documentContext?: string;
   isActive: boolean;
   mdView: 'source' | 'preview';
   setMdView: (v: 'source' | 'preview') => void;
@@ -514,6 +539,7 @@ interface ActiveFileBodyProps {
 
 function ActiveFileBody({
   doc,
+  documentContext,
   isActive,
   mdView,
   setMdView,
@@ -595,8 +621,8 @@ function ActiveFileBody({
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Toolbar: path, git diff controls, markdown toggle, save */}
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1">
-        <span className="truncate text-xs text-muted-foreground" title={doc.identity.path}>
-          {doc.identity.path}
+        <span className="truncate text-xs text-muted-foreground" title={documentContext ?? doc.identity.path}>
+          {documentContext ?? doc.identity.path}
         </span>
         <div className="ml-auto flex items-center gap-1">
           {/* Git diff controls */}

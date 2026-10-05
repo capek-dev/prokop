@@ -1,13 +1,13 @@
 import {useCallback, useLayoutEffect, useRef} from 'react';
 import {useRouter} from '@tanstack/react-router';
-import {useSidebar} from '@/components/ui/sidebar';
+import { isFileViewId, isWorkspaceViewId, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
+import { useDockStore, type DockPosition } from '@/stores/dockStore';
 import {useKeyboardShortcuts} from '@/hooks/useKeyboardShortcuts';
 import {useChatLayoutStore} from '@/stores/chatLayoutStore';
 import {useServerDataStore} from '@/stores/serverDataStore';
 import type {AppSidebarHandle} from '@/components/layout/AppSidebar';
 import type {Preconfig, Workspace} from '@prokopai/sdk';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
-import { useBoardFocus } from '@/hooks/useBoardFocus';
 import { useSessionPaneRegistry } from '@/contexts/SessionPaneRegistryContext';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 
@@ -21,7 +21,6 @@ export interface AppKeyboardHandlersConfig {
   handleInterruptSession: () => void;
   serverId: string;
   createSession: (preconfigId?: string, title?: string) => void;
-  setSidebarOpen: (open: boolean) => void;
   onToggleAutoFollow?: () => void;
 }
 
@@ -35,11 +34,9 @@ export function useAppKeyboardHandlers({
   handleInterruptSession,
   serverId,
   createSession,
-  setSidebarOpen,
   onToggleAutoFollow,
 }: AppKeyboardHandlersConfig) {
   const paneRegistry = useSessionPaneRegistry();
-  const focusBoard = useBoardFocus();
 
   const focusSidebarSessionPanel = useCallback(() => {
     if (window.innerWidth < 640) {
@@ -58,16 +55,17 @@ export function useAppKeyboardHandlers({
       return;
     }
 
-    setSidebarOpen(true);
+    useWorkspaceViewStore.getState().activateView('sessions');
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         sidebarRef.current?.focusSessionPanel();
       });
     });
-  }, [setSidebarOpen, sidebarRef]);
+  }, [sidebarRef]);
 
   const focusTerminalPanel = useCallback(() => {
-    useChatLayoutStore.getState().setShowTerminalPanel(true);
+    if (window.innerWidth < 640) useWorkspaceViewStore.getState().setMobileTerminalOpen(true);
+    else useWorkspaceViewStore.getState().activateView('terminals');
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         terminalPanelRef.current?.focus();
@@ -86,7 +84,8 @@ export function useAppKeyboardHandlers({
   });
 
   const handleCloseTerminal = useCallback(() => {
-    useChatLayoutStore.getState().setShowTerminalPanel(false);
+    if (window.innerWidth < 640) useWorkspaceViewStore.getState().setMobileTerminalOpen(false);
+    else useWorkspaceViewStore.getState().hideView('terminals');
   }, []);
 
   const focusFilesPanel = useCallback(() => {
@@ -101,17 +100,14 @@ export function useAppKeyboardHandlers({
   });
 
   const focusChatInput = useCallback(() => {
+    if (window.innerWidth < 640) useChatLayoutStore.getState().setMobileSurface('chat');
     const focusedSessionId = useSessionBoardStore.getState().focusedSessionId;
-    const focusedPane = focusedSessionId
-      ? paneRegistry.getHandle(focusedSessionId)
-      : undefined;
-
-    if (focusedPane) {
-      focusedPane.focusInput();
-      return;
-    }
-
-    chatInputRef.current?.focus();
+    if (focusedSessionId) useSessionBoardStore.getState().focusSession(focusedSessionId);
+    requestAnimationFrame(() => {
+      const focusedPane = focusedSessionId ? paneRegistry.getHandle(focusedSessionId) : undefined;
+      if (focusedPane) focusedPane.focusInput();
+      else chatInputRef.current?.focus();
+    });
   }, [chatInputRef, paneRegistry]);
 
   const handleNewSession = useCallback(() => {
@@ -132,63 +128,74 @@ export function useAppKeyboardHandlers({
     }
   }, [router, serverId]);
 
-  const handleCloseFocusedPanel = useCallback(() => {
+  const focusDock = useCallback((position: DockPosition) => {
+    useDockStore.getState().setDockOpen(position, true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const dock = document.querySelector<HTMLElement>(`[data-dock-position="${position}"]`);
+        if (dock?.contains(document.activeElement)) return;
+        const target = dock?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+          ?? dock?.querySelector<HTMLElement>('[data-workspace-panel-menu]');
+        target?.focus({ preventScroll: true });
+      });
+    });
+  }, []);
+
+  const handleCloseFocusedDock = useCallback(() => {
     const activeEl = document.activeElement;
-    if (activeEl?.closest('[data-mobile-surface="sessions"]')) {
-      useChatLayoutStore.getState().setMobileSurface('chat');
+    if (window.innerWidth >= 640) {
+      const position = activeEl?.closest<HTMLElement>('[data-dock-position]')?.dataset.dockPosition;
+      if (position === 'left' || position === 'right' || position === 'bottom') {
+        useDockStore.getState().setDockOpen(position, false);
+        requestAnimationFrame(() => {
+          document.querySelector<HTMLElement>('[data-dock-position="center"] [role="tab"][aria-selected="true"]')?.focus({ preventScroll: true });
+        });
+      }
+      return;
+    }
+    const view = activeEl?.closest<HTMLElement>('[data-workspace-view]')?.dataset.workspaceView;
+    if (view && isFileViewId(view)) {
+      useChatLayoutStore.getState().setMobileSurface('files');
+    } else if (isWorkspaceViewId(view)) {
+      if (view === 'terminals') handleCloseTerminal();
+      else useChatLayoutStore.getState().setMobileSurface(view === 'editor' ? 'files' : 'chat');
     } else if (activeEl?.closest('[data-terminal-panel]')) {
       handleCloseTerminal();
-    } else if (activeEl?.closest('[data-panel-id="files"]')) {
-      useChatLayoutStore.getState().setShowFilesPanel(false);
     } else if (activeEl?.closest('[data-editor-surface]')) {
-      const layout = useChatLayoutStore.getState();
-      if (window.innerWidth < 640) layout.setMobileSurface('files');
-      else layout.setShowFilesPanel(false);
-    } else if (activeEl?.closest('[data-workbench-explorer]')) {
-      const layout = useChatLayoutStore.getState();
-      if (window.innerWidth < 640) layout.setMobileSurface('chat');
-      else layout.setShowFilesPanel(false);
-    } else if (activeEl?.closest('[data-sidebar="sidebar"]')) {
-      setSidebarOpen(false);
+      useChatLayoutStore.getState().setMobileSurface('files');
+    } else {
+      useChatLayoutStore.getState().setMobileSurface('chat');
     }
-  }, [handleCloseTerminal, setSidebarOpen]);
+  }, [handleCloseTerminal]);
 
   const handleStopStreaming = useCallback(() => {
     handleInterruptSession();
   }, [handleInterruptSession]);
 
-  const focusPaneInput = useCallback((sessionId: string) => {
-    const state = useSessionBoardStore.getState();
-    if (sessionId !== state.focusedSessionId) {
-      focusBoard(sessionId);
-    }
+  const getFocusedTabs = useCallback(() => {
+    // Read the rendered strip so hidden views and unavailable resources never
+    // consume an index. Clicking reuses each tab's session/file activation path.
+    const group = document.activeElement?.closest('[data-view-group], [data-mobile-tab-group]')
+      ?? document.querySelector('[data-dock-position="center"] [data-view-group]')
+      ?? document.querySelector('[data-mobile-tab-group]');
+    return Array.from(group?.querySelectorAll<HTMLButtonElement>('[data-workspace-tab-id] > [role="tab"]') ?? [])
+      .filter((tab) => !tab.closest('[inert], [hidden], [aria-hidden="true"]'));
+  }, []);
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        paneRegistry.getHandle(sessionId)?.focusInput();
-      });
-    });
-  }, [focusBoard, paneRegistry]);
+  const handleFocusTab = useCallback((index: number) => {
+    const tab = getFocusedTabs()[index];
+    tab?.click();
+    tab?.focus({ preventScroll: true });
+  }, [getFocusedTabs]);
 
-  const handleFocusPane = useCallback((index: number) => {
-    const sessionId = useSessionBoardStore.getState().openSessionIds[index];
-    if (sessionId) focusPaneInput(sessionId);
-  }, [focusPaneInput]);
-
-  const handleCyclePane = useCallback((direction: -1 | 1) => {
-    const state = useSessionBoardStore.getState();
-    if (state.openSessionIds.length < 2) return;
-
-    const currentIndex = state.focusedSessionId
-      ? state.openSessionIds.indexOf(state.focusedSessionId)
-      : 0;
-    const normalizedIndex = currentIndex === -1 ? 0 : currentIndex;
-    const targetIndex = (
-      normalizedIndex + direction + state.openSessionIds.length
-    ) % state.openSessionIds.length;
-    const sessionId = state.openSessionIds[targetIndex];
-    if (sessionId) focusPaneInput(sessionId);
-  }, [focusPaneInput]);
+  const handleCycleTab = useCallback((direction: -1 | 1) => {
+    const tabs = getFocusedTabs();
+    if (tabs.length < 2) return;
+    const index = tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
+    const target = tabs[(Math.max(0, index) + direction + tabs.length) % tabs.length];
+    target.click();
+    target.focus({ preventScroll: true });
+  }, [getFocusedTabs]);
 
   const handleToggleAutoFollow = useCallback(() => {
     const focusedSessionId = useSessionBoardStore.getState().focusedSessionId;
@@ -205,17 +212,17 @@ export function useAppKeyboardHandlers({
   }, [onToggleAutoFollow, paneRegistry]);
 
   useKeyboardShortcuts({
-    onOpenSidebar: () => focusSidebarSessionPanelRef.current(),
-    onOpenTerminal: () => focusTerminalPanelRef.current(),
-    onOpenFilesPanel: () => focusFilesPanelRef.current(),
+    onFocusLeftDock: () => window.innerWidth < 640 ? focusSidebarSessionPanelRef.current() : focusDock('left'),
+    onFocusBottomDock: () => window.innerWidth < 640 ? focusTerminalPanelRef.current() : focusDock('bottom'),
+    onFocusRightDock: () => window.innerWidth < 640 ? focusFilesPanelRef.current() : focusDock('right'),
     onNewSession: handleNewSession,
     onToggleViewMode: handleToggleViewMode,
-    onCloseFocusedPanel: handleCloseFocusedPanel,
+    onCloseFocusedDock: handleCloseFocusedDock,
     onFocusChatInput: focusChatInput,
     onStopStreaming: handleStopStreaming,
     onToggleAutoFollow: handleToggleAutoFollow,
-    onFocusPane: handleFocusPane,
-    onCyclePane: handleCyclePane,
+    onFocusTab: handleFocusTab,
+    onCycleTab: handleCycleTab,
   });
 }
 
@@ -231,12 +238,11 @@ export interface AppKeyboardHandlersMountProps {
 }
 
 export function AppKeyboardHandlersMount(props: AppKeyboardHandlersMountProps) {
-  const { setOpen } = useSidebar();
   const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
   const preconfigs = useServerDataStore((s) => s.preconfigs);
   const primaryPreconfigs = preconfigs.filter((p) => p.mode !== 'subagent');
 
-  useAppKeyboardHandlers({ ...props, activeWorkspace, primaryPreconfigs, setSidebarOpen: setOpen });
+  useAppKeyboardHandlers({ ...props, activeWorkspace, primaryPreconfigs });
 
   return null;
 }

@@ -6,7 +6,7 @@ import { Slot } from "radix-ui"
 
 import { clampPanelWidth } from "@prokopai/sdk"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { useChatLayoutStore } from "@/stores/chatLayoutStore"
+import { useDockStore } from "@/stores/dockStore"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -693,13 +693,10 @@ interface PanelResizeHandleProps extends React.ComponentProps<"div"> {
 function PanelResizeHandle({ side, panelId, className, ...props }: PanelResizeHandleProps) {
   const isMobile = useIsMobile();
 
-  const sessionsPanelWidth = useChatLayoutStore((s) => s.sessionsPanelWidth);
-  const setSessionsPanelWidth = useChatLayoutStore((s) => s.setSessionsPanelWidth);
-  const filesPanelWidth = useChatLayoutStore((s) => s.filesPanelWidth);
-  const setFilesPanelWidth = useChatLayoutStore((s) => s.setFilesPanelWidth);
-
-  const panelWidth = panelId === "sessions" ? sessionsPanelWidth : filesPanelWidth;
-  const setPanelWidth = panelId === "sessions" ? setSessionsPanelWidth : setFilesPanelWidth;
+  const position = panelId === "sessions" ? "left" : "right";
+  const panelWidth = useDockStore((s) => s.docks[position].size);
+  const setDockSize = useDockStore((s) => s.setDockSize);
+  const setPanelWidth = React.useCallback((width: number) => setDockSize(position, width), [position, setDockSize]);
 
   const [isDragging, setIsDragging] = React.useState(false);
   const isDraggingRef = React.useRef(false);

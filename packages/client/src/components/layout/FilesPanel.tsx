@@ -25,6 +25,8 @@ import {
   PanelResizeHandle,
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import { useWorkspaceViewStore, type RepositoryViewId } from '@/stores/workspaceViewStore';
+import { useDockStore } from '@/stores/dockStore';
 import { useSessionChatLayoutStore as useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { useUIStore, type DefaultFileOpenMode } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
@@ -41,6 +43,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 
 interface FilesPanelProps {
   sdkClient: ProkopaiClient | null;
+  view?: Exclude<RepositoryViewId, 'worktrees'>;
   embedded?: boolean;
   embeddedWidth?: number;
 }
@@ -93,14 +96,15 @@ function PathSwitcher({
 }
 
 export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
-  ({ sdkClient, embedded = false, embeddedWidth: _embeddedWidth }, ref) => {
+  ({ sdkClient, view, embedded = false, embeddedWidth: _embeddedWidth }, ref) => {
     const isMobile = useIsMobile();
     const fileTreeRef = useRef<FileTreeHandle>(null);
     const gitChangesRef = useRef<GitChangesViewHandle>(null);
-    const filesPanelWidth = useChatLayoutStore((s) => s.filesPanelWidth);
-    const showFilesPanel = useChatLayoutStore((s) => s.showFilesPanel);
-    const setShowFilesPanel = useChatLayoutStore((s) => s.setShowFilesPanel);
-    const filesPanelTab = useChatLayoutStore((s) => s.filesPanelTab);
+    const filesPanelWidth = useDockStore((s) => s.docks.right.size);
+    const showFilesPanel = useDockStore((s) => s.docks.right.open);
+    const activateView = useWorkspaceViewStore((s) => s.activateView);
+    const selectedTab = useChatLayoutStore((s) => s.filesPanelTab);
+    const filesPanelTab = view === 'explorer' ? 'project' : view ?? selectedTab;
     const setFilesPanelTab = useChatLayoutStore((s) => s.setFilesPanelTab);
     const filesPanelRoot = useChatLayoutStore((s) => s.filesPanelRoot);
     const filesPanelRootPinned = useChatLayoutStore((s) => s.filesPanelRootPinned);
@@ -205,11 +209,11 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
     // When the last worktree disappears, the tab hides; leave the stored tab
     // on a surface that still renders.
     useEffect(() => {
-      if (filesPanelTab === 'worktrees' && !worktrees.isLoading && (worktrees.data ?? []).length === 0) {
+      if (!view && filesPanelTab === 'worktrees' && !worktrees.isLoading && (worktrees.data ?? []).length === 0) {
         setFilesPanelTab('project');
         setWorkbenchSurface('explorer');
       }
-    }, [filesPanelTab, worktrees.isLoading, worktrees.data, setFilesPanelTab, setWorkbenchSurface]);
+    }, [view, filesPanelTab, worktrees.isLoading, worktrees.data, setFilesPanelTab, setWorkbenchSurface]);
 
     const focus = useCallback(() => {
       const focusActiveView = () => {
@@ -221,14 +225,15 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       };
 
       if (isMobile) {
+        setFilesPanelTab(filesPanelTab);
         setMobileSurface('files');
       } else {
         setWorkbenchSurface(filesPanelTab === 'changes' || filesPanelTab === 'branches' || filesPanelTab === 'worktrees' ? filesPanelTab : 'explorer');
-        setShowFilesPanel(true);
+        activateView(filesPanelTab === 'project' ? 'explorer' : filesPanelTab);
       }
       requestAnimationFrame(() => requestAnimationFrame(focusActiveView));
       window.setTimeout(focusActiveView, 250);
-    }, [filesPanelTab, isMobile, setMobileSurface, setShowFilesPanel, setWorkbenchSurface]);
+    }, [filesPanelTab, isMobile, setFilesPanelTab, setMobileSurface, activateView, setWorkbenchSurface]);
 
     useImperativeHandle(ref, () => ({ focus }), [focus]);
 
@@ -270,14 +275,11 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
           );
           if (isMobile) {
             setMobileSurface('editor');
-          } else {
-            setWorkbenchSurface('editor');
-            setShowFilesPanel(true);
           }
           return;
         }
       }
-    }, [workspaceId, serverId, isMobile, setMobileSurface, setShowFilesPanel, setWorkbenchSurface, openFilePreview, defaultFileOpenMode]);
+    }, [workspaceId, serverId, isMobile, setMobileSurface, activateView, setWorkbenchSurface, openFilePreview, defaultFileOpenMode]);
 
     const handleFileSelect = useCallback((target: FileEntryActionTarget, mode?: DefaultFileOpenMode) => {
       openFile(target, mode);
@@ -285,7 +287,7 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
 
     // Changes-tab stats in the header row. Reads the same git-status cache
     // as GitChangesView (shared query key), so no extra request.
-    const isChangesTab = !embedded && filesPanelTab === 'changes';
+    const isChangesTab = filesPanelTab === 'changes';
     // The worktrees tab manages bindings and is workspace-scoped: a dead
     // session binding must not block it (Project and Changes stay
     // fail-closed), and the root-switcher header row is hidden entirely.
@@ -293,9 +295,9 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
     const changesRoot = isMainRoot ? undefined : selectedRoot;
     const gitStatusQuery = useGitStatusQuery(
       sdkClient,
-      isChangesTab ? workspaceId : undefined,
+      isChangesTab && !rootBlocked ? workspaceId : undefined,
       changesRoot,
-      isChangesTab,
+      isChangesTab && !rootBlocked,
     );
     const changesStats = useMemo(
       () => summarizeDiffStats(gitStatusQuery.data?.files ?? []),

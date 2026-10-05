@@ -15,7 +15,8 @@ import { HeaderPanelToggles } from '@/components/app/HeaderPanelToggles';
 import { useUIStore } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
-import { useSidebar } from '@/components/ui/sidebar';
+import { useWorkspaceViewStore } from '@/stores/workspaceViewStore';
+import { useDockStore } from '@/stores/dockStore';
 import { cn } from '@/lib/utils';
 
 /**
@@ -34,20 +35,21 @@ export function AppHeader() {
   const setShowSettings = useUIStore((s) => s.setShowSettings);
   const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
 
-  const { toggleSidebar, state: sidebarState } = useSidebar();
-  const showFilesPanel = useChatLayoutStore((s) => s.showFilesPanel);
-  const setShowFilesPanel = useChatLayoutStore((s) => s.setShowFilesPanel);
+  const leftOpen = useDockStore((s) => s.docks.left.open);
+  const rightOpen = useDockStore((s) => s.docks.right.open);
+  const mobileTerminalOpen = useWorkspaceViewStore((s) => s.mobileTerminalOpen);
+  const setMobileTerminalOpen = useWorkspaceViewStore((s) => s.setMobileTerminalOpen);
+  const bottomOpen = useDockStore((s) => s.docks.bottom.open);
+  const toggleDock = useDockStore((s) => s.toggleDock);
   const mobileSurface = useChatLayoutStore((s) => s.mobileSurface);
   const setMobileSurface = useChatLayoutStore((s) => s.setMobileSurface);
-  const showTerminalPanel = useChatLayoutStore((s) => s.showTerminalPanel);
-  const setShowTerminalPanel = useChatLayoutStore((s) => s.setShowTerminalPanel);
 
   const sessionsActive = isMobile
     ? mobileSurface === 'sessions'
-    : sidebarState === 'expanded';
+    : leftOpen;
   const filesActive = isMobile
     ? mobileSurface === 'files' || mobileSurface === 'editor'
-    : showFilesPanel;
+    : rightOpen;
 
   const goWorkspace = () =>
     router.navigate({ to: '/server/$serverId/workspace', params: { serverId: params.serverId } });
@@ -58,26 +60,27 @@ export function AppHeader() {
     if (isMobile) {
       setMobileSurface(sessionsActive ? 'chat' : 'sessions');
     } else {
-      toggleSidebar();
+      toggleDock('left');
     }
   };
   const toggleFiles = () => {
     if (isMobile) {
       setMobileSurface(filesActive ? 'chat' : 'files');
     } else {
-      setShowFilesPanel(!showFilesPanel);
+      toggleDock('right');
     }
   };
 
   const panelToggles = (
     <HeaderPanelToggles
-      sessionsActive={sessionsActive}
-      onToggleSessions={toggleSessions}
-      filesActive={filesActive}
-      onToggleFiles={toggleFiles}
-      terminalActive={showTerminalPanel}
-      onToggleTerminal={() => setShowTerminalPanel(!showTerminalPanel)}
-      hasWorkspace={Boolean(activeWorkspace)}
+      leftActive={sessionsActive}
+      onToggleLeft={toggleSessions}
+      rightActive={filesActive}
+      onToggleRight={toggleFiles}
+      bottomActive={isMobile ? mobileTerminalOpen : bottomOpen}
+      onToggleBottom={() => isMobile ? setMobileTerminalOpen(!mobileTerminalOpen) : toggleDock('bottom')}
+      hasRightDock={!isMobile || Boolean(activeWorkspace)}
+      mobile={isMobile}
       onOpenSettings={() => setShowSettings(true)}
       updateVersion={updateVersion}
     />

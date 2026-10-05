@@ -3,7 +3,7 @@ import { act, fireEvent, render } from '@testing-library/react';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { AppSidebar, type AppSidebarHandle } from '@/components/layout/AppSidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
-import { useChatLayoutStore } from '@/stores/chatLayoutStore';
+import { useDockStore } from '@/stores/dockStore';
 
 function renderSidebar(currentSessionId: string | null = null) {
   const ref = createRef<AppSidebarHandle>();
@@ -25,45 +25,28 @@ function renderSidebar(currentSessionId: string | null = null) {
 
 describe('AppSidebar', () => {
   beforeEach(() => {
-    useChatLayoutStore.setState({ sessionsPanelWidth: 256 });
+    useDockStore.setState(useDockStore.getInitialState());
   });
 
   test('renders desktop session navigation as a dedicated in-flow panel', () => {
     const { container, getByRole } = renderSidebar();
 
-    const panel = container.querySelector('[data-slot="sessions-panel"]');
-
-    expect(panel).toHaveAttribute('data-variant', 'shell');
-    expect(panel).toHaveAttribute('data-sidebar', 'sidebar');
-    expect(panel).toHaveClass('relative', 'h-full', 'shrink-0', 'overflow-hidden');
-    expect(panel).not.toHaveClass(
-      'fixed',
-      'p-2',
-      'rounded-lg',
-      'shadow-sm',
-      'transition-[width]',
-    );
-    const divider = getByRole('separator', { name: 'Resize Sessions' });
-    expect(divider).toHaveAttribute('aria-valuenow', '256');
-    expect(divider).toHaveAttribute('data-slot', 'desktop-panel-divider');
-    expect(divider).toHaveClass('relative', 'w-3', 'shrink-0', 'bg-transparent');
-    expect(container.querySelector('[data-slot="sidebar"]')).not.toBeInTheDocument();
+    const region = container.querySelector('[data-dock-position="left"]');
+    expect(region).toContainElement(getByRole('button', { name: 'Session one' }));
+    expect(getByRole('separator', { name: 'Resize left dock' })).toHaveAttribute('aria-valuenow', '256');
     expect(container.querySelector('[data-slot="sidebar-container"]')).not.toBeInTheDocument();
-    expect(
-      container.querySelector('[data-slot="desktop-panel-divider-indicator"]'),
-    ).toHaveClass('left-1/2', '-translate-x-1/2', 'rounded-full');
   });
 
   test('resizes the desktop session panel with the keyboard', () => {
     const { container, getByRole } = renderSidebar();
-    const wrapper = container.querySelector<HTMLElement>('[data-panel-id="sessions"]');
+    const wrapper = container.querySelector<HTMLElement>('[data-dock-position="left"]');
 
-    fireEvent.keyDown(getByRole('separator', { name: 'Resize Sessions' }), {
+    fireEvent.keyDown(getByRole('separator', { name: 'Resize left dock' }), {
       key: 'ArrowRight',
     });
 
-    expect(useChatLayoutStore.getState().sessionsPanelWidth).toBe(272);
-    expect(wrapper?.style.getPropertyValue('--sidebar-width')).toBe('272px');
+    expect(useDockStore.getState().docks.left.size).toBe(272);
+    expect(wrapper?.style.getPropertyValue('--dock-size')).toBe('272px');
   });
 
   test('preserves focusSessionPanel for the active session', () => {

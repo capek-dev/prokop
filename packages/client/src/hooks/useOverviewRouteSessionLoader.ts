@@ -5,7 +5,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { parseOpenSessionIds } from '@/stores/sessionBoardStore';
 
 /**
- * On F5 in Overview, route `open` IDs may not exist in `sessionStore` yet,
+ * On F5 in either workspace view, route `open` IDs may not exist in `sessionStore` yet,
  * or may be beyond the first bounded page. This hook fetches them directly
  * via `sdkClient.http.sessions.get()` and merges them into the store so
  * that `useBoardRouteSync` can validate them on the next cycle.
@@ -21,6 +21,13 @@ export function useOverviewRouteSessionLoader(
   const sessions = useSessionStore(s => s.sessions);
   const addSessionToFront = useSessionStore(s => s.addSessionToFront);
   const fetchedRef = useRef<Set<string>>(new Set());
+  const generationRef = useRef(0);
+
+  useEffect(() => {
+    fetchedRef.current.clear();
+    generationRef.current += 1;
+    return () => { generationRef.current += 1; };
+  }, [sdkClient]);
 
   const searchOpen = useRouterState({
     select: (s) => {
@@ -38,6 +45,7 @@ export function useOverviewRouteSessionLoader(
 
   useEffect(() => {
     if (!sdkClient || !connected) return;
+    const generation = generationRef.current;
 
     // Collect all route session IDs (focused + open)
     const routeIds = new Set<string>();
@@ -58,6 +66,7 @@ export function useOverviewRouteSessionLoader(
     for (const id of unknownIds) {
       fetchedRef.current.add(id);
       sdkClient.http.sessions.get(id).then((response: { session: import('@prokopai/sdk').Session }) => {
+        if (generation !== generationRef.current) return;
         addSessionToFront(response.session);
       }).catch(() => {
         // Session not found or error - leave it absent.

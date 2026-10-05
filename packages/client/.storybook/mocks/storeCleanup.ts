@@ -9,6 +9,8 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useConnectionStore } from '@/stores/connectionStore';
+import { createDefaultViewLayout, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
+import { useDockStore } from '@/stores/dockStore';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { useAskStore } from '@/stores/askStore';
 import { useCompletionStore } from '@/stores/completionStore';
@@ -73,11 +75,16 @@ export function resetAllStores(): void {
 
   // Chat Layout Store
   useChatLayoutStore.setState({
-    showFilesPanel: false,
-    showTerminalPanel: false,
-    sessionsPanelWidth: 280,
-    filesPanelWidth: 300,
+    sessionFilesLayouts: {},
+    filesPanelTab: 'project',
+    filesPanelRoot: null,
+    filesPanelRootPinned: false,
+    workbenchSurface: 'explorer',
+    mobileSurface: 'chat',
   });
+
+  useDockStore.setState(useDockStore.getInitialState());
+  useWorkspaceViewStore.setState({ layout: createDefaultViewLayout(), mobileTerminalOpen: false });
 
   // Ask Store
   useAskStore.setState({

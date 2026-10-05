@@ -12,17 +12,17 @@ const DISABLED_HOTKEY = '__prokop_disabled_hotkey__';
 const SEQUENCE_TIMEOUT_MS = 500;
 
 export interface KeyboardShortcutsConfig {
-  onOpenSidebar: () => void;
-  onOpenTerminal: () => void;
-  onOpenFilesPanel: () => void;
+  onFocusLeftDock: () => void;
+  onFocusBottomDock: () => void;
+  onFocusRightDock: () => void;
   onNewSession: () => void;
   onToggleViewMode: () => void;
-  onCloseFocusedPanel: () => void;
+  onCloseFocusedDock: () => void;
   onFocusChatInput: () => void;
   onStopStreaming: () => void;
   onToggleAutoFollow: () => void;
-  onFocusPane: (index: number) => void;
-  onCyclePane: (direction: -1 | 1) => void;
+  onFocusTab: (index: number) => void;
+  onCycleTab: (direction: -1 | 1) => void;
 }
 
 function isModalDialogOpen(): boolean {
@@ -119,20 +119,23 @@ export function useKeyboardShortcuts(config: KeyboardShortcutsConfig): void {
     config.onFocusChatInput();
   });
 
-  useCommandHotkey('panel.closeFocused', overrides, () => config.onCloseFocusedPanel());
-  useCommandHotkey('navigation.sessions', overrides, () => config.onOpenSidebar());
-  useCommandHotkey('navigation.files', overrides, () => config.onOpenFilesPanel());
-  useCommandHotkey('navigation.terminal', overrides, () => config.onOpenTerminal());
+  useCommandHotkey('dock.closeFocused', overrides, () => config.onCloseFocusedDock());
+  useCommandHotkey('dock.focusLeft', overrides, () => config.onFocusLeftDock());
+  useCommandHotkey('dock.focusRight', overrides, () => config.onFocusRightDock());
+  useCommandHotkey('dock.focusBottom', overrides, () => config.onFocusBottomDock());
   useCommandHotkey('navigation.overview', overrides, () => config.onToggleViewMode());
   useCommandHotkey('session.create', overrides, () => config.onNewSession());
   useCommandHotkey('chat.toggleAutoFollow', overrides, () => config.onToggleAutoFollow());
 
-  useCommandHotkey('pane.focus.1', overrides, () => config.onFocusPane(0));
-  useCommandHotkey('pane.focus.2', overrides, () => config.onFocusPane(1));
-  useCommandHotkey('pane.focus.3', overrides, () => config.onFocusPane(2));
-  useCommandHotkey('pane.focus.4', overrides, () => config.onFocusPane(3));
-  useCommandHotkey('pane.focus.5', overrides, () => config.onFocusPane(4));
-  useCommandHotkey('pane.focus.6', overrides, () => config.onFocusPane(5));
-  useCommandHotkey('pane.focusPrevious', overrides, () => config.onCyclePane(-1));
-  useCommandHotkey('pane.focusNext', overrides, () => config.onCyclePane(1));
+  useCommandHotkey('tab.focus.1', overrides, () => config.onFocusTab(0));
+  useCommandHotkey('tab.focus.2', overrides, () => config.onFocusTab(1));
+  useCommandHotkey('tab.focus.3', overrides, () => config.onFocusTab(2));
+  useCommandHotkey('tab.focus.4', overrides, () => config.onFocusTab(3));
+  useCommandHotkey('tab.focus.5', overrides, () => config.onFocusTab(4));
+  useCommandHotkey('tab.focus.6', overrides, () => config.onFocusTab(5));
+  useCommandHotkey('tab.focus.7', overrides, () => config.onFocusTab(6));
+  useCommandHotkey('tab.focus.8', overrides, () => config.onFocusTab(7));
+  useCommandHotkey('tab.focus.9', overrides, () => config.onFocusTab(8));
+  useCommandHotkey('tab.focusPrevious', overrides, () => config.onCycleTab(-1));
+  useCommandHotkey('tab.focusNext', overrides, () => config.onCycleTab(1));
 }

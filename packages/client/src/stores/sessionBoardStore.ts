@@ -1,18 +1,23 @@
 import { create } from 'zustand';
-import {
-  getBoardLayoutPreference,
-  saveBoardLayoutPreference,
-} from '@/config/boardLayoutStorage';
+import { sessionViewId, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
+import { useServerDataStore } from '@/stores/serverDataStore';
 
-export const MAX_PANES = 6;
+function viewId(sessionId: string) {
+  const serverId = useServerDataStore.getState().serverId;
+  return serverId ? sessionViewId(serverId, sessionId) : null;
+}
 
-export type LayoutMode = 'focused' | 'board' | 'tabs';
+function revealSession(sessionId: string): void {
+  const id = viewId(sessionId);
+  if (id) useWorkspaceViewStore.getState().activateView(id);
+}
 
-/**
- * Intent recorded when a client-initiated session creation is pending.
- * When `session.created` arrives, this intent determines how the new
- * session is applied to the board (replace-focused vs open-alongside).
- */
+function removeSessionView(sessionId: string): void {
+  const id = viewId(sessionId);
+  if (id) useWorkspaceViewStore.getState().removeView(id);
+}
+
+/** Legacy command intent remains accepted; both actions now open a session tab. */
 export interface PendingSessionCreateIntent {
   workspaceId: string;
   boardAction: 'replace-focused' | 'open-alongside';
@@ -21,195 +26,115 @@ export interface PendingSessionCreateIntent {
 export interface SessionBoardState {
   openSessionIds: string[];
   focusedSessionId: string | null;
-  layoutMode: LayoutMode;
 }
 
 export interface SessionBoardActions {
-  /** Hydrate board state from validated route params. */
   hydrateFromRoute: (focusedSessionId: string | null, openSessionIds: string[]) => void;
-  /** Focus a specific open pane. No-op if not open. */
   focusSession: (sessionId: string) => void;
-  /** Replace the contents of the focused pane with a new session. */
+  /** Open a session tab or focus its existing placement. */
   openInFocusedPane: (sessionId: string) => void;
-  /** Add a new pane alongside existing ones (respects MAX_PANES). */
+  /** Compatibility entry point for opening a session tab. */
   openAlongside: (sessionId: string) => void;
-  /** Remove a pane from the board, focusing nearest neighbor. */
+  /** Close only the tab, leaving session data and execution intact. */
   removeFromBoard: (sessionId: string) => void;
-  /** Move an open session to a new row-major board position. */
   reorderSession: (sessionId: string, targetIndex: number) => void;
-  /** Remove any session IDs that are not in the valid set. */
   removeInvalidSessions: (validIds: Set<string>) => void;
-  /** Replace an old session ID with a new one (e.g. after fork). */
   replaceSessionId: (oldId: string, newId: string) => void;
-  /** Clear all board state. */
   clearBoard: () => void;
-  /** Set layout mode. Multi-pane modes persist the preference. */
-  setLayoutMode: (mode: LayoutMode) => void;
 }
 
 type SessionBoardStore = SessionBoardState & SessionBoardActions;
 
-/**
- * Choose the nearest pane to focus after removing one.
- * Prefers the pane to the left, wrapping to the right edge.
- */
-function chooseNextFocus(openIds: string[], removedId: string): string | null {
-  const idx = openIds.indexOf(removedId);
-  if (idx === -1) return openIds[0] ?? null;
-
-  const remainingIds = openIds.filter(id => id !== removedId);
-  if (remainingIds.length === 0) return null;
-
-  return remainingIds[Math.max(0, idx - 1)] ?? remainingIds[0] ?? null;
-}
-
+/** Session navigation keeps its existing entry point; docks own all geometry. */
 export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
   openSessionIds: [],
   focusedSessionId: null,
-  layoutMode: 'focused',
 
   hydrateFromRoute: (focusedSessionId, openSessionIds) => {
-    const preference = getBoardLayoutPreference('board');
-    set((state) => ({
-      openSessionIds,
-      focusedSessionId,
-      // Route hydration is progressive: the focused session validates first,
-      // remaining `open` IDs join once their data loads (overview F5 does one
-      // fetch per unknown ID). The board must reveal whenever the route ends
-      // up with multiple sessions, not only when hydration started empty.
-      layoutMode: openSessionIds.length > 1 ? preference : state.layoutMode,
-    }));
+    const previous = get();
+    const ids = [...new Set(openSessionIds)];
+    for (const id of previous.openSessionIds) {
+      if (!ids.includes(id)) removeSessionView(id);
+    }
+    const views = ids.flatMap((id) => { const view = viewId(id); return view ? [view] : []; });
+    useWorkspaceViewStore.getState().ensureViews(views);
+    set({ openSessionIds: ids, focusedSessionId });
+    if (focusedSessionId && (previous.focusedSessionId !== focusedSessionId || !previous.openSessionIds.includes(focusedSessionId))) {
+      revealSession(focusedSessionId);
+    }
   },
 
   focusSession: (sessionId) => {
-    const state = get();
-    if (!state.openSessionIds.includes(sessionId)) return;
-    if (state.focusedSessionId === sessionId) return;
-    set({ focusedSessionId: sessionId });
+    if (!get().openSessionIds.includes(sessionId)) return;
+    revealSession(sessionId);
+    if (get().focusedSessionId !== sessionId) set({ focusedSessionId: sessionId });
   },
 
   openInFocusedPane: (sessionId) => {
     const state = get();
-    // If already open, just focus it
-    if (state.openSessionIds.includes(sessionId)) {
-      set({ focusedSessionId: sessionId });
-      return;
-    }
-    // If no panes, start the board
-    if (state.openSessionIds.length === 0) {
-      set({ openSessionIds: [sessionId], focusedSessionId: sessionId });
-      return;
-    }
-    // Replace the focused pane
-    const focusedIdx = state.focusedSessionId
-      ? state.openSessionIds.indexOf(state.focusedSessionId)
-      : 0;
-    const idx = focusedIdx === -1 ? 0 : focusedIdx;
-    const newOpenIds = [...state.openSessionIds];
-    newOpenIds[idx] = sessionId;
-    set({ openSessionIds: newOpenIds, focusedSessionId: sessionId });
+    set({
+      openSessionIds: state.openSessionIds.includes(sessionId) ? state.openSessionIds : [...state.openSessionIds, sessionId],
+      focusedSessionId: sessionId,
+    });
+    revealSession(sessionId);
   },
 
-  openAlongside: (sessionId) => {
-    const state = get();
-    // If already open, focus it and reveal the multi-session layout.
-    if (state.openSessionIds.includes(sessionId)) {
-      const preference = getBoardLayoutPreference('board');
-      set({ focusedSessionId: sessionId, layoutMode: preference });
-      return;
-    }
-    // Respect pane limit
-    if (state.openSessionIds.length >= MAX_PANES) return;
-    set({
-      openSessionIds: [...state.openSessionIds, sessionId],
-      focusedSessionId: sessionId,
-      layoutMode: getBoardLayoutPreference('board'),
-    });
-  },
+  openAlongside: (sessionId) => get().openInFocusedPane(sessionId),
 
   removeFromBoard: (sessionId) => {
     const state = get();
-    const newOpenIds = state.openSessionIds.filter(id => id !== sessionId);
-    let newFocus = state.focusedSessionId;
-    if (state.focusedSessionId === sessionId) {
-      newFocus = chooseNextFocus(state.openSessionIds, sessionId);
-    }
-    set({
-      openSessionIds: newOpenIds,
-      focusedSessionId: newFocus,
-      layoutMode: newOpenIds.length > 1 ? state.layoutMode : 'focused',
-    });
+    const index = state.openSessionIds.indexOf(sessionId);
+    if (index < 0) return;
+    const ids = state.openSessionIds.filter((id) => id !== sessionId);
+    const focusedSessionId = state.focusedSessionId === sessionId
+      ? ids[Math.max(0, index - 1)] ?? null : state.focusedSessionId;
+    removeSessionView(sessionId);
+    set({ openSessionIds: ids, focusedSessionId });
+    if (focusedSessionId && focusedSessionId !== state.focusedSessionId) revealSession(focusedSessionId);
   },
 
   reorderSession: (sessionId, targetIndex) => {
-    const state = get();
-    const sourceIndex = state.openSessionIds.indexOf(sessionId);
-    if (sourceIndex === -1) return;
-
-    const boundedTargetIndex = Math.max(0, Math.min(targetIndex, state.openSessionIds.length - 1));
-    if (sourceIndex === boundedTargetIndex) return;
-
-    const newOpenIds = [...state.openSessionIds];
-    const movedSessionId = newOpenIds.splice(sourceIndex, 1)[0];
-    if (!movedSessionId) return;
-    newOpenIds.splice(boundedTargetIndex, 0, movedSessionId);
-    set({ openSessionIds: newOpenIds });
+    const ids = [...get().openSessionIds];
+    const index = ids.indexOf(sessionId);
+    if (index < 0) return;
+    ids.splice(index, 1);
+    ids.splice(Math.max(0, Math.min(targetIndex, ids.length)), 0, sessionId);
+    set({ openSessionIds: ids });
   },
 
   removeInvalidSessions: (validIds) => {
     const state = get();
-    const newOpenIds = state.openSessionIds.filter(id => validIds.has(id));
-    let newFocus = state.focusedSessionId;
-    if (newFocus && !newOpenIds.includes(newFocus)) {
-      newFocus = newOpenIds[0] ?? null;
-    }
-    if (newOpenIds.length === state.openSessionIds.length && newFocus === state.focusedSessionId) {
-      return;
-    }
-    set({ openSessionIds: newOpenIds, focusedSessionId: newFocus });
+    const ids = state.openSessionIds.filter((id) => validIds.has(id));
+    if (ids.length === state.openSessionIds.length) return;
+    for (const id of state.openSessionIds) if (!validIds.has(id)) removeSessionView(id);
+    const focusedSessionId = state.focusedSessionId && ids.includes(state.focusedSessionId)
+      ? state.focusedSessionId : ids[0] ?? null;
+    set({ openSessionIds: ids, focusedSessionId });
+    if (focusedSessionId && focusedSessionId !== state.focusedSessionId) revealSession(focusedSessionId);
   },
 
   replaceSessionId: (oldId, newId) => {
     const state = get();
     if (!state.openSessionIds.includes(oldId)) return;
+    const oldView = viewId(oldId);
+    const newView = viewId(newId);
+    if (oldView && newView) useWorkspaceViewStore.getState().replaceView(oldView, newView);
     set({
-      openSessionIds: state.openSessionIds.map(id => id === oldId ? newId : id),
+      openSessionIds: [...new Set(state.openSessionIds.map((id) => id === oldId ? newId : id))],
       focusedSessionId: state.focusedSessionId === oldId ? newId : state.focusedSessionId,
     });
   },
 
-  clearBoard: () => set({ openSessionIds: [], focusedSessionId: null, layoutMode: 'focused' }),
-
-  setLayoutMode: (layoutMode) => {
-    if (layoutMode === 'board' || layoutMode === 'tabs') {
-      saveBoardLayoutPreference(layoutMode);
-    }
-    set({ layoutMode });
+  clearBoard: () => {
+    for (const id of get().openSessionIds) removeSessionView(id);
+    set({ openSessionIds: [], focusedSessionId: null });
   },
 }));
 
-// ── URL helpers ──────────────────────────────────────────────
-
-/**
- * Parse the `open` search param (comma-separated session IDs) into a deduplicated array.
- */
 export function parseOpenSessionIds(raw: string | undefined | null): string[] {
-  if (!raw) return [];
-  const ids = raw.split(',').map(s => s.trim()).filter(Boolean);
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const id of ids) {
-    if (!seen.has(id)) {
-      seen.add(id);
-      result.push(id);
-    }
-  }
-  return result;
+  return [...new Set((raw ?? '').split(',').map((id) => id.trim()).filter(Boolean))];
 }
 
-/**
- * Serialize an ordered array of session IDs into the `open` search param value.
- */
 export function serializeOpenSessionIds(ids: string[]): string {
   return ids.join(',');
 }

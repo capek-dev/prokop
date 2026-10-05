@@ -4,6 +4,7 @@ import type {
   FileRevisionConflictDetails,
   SaveFileResponse,
 } from '@prokopai/sdk';
+import { fileViewId, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
 
 /**
  * A single open document is uniquely identified by the combination of
@@ -71,8 +72,8 @@ interface FileEditorActions {
   updateContent: (docId: FileDocId, content: string) => void;
   /** Mark a doc as saving. */
   markSaving: (docId: FileDocId) => void;
-  /** Apply a successful save result (clears dirty, updates revision). */
-  saveSuccess: (docId: FileDocId, result: SaveFileResponse) => void;
+  /** Apply the submitted save snapshot; newer edits remain dirty. */
+  saveSuccess: (docId: FileDocId, result: SaveFileResponse, savedContent?: string) => void;
   /** Set conflict details on a doc. */
   setConflict: (docId: FileDocId, conflict: FileRevisionConflictDetails) => void;
   /** Clear conflict details (preserves local dirty content). */
@@ -170,6 +171,7 @@ export const useFileEditorStore = create<FileEditorStore>((baseSet) => {
           activeDocId: docId,
         };
       });
+      useWorkspaceViewStore.getState().activateView(fileViewId(docId));
       return docId;
     },
 
@@ -271,7 +273,7 @@ export const useFileEditorStore = create<FileEditorStore>((baseSet) => {
       });
     },
 
-    saveSuccess: (docId, result) => {
+    saveSuccess: (docId, result, savedContent) => {
       set((state) => {
         const doc = state.docs[docId];
         if (!doc) return {};
@@ -281,7 +283,7 @@ export const useFileEditorStore = create<FileEditorStore>((baseSet) => {
             [docId]: {
               ...doc,
               revision: result.revision,
-              baseContent: doc.content,
+              baseContent: savedContent ?? doc.content,
               status: 'loaded',
               conflict: undefined,
             },
@@ -350,7 +352,10 @@ export const useFileEditorStore = create<FileEditorStore>((baseSet) => {
       });
     },
 
-    setActiveDoc: (docId) => set({ activeDocId: docId }),
+    setActiveDoc: (docId) => {
+      set({ activeDocId: docId });
+      if (docId) useWorkspaceViewStore.getState().activateView(fileViewId(docId));
+    },
 
     closeDoc: (docId) => {
       let nextActive: FileDocId | null = null;
@@ -367,6 +372,7 @@ export const useFileEditorStore = create<FileEditorStore>((baseSet) => {
         nextActive = activeDocId;
         return { docs, openDocIds, activeDocId };
       });
+      useWorkspaceViewStore.getState().removeView(fileViewId(docId));
       return nextActive;
     },
 

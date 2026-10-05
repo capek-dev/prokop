@@ -13,6 +13,7 @@ import type { SessionUsage } from '@/stores/sessionStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useConnectionStore } from '@/stores/connectionStore';
+import { useDockStore } from '@/stores/dockStore';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { useAskStore } from '@/stores/askStore';
 import type { PendingAskRequest, AskHandler } from '@/stores/askStore';
@@ -190,17 +191,15 @@ export function withConnectionStore(overrides: ConnectionStoreDefaults = {}) {
 // -----------------------------------------------------------------------------
 
 interface ChatLayoutStoreDefaults {
-  showFilesPanel?: ChatLayoutStoreState['showFilesPanel'];
-  showTerminalPanel?: boolean;
-  sessionsPanelWidth?: number;
-  filesPanelWidth?: number;
+  mobileSurface?: ChatLayoutStoreState['mobileSurface'];
+  workbenchSurface?: ChatLayoutStoreState['workbenchSurface'];
+  filesPanelTab?: ChatLayoutStoreState['filesPanelTab'];
 }
 
 const defaultChatLayoutState = (): ChatLayoutStoreDefaults => ({
-  showFilesPanel: false,
-  showTerminalPanel: false,
-  sessionsPanelWidth: 280,
-  filesPanelWidth: 300,
+  mobileSurface: 'chat',
+  workbenchSurface: 'explorer',
+  filesPanelTab: 'project',
 });
 
 export function withChatLayoutStore(overrides: ChatLayoutStoreDefaults = {}) {
@@ -260,6 +259,7 @@ export interface AllStoresOverrides {
   ui?: UIStoreDefaults;
   connection?: ConnectionStoreDefaults;
   chatLayout?: ChatLayoutStoreDefaults;
+  docks?: ReturnType<typeof useDockStore.getState>['docks'];
   ask?: AskStoreDefaults;
   completion?: CompletionStoreDefaults;
 }
@@ -272,6 +272,7 @@ export function withAllStores(overrides: AllStoresOverrides = {}) {
     useUIStore.setState({ ...defaultUIState(), ...overrides.ui });
     useConnectionStore.setState({ ...defaultConnectionState(), ...overrides.connection });
     useChatLayoutStore.setState({ ...defaultChatLayoutState(), ...overrides.chatLayout });
+    useDockStore.setState({ docks: overrides.docks ?? useDockStore.getInitialState().docks });
     useAskStore.setState({ ...defaultAskState(), ...overrides.ask });
     useCompletionStore.setState({ ...defaultCompletionState(), ...overrides.completion });
     return <Story />;

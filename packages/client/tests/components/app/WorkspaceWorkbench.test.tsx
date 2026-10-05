@@ -27,7 +27,6 @@ vi.mock('@/hooks/queries', () => ({
 describe('WorkspaceWorkbench', () => {
   beforeEach(() => {
     useChatLayoutStore.setState({
-      showFilesPanel: true,
       workbenchSurface: 'explorer',
       filesPanelTab: 'project',
       mobileSurface: 'chat',
