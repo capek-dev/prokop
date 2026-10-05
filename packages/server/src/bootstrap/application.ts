@@ -85,6 +85,8 @@ import { getTerminalManager, installTerminalSessionStore } from '@/transport/ter
 import { broadcastEvent, broadcastSessionUpdated, sendToConnectionEvent } from '@/transport/websocket/broadcast';
 import { addWorkspaceFilesChangedObserver } from '@/application/workspaces/files-changed';
 import { getWorkspaceTools, setMcpChangeListener } from '@/infrastructure/mcp';
+import { browserService } from '@/infrastructure/browser/service';
+import { installBrowserRequestsPort } from '@/application/ports/browser';
 import { listWorkspaces } from '@/infrastructure/sqlite/workspaces';
 import { createJean2TerminalSessionPort } from '@/adapters/jean2/terminal';
 import { createTransportControllerPorts } from '@/transport/websocket/control-port';
@@ -180,6 +182,7 @@ export function createWiredAgentsApplication(): AgentsApplication {
 }
 
 export function createWiredApplication(existingAgents?: AgentsApplication): WiredApplication {
+  installBrowserRequestsPort(browserService);
   setMcpChangeListener(path => {
     if (path === null) {
       broadcastEvent({ type: 'mcp.changed', workspaceId: null });

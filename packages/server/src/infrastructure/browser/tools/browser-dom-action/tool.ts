@@ -80,7 +80,7 @@ export const definition: ToolDefinition = {
 
 export async function execute(
   input: Record<string, unknown>,
-  ctx: ToolContext,
+  ctx: Pick<ToolContext, 'ask'>,
 ): Promise<ToolResult> {
   const params = input as unknown as DomActionParams;
 

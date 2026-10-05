@@ -8,12 +8,6 @@
  */
 
 import type { LoadedTool, ToolContext, ToolDefinition, ToolResult } from '@capekai/tool';
-import * as browserDiscoverElements from '@/harnesses/prokop/tools/browser-discover-elements/tool';
-import * as browserDomAction from '@/harnesses/prokop/tools/browser-dom-action/tool';
-import * as browserNavigate from '@/harnesses/prokop/tools/browser-navigate/tool';
-import * as browserReadActiveTab from '@/harnesses/prokop/tools/browser-read-active-tab/tool';
-import * as browserScreenshot from '@/harnesses/prokop/tools/browser-screenshot/tool';
-import * as browserTabManage from '@/harnesses/prokop/tools/browser-tab-manage/tool';
 import * as edit from '@/harnesses/prokop/tools/edit/tool';
 import * as fileToMarkdown from '@/harnesses/prokop/tools/file-to-markdown/tool';
 import * as glob from '@/harnesses/prokop/tools/glob/tool';
@@ -42,12 +36,6 @@ function toLoadedTool(module: BuiltinToolModule): LoadedTool {
 }
 
 const modules = [
-  browserDiscoverElements,
-  browserDomAction,
-  browserNavigate,
-  browserReadActiveTab,
-  browserScreenshot,
-  browserTabManage,
   edit,
   fileToMarkdown,
   glob,

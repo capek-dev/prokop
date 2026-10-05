@@ -1,10 +1,13 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 
 export const definition: ToolDefinition = {
-  name: 'browser_screenshot',
+  name: 'browser_discover_elements',
   description:
-    'Capture a screenshot of a tab selected by tabId, or the most recently active non-PWA browser tab. Returns a base64-encoded PNG image. ' +
-    'Use this to visually verify the current state of a page after performing actions. ' +
+    'Discover all interactive elements (buttons, links, inputs, selects, etc.) on a tab selected by tabId, or the most recently active non-PWA browser tab. ' +
+    'Returns a list of elements with their CSS selectors, text content, attributes, ' +
+    'bounding rectangles (x, y, width, height, top, right, bottom, left), ' +
+    'visibility flags (isVisible, isInViewport), and viewport dimensions. ' +
+    'Use this before browser_dom_action to find the correct selectors and understand element layout. ' +
     'Requires a connected ProkopaiBrowser extension.',
   inputSchema: {
     type: 'object',
@@ -20,12 +23,12 @@ export const definition: ToolDefinition = {
 
 export async function execute(
   input: Record<string, unknown>,
-  ctx: ToolContext,
+  ctx: Pick<ToolContext, 'ask'>,
 ): Promise<ToolResult> {
   const approved = await ctx.ask({
     type: 'permission',
-    question: 'Take browser screenshot?',
-    description: 'Capture a screenshot of the selected browser tab as a PNG image.',
+    question: 'Discover interactive browser elements?',
+    description: 'List all interactive elements (buttons, links, inputs, etc.) on the selected browser tab.',
     risk: 'low',
     resource: 'browser',
     action: 'read',
@@ -37,9 +40,9 @@ export async function execute(
     const executionResult = await ctx.ask({
       type: 'client_capability',
       target: 'client',
-      capability: 'browser_screenshot',
+      capability: 'browser_discover_elements',
       metadata: {
-        task: 'browser.screenshot',
+        task: 'browser.discover_elements',
         params: { tabId: input.tabId },
       },
     });
@@ -52,41 +55,21 @@ export async function execute(
     }
 
     const result = executionResult as Record<string, unknown>;
+    const elements = result.elements as Record<string, unknown>[] | undefined;
 
-    if (!result.success) {
+    if (!elements || !Array.isArray(elements)) {
       return {
         success: false,
-        error: `Screenshot failed: ${result.error ?? 'unknown error'}`,
-      };
-    }
-
-    const pngPrefix = 'data:image/png;base64,';
-    if (typeof result.dataUrl !== 'string' || !result.dataUrl.startsWith(pngPrefix)) {
-      return {
-        success: false,
-        error: 'Extension returned invalid PNG screenshot data.',
-      };
-    }
-
-    const pngBase64 = result.dataUrl.slice(pngPrefix.length);
-    if (!pngBase64) {
-      return {
-        success: false,
-        error: 'Extension returned empty PNG screenshot data.',
+        error: 'Extension returned invalid element list.',
       };
     }
 
     return {
       success: true,
       result: {
-        captured: true,
-        mediaType: 'image/png',
+        elementCount: elements.length,
+        elements,
       },
-      modelOutput: [{
-        type: 'image',
-        data: pngBase64,
-        mediaType: 'image/png',
-      }],
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -95,13 +78,13 @@ export async function execute(
       return {
         success: false,
         error:
-          'Screenshot timed out. Ensure the ProkopaiBrowser extension is installed and connected.',
+          'Element discovery timed out. Ensure the ProkopaiBrowser extension is installed and connected.',
       };
     }
 
     return {
       success: false,
-      error: `Screenshot failed: ${message}`,
+      error: `Element discovery failed: ${message}`,
     };
   }
 }

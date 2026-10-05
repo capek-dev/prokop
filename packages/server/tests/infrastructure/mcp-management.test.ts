@@ -110,7 +110,7 @@ describe('workspace MCP management', () => {
   test('serializes concurrent configuration writes and retains disabled servers', async () => {
     await Promise.all(['one', 'two', 'three'].map(name => updateMcpConfig(root, name, { ...config, enabled: false })));
     expect(Object.keys((await loadMcpConfig(root)).servers).sort()).toEqual(['one', 'three', 'two']);
-    expect(Object.keys(await getAllServerStatus(root))).toHaveLength(3);
+    expect(Object.keys(await getAllServerStatus(root))).toHaveLength(4); // Includes the built-in browser entry.
     await initializeWorkspace(root);
     expect(await getWorkspaceTools(root)).toEqual([]);
   });
@@ -148,7 +148,9 @@ describe('workspace MCP management', () => {
     expect(await getWorkspaceTools(root)).toEqual([]);
     expect((await getAllServerStatus(root)).crm?.status.status).toBe('disabled');
     await removeServer(root, 'crm');
-    expect(await getAllServerStatus(root)).toEqual({});
+    expect(await getAllServerStatus(root)).toEqual({ 'Prokop Browser': {
+      config: { type: 'builtin', id: 'browser', enabled: false }, status: { status: 'disabled' },
+    } });
   });
   test('config replacement invalidates old handles and isolates workspace credentials and tools', async () => {
     await saveServer(root, 'crm', config);

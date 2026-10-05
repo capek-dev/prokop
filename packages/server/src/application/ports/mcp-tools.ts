@@ -5,7 +5,7 @@ export interface WorkspaceMcpTool {
   toolName: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  execute(input: Record<string, unknown>, signal?: AbortSignal, authorized?: () => boolean): Promise<WorkspaceMcpResult>;
+  execute(input: Record<string, unknown>, signal?: AbortSignal, authorized?: () => boolean | Promise<boolean>): Promise<WorkspaceMcpResult>;
 }
 export interface WorkspaceMcpResult {
   content: Array<Record<string, unknown>>;
@@ -14,5 +14,5 @@ export interface WorkspaceMcpResult {
 }
 export interface WorkspaceMcpToolsPort {
   /** Effective global and workspace tools, with workspace server names taking precedence. */
-  tools(workspacePath: string): Promise<WorkspaceMcpTool[]>;
+  tools(workspacePath: string, sessionId?: string): Promise<WorkspaceMcpTool[]>;
 }

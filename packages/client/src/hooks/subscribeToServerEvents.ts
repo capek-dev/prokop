@@ -91,8 +91,8 @@ export function subscribeToServerEvents(
   });
   add('mcp.changed', (workspaceId: unknown) => {
     if (workspaceId !== null && typeof workspaceId !== 'string') return;
-    void queryClient.invalidateQueries({ queryKey: queryKeys.mcp.status(workspaceId) });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.mcp.tools(workspaceId) });
+    void queryClient.invalidateQueries({ queryKey: workspaceId === null ? ['mcp', 'status'] : queryKeys.mcp.status(workspaceId) });
+    void queryClient.invalidateQueries({ queryKey: workspaceId === null ? ['mcp', 'tools'] : queryKeys.mcp.tools(workspaceId) });
   });
   add('git.changed', (workspaceId: unknown) => {
     if (typeof workspaceId === 'string') handleGitChanged(workspaceId);

@@ -46,7 +46,7 @@ export const definition: ToolDefinition = {
 
 export async function execute(
   input: Record<string, unknown>,
-  ctx: ToolContext,
+  ctx: Pick<ToolContext, 'ask'>,
 ): Promise<ToolResult> {
   const action = input.action as string;
 

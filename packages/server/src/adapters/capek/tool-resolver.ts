@@ -27,6 +27,8 @@ import {
 } from '@capekai/core/plugins';
 import { capekToolResolverKey, type CapekPlugin } from '@capekai/core/composition';
 
+import { browserTools } from '@/infrastructure/browser/catalog';
+const browserNames = new Set(browserTools.map(tool => tool.definition.name));
 const REFRESH_TTL_MS = 60_000;
 
 let lastRefreshAt = 0;
@@ -65,6 +67,7 @@ function warnShadowed(installed: LoadedTool): void {
 export function createMergedToolResolver(contributed: ToolRegistryResolver): ToolRegistryResolver {
   return {
     get(name: string): LoadedTool | null {
+      if (browserNames.has(name)) return null;
       scheduleInstalledToolsRefresh();
       return contributed.get(name) ?? capekGetInstalledTool(name);
     },
@@ -73,6 +76,7 @@ export function createMergedToolResolver(contributed: ToolRegistryResolver): Too
       const merged = [...contributed.list()];
       const contributedNames = new Set(merged.map((tool) => tool.definition.name));
       for (const installed of capekListInstalledTools()) {
+        if (browserNames.has(installed.definition.name)) continue;
         if (contributedNames.has(installed.definition.name)) {
           warnShadowed(installed);
           continue;

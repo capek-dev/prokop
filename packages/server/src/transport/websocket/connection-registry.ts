@@ -1,5 +1,12 @@
 import type { ClientDescriptor, ClientRegisterMessage, ClientRejectedMessage, ServerMessage } from '@prokopai/sdk';
 import { createConnectionId, type ConnectionId } from './connection-id';
+import { getBrowserRequestsPort } from '@/application/ports/browser';
+import { broadcastEvent } from './broadcast';
+
+function browserConnectionsChanged(): void {
+  getBrowserRequestsPort()?.connectionsChanged();
+  broadcastEvent({ type: 'mcp.changed', workspaceId: null });
+}
 
 // Types
 
@@ -69,6 +76,7 @@ export function unregisterConnection(socket: unknown): void {
       if (client.connectionIds.size === 0) {
         clientsByClientId.delete(conn.clientId);
       }
+      if (client.clientType === 'extension') browserConnectionsChanged();
     }
   }
 }
@@ -159,6 +167,7 @@ export function handleClientRegistration(
   }
 
   conn.clientId = descriptor.clientId;
+  if (descriptor.clientType === 'extension') browserConnectionsChanged();
 
   send(connectionId, {
     type: 'client.registered',

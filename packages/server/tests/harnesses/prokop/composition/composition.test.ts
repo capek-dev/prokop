@@ -358,12 +358,6 @@ describe('C4 coding bundle in the Jean2 composition', () => {
   void STANDARD_CODING_TOOL_NAMES;
 
   const BUILTIN_BASELINE_TOOL_NAMES = [
-    'browser_discover_elements',
-    'browser_dom_action',
-    'browser_navigate',
-    'browser_read_active_tab',
-    'browser_screenshot',
-    'browser_tab_manage',
     'edit',
     'file-to-markdown',
     'glob',

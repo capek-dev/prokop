@@ -27,7 +27,7 @@ export function McpServerForm({ name: originalName, config, names, pending, onSa
 }) {
   const id = useId();
   const [name, setName] = useState(originalName ?? '');
-  const [type, setType] = useState<'local' | 'remote'>(config?.type ?? 'remote');
+  const [type, setType] = useState<'local' | 'remote'>(config?.type === 'local' ? 'local' : 'remote');
   const [url, setUrl] = useState(config?.type === 'remote' ? config.url : '');
   const [command, setCommand] = useState(config?.type === 'local' ? config.command[0] : '');
   const [args, setArgs] = useState(config?.type === 'local' ? config.command.slice(1).join('\n') : '');

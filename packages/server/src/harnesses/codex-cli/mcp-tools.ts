@@ -1,14 +1,17 @@
 import type { WorkspaceMcpToolsPort } from '@/application/ports/mcp-tools';
 import { codexObject } from './app-server';
-import type { CodexMemoryCallResult } from './memory-tools';
+export interface CodexMcpCallResult {
+  success: boolean;
+  contentItems: Array<{ type: 'inputText'; text: string } | { type: 'inputImage'; imageUrl: string }>;
+}
 
-const fail = (text: string): CodexMemoryCallResult => ({ success: false, contentItems: [{ type: 'inputText', text }] });
+const fail = (text: string): CodexMcpCallResult => ({ success: false, contentItems: [{ type: 'inputText', text }] });
 /** Stable entrypoints let a new Codex thread discover future workspace configuration changes. */
 export function createCodexMcpTools(options: {
-  bridge: WorkspaceMcpToolsPort; path: string;
+  bridge: WorkspaceMcpToolsPort; path: string; sessionId?: string; signal?: AbortSignal;
   authorized(turnId: string): boolean;
 }): { definitions: Array<{ type: 'function'; name: string; description: string; inputSchema: Record<string, unknown> }>;
-  call(raw: unknown): Promise<CodexMemoryCallResult> } {
+  call(raw: unknown): Promise<CodexMcpCallResult> } {
   const seen = new Set<string>();
   return {
     definitions: [
@@ -29,7 +32,7 @@ export function createCodexMcpTools(options: {
       const input = codexObject(request.arguments);
       if (!input || JSON.stringify(input).length > 256_000) return fail('Invalid MCP arguments');
       try {
-        const tools = await options.bridge.tools(options.path);
+        const tools = await options.bridge.tools(options.path, options.sessionId);
         if (!options.authorized(request.turnId)) return fail('MCP tool unavailable');
         if (request.tool === 'mcp_list_tools') {
           if (Object.keys(input).length) return fail('Invalid MCP arguments');
@@ -41,8 +44,16 @@ export function createCodexMcpTools(options: {
         const tool = tools.find(tool => tool.name === input.tool);
         if (!tool) return fail('MCP tool is unavailable or disabled');
         const turnId = request.turnId;
-        const result = await tool.execute(input.arguments as Record<string, unknown>, undefined, () => options.authorized(turnId));
-        return { success: !result.isError, contentItems: [{ type: 'inputText', text: JSON.stringify(result) }] };
+        const result = await tool.execute(input.arguments as Record<string, unknown>, options.signal, () => options.authorized(turnId));
+        const images: CodexMcpCallResult['contentItems'] = [];
+        const content = result.content.map(block => {
+          if (block.type !== 'image' || typeof block.data !== 'string' || typeof block.mimeType !== 'string') return block;
+          images.push({ type: 'inputImage', imageUrl: `data:${block.mimeType};base64,${block.data}` });
+          return { type: 'text', text: `[Image: ${block.mimeType}]` };
+        });
+        return { success: !result.isError, contentItems: [
+          { type: 'inputText', text: JSON.stringify({ ...result, content }) }, ...images,
+        ] };
       } catch { return fail('MCP tool failed or access was disabled'); }
     },
   };

@@ -55,7 +55,7 @@ interface CodexSessionConnection {
   parentNotify: ((event: CodexNotification) => void) | null;
   parentHook: ((call: import('./hook-policy').CodexHookCall) => Promise<HookDecision>) | null;
   parentApproval: ((method: string, params: unknown) => Promise<{ decision: 'accept' | 'decline' }>) | null;
-  parentTool: ((params: unknown) => Promise<{ contentItems: Array<{ type: 'inputText'; text: string }>; success: boolean }>) | null;
+  parentTool: ((params: unknown) => Promise<import('./mcp-tools').CodexMcpCallResult>) | null;
   idleTimer?: ReturnType<typeof setTimeout>;
 }
 
@@ -66,6 +66,7 @@ interface ActiveTurn {
   fail(error: Error): void;
   goal: boolean;
   stopRequested: boolean;
+  mcpAbort: AbortController;
   isTurnCompleted(): boolean;
   activationSettled: Promise<void>;
   resolveActivation(): void;
@@ -433,6 +434,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
       }
       if (run.stop) return run.stop;
       run.stopRequested = true;
+      run.mcpAbort.abort();
       run.stop = (async (): Promise<InterruptExecutionResult> => {
         codexApprovals.cancelSession(sessionId);
         const connection = connections.get(sessionId);
@@ -848,7 +850,9 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
             } catch { return false; }
           },
         });
+        const mcpAbort = new AbortController();
         const mcp = deps.mcp && createCodexMcpTools({ bridge: deps.mcp, path: workspace.path,
+          sessionId, signal: mcpAbort.signal,
           authorized: turnId => {
             const current = getSession(sessionId);
             return !!run && active.get(sessionId) === run && run.turnId === turnId && !completed && !run.stopRequested
@@ -1009,7 +1013,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
         let resolveActivation!: () => void;
         const activationSettled = new Promise<void>(resolve => { resolveActivation = resolve; });
         run = { client, threadId, turnId: null, fail: rejectDone, goal: goalTokenBudget !== undefined,
-          stopRequested: false, isTurnCompleted: () => completed, activationSettled, resolveActivation,
+          stopRequested: false, mcpAbort, isTurnCompleted: () => completed, activationSettled, resolveActivation,
           pauseGoal: goal => {
             goalStatus = goal.status;
             publishCodexGoal(session, goal, wire.delivery);
@@ -1119,6 +1123,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
         starting.delete(sessionId);
         if (reuseId) resubmitting.delete(sessionId);
         if (run) {
+          run.mcpAbort.abort();
           run.resolveActivation();
           active.delete(sessionId);
         }

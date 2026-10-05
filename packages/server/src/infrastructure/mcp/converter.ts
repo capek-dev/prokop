@@ -2,15 +2,20 @@ import { createCapabilityTool, type CapabilityTool } from '@/adapters/capek/cont
 import { CallToolResultSchema, type Tool as MCPToolDef } from '@modelcontextprotocol/sdk/types.js';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { getWorkspaceTools } from './manager';
+import { mcpModelOutput, mcpOutputForCapek } from '@/adapters/capek/mcp-output';
 
-export async function getTools(path: string, _sessionId: string, authorized?: () => Promise<boolean>): Promise<Record<string, CapabilityTool>> {
-  return Object.fromEntries((await getWorkspaceTools(path)).map(tool => [tool.name, createCapabilityTool({
-    description: tool.description, inputSchema: tool.inputSchema, execute: async input => {
+export async function getTools(path: string, sessionId: string, authorized?: () => Promise<boolean>): Promise<Record<string, CapabilityTool>> {
+  return Object.fromEntries((await getWorkspaceTools(path, sessionId)).map(tool => {
+    const converted = createCapabilityTool({ description: tool.description, inputSchema: tool.inputSchema,
+      execute: async () => { throw new Error('MCP execution context unavailable'); } });
+    converted.execute = async (input, options) => {
       if (authorized && !await authorized()) throw new Error('MCP access is not allowed for this agent');
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid MCP arguments');
-      return tool.execute(input as Record<string, unknown>);
-    },
-  })]));
+      return mcpOutputForCapek(await tool.execute(input as Record<string, unknown>, options?.abortSignal, authorized));
+    };
+    converted.toModelOutput = mcpModelOutput;
+    return [tool.name, converted];
+  }));
 }
 
 type TextContent = { type: 'text'; text: string };

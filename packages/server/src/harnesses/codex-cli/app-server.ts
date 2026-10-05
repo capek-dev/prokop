@@ -88,7 +88,7 @@ export class CodexAppServer {
     private readonly io: CodexConnection,
     private readonly onNotification: (notification: CodexNotification) => void,
     private readonly onApproval?: (method: string, params: unknown) => Promise<{ decision: 'accept' | 'decline' }>,
-    private readonly onToolCall?: (params: unknown) => Promise<{ contentItems: Array<{ type: 'inputText'; text: string }>; success: boolean }>,
+    private readonly onToolCall?: (params: unknown) => Promise<{ contentItems: Array<{ type: 'inputText'; text: string } | { type: 'inputImage'; imageUrl: string }>; success: boolean }>,
     private readonly dynamicToolsEnabled = false,
   ) {
     this.disconnected = new Promise<never>((_resolve, reject) => { this.rejectDisconnected = reject; });

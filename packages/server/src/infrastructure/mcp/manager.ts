@@ -15,6 +15,9 @@ import { StdioTransport } from './stdio-transport';
 import { McpOAuthProvider } from './oauth-provider';
 import { getMcpServers, updateMcpConfig } from './config';
 import { removeAuth } from './auth';
+import { BUILTIN_BROWSER_MCP_NAME } from '@prokopai/sdk';
+import { browserTools } from '@/infrastructure/browser/catalog';
+import { browserConnection, browserService } from '@/infrastructure/browser/service';
 
 const TIMEOUT = 30_000;
 interface State { client: Client | null; status: McpStatus; config: McpServerConfig }
@@ -23,7 +26,7 @@ interface PendingAuth {
   provider: McpOAuthProvider; expiresAt: number;
 }
 export interface McpManager extends Omit<McpLifecyclePort, 'getTools' | 'getMcpServers'> {
-  getWorkspaceTools(path: string): Promise<WorkspaceMcpTool[]>;
+  getWorkspaceTools(path: string, sessionId?: string): Promise<WorkspaceMcpTool[]>;
   setMcpChangeListener(listener: (path: string | null) => void): void;
 }
 
@@ -38,6 +41,7 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     return createHash('sha256').update(JSON.stringify([path, name, url])).digest('hex');
   }
   function transportIdentity(config: McpServerConfig): string {
+    if (config.type === 'builtin') return JSON.stringify(['builtin', config.id]);
     const pairs = (values: Record<string, string> = {}) => Object.entries(values).sort(([a], [b]) => a.localeCompare(b));
     if (config.type === 'local') return JSON.stringify(['local', config.command, pairs(config.env), config.timeout ?? TIMEOUT]);
     const oauth = typeof config.oauth === 'object' ? config.oauth : {};
@@ -77,6 +81,10 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     const state: State = { client: null, status: { status: 'disabled' }, config };
     clients.set(name, state);
     if (config.enabled === false) return state.status;
+    if (config.type === 'builtin') {
+      state.status = browserStatus();
+      return state.status;
+    }
     const timeout = config.timeout ?? TIMEOUT;
     const transports = config.type === 'local'
       ? [(_signal: AbortSignal) => new StdioTransport({ command: config.command[0]!, args: config.command.slice(1),
@@ -144,6 +152,8 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     return serialized(path, () => connect(path, name, config));
   }
   async function disconnectServer(path: string | null, name: string): Promise<void> {
+    const config = await settingsConfig(path, name);
+    if (config?.type === 'builtin') { await saveServer(path, name, { ...config, enabled: false }); return; }
     await serialized(path, () => disconnect(path, name)); onChange(path);
   }
   async function saveServer(path: string | null, name: string, config: McpServerConfig): Promise<void> {
@@ -169,9 +179,12 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     });
     onChange(path);
   }
+  async function settingsConfig(path: string | null, name: string): Promise<McpServerConfig | undefined> {
+    return (await getMcpServers(path))[name] ?? (name === BUILTIN_BROWSER_MCP_NAME ? (await getMcpServers(null))[name] : undefined);
+  }
   async function setToolEnabled(path: string | null, name: string, toolName: string, enabled: boolean): Promise<void> {
     await serialized(path, async () => {
-      const config = (await getMcpServers(path))[name];
+      const config = await settingsConfig(path, name);
       if (!config) throw new NotFoundError('MCP server not found');
       const disabled = new Set(config.disabledTools);
       if (enabled) disabled.delete(toolName); else disabled.add(toolName);
@@ -179,13 +192,23 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     });
     onChange(path);
   }
+  function browserStatus(): McpStatus {
+    return browserConnection() ? { status: 'connected' }
+      : { status: 'failed', error: 'Connect exactly one Prokop Browser extension.' };
+  }
   async function getServerStatus(path: string | null, name: string): Promise<McpStatus | undefined> {
+    const config = await settingsConfig(path, name);
+    if (config?.type === 'builtin') return config.enabled === false ? { status: 'disabled' } : browserStatus();
     return workspaces.get(path)?.get(name)?.status;
   }
   async function getAllServerStatus(path: string | null): Promise<Record<string, { config: McpServerConfig; status: McpStatus }>> {
     const configs = await getMcpServers(path);
+    if (!Object.hasOwn(configs, BUILTIN_BROWSER_MCP_NAME)) {
+      configs[BUILTIN_BROWSER_MCP_NAME] = (await getMcpServers(null))[BUILTIN_BROWSER_MCP_NAME]!;
+    }
     return Object.fromEntries(Object.entries(configs).map(([name, config]) => [name, {
-      config, status: config.enabled === false ? { status: 'disabled' } : workspaces.get(path)?.get(name)?.status ?? { status: 'disabled' },
+      config, status: config.enabled === false ? { status: 'disabled' }
+        : config.type === 'builtin' ? browserStatus() : workspaces.get(path)?.get(name)?.status ?? { status: 'disabled' },
     }]));
   }
   async function listTools(state: State): Promise<Tool[]> {
@@ -204,11 +227,12 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
   }
   async function getServerTools(path: string | null, name: string): Promise<McpToolInfo[]> {
     await initializeWorkspace(path);
-    const config = (await getMcpServers(path))[name];
+    const config = await settingsConfig(path, name);
     if (!config) throw new NotFoundError('MCP server not found');
     const state = workspaces.get(path)?.get(name);
     let tools: Tool[];
-    try { tools = state ? await listTools(state) : []; }
+    try { tools = config.type === 'builtin' ? browserTools.map(tool => ({ name: tool.definition.name, description: tool.definition.description,
+      inputSchema: { ...tool.definition.inputSchema, type: 'object' as const } })) : state ? await listTools(state) : []; }
     catch { throw new Error('Unable to list MCP tools. Reconnect and try again.'); }
     return tools.map(tool => ({ name: tool.name, description: tool.description,
       enabled: !config.disabledTools?.includes(tool.name) }));
@@ -237,7 +261,7 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
               || transportIdentity(current) !== transportIdentity(config)
               || workspaces.get(path)?.get(name)?.client !== client) throw new Error('MCP tool is disabled or its connection changed');
             if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid MCP arguments');
-            if (authorized && !authorized()) throw new Error('MCP tool unavailable');
+            if (authorized && !await authorized()) throw new Error('MCP tool unavailable');
             signal?.throwIfAborted();
             return CallToolResultSchema.parse(await client.callTool({ name: definition.name, arguments: input }, CallToolResultSchema,
               { timeout: current.timeout ?? TIMEOUT, signal }));
@@ -246,21 +270,43 @@ export function createMcpManager(fetchMcp: FetchLike = fetch): McpManager {
     }
     return result;
   }
-  async function getWorkspaceTools(path: string): Promise<WorkspaceMcpTool[]> {
+  async function getWorkspaceTools(path: string, sessionId?: string): Promise<WorkspaceMcpTool[]> {
     const [globalTools, workspaceTools, workspaceServers] = await Promise.all([
       getScopeTools(null), getScopeTools(path), getMcpServers(path),
     ]);
+    const effective = { ...await getMcpServers(null), ...workspaceServers };
+    const builtins: WorkspaceMcpTool[] = [];
+    if (sessionId) for (const [name, config] of Object.entries(effective)) {
+      if (config.type !== 'builtin' || config.enabled === false) continue;
+      const workspaceOwned = Object.hasOwn(workspaceServers, name);
+      for (const tool of browserTools) {
+        const definition = tool.definition;
+        if (config.disabledTools?.includes(definition.name)) continue;
+        builtins.push({ name: definition.name, serverName: name, toolName: definition.name,
+          description: definition.description, inputSchema: definition.inputSchema,
+          execute(input, signal, authorized) {
+            const allowed = async (): Promise<boolean> => {
+              const workspaceConfig = await getMcpServers(path);
+              if (workspaceOwned !== Object.hasOwn(workspaceConfig, name)) return false;
+              const current = workspaceOwned ? workspaceConfig[name] : (await getMcpServers(null))[name];
+              return current?.type === 'builtin' && current.enabled !== false
+                && !current.disabledTools?.includes(definition.name) && (!authorized || await authorized());
+            };
+            return browserService.execute(definition.name, input, sessionId, path, signal, allowed, config.timeout);
+          } });
+      }
+    }
     const inherited = globalTools.filter(tool => !Object.hasOwn(workspaceServers, tool.serverName));
     return [...inherited.map(tool => ({
       ...tool,
-      async execute(input: Record<string, unknown>, signal?: AbortSignal, authorized?: () => boolean) {
+      async execute(input: Record<string, unknown>, signal?: AbortSignal, authorized?: () => boolean | Promise<boolean>) {
         // A newly added workspace override also revokes handles already exposed to a turn.
         if (Object.hasOwn(await getMcpServers(path), tool.serverName)) {
           throw new Error('Global MCP server is overridden by this workspace');
         }
         return tool.execute(input, signal, authorized);
       },
-    })), ...workspaceTools];
+    })), ...workspaceTools, ...builtins];
   }
   async function startAuth(path: string | null, name: string, redirectUrl: string): Promise<{ authorizationUrl: string }> {
     return serialized(path, async () => {

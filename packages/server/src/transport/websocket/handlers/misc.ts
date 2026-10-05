@@ -2,6 +2,7 @@ import type { RouterContext } from '@/transport/websocket/router-context';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { handleClientRegistration, getClientByClientId, getClientIdForConnection, getConnectionById } from '@/transport/websocket/connection-registry';
 import { sandboxController, capekResolveAsk, capekGetSessionIdForPendingAsk, capekGetAuthorityForPendingAsk, type SandboxRespondMessage } from '@/adapters/capek/contracts';
+import { getBrowserRequestsPort } from '@/application/ports/browser';
 import { getAskResolutionPort } from '@/application/ports/ask-resolution';
 import { getControlState } from '@/transport/websocket/control-registry';
 import { requireWireApplication } from '@/transport/websocket/application';
@@ -140,6 +141,13 @@ export async function handleAskResponse(
   ws: ConnectionId,
   msg: AskResponseMessage,
 ): Promise<void> {
+  if (msg.toolCallId.startsWith('browser-request:')) {
+    const browser = getBrowserRequestsPort();
+    if (!browser || !msg.requestId || !browser.acceptsConnection(msg.toolCallId, ws)
+      || !await browser.getSessionIdForPendingAsk(msg.toolCallId, msg.requestId)) return;
+    await handleAskResponseWithDependencies(ctx, ws, msg, browser);
+    return;
+  }
   await handleAskResponseWithDependencies(ctx, ws, msg, askResponseDependencies);
 }
 

@@ -31,6 +31,19 @@ function setupPanel(initial: Record<string, { config: McpServerConfig; status: {
 }
 describe.each(['ws', null])('MCP settings for %s', workspaceId => {
   const setup = (initial?: Parameters<typeof setupPanel>[0]) => setupPanel(initial, workspaceId);
+  test('shows built-in browser setup without URL, command, edit or remove controls', async () => {
+    const { api, user } = setup({ 'Prokop Browser': { config: { type: 'builtin', id: 'browser', enabled: false }, status: { status: 'disabled' } } });
+    expect(await screen.findByText('Built-in')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Prokop Browser' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove Prokop Browser' })).not.toBeInTheDocument();
+    await user.click(screen.getByText('Set up browser extension'));
+    expect(screen.getByRole('link', { name: 'Download the Prokop Browser extension' })).toHaveAttribute('href',
+      'https://github.com/rabbyte-tech/jean2/releases?q=browser%2F&expanded=true');
+    await user.click(screen.getByRole('switch', { name: 'Enable Prokop Browser' }));
+    await waitFor(() => expect(api.save).toHaveBeenCalledWith(workspaceId, 'Prokop Browser',
+      { type: 'builtin', id: 'browser', enabled: true }));
+    expect(await screen.findByRole('button', { name: 'Choose tools' })).toBeInTheDocument();
+  });
   test('adds a remote server without editing a file', async () => {
     const { api, user } = setup();
     await user.click(screen.getByRole('button', { name: 'Add server' }));

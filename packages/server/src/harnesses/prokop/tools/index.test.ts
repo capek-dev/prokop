@@ -4,12 +4,6 @@ import { builtinTools, builtinToolNames, isBuiltinToolName } from './index';
 describe('built-in tool catalog', () => {
   test('exposes the full baked-in set', () => {
     expect([...builtinToolNames].sort()).toEqual([
-      'browser_discover_elements',
-      'browser_dom_action',
-      'browser_navigate',
-      'browser_read_active_tab',
-      'browser_screenshot',
-      'browser_tab_manage',
       'edit',
       'file-to-markdown',
       'glob',
@@ -25,7 +19,7 @@ describe('built-in tool catalog', () => {
   });
 
   test('every tool has a valid definition and executor', () => {
-    expect(builtinTools).toHaveLength(17);
+    expect(builtinTools).toHaveLength(11);
     for (const tool of builtinTools) {
       expect(tool.definition.name).toBeTruthy();
       expect(tool.definition.description).toBeTruthy();
@@ -42,7 +36,7 @@ describe('built-in tool catalog', () => {
 
   test('isBuiltinToolName matches catalog names only', () => {
     expect(isBuiltinToolName('read-file')).toBe(true);
-    expect(isBuiltinToolName('browser_navigate')).toBe(true);
+    expect(isBuiltinToolName('browser_navigate')).toBe(false);
     expect(isBuiltinToolName('file-to-markdown')).toBe(true);
     expect(isBuiltinToolName('shell')).toBe(true);
     expect(isBuiltinToolName('todo')).toBe(true);

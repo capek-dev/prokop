@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { McpConfig, McpServerConfig, McpLocalServerConfig, McpRemoteServerConfig } from '@prokopai/sdk';
+import { BUILTIN_BROWSER_MCP_NAME } from '@prokopai/sdk';
 import { resolveWorkspaceDir } from '@/infrastructure/runtime/workspace-dirs';
 import { getDataDir } from '@/infrastructure/runtime/paths';
 import { mcpConfigSchema, mcpNameSchema, mcpServerConfigSchema } from '@/domains/mcp/config';
@@ -28,6 +29,10 @@ export async function loadMcpConfig(workspacePath: string | null): Promise<McpCo
 export async function updateMcpConfig(workspacePath: string | null, name: string, config: McpServerConfig | null): Promise<void> {
   mcpNameSchema.parse(name);
   if (config !== null) mcpServerConfigSchema.parse(config);
+  if (config?.type === 'builtin' && name !== BUILTIN_BROWSER_MCP_NAME
+    || name === BUILTIN_BROWSER_MCP_NAME && config !== null && config.type !== 'builtin') {
+    throw new Error('Prokop Browser is reserved for the built-in browser integration');
+  }
   const directory = configDirectory(workspacePath);
   const previous = writes.get(directory) ?? Promise.resolve();
   const next = previous.catch(() => {}).then(async () => {
@@ -44,7 +49,10 @@ export async function updateMcpConfig(workspacePath: string | null, name: string
 }
 
 export async function getMcpServers(workspacePath: string | null): Promise<Record<string, McpServerConfig>> {
-  return (await loadMcpConfig(workspacePath)).servers;
+  const servers = (await loadMcpConfig(workspacePath)).servers;
+  return workspacePath === null
+    ? { [BUILTIN_BROWSER_MCP_NAME]: { type: 'builtin', id: 'browser', enabled: false }, ...servers }
+    : servers;
 }
 
 export function isLocalConfig(config: McpServerConfig): config is McpLocalServerConfig {

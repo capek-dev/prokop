@@ -64,16 +64,17 @@ function McpSettings({ workspaceId, client }: { workspaceId: string | null; clie
               <div className="flex items-center gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{config.type === 'remote' ? config.url : config.command.join(' ')}</p>
+                  <p className="truncate text-xs text-muted-foreground">{config.type === 'builtin' ? 'Browser tools for Prokop, Claude Code and Codex CLI.' : config.type === 'remote' ? config.url : config.command.join(' ')}</p>
                 </div>
                 <Switch aria-label={'Enable ' + name} checked={config.enabled !== false} disabled={action.isPending}
                   onCheckedChange={enabled => run(() => client.http.mcp.save(workspaceId, name, { ...config, enabled }))} />
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={connection.status === 'failed' ? 'destructive' : 'secondary'}>
-                  {config.enabled === false ? 'Disabled' : statusLabels[connection.status]}
+                  {config.enabled === false ? 'Disabled' : config.type === 'builtin' && connection.status !== 'connected' ? 'Extension not connected' : statusLabels[connection.status]}
                 </Badge>
-                {config.enabled !== false && connection.status !== 'connected' && <Button size="sm" variant="ghost" disabled={action.isPending}
+                {config.type === 'builtin' && <Badge variant="outline">Built-in</Badge>}
+                {config.type !== 'builtin' && config.enabled !== false && connection.status !== 'connected' && <Button size="sm" variant="ghost" disabled={action.isPending}
                   onClick={() => run(() => client.http.mcp.connect(workspaceId, name))}><RefreshCw data-icon="inline-start" />Connect</Button>}
                 {config.type === 'remote' && config.oauth !== false && config.enabled !== false && connection.status !== 'connected' && <Button size="sm" variant="ghost"
                   disabled={action.isPending} onClick={() => {
@@ -88,13 +89,22 @@ function McpSettings({ workspaceId, client }: { workspaceId: string | null; clie
                       } catch (error: unknown) { popup?.close(); throw error; }
                     });
                   }}><ExternalLink data-icon="inline-start" />Sign in</Button>}
-                <Button size="icon-sm" variant="ghost" aria-label={'Edit ' + name} disabled={action.isPending}
+                {config.type !== 'builtin' && <><Button size="icon-sm" variant="ghost" aria-label={'Edit ' + name} disabled={action.isPending}
                   onClick={() => setEditing({ name, config })}><Pencil /></Button>
                 <Button size="icon-sm" variant="ghost" aria-label={'Remove ' + name} disabled={action.isPending}
-                  onClick={() => run(() => client.http.mcp.remove(workspaceId, name))}><Trash2 /></Button>
+                  onClick={() => run(() => client.http.mcp.remove(workspaceId, name))}><Trash2 /></Button></>}
               </div>
+              {config.type === 'builtin' && <details className="text-sm">
+                <summary className="cursor-pointer text-muted-foreground">Set up browser extension</summary>
+                <ol className="mt-2 flex list-inside list-decimal flex-col gap-2 text-xs text-muted-foreground">
+                  <li><a className="underline" href="https://github.com/rabbyte-tech/jean2/releases?q=browser%2F&expanded=true" target="_blank" rel="noopener noreferrer">Download the Prokop Browser extension</a> ZIP from a browser release and extract it.</li>
+                  <li>Open <code>chrome://extensions</code>, enable Developer mode, choose Load unpacked, and select the extracted folder containing <code>manifest.json</code>.</li>
+                  <li>Open the extension, enter this Prokop server URL and API token, and connect. Keep only one browser profile connected.</li>
+                  <li>Enable Prokop Browser here, then start a new turn. Existing Prokop agents should use this MCP entry instead of their old browser tool selections.</li>
+                </ol>
+              </details>}
               {'error' in connection && <p className="text-xs text-destructive">{connection.error}</p>}
-              {connection.status === 'connected' && config.enabled !== false && <McpTools workspaceId={workspaceId} name={name} client={client} />}
+              {(connection.status === 'connected' || config.type === 'builtin') && config.enabled !== false && <McpTools workspaceId={workspaceId} name={name} client={client} />}
             </div>
           ))}
         </div>

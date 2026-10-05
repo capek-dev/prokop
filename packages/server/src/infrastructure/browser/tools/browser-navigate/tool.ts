@@ -32,7 +32,7 @@ export const definition: ToolDefinition = {
 
 export async function execute(
   input: Record<string, unknown>,
-  ctx: ToolContext,
+  ctx: Pick<ToolContext, 'ask'>,
 ): Promise<ToolResult> {
   const url = input.url as string;
   const waitForLoad = input.waitForLoad as boolean | undefined;

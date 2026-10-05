@@ -16,6 +16,8 @@ import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { jean2PreconfigSource } from './context-sources';
 import { createProkopMcpDiscovery } from './mcp-discovery';
+import { browserTools } from '@/infrastructure/browser/catalog';
+const browserNames = new Set(browserTools.map(tool => tool.definition.name));
 
 /** Harness-owned built-ins, read through the installed port at call time
  * so this adapter never imports harness internals. */
@@ -53,12 +55,13 @@ export const jean2ToolCatalog = {
       ...installed
         .filter((definition) => (
           !builtinNames.has(definition.name)
-          && !domainNames.has(definition.name)
+          && !domainNames.has(definition.name) && !browserNames.has(definition.name)
         ))
         .map((definition) => ({ ...definition, source: 'installed' as const })),
     ].sort((a, b) => a.name.localeCompare(b.name));
   },
   getTool: async (name: string) => {
+    if (browserNames.has(name)) return null;
     const builtin = exposedBuiltinTools().find((tool) => tool.definition.name === name);
     if (builtin) return builtin;
     return capekGetTool(name);

@@ -36,7 +36,8 @@ describe('harness MCP adapters', () => {
       path: '/workspace', authorized: id => active && id === 'turn' });
     const request = (callId: string, name = 'mcp_call_tool', args: unknown = { tool: 'crm_read', arguments: {} }) =>
       ({ namespace: null, turnId: 'turn', callId, tool: name, arguments: args });
-    expect((await adapter.call(request('list', 'mcp_list_tools', {}))).contentItems[0]?.text).toContain('crm_read');
+    const first = (await adapter.call(request('list', 'mcp_list_tools', {}))).contentItems[0];
+    expect(first?.type === 'inputText' ? first.text : '').toContain('crm_read');
     expect((await adapter.call(request('one'))).success).toBe(true);
     expect((await adapter.call(request('one'))).success).toBe(false);
     enabled = false;

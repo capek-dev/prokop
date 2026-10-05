@@ -1,15 +1,10 @@
 import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
 
-interface ActiveTabResult {
-  title: string;
-  url: string;
-  text: string;
-}
-
 export const definition: ToolDefinition = {
-  name: 'browser_read_active_tab',
+  name: 'browser_screenshot',
   description:
-    'Read a browser tab by tabId. Without tabId, reads the most recently active non-PWA browser tab. Returns the page title, URL, and visible text content. ' +
+    'Capture a screenshot of a tab selected by tabId, or the most recently active non-PWA browser tab. Returns a base64-encoded PNG image. ' +
+    'Use this to visually verify the current state of a page after performing actions. ' +
     'Requires a connected ProkopaiBrowser extension.',
   inputSchema: {
     type: 'object',
@@ -20,17 +15,17 @@ export const definition: ToolDefinition = {
       },
     },
   },
-  timeout: 120000,
+  timeout: 15000,
 };
 
 export async function execute(
   input: Record<string, unknown>,
-  ctx: ToolContext,
+  ctx: Pick<ToolContext, 'ask'>,
 ): Promise<ToolResult> {
   const approved = await ctx.ask({
     type: 'permission',
-    question: 'Read active browser tab?',
-    description: 'Read the title, URL, and visible text content of the selected browser tab.',
+    question: 'Take browser screenshot?',
+    description: 'Capture a screenshot of the selected browser tab as a PNG image.',
     risk: 'low',
     resource: 'browser',
     action: 'read',
@@ -42,9 +37,9 @@ export async function execute(
     const executionResult = await ctx.ask({
       type: 'client_capability',
       target: 'client',
-      capability: 'active_tab_read',
+      capability: 'browser_screenshot',
       metadata: {
-        task: 'browser.read_active_tab',
+        task: 'browser.screenshot',
         params: { tabId: input.tabId },
       },
     });
@@ -56,22 +51,42 @@ export async function execute(
       };
     }
 
-    const result = executionResult as ActiveTabResult;
+    const result = executionResult as Record<string, unknown>;
 
-    if (!result.title && !result.url && !result.text) {
+    if (!result.success) {
       return {
         success: false,
-        error: 'Extension returned empty result.',
+        error: `Screenshot failed: ${result.error ?? 'unknown error'}`,
+      };
+    }
+
+    const pngPrefix = 'data:image/png;base64,';
+    if (typeof result.dataUrl !== 'string' || !result.dataUrl.startsWith(pngPrefix)) {
+      return {
+        success: false,
+        error: 'Extension returned invalid PNG screenshot data.',
+      };
+    }
+
+    const pngBase64 = result.dataUrl.slice(pngPrefix.length);
+    if (!pngBase64) {
+      return {
+        success: false,
+        error: 'Extension returned empty PNG screenshot data.',
       };
     }
 
     return {
       success: true,
       result: {
-        title: result.title || '',
-        url: result.url || '',
-        text: result.text || '',
+        captured: true,
+        mediaType: 'image/png',
       },
+      modelOutput: [{
+        type: 'image',
+        data: pngBase64,
+        mediaType: 'image/png',
+      }],
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -80,13 +95,13 @@ export async function execute(
       return {
         success: false,
         error:
-          'Browser read timed out. Ensure the ProkopaiBrowser extension is installed, connected, and the active tab is accessible.',
+          'Screenshot timed out. Ensure the ProkopaiBrowser extension is installed and connected.',
       };
     }
 
     return {
       success: false,
-      error: `Browser read failed: ${message}`,
+      error: `Screenshot failed: ${message}`,
     };
   }
 }

@@ -3,7 +3,8 @@
  * Used for configuring MCP servers in workspace .prokopai/mcp.json (legacy: .jean2)
  */
 
-export type McpServerType = 'local' | 'remote';
+export const BUILTIN_BROWSER_MCP_NAME = 'Prokop Browser';
+export type McpServerType = 'local' | 'remote' | 'builtin';
 
 export interface McpOAuthConfig {
   clientId?: string;
@@ -30,7 +31,15 @@ export interface McpRemoteServerConfig {
   disabledTools?: string[];
 }
 
-export type McpServerConfig = McpLocalServerConfig | McpRemoteServerConfig;
+export interface McpBuiltinServerConfig {
+  type: 'builtin';
+  id: 'browser';
+  enabled?: boolean;
+  disabledTools?: string[];
+  timeout?: number;
+}
+
+export type McpServerConfig = McpLocalServerConfig | McpRemoteServerConfig | McpBuiltinServerConfig;
 
 export interface McpConfig {
   servers: Record<string, McpServerConfig>;
