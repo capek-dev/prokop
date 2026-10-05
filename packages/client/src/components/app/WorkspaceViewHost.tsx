@@ -42,6 +42,9 @@ export function WorkspaceViewHost({ id, label = id, target, visible, children }:
     host.setAttribute('aria-label', label);
     host.setAttribute('class', 'absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden');
     host.style.setProperty('visibility', visible ? 'visible' : 'hidden');
+    // Descendant transition-all can delay inherited visibility. Hide the whole
+    // host immediately without collapsing layout or losing retained view state.
+    host.style.setProperty('opacity', visible ? '1' : '0');
     host.style.setProperty('pointer-events', visible ? '' : 'none');
     host.toggleAttribute('inert', !visible);
     host.setAttribute('aria-hidden', String(!visible));

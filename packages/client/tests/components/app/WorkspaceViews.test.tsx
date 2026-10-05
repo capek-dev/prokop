@@ -123,6 +123,28 @@ describe('workspace view hosts', () => {
     expect(document.querySelector('[data-workspace-view]')).toBeNull();
   });
 
+  test('hides retained repository controls immediately when switching tabs', () => {
+    useDockStore.getState().setDockOpen('right', true);
+    render(<WorkspaceViews views={{
+      explorer: <div>Explorer contents</div>,
+      branches: <button style={{ transition: 'all 150ms', visibility: 'visible' }}>Branch control</button>,
+      changes: <button style={{ transition: 'all 150ms', visibility: 'visible' }}>Changes control</button>,
+    }} />);
+    const branchControl = screen.getByText('Branch control');
+    const changesControl = screen.getByText('Changes control');
+    const branches = branchControl.closest<HTMLElement>('[data-workspace-view]')!;
+    const changes = changesControl.closest<HTMLElement>('[data-workspace-view]')!;
+    for (const id of ['branches', 'changes', 'explorer'] as const) {
+      fireEvent.click(screen.getByRole('tab', { name: id === 'branches' ? 'Branches' : id === 'changes' ? 'Changes' : 'Explorer' }));
+      expect(branches.style.opacity).toBe(id === 'branches' ? '1' : '0');
+      expect(changes.style.opacity).toBe(id === 'changes' ? '1' : '0');
+    }
+    expect(branches).toHaveAttribute('inert');
+    expect(changes).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('Branch control')).toBe(branchControl);
+    expect(screen.getByText('Changes control')).toBe(changesControl);
+  });
+
   test('mobile terminal visibility is independent of desktop bottom placement', () => {
     viewport.mobile = true;
     useWorkspaceViewStore.getState().moveView('conversations', 'bottom');
