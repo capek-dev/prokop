@@ -139,11 +139,15 @@ export class FilesRestNamespace {
 
   async tree(
     workspaceId: string,
-    options?: { root?: string; signal?: AbortSignal },
+    /** `refresh` rewalks instead of serving the server's cached tree for a watched root. */
+    options?: { root?: string; refresh?: boolean; signal?: AbortSignal },
   ): Promise<FileTreeRestResponse> {
     const params: Record<string, string> = {};
     if (options?.root !== undefined) {
       params.root = options.root;
+    }
+    if (options?.refresh) {
+      params.refresh = 'true';
     }
     return this.http.get(`/workspaces/${encodeURIComponent(workspaceId)}/files/tree`, {
       params: Object.keys(params).length > 0 ? params : undefined,
@@ -274,11 +278,15 @@ export class FilesRestNamespace {
 
   async gitStatus(
     workspaceId: string,
-    options?: { root?: string; signal?: AbortSignal },
+    /** `refresh` recomputes instead of serving the server's cached status for a watched root. */
+    options?: { root?: string; refresh?: boolean; signal?: AbortSignal },
   ): Promise<GitStatusResponse> {
     const params: Record<string, string> = {};
     if (options?.root !== undefined) {
       params.root = options.root;
+    }
+    if (options?.refresh) {
+      params.refresh = 'true';
     }
     return this.http.get(`/workspaces/${encodeURIComponent(workspaceId)}/git/status`, {
       params: Object.keys(params).length > 0 ? params : undefined,

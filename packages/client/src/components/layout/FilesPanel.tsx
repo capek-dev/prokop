@@ -35,6 +35,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useFileEditorStore } from '@/stores/fileEditorStore';
 import { queryClient } from '@/components/providers/QueryProvider';
 import { queryKeys } from '@/lib/queryKeys';
+import { refreshGitStatus } from '@/lib/rootFeedRefresh';
 import { buildFilesPanelRootOptions, resolveFilesPanelRoot } from '@/lib/sessionWorktree';
 import { WorktreesPanel } from '@/components/worktrees/WorktreesPanel';
 import { BranchesPanel } from '@/components/files/BranchesPanel';
@@ -177,15 +178,23 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
     const handleRefresh = useCallback(() => {
       setIsRefreshing(true);
       queryClient.invalidateQueries({ queryKey: queryKeys.files.browsePrefix });
-      queryClient.invalidateQueries({ queryKey: queryKeys.files.treePrefix });
       queryClient.invalidateQueries({ queryKey: queryKeys.files.searchPrefix });
       queryClient.invalidateQueries({ queryKey: queryKeys.files.browseFsPrefix });
       queryClient.invalidateQueries({ queryKey: queryKeys.files.parentPrefix });
       queryClient.invalidateQueries({ queryKey: queryKeys.files.drivesPrefix });
-      queryClient.invalidateQueries({ queryKey: queryKeys.files.gitStatusPrefix });
 
-      if (sdkClient && workspaceId) {
-        void sdkClient.http.workspaces
+      if (!sdkClient || !workspaceId) {
+        setIsRefreshing(false);
+        return;
+      }
+      const logFailure = (what: string) => (err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`Failed to refresh ${what}:`, message);
+      };
+      // Git status and the tree of a watched root come from the server feeds'
+      // caches; force a recompute so changes made outside Prokop show up.
+      void Promise.all([
+        sdkClient.http.workspaces
           .get(workspaceId)
           .then(({ workspace: updatedWorkspace }) => {
             const store = useServerDataStore.getState();
@@ -196,15 +205,11 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
               store.setActiveWorkspace(updatedWorkspace);
             }
           })
-          .catch((err: unknown) => {
-            const message = err instanceof Error ? err.message : String(err);
-            console.error('Failed to refresh workspace:', message);
-          })
-          .finally(() => setIsRefreshing(false));
-      } else {
-        setIsRefreshing(false);
-      }
-    }, [sdkClient, workspaceId]);
+          .catch(logFailure('workspace')),
+        refreshGitStatus(sdkClient, workspaceId, isMainRoot ? undefined : selectedRoot).catch(logFailure('Git status')),
+        fileTreeRef.current?.refresh().catch(logFailure('file tree')),
+      ]).finally(() => setIsRefreshing(false));
+    }, [sdkClient, workspaceId, isMainRoot, selectedRoot]);
 
     // When the last worktree disappears, the tab hides; leave the stored tab
     // on a surface that still renders.

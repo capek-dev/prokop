@@ -206,7 +206,25 @@ export interface FileTreeResponse {
   /** Every visible file and directory path, POSIX separators, presorted. */
   paths: string[];
   truncated: boolean;
+  /** Increases whenever the server's tree for this root changes; ignore older ones. */
+  revision?: number;
 }
+
+/**
+ * Pushed change to a watched tree root. New subscribers and large changes
+ * get the whole tree; otherwise the paths added and removed since
+ * `baseRevision`, which only applies on top of that exact revision.
+ */
+export type FileTreeUpdate =
+  | { kind: 'snapshot'; tree: FileTreeResponse }
+  | {
+      kind: 'delta';
+      baseRevision: number;
+      revision: number;
+      added: string[];
+      removed: string[];
+      truncated: boolean;
+    };
 
 /** Shared mutation result shape for file create/rename/delete. */
 export interface FileMutationResult {

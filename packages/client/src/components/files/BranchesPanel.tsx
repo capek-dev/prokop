@@ -60,7 +60,7 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
     setPickerOpen(false);
   };
   const refresh = () => {
-    for (const key of [['git-branches'], ['git-history'], ['git-repository'], ['git-rebase'], queryKeys.files.treePrefix, queryKeys.files.browsePrefix, queryKeys.files.gitStatusPrefix, ['files', 'git-diff'], queryKeys.worktrees.refsByWorkspace(workspaceId)]) {
+    for (const key of [['git-branches'], ['git-history'], ['git-repository'], ['git-rebase'], queryKeys.files.browsePrefix, queryKeys.files.gitStatusPrefix, ['files', 'git-diff'], queryKeys.worktrees.refsByWorkspace(workspaceId)]) {
       void cache.invalidateQueries({ queryKey: key });
     }
   };

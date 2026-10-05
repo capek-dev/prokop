@@ -433,9 +433,11 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     listAvailableWorktreePaths: worktreeRoots.listAvailablePaths,
   }), (workspaceId, root) => broadcastEvent({ type: 'git.changed', workspaceId, root }), {
     deliverGitStatus: (subscriber, message) => sendToConnectionEvent(subscriber as ConnectionId, message),
+    deliverFileTree: (subscriber, message) => sendToConnectionEvent(subscriber as ConnectionId, message),
   });
-  // Tool completions that may write files refresh subscribed Git status, throttled per root.
+  // Tool completions that may write files refresh subscribed Git status and trees, throttled per root.
   addWorkspaceFilesChangedObserver((workspaceId) => files.gitStatusFeed.filesChanged(workspaceId));
+  addWorkspaceFilesChangedObserver((workspaceId) => files.fileTreeFeed.filesChanged(workspaceId));
   const configuration = createConfigurationApplication({
     ...createJean2ConfigurationPorts(),
     // Primary/both preconfigs materialize as agents on save. Materialization

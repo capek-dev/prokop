@@ -23,12 +23,15 @@ import type {
   Workspace,
   GitHead,
   GitStatusMessage,
+  FileTreeMessage,
+  FileTreeResponse,
 } from '@prokopai/sdk';
 import type {
   FilesApplicationPort,
   GitStatusResult,
 } from '@/application/ports/files';
 import { createGitStatusFeed, type GitStatusFeed } from './git-status-feed';
+import { createFileTreeFeed, type FileTreeFeed } from './file-tree-feed';
 
 export interface FilesListResult {
   files: FileEntry[];
@@ -75,7 +78,8 @@ export interface FilesApplication {
   gitCommit(workspaceId: string, input: GitCommitInput): Promise<GitCommitResult>;
   gitPush(workspaceId: string, input: GitPushInput): Promise<GitPushResult>;
   gitPushPreview(workspaceId: string, input: GitPushPreviewInput): Promise<{ remoteHead: string | null }>;
-  gitStatus(workspaceId: string, rootQuery?: string): Promise<FilesGitStatusWire>;
+  /** `fresh` recomputes a watched root instead of serving its cached status (manual refresh). */
+  gitStatus(workspaceId: string, rootQuery?: string, options?: { fresh?: boolean }): Promise<FilesGitStatusWire>;
   /** Pushed Git status per root; subscribers are opaque connection ids. */
   gitStatusFeed: GitStatusFeed<string>;
   gitDiff(workspaceId: string, path: string, rootQuery?: string): Promise<GitFileDiffResponse>;
@@ -88,8 +92,11 @@ export interface FilesApplication {
   ): Promise<SaveFileResponse>;
   listTreePaths(
     workspaceId: string,
-    input: { root?: string; showHidden?: boolean },
-  ): Promise<{ root: string; isMain: boolean; paths: string[]; truncated: boolean }>;
+    /** `fresh` rewalks a watched root instead of serving its cached tree (manual refresh). */
+    input: { root?: string; showHidden?: boolean; fresh?: boolean },
+  ): Promise<FileTreeResponse>;
+  /** Pushed file tree per root; subscribers are opaque connection ids. */
+  fileTreeFeed: FileTreeFeed<string>;
   createFileEntry(
     workspaceId: string,
     input: { path: string; kind?: 'file' | 'directory'; root?: string; createParents?: boolean },
@@ -111,6 +118,8 @@ export interface FilesApplication {
 export interface FilesApplicationOptions {
   /** Transport delivery for the Git status feed; without it the feed only serves reads. */
   deliverGitStatus?(subscriber: string, message: GitStatusMessage): void;
+  /** Transport delivery for the file tree feed; without it the feed only serves reads. */
+  deliverFileTree?(subscriber: string, message: FileTreeMessage): void;
 }
 
 export function createFilesApplication(
@@ -150,10 +159,30 @@ export function createFilesApplication(
     deliver: (subscriber, message) => options.deliverGitStatus?.(subscriber, message),
   });
 
-  /** App Git mutations refresh the pushed status at once, then notify the other Git views. */
+  /** Roots the tree walk accepts; anything else keeps the direct path and its 400. */
+  function treeRoot(workspaceId: string, rootQuery?: string): string {
+    const { root } = port.resolveRoot(resolveWorkspace(workspaceId), rootQuery);
+    if (rootQuery && resolve(rootQuery) !== root) throw new Error('Invalid workspace root');
+    return root;
+  }
+
+  const fileTreeFeed = createFileTreeFeed<string>({
+    resolveRoot: treeRoot,
+    compute: (workspaceId, root) => port.listTreePaths(resolveWorkspace(workspaceId), { root }),
+    deliver: (subscriber, message) => options.deliverFileTree?.(subscriber, message),
+  });
+
+  /** App Git mutations refresh the pushed status and tree at once, then notify the other Git views. */
   function gitChanged(workspaceId: string, root: string): void {
     gitStatusFeed.refreshRoot(workspaceId, root);
+    fileTreeFeed.refreshRoot(workspaceId, root);
     onGitChanged?.(workspaceId, root);
+  }
+
+  /** App create/rename/delete/save: push the new tree and Git status at once. */
+  function entriesChanged(workspaceId: string, rootQuery?: string): void {
+    fileTreeFeed.refresh(workspaceId, rootQuery);
+    gitStatusFeed.refresh(workspaceId, rootQuery);
   }
 
   /** The exact pre-slice repo-relative to selected-root-relative conversion
@@ -292,8 +321,8 @@ export function createFilesApplication(
       }
     },
 
-    async gitStatus(workspaceId, rootQuery) {
-      return gitStatusFeed.read(workspaceId, rootQuery);
+    async gitStatus(workspaceId, rootQuery, options) {
+      return gitStatusFeed.read(workspaceId, rootQuery, options);
     },
 
     gitStatusFeed,
@@ -329,29 +358,45 @@ export function createFilesApplication(
       return port.readEditableFile(workspace, path, rootQuery);
     },
 
-    saveFile(workspaceId, input) {
+    async saveFile(workspaceId, input) {
       const workspace = resolveWorkspace(workspaceId);
-      return port.saveFile(workspace, input);
+      const result = await port.saveFile(workspace, input);
+      entriesChanged(workspaceId, input.root);
+      return result;
     },
 
     listTreePaths(workspaceId, input) {
       const workspace = resolveWorkspace(workspaceId);
-      return port.listTreePaths(workspace, input);
+      // The feed serves the default view; hidden-file filtering and invalid
+      // roots keep the direct walk (and its validation errors).
+      if (input.showHidden === false
+        || (input.root && resolve(input.root) !== port.resolveRoot(workspace, input.root).root)) {
+        return port.listTreePaths(workspace, input);
+      }
+      return fileTreeFeed.read(workspaceId, input.root, { fresh: input.fresh });
     },
 
-    createFileEntry(workspaceId, input) {
+    fileTreeFeed,
+
+    async createFileEntry(workspaceId, input) {
       const workspace = resolveWorkspace(workspaceId);
-      return port.createFileEntry(workspace, input);
+      const result = await port.createFileEntry(workspace, input);
+      entriesChanged(workspaceId, input.root);
+      return result;
     },
 
-    renameFileEntry(workspaceId, input) {
+    async renameFileEntry(workspaceId, input) {
       const workspace = resolveWorkspace(workspaceId);
-      return port.renameFileEntry(workspace, input);
+      const result = await port.renameFileEntry(workspace, input);
+      entriesChanged(workspaceId, input.root);
+      return result;
     },
 
-    deleteFileEntry(workspaceId, input) {
+    async deleteFileEntry(workspaceId, input) {
       const workspace = resolveWorkspace(workspaceId);
-      return port.deleteFileEntry(workspace, input);
+      const result = await port.deleteFileEntry(workspace, input);
+      entriesChanged(workspaceId, input.root);
+      return result;
     },
 
     listDirectoryOnly(dirPath, showHidden) {

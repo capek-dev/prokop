@@ -14,6 +14,8 @@ import { useFileTreeFullQuery } from '@/hooks/queries/useFileTreeFullQuery';
 import { useGitStatusQuery } from '@/hooks/queries/useFileQueries';
 import { fileTreeExpandedPaths, useFileTreeStateStore } from '@/stores/fileTreeStateStore';
 import { activatePierreFileSelection } from './pierreTreeHost';
+import { fileTreeSyncOperations } from './fileTreeSync';
+import { refreshFileTree } from '@/lib/rootFeedRefresh';
 import { useFileActions } from './useFileActions';
 import { FileActionsDialogs } from './FileActionsDialogs';
 import { PierreTreeActionMenu, type PierreTreeActionMenuActions } from './PierreTreeActionMenu';
@@ -92,7 +94,8 @@ interface FileTreeProps {
 }
 
 export interface FileTreeHandle {
-  refresh: () => void;
+  /** Rewalks this root on the server; resolves when the fresh tree is cached. */
+  refresh: () => Promise<void>;
   focus: () => void;
   /** Focus the in-tree filter input. */
   focusSearch: () => void;
@@ -151,7 +154,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     });
 
     // Filesystem actions (create/rename/delete/copy). onMutated applies the
-    // optimistic model update; the query invalidation refetch reconciles.
+    // optimistic model update; the server's pushed tree change reconciles.
     const {
       dialog: actionDialog,
       openCreate,
@@ -188,7 +191,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
             model.remove(info.path + (info.isDirectory ? '/' : ''), { recursive: true });
           }
         } catch {
-          // Model mutations are best-effort; refetch reconciles.
+          // Model mutations are best-effort; the pushed tree reconciles.
         }
       },
       onOpenFileEdit,
@@ -228,15 +231,28 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       [menuActions],
     );
 
-    // Query refreshes replace model contents in place. resetPaths rebuilds
-    // the expansion map, so previously opened directories are re-passed as
-    // initialExpandedPaths from the persisted per-workspace store.
+    // Pushed tree changes usually add or remove a few paths: patch the model
+    // in place, which keeps expansion, selection, and scroll. The first load,
+    // large changes, and failed patches rebuild it with resetPaths, which
+    // drops the expansion map, so previously opened directories are
+    // re-passed as initialExpandedPaths from the persisted per-workspace store.
     const prevPathsRef = useRef<string[] | null>(null);
     useEffect(() => {
-      if (prevPathsRef.current === paths) return;
+      const previous = prevPathsRef.current;
+      if (previous === paths) return;
       prevPathsRef.current = paths;
-      const restored = fileTreeExpandedPaths(stateKey);
-      model.resetPaths(paths, { initialExpandedPaths: restored });
+      const operations = previous?.length
+        ? fileTreeSyncOperations(previous, paths, (path) => model.getItem(path) != null)
+        : null;
+      if (operations) {
+        try {
+          if (operations.length) model.batch(operations);
+          return;
+        } catch {
+          // Batches are not atomic; the reset below repairs a partial one.
+        }
+      }
+      model.resetPaths(paths, { initialExpandedPaths: fileTreeExpandedPaths(stateKey) });
     }, [paths, model, stateKey]);
 
     // Capture expansion changes so refreshes and reloads keep your place.
@@ -285,8 +301,9 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     }, [activePath, activeRoot, root, model]);
 
     useImperativeHandle(ref, () => ({
-      refresh: () => {
-        void refetch();
+      refresh: async () => {
+        const { sdkClient: client, root: liveRoot } = liveRef.current;
+        if (client) await refreshFileTree(client, workspaceId, liveRoot);
       },
       openCreateAtRoot: (kind: 'file' | 'directory') => {
         openCreate('', kind);
@@ -332,7 +349,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       focusSearch: () => {
         model.openSearch('');
       },
-    }), [refetch, model]);
+    }), [model, workspaceId]);
 
     const retryRefetch = useCallback(() => {
       void refetch();

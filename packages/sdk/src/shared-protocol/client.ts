@@ -315,6 +315,30 @@ export interface GitStatusRefreshMessage {
   root?: string;
 }
 
+// =============================================================================
+// File Tree Feed Messages
+// =============================================================================
+
+/** Start receiving `files.tree` for a workspace root; the server replies with a snapshot. */
+export interface FileTreeSubscribeMessage {
+  type: 'files.tree.subscribe';
+  workspaceId: string;
+  root?: string;
+}
+
+export interface FileTreeUnsubscribeMessage {
+  type: 'files.tree.unsubscribe';
+  workspaceId: string;
+  root?: string;
+}
+
+/** Rewalk now (window focus, manual refresh); pushes only if paths changed. */
+export interface FileTreeRefreshMessage {
+  type: 'files.tree.refresh';
+  workspaceId: string;
+  root?: string;
+}
+
 export type ClientMessage = 
   | ClientRegisterMessage
   | SessionCreateMessage 
@@ -348,4 +372,7 @@ export type ClientMessage =
   | PongMessage
   | GitStatusSubscribeMessage
   | GitStatusUnsubscribeMessage
-  | GitStatusRefreshMessage;
+  | GitStatusRefreshMessage
+  | FileTreeSubscribeMessage
+  | FileTreeUnsubscribeMessage
+  | FileTreeRefreshMessage;

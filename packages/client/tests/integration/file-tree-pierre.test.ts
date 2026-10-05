@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { FileTree } from '@pierre/trees';
+import { fileTreeSyncOperations } from '@/components/files/fileTreeSync';
 
 /**
  * Contract tests for the path list consumed by FileTreePierre.
@@ -188,5 +189,60 @@ describe('FileTree resetPaths keeps accepting the same wire format', () => {
     } finally {
       container.remove();
     }
+  });
+});
+
+describe('FileTree incremental sync from pushed tree changes', () => {
+  function withTree(paths: string[], run: (tree: FileTree) => void): void {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const tree = new FileTree({ paths, icons: { set: 'standard' } });
+    try {
+      tree.render({ fileTreeContainer: container });
+      run(tree);
+    } finally {
+      tree.cleanUp();
+      container.remove();
+    }
+  }
+
+  const exists = (tree: FileTree) => (path: string) => tree.getItem(path) != null;
+
+  test('adds and removes nested paths in place and keeps expansion', () => {
+    const previous = ['README.md', 'src/', 'src/a.ts', 'src/old/', 'src/old/x.ts', 'src/old/y.ts'];
+    const next = ['README.md', 'docs/', 'docs/d.md', 'src/', 'src/a.ts', 'src/empty/', 'src/new/', 'src/new/deep/', 'src/new/deep/z.ts'];
+    withTree(previous, (tree) => {
+      (tree.getItem('src/') as unknown as { toggle(): void }).toggle();
+
+      const operations = fileTreeSyncOperations(previous, next, exists(tree));
+      expect(operations).toEqual([
+        { type: 'remove', path: 'src/old/', recursive: true },
+        { type: 'add', path: 'docs/d.md' },
+        { type: 'add', path: 'src/empty/' },
+        { type: 'add', path: 'src/new/deep/z.ts' },
+      ]);
+      tree.batch(operations!);
+
+      for (const path of next) expect(tree.getItem(path), path).not.toBeNull();
+      for (const path of ['src/old/', 'src/old/x.ts']) expect(tree.getItem(path), path).toBeNull();
+      const rows = tree.getVisibleRows(0, tree.getVisibleCount());
+      expect(rows.find((row) => row.path === 'src/')?.isExpanded).toBe(true);
+    });
+  });
+
+  test('changes the model already holds from optimistic file actions are skipped', () => {
+    const previous = ['a.ts', 'b.ts'];
+    withTree(previous, (tree) => {
+      tree.add('c.ts');
+      tree.remove('a.ts');
+
+      const operations = fileTreeSyncOperations(previous, ['b.ts', 'c.ts'], exists(tree));
+      expect(operations).toEqual([]);
+    });
+  });
+
+  test('large changes ask for a full reset', () => {
+    const next = Array.from({ length: 2_001 }, (_, i) => `f${i}.ts`);
+    expect(fileTreeSyncOperations(['a.ts'], next, () => false)).toBeNull();
   });
 });

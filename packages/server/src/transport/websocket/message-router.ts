@@ -33,6 +33,11 @@ import {
   handleGitStatusUnsubscribe,
   handleGitStatusRefresh,
 } from '@/transport/websocket/handlers/git';
+import {
+  handleFileTreeSubscribe,
+  handleFileTreeUnsubscribe,
+  handleFileTreeRefresh,
+} from '@/transport/websocket/handlers/files';
 
 // Re-export for external consumers
 export type { RouterContext, ClientEntry } from './router-context';
@@ -97,6 +102,9 @@ const handlers: Record<string, Handler> = {
   'git.status.subscribe': cast(handleGitStatusSubscribe),
   'git.status.unsubscribe': cast(handleGitStatusUnsubscribe),
   'git.status.refresh': cast(handleGitStatusRefresh),
+  'files.tree.subscribe': cast(handleFileTreeSubscribe),
+  'files.tree.unsubscribe': cast(handleFileTreeUnsubscribe),
+  'files.tree.refresh': cast(handleFileTreeRefresh),
 };
 
 // Dispatcher

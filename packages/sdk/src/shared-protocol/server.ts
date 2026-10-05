@@ -1,6 +1,7 @@
 import type { ControllerGatedAction as CapekControllerGatedAction } from '@capekai/types';
 import type { ServerMessage as CapekServerMessage } from '@capekai/types/wire';
 import type { ManagedWorktree } from '../shared-types/worktree';
+import type { FileTreeUpdate } from '../shared-types/file';
 import type { GitStatusResponse } from '../types/rest-responses';
 
 export interface WorktreeUpdatedMessage {
@@ -50,7 +51,16 @@ export interface GitStatusMessage {
   status: GitStatusResponse;
 }
 
-export type ServerMessage = CapekServerMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage | GitChangedMessage | LearningChangedMessage | McpChangedMessage | WorkspaceConversationActivityMessage | FilesChangedMessage | GitStatusMessage;
+/** File tree of one workspace root, pushed to its subscribers when paths are added or removed. */
+export interface FileTreeMessage {
+  type: 'files.tree';
+  workspaceId: string;
+  /** Resolved absolute root; matches `FileTreeResponse.root`. */
+  root: string;
+  update: FileTreeUpdate;
+}
+
+export type ServerMessage = CapekServerMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage | GitChangedMessage | LearningChangedMessage | McpChangedMessage | WorkspaceConversationActivityMessage | FilesChangedMessage | GitStatusMessage | FileTreeMessage;
 
 /**
  * Prokopai extends the neutral Capek gate action union with session

@@ -15,10 +15,10 @@ function invalidateGitRefs(workspaceId: string): void {
 
 /** One Git operation can affect multiple roots/subdirectories of the same repository. */
 export function handleGitChanged(workspaceId: string): void {
+  // The server refreshes the pushed file tree of the root itself.
   for (const prefix of [queryKeys.files.gitStatusPrefix, queryKeys.files.browsePrefix, ['files', 'git-diff']]) {
     void queryClient.invalidateQueries({ queryKey: [...prefix, workspaceId] });
   }
-  void queryClient.invalidateQueries({ queryKey: [...queryKeys.files.treePrefix, workspaceId] });
   invalidateGitRefs(workspaceId);
 }
 

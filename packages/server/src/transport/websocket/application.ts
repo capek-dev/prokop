@@ -7,6 +7,7 @@ import type {
   SessionWirePorts,
 } from '@/application';
 import type { GitStatusFeed } from '@/application/files/git-status-feed';
+import type { FileTreeFeed } from '@/application/files/file-tree-feed';
 import type { RouterContext } from './router-context';
 import type { ConnectionId } from './connection-id';
 
@@ -18,6 +19,8 @@ export interface WireApplication {
   permissions: PermissionsApplication;
   /** Pushed Git status; absent in wire tests that do not exercise it. */
   gitStatus?: GitStatusFeed<string>;
+  /** Pushed file trees; absent in wire tests that do not exercise it. */
+  fileTree?: FileTreeFeed<string>;
 }
 
 let installed: WireApplication | null = null;

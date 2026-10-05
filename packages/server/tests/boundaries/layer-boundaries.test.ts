@@ -1519,16 +1519,24 @@ describe('server layer boundaries', () => {
       '@prokopai/sdk',
       '@/application/ports/files',
       './git-status-feed',
+      './file-tree-feed',
       'path',
     ].sort());
     expect(file!.sourceText).not.toContain("@/store");
     expect(file!.sourceText).not.toContain("@/services");
 
-    // The Git status feed is pure scheduling over injected compute and delivery.
-    const feedPath = resolve(applicationDir, 'files/git-status-feed.ts');
-    const feed = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === feedPath);
-    expect(feed).toBeDefined();
-    expect(parseImports(feed!.sourceText, feed!.path).map((imp) => imp.specifier)).toEqual(['@prokopai/sdk']);
+    // The feeds are pure scheduling over injected compute and delivery.
+    const expectedFeedImports: Record<string, string[]> = {
+      'files/root-feed.ts': [],
+      'files/git-status-feed.ts': ['@prokopai/sdk', './root-feed'],
+      'files/file-tree-feed.ts': ['@prokopai/sdk', './root-feed'],
+    };
+    for (const [relativePath, expected] of Object.entries(expectedFeedImports)) {
+      const feedPath = resolve(applicationDir, relativePath);
+      const feed = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === feedPath);
+      expect(feed).toBeDefined();
+      expect(parseImports(feed!.sourceText, feed!.path).map((imp) => imp.specifier)).toEqual(expected);
+    }
   });
 
   test('S5 gate: the filesystem infrastructure modules import only utilities, binaries, and their siblings', () => {

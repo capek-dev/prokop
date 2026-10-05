@@ -177,6 +177,7 @@ export const gitPushSchema = gitPushPreviewSchema.extend({
 export const fileTreeQuerySchema = z.object({
   root: z.string().optional(),
   showHidden: z.enum(['true', 'false']).optional(),
+  refresh: z.enum(['true', 'false']).optional(),
 }).loose();
 
 export const createFileSchema = z.object({

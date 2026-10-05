@@ -1,4 +1,4 @@
-import type { ChatRetryMessage, CompactionCompleteMessage, GitStatusResponse, ManagedWorktree, ProkopaiClient, SessionInterruptResult, SessionControlState } from '@prokopai/sdk';
+import type { ChatRetryMessage, CompactionCompleteMessage, FileTreeUpdate, GitStatusResponse, ManagedWorktree, ProkopaiClient, SessionInterruptResult, SessionControlState } from '@prokopai/sdk';
 import type { RefObject } from 'react';
 import type { Session, Message, Part, MessageWithParts, PermissionGrant, QueuedMessage, Ask } from '@prokopai/sdk';
 import type { SessionHandlersContext, SessionUsage } from '@/handlers/serverMessage';
@@ -11,7 +11,7 @@ import { controlHandlers } from '@/handlers/serverMessage';
 import { worktreeHandlers } from '@/handlers/serverMessage';
 import { queryClient } from '@/components/providers/QueryProvider';
 import { handleGitChanged, handleGitStatus } from '@/handlers/serverMessage/gitHandlers';
-import { handleFilesChanged } from '@/handlers/serverMessage/fileHandlers';
+import { handleFileTree, handleFilesChanged } from '@/handlers/serverMessage/fileHandlers';
 import { useChatRetryStore } from '@/stores/chatRetryStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { handleWorkspaceActivity } from '@/handlers/serverMessage/workspaceActivity';
@@ -99,6 +99,11 @@ export function subscribeToServerEvents(
   });
   add('files.changed', (workspaceId: unknown) => {
     if (typeof workspaceId === 'string') handleFilesChanged(workspaceId);
+  });
+  add('files.tree', (workspaceId: unknown, root: unknown, update: unknown) => {
+    if (typeof workspaceId === 'string' && typeof root === 'string') {
+      handleFileTree(workspaceId, root, update as FileTreeUpdate);
+    }
   });
   add('git.status', (workspaceId: unknown, root: unknown, status: unknown) => {
     if (typeof workspaceId === 'string' && typeof root === 'string') {

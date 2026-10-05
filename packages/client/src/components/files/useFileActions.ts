@@ -82,8 +82,8 @@ function errorStatusCode(err: unknown): number | undefined {
   return undefined;
 }
 
+/** The tree itself is reconciled by the server's `files.tree` push for the action. */
 function invalidateFileQueries(): void {
-  void queryClient.invalidateQueries({ queryKey: queryKeys.files.treePrefix });
   void queryClient.invalidateQueries({ queryKey: queryKeys.files.searchPrefix });
   void queryClient.invalidateQueries({ queryKey: queryKeys.files.gitStatusPrefix });
 }

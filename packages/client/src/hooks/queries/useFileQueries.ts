@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { GitStatusResponse, ProkopaiClient } from '@prokopai/sdk';
 import { queryKeys } from '@/lib/queryKeys';
-import { retainGitStatus } from '@/lib/gitStatusSubscriptions';
+import { retainGitStatus } from '@/lib/rootFeedSubscriptions';
 import { newerGitStatus } from '@/handlers/serverMessage/gitHandlers';
 
 const FILE_BROWSE_STALE_TIME_MS = 10_000;

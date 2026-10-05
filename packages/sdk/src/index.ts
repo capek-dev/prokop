@@ -34,6 +34,7 @@ export { QueueNamespace } from './namespaces/queue';
 export { ProvidersNamespace } from './namespaces/providers';
 export { ControlNamespace } from './namespaces/control';
 export { GitNamespace } from './namespaces/git';
+export { FilesNamespace } from './namespaces/files';
 export { NotificationsNamespace } from './namespaces/notifications';
 
 export {

@@ -106,12 +106,13 @@ export function registerFileRoutes(app: Hono, files: FilesApplication): void {
     validate('query', fileTreeQuerySchema),
     async (c) => {
       const workspaceId = c.req.param('id');
-      const query = c.req.valid('query') as { root?: string; showHidden?: 'true' | 'false' };
+      const query = c.req.valid('query') as { root?: string; showHidden?: 'true' | 'false'; refresh?: 'true' | 'false' };
 
       try {
         const result = await files.listTreePaths(workspaceId, {
           root: query.root,
           showHidden: query.showHidden ? query.showHidden === 'true' : undefined,
+          ...(query.refresh === 'true' ? { fresh: true } : {}),
         });
         return c.json(result);
       } catch (err) {
@@ -256,7 +257,7 @@ export function registerFileRoutes(app: Hono, files: FilesApplication): void {
     const rootQuery = c.req.query('root');
 
     try {
-      const status = await files.gitStatus(workspaceId, rootQuery);
+      const status = await files.gitStatus(workspaceId, rootQuery, { fresh: c.req.query('refresh') === 'true' });
       return c.json(status);
     } catch (err) {
       mapApplicationError(err);

@@ -47,6 +47,7 @@ import type {
   WorktreeDeletedMessage,
   FilesChangedMessage,
   GitStatusMessage,
+  FileTreeMessage,
 } from '../shared';
 import type { TypedEventEmitter } from '../emitter';
 import type { SdkEvent } from './sdk-types';
@@ -99,6 +100,7 @@ export interface SdkEventMap {
   'git.changed': [workspaceId: string, root: string];
   'files.changed': [workspaceId: FilesChangedMessage['workspaceId']];
   'git.status': [workspaceId: GitStatusMessage['workspaceId'], root: GitStatusMessage['root'], status: GitStatusMessage['status']];
+  'files.tree': [workspaceId: FileTreeMessage['workspaceId'], root: FileTreeMessage['root'], update: FileTreeMessage['update']];
   'worktree.updated': [worktree: WorktreeUpdatedMessage['worktree']];
   'worktree.deleted': [worktree: WorktreeDeletedMessage['worktree']];
   'session.interrupted': [
@@ -285,6 +287,9 @@ export function routeServerMessage(
       break;
     case 'git.status':
       emitter.emit('git.status', msg.workspaceId, msg.root, msg.status);
+      break;
+    case 'files.tree':
+      emitter.emit('files.tree', msg.workspaceId, msg.root, msg.update);
       break;
     case 'worktree.updated':
       emitter.emit('worktree.updated', msg.worktree);

@@ -365,6 +365,10 @@ describe('files route contract (S5 filesystem isolation)', () => {
       paths: ['a.txt'],
       truncated: true,
     });
+
+    // Manual refresh asks for a rewalk instead of the feed's cached tree.
+    await filesApp(application).request('/api/workspaces/ws-1/files/tree?refresh=true');
+    expect(calls.at(-1)).toEqual({ workspaceId: 'ws-1', input: { root: undefined, showHidden: undefined, fresh: true } });
   });
 
   test('the mutation endpoints delegate validated bodies verbatim', async () => {
@@ -466,12 +470,16 @@ describe('files route contract (S5 filesystem isolation)', () => {
   });
 
   test('the git status endpoint returns the wire shape from the application', async () => {
+    const options: unknown[] = [];
     const application = makeFilesApplication({
-      gitStatus: async () => ({
-        availability: { available: true, root: '/ws' },
-        files: [{ path: 'a.txt', git: { status: 'modified', staged: false, unstaged: true } }],
-        root: '/ws',
-      }),
+      gitStatus: async (_workspaceId, _root, option) => {
+        options.push(option);
+        return {
+          availability: { available: true, root: '/ws' },
+          files: [{ path: 'a.txt', git: { status: 'modified', staged: false, unstaged: true } }],
+          root: '/ws',
+        };
+      },
     });
 
     const response = await filesApp(application).request('/api/workspaces/ws-1/git/status');
@@ -481,6 +489,10 @@ describe('files route contract (S5 filesystem isolation)', () => {
       files: [{ path: 'a.txt', git: { status: 'modified', staged: false, unstaged: true } }],
       root: '/ws',
     });
+
+    // Manual refresh asks for a recompute instead of the feed's cached status.
+    await filesApp(application).request('/api/workspaces/ws-1/git/status?refresh=true');
+    expect(options).toEqual([{ fresh: false }, { fresh: true }]);
   });
 
   test('the home browse endpoint delegates listDirectoryOnly and maps failures to 400', async () => {

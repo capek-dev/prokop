@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { retainGitStatus } from '@/lib/gitStatusSubscriptions';
+import { retainFileTree, retainGitStatus } from '@/lib/rootFeedSubscriptions';
 
 function fakeClient() {
   const listeners = new Map<string, Set<() => void>>();
@@ -12,6 +12,7 @@ function fakeClient() {
     }),
     off: vi.fn((event: string, fn: () => void) => listeners.get(event)?.delete(fn)),
     git: { subscribeStatus: vi.fn(), unsubscribeStatus: vi.fn(), refreshStatus: vi.fn() },
+    files: { subscribeTree: vi.fn(), unsubscribeTree: vi.fn(), refreshTree: vi.fn() },
     emit(event: string) { for (const fn of listeners.get(event) ?? []) fn(); },
     listenerCount: (event: string) => listeners.get(event)?.size ?? 0,
   };
@@ -69,4 +70,22 @@ test('window focus asks the server to recompute each watched root once', () => {
   expect(client.git.refreshStatus).toHaveBeenCalledTimes(1);
   expect(client.git.refreshStatus).toHaveBeenCalledWith('ws', '/repo');
   release();
+});
+
+test('file tree subscriptions are counted separately from Git status', () => {
+  const client = fakeClient();
+  const sdk = client as unknown as ProkopaiClient;
+  const releaseStatus = retainGitStatus(sdk, 'ws', '/repo');
+  const releaseTree = retainFileTree(sdk, 'ws', '/repo');
+  expect(client.files.subscribeTree).toHaveBeenCalledWith('ws', '/repo');
+  expect(client.git.subscribeStatus).toHaveBeenCalledTimes(1);
+
+  window.dispatchEvent(new Event('focus'));
+  vi.advanceTimersByTime(300);
+  expect(client.files.refreshTree).toHaveBeenCalledWith('ws', '/repo');
+
+  releaseTree();
+  expect(client.files.unsubscribeTree).toHaveBeenCalledWith('ws', '/repo');
+  expect(client.git.unsubscribeStatus).not.toHaveBeenCalled();
+  releaseStatus();
 });

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import { homedir, tmpdir } from 'os';
 import { join, resolve } from 'path';
+import type { FileTreeMessage, GitStatusMessage } from '@prokopai/sdk';
 import { createFilesApplication } from '@/application/files';
 import { createJean2FilesApplicationPort } from '@/adapters/jean2/files';
 import { ConflictError } from '@/application/http-errors';
@@ -156,6 +157,82 @@ describe('files application over the Jean2 port (S5 filesystem isolation)', () =
 
     const tree = await files().listTreePaths(workspaceId, {});
     expect(tree.paths).toContain('secret.log');
+  });
+
+  test('tree reads share the pushed feed and app file actions push the change', async () => {
+    writeFileSync(join(main, 'a.txt'), 'a');
+    const pushed: FileTreeMessage[] = [];
+    const app = createFilesApplication(createJean2FilesApplicationPort(), undefined, {
+      deliverFileTree: (_subscriber, message) => { pushed.push(message); },
+    });
+    const until = async (check: () => boolean) => {
+      for (let i = 0; i < 200 && !check(); i++) await Bun.sleep(5);
+    };
+
+    const first = await app.listTreePaths(workspaceId, {});
+    expect(first.paths).toEqual(['a.txt']);
+    expect(first.revision).toBeGreaterThan(0);
+
+    app.fileTreeFeed.subscribe('c1', workspaceId);
+    await until(() => pushed.length === 1);
+    expect(pushed[0]).toMatchObject({ type: 'files.tree', workspaceId, root: resolve(main), update: { kind: 'snapshot' } });
+
+    await app.createFileEntry(workspaceId, { path: 'b.txt' });
+    await until(() => pushed.length === 2);
+    expect(pushed[1]!.update).toMatchObject({ kind: 'delta', added: ['b.txt'], removed: [] });
+    app.fileTreeFeed.disconnect('c1');
+
+    // A manual refresh rewalks a watched root instead of serving its cached tree.
+    app.fileTreeFeed.subscribe('c2', workspaceId);
+    await until(() => pushed.length === 3);
+    writeFileSync(join(main, 'outside-tools.txt'), 'x');
+    expect((await app.listTreePaths(workspaceId, {})).paths).not.toContain('outside-tools.txt');
+    expect((await app.listTreePaths(workspaceId, { fresh: true })).paths).toContain('outside-tools.txt');
+    app.fileTreeFeed.disconnect('c2');
+
+    // Invalid roots and hidden-file filtering keep the direct walk and its errors.
+    await expect(app.listTreePaths(workspaceId, { root: tempRoot('outside-root') })).rejects.toThrow('Invalid workspace root');
+    expect((await app.listTreePaths(workspaceId, { showHidden: false })).revision).toBeUndefined();
+  });
+
+  test('explorer deletes and editor saves push Git status; manual refresh recomputes', async () => {
+    const git = (...args: string[]) => expect(Bun.spawnSync(['git', '-C', main, ...args]).exitCode).toBe(0);
+    git('init', '-q');
+    git('config', 'user.name', 'Test');
+    git('config', 'user.email', 'test@example.invalid');
+    writeFileSync(join(main, 'gone.txt'), 'gone');
+    writeFileSync(join(main, 'edit.txt'), 'before');
+    git('add', '.');
+    git('commit', '-q', '-m', 'init');
+
+    const pushed: GitStatusMessage[] = [];
+    const app = createFilesApplication(createJean2FilesApplicationPort(), undefined, {
+      deliverGitStatus: (_subscriber, message) => { pushed.push(message); },
+    });
+    const until = async (check: () => boolean) => {
+      for (let i = 0; i < 400 && !check(); i++) await Bun.sleep(5);
+    };
+    const changed = (message: GitStatusMessage | undefined) =>
+      message?.status.files.map((file) => `${file.git.status} ${file.path}`).sort();
+
+    app.gitStatusFeed.subscribe('changes-tab', workspaceId);
+    await until(() => pushed.length === 1);
+    expect(changed(pushed[0])).toEqual([]);
+
+    await app.deleteFileEntry(workspaceId, { path: 'gone.txt' });
+    await until(() => pushed.length === 2);
+    expect(changed(pushed[1])).toEqual(['deleted gone.txt']);
+
+    const read = await app.readEditableFile(workspaceId, 'edit.txt');
+    await app.saveFile(workspaceId, { path: 'edit.txt', content: 'after', expectedRevision: read.revision });
+    await until(() => pushed.length === 3);
+    expect(changed(pushed[2])).toEqual(['deleted gone.txt', 'modified edit.txt']);
+
+    // A terminal write reports nothing: plain reads serve the cache, refresh recomputes.
+    writeFileSync(join(main, 'terminal.txt'), 'x');
+    expect((await app.gitStatus(workspaceId)).files.map((file) => file.path)).not.toContain('terminal.txt');
+    expect((await app.gitStatus(workspaceId, undefined, { fresh: true })).files.map((file) => file.path)).toContain('terminal.txt');
+    app.gitStatusFeed.disconnect('changes-tab');
   });
 
   test('browse denies paths outside the workspace with the exact error', async () => {
