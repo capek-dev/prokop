@@ -22,6 +22,7 @@ import { codexApprovals } from './approvals';
 import { CodexToolItems } from './tool-items';
 import { CodexChildTimelines } from './child-timelines';
 import { StreamingTextWriter } from '@/harnesses/shared/streaming-text';
+import { describeError, logHarness } from '@/harnesses/shared/diagnostics';
 import { logCodexPermissionDenial } from './permission-diagnostics';
 import { createPretoolChannel, verifyPretoolHook, type PretoolChannel, type HookDecision } from './pretool-hook';
 import { classifyCodexHook } from './hook-policy';
@@ -539,6 +540,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
       let idleTimer: ReturnType<typeof setTimeout> | undefined;
       let phase = 'workspace validation';
       let succeeded = false;
+      const startedAt = Date.now();
       const streamText = new StreamingTextWriter();
       const settleStreamedText = (): void => {
         for (const { part } of streamText.settleAll()) {
@@ -585,6 +587,9 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
         const version = deps.version();
         const binding = getCodexBinding(sessionId);
         if (binding && (binding.workspaceRoot !== root || binding.cliVersion !== version)) {
+          logHarness('codex-cli', 'thread binding blocks turn', { sessionId,
+            workspaceChanged: binding.workspaceRoot !== root, cliChanged: binding.cliVersion !== version,
+            boundCli: binding.cliVersion, currentCli: version });
           throw new Error('Codex session root or CLI version changed; reopen with the original host');
         }
         connection = connections.get(sessionId);
@@ -780,6 +785,11 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
             toolItems?.finish();
             settleStreamedText();
             const status = turn?.status;
+            const turnError = codexObject(turn?.error);
+            logHarness('codex-cli', status === 'failed' ? 'turn failed (reported by Codex)' : 'turn completed', {
+              sessionId, status: typeof status === 'string' ? status : 'invalid', durationMs: Date.now() - startedAt,
+              ...(typeof turnError?.message === 'string' ? describeError(new Error(turnError.message)) : {}),
+            }, status === 'failed' ? 'warn' : 'info');
             if (status !== 'completed' && status !== 'interrupted' && status !== 'failed') {
               rejectDone(new Error('Invalid Codex turn status'));
             } else {
@@ -1010,6 +1020,8 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
         // Record uncertainty before sending: a process exit or restart must not
         // cause a possibly executed turn to be silently replayed.
         phase = 'turn start';
+        logHarness('codex-cli', 'turn start', { sessionId, model: selection?.model ?? null,
+          effort: selection?.effort ?? null, goal: goalTokenBudget !== undefined, queued: !!queued, resubmit: !!reuseId }, 'info');
         getDatabase().transaction(() => {
           markCodexTurnPending(sessionId, user.id, assistant!.id);
           if (reuseId) setRollbackPhase(sessionId, 'sent');
@@ -1075,6 +1087,10 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
         if (reuseId && !getCodexBinding(sessionId)?.pendingTurn) clearRollbackIntent(sessionId);
         succeeded = true;
       } catch (error: unknown) {
+        logHarness('codex-cli', 'turn failed', { sessionId, phase, durationMs: Date.now() - startedAt,
+          rpcCode: error instanceof CodexRequestError ? error.code : null,
+          pendingTurn: !!getCodexBinding(sessionId)?.pendingTurn, ...describeError(error),
+          stderr: connection?.client.stderrTail() });
         settleStreamedText();
         if (reuseId && !getCodexBinding(sessionId)?.pendingTurn
           && getRollbackIntent(sessionId)?.phase === 'ready' && assistant) {
@@ -1285,6 +1301,6 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
       }
     },
   };
-  const queuedExecution = withCliMessageQueue(execution);
+  const queuedExecution = withCliMessageQueue(execution, 'codex-cli');
   return queuedExecution;
 }

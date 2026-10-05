@@ -1,4 +1,5 @@
 import { logCodexPermissionDenial } from './permission-diagnostics';
+import { logHarness, StderrTail } from '@/harnesses/shared/diagnostics';
 
 /** Codex app-server stdio transport. Only the server spawns the installed CLI. */
 export interface CodexConnection {
@@ -6,13 +7,21 @@ export interface CodexConnection {
   stdin: { write(data: Uint8Array): number | Promise<number> };
   exited: Promise<number>;
   kill(): void;
+  /** Last stderr output, for failure logs only. */
+  stderrTail?(): string | undefined;
 }
 
 export type CodexNotification = { method: string; params: unknown };
 
 export class CodexRequestError extends Error {
-  constructor(readonly code: number | null) {
+  /**
+   * Upstream error text for the server log. Wire errors never include it.
+   */
+  readonly detail?: string;
+
+  constructor(readonly code: number | null, detail?: string) {
     super('Codex request rejected');
+    if (detail) this.detail = detail;
   }
 }
 
@@ -26,18 +35,33 @@ function record(value: unknown): Record<string, unknown> | null {
 
 export function spawnCodexAppServer(args: string[] = [], env?: Record<string, string | undefined>): CodexConnection {
   const process = Bun.spawn(['codex', 'app-server', '--stdio', ...args], {
-    stdin: 'pipe', stdout: 'pipe', stderr: 'ignore', ...(env ? { env } : {}),
+    stdin: 'pipe', stdout: 'pipe', stderr: 'pipe', ...(env ? { env } : {}),
   });
   if (!process.stdin || !process.stdout || typeof process.stdin === 'number'
     || typeof process.stdout === 'number') {
     process.kill();
     throw new Error('Codex stdio is unavailable');
   }
+  const stderr = new StderrTail();
+  if (process.stderr && typeof process.stderr !== 'number') {
+    void (async () => {
+      const decoder = new TextDecoder();
+      for await (const chunk of process.stderr as ReadableStream<Uint8Array>) stderr.push(decoder.decode(chunk, { stream: true }));
+    })().catch(() => {});
+  }
+  let killed = false;
+  void process.exited.then((code) => {
+    if (!killed) logHarness('codex-cli', 'app-server exited unexpectedly', { code, stderr: stderr.read() });
+  }, () => {});
   return {
     stdin: process.stdin,
     stdout: process.stdout,
     exited: process.exited,
-    kill: () => process.kill(),
+    kill: () => {
+      killed = true;
+      process.kill();
+    },
+    stderrTail: () => stderr.read(),
   };
 }
 
@@ -102,6 +126,11 @@ export class CodexAppServer {
         }
       });
     });
+  }
+
+  /** Last app-server stderr output, for failure logs. */
+  stderrTail(): string | undefined {
+    return this.io.stderrTail?.();
   }
 
   async close(): Promise<void> {
@@ -206,7 +235,9 @@ export class CodexAppServer {
       clearTimeout(pending.timer);
       if (message.error) {
         const code = record(message.error)?.code;
-        pending.reject(new CodexRequestError(typeof code === 'number' && Number.isInteger(code) ? code : null));
+        const detail = record(message.error)?.message;
+        pending.reject(new CodexRequestError(typeof code === 'number' && Number.isInteger(code) ? code : null,
+          typeof detail === 'string' ? detail : undefined));
       } else if ('result' in message) pending.resolve(message.result);
       else pending.reject(new Error('Invalid Codex response'));
       return;

@@ -12,6 +12,7 @@ import { createMessage, createPart, getToolPartByCallId, listMessagesWithParts, 
 import { getClaudeModelSelection } from './models';
 import { claudeCliVersion } from './version';
 import { StreamingTextWriter } from '@/harnesses/shared/streaming-text';
+import { describeError, logHarness, StderrTail } from '@/harnesses/shared/diagnostics';
 import { runClaudeTurn } from './sdk-turn';
 import { readClaudeGoalVerdict } from './goal-transcript';
 import { runClaudeCompact } from './compact';
@@ -208,6 +209,9 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       let children: ClaudeChildTimelines | null = null;
       let ownedNativeId: string | null = null;
       let drainable = false;
+      const startedAt = Date.now();
+      const stderr = new StderrTail();
+      let phase = 'setup';
       try {
         const workspace = getWorkspace(session.workspaceId);
         if (!cliWorkspaceAvailable(workspace)) throw new Error('Claude workspace unavailable');
@@ -271,11 +275,17 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
         const binding = db.query<Binding, [string]>(`SELECT native_session_id, workspace_root, cli_version, pending
           FROM claude_session_bindings WHERE session_id = ?`).get(sessionId);
         if (binding && (binding.workspace_root !== root || binding.cli_version !== version || binding.pending)) {
+          logHarness('claude-cli', 'native binding blocks turn', { sessionId,
+            pendingFromEarlierTurn: !!binding.pending, workspaceChanged: binding.workspace_root !== root,
+            cliChanged: binding.cli_version !== version, boundCli: binding.cli_version, currentCli: version });
           throw new Error('Claude turn requires reconciliation or its workspace/CLI changed');
         }
         controller.signal.throwIfAborted();
         if (queued && !queued.isPending()) return 'drainable';
         const nativeId = binding?.native_session_id ?? crypto.randomUUID();
+        phase = 'turn';
+        logHarness('claude-cli', 'turn start', { sessionId, resume: !!binding, model: selection.model,
+          effort: selection.effort, goal: goalCondition !== undefined, queued: !!queued, resubmit: !!resubmit }, 'info');
         const goalStartedAt = Date.now();
         children = new ClaudeChildTimelines(session, nativeId, wire.delivery);
         // Lock the native identity before writing to the process. A lost result never triggers replay.
@@ -349,6 +359,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
           controller, canUseTool: approvals.request(sessionId, session.workspaceId, root, wire.delivery,
             controller.signal, id => children?.childSessionId(toolOwners.get(id) ?? '') ?? null),
           onToolOwner: (id, owner) => { if (owner) toolOwners.set(id, owner); },
+          stderr: chunk => stderr.push(chunk),
           start: deps.start })) {
           if (event.type === 'goal-state') {
             if (event.active) {
@@ -507,7 +518,13 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
         })();
         notifyHarnessTurnFinished(completed);
         drainable = true;
+        logHarness('claude-cli', 'turn completed', { sessionId, durationMs: Date.now() - startedAt }, 'info');
       } catch (error) {
+        logHarness('claude-cli', controller.signal.aborted ? 'turn interrupted' : 'turn failed', {
+          sessionId, phase, durationMs: Date.now() - startedAt, aborted: controller.signal.aborted,
+          assistantCreated: !!assistant, ...describeError(error),
+          ...(controller.signal.aborted ? {} : { stderr: stderr.read() }),
+        }, controller.signal.aborted ? 'info' : 'warn');
         settleOpenSegment();
         if (goalCondition !== undefined && assistant) {
           const previous = getSession(sessionId);
@@ -680,5 +697,5 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
         active.delete(sessionId);
       }
     },
-  });
+  }, 'claude-cli');
 }

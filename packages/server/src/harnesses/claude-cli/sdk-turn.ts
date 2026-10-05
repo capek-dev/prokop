@@ -38,6 +38,8 @@ export interface ClaudeTurnInput {
   controller: AbortController;
   canUseTool: CanUseTool;
   onToolOwner?: (toolUseId: string, parentToolUseId?: string) => void;
+  /** Claude Code process stderr, kept for failure diagnostics. */
+  stderr?: (data: string) => void;
   /** A fake query source for offline tests. */
   start?: (prompt: string | AsyncIterable<SDKUserMessage>, options: Options) => AsyncIterable<SDKMessage>;
 }
@@ -87,6 +89,7 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
     ...(input.effort === 'default' ? {} : { effort: input.effort as NonNullable<Options['effort']> }),
     ...(input.resume ? { resume: input.sessionId } : { sessionId: input.sessionId }),
     abortController: input.controller,
+    ...(input.stderr ? { stderr: input.stderr } : {}),
     persistSession: true,
     includePartialMessages: true,
     forwardSubagentText: true,
