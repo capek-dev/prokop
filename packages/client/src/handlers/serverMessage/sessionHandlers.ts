@@ -37,11 +37,23 @@ function invalidateSessionQueriesForWorkspace(workspaceId: string): void {
 }
 
 /**
- * Invalidate session-related queries scoped to a single workspace and its tags.
+ * The fields that decide which session lists hold a session: its workspace,
+ * root or child, active or archived, and scheduled or learning runs.
  */
-function invalidateSessionsAndTagsForWorkspace(workspaceId: string): void {
-  invalidateSessionQueriesForWorkspace(workspaceId);
-  queryClient.invalidateQueries({ queryKey: queryKeys.sessions.tags(workspaceId) });
+function listPlacement(session: Session): string {
+  return JSON.stringify([
+    session.workspaceId ?? null,
+    session.parentId ?? null,
+    session.status,
+    session.metadata?.scheduledJobId ?? null,
+    session.metadata?.learningRunId ?? null,
+  ]);
+}
+
+function sameTags(a: string[] | undefined, b: string[] | undefined): boolean {
+  const left = a ?? [];
+  const right = b ?? [];
+  return left.length === right.length && left.every((tag, index) => tag === right[index]);
 }
 
 /**
@@ -64,7 +76,7 @@ export function handleSessionCreated(
     defaultModel,
   } = ctx;
 
-  setSessions(prev => [session, ...prev]);
+  setSessions(prev => [session, ...prev.filter(s => s.id !== session.id)]);
 
   if (pendingSessionCreateRef.current) {
     const intent = pendingSessionCreateRef.current;
@@ -325,6 +337,12 @@ export function handleSessionDeleted(
   }
 }
 
+/**
+ * Every session change (running state, tokens, model, title, status, tags,
+ * forks and scheduled runs announced to other clients). The session list
+ * updates in place; lists are refetched only when the session moves between
+ * them, so frequent updates (a run starting or ending) cost no requests.
+ */
 export function handleSessionUpdated(
   msg: { type: 'session.updated'; session: Session },
   ctx: SessionHandlersContext,
@@ -332,9 +350,13 @@ export function handleSessionUpdated(
   const { session } = msg;
   const { setSessions, setModelForSession, setVariantForSession } = ctx;
 
-  setSessions(prev => prev.map(s =>
-    s.id === session.id ? session : s
-  ));
+  let previous: Session | undefined;
+  setSessions(prev => {
+    previous = prev.find(s => s.id === session.id);
+    // Not seen yet (sub-sessions, forks, scheduled runs, sessions created
+    // while this client was away): it joins at the top, like session.created.
+    return previous ? prev.map(s => (s.id === session.id ? session : s)) : [session, ...prev];
+  });
 
   if (session.selectedModel) {
     setModelForSession(session.id, session.selectedModel);
@@ -347,8 +369,16 @@ export function handleSessionUpdated(
     usePendingOperationsStore.getState().acknowledgeOperation(session.id, 'compact');
   }
 
-  if (session.workspaceId) {
-    invalidateSessionsAndTagsForWorkspace(session.workspaceId);
+  const workspaceIds = [...new Set([session.workspaceId, previous?.workspaceId].filter(Boolean) as string[])];
+  // A new root session changes counts and pages; a new child is not in any root list.
+  const moved = previous ? listPlacement(previous) !== listPlacement(session) : !session.parentId;
+  if (moved) {
+    for (const workspaceId of workspaceIds) invalidateSessionQueriesForWorkspace(workspaceId);
+  }
+  if (!sameTags(previous?.tags, session.tags)) {
+    for (const workspaceId of workspaceIds) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.sessions.tags(workspaceId) });
+    }
   }
 }
 
@@ -359,15 +389,13 @@ export function handleSessionRenamed(
   const { session } = msg;
   const { setSessions } = ctx;
 
+  // Renames reach every client and never move a session between lists, so
+  // the row updates in place without refetching.
   setSessions(prev => prev.map(s =>
     s.id === session.id ? session : s
   ));
   usePendingOperationsStore.getState().clearOperation(session.id, 'rename');
   usePendingOperationsStore.getState().clearOperation(session.id, 'regenerate_title');
-
-  if (session.workspaceId) {
-    invalidateSessionQueriesForWorkspace(session.workspaceId);
-  }
 }
 
 export function handleSessionInterrupted(
@@ -413,7 +441,7 @@ export function handleSessionForked(
     clearCompletion,
   } = ctx;
 
-  setSessions(prev => [forkedSession, ...prev]);
+  setSessions(prev => [forkedSession, ...prev.filter(s => s.id !== forkedSession.id)]);
   ctx.replaceSessionContent(forkedSession.id, forkedMessages);
 
   useSessionBoardStore.getState().replaceSessionId(msg.originalSessionId, forkedSession.id);

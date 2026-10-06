@@ -1,5 +1,5 @@
 import { getModelsConfig } from '@/config';
-import type { ScheduledJob } from '@prokopai/sdk';
+import type { ScheduledJob, Session } from '@prokopai/sdk';
 import { getDefaultPreconfig, getPreconfig } from '@/infrastructure/config/preconfig';
 import { createScheduledJobRunner } from '@/infrastructure/scheduling/scheduled-job-runner';
 import { createSession, getSession } from '@/infrastructure/sqlite/session-store';
@@ -14,12 +14,21 @@ import type { ScheduledJobExecutionPort } from '@/application/ports/scheduling';
  * scope, so this adapter no longer reaches any harness internals.
  */
 export function createJean2ScheduledJobExecution(
+  /** Tells clients about the new run session; scheduled runs have no connection of their own. */
+  announceSession: (session: Session) => void = () => {},
   runner: Pick<ScheduledJobExecutionPort, 'run'> = createScheduledJobRunner({
     repository: {
       markRun: markScheduledJobRun,
       markError: markScheduledJobError,
     },
-    sessions: { createSession, getSession },
+    sessions: {
+      createSession: (...input: Parameters<typeof createSession>) => {
+        const session = createSession(...input);
+        announceSession(session);
+        return session;
+      },
+      getSession,
+    },
     workspaces: { getWorkspace, permissionMode: getWorkspacePermissionMode },
     preconfigs: { getPreconfig, getDefaultPreconfig },
     modelsConfig: { getModelsConfig },

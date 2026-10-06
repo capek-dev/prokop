@@ -379,6 +379,7 @@ export function createSessionLifecycleApplication<Origin>(
       }
       const updated = deps.repository.updateSession(sessionId, updates);
       wire.delivery.send(origin, { type: 'session.updated', session: updated! });
+      if (updated) wire.delivery.broadcast({ type: 'session.updated', session: updated }, origin);
     },
 
     async selectHarnessModel(wire, origin, input): Promise<void> {
@@ -493,8 +494,10 @@ export function createSessionLifecycleApplication<Origin>(
     },
 
     close(wire, origin, sessionId): void {
-      deps.repository.updateSession(sessionId, { status: 'closed' });
+      const updated = deps.repository.updateSession(sessionId, { status: 'closed' });
       wire.delivery.send(origin, { type: 'session.closed', sessionId });
+      // Other clients move it to the archive without closing their open view of it.
+      if (updated) wire.delivery.broadcast({ type: 'session.updated', session: updated }, origin);
     },
 
     reopen(wire, origin, sessionId): void {
@@ -505,6 +508,7 @@ export function createSessionLifecycleApplication<Origin>(
       }
       const updated = deps.repository.updateSession(sessionId, { status: 'active' });
       wire.delivery.send(origin, { type: 'session.reopened', session: updated! });
+      if (updated) wire.delivery.broadcast({ type: 'session.updated', session: updated }, origin);
     },
 
     remove(wire, origin, sessionId): void {
@@ -517,6 +521,7 @@ export function createSessionLifecycleApplication<Origin>(
         deps.repository.deleteSession(sessionId);
         refreshAttachments(session.workspaceRootId);
         wire.delivery.send(origin, { type: 'session.deleted', sessionId });
+        wire.delivery.broadcast({ type: 'session.deleted', sessionId }, origin);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Delete failed';
         wire.delivery.send(origin, { type: 'error', code: 'delete_error', message, sessionId });
@@ -541,7 +546,8 @@ export function createSessionLifecycleApplication<Origin>(
           metadata: deps.repository.markManualSessionTitle(session.metadata),
         });
         refreshAttachments(updatedSession?.workspaceRootId);
-        wire.delivery.broadcastToSession(sessionId, { type: 'session.renamed', session: updatedSession! });
+        // Session lists show titles, so every client hears it, not only those with the session open.
+        wire.delivery.broadcast({ type: 'session.renamed', session: updatedSession! });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Rename failed';
         wire.delivery.send(origin, { type: 'error', code: 'rename_error', message, sessionId });

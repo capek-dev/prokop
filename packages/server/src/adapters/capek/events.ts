@@ -116,6 +116,17 @@ export function mapCapekEventToServerMessage(event: RuntimeEvent): ServerMessage
   }
 }
 
+/**
+ * Čapek sends auto-title renames to the session's participants. Session
+ * lists on every client show titles, so renames go to everyone.
+ */
+function audienceOf<Origin>(delivery: RuntimeDelivery<Origin>): RuntimeDelivery<Origin>['audience'] {
+  return delivery.event.kind === 'session' && delivery.event.action === 'renamed'
+    && delivery.audience.scope === 'session'
+    ? { scope: 'global' }
+    : delivery.audience;
+}
+
 export interface Jean2EventRouter<Origin> {
   send(origin: Origin, message: ServerMessage): void;
   broadcast(message: ServerMessage): void;
@@ -143,21 +154,22 @@ export function createJean2RuntimeContext<Origin>(
       const message = mapCapekEventToServerMessage(delivery.event);
       if (!message) return;
 
-      switch (delivery.audience.scope) {
+      const audience = audienceOf(delivery);
+      switch (audience.scope) {
         case 'origin':
-          router.send(delivery.audience.origin, message);
+          router.send(audience.origin, message);
           break;
         case 'session':
-          router.broadcastToSession(delivery.audience.sessionId, message);
+          router.broadcastToSession(audience.sessionId, message);
           break;
         case 'global':
           router.broadcast(message);
           break;
         case 'controller':
-          router.sendToController(delivery.audience.sessionId, message);
+          router.sendToController(audience.sessionId, message);
           break;
         case 'ask_targets':
-          router.sendToAskTargets(delivery.audience.sessionId, delivery.audience.authority, message);
+          router.sendToAskTargets(audience.sessionId, audience.authority, message);
           break;
         case 'host':
           deliverCapekEvent(delivery);
@@ -183,18 +195,19 @@ export function deliverCapekEvent(
   const message = mapCapekEventToServerMessage(delivery.event);
   if (!message) return;
 
-  switch (delivery.audience.scope) {
+  const audience = audienceOf(delivery);
+  switch (audience.scope) {
     case 'global':
       broadcastEvent(message);
       break;
     case 'session':
-      broadcastToSessionEvent(delivery.audience.sessionId, message);
+      broadcastToSessionEvent(audience.sessionId, message);
       break;
     case 'controller':
-      sendToControllerEvent(delivery.audience.sessionId, message);
+      sendToControllerEvent(audience.sessionId, message);
       break;
     case 'ask_targets':
-      sendToAskTargetsEvent(delivery.audience.sessionId, delivery.audience.authority, message);
+      sendToAskTargetsEvent(audience.sessionId, audience.authority, message);
       break;
     case 'origin':
     case 'host':

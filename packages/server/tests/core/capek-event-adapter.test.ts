@@ -179,6 +179,26 @@ describe('Čapek event adapter', () => {
     expect(messages.every((message) => message.type === 'error')).toBe(true);
   });
 
+  test('session-scoped auto-title renames reach every client', () => {
+    const calls: string[] = [];
+    const record = (scope: string) => () => { calls.push(scope); };
+    const context = createJean2RuntimeContext<object>({
+      send: record('origin'),
+      broadcast: record('global'),
+      broadcastToSession: record('session'),
+      sendToController: record('controller'),
+      sendToAskTargets: record('ask_targets'),
+      attachOriginToSession: () => {},
+    });
+    const session = { id: 'session-1', title: 'Fix login' } as never;
+
+    context.emit({ audience: { scope: 'session', sessionId: 'session-1' }, event: { kind: 'session', action: 'renamed', session } });
+    // Other session-scoped updates keep their audience.
+    context.emit({ audience: { scope: 'session', sessionId: 'session-1' }, event: { kind: 'session', action: 'updated', session } });
+
+    expect(calls).toEqual(['global', 'session']);
+  });
+
   test('reports runtime session changes for worktree attachment refresh', () => {
     const changedRoots: Array<string | null | undefined> = [];
     const router: Jean2EventRouter<object> = {

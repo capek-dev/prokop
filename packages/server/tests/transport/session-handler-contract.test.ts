@@ -141,8 +141,8 @@ describe('S3 session wire handler integration contract', () => {
     });
   });
 
-  test('session.rename trims the title, marks it manual, and broadcasts to the session', async () => {
-    const { ctx, broadcastToSession } = makeContext();
+  test('session.rename trims the title, marks it manual, and broadcasts to every client', async () => {
+    const { ctx, broadcast, broadcastToSession } = makeContext();
     const connectionId = registerClient('renamer');
 
     await handleClientMessage(ctx, connectionId, {
@@ -151,8 +151,9 @@ describe('S3 session wire handler integration contract', () => {
       title: '  Renamed by wire  ',
     } as ClientMessage);
 
-    expect(broadcastToSession).toHaveLength(1);
-    expect(broadcastToSession[0]).toMatchObject({ type: 'session.renamed' });
+    // Session lists show titles, so clients without the session open hear it too.
+    expect(broadcast).toEqual([expect.objectContaining({ type: 'session.renamed' })]);
+    expect(broadcastToSession).toEqual([]);
     const stored = getSession(sessionId);
     expect(stored?.title).toBe('Renamed by wire');
     expect((stored?.metadata as Record<string, unknown>)?.titleManuallyRenamed).toBe(true);

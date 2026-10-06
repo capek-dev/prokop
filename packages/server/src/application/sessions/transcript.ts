@@ -148,6 +148,9 @@ export function createSessionTranscriptApplication<Origin>(
           forkedSession,
           messages: clientMessages,
         });
+        // Other clients add the fork to their lists. Not session.created: a
+        // client creating a session right now would take it as its own.
+        wire.delivery.broadcast({ type: 'session.updated', session: forkedSession });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Fork failed';
         wire.delivery.send(origin, { type: 'error', code: 'fork_error', message, sessionId });

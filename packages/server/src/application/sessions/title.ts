@@ -65,7 +65,8 @@ export function createSessionTitleRegeneration<Origin>(deps: SessionTitleDeps) {
       const updated = deps.repository.updateSession(sessionId, { title });
       if (updated) {
         console.info('[session-title] Updated session title', { sessionId, title });
-        wire.delivery.broadcastToSession(sessionId, { type: 'session.renamed', session: updated });
+        // Session lists show titles, so every client hears it, not only those with the session open.
+        wire.delivery.broadcast({ type: 'session.renamed', session: updated });
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

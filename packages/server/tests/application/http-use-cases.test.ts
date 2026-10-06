@@ -118,6 +118,34 @@ describe('session HTTP application', () => {
     expect(app.updateSession('missing', { status: 'closed' })).toBeNull();
   });
 
+  test('HTTP creates, updates, and deletes are announced to every client', () => {
+    const events: unknown[] = [];
+    const changes = {
+      created: (session: { id: string }) => { events.push(['created', session.id]); },
+      updated: (session: { id: string; tags?: string[] }) => { events.push(['updated', session.id, session.tags]); },
+      deleted: (sessionId: string) => { events.push(['deleted', sessionId]); },
+    };
+    const repository = makeRepository({
+      createSession: () => makeSession({ id: 'new-1' }),
+      updateSession: (id, updates) => makeSession({ id, tags: updates.tags }),
+    });
+    const app = createSessionHttpApplication(repository, undefined, undefined, undefined, undefined, undefined,
+      undefined, undefined, undefined, undefined, undefined, changes);
+
+    app.createSession({ workspaceId: 'ws-1' });
+    app.updateSession('sess-1', { tags: ['bugs'] });
+    app.deleteSession('sess-1');
+    expect(events).toEqual([['created', 'new-1'], ['updated', 'sess-1', ['bugs']], ['deleted', 'sess-1']]);
+
+    // Nothing changed, nothing announced.
+    events.length = 0;
+    const missing = createSessionHttpApplication(makeRepository({ updateSession: () => null, deleteSession: () => false }),
+      undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, changes);
+    missing.updateSession('missing', { status: 'closed' });
+    missing.deleteSession('missing');
+    expect(events).toEqual([]);
+  });
+
   test('createAttachment resolves the workspace from the session and returns null when missing', () => {
     const createInputs: unknown[] = [];
     const repository = makeRepository({

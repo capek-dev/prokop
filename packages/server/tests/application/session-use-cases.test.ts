@@ -446,6 +446,8 @@ describe('application session use cases', () => {
         originalSessionId: 'sess-1',
         forkedSession,
       });
+      // Other clients add the fork to their lists.
+      expect(spy.broadcast).toEqual([{ message: { type: 'session.updated', session: forkedSession }, exclude: undefined }]);
       expect(refreshed).toEqual(['worktree-1']);
     });
 
@@ -1113,6 +1115,25 @@ describe('application session use cases', () => {
 
       expect(updateInputs).toEqual([{ status: 'closed' }]);
       expect(spy.sent).toEqual([{ type: 'session.closed', sessionId: 'sess-1' }]);
+      expect(spy.broadcast).toEqual([]);
+    });
+
+    test('archiving and unarchiving reach other clients as a status update', () => {
+      const repository = makeRepository({
+        updateSession: (_id, updates) => makeSession({ status: updates.status }),
+      });
+      const app = createSessionLifecycleApplication({ ...makeDeps({ repository }) });
+      const spy = makeSpy();
+      const wire = makeWire(spy);
+
+      // Not session.closed: other clients keep their open view of the session.
+      app.close(wire, origin, 'sess-1');
+      app.reopen(wire, origin, 'sess-1');
+
+      expect(spy.broadcast).toEqual([
+        { message: { type: 'session.updated', session: expect.objectContaining({ status: 'closed' }) }, exclude: origin },
+        { message: { type: 'session.updated', session: expect.objectContaining({ status: 'active' }) }, exclude: origin },
+      ]);
     });
 
     test('reopen requires the session and sends session.reopened', () => {
@@ -1138,16 +1159,19 @@ describe('application session use cases', () => {
 
       app.remove(wire, origin, 'sess-1');
       expect(spy.sent).toEqual([{ type: 'session.deleted', sessionId: 'sess-1' }]);
+      expect(spy.broadcast).toEqual([{ message: { type: 'session.deleted', sessionId: 'sess-1' }, exclude: origin }]);
 
       spy.sent.length = 0;
+      spy.broadcast.length = 0;
       const failingApp = createSessionLifecycleApplication({
         ...makeDeps({ repository: makeRepository({ deleteSession: () => { throw new Error('db down'); } }) }),
       });
       failingApp.remove(wire, origin, 'sess-1');
       expect(spy.sent).toEqual([{ type: 'error', code: 'delete_error', message: 'db down', sessionId: 'sess-1' }]);
+      expect(spy.broadcast).toEqual([]);
     });
 
-    test('rename trims, marks the manual title, and broadcasts session.renamed', () => {
+    test('rename trims, marks the manual title, and broadcasts session.renamed to every client', () => {
       const updateInputs: unknown[] = [];
       const repository = makeRepository({
         getSession: () => makeSession({ metadata: { existing: true } }),
@@ -1163,7 +1187,8 @@ describe('application session use cases', () => {
       app.rename(wire, origin, { sessionId: 'sess-1', title: '  Fresh  ' });
 
       expect(updateInputs).toEqual([{ title: 'Fresh', metadata: { existing: true, titleManuallyRenamed: true } }]);
-      expect(spy.broadcastToSession).toEqual([expect.objectContaining({ sessionId: 'sess-1', message: expect.objectContaining({ type: 'session.renamed' }) })]);
+      expect(spy.broadcast).toEqual([{ message: expect.objectContaining({ type: 'session.renamed' }), exclude: undefined }]);
+      expect(spy.broadcastToSession).toEqual([]);
     });
 
     test('rename rejects empty titles with invalid_title', () => {

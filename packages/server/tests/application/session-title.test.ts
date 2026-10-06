@@ -73,7 +73,8 @@ function makeTitleHarness(session: Session | null = makeSession()): TitleHarness
   const wire = {
     delivery: {
       send: (_o: Origin, message: ServerMessage) => { state.sent.push(message); },
-      broadcastToSession: (_sessionId: string, message: ServerMessage) => { state.broadcasts.push(message); },
+      // Renames go to every client: session lists show titles.
+      broadcast: (message: ServerMessage) => { state.broadcasts.push(message); },
     },
     actor: { attachOriginToSession: () => {} },
   } as unknown as SessionWirePorts<Origin>;

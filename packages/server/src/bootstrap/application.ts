@@ -344,10 +344,16 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     codexWorkspaceAvailable,
     { settings: harnessSettings, codexVersion: codexCliVersion, claudeVersion: claudeCliVersion,
       usage: { 'codex-cli': readCachedCodexUsageLimits, 'claude-cli': readCachedClaudeUsageLimits } },
+    {
+      created: (session) => broadcastEvent({ type: 'session.created', session }),
+      updated: broadcastSessionUpdated,
+      deleted: (sessionId) => broadcastEvent({ type: 'session.deleted', sessionId }),
+    },
   );
 
   const schedulingRepository = createJean2ScheduledJobRepository();
-  const schedulingExecution = createJean2ScheduledJobExecution();
+  // Scheduled runs create sessions outside any connection; announce them to every client.
+  const schedulingExecution = createJean2ScheduledJobExecution(broadcastSessionUpdated);
 
   const scheduling = createSchedulingHttpApplication({
     repository: schedulingRepository,

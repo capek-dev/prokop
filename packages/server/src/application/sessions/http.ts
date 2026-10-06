@@ -76,6 +76,13 @@ export interface SessionHarnessSettingsDeps {
   usage?: Partial<Record<HarnessUsageLimits['harness'], () => Promise<HarnessUsageLimits>>>;
 }
 
+/** Tells every connected client about sessions changed over HTTP, so their lists follow. */
+export interface SessionChangeBroadcast {
+  created(session: Session): void;
+  updated(session: Session): void;
+  deleted(sessionId: string): void;
+}
+
 export interface SessionHttpApplication {
   codexAvailable(): boolean;
   claudeAvailable(): boolean;
@@ -145,6 +152,7 @@ export function createSessionHttpApplication(
   claudeModels?: CodexModelPort,
   claudeWorkspaceAvailable: (workspaceId: string) => boolean = () => false,
   harnessSettings?: SessionHarnessSettingsDeps,
+  changes?: SessionChangeBroadcast,
 ): SessionHttpApplication {
   const harnessVersion = (probe: (() => string) | undefined, available: boolean): string | null => {
     if (!available || !probe) return null;
@@ -249,6 +257,7 @@ export function createSessionHttpApplication(
         agentName: null,
       });
       if (session.workspaceRootId) worktreeAttachments?.changed(session.workspaceRootId);
+      changes?.created(session);
       return session;
     },
 
@@ -280,6 +289,7 @@ export function createSessionHttpApplication(
         permissionMode: input.permissionMode,
       });
       if (updated?.workspaceRootId) worktreeAttachments?.changed(updated.workspaceRootId);
+      if (updated) changes?.updated(updated);
       return updated;
     },
 
@@ -289,6 +299,7 @@ export function createSessionHttpApplication(
       if (deleted && existing?.workspaceRootId) {
         worktreeAttachments?.changed(existing.workspaceRootId);
       }
+      if (deleted) changes?.deleted(id);
       return deleted;
     },
 

@@ -6,7 +6,8 @@ vi.mock('@/components/providers/QueryProvider', () => ({
   queryClient: { invalidateQueries: vi.fn() },
 }));
 
-import { handleSessionCreated, handleSessionForked, handleSessionUpdated } from '@/handlers/serverMessage/sessionHandlers';
+import { queryClient } from '@/components/providers/QueryProvider';
+import { handleSessionCreated, handleSessionForked, handleSessionRenamed, handleSessionUpdated } from '@/handlers/serverMessage/sessionHandlers';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
@@ -47,6 +48,109 @@ describe('handleSessionUpdated', () => {
       sessionId: 'session-1',
       acknowledgedAt: 25_000,
     });
+  });
+});
+
+describe('session.updated keeps every list current without refetching on each change', () => {
+  const session = (overrides: Partial<Session> = {}): Session => ({
+    id: 'root', workspaceId: 'ws', parentId: null, status: 'active', title: 'Root', tags: [],
+    runningAt: null, metadata: null, updatedAt: '2026-10-06T10:00:00.000Z', ...overrides,
+  }) as Session;
+
+  /** A store-backed setSessions, so handlers see what is already listed. */
+  function listContext(initial: Session[]) {
+    let sessions = initial;
+    const context = {
+      ...createContext(),
+      setSessions: vi.fn((updater: Session[] | ((prev: Session[]) => Session[])) => {
+        sessions = typeof updater === 'function' ? updater(sessions) : updater;
+      }),
+    } as unknown as SessionHandlersContext;
+    return { context, list: () => sessions };
+  }
+
+  const invalidate = vi.mocked(queryClient.invalidateQueries);
+  const listKey = (workspaceId: string) => ['sessions', 'workspace', 'infinite', { workspaceId, limit: 100, rootOnly: true, category: 'active' }];
+  /** Whether any invalidation call covers this query key. */
+  const refetched = (key: readonly unknown[]) => invalidate.mock.calls.some(([filters]) => {
+    const { predicate, queryKey } = filters as { predicate?: (query: { queryKey: readonly unknown[] }) => boolean; queryKey?: readonly unknown[] };
+    return predicate ? predicate({ queryKey: key }) : JSON.stringify(queryKey) === JSON.stringify(key);
+  });
+
+  beforeEach(() => invalidate.mockClear());
+
+  test('a run starting, a rename, or a token update changes the row in place and refetches nothing', () => {
+    const { context, list } = listContext([session()]);
+    handleSessionUpdated({ type: 'session.updated', session: session({ runningAt: '2026-10-06T10:01:00.000Z' }) }, context);
+    handleSessionUpdated({ type: 'session.updated', session: session({ title: 'Fix login', totalTokens: 900 }) }, context);
+
+    expect(list()).toEqual([session({ title: 'Fix login', totalTokens: 900 })]);
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  test('a rename from any client updates the title in place', () => {
+    const { context, list } = listContext([session()]);
+    handleSessionRenamed({ type: 'session.renamed', session: session({ title: 'Auto title' }) }, context);
+
+    expect(list()[0]?.title).toBe('Auto title');
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  test('archiving or unarchiving on another device moves the session between lists', () => {
+    const { context, list } = listContext([session()]);
+    handleSessionUpdated({ type: 'session.updated', session: session({ status: 'closed' }) }, context);
+
+    expect(list()[0]?.status).toBe('closed');
+    expect(refetched(listKey('ws'))).toBe(true);
+    expect(refetched(['sessions', 'counts', 'ws'])).toBe(true);
+    expect(refetched(listKey('other-ws'))).toBe(false);
+  });
+
+  test('an unseen root session (scheduled run, fork, created elsewhere) is listed and lists refresh', () => {
+    const { context, list } = listContext([session()]);
+    handleSessionUpdated({ type: 'session.updated', session: session({ id: 'scheduled', metadata: { scheduledJobId: 'job-1' } }) }, context);
+
+    expect(list().map(s => s.id)).toEqual(['scheduled', 'root']);
+    expect(refetched(listKey('ws'))).toBe(true);
+  });
+
+  test('an unseen sub-session is listed under its parent without refetching root lists', () => {
+    const { context, list } = listContext([session()]);
+    handleSessionUpdated({ type: 'session.updated', session: session({ id: 'child', parentId: 'root' }) }, context);
+
+    expect(list().map(s => s.id)).toEqual(['child', 'root']);
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  test('tag edits refresh the tag list only', () => {
+    const { context } = listContext([session()]);
+    handleSessionUpdated({ type: 'session.updated', session: session({ tags: ['bugs'] }) }, context);
+
+    expect(refetched(['sessions', 'tags', 'ws'])).toBe(true);
+    expect(refetched(listKey('ws'))).toBe(false);
+  });
+
+  test('moving a session to another workspace refreshes both workspaces', () => {
+    const { context } = listContext([session()]);
+    handleSessionUpdated({ type: 'session.updated', session: session({ workspaceId: 'ws-2' }) }, context);
+
+    expect(refetched(listKey('ws'))).toBe(true);
+    expect(refetched(listKey('ws-2'))).toBe(true);
+  });
+
+  test('created and forked events never list a session twice', () => {
+    const { context, list } = listContext([session({ id: 'fork' }), session()]);
+    const lifecycle = {
+      ...context,
+      replaceSessionContent: vi.fn(), sessionAccessTimesRef: { current: new Map() }, partIdIndexRef: { current: new Map() },
+      clearCompletion: vi.fn(), setUsageForSession: vi.fn(), navigateToSessionWithOpen: vi.fn(), resumeSessionAfterCreate: vi.fn(),
+      pendingSessionCreateRef: { current: null },
+    } as unknown as SessionHandlersContext;
+
+    handleSessionForked({ type: 'session.forked', originalSessionId: 'root', forkedSession: session({ id: 'fork' }), messages: [] }, lifecycle);
+    handleSessionCreated({ type: 'session.created', session: session({ id: 'fork' }) }, lifecycle);
+
+    expect(list().map(s => s.id)).toEqual(['fork', 'root']);
   });
 });
 
