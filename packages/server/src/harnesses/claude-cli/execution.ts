@@ -209,6 +209,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       let children: ClaudeChildTimelines | null = null;
       let ownedNativeId: string | null = null;
       let drainable = false;
+      let terminalResult = false;
       const startedAt = Date.now();
       const stderr = new StderrTail();
       let phase = 'setup';
@@ -453,7 +454,8 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
             if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part: updated });
           }
           if (event.type === 'result') {
-            if (!event.success) throw new Error('Claude CLI turn failed');
+            terminalResult = true;
+            if (!event.success) throw new Error(event.error ? `Claude CLI turn failed: ${event.error}` : 'Claude CLI turn failed');
             // Later SDK turns can finish background work; they do not replace the user's reply.
             if (result === null) {
               result = event.text;
@@ -551,13 +553,14 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
           const part = transitionToolToInterrupted(id, 'error');
           if (part) wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part });
         }
-        // Explicit Stop ends this ordinary turn, not the native conversation.
-        // Release only our own binding after stream/tool cleanup, never replay
-        // the prompt or unlock uncertain goals, history edits, or earlier failures.
-        if (controller.signal.aborted && ownedNativeId && goalCondition === undefined && !resubmit) {
+        // Explicit Stop or a terminal CLI result (usage limit, API error) ends this
+        // ordinary turn, not the native conversation. Release only our own binding
+        // after stream/tool cleanup, never replay the prompt or unlock uncertain
+        // goals, history edits, or turns whose outcome the CLI never reported.
+        if ((controller.signal.aborted || terminalResult) && ownedNativeId && goalCondition === undefined && !resubmit) {
           getDatabase().run(`UPDATE claude_session_bindings SET pending = 0
             WHERE session_id = ? AND native_session_id = ? AND pending = 1`, [sessionId, ownedNativeId]);
-          drainable = true;
+          if (controller.signal.aborted) drainable = true;
         }
         active.delete(sessionId);
         if (resubmit) resubmitting.delete(sessionId);

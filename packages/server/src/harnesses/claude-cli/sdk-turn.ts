@@ -12,7 +12,7 @@ export type ClaudeTurnEvent = (
   | { type: 'tool-end'; id: string; output: unknown; failed: boolean }
   | { type: 'child-start'; id: string; background: boolean }
   | { type: 'child-finish'; id: string; status: 'completed' | 'error' | 'interrupted' }
-  | { type: 'result'; text: string; success: boolean; usage: ClaudeTurnUsage | null }
+  | { type: 'result'; text: string; success: boolean; error?: string; usage: ClaudeTurnUsage | null }
   | { type: 'context-usage'; used: number; window: number }
   | { type: 'compact-boundary'; trigger: 'auto' | 'manual'; preTokens: number; postTokens: number | null }
   | { type: 'goal-state'; active: boolean; iterations: number | null }
@@ -297,8 +297,12 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
       const firstResult = !sawResult;
       finished = true;
       sawResult = true;
-      yield { type: 'result', text: message.subtype === 'success' ? message.result : '',
-        success: message.subtype === 'success' && !message.is_error,
+      const success = message.subtype === 'success' && !message.is_error;
+      // Usage limits arrive as an is_error success result whose text names the reset time.
+      const error = success ? '' : message.subtype === 'success' ? message.result
+        : Array.isArray(message.errors) ? message.errors.join('; ') : '';
+      yield { type: 'result', text: message.subtype === 'success' ? message.result : '', success,
+        ...(error?.trim() ? { error: error.trim().slice(0, 500) } : {}),
         usage: parseClaudeUsage(message.modelUsage, input.model) };
       if (firstResult && message.subtype === 'success' && 'getContextUsage' in messages
         && typeof messages.getContextUsage === 'function') {

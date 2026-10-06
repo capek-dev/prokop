@@ -117,7 +117,7 @@ test('Claude wakes an idle image-only queue and keeps rejected images queued', a
   expect(listQueuedMessages('session')).toEqual([invalid]);
 });
 
-test('a failed queued Claude turn is consumed once and leaves later messages queued', async () => {
+test('a failed queued Claude turn is consumed once and only the next wake sends later messages', async () => {
   const { wire } = wireFixture();
   const first = addMessageToQueue('session', 'first queued');
   const second = addMessageToQueue('session', 'second queued');
@@ -128,9 +128,13 @@ test('a failed queued Claude turn is consumed once and leaves later messages que
   expect(calls).toHaveLength(1);
   expect(listQueuedMessages('session')).toEqual([second]);
   expect(listQueuedMessages('session').some(message => message.id === first.id)).toBe(false);
+  // A failed result ends the native turn; a later wake resumes with the next message, not the failed one.
   await exec.drainQueue?.(wire, 'origin', 'session');
-  expect(calls).toHaveLength(1);
-  expect(listQueuedMessages('session')).toEqual([second]);
+  expect(calls).toHaveLength(2);
+  expect(calls[1].resume).toBe(calls[0].sessionId);
+  expect(listQueuedMessages('session')).toEqual([]);
+  expect(listMessagesWithParts('session').filter(entry => entry.message.role === 'user')
+    .map(entry => entry.parts.map(part => part.type === 'text' ? part.text : ''))).toEqual([['first queued'], ['second queued']]);
 });
 
 test('selected Claude model and effort deliver a persisted reply through the fake CLI', async () => {
@@ -555,20 +559,54 @@ test('failed turns retain partial text without replaying it', async () => {
     message: { status: 'error' }, parts: [{ type: 'text', text: 'Partial' }],
   });
   expect(events.filter(event => (event as { type?: string }).type === 'part.created')).toHaveLength(2);
-  expect(getDatabase().query<{ pending: number }, []>('SELECT pending FROM claude_session_bindings').get()?.pending).toBe(1);
+  expect(getDatabase().query<{ pending: number }, []>('SELECT pending FROM claude_session_bindings').get()?.pending).toBe(0);
 });
 
-test('retains received text on failed turns without replaying the pending turn', async () => {
+test('a terminal failure (usage limit) keeps the session usable without replaying the failed prompt', async () => {
   const calls: Options[] = [];
   const { wire, events } = wireFixture();
-  const exec = createClaudeExecution({ version: () => '2.1.274',
-    start: (prompt, options) => fakeTurn(prompt, options, calls, 'failure') });
+  const exec = createClaudeExecution({ version: () => '2.1.274', start: (prompt, options) => {
+    if (calls.length) return fakeTurn(prompt, options, calls);
+    calls.push(options);
+    const id = options.sessionId!;
+    async function* limited(): AsyncGenerator<SDKMessage> {
+      yield { type: 'system', subtype: 'init', session_id: id } as SDKMessage;
+      yield { type: 'assistant', session_id: id, parent_tool_use_id: null,
+        message: { content: [{ type: 'text', text: 'reply' }] } } as SDKMessage;
+      yield { type: 'result', subtype: 'success', session_id: id, is_error: true,
+        result: "You've hit your limit · resets 5pm" } as SDKMessage;
+    }
+    return limited();
+  } });
+  await exec.sendMessage(wire, 'origin', 'session', 'first');
+  expect(listMessagesWithParts('session')[1]).toMatchObject({
+    message: { status: 'error', error: "Claude CLI turn failed: You've hit your limit · resets 5pm" },
+    parts: [{ type: 'text', text: 'reply' }],
+  });
+  expect(getDatabase().query<{ pending: number }, []>('SELECT pending FROM claude_session_bindings').get()?.pending).toBe(0);
+  await exec.sendMessage(wire, 'origin', 'session', 'second');
+  expect(calls).toHaveLength(2);
+  expect(calls[1].resume).toBe(calls[0].sessionId);
+  expect(events.some(event => typeof (event as { message?: unknown }).message === 'string'
+    && (event as { message: string }).message.includes('reconciliation'))).toBe(false);
+  expect(listMessagesWithParts('session').at(-1)?.message.status).toBe('completed');
+});
+
+test('a turn that ends without a terminal result stays locked', async () => {
+  const calls: Options[] = [];
+  const { wire, events } = wireFixture();
+  const exec = createClaudeExecution({ version: () => '2.1.274', start: (prompt, options) => {
+    if (calls.length) return fakeTurn(prompt, options, calls);
+    calls.push(options);
+    async function* lost(): AsyncGenerator<SDKMessage> {
+      yield { type: 'system', subtype: 'init', session_id: options.sessionId } as SDKMessage;
+      throw new Error('CLI crashed');
+    }
+    return lost();
+  } });
   await exec.sendMessage(wire, 'origin', 'session', 'first');
   await exec.sendMessage(wire, 'origin', 'session', 'second');
   expect(calls).toHaveLength(1);
-  expect(listMessagesWithParts('session')[1]).toMatchObject({
-    message: { status: 'error' }, parts: [{ type: 'text', text: 'reply' }],
-  });
   expect(events.some(event => typeof (event as { message?: unknown }).message === 'string'
     && (event as { message: string }).message.includes('reconciliation'))).toBe(true);
   expect(getDatabase().query<{ pending: number }, []>('SELECT pending FROM claude_session_bindings').get()?.pending).toBe(1);
