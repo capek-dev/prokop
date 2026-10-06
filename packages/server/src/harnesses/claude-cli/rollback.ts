@@ -145,7 +145,7 @@ export function rollbackResult(local: MessageWithParts[], firstRemoved: number, 
 
 export function applyClaudeRollback(input: {
   sessionId: string; operation: 'edit' | 'revert'; targetId: string; content: string | null;
-  originalNativeId: string; newNativeId: string | null; firstRemoved: number;
+  originalNativeId: string | null; newNativeId: string | null; firstRemoved: number;
   inheritedUsers: Array<{ messageId: string; nativeId: string }>;
 }): RevertExecutionResult {
   return getDatabase().transaction(() => {
@@ -156,8 +156,11 @@ export function applyClaudeRollback(input: {
     const binding = db.query<{ native_session_id: string; pending: number }, [string]>(
       'SELECT native_session_id, pending FROM claude_session_bindings WHERE session_id = ?',
     ).get(input.sessionId);
+    // Resetting to the first message discards the native conversation, even a pending one.
+    const reset = input.firstRemoved === 0;
     if (intent?.phase !== 'fork' || intent.target_message_id !== input.targetId
-      || binding?.native_session_id !== input.originalNativeId || binding.pending !== 0) {
+      || (binding?.native_session_id ?? null) !== input.originalNativeId
+      || !reset && binding?.pending !== 0 || reset && input.newNativeId) {
       throw new Error('Claude rollback state changed');
     }
     const local = listMessagesWithParts(input.sessionId);
@@ -185,8 +188,10 @@ export function applyClaudeRollback(input: {
       const updated = db.run('UPDATE claude_session_bindings SET native_session_id = ? WHERE session_id = ? AND native_session_id = ? AND pending = 0',
         [input.newNativeId, input.sessionId, input.originalNativeId]);
       if (updated.changes !== 1) throw new Error('Claude rollback binding changed');
-    } else {
-      db.run('DELETE FROM claude_session_bindings WHERE session_id = ? AND native_session_id = ? AND pending = 0',
+    } else if (!reset) {
+      throw new Error('Claude rollback binding changed');
+    } else if (input.originalNativeId) {
+      db.run('DELETE FROM claude_session_bindings WHERE session_id = ? AND native_session_id = ?',
         [input.sessionId, input.originalNativeId]);
     }
     for (const item of input.inheritedUsers) {

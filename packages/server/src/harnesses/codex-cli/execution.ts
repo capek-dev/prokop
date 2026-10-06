@@ -33,7 +33,7 @@ import { createCodexMemoryTools } from './memory-tools';
 import { createCodexSessionSearchTools } from './session-search-tools';
 import { createCodexAgentSkillTools } from './agent-skill-tools';
 import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
-import { applyRollback, clearRollbackIntent, getRollbackIntent, readRollbackHistory, readTurnIds, sameTurns, saveRollbackIntent, setRollbackPhase } from './rollback';
+import { applyRollback, clearRollbackIntent, getRollbackIntent, readRollbackHistory, readTurnIds, retargetReadyEdit, sameTurns, saveRollbackIntent, setRollbackPhase } from './rollback';
 import { forkCodexSession } from './fork';
 import { codexCliVersion } from './version';
 import { ensureSessionTempDir, sessionTempInstructions } from '@/infrastructure/filesystem/session-temp';
@@ -332,8 +332,15 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
     if (codexObject(metadata?.codexGoal)?.status === 'active' || metadata?.codexGoalPending
       || binding.goalRequested) throw new Error('Codex goal requires recovery');
     let intent = getRollbackIntent(sessionId);
-    if (intent && (intent.operation !== operation || intent.targetMessageId !== targetMessageId
-      || intent.content !== content)) throw new Error('Another Codex rollback requires recovery');
+    // A ready edit was never resent, so editing the same message again may change its text.
+    const sameRequest = !!intent && intent.operation === operation && intent.targetMessageId === targetMessageId
+      && (intent.content === content || intent.phase === 'ready');
+    // A rollback-phase intent is checked against the thread below; it may never have run.
+    if (intent && intent.phase !== 'rollback' && !sameRequest) throw new Error('Another Codex rollback requires recovery');
+    if (intent?.phase === 'ready' && content !== null && intent.content !== content) {
+      retargetReadyEdit(intent, content);
+      intent = getRollbackIntent(sessionId);
+    }
     if (intent?.phase === 'sent') {
       if (binding.pendingTurn) {
         if (!wire) throw new Error('Codex edit turn requires recovery');
@@ -360,6 +367,18 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
       if (resumedThread?.id !== binding.threadId || codexObject(resumedThread.status)?.type !== 'idle') {
         throw new Error('Codex thread is not idle after resume');
       }
+      if (intent) {
+        const existing = await readTurnIds(client, binding.threadId);
+        const prefix = intent.turnIds.slice(0, intent.turnIds.indexOf(intent.beforeTurnId));
+        if (sameTurns(existing, prefix)) {
+          if (!sameRequest) throw new Error('Another Codex rollback requires recovery');
+          return applyRollback(intent);
+        }
+        // An idle thread that still has every original turn never ran the revert. Start over.
+        if (!sameTurns(existing, intent.turnIds)) throw new Error('Codex rollback outcome is uncertain');
+        clearRollbackIntent(sessionId);
+        intent = null;
+      }
       if (!intent) {
         const ids = await readRollbackHistory(client, binding);
         const local = listMessagesWithParts(sessionId);
@@ -380,13 +399,8 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
         intent = { sessionId, operation, targetMessageId,
           content, beforeTurnId: ids[userIndex]!, turnIds: ids, phase: 'rollback' };
         saveRollbackIntent(intent);
-      } else {
-        const existing = await readTurnIds(client, binding.threadId);
-        const prefix = intent.turnIds.slice(0, intent.turnIds.indexOf(intent.beforeTurnId));
-        if (sameTurns(existing, prefix)) return applyRollback(intent);
-        // A request whose response was lost is never issued twice.
-        throw new Error('Codex rollback outcome is uncertain');
       }
+      // A request whose response was lost is never issued twice: a retry first reads the thread above.
       await client.request('thread/revert', { threadId: binding.threadId, beforeTurnId: intent.beforeTurnId });
       const actual = await readTurnIds(client, binding.threadId);
       const prefix = intent.turnIds.slice(0, intent.turnIds.indexOf(intent.beforeTurnId));
@@ -501,7 +515,9 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
       if (rollback && (rollback.phase !== 'ready' || rollback.operation !== 'edit'
         || rollback.targetMessageId !== reuseId)) {
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session',
-          message: 'Codex rollback requires reconciliation before another send', sessionId });
+          message: rollback.phase === 'ready' && rollback.operation === 'edit'
+            ? 'Codex edit was not sent; edit that message again to resend it'
+            : 'Codex Edit or Undo is unfinished; retry the same Edit or Undo to recover', sessionId });
         return;
       }
       if (goalTokenBudget !== undefined && (!validGoalBudget(goalTokenBudget)
@@ -1097,6 +1113,25 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
           pendingTurn: !!getCodexBinding(sessionId)?.pendingTurn, ...describeError(error),
           stderr: connection?.client.stderrTail() });
         settleStreamedText();
+        const rejectedUser = getCodexBinding(sessionId)?.pendingUserId;
+        if (error instanceof CodexRequestError && phase === 'turn start' && !run?.turnId
+          && getCodexBinding(sessionId)?.pendingTurn) {
+          // Codex answered turn/start with an error, so the turn never started: release it.
+          // A plain send also drops its rows so the transcript keeps matching Codex turns.
+          getDatabase().transaction(() => {
+            markCodexTurnCompleted(sessionId);
+            if (reuseId) setRollbackPhase(sessionId, 'ready');
+            else {
+              if (assistant) deleteMessage(assistant.id);
+              if (rejectedUser) deleteMessage(rejectedUser);
+            }
+          })();
+          if (!reuseId) {
+            assistant = undefined;
+            wire.delivery.broadcastToSession(sessionId, { type: 'session.state', sessionId,
+              messages: listMessagesWithParts(sessionId).slice(-50) });
+          }
+        }
         if (reuseId && !getCodexBinding(sessionId)?.pendingTurn
           && getRollbackIntent(sessionId)?.phase === 'ready' && assistant) {
           // A failed setup before turn/start must not leave an orphan assistant
@@ -1301,8 +1336,8 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
         const pending = getRollbackIntent(input.sessionId);
         wire.delivery.send(origin, { type: 'error', code: 'edit_error',
           message: pending?.phase === 'rollback'
-            ? `Codex edit blocked: ${reason}. Rollback may have run; do not retry or send in this session.`
-            : pending ? `Codex edit stopped after rollback: ${reason}. Do not retry or send in this session.`
+            ? `Codex edit blocked: ${reason}. Rollback may have run; retry the same edit to recover.`
+            : pending ? `Codex edit stopped after rollback: ${reason}. Edit the message again to resend it.`
               : `Codex edit stopped before rollback: ${reason}.`, sessionId: input.sessionId });
       }
     },

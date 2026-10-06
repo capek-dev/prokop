@@ -8,7 +8,7 @@ import { getSession, updateSession } from '@/infrastructure/sqlite/session-store
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { createMessage, createPart, getToolPartByCallId, listMessagesWithParts, transitionToolToCompleted,
-  transitionToolToError, transitionToolToInterrupted, updateMessage } from '@/infrastructure/sqlite/message-store';
+  transitionToolToError, transitionToolToInterrupted, updateMessage, updatePart } from '@/infrastructure/sqlite/message-store';
 import { getClaudeModelSelection } from './models';
 import { claudeCliVersion } from './version';
 import { StreamingTextWriter } from '@/harnesses/shared/streaming-text';
@@ -20,7 +20,7 @@ import { claudeApprovals, type ClaudeApprovals } from './approvals';
 import { ClaudeChildTimelines } from './child-timelines';
 import { resolveClaudeImages } from './images';
 import type { ClaudeTurnUsage } from './usage';
-import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistory, matchClaudeHistoryPrefix, type ClaudeRollbackDependencies } from './rollback';
+import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistoryPrefix, type ClaudeRollbackDependencies } from './rollback';
 import { forkClaudeSession } from './fork';
 import { claudeDeveloperInstructions, defaultClaudePreconfigId, type ClaudeInstructionSources } from './instructions';
 import { createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools } from './dynamic-tools';
@@ -61,6 +61,29 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       'SELECT phase, target_message_id FROM claude_rollback_intents WHERE session_id = ?',
     ).get(id) ?? null;
 
+  const recoveryHint = (pending: { phase: string }): string => pending.phase === 'ready'
+    ? 'Claude edit was not sent; edit that message again to resend it'
+    : 'Claude edit outcome is uncertain; edit the first message to start over';
+
+  /** An applied edit whose resend never reached Claude is resent as is; its text may still change. */
+  function resumeEdit(sessionId: string, messageId: string, content: string): boolean {
+    const pending = intent(sessionId);
+    if (pending?.phase !== 'ready' || pending.target_message_id !== messageId) return false;
+    const session = getSession(sessionId);
+    if (!session || session.harness !== 'claude-cli' || session.parentId || session.status !== 'active'
+      || active.has(sessionId) || rollingBack.has(sessionId)) throw new Error('Claude session is unavailable or busy');
+    if (!content.trim() || content !== content.trim() || content.length > 4000) {
+      throw new Error('Claude edit requires nonempty text');
+    }
+    const target = listMessagesWithParts(sessionId).at(-1);
+    const part = target?.parts[0];
+    if (target?.message.id !== messageId || target.message.role !== 'user' || part?.type !== 'text') {
+      throw new Error('Claude edit target changed');
+    }
+    if (part.text !== content && !updatePart(part.id, { text: content })) throw new Error('Claude edit text is unavailable');
+    return true;
+  }
+
   async function rollback(sessionId: string, operation: 'edit' | 'revert', targetId: string,
     content: string | null): Promise<import('@/application/ports/execution').RevertExecutionResult> {
     const session = getSession(sessionId);
@@ -68,10 +91,12 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       || active.has(sessionId) || rollingBack.has(sessionId)) throw new Error('Claude session is unavailable or busy');
     if (session.metadata?.claudeCompactPending || session.metadata?.claudeGoal
       || session.metadata?.claudeCompactedAt) throw new Error('Claude Goal or Compact history cannot be edited');
-    if (intent(sessionId)) throw new Error('Claude history change requires recovery; do not retry');
     if (operation === 'edit' && (!content?.trim() || content !== content.trim() || content.length > 4000)) {
       throw new Error('Claude edit requires nonempty text');
     }
+    // Apply is one transaction that also advances the intent. A fork-phase intent
+    // therefore means the transcript and binding are untouched: drop it and start over.
+    getDatabase().run("DELETE FROM claude_rollback_intents WHERE session_id = ? AND phase = 'fork'", [sessionId]);
     rollingBack.add(sessionId);
     try {
       const workspace = getWorkspace(session.workspaceId);
@@ -84,9 +109,6 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       const version = (deps.version ?? claudeCliVersion)();
       const binding = getDatabase().query<Binding, [string]>(`SELECT native_session_id, workspace_root, cli_version, pending
         FROM claude_session_bindings WHERE session_id = ?`).get(sessionId);
-      if (!binding || binding.pending || binding.workspace_root !== root || binding.cli_version !== version) {
-        throw new Error('Claude native history is unavailable');
-      }
       const local = listMessagesWithParts(sessionId);
       const targetIndex = local.findIndex(entry => entry.message.id === targetId);
       const firstRemoved = operation === 'edit' || targetIndex === 0 ? targetIndex : targetIndex + 1;
@@ -96,15 +118,19 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
         throw new Error('Invalid Claude history target');
       }
       const turnCount = firstRemoved / 2;
-      // A stopped or failed turn leaves native history Claude may have written
-      // only partly. When such a turn is discarded by this rollback, verify only
-      // the kept turns; otherwise the whole history must still match.
-      const discardsUnfinished = local.length % 2 !== 0 || local.slice(firstRemoved)
-        .some(entry => entry.message.role === 'assistant' && entry.message.status !== 'completed');
-      const readNative = () => (deps.readHistory ?? getSessionMessages)(binding.native_session_id, { dir: root });
-      const turns = !discardsUnfinished
-        ? matchClaudeHistory(local, await readNative(), binding.native_session_id)
-        : turnCount === 0 ? [] : matchClaudeHistoryPrefix(local, await readNative(), binding.native_session_id, turnCount);
+      // Rolling back to the first message drops the native conversation entirely, so it
+      // needs no native history and also clears a stuck turn or an unfinished edit.
+      if (turnCount > 0) {
+        if (intent(sessionId)) throw new Error('Claude history change requires recovery; do not retry');
+        if (!binding || binding.pending || binding.workspace_root !== root || binding.cli_version !== version) {
+          throw new Error('Claude native history is unavailable');
+        }
+      }
+      // Only the kept turns must match native history. Discarded turns may hold
+      // tool output or a stopped or failed reply and never block the rollback.
+      const turns = turnCount === 0 || !binding ? [] : matchClaudeHistoryPrefix(local,
+        await (deps.readHistory ?? getSessionMessages)(binding.native_session_id, { dir: root }),
+        binding.native_session_id, turnCount);
       const cutoffTurn = turnCount === 0 ? null : turns[turnCount - 1]!;
       if (cutoffTurn && cutoffTurn.assistantId === null) {
         throw new Error('Claude conversation history is not available for Edit or Undo');
@@ -112,11 +138,13 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       const cutoff = cutoffTurn?.assistantId ?? null;
       // The intent survives a lost fork response. Do not issue this fork a second time.
       getDatabase().run(`INSERT INTO claude_rollback_intents
-        (session_id, operation, target_message_id, phase) VALUES (?, ?, ?, 'fork')`,
+        (session_id, operation, target_message_id, phase) VALUES (?, ?, ?, 'fork')
+        ON CONFLICT(session_id) DO UPDATE SET operation = excluded.operation,
+          target_message_id = excluded.target_message_id, phase = 'fork'`,
       [sessionId, operation, targetId]);
       let forkedId: string | null = null;
       let inheritedUsers: Array<{ messageId: string; nativeId: string }> = [];
-      if (cutoff) {
+      if (cutoff && binding) {
         const forked = await (deps.forkHistory ?? forkSession)(binding.native_session_id,
           { dir: root, upToMessageId: cutoff });
         forkedId = forked.sessionId;
@@ -139,7 +167,11 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
         }));
       }
       return applyClaudeRollback({ sessionId, operation, targetId, content,
-        originalNativeId: binding.native_session_id, newNativeId: forkedId, firstRemoved, inheritedUsers });
+        originalNativeId: binding?.native_session_id ?? null, newNativeId: forkedId, firstRemoved, inheritedUsers });
+    } catch (error) {
+      // Apply never committed, so nothing changed: an orphan native fork file is harmless.
+      getDatabase().run("DELETE FROM claude_rollback_intents WHERE session_id = ? AND phase = 'fork'", [sessionId]);
+      throw error;
     } finally { rollingBack.delete(sessionId); }
   }
   return withCliMessageQueue({
@@ -176,10 +208,14 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       }
       const resubmit = resubmitting.get(sessionId);
       if (rollingBack.has(sessionId) || active.has(sessionId)) return reject('Claude CLI turn already running');
+      // No rollback is running, so a fork-phase intent is left from a crash before Apply: nothing changed.
+      getDatabase().run("DELETE FROM claude_rollback_intents WHERE session_id = ? AND phase = 'fork'", [sessionId]);
       const pendingEdit = intent(sessionId);
       if (pendingEdit && (pendingEdit.phase !== 'ready' || pendingEdit.target_message_id !== resubmit)
         || resubmit && !pendingEdit) {
-        return reject('Claude history change requires recovery; do not send in this session');
+        return reject(pendingEdit?.phase === 'ready' && !resubmit
+          ? 'Claude edit was not sent; edit that message again to resend it'
+          : 'Claude edit outcome is uncertain; edit the first message to start over');
       }
       const controller = new AbortController();
       active.set(sessionId, controller);
@@ -279,7 +315,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
           logHarness('claude-cli', 'native binding blocks turn', { sessionId,
             pendingFromEarlierTurn: !!binding.pending, workspaceChanged: binding.workspace_root !== root,
             cliChanged: binding.cli_version !== version, boundCli: binding.cli_version, currentCli: version });
-          throw new Error('Claude turn requires reconciliation or its workspace/CLI changed');
+          throw new Error('Claude turn requires reconciliation or its workspace/CLI changed; edit the first message to start over');
         }
         controller.signal.throwIfAborted();
         if (queued && !queued.isPending()) return 'drainable';
@@ -554,12 +590,16 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
           if (part) wire.delivery.broadcastToSession(sessionId, { type: 'part.updated', sessionId, part });
         }
         // Explicit Stop or a terminal CLI result (usage limit, API error) ends this
-        // ordinary turn, not the native conversation. Release only our own binding
-        // after stream/tool cleanup, never replay the prompt or unlock uncertain
-        // goals, history edits, or turns whose outcome the CLI never reported.
-        if ((controller.signal.aborted || terminalResult) && ownedNativeId && goalCondition === undefined && !resubmit) {
-          getDatabase().run(`UPDATE claude_session_bindings SET pending = 0
-            WHERE session_id = ? AND native_session_id = ? AND pending = 1`, [sessionId, ownedNativeId]);
+        // turn, not the native conversation; an edit's resend is then delivered too.
+        // Release only our own binding after stream/tool cleanup, never replay the
+        // prompt or unlock uncertain goals or turns whose outcome the CLI never reported.
+        if ((controller.signal.aborted || terminalResult) && ownedNativeId && goalCondition === undefined) {
+          const db = getDatabase();
+          db.transaction(() => {
+            db.run(`UPDATE claude_session_bindings SET pending = 0
+              WHERE session_id = ? AND native_session_id = ? AND pending = 1`, [sessionId, ownedNativeId]);
+            if (resubmit) db.run("DELETE FROM claude_rollback_intents WHERE session_id = ? AND phase = 'sent'", [sessionId]);
+          })();
           if (controller.signal.aborted) drainable = true;
         }
         active.delete(sessionId);
@@ -573,7 +613,8 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
         notifySessionFilesChanged(input.sessionId);
         return result;
       } catch (error) {
-        if (intent(input.sessionId)) throw new Error('Claude Undo outcome requires recovery; do not retry or send in this session', { cause: error });
+        const pending = intent(input.sessionId);
+        if (pending) throw new Error(recoveryHint(pending), { cause: error });
         const safe = new Set(['Claude session is unavailable or busy', 'Claude Goal or Compact history cannot be edited',
           'Claude native history is unavailable', 'Invalid Claude history target',
           'Claude conversation history is not available for Edit or Undo']);
@@ -613,15 +654,17 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
     },
     async editMessage(wire, origin, input) {
       try {
-        await rollback(input.sessionId, 'edit', input.messageId, input.content);
+        if (!resumeEdit(input.sessionId, input.messageId, input.content)) {
+          await rollback(input.sessionId, 'edit', input.messageId, input.content);
+        }
         wire.delivery.broadcastToSession(input.sessionId, { type: 'session.state', sessionId: input.sessionId,
           messages: listMessagesWithParts(input.sessionId).slice(-50) });
         resubmitting.set(input.sessionId, input.messageId);
         await this.sendMessage(wire, origin, input.sessionId, input.content);
       } catch {
+        const pending = intent(input.sessionId);
         wire.delivery.send(origin, { type: 'error', code: 'edit_error', sessionId: input.sessionId,
-          message: intent(input.sessionId) ? 'Claude edit outcome requires recovery; do not retry or send in this session'
-            : 'Claude conversation cannot be edited at this point' });
+          message: pending ? recoveryHint(pending) : 'Claude conversation cannot be edited at this point' });
       } finally { resubmitting.delete(input.sessionId); }
     },
     async compact(sessionId, _reason, delivery) {

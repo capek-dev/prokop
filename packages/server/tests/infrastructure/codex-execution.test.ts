@@ -2174,12 +2174,12 @@ test('Codex edit hides upstream RPC text and marks uncertain rollback as blocked
     sessionId: 's', messageId: users[0]!, content: 'updated',
   });
   expect(events.at(-1)).toMatchObject({ type: 'error', code: 'edit_error',
-    message: 'Codex edit blocked: Codex rollback request or history read failed. Rollback may have run; do not retry or send in this session.' });
+    message: 'Codex edit blocked: Codex rollback request or history read failed. Rollback may have run; retry the same edit to recover.' });
   expect(JSON.stringify(events)).not.toContain('secret upstream detail');
   expect(getRollbackIntent('s')?.phase).toBe('rollback');
 });
 
-test('uncertain Codex rollback blocks sends and recovers only after upstream prefix is proven', async () => {
+test('a failed Codex revert blocks sends, retries only when history proves it never ran, and recovers a proven prefix', async () => {
   const { users, turns } = seedRollbackTurns();
   const upstream = [...turns];
   const connections: ReturnType<typeof fakeCodex>[] = [];
@@ -2193,10 +2193,17 @@ test('uncertain Codex rollback blocks sends and recovers only after upstream pre
   expect(getRollbackIntent('s')?.phase).toBe('rollback');
   const events: ServerMessage[] = [];
   await execution.sendMessage(wire(events), 'origin', 's', 'must not run');
-  expect(events.at(-1)).toMatchObject({ type: 'error', code: 'invalid_session' });
+  expect(events.at(-1)).toMatchObject({ type: 'error', code: 'invalid_session',
+    message: 'Codex Edit or Undo is unfinished; retry the same Edit or Undo to recover' });
   expect(connections).toHaveLength(1);
+  // Every original turn is still there, so the first revert never ran: the retry issues it again.
+  await expect(execution.revert({ sessionId: 's', targetMessageId: users[0]! })).rejects.toThrow();
+  expect(connections[1]!.sent.some(entry => entry.method === 'thread/revert')).toBe(true);
+  expect(getRollbackIntent('s')?.phase).toBe('rollback');
+  // Neither the original turns nor the expected prefix: never issue it again.
+  upstream.splice(1);
   await expect(execution.revert({ sessionId: 's', targetMessageId: users[0]! })).rejects.toThrow('uncertain');
-  expect(connections[1]!.sent.some(entry => entry.method === 'thread/revert')).toBe(false);
+  expect(connections[2]!.sent.some(entry => entry.method === 'thread/revert')).toBe(false);
   upstream.splice(0);
   const restarted = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
     const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns: upstream }),
@@ -2205,9 +2212,54 @@ test('uncertain Codex rollback blocks sends and recovers only after upstream pre
     return fake.connection;
   } });
   const result = await restarted.revert({ sessionId: 's', targetMessageId: users[0]! });
-  expect(connections[2]!.sent.some(entry => entry.method === 'thread/revert')).toBe(false);
+  expect(connections[3]!.sent.some(entry => entry.method === 'thread/revert')).toBe(false);
   expect(result.revertedTo.messageId).toBeNull();
   expect(listMessagesWithParts('s')).toHaveLength(0);
+});
+
+test('a rejected turn/start releases the turn and drops its rows so Edit and Undo stay available', async () => {
+  const { users, turns } = seedRollbackTurns(1);
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () =>
+    fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns }), 'turn/start').connection });
+  const events: ServerMessage[] = [];
+  await execution.sendMessage(wire(events), 'origin', 's', 'rejected');
+  expect(getCodexBinding('s')?.pendingTurn).toBe(false);
+  expect(listMessagesWithParts('s').map(entry => entry.message.id)).toEqual([users[0], 'assistant-0']);
+  expect(JSON.stringify(events)).not.toContain('secret upstream detail');
+  expect(events).toContainEqual(expect.objectContaining({ type: 'error', message: expect.stringContaining('Check the host CLI setup') }));
+});
+
+test('an edit whose resend was rejected resends with new text when edited again', async () => {
+  const { users, turns } = seedRollbackTurns(2);
+  const upstream = [...turns];
+  let rejectTurn = true;
+  const processes: ReturnType<typeof fakeCodex>[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
+    const fake = fakeCodex(() => ({ id: 'thread-1', status: { type: 'idle' }, turns: upstream }),
+      rejectTurn ? 'turn/start' : undefined, false, undefined, false, false, false, before => {
+        upstream.splice(upstream.findIndex(turn => turn.id === before));
+      });
+    processes.push(fake);
+    return fake.connection;
+  } });
+  const events: ServerMessage[] = [];
+  await execution.editMessage(wire(events), 'origin', { sessionId: 's', messageId: users[1]!, content: 'first try' });
+  expect(getRollbackIntent('s')?.phase).toBe('ready');
+  expect(getCodexBinding('s')?.pendingTurn).toBe(false);
+  await execution.sendMessage(wire(events), 'origin', 's', 'plain send');
+  expect(events).toContainEqual(expect.objectContaining({ message: 'Codex edit was not sent; edit that message again to resend it' }));
+  rejectTurn = false;
+  const before = processes.length;
+  const operation = execution.editMessage(wire(events), 'origin', { sessionId: 's', messageId: users[1]!, content: 'second try' });
+  await waitFor(() => processes.length > before && processes.at(-1)!.sent.some(entry => entry.method === 'turn/start'));
+  expect(processes.at(-1)!.sent.find(entry => entry.method === 'turn/start')?.params)
+    .toMatchObject({ clientUserMessageId: users[1], input: [{ type: 'text', text: 'second try' }] });
+  expect(processes.flatMap(fake => fake.sent).filter(entry => entry.method === 'thread/revert')).toHaveLength(1);
+  processes.at(-1)!.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  processes.at(-1)!.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await operation;
+  expect(getRollbackIntent('s')).toBeNull();
+  expect(listMessagesWithParts('s')[2]!.parts[0]).toMatchObject({ type: 'text', text: 'second try' });
 });
 
 test('Codex advertises and routes only selected agent skill management on start and resume', async () => {

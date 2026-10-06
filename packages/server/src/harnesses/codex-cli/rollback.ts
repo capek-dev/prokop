@@ -38,6 +38,20 @@ export function setRollbackPhase(sessionId: string, phase: RollbackIntent['phase
   getDatabase().run('UPDATE codex_rollback_intents SET phase = ? WHERE session_id = ?', [phase, sessionId]);
 }
 
+/** The thread is already rolled back and the edit was never resent, so its local text may still change. */
+export function retargetReadyEdit(intent: RollbackIntent, content: string): void {
+  getDatabase().transaction(() => {
+    const current = getRollbackIntent(intent.sessionId);
+    const target = listMessagesWithParts(intent.sessionId).at(-1);
+    const text = target?.parts.find(part => part.type === 'text');
+    if (current?.phase !== 'ready' || current.operation !== 'edit' || current.targetMessageId !== intent.targetMessageId
+      || target?.message.id !== intent.targetMessageId || !text || !updatePart(text.id, { text: content })) {
+      throw new Error('Codex edit text is unavailable');
+    }
+    getDatabase().run('UPDATE codex_rollback_intents SET content = ? WHERE session_id = ?', [content, intent.sessionId]);
+  })();
+}
+
 export function clearRollbackIntent(sessionId: string): void {
   getDatabase().run('DELETE FROM codex_rollback_intents WHERE session_id = ?', [sessionId]);
 }

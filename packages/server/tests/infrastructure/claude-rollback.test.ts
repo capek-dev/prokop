@@ -155,17 +155,104 @@ test('Edit retains the user message ID, drops later turns, and submits edited te
   expect(f.histories.get(f.binding()!.native_session_id)?.[2]?.uuid).toBe(local[2]!.message.id);
 });
 
-test.each(['lost', 'bad'] as const)('%s fork locks history without changing local messages', async kind => {
+test.each(['lost', 'bad'] as const)('%s fork changes nothing and leaves the session usable', async kind => {
   const f = fixture();
   const local = await twoTurns(f);
+  const oldId = f.binding()!.native_session_id;
   if (kind === 'lost') f.failFork(); else f.badFork();
   await expect(f.exec.revert({ sessionId: 'session', targetMessageId: local[1]!.message.id })).rejects.toThrow();
   expect(listMessagesWithParts('session')).toHaveLength(4);
-  expect(f.pending()?.phase).toBe('fork');
-  await expect(f.exec.revert({ sessionId: 'session', targetMessageId: local[1]!.message.id })).rejects.toThrow('recovery');
-  await f.exec.sendMessage(f.wire, 'origin', 'session', 'must not replay');
+  // Apply never committed, so the intent is dropped and the original native session stays bound.
+  expect(f.pending()).toBeNull();
+  expect(f.binding()).toMatchObject({ native_session_id: oldId, pending: 0 });
+  await f.exec.sendMessage(f.wire, 'origin', 'session', 'next');
+  expect(listMessagesWithParts('session')).toHaveLength(6);
+  expect(f.binding()).toMatchObject({ native_session_id: oldId, pending: 0 });
+});
+
+test('a fork intent left by a crash is dropped on the next send', async () => {
+  const f = fixture();
+  const local = await twoTurns(f);
+  getDatabase().run(`INSERT INTO claude_rollback_intents (session_id, operation, target_message_id, phase)
+    VALUES ('session', 'revert', ?, 'fork')`, [local[1]!.message.id]);
+  await f.exec.sendMessage(f.wire, 'origin', 'session', 'next');
+  expect(f.pending()).toBeNull();
+  expect(listMessagesWithParts('session')).toHaveLength(6);
+});
+
+test('Stop during an edited resend releases the edit and the session', async () => {
+  const f = fixture();
+  const local = await twoTurns(f);
+  f.stopTurn();
+  await f.exec.editMessage(f.wire, 'origin', { sessionId: 'session', messageId: local[2]!.message.id,
+    content: 'revised' });
+  expect(f.pending()).toBeNull();
   expect(f.binding()?.pending).toBe(0);
+  await f.exec.sendMessage(f.wire, 'origin', 'session', 'next');
+  expect(listMessagesWithParts('session').at(-1)?.message).toMatchObject({ role: 'assistant', status: 'completed' });
+});
+
+test('an edit whose resend failed in setup resends when edited again', async () => {
+  const f = fixture();
+  const local = await twoTurns(f);
+  getDatabase().run('DELETE FROM claude_session_models WHERE session_id = ?', ['session']);
+  await f.exec.editMessage(f.wire, 'origin', { sessionId: 'session', messageId: local[2]!.message.id,
+    content: 'revised' });
+  expect(f.pending()?.phase).toBe('ready');
+  expect(f.events).toContainEqual(expect.objectContaining({ message: 'Choose a Claude model and effort before sending' }));
+  await f.exec.sendMessage(f.wire, 'origin', 'session', 'plain send');
+  expect(f.events).toContainEqual(expect.objectContaining({ message: expect.stringContaining('edit that message again') }));
+  saveClaudeModelSelection('session', { model: 'claude-sonnet-5', effort: 'medium' });
+  await f.exec.editMessage(f.wire, 'origin', { sessionId: 'session', messageId: local[2]!.message.id,
+    content: 'revised again' });
+  const after = listMessagesWithParts('session');
+  expect(after).toHaveLength(4);
+  expect(after[2]?.parts[0]).toMatchObject({ text: 'revised again' });
+  expect(after[3]?.message).toMatchObject({ status: 'completed' });
+  expect(f.pending()).toBeNull();
+  expect(f.forkCalls).toHaveLength(1);
+});
+
+test('tool use in discarded turns does not block Edit, and the first message always resets', async () => {
+  const f = fixture();
+  const local = await twoTurns(f);
+  createPart({ id: crypto.randomUUID(), messageId: local[3]!.message.id, type: 'tool',
+    callId: 'claude-tool:dummy', name: 'Claude Read', createdAt: Date.now(),
+    state: { status: 'completed', input: {}, output: {}, startedAt: Date.now(), completedAt: Date.now() },
+    presentation: { summary: 'Read', debugAvailable: false } }, 'session');
+  await f.exec.editMessage(f.wire, 'origin', { sessionId: 'session', messageId: local[2]!.message.id,
+    content: 'revised' });
+  expect(f.events).not.toContainEqual(expect.objectContaining({ code: 'edit_error' }));
   expect(listMessagesWithParts('session')).toHaveLength(4);
+  createPart({ id: crypto.randomUUID(), messageId: local[1]!.message.id, type: 'tool',
+    callId: 'claude-tool:dummy-2', name: 'Claude Read', createdAt: Date.now(),
+    state: { status: 'completed', input: {}, output: {}, startedAt: Date.now(), completedAt: Date.now() },
+    presentation: { summary: 'Read', debugAvailable: false } }, 'session');
+  await f.exec.editMessage(f.wire, 'origin', { sessionId: 'session', messageId: local[0]!.message.id,
+    content: 'revised first' });
+  expect(f.events).not.toContainEqual(expect.objectContaining({ code: 'edit_error' }));
+  expect(listMessagesWithParts('session')).toHaveLength(2);
+});
+
+test('editing the first message recovers a turn stuck pending after a crash', async () => {
+  const f = fixture();
+  const local = await twoTurns(f);
+  const oldId = f.binding()!.native_session_id;
+  getDatabase().run('UPDATE claude_session_bindings SET pending = 1');
+  getDatabase().run(`INSERT INTO claude_rollback_intents (session_id, operation, target_message_id, phase)
+    VALUES ('session', 'edit', ?, 'sent')`, [local[2]!.message.id]);
+  await f.exec.sendMessage(f.wire, 'origin', 'session', 'blocked');
+  expect(listMessagesWithParts('session')).toHaveLength(4);
+  await f.exec.editMessage(f.wire, 'origin', { sessionId: 'session', messageId: local[0]!.message.id,
+    content: 'start over' });
+  expect(f.events).not.toContainEqual(expect.objectContaining({ code: 'edit_error' }));
+  const after = listMessagesWithParts('session');
+  expect(after).toHaveLength(2);
+  expect(after[1]?.message).toMatchObject({ status: 'completed' });
+  expect(f.binding()).toMatchObject({ pending: 0 });
+  expect(f.binding()?.native_session_id).not.toBe(oldId);
+  expect(f.pending()).toBeNull();
+  expect(f.forkCalls).toEqual([]);
 });
 
 test('Edit on the first turn creates a fresh native session without duplicating the user row', async () => {
@@ -257,11 +344,12 @@ test('Edit with thinking-split history resubmits once through the fork', async (
   expect(f.pending()).toBeNull();
 });
 
-test('native consecutive user messages refuse Undo before any fork', async () => {
+test('native consecutive user messages in kept history refuse Undo before any fork', async () => {
   const f = fixture();
   const local = await twoTurns(f);
   const native = f.histories.get(f.binding()!.native_session_id)!;
-  native.splice(2, 0, { ...native[2]!, uuid: crypto.randomUUID() });
+  // Inside the kept first turn; discarded native turns are never parsed.
+  native.splice(1, 0, { ...native[0]!, uuid: crypto.randomUUID() });
   await expect(f.exec.revert({ sessionId: 'session', targetMessageId: local[1]!.message.id })).rejects.toThrow('not available');
   expect(f.pending()).toBeNull();
   expect(f.forkCalls).toEqual([]);
