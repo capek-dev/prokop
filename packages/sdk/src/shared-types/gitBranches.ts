@@ -11,16 +11,22 @@ export interface GitBranchInfo {
   /** Relative to the last fetched upstream, not a live remote read. */
   ahead: number | null;
   behind: number | null;
+  /** Committer date of the branch head (ISO 8601). */
+  committedAt: string | null;
 }
 export interface GitBranchesResult {
   repository: GitRepositoryState;
   branches: GitBranchInfo[];
+  /** Newest FETCH_HEAD write across the repository's worktrees (ISO 8601), null if never fetched. */
+  lastFetchedAt: string | null;
 }
 export interface GitHistoryEntry {
   head: string;
   subject: string;
   author: string;
   date: string;
+  /** Parent SHAs; more than one marks a merge commit. */
+  parents: string[];
   /** ahead = local-only (push to publish); behind = upstream-only (pull to get). */
   sync?: 'ahead' | 'behind';
 }

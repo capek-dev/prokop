@@ -125,6 +125,32 @@ test('track creates a local branch from the reviewed remote head without checkou
   await expect(runGitBranchAction(root, { action: 'track', remote: 'origin', branch: 'feature', name: 'other', expectedHead: secondHead })).rejects.toThrow('remote branch changed');
 });
 
+test('history reports parents and branches report commit date and fetch time across worktrees', async () => {
+  const branches = await listGitBranches(root);
+  expect(branches.lastFetchedAt).toBeNull();
+  expect(Date.parse(branches.branches.find((b) => b.name === 'main')!.committedAt!)).not.toBeNaN();
+  await git(root, ['switch', '-c', 'side']);
+  await writeFile(join(root, 'side'), 'side');
+  await git(root, ['add', 'side']);
+  await git(root, ['commit', '-m', 'Side']);
+  const side = (await git(root, ['rev-parse', 'HEAD'])).stdout.trim();
+  await git(root, ['switch', 'main']);
+  await git(root, ['merge', '--no-ff', '--no-edit', 'side']);
+  const merge = (await git(root, ['rev-parse', 'HEAD'])).stdout.trim();
+  const commits = (await getGitHistory(root, merge, 0)).commits;
+  expect(commits.find((c) => c.head === merge)?.parents).toEqual([head, side]);
+  expect(commits.find((c) => c.head === head)?.parents).toEqual([]);
+  // A fetch from a linked worktree writes that worktree's FETCH_HEAD only.
+  const remote = join(base, 'remote.git');
+  await git(root, ['init', '--bare', remote]);
+  await git(root, ['remote', 'add', 'origin', remote]);
+  await git(root, ['worktree', 'add', join(base, 'linked'), 'side']);
+  await runGitBranchAction(join(base, 'linked'), { action: 'fetch', remote: 'origin' });
+  const fetchedAt = (await listGitBranches(root)).lastFetchedAt;
+  expect(fetchedAt).not.toBeNull();
+  expect(Math.abs(Date.now() - Date.parse(fetchedAt!))).toBeLessThan(60_000);
+});
+
 test('history annotates ahead and behind commits against an upstream', async () => {
   const remote = join(base, 'remote.git');
   await git(root, ['init', '--bare', remote]);

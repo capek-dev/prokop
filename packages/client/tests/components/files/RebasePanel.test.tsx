@@ -12,8 +12,8 @@ const idle = { active: false, token: null, branch: null, originalHead: null, ont
 const active = { active: true, token, branch: 'feature/1232', originalHead: head, onto: head, conflicts: ['file'] };
 const files = { gitRebaseState: vi.fn(), gitRebaseStart: vi.fn(), gitRebaseControl: vi.fn(), gitRebaseResolve: vi.fn(), gitRebaseConflict: vi.fn(), gitBranches: vi.fn(), gitHistory: vi.fn() };
 const client = { ...gitStatusFeedStub, http: { files } } as unknown as ProkopaiClient;
-const branch = (name: string, current = false) => ({ ref: `refs/heads/${name}`, name, head, kind: 'local' as const, current, checkedOut: current, upstream: null, ahead: null, behind: null });
-const branches = { repository: { branch: 'feature/1232', head, upstream: null, remotes: [] }, branches: [branch('feature/1232', true), branch('main'), { ...branch('origin/main'), kind: 'remote' as const }] };
+const branch = (name: string, current = false) => ({ ref: `refs/heads/${name}`, name, head, kind: 'local' as const, current, checkedOut: current, upstream: null, ahead: null, behind: null, committedAt: null });
+const branches = { repository: { branch: 'feature/1232', head, upstream: null, remotes: [] }, lastFetchedAt: null, branches: [branch('feature/1232', true), branch('main'), { ...branch('origin/main'), kind: 'remote' as const }] };
 beforeEach(() => {
   Object.values(files).forEach((fn) => fn.mockReset());
   files.gitRebaseState.mockResolvedValue(idle);

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, ChevronDown, Download, GitBranch, Loader2, MoreHorizontal, Plus, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Download, GitBranch, GitMerge, Loader2, MoreHorizontal, Plus, RefreshCw, X } from 'lucide-react';
 import { CommitPatch } from './CommitPatch';
 import { RebasePanel, rebaseKey } from './RebasePanel';
-import type { GitBranchAction, GitBranchInfo, GitBranchPushReview, GitBranchPushTarget, ProkopaiClient } from '@prokopai/sdk';
+import type { GitBranchAction, GitBranchInfo, GitBranchPushReview, GitBranchPushTarget, GitHistoryEntry, ProkopaiClient } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -16,6 +16,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { cn } from '@/lib/utils';
 import { useGitStatusSubscription } from '@/hooks/queries/useFileQueries';
 import { branchLabelInGroup, groupBranchesByPrefix } from './branchGroups';
+import { branchSync, buildHistoryRows, fetchedLabel, isFetchStale, recentBranches, refLabel, refsByHead, relativeAge } from './branchHistory';
 
 interface Props {
   sdkClient: ProkopaiClient | null;
@@ -23,17 +24,28 @@ interface Props {
   workspaceId: string;
   root?: string;
 }
-/** Shape of a git-history row (SDK type not exported; kept structural). */
-interface HistoryEntry { head: string; subject: string; author: string; date: string }
+type HistoryEntry = GitHistoryEntry;
 
 const pushKey = (serverId: string | undefined, workspaceId: string, root: string | undefined) => ['git-branch-push', serverId, workspaceId, root] as const;
 type PushAction = Extract<GitBranchAction, { action: 'push' }>;
 
+/** Display clock for relative times ("5m", "Fetched 2h ago"); not a data poll. */
+function useNow(intervalMs = 60_000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
 export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props) {
   const cache = useQueryClient();
+  const now = useNow();
   // HEAD moves (agent or terminal commits, branch switches) arrive through the status feed.
   useGitStatusSubscription(sdkClient, workspaceId, root);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const [rebaseOpen, setRebaseOpen] = useState(false);
   const rebase = useQuery({ queryKey: rebaseKey(serverId, workspaceId, root), queryFn: () => {
     if (!sdkClient) throw new Error('Not connected');
@@ -58,6 +70,7 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
     setCreateFrom(null);
     setPushBranch(null);
     setPickerOpen(false);
+    setSearch('');
   };
   const refresh = () => {
     for (const key of [['git-branches'], ['git-history'], ['git-repository'], ['git-rebase'], queryKeys.files.browsePrefix, queryKeys.files.gitStatusPrefix, ['files', 'git-diff'], queryKeys.worktrees.refsByWorkspace(workspaceId)]) {
@@ -104,40 +117,96 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
       await mutation.mutateAsync({ action: 'switch', name: target.localName, expectedBranch: data.repository.branch, expectedHead: data.repository.head, targetHead: target.existing ? target.existing.head : branch.head });
     } catch { /* surfaced through mutation.error */ }
   };
+  // Current branch pulls its configured upstream into the checkout; any other
+  // local branch fast-forwards in place without switching.
+  const canPull = !!selected && !!data && selected.kind === 'local' && (selected.current
+    ? !!data.repository.branch && !!data.repository.head && !!data.repository.upstream
+    : !rebase.error && !selected.checkedOut && !!selected.upstream?.startsWith('refs/remotes/'));
+  const pull = () => {
+    if (busy || !canPull || !selected || !data) return;
+    if (selected.current) {
+      if (!data.repository.branch || !data.repository.head || !data.repository.upstream) return;
+      mutation.mutate({ action: 'pull', expectedBranch: data.repository.branch, expectedHead: data.repository.head, ...data.repository.upstream });
+    } else {
+      setCommit(null);
+      mutation.mutate({ action: 'pull-branch', name: selected.name, expectedHead: selected.head });
+    }
+  };
+  const canPush = !!selected?.current && !!data?.repository.remotes.length;
+  const openPush = () => { if (selected && canPush) { setPushBranch(selected); setCreateFrom(null); } };
+  // Fetch the remote the inspected branch relates to; a lone remote is unambiguous.
+  const fetchRemote = data && selected
+    ? data.repository.remotes.find((r) => selected.upstream?.startsWith(`refs/remotes/${r}/`))
+      ?? (selected.kind === 'remote' ? resolveCheckout(selected)?.remote : undefined)
+      ?? (data.repository.remotes.length === 1 ? data.repository.remotes[0] : undefined)
+    : undefined;
+  const fetching = mutation.isPending && mutation.variables?.action === 'fetch';
+  const recent = useMemo(() => recentBranches(data?.branches ?? []), [data?.branches]);
   if (!sdkClient) return <p className="p-3 text-xs text-muted-foreground">Connect to a server to manage branches.</p>;
   if (rebaseOpen) return <RebasePanel sdkClient={sdkClient} serverId={serverId} workspaceId={workspaceId} root={root} branches={data} onClose={() => setRebaseOpen(false)} onChanged={refresh} />;
 
-  // One quiet meta line for the selected branch; checked-out context only when
-  // the user is inspecting a different branch than the one that is active.
+  const localBranches = data?.branches.filter((b) => b.kind === 'local') ?? [];
+  const remoteBranches = data?.branches.filter((b) => b.kind === 'remote') ?? [];
+  // Recent repeats branches listed below, so it only earns its place when the
+  // list is long enough to need it and the user is not searching.
+  const showRecent = !search && localBranches.length > recent.length && recent.length > 1;
+  const pickerItem = (b: GitBranchInfo, label: string, value: string, indent = false) => <CommandItem key={value} value={value} onSelect={() => selectBranch(b.ref)}>
+    <span className={cn('min-w-0 flex-1 truncate', indent && 'pl-4')}>{label}</span>
+    {!!b.ahead && <span className="shrink-0 text-[10px] tabular-nums text-success" title={`${b.ahead} to push`}>↑{b.ahead}</span>}
+    {!!b.behind && <span className="shrink-0 text-[10px] tabular-nums text-warning" title={`${b.behind} to pull`}>↓{b.behind}</span>}
+    {b.committedAt && <span className="min-w-8 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground/70" title={`Last commit ${new Date(b.committedAt).toLocaleString()}`}>{relativeAge(b.committedAt, now)}</span>}
+    <span className="flex w-10 shrink-0 justify-end">{b.current ? <Check /> : b.checkedOut ? <span className="text-xs text-muted-foreground">In use</span> : null}</span>
+  </CommandItem>;
+
+  const sync = selected ? branchSync(selected) : null;
+  const stale = isFetchStale(data?.lastFetchedAt ?? null, now);
+  const fetched = fetchedLabel(data?.lastFetchedAt ?? null, now);
+  const countClass = 'shrink-0 rounded-sm font-medium tabular-nums underline-offset-2 enabled:hover:underline disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+  const syncTitle = stale ? `May be outdated: ${fetched.toLowerCase()}. Fetch to update.` : `Relative to the last fetch (${fetched.toLowerCase()})`;
+  const syncStatus = (() => {
+    if (!sync) return null;
+    switch (sync.kind) {
+      case 'remote': return <span className="truncate text-muted-foreground">Remote branch</span>;
+      case 'unpublished': return canPush
+        ? <button type="button" className={cn(countClass, 'text-foreground/80')} disabled={busy} title="Review and push this branch" onClick={openPush}>Not published</button>
+        : <span className="truncate text-muted-foreground">{data?.repository.remotes.length ? 'Not published' : 'Local only'}</span>;
+      case 'gone': return <span className="truncate text-warning" title="The upstream branch no longer exists on the remote">Upstream gone</span>;
+      case 'up-to-date': return <span className={cn('flex items-center gap-1 truncate text-muted-foreground', stale && 'opacity-60')} title={syncTitle}><Check className="size-3" />Up to date</span>;
+      default: return <span className={cn('flex min-w-0 items-baseline gap-1.5', stale && 'opacity-60')} title={sync.kind === 'diverged' ? `${syncTitle}. Pull is fast-forward only; rebase to reconcile.` : syncTitle}>
+        {sync.kind === 'diverged' && <span className="shrink-0 text-muted-foreground">Diverged</span>}
+        {sync.ahead > 0 && <button type="button" className={cn(countClass, 'text-success')} disabled={busy || !canPush} onClick={openPush}>{sync.ahead} to push</button>}
+        {sync.behind > 0 && <button type="button" className={cn(countClass, 'text-warning')} disabled={busy || !canPull} onClick={pull}>{sync.behind} to pull</button>}
+      </span>;
+    }
+  })();
+  // One quiet context line: checked-out branch (only while inspecting another),
+  // upstream name, and fetch freshness with the fetch control beside it.
   const showCurrentBranch = selected && !selected.current && currentBranch;
-  const branchContext = !selected?.upstream
-    ? selected?.kind === 'remote' ? 'Remote branch history' : selected ? 'No upstream' : null
-    : null;
-  const branchMeta = <>
-    {showCurrentBranch && <button
-      type="button"
-      className="min-w-0 truncate rounded-sm text-left underline decoration-dotted underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      aria-label={`View checked-out branch ${currentBranch.name}`}
-      title={`View ${currentBranch.name} history without switching branches`}
-      onClick={() => selectBranch(currentBranch.ref)}
-    >Checked out: {currentBranch.name}</button>}
-    {showCurrentBranch && branchContext && <span aria-hidden="true"> · </span>}
-    {branchContext && <span className="truncate">{branchContext}</span>}
-  </>;
+  const context: ReactNode[] = [];
+  if (showCurrentBranch) context.push(<button
+    key="current"
+    type="button"
+    className="min-w-0 truncate rounded-sm text-left underline decoration-dotted underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    aria-label={`View checked-out branch ${currentBranch.name}`}
+    title={`View ${currentBranch.name} history without switching branches`}
+    onClick={() => selectBranch(currentBranch.ref)}
+  >Checked out: {currentBranch.name}</button>);
+  if (selected?.upstream) context.push(<span key="upstream" className="min-w-0 truncate" title="Upstream">{refLabel(selected.upstream)}</span>);
+  if (fetchRemote) context.push(<span key="fetch" className="flex shrink-0 items-center gap-0.5">
+    <span title={data?.lastFetchedAt ? new Date(data.lastFetchedAt).toLocaleString() : 'This repository has not been fetched'}>{fetching ? `Fetching ${fetchRemote}…` : fetched}</span>
+    <Button variant="ghost" size="icon-xs" className="size-5" aria-label={`Fetch ${fetchRemote}`} title={`Fetch ${fetchRemote}`} disabled={busy} onClick={() => mutation.mutate({ action: 'fetch', remote: fetchRemote })}><RefreshCw className={cn('size-3', fetching && 'animate-spin')} /></Button>
+  </span>);
 
   return <div className="flex min-h-0 flex-1 flex-col">
     <div className="flex shrink-0 items-center gap-1 px-2 py-1.5">
-      <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+      <Popover open={pickerOpen} onOpenChange={(open) => { setPickerOpen(open); if (!open) setSearch(''); }}>
         <PopoverTrigger asChild><Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start" disabled={busy || !data} aria-label="Select branch history"><GitBranch data-icon="inline-start" /><span className="min-w-0 flex-1 truncate text-left">{selected?.name ?? data?.repository.branch ?? 'Branches'}</span><ChevronDown data-icon="inline-end" /></Button></PopoverTrigger>
-        <PopoverContent align="start" className="w-72 p-0"><Command>
-          <CommandInput placeholder="Find branch…" />
+        <PopoverContent align="start" className="w-80 p-0"><Command>
+          <CommandInput placeholder="Find branch…" value={search} onValueChange={setSearch} />
           <CommandList><CommandEmpty>No branches</CommandEmpty>
-            {groupBranchesByPrefix(data?.branches.filter((b) => b.kind === 'local') ?? []).map((group) => <CommandGroup key={group.label ?? ''} heading={group.label ?? 'Local'}>{group.items.map((b) => <CommandItem key={b.ref} value={b.ref} onSelect={() => selectBranch(b.ref)}>
-              <span className={cn('min-w-0 flex-1 truncate', group.label && 'pl-4')}>{branchLabelInGroup(b.name, group.label)}</span>{b.current ? <Check /> : b.checkedOut ? <span className="text-xs text-muted-foreground">In use</span> : null}
-            </CommandItem>)}</CommandGroup>)}
-            {(data?.branches.some((b) => b.kind === 'remote') ?? false) && <CommandGroup heading="Remote">{data!.branches.filter((b) => b.kind === 'remote').map((b) => <CommandItem key={b.ref} value={b.ref} onSelect={() => selectBranch(b.ref)}>
-              <span className="min-w-0 flex-1 truncate">{b.name}</span>
-            </CommandItem>)}</CommandGroup>}
+            {showRecent && <CommandGroup heading="Recent">{recent.map((b) => pickerItem(b, b.name, `recent:${b.ref}`))}</CommandGroup>}
+            {groupBranchesByPrefix(localBranches).map((group) => <CommandGroup key={group.label ?? ''} heading={group.label ?? 'Local'}>{group.items.map((b) => pickerItem(b, branchLabelInGroup(b.name, group.label), b.ref, !!group.label))}</CommandGroup>)}
+            {remoteBranches.length > 0 && <CommandGroup heading="Remote">{remoteBranches.map((b) => pickerItem(b, b.name, b.ref))}</CommandGroup>}
           </CommandList>
         </Command></PopoverContent>
       </Popover>
@@ -166,31 +235,24 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
     {rebase.error && <p role="alert" className="px-3 pb-1 text-xs text-destructive">Unable to read rebase state. <button type="button" className="underline underline-offset-2" onClick={() => void rebase.refetch()}>Retry</button></p>}
     {branches.isPending && <div className="flex flex-col gap-2 p-3">{[0, 1, 2, 3, 4].map((i) => <Skeleton className="h-9 w-full" key={i} />)}</div>}
     {branches.error && <div className="p-3 text-xs text-destructive" role="alert">{branches.error.message} <Button size="sm" variant="ghost" onClick={() => void branches.refetch()}>Retry</Button></div>}
-    {data && selected && !pushBranch && <div className="flex shrink-0 items-center gap-1 px-3 pb-1.5">
-      {selected.upstream ? <span className="flex min-w-0 flex-1 items-baseline gap-1.5 text-xs text-muted-foreground" title="Counts relative to last fetched upstream">
-        {branchMeta}
-        <span className="min-w-0 truncate">{selected.upstream.replace('refs/remotes/', '')}</span>
-        <span className={cn('shrink-0 font-medium tabular-nums', selected.ahead ? 'text-success' : 'text-muted-foreground/60')}>↑{selected.ahead ?? '?'}</span>
-        <span className={cn('shrink-0 font-medium tabular-nums', selected.behind ? 'text-warning' : 'text-muted-foreground/60')}>↓{selected.behind ?? '?'}</span>
-      </span> : <span className="flex min-w-0 flex-1 items-baseline gap-1 text-xs text-muted-foreground">{branchMeta}</span>}
-      {selected.kind === 'local' && (selected.current ? <>
-        <Button variant="ghost" size="sm" disabled={busy || !data.repository.upstream || !data.repository.head} title={data.repository.upstream ? `Pull ${data.repository.upstream.remote}/${data.repository.upstream.branch} (fast-forward only)` : 'Configure an upstream on the server to pull'} onClick={() => {
-          if (busy || !data?.repository.branch || !data.repository.head || !data.repository.upstream) return;
-          mutation.mutate({ action: 'pull', expectedBranch: data.repository.branch, expectedHead: data.repository.head, ...data.repository.upstream });
-        }}>{busy && mutation.variables?.action === 'pull' ? 'Pulling…' : 'Pull'}</Button>
-        <Button variant="ghost" size="sm" disabled={busy || !data?.repository.remotes.length} onClick={() => { if (selected) { setPushBranch(selected); setCreateFrom(null); } }}>Push…</Button>
-      </> : <>
-        <Button variant="ghost" size="sm" disabled={busy || !!rebase.error || selected.checkedOut || !selected.upstream?.startsWith('refs/remotes/')} title={selected.checkedOut ? 'Pull from the worktree where this branch is checked out' : selected.upstream?.startsWith('refs/remotes/') ? `Fetch and fast-forward ${selected.name} without switching branches` : 'Configure a remote upstream on the server to pull'} onClick={() => {
-          if (busy || rebase.error || selected.checkedOut || !selected.upstream?.startsWith('refs/remotes/')) return;
-          setCommit(null);
-          mutation.mutate({ action: 'pull-branch', name: selected.name, expectedHead: selected.head });
-        }}>{busy && mutation.variables?.action === 'pull-branch' ? 'Pulling…' : 'Pull'}</Button>
-        <Button variant="ghost" size="sm" disabled={busy || selected.checkedOut} onClick={() => { if (selected && data) mutation.mutate({ action: 'switch', name: selected.name, expectedBranch: data.repository.branch, expectedHead: data.repository.head, targetHead: selected.head }); }}>Switch</Button>
-      </>)}
-      {selected.kind === 'remote' && (() => {
-        const target = resolveCheckout(selected);
-        return <Button variant="ghost" size="sm" disabled={busy || !data.repository.head || !target} title={target?.existing ? `Switch to existing local branch ${target.localName}` : `Create ${target?.localName ?? ''} tracking ${selected.name}, then switch to it`} onClick={() => void checkoutRemote(selected)}>{busy && (mutation.variables?.action === 'track' || mutation.variables?.action === 'switch') ? 'Checking out…' : 'Checkout'}</Button>;
-      })()}
+    {data && selected && !pushBranch && <div className="flex shrink-0 flex-col gap-0.5 px-3 pb-1.5">
+      <div className="flex min-w-0 items-center gap-1">
+        <div className="flex min-w-0 flex-1 items-baseline text-xs">{syncStatus}</div>
+        {selected.kind === 'local' && (selected.current ? <>
+          <Button variant="ghost" size="sm" disabled={busy || !canPull} title={data.repository.upstream ? `Pull ${data.repository.upstream.remote}/${data.repository.upstream.branch} (fast-forward only)` : 'Configure an upstream on the server to pull'} onClick={pull}>{busy && mutation.variables?.action === 'pull' ? 'Pulling…' : 'Pull'}</Button>
+          <Button variant="ghost" size="sm" disabled={busy || !canPush} onClick={openPush}>Push…</Button>
+        </> : <>
+          <Button variant="ghost" size="sm" disabled={busy || !canPull} title={selected.checkedOut ? 'Pull from the worktree where this branch is checked out' : selected.upstream?.startsWith('refs/remotes/') ? `Fetch and fast-forward ${selected.name} without switching branches` : 'Configure a remote upstream on the server to pull'} onClick={pull}>{busy && mutation.variables?.action === 'pull-branch' ? 'Pulling…' : 'Pull'}</Button>
+          <Button variant="ghost" size="sm" disabled={busy || selected.checkedOut} onClick={() => { if (selected && data) mutation.mutate({ action: 'switch', name: selected.name, expectedBranch: data.repository.branch, expectedHead: data.repository.head, targetHead: selected.head }); }}>Switch</Button>
+        </>)}
+        {selected.kind === 'remote' && (() => {
+          const target = resolveCheckout(selected);
+          return <Button variant="ghost" size="sm" disabled={busy || !data.repository.head || !target} title={target?.existing ? `Switch to existing local branch ${target.localName}` : `Create ${target?.localName ?? ''} tracking ${selected.name}, then switch to it`} onClick={() => void checkoutRemote(selected)}>{busy && (mutation.variables?.action === 'track' || mutation.variables?.action === 'switch') ? 'Checking out…' : 'Checkout'}</Button>;
+        })()}
+      </div>
+      {context.length > 0 && <div className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+        {context.flatMap((node, index) => index ? [<span key={`sep-${index}`} aria-hidden="true">·</span>, node] : [node])}
+      </div>}
     </div>}
     {createFrom && <form className="flex shrink-0 flex-col gap-1.5 border-b border-border/60 px-2 py-2" onSubmit={(event) => { event.preventDefault(); if (createFrom && name.trim() && !busy) mutation.mutate({ action: 'create', name: name.trim(), startHead: createFrom }); }}>
       <div className="flex items-center gap-1">
@@ -204,30 +266,80 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
     </form>}
     {mutation.error && <p role="alert" className="px-3 py-2 text-xs text-destructive">{mutation.error.message}</p>}
     {mutation.data?.warning && <p role="alert" className="px-3 py-2 text-xs text-destructive">{mutation.data.warning}</p>}
-    {pushBranch && data ? <BranchPush key={`${pushBranch.ref}:${pushBranch.head}`} sdkClient={sdkClient} serverId={serverId} workspaceId={workspaceId} root={root} source={pushBranch} remotes={data.repository.remotes} onClose={() => setPushBranch(null)} onChanged={refresh} /> : commit ? <CommitDetails key={commit.head} sdkClient={sdkClient} workspaceId={workspaceId} serverId={serverId} root={root} entry={commit} onBack={() => setCommit(null)} /> : selected ? <BranchHistory key={selected.head} sdkClient={sdkClient} workspaceId={workspaceId} serverId={serverId} root={root} head={selected.head} upstream={selected.upstream} onSelect={setCommit} /> : data && <p className="p-3 text-xs text-muted-foreground">{selectedRef ? 'This branch no longer exists. Choose another branch.' : 'No commits yet. Create the first commit in Changes.'}</p>}
+    {pushBranch && data ? <BranchPush key={`${pushBranch.ref}:${pushBranch.head}`} sdkClient={sdkClient} serverId={serverId} workspaceId={workspaceId} root={root} source={pushBranch} remotes={data.repository.remotes} onClose={() => setPushBranch(null)} onChanged={refresh} /> : commit ? <CommitDetails key={commit.head} sdkClient={sdkClient} workspaceId={workspaceId} serverId={serverId} root={root} entry={commit} onBack={() => setCommit(null)} /> : selected && data ? <BranchHistory key={selected.head} sdkClient={sdkClient} workspaceId={workspaceId} serverId={serverId} root={root} head={selected.head} upstream={selected.upstream} branches={data.branches} selected={selected} now={now} onSelect={setCommit} /> : data && <p className="p-3 text-xs text-muted-foreground">{selectedRef ? 'This branch no longer exists. Choose another branch.' : 'No commits yet. Create the first commit in Changes.'}</p>}
   </div>;
 }
 
-function BranchHistory({ sdkClient, workspaceId, serverId, root, head, upstream, onSelect }: Props & { sdkClient: ProkopaiClient; head: string; upstream?: string | null; onSelect: (entry: HistoryEntry) => void }) {
+/** Vertical rail segment; `top`/`bottom` draw the line into neighbouring rows. */
+function Rail({ top, bottom, title, children }: { top: boolean; bottom: boolean; title?: string; children?: ReactNode }) {
+  return <span aria-hidden="true" title={title} className="relative flex w-3 shrink-0 items-center justify-center self-stretch">
+    {top && <span className="absolute top-0 left-1/2 h-1/2 w-px -translate-x-1/2 bg-border" />}
+    {bottom && <span className="absolute bottom-0 left-1/2 h-1/2 w-px -translate-x-1/2 bg-border" />}
+    {children}
+  </span>;
+}
+
+const syncHint = { ahead: 'Not on upstream yet, push to publish', behind: 'On upstream only, pull to get' } as const;
+
+function CommitNode({ entry }: { entry: HistoryEntry }) {
+  if (entry.parents.length > 1) {
+    return <GitMerge className={cn('relative size-3 bg-background', entry.sync === 'ahead' ? 'text-success' : entry.sync === 'behind' ? 'text-warning' : 'text-muted-foreground')} />;
+  }
+  return <span className={cn('relative size-2 rounded-full', entry.sync === 'ahead' ? 'border-[1.5px] border-success bg-background' : entry.sync === 'behind' ? 'border-[1.5px] border-warning bg-warning/30' : 'bg-muted-foreground/60')} />;
+}
+
+const MAX_CHIPS = 2;
+
+function RefChips({ refs }: { refs: GitBranchInfo[] }) {
+  if (refs.length === 0) return null;
+  const shown = refs.slice(0, MAX_CHIPS);
+  return <span className="flex shrink-0 items-center gap-1">
+    {shown.map((b) => <span key={b.ref} title={b.current ? `${b.name} (checked out)` : b.name} className={cn('max-w-28 truncate rounded px-1 text-[10px] leading-4', b.kind === 'remote' ? 'border border-border text-muted-foreground' : b.current ? 'bg-primary/15 text-primary' : 'bg-muted text-foreground/80')}>{b.name}</span>)}
+    {refs.length > MAX_CHIPS && <span className="text-[10px] text-muted-foreground" title={refs.slice(MAX_CHIPS).map((b) => b.name).join(', ')}>+{refs.length - MAX_CHIPS}</span>}
+  </span>;
+}
+
+function BranchHistory({ sdkClient, workspaceId, serverId, root, head, upstream, branches, selected, now, onSelect }: Props & { sdkClient: ProkopaiClient; head: string; upstream?: string | null; branches: GitBranchInfo[]; selected: GitBranchInfo; now: number; onSelect: (entry: HistoryEntry) => void }) {
   const history = useInfiniteQuery({
     queryKey: ['git-history', serverId, workspaceId, root, head, upstream ?? null], initialPageParam: 0,
     queryFn: ({ pageParam }) => sdkClient.http.files.gitHistory(workspaceId, { root, head, offset: pageParam, upstream }),
     getNextPageParam: (page) => page.nextOffset ?? undefined, retry: false,
   });
   const commits = history.data?.pages.flatMap((page) => page.commits) ?? [];
-  return <div className="dialog-scrollbar min-h-0 flex-1 overflow-y-auto py-1">
-    {commits.map((entry) => <button type="button" key={entry.head} className="group flex w-full min-w-0 items-baseline gap-2 px-3 py-1 text-left hover:bg-muted/50" onClick={() => onSelect(entry)}>
-      {entry.sync && <span title={entry.sync === 'ahead' ? 'Not on upstream yet — push to publish' : 'On upstream only — pull to get'} className={cn('size-1.5 shrink-0 self-center rounded-full', entry.sync === 'ahead' ? 'bg-success' : 'bg-warning')} />}
-      <span className={cn('min-w-0 flex-1 truncate text-xs transition-colors group-hover:text-foreground', entry.sync ? 'text-foreground/80' : 'text-muted-foreground')}>{entry.subject}</span>
-      <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/60">{entry.head.slice(0, 7)}</span>
-      <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/60" title={entry.date.slice(0, 10)}>{entry.date.slice(5, 10)}</span>
-    </button>)}
+  const chips = useMemo(() => refsByHead(branches, selected), [branches, selected]);
+  const upstreamBranch = upstream ? branches.find((b) => b.ref === upstream) : undefined;
+  const rows = buildHistoryRows(commits, now, upstreamBranch ? { ref: upstreamBranch.ref, head: upstreamBranch.head } : null, !history.hasNextPage);
+  return <div className="dialog-scrollbar @container min-h-0 flex-1 overflow-y-auto pb-1">
+    {rows.map((row, index) => {
+      // Only the leading day heading sits above every commit; later ones bridge the rail.
+      if (row.type === 'day') return <div key={row.key} className="sticky top-0 z-10 flex h-6 items-center gap-2 bg-background px-3">
+        <Rail top={index > 0} bottom={index > 0} />
+        <span className="text-[10px] font-medium text-muted-foreground/70">{row.label}</span>
+      </div>;
+      if (row.type === 'upstream') return <div key={row.key} className="flex h-5 items-center gap-2 px-3" title={`${row.label} points at the commit below`}>
+        <Rail top bottom />
+        <span className="flex-1 border-t border-dashed border-border" />
+        <span className="max-w-[60%] shrink-0 truncate text-[10px] text-muted-foreground">{row.label}</span>
+      </div>;
+      const { entry, first, last } = row;
+      // The divider already names the upstream on any row below the first.
+      const refs = (chips.get(entry.head) ?? []).filter((b) => first || b.ref !== upstream);
+      return <button type="button" key={row.key} className="group flex h-7 w-full min-w-0 items-center gap-2 px-3 text-left hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none" title={`${entry.subject}\n${entry.author} · ${new Date(entry.date).toLocaleString()}`} onClick={() => onSelect(entry)}>
+        <Rail top={!first} bottom={!last} title={entry.sync ? syncHint[entry.sync] : undefined}><CommitNode entry={entry} /></Rail>
+        {entry.sync && <span className="sr-only">{syncHint[entry.sync]}.</span>}
+        <span className={cn('min-w-0 flex-1 truncate text-xs transition-colors group-hover:text-foreground', entry.sync ? 'text-foreground/80' : 'text-muted-foreground')}>{entry.subject}</span>
+        <RefChips refs={refs} />
+        <span className="hidden shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/60 @xs:inline">{entry.head.slice(0, 7)}</span>
+        <span className="min-w-6 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground/60">{relativeAge(entry.date, now)}</span>
+      </button>;
+    })}
     {history.isPending && <div className="flex flex-col gap-2 p-3">{[0, 1, 2, 3, 4].map((i) => <Skeleton className="h-5 w-full" key={i} />)}</div>}
     {!history.isPending && commits.length === 0 && <p className="p-3 text-xs text-muted-foreground">No commits.</p>}
     {history.error && <p role="alert" className="p-3 text-xs text-destructive">{history.error.message}</p>}
     {history.hasNextPage && <Button className="m-2" variant="ghost" size="sm" disabled={history.isFetchingNextPage} onClick={() => void history.fetchNextPage()}>Load older commits</Button>}
   </div>;
 }
+
 function CommitDetails({ sdkClient, workspaceId, serverId, root, entry, onBack }: Props & { sdkClient: ProkopaiClient; entry: HistoryEntry; onBack: () => void }) {
   const { resolvedMode } = useTheme();
   const details = useQuery({ queryKey: ['git-commit-details', serverId, workspaceId, root, entry.head], queryFn: () => sdkClient.http.files.gitCommitDetails(workspaceId, { root, head: entry.head }), retry: false });

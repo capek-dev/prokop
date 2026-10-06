@@ -1,4 +1,4 @@
-import { lstat, readdir } from 'node:fs/promises';
+import { lstat, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { GitBranchAction, GitBranchesResult, GitBranchPushTarget, GitBranchPushReview, GitHistoryEntry, GitHistoryResult, GitCommitDetails } from '@prokopai/sdk';
 import { git, getGitRepository, previewGitPush } from './git-operations';
@@ -27,27 +27,42 @@ export async function listGitBranches(root: string): Promise<GitBranchesResult> 
   const repository = await getGitRepository(root);
   const worktrees = (await git(root, ['worktree', 'list', '--porcelain', '-z'])).stdout.split('\0');
   const checkedOut = new Set(worktrees.filter((line) => line.startsWith('branch ')).map((line) => line.slice(7)));
-  const output = (await git(root, ['for-each-ref', '--sort=refname', '--format=%(refname)%00%(objectname)%00%(upstream)%00%(upstream:track)%00%(symref)', 'refs/heads', 'refs/remotes'])).stdout;
+  const output = (await git(root, ['for-each-ref', '--sort=refname', '--format=%(refname)%00%(objectname)%00%(upstream)%00%(upstream:track)%00%(symref)%00%(committerdate:iso-strict)', 'refs/heads', 'refs/remotes'])).stdout;
   const branches: GitBranchesResult['branches'] = [];
   for (const line of output.split('\n').filter(Boolean)) {
-    const [ref, head, upstream, track, symbolic] = line.split('\0');
+    const [ref, head, upstream, track, symbolic, committedAt] = line.split('\0');
     if (symbolic) continue;
     const local = ref.startsWith('refs/heads/');
     branches.push({ ref, head, name: ref.slice(local ? 11 : 13), kind: local ? 'local' : 'remote', current: local && ref === `refs/heads/${repository.branch}`, checkedOut: checkedOut.has(ref), upstream: upstream || null,
       ahead: upstream && track !== '[gone]' ? Number(/ahead (\d+)/.exec(track)?.[1] ?? 0) : null,
       behind: upstream && track !== '[gone]' ? Number(/behind (\d+)/.exec(track)?.[1] ?? 0) : null,
+      committedAt: committedAt || null,
     });
   }
-  return { repository, branches };
+  return { repository, branches, lastFetchedAt: await lastFetchedAt(root) };
+}
+/**
+ * FETCH_HEAD lives in each worktree's git dir while remote-tracking refs are
+ * shared, so the newest write across all worktrees is the repository's fetch time.
+ */
+async function lastFetchedAt(root: string): Promise<string | null> {
+  const common = (await git(root, ['rev-parse', '--path-format=absolute', '--git-common-dir'])).stdout.trim();
+  const linked = await readdir(join(common, 'worktrees')).catch(() => [] as string[]);
+  let newest = 0;
+  for (const dir of [common, ...linked.map((name) => join(common, 'worktrees', name))]) {
+    newest = Math.max(newest, await stat(join(dir, 'FETCH_HEAD')).then((entry) => entry.mtimeMs, () => 0));
+  }
+  return newest ? new Date(newest).toISOString() : null;
 }
 async function log(root: string, revisions: string[], offset = 0, limit = 51): Promise<GitHistoryEntry[]> {
-  const output = (await git(root, ['log', '--no-show-signature', `--skip=${offset}`, `--max-count=${limit}`, '--format=%H%x00%s%x00%an%x00%aI', '-z', ...revisions, '--'])).stdout;
+  const output = (await git(root, ['log', '--no-show-signature', `--skip=${offset}`, `--max-count=${limit}`, '--format=%H%x00%s%x00%an%x00%aI%x00%P', '-z', ...revisions, '--'])).stdout;
   const fields = output.split('\0');
   const commits: GitHistoryEntry[] = [];
-  for (let i = 0; i + 3 < fields.length; i += 4) {
+  for (let i = 0; i + 4 < fields.length; i += 5) {
     const head = fields[i].trim();
-    if (!SHA.test(head)) fail('invalid Git history response.');
-    commits.push({ head, subject: fields[i + 1], author: fields[i + 2], date: fields[i + 3] });
+    const parents = fields[i + 4].split(' ').filter(Boolean);
+    if (!SHA.test(head) || !parents.every((parent) => SHA.test(parent))) fail('invalid Git history response.');
+    commits.push({ head, subject: fields[i + 1], author: fields[i + 2], date: fields[i + 3], parents });
   }
   return commits;
 }
