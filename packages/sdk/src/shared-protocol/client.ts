@@ -23,6 +23,11 @@ export interface ClientRegisterMessage {
 
 export interface SessionCreateMessage {
   type: 'session.create';
+  /**
+   * Client-chosen UUID for the new session, so the creating client can tell
+   * its own `session.created` from sessions created elsewhere at the same time.
+   */
+  id?: string;
   workspaceId?: string;
   workspaceRootId?: string;
   preconfigId?: string;

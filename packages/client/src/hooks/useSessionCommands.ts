@@ -96,8 +96,10 @@ export function useSessionCommands({
 
   const createSession = useCallback((preconfigId?: string, title?: string, options?: CreateSessionOptions) => {
     const client = clientRef.current;
+    const sessionId = crypto.randomUUID();
     pendingSessionCreateRef.current = activeWorkspace
       ? {
+          sessionId,
           workspaceId: activeWorkspace.id,
           boardAction: getSessionCreateBoardAction(options),
         }
@@ -109,6 +111,7 @@ export function useSessionCommands({
     pendingPartAppendsRef.current.clear();
     if (client && client.connected) {
       client.sessions.create({
+        id: sessionId,
         // New sessions always carry the workspace default agent when none was
         // picked explicitly, so the agent (and its model pin, including a
         // pinned harness model) governs the session from the start. The server
@@ -398,7 +401,9 @@ export function useSessionCommands({
     const client = clientRef.current;
     const ws = workspaces.find(w => w.id === workspaceId) || null;
     setActiveWorkspace(ws);
+    const sessionId = crypto.randomUUID();
     pendingSessionCreateRef.current = {
+      sessionId,
       workspaceId,
       boardAction: getSessionCreateBoardAction(options),
     };
@@ -412,6 +417,7 @@ export function useSessionCommands({
       : primaryPreconfigs[0]?.id;
     if (client && client.connected) {
       client.sessions.create({
+        id: sessionId,
         preconfigId: defaultId,
         workspaceId,
         workspaceRootId: options?.workspaceRootId,

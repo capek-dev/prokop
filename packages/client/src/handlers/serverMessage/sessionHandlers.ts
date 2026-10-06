@@ -78,7 +78,9 @@ export function handleSessionCreated(
 
   setSessions(prev => [session, ...prev.filter(s => s.id !== session.id)]);
 
-  if (pendingSessionCreateRef.current) {
+  // Sub-agents and other devices create sessions too; only the one this
+  // client asked for (by id) is opened.
+  if (pendingSessionCreateRef.current?.sessionId === session.id) {
     const intent = pendingSessionCreateRef.current;
     ctx.replaceSessionContent(session.id, []);
     // Remove only this session's entries (new session, nothing should exist)

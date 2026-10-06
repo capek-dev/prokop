@@ -18,6 +18,8 @@ import { projectMessagesForClient } from './tool-debug';
 import { checkHarnessCreate, prokopFeatureError, unknownHarnessError } from './harness-policy';
 import { resolveSessionVariant } from '@/domains/sessions/variant';
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface SessionLifecycleDeps<Origin> {
   repository: SessionRepositoryPort;
   execution: SessionExecutionPort;
@@ -51,6 +53,8 @@ export interface SessionLifecycleDeps<Origin> {
 }
 
 export interface SessionCreateInput {
+  /** Client-chosen UUID, so the creator can match its reply; generated when absent. */
+  id?: string;
   harness?: SessionHarness;
   workspaceId?: string;
   workspaceRootId?: string;
@@ -168,7 +172,11 @@ export function createSessionLifecycleApplication<Origin>(
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Preconfig is unavailable' });
         return;
       }
-      const sessionId = crypto.randomUUID();
+      if (input.id !== undefined && (!UUID_PATTERN.test(input.id) || deps.repository.getSession(input.id))) {
+        wire.delivery.send(origin, { type: 'error', code: 'invalid_session', message: 'Session id is invalid or already in use' });
+        return;
+      }
+      const sessionId = input.id ?? crypto.randomUUID();
       const session = deps.repository.createSession({
         id: sessionId,
         workspaceId,

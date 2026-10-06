@@ -738,6 +738,41 @@ describe('application session use cases', () => {
       expect(spy.broadcast).toEqual([{ message: { type: 'session.created', session }, exclude: origin }]);
     });
 
+    test('create keeps the client-chosen id so the creator can tell its own session.created apart', async () => {
+      const clientId = '6f1c2b8e-4d3a-4f6b-9c2d-1e5a7b9c0d3f';
+      const createInputs: Array<{ id: string }> = [];
+      const repository = makeRepository({
+        getSession: () => null,
+        createSession: (input) => {
+          createInputs.push(input);
+          return makeSession({ id: input.id });
+        },
+      });
+      const app = createSessionLifecycleApplication({ ...makeDeps({ repository }) });
+
+      await app.create(makeWire(makeSpy()), origin, { id: clientId, workspaceId: 'ws-9' });
+      await app.create(makeWire(makeSpy()), origin, { workspaceId: 'ws-9' });
+
+      expect(createInputs[0]?.id).toBe(clientId);
+      expect(createInputs[1]?.id).toMatch(/^[0-9a-f-]{36}$/);
+      expect(createInputs[1]?.id).not.toBe(clientId);
+    });
+
+    test('create rejects malformed or already used client ids', async () => {
+      const taken = '6f1c2b8e-4d3a-4f6b-9c2d-1e5a7b9c0d3f';
+      const repository = makeRepository({
+        getSession: (id) => (id === taken ? makeSession({ id }) : null),
+        createSession: () => { throw new Error('must not create'); },
+      });
+      const app = createSessionLifecycleApplication({ ...makeDeps({ repository }) });
+      for (const id of [taken, 'not-a-uuid', '']) {
+        const spy = makeSpy();
+        await app.create(makeWire(spy), origin, { id, workspaceId: 'ws-9' });
+        expect(spy.sent).toEqual([{ type: 'error', code: 'invalid_session', message: 'Session id is invalid or already in use' }]);
+        expect(spy.broadcast).toEqual([]);
+      }
+    });
+
     test('rejects Codex and unknown harnesses before creating a session', async () => {
       const repository = makeRepository({ createSession: () => { throw new Error('must not create'); } });
       const app = createSessionLifecycleApplication({ ...makeDeps({ repository }) });

@@ -169,7 +169,7 @@ describe('session tab lifecycle navigation', () => {
       partIdIndexRef: { current: new Map() },
       clearCompletion: vi.fn(), setUsageForSession: vi.fn(),
       navigateToSessionWithOpen: vi.fn(), navigateToSession: vi.fn(), resumeSessionAfterCreate: vi.fn(),
-      pendingSessionCreateRef: { current: { workspaceId: 'workspace', boardAction: 'replace-focused' } },
+      pendingSessionCreateRef: { current: { sessionId: 'created', workspaceId: 'workspace', boardAction: 'replace-focused' } },
     } as unknown as SessionHandlersContext;
   }
 
@@ -179,6 +179,21 @@ describe('session tab lifecycle navigation', () => {
     handleSessionCreated({ type: 'session.created', session: { id: 'created', workspaceId: 'workspace' } as Session }, context);
     expect(useSessionBoardStore.getState().openSessionIds).toEqual(['existing', 'created']);
     expect(context.navigateToSessionWithOpen).toHaveBeenCalledWith('created', 'existing,created');
+  });
+
+  test('a sub-agent or other device creating a session mid-create does not take its place', () => {
+    useSessionBoardStore.getState().openInFocusedPane('existing');
+    const context = lifecycleContext();
+
+    handleSessionCreated({ type: 'session.created', session: { id: 'subagent', parentId: 'existing', workspaceId: 'workspace' } as Session }, context);
+    expect(useSessionBoardStore.getState().openSessionIds).toEqual(['existing']);
+    expect(context.navigateToSessionWithOpen).not.toHaveBeenCalled();
+    expect(context.pendingSessionCreateRef.current).not.toBeNull();
+
+    handleSessionCreated({ type: 'session.created', session: { id: 'created', workspaceId: 'workspace' } as Session }, context);
+    expect(useSessionBoardStore.getState().openSessionIds).toEqual(['existing', 'created']);
+    expect(context.navigateToSessionWithOpen).toHaveBeenCalledWith('created', 'existing,created');
+    expect(context.pendingSessionCreateRef.current).toBeNull();
   });
 
   test('fork keeps the replaced tab placement and preserves unrelated tabs in the URL', () => {

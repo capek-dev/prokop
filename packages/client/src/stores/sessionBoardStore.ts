@@ -19,6 +19,8 @@ function removeSessionView(sessionId: string): void {
 
 /** Legacy command intent remains accepted; both actions now open a session tab. */
 export interface PendingSessionCreateIntent {
+  /** Id sent with session.create; only the matching session.created opens. */
+  sessionId: string;
   workspaceId: string;
   boardAction: 'replace-focused' | 'open-alongside';
 }

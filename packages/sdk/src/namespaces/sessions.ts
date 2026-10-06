@@ -5,6 +5,8 @@ export class SessionsNamespace {
   constructor(private send: (msg: ClientMessage) => void) {}
 
   create(options?: {
+    /** Client-chosen UUID; the reply's `session.created` carries it. */
+    id?: string;
     workspaceId?: string;
     workspaceRootId?: string;
     preconfigId?: string;
