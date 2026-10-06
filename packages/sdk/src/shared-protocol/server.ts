@@ -60,7 +60,13 @@ export interface FileTreeMessage {
   update: FileTreeUpdate;
 }
 
-export type ServerMessage = CapekServerMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage | GitChangedMessage | LearningChangedMessage | McpChangedMessage | WorkspaceConversationActivityMessage | FilesChangedMessage | GitStatusMessage | FileTreeMessage;
+/** A workspace's scheduled jobs changed (edit, pause, run, error, schedule advance); refetch them. */
+export interface SchedulerChangedMessage {
+  type: 'scheduler.changed';
+  workspaceId: string;
+}
+
+export type ServerMessage = CapekServerMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage | GitChangedMessage | LearningChangedMessage | McpChangedMessage | WorkspaceConversationActivityMessage | FilesChangedMessage | GitStatusMessage | FileTreeMessage | SchedulerChangedMessage;
 
 /**
  * Prokopai extends the neutral Capek gate action union with session

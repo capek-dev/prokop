@@ -101,6 +101,7 @@ export interface SdkEventMap {
   'files.changed': [workspaceId: FilesChangedMessage['workspaceId']];
   'git.status': [workspaceId: GitStatusMessage['workspaceId'], root: GitStatusMessage['root'], status: GitStatusMessage['status']];
   'files.tree': [workspaceId: FileTreeMessage['workspaceId'], root: FileTreeMessage['root'], update: FileTreeMessage['update']];
+  'scheduler.changed': [workspaceId: string];
   'worktree.updated': [worktree: WorktreeUpdatedMessage['worktree']];
   'worktree.deleted': [worktree: WorktreeDeletedMessage['worktree']];
   'session.interrupted': [
@@ -290,6 +291,9 @@ export function routeServerMessage(
       break;
     case 'files.tree':
       emitter.emit('files.tree', msg.workspaceId, msg.root, msg.update);
+      break;
+    case 'scheduler.changed':
+      emitter.emit('scheduler.changed', msg.workspaceId);
       break;
     case 'worktree.updated':
       emitter.emit('worktree.updated', msg.worktree);

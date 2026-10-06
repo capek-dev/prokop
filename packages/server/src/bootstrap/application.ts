@@ -6,6 +6,7 @@ import {
   createProvidersApplication,
   createSchedulingHttpApplication,
   createSchedulingTicker,
+  withScheduledJobChangeNotices,
   createSessionApplication,
   createSessionControlApplication,
   createSessionHttpApplication,
@@ -351,9 +352,14 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     },
   );
 
-  const schedulingRepository = createJean2ScheduledJobRepository();
+  // Every job write (edits, runs, errors, schedule advances) tells clients to refetch that workspace's jobs.
+  const schedulingRepository = withScheduledJobChangeNotices(createJean2ScheduledJobRepository(),
+    (workspaceId) => broadcastEvent({ type: 'scheduler.changed', workspaceId }));
   // Scheduled runs create sessions outside any connection; announce them to every client.
-  const schedulingExecution = createJean2ScheduledJobExecution(broadcastSessionUpdated);
+  const schedulingExecution = createJean2ScheduledJobExecution({
+    announceSession: broadcastSessionUpdated,
+    runs: schedulingRepository,
+  });
 
   const scheduling = createSchedulingHttpApplication({
     repository: schedulingRepository,

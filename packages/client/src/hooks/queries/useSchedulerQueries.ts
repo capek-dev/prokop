@@ -16,7 +16,7 @@ export function useScheduledJobs(
       const response = await sdkClient.http.scheduler.list(workspaceId);
       return response.jobs;
     },
-    refetchInterval: 60_000,
+    // No polling: the server sends scheduler.changed on every job write (handleSchedulerChanged).
   });
 }
 

@@ -5,7 +5,14 @@ import { createScheduledJobRunner } from '@/infrastructure/scheduling/scheduled-
 import { createSession, getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace, getWorkspacePermissionMode } from '@/infrastructure/sqlite/workspaces';
 import { markScheduledJobError, markScheduledJobRun } from '@/infrastructure/sqlite/scheduled-job-store';
-import type { ScheduledJobExecutionPort } from '@/application/ports/scheduling';
+import type { ScheduledJobExecutionPort, ScheduledJobRepositoryPort } from '@/application/ports/scheduling';
+
+export interface Jean2ScheduledJobExecutionOptions {
+  /** Tells clients about the new run session; scheduled runs have no connection of their own. */
+  announceSession?: (session: Session) => void;
+  /** Run bookkeeping. Defaults to the store; bootstrap passes the change-reporting repository. */
+  runs?: Pick<ScheduledJobRepositoryPort, 'markRun' | 'markError'>;
+}
 
 /**
  * Jean2 scheduled-job execution adapter. Harness-agnostic since S11.3: the
@@ -14,13 +21,12 @@ import type { ScheduledJobExecutionPort } from '@/application/ports/scheduling';
  * scope, so this adapter no longer reaches any harness internals.
  */
 export function createJean2ScheduledJobExecution(
-  /** Tells clients about the new run session; scheduled runs have no connection of their own. */
-  announceSession: (session: Session) => void = () => {},
+  {
+    announceSession = () => {},
+    runs = { markRun: markScheduledJobRun, markError: markScheduledJobError },
+  }: Jean2ScheduledJobExecutionOptions = {},
   runner: Pick<ScheduledJobExecutionPort, 'run'> = createScheduledJobRunner({
-    repository: {
-      markRun: markScheduledJobRun,
-      markError: markScheduledJobError,
-    },
+    repository: runs,
     sessions: {
       createSession: (...input: Parameters<typeof createSession>) => {
         const session = createSession(...input);
