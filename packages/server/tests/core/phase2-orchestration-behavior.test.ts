@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { AssistantMessage, Preconfig, ServerMessage } from '@prokopai/sdk';
 import type { ServerWebSocket } from 'bun';
-import { runOrchestratorSession } from '@capekai/core/execution';
-import { executeChildSession } from '@capekai/core/providers';
+import { runOrchestratorSession } from '@/harnesses/prokop/workflow/orchestrator-session';
+import { executeChildSession } from '@/harnesses/prokop/subagent/child-session';
 import { handleChat, handleSessionEditMessage } from '@/transport/websocket/chat-handler';
 import type { RouterContext } from '@/transport/websocket/router-context';
-import { executeCompaction, interruptManager } from '@capekai/core/execution';
-import { sandboxController } from '@capekai/core/sandbox';
+import { executeCompaction } from '@/harnesses/prokop/compaction/executor';
+import { interruptManager } from '@/harnesses/prokop/execution/interrupt';
+import { sandboxController } from '@/infrastructure/sandbox/controller';
 import { createPreconfig } from '@/infrastructure/config/preconfig';
 import { activateSandbox, deactivateSandbox } from '@/infrastructure/sandbox';
 import { createSession, getChildSessions, getSession, updateSession } from '@/infrastructure/sqlite/session-store';

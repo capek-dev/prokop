@@ -44,7 +44,7 @@ function clearAppBadge(): void {
   }
 }
 
-export function registerJean2ServiceWorker(): void {
+export function registerProkopServiceWorker(): void {
   navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
 
   const updateServiceWorker = registerSW({

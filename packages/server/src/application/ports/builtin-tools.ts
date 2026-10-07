@@ -1,4 +1,4 @@
-import type { LoadedTool } from '@capekai/tool';
+import type { LoadedTool } from '@prokopai/sdk/tool';
 
 /**
  * Harness-owned built-in tool set (S11.5b physical move).

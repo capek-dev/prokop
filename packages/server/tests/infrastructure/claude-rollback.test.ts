@@ -361,7 +361,7 @@ test('Edit after stopping the first reply resubmits on a fresh native session', 
   f.stopTurn();
   await f.exec.sendMessage(f.wire, 'origin', 'session', 'first');
   const stopped = listMessagesWithParts('session');
-  expect(stopped.map(item => item.message.status ?? null)).toEqual([null, 'interrupted']);
+  expect(stopped.map(item => 'status' in item.message ? item.message.status : null)).toEqual([null, 'interrupted']);
   const oldId = f.binding()!.native_session_id;
   await f.exec.editMessage(f.wire, 'origin', { sessionId: 'session', messageId: stopped[0]!.message.id,
     content: 'revised first' });

@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { MockLanguageModelV3, convertArrayToReadableStream } from 'ai/test';
 import type { AssistantMessage, ToolPart } from '@prokopai/sdk';
-import { withProviderOverrides } from '@capekai/core/providers';
-import { getRuntimeConfiguration, withRuntimeConfiguration } from '@capekai/core/configuration';
-import { getRuntimeHost as getJean2CompatibilityBindings, withRuntimeHost as withJean2CompatibilityBindings } from '@capekai/core/hosts';
-import { type RuntimeEvent } from '@capekai/core';
-import { type ConnectableProvider, type ModelFactoryOptions } from '@capekai/core/providers';
-import { getStorage } from '@capekai/core/storage';
+import { withProviderOverrides } from '@/infrastructure/providers/registry';
+import { getRuntimeConfiguration, withRuntimeConfiguration } from '@/infrastructure/providers/configuration/runtime';
+import {
+  getRuntimeHost as getProkopCompatibilityBindings,
+  withRuntimeHost as withProkopCompatibilityBindings,
+} from '@/infrastructure/runtime/host';
+import type { RuntimeEvent } from '@/infrastructure/runtime/events';
+import type { ConnectableProvider, ModelFactoryOptions } from '@/infrastructure/providers/types';
+import { getStorage } from '@/infrastructure/storage/runtime';
 import { createRuntime } from '@/bootstrap/create-runtime';
-import { executeCompaction, isCompactionActive } from '@capekai/core/execution';
-import { convertToAiSdkMessages } from '@capekai/core/execution';
+import { executeCompaction, isCompactionActive } from '@/harnesses/prokop/compaction/executor';
+import { convertToAiSdkMessages } from '@/harnesses/prokop/execution/message-utils';
 import { createSession, getSession } from '@/infrastructure/sqlite/session-store';
 import {
   createMessage,
@@ -80,7 +83,7 @@ function executeWithBindings(
   providers: ReadonlyMap<string, ConnectableProvider>,
   ...args: Parameters<typeof executeCompaction>
 ): ReturnType<typeof executeCompaction> {
-  const bindings = getJean2CompatibilityBindings();
+  const bindings = getProkopCompatibilityBindings();
   const runtimeConfiguration = getRuntimeConfiguration();
   return withRuntimeConfiguration(
     {
@@ -92,7 +95,7 @@ function executeWithBindings(
       getCompactionToolClearCharsThreshold: () => 0,
       getCompactionMaxPrunedToolCount: () => 100,
     },
-    () => withJean2CompatibilityBindings(
+    () => withProkopCompatibilityBindings(
       {
         ...bindings,
         sandbox: { isSandboxActive: () => false },

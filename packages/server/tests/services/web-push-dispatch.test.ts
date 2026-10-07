@@ -9,7 +9,7 @@ import {
 } from '@/infrastructure/sqlite/web-push';
 import { createScheduledJob, deleteScheduledJob } from '@/infrastructure/sqlite/scheduled-job-store';
 import { createPendingAsk } from '@/infrastructure/sqlite/pending-asks';
-import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
+import { getProkopNotificationsApplication } from '@/adapters/prokop/notifications';
 
 const validKeys = { p256dh: 'p256dh-value', auth: 'auth-value' };
 const validEndpoint = 'https://fcm.googleapis.com/fcm/send/abc';
@@ -124,7 +124,7 @@ describe('web-push dispatch service', () => {
       },
     }));
 
-    const app = getJean2NotificationsApplication();
+    const app = getProkopNotificationsApplication();
 
     // Dynamically import to get the mocked version
     await app.dispatch({
@@ -144,7 +144,7 @@ describe('web-push dispatch service', () => {
       preferences: { completion: false, permission: true },
     }));
 
-    const app = getJean2NotificationsApplication();
+    const app = getProkopNotificationsApplication();
 
     // Completion event should find zero enabled subscriptions
     await app.dispatch({
@@ -173,7 +173,7 @@ describe('web-push dispatch service', () => {
       }));
       const session = seedSession('ws1', { parentId: null });
 
-      const app = getJean2NotificationsApplication();
+      const app = getProkopNotificationsApplication();
 
       const msg = {
         id: 'msg-normal-1',
@@ -202,7 +202,7 @@ describe('web-push dispatch service', () => {
       }));
       const session = seedSession('ws1', { parentId: null });
 
-      const app = getJean2NotificationsApplication();
+      const app = getProkopNotificationsApplication();
 
       const msg = {
         id: 'msg-normal-error',
@@ -243,7 +243,7 @@ describe('web-push dispatch service', () => {
         metadata: { scheduledJobId: job.id },
       });
 
-      const app = getJean2NotificationsApplication();
+      const app = getProkopNotificationsApplication();
 
       const msg = {
         id: 'msg-sched-off',
@@ -284,7 +284,7 @@ describe('web-push dispatch service', () => {
         metadata: { scheduledJobId: job.id },
       });
 
-      const app = getJean2NotificationsApplication();
+      const app = getProkopNotificationsApplication();
 
       const msg = {
         id: 'msg-sched-on',
@@ -335,7 +335,7 @@ describe('web-push dispatch service', () => {
         metadata: { scheduledJobId: jobOn.id },
       });
 
-      const app = getJean2NotificationsApplication();
+      const app = getProkopNotificationsApplication();
       const messageBase = {
         role: 'assistant' as const,
         status: 'error' as const,
@@ -392,7 +392,7 @@ describe('web-push dispatch service', () => {
       // Delete the job so the session references a missing record
       deleteScheduledJob(job.id);
 
-      const app = getJean2NotificationsApplication();
+      const app = getProkopNotificationsApplication();
 
       const msg = {
         id: 'msg-sched-missing',
@@ -446,7 +446,7 @@ describe('web-push dispatch service', () => {
         createdAt: Date.now(),
       });
 
-      const app = getJean2NotificationsApplication();
+      const app = getProkopNotificationsApplication();
       await app.dispatchPendingPermissionNotification(requestIdOff, sessionOff.id);
 
       // No delivery row should have been created for the off-session

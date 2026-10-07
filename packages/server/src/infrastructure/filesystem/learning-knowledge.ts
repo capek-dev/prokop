@@ -1,7 +1,7 @@
 import { lstat, mkdir, mkdtemp, open, readdir, readFile, realpath, rename, rm } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
-import { withKnowledgeMutationLock } from '@capekai/core/hosts';
+import { withKnowledgeMutationLock } from '@/infrastructure/filesystem/knowledge-mutation-lock';
 import type { KnowledgeFilePort } from '@/application/learning/knowledge-journal';
 import type { KnowledgeSnapshot, KnowledgeStagingPort } from '@/application/learning/knowledge-staging';
 

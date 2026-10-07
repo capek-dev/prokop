@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { type RuntimeEvent } from '@capekai/core';
+import type { RuntimeEvent } from '@/infrastructure/runtime/events';
 import type { ServerMessage } from '@prokopai/sdk';
 import {
-  createJean2RuntimeContext,
+  createProkopRuntimeContext,
   deliverCapekEvent,
   mapCapekEventToServerMessage,
-  type Jean2EventRouter,
-} from '@/adapters/capek/events';
+  type ProkopEventRouter,
+} from '@/harnesses/prokop/host/events';
 
 function map(event: RuntimeEvent): unknown {
   return mapCapekEventToServerMessage(event);
@@ -134,7 +134,7 @@ describe('Čapek event adapter', () => {
   test('routes each audience through the matching Jean2 host operation', () => {
     const calls: string[] = [];
     const messages: ServerMessage[] = [];
-    const router: Jean2EventRouter<object> = {
+    const router: ProkopEventRouter<object> = {
       send: (_origin, message) => {
         calls.push('origin');
         messages.push(message);
@@ -157,7 +157,7 @@ describe('Čapek event adapter', () => {
       },
       attachOriginToSession: () => calls.push('attached'),
     };
-    const context = createJean2RuntimeContext(router);
+    const context = createProkopRuntimeContext(router);
     const failure = { kind: 'failure', category: 'generic', code: 'test', message: 'test' } as const;
 
     context.emit({ audience: { scope: 'origin', origin: {} }, event: failure });
@@ -182,7 +182,7 @@ describe('Čapek event adapter', () => {
   test('session-scoped auto-title renames reach every client', () => {
     const calls: string[] = [];
     const record = (scope: string) => () => { calls.push(scope); };
-    const context = createJean2RuntimeContext<object>({
+    const context = createProkopRuntimeContext<object>({
       send: record('origin'),
       broadcast: record('global'),
       broadcastToSession: record('session'),
@@ -201,7 +201,7 @@ describe('Čapek event adapter', () => {
 
   test('reports runtime session changes for worktree attachment refresh', () => {
     const changedRoots: Array<string | null | undefined> = [];
-    const router: Jean2EventRouter<object> = {
+    const router: ProkopEventRouter<object> = {
       send: () => {},
       broadcast: () => {},
       broadcastToSession: () => {},
@@ -209,7 +209,7 @@ describe('Čapek event adapter', () => {
       sendToAskTargets: () => {},
       attachOriginToSession: () => {},
     };
-    const context = createJean2RuntimeContext(
+    const context = createProkopRuntimeContext(
       router,
       (session) => changedRoots.push(session.workspaceRootId),
     );

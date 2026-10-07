@@ -73,5 +73,5 @@ export { NotificationsRestNamespace } from './rest/notifications';
 export { HttpNamespace } from './rest/http-namespace';
 export type { LoadAllResult, CriticalServerData, SecondaryServerData } from './rest/http-namespace';
 
-export type { ClientConfig, ConnectionState, SdkEvent } from './types';
+export type { ClientConfig, ConnectionState, SdkEvent } from './types/index';
 export type { GetToolDebugResponse, GitStatusFile, GitStatusResponse } from './types/rest-responses';

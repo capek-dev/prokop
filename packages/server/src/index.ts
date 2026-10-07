@@ -21,14 +21,14 @@ import {
   getParticipantClientIds,
   getParticipantConnections,
 } from '@/transport/websocket/control-registry';
-import { scanTools } from '@/adapters/capek/contracts';
+import { scanTools } from '@/infrastructure/tools/registry';
 import { closeDatabase, getDatabase } from '@/infrastructure/sqlite/database';
 import { backfillFts } from '@/infrastructure/session-search/fts';
 import type { ServerMessage, AskAuthority } from '@prokopai/sdk';
 import { getTerminalManager, getTerminalEventManager } from '@/transport/terminal';
 import { cleanupRunningSessionsOnStartup } from '@/infrastructure/sqlite/terminal-session-store';
 import { reconcileStuckRunningSessions } from '@/infrastructure/sqlite/session-store';
-import { reconcileAllSessionsCompaction } from '@/adapters/capek/compaction-recovery';
+import { reconcileAllSessionsCompaction } from '@/harnesses/prokop/host/compaction-recovery';
 import { readEnv } from '@/infrastructure/runtime/env-compat';
 import { disposeExecutionLifecycle, initializeExecutionLifecycle } from '@/application/ports/execution-lifecycle';
 import { reconcileAllOrphanedToolCalls } from '@/infrastructure/sqlite/message-store';

@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { MockLanguageModelV3, convertArrayToReadableStream } from 'ai/test';
-import { withProviderOverrides } from '@capekai/core/providers';
-import { type ConnectableProvider, type ModelFactoryOptions } from '@capekai/core/providers';
+import { withProviderOverrides } from '@/infrastructure/providers/registry';
+import type { ConnectableProvider, ModelFactoryOptions } from '@/infrastructure/providers/types';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
 import { seedWorkspaceWithSession } from '#tests/seed';
@@ -25,8 +25,11 @@ import {
   deleteQueuedMessage,
   getNextQueuedMessage,
 } from '@/infrastructure/sqlite/queued-messages';
-import { executeCompaction, revertToStep, forkSession, interruptManager } from '@capekai/core/execution';
-import { resolveAsk, createAskApi } from '@capekai/core/ask-authority';
+import { executeCompaction } from '@/harnesses/prokop/compaction/executor';
+import { revertToStep } from '@/harnesses/prokop/execution/revert';
+import { forkSession } from '@/harnesses/prokop/execution/fork';
+import { interruptManager } from '@/harnesses/prokop/execution/interrupt';
+import { resolveAsk, createAskApi } from '@/harnesses/prokop/permission/ask-user-api';
 import { getWorkspaceGrants, revokeGrant, revokeAllWorkspaceGrants } from '@/infrastructure/sqlite/permissions';
 import type { AssistantMessage, ToolPart, ServerMessage } from '@prokopai/sdk';
 
@@ -73,35 +76,41 @@ function executeCompactionWithModel(
   return withProviderOverrides(compactionProviders, () => executeCompaction(...args));
 }
 
-mock.module('@/config', () => ({
-  findModel: () => ({ providerId: 'openai' }),
-  getModelsConfig: () => ({
-    defaultModel: 'gpt-4o',
-    defaultProvider: 'openai',
-  }),
-  clearConfigCache: () => {},
-  clearModelsCache: () => {},
-}));
+const realConfig = { ...await import('@/config') };
+const realEnvironment = { ...await import('@/infrastructure/runtime/environment') };
 
-mock.module('@/infrastructure/runtime/environment', () => ({
-  getLLMOpenAIApiKey: () => 'test-key',
-  getCompactionMaxTokens: () => 2000,
-  getCompactionPreserveRecentToolCount: () => 3,
-  getCompactionPreserveSmallToolChars: () => 200,
-  getCompactionToolClearCharsThreshold: () => 1000,
-  getCompactionMaxPrunedToolCount: () => 10,
-  getCompactionAutoThresholdRatio: () => 0.7,
-  getCompactionAutoReserveCapTokens: () => 30000,
-  getCompactionAutoSafetyMarginTokens: () => 5000,
-  getCompactionModel: () => null,
-  getCompactionProvider: () => null,
-}));
+function installConfigurationMocks(): void {
+  mock.module('@/config', () => ({
+    findModel: () => ({ providerId: 'openai' }),
+    getModelsConfig: () => ({
+      defaultModel: 'gpt-4o',
+      defaultProvider: 'openai',
+    }),
+    clearConfigCache: () => {},
+    clearModelsCache: () => {},
+  }));
+
+  mock.module('@/infrastructure/runtime/environment', () => ({
+    getLLMOpenAIApiKey: () => 'test-key',
+    getCompactionMaxTokens: () => 2000,
+    getCompactionPreserveRecentToolCount: () => 3,
+    getCompactionPreserveSmallToolChars: () => 200,
+    getCompactionToolClearCharsThreshold: () => 1000,
+    getCompactionMaxPrunedToolCount: () => 10,
+    getCompactionAutoThresholdRatio: () => 0.7,
+    getCompactionAutoReserveCapTokens: () => 30000,
+    getCompactionAutoSafetyMarginTokens: () => 5000,
+    getCompactionModel: () => null,
+    getCompactionProvider: () => null,
+  }));
+}
 
 describe('Integration: WebSocket message handlers', () => {
   let sessionId: string;
   let workspaceId: string;
 
   beforeEach(() => {
+    installConfigurationMocks();
     setupTestDataDir();
     setupTestDatabase();
     const deliveryPort: DeliveryPort = {
@@ -123,6 +132,8 @@ describe('Integration: WebSocket message handlers', () => {
     installDeliveryPort(null as never);
     resetTestDatabase();
     resetTestDataDir();
+    mock.module('@/config', () => realConfig);
+    mock.module('@/infrastructure/runtime/environment', () => realEnvironment);
   });
 
   function createUserMsg(id: string, sid: string = sessionId, ts: number = Date.now()) {

@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
-import { revertToStep } from '@capekai/core/execution';
+import { revertToStep } from '@/harnesses/prokop/execution/revert';
 import { createMessage, createPart, listMessagesWithParts } from '@/infrastructure/sqlite/message-store';
 import type { AssistantMessage } from '@prokopai/sdk';
 

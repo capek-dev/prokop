@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isJean2Cache, isLikelyStaleBuildError } from '@/pwa/recovery';
+import { isProkopCache, isLikelyStaleBuildError } from '@/pwa/recovery';
 
 describe('PWA recovery', () => {
   it('recognizes common stale build failures', () => {
@@ -12,10 +12,10 @@ describe('PWA recovery', () => {
   });
 
   it('selects only Jean2 Workbox and runtime caches', () => {
-    expect(isJean2Cache('workbox-precache-v2-http://localhost')).toBe(true);
-    expect(isJean2Cache('static-assets')).toBe(true);
-    expect(isJean2Cache('static-media')).toBe(true);
-    expect(isJean2Cache('html-cache')).toBe(true);
-    expect(isJean2Cache('unrelated-cache')).toBe(false);
+    expect(isProkopCache('workbox-precache-v2-http://localhost')).toBe(true);
+    expect(isProkopCache('static-assets')).toBe(true);
+    expect(isProkopCache('static-media')).toBe(true);
+    expect(isProkopCache('html-cache')).toBe(true);
+    expect(isProkopCache('unrelated-cache')).toBe(false);
   });
 });

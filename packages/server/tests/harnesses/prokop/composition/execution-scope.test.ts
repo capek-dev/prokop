@@ -1,51 +1,48 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import type { executeCompaction as CapekExecuteCompaction } from '@/harnesses/prokop/compaction/executor';
+import type { forkSession as CapekForkSession } from '@/harnesses/prokop/execution/fork';
 import type {
-  executeCompaction as CapekExecuteCompaction,
-  forkSession as CapekForkSession,
   handleChat as CapekHandleChat,
   handleSessionEditMessage as CapekHandleSessionEditMessage,
   regenerateSessionTitle as CapekRegenerateSessionTitle,
-  revertToStep as CapekRevertToStep,
-} from '@capekai/core/execution';
-import {
-  configureStorage,
-  createInMemoryStorageBundle,
-  getStorage,
-} from '@capekai/core/storage';
-import { configureJean2Bindings } from '@/harnesses/prokop/composition/bindings';
-import { configureJean2RuntimeConfiguration } from '@/adapters/capek/runtime-configuration';
-import { configureJean2Storage, jean2StorageBundle } from '@/adapters/capek/storage';
-import { configureJean2WorkspaceToolDiscovery } from '@/adapters/capek/tool-source';
-import { createJean2SessionExecution, type Jean2SessionExecutionDependencies } from '@/harnesses/prokop/execution';
+} from '@/harnesses/prokop/execution/chat-handler';
+import type { revertToStep as CapekRevertToStep } from '@/harnesses/prokop/execution/revert';
+import { configureStorage, getStorage } from '@/infrastructure/storage/runtime';
+import { createInMemoryStorageBundle } from '@/infrastructure/storage/memory';
+import { configureProkopBindings } from '@/harnesses/prokop/composition/bindings';
+import { configureProkopRuntimeConfiguration } from '@/harnesses/prokop/host/runtime-configuration';
+import { configureProkopStorage, prokopStorageBundle } from '@/harnesses/prokop/host/storage';
+import { configureProkopWorkspaceToolDiscovery } from '@/harnesses/prokop/host/tool-source';
+import { createProkopSessionExecution, type ProkopSessionExecutionDependencies } from '@/harnesses/prokop/execution';
 import { createProkopHarness } from '@/harnesses/prokop';
 import {
-  disposeJean2ExecutionScope,
-  getJean2ExecutionComposition,
-  initializeJean2ExecutionScope,
-  resetJean2ExecutionCompositionFactoryForTests,
-  setJean2ExecutionCompositionFactoryForTests,
-  withJean2ExecutionScope,
+  disposeProkopExecutionScope,
+  getProkopExecutionComposition,
+  initializeProkopExecutionScope,
+  resetProkopExecutionCompositionFactoryForTests,
+  setProkopExecutionCompositionFactoryForTests,
+  withProkopExecutionScope,
 } from '@/harnesses/prokop/composition/execution-scope';
 
 describe('Jean2 composed execution scope', () => {
   afterEach(async () => {
-    await disposeJean2ExecutionScope();
-    resetJean2ExecutionCompositionFactoryForTests();
+    await disposeProkopExecutionScope();
+    resetProkopExecutionCompositionFactoryForTests();
     configureStorage(createInMemoryStorageBundle());
   });
 
   function configureComposition(): void {
-    configureJean2Storage();
-    configureJean2RuntimeConfiguration();
-    configureJean2WorkspaceToolDiscovery();
-    configureJean2Bindings();
+    configureProkopStorage();
+    configureProkopRuntimeConfiguration();
+    configureProkopWorkspaceToolDiscovery();
+    configureProkopBindings();
   }
 
   test('enters one cached agent scope and preserves it across async suspension', async () => {
     configureComposition();
 
-    const composition = await getJean2ExecutionComposition();
-    expect(await getJean2ExecutionComposition()).toBe(composition);
+    const composition = await getProkopExecutionComposition();
+    expect(await getProkopExecutionComposition()).toBe(composition);
 
     const fallbackStorage = createInMemoryStorageBundle();
     configureStorage(fallbackStorage);
@@ -55,10 +52,10 @@ describe('Jean2 composed execution scope', () => {
       release = resolve;
     });
 
-    const execution = withJean2ExecutionScope(async () => {
-      expect(getStorage()).toBe(jean2StorageBundle);
+    const execution = withProkopExecutionScope(async () => {
+      expect(getStorage()).toBe(prokopStorageBundle);
       await barrier;
-      expect(getStorage()).toBe(jean2StorageBundle);
+      expect(getStorage()).toBe(prokopStorageBundle);
       return 'completed';
     });
 
@@ -69,7 +66,7 @@ describe('Jean2 composed execution scope', () => {
 
   test('all stateful session execution entries enter the composed scope across suspension', async () => {
     configureComposition();
-    await getJean2ExecutionComposition();
+    await getProkopExecutionComposition();
 
     const fallbackStorage = createInMemoryStorageBundle();
     configureStorage(fallbackStorage);
@@ -83,7 +80,7 @@ describe('Jean2 composed execution scope', () => {
       values.push(getStorage());
     }
 
-    const dependencies: Jean2SessionExecutionDependencies = {
+    const dependencies: ProkopSessionExecutionDependencies = {
       handleChat: async (..._args: Parameters<typeof CapekHandleChat>): Promise<void> => observe('chat'),
       handleSessionEditMessage: async (..._args: Parameters<typeof CapekHandleSessionEditMessage>): Promise<void> =>
         observe('edit'),
@@ -102,7 +99,7 @@ describe('Jean2 composed execution scope', () => {
         return {} as Awaited<ReturnType<typeof CapekForkSession>>;
       },
     };
-    const execution = createJean2SessionExecution(dependencies);
+    const execution = createProkopSessionExecution(dependencies);
     const wire = {
       delivery: {
         send: () => {},
@@ -127,14 +124,14 @@ describe('Jean2 composed execution scope', () => {
 
     expect([...observations.keys()]).toEqual(['chat', 'edit', 'title', 'compact', 'revert', 'fork']);
     for (const values of observations.values()) {
-      expect(values).toEqual([jean2StorageBundle, jean2StorageBundle]);
+      expect(values).toEqual([prokopStorageBundle, prokopStorageBundle]);
     }
     expect(getStorage()).toBe(fallbackStorage);
   });
 
   test('shutdown rejects new entries, drains active work, and disposes once', async () => {
     configureComposition();
-    await getJean2ExecutionComposition();
+    await getProkopExecutionComposition();
 
     let markStarted!: () => void;
     const started = new Promise<void>((resolve) => {
@@ -145,42 +142,42 @@ describe('Jean2 composed execution scope', () => {
       release = resolve;
     });
 
-    const execution = withJean2ExecutionScope(async () => {
+    const execution = withProkopExecutionScope(async () => {
       markStarted();
       await barrier;
     });
     await started;
 
     let disposed = false;
-    const firstDisposal = disposeJean2ExecutionScope();
+    const firstDisposal = disposeProkopExecutionScope();
     void firstDisposal.then(() => {
       disposed = true;
     });
-    const secondDisposal = disposeJean2ExecutionScope();
+    const secondDisposal = disposeProkopExecutionScope();
     expect(secondDisposal).toBe(firstDisposal);
     await Promise.resolve();
     expect(disposed).toBe(false);
-    expect(() => withJean2ExecutionScope(async () => {})).toThrow('shutting down');
+    expect(() => withProkopExecutionScope(async () => {})).toThrow('shutting down');
 
     release();
     await execution;
     await firstDisposal;
     expect(disposed).toBe(true);
-    expect(() => getJean2ExecutionComposition()).toThrow('shutting down');
+    expect(() => getProkopExecutionComposition()).toThrow('shutting down');
 
-    await initializeJean2ExecutionScope();
-    expect(await getJean2ExecutionComposition()).toBeDefined();
+    await initializeProkopExecutionScope();
+    expect(await getProkopExecutionComposition()).toBeDefined();
   });
 
   test('failed composition does not poison retry or cleanup', async () => {
     let attempts = 0;
-    setJean2ExecutionCompositionFactoryForTests(async () => {
+    setProkopExecutionCompositionFactoryForTests(async () => {
       attempts += 1;
       throw new Error('composition failed');
     });
 
-    const failed = getJean2ExecutionComposition();
-    await disposeJean2ExecutionScope();
+    const failed = getProkopExecutionComposition();
+    await disposeProkopExecutionScope();
     let failure: unknown;
     try {
       await failed;
@@ -189,16 +186,16 @@ describe('Jean2 composed execution scope', () => {
     }
     expect(failure).toBeInstanceOf(Error);
 
-    resetJean2ExecutionCompositionFactoryForTests();
+    resetProkopExecutionCompositionFactoryForTests();
     configureComposition();
-    const recovered = await getJean2ExecutionComposition();
+    const recovered = await getProkopExecutionComposition();
     expect(recovered.agentScope).toBeDefined();
     expect(attempts).toBe(1);
   });
 
   test('headless scheduled run enters the composed scope across suspension', async () => {
     configureComposition();
-    await getJean2ExecutionComposition();
+    await getProkopExecutionComposition();
     configureStorage(createInMemoryStorageBundle());
 
     const observedStorages: unknown[] = [];
@@ -224,7 +221,7 @@ describe('Jean2 composed execution scope', () => {
       resumeFromHistory: false,
     });
 
-    expect(observedStorages[0]).toBe(jean2StorageBundle);
-    expect(observedStorages[1]).toBe(jean2StorageBundle);
+    expect(observedStorages[0]).toBe(prokopStorageBundle);
+    expect(observedStorages[1]).toBe(prokopStorageBundle);
   });
 });

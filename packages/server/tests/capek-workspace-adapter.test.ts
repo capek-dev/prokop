@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { resolve } from 'path';
-import { createWorkspaceCapability } from '@capekai/core/execution';
-import { jean2CompatibilityBindings } from '@/harnesses/prokop/composition/bindings';
+import { createWorkspaceCapability } from '@/infrastructure/filesystem/workspace-policy/policy';
+import { prokopCompatibilityBindings } from '@/harnesses/prokop/composition/bindings';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
@@ -22,7 +22,7 @@ describe('Čapek workspace mutation adapter', () => {
       additionalPaths: ['/workspace/existing'],
     });
     const capability = createWorkspaceCapability(
-      jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+      prokopCompatibilityBindings.workspace.createToolWorkspaceHost({
         workspaceId: 'workspace-1',
         workspacePath: '/workspace/project',
         additionalPaths: ['/workspace/existing'],
@@ -49,14 +49,14 @@ describe('Čapek workspace mutation adapter', () => {
       additionalPaths: ['/workspace/existing'],
     });
     const first = createWorkspaceCapability(
-      jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+      prokopCompatibilityBindings.workspace.createToolWorkspaceHost({
         workspaceId: 'workspace-1',
         workspacePath: '/workspace/project',
         sessionId: 'session-1',
       }),
     );
     const second = createWorkspaceCapability(
-      jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+      prokopCompatibilityBindings.workspace.createToolWorkspaceHost({
         workspaceId: 'workspace-1',
         workspacePath: '/workspace/project',
         sessionId: 'session-2',
@@ -83,7 +83,7 @@ describe('Čapek workspace mutation adapter', () => {
 
   test('returns false when the workspace no longer exists', async () => {
     const capability = createWorkspaceCapability(
-      jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+      prokopCompatibilityBindings.workspace.createToolWorkspaceHost({
         workspaceId: 'missing',
         workspacePath: '/workspace/project',
         sessionId: 'session-1',

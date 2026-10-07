@@ -1,4 +1,4 @@
-import type { ToolResult } from '@capekai/tool';
+import type { ToolResult } from '@prokopai/sdk/tool';
 
 export interface LearningHistoryTurn {
   messageId: string;

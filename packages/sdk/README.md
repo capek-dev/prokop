@@ -1,10 +1,16 @@
 # @prokopai/sdk
 
-The private TypeScript client package used inside the Prokop monorepo.
+The private TypeScript client, shared data types, and tool interfaces used inside the Prokop monorepo.
+
+- `@prokopai/sdk`: client and public API.
+- `@prokopai/sdk/types`: shared data types, wire messages, and helpers without client transports.
+- `@prokopai/sdk/tool`: tool definitions, execution context, results, and permission helpers.
+
+Individual data modules are also available under `@prokopai/sdk/types/*`.
 
 ## Install
 
-This package is not published to npm. Consume it as a workspace dependency. Use `@capekai/tool` when building external tools.
+This package is not published to npm. Consume it as a workspace dependency. Use `@prokopai/sdk/tool` when building external tools.
 
 ## Quick Start
 

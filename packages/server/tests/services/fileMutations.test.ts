@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, rmSync, symlinkSync, chmodSync, lstatSync, re
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { createHash } from 'crypto';
-import { workspacePathPolicyPort } from '@/adapters/capek/workspace-paths';
+import { workspacePathPolicyPort } from '@/adapters/workspace-paths';
 import { createEditableFileOps } from '@/infrastructure/filesystem/file-mutations';
 
 const { readEditableFile, saveFile } = createEditableFileOps(workspacePathPolicyPort);

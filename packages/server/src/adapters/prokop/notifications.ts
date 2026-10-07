@@ -1,0 +1,44 @@
+import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
+import { getSession } from '@/infrastructure/sqlite/session-store';
+import { getScheduledJob } from '@/infrastructure/sqlite/scheduled-job-store';
+import { getPermissionRequestByRequestId } from '@/infrastructure/sqlite/pending-asks';
+import { createNotificationRepository } from '@/infrastructure/sqlite/notification-repository';
+import { createWebPushSender } from '@/infrastructure/web-push/sender';
+import { canNotifyForSession as scheduledSessionCanNotify } from '@/domains/scheduling/notifications';
+import { getControlState } from '@/transport/websocket/control-registry';
+import {
+  createNotificationsApplication,
+  type NotificationsApplication,
+} from '@/application/notifications';
+
+/**
+ * Prokop notification adapter (S4/S5). Wires the notification application to
+ * the current store and web-push implementations. The scheduled-run
+ * eligibility predicate comes from the scheduling domain (shared policy,
+ * not duplicated). A module-level singleton keeps the pending-terminal
+ * dispatch map shared between the wired application, the compat dispatch
+ * module, and the transport ack handler.
+ */
+
+let singleton: NotificationsApplication | null = null;
+
+export function getProkopNotificationsApplication(): NotificationsApplication {
+  if (singleton) {
+    return singleton;
+  }
+
+  const store = createNotificationRepository();
+  const sender = createWebPushSender();
+
+  singleton = createNotificationsApplication({
+    store,
+    sender,
+    getSession,
+    canNotifyForSession: (session) => scheduledSessionCanNotify(session, (id) => getScheduledJob(id)),
+    getPendingAsk: getPermissionRequestByRequestId,
+    permissionTimeoutMs: getPermissionTimeoutMs,
+    getControllerClientId: (sessionId) => getControlState(sessionId).controllerClientId,
+  });
+
+  return singleton;
+}

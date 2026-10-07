@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { PermissionAsk } from '@prokopai/sdk';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
-import { executeSchedulerTool } from '@capekai/core/hosts';
+import { executeSchedulerTool } from '@/harnesses/prokop/scheduler/scheduler-tool';
 
 describe('scheduler ask gating', () => {
   let workspaceId: string;

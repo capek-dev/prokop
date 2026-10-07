@@ -7,7 +7,7 @@ import { createLearningReviewRunner, type LearningReviewRunnerDependencies } fro
 import { createLearningRecovery } from '@/application/learning/recovery';
 import type { LearningRuntimePort } from '@/application/ports/learning-runtime';
 import { getHeadlessExecutionPort, type HeadlessSessionRunPort } from '@/application/ports/headless-execution';
-import { createJean2SessionRepository } from '@/adapters/jean2/session-repository';
+import { createProkopSessionRepository } from '@/adapters/prokop/session-repository';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { getWorkspace, listWorkspaces } from '@/infrastructure/sqlite/workspaces';
 import { listSessions } from '@/infrastructure/sqlite/session-store';
@@ -80,7 +80,7 @@ export function createWiredLearning(
     operations.set(workspaceId, next);
     return next.finally(() => { if (operations.get(workspaceId) === next) operations.delete(workspaceId); });
   }
-  const sessions = createJean2SessionRepository(agents);
+  const sessions = createProkopSessionRepository(agents);
   const reader = (workspace: NonNullable<ReturnType<typeof getWorkspace>>) => createLearningEvidenceReader(db,
     workspace.settings.isAgentHome
       ? { kind: 'agent', agentId: workspace.settings.agentId ?? '', sources: agentSourcesFor(workspace.settings.agentId ?? '') }

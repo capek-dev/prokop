@@ -2,18 +2,26 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import ts from 'typescript';
-import { buildSystemMessage, createWorkspaceCapability } from '@capekai/core/execution';
-import { createModelForProvider, getConnectableProviders, getProvider } from '@capekai/core/providers';
-import { configureWorkspaceToolDiscovery, configureToolsPath, getWorkspaceToolDiscovery } from '@capekai/core/tools';
-import { sandboxController } from '@capekai/core/sandbox';
-import { configureRuntimeConfiguration, getRuntimeConfiguration } from '@capekai/core/configuration';
-import { configureWorkspacePolicy } from '@capekai/core/workspace';
-import { configureAgentSource, configureInstructionSource, configurePreconfigSource, configureSessionSearchHost, getRuntimeHost as getJean2CompatibilityBindings, getSessionSearchHost } from '@capekai/core/hosts';
+import { buildSystemMessage } from '@/harnesses/prokop/composition/plugins/legacy-system-message';
+import { createWorkspaceCapability } from '@/infrastructure/filesystem/workspace-policy/policy';
+import { createModelForProvider, getConnectableProviders, getProvider } from '@/infrastructure/providers/registry';
+import { configureWorkspaceToolDiscovery, getWorkspaceToolDiscovery } from '@/infrastructure/tools/tool-source';
+import { configureToolsPath } from '@/infrastructure/tools/registry';
+import { sandboxController } from '@/infrastructure/sandbox/controller';
 import {
-  configureStorage,
-  createInMemoryStorageBundle,
-  getStorage,
-} from '@capekai/core/storage';
+  configureRuntimeConfiguration,
+  getRuntimeConfiguration,
+} from '@/infrastructure/providers/configuration/runtime';
+import { configureWorkspacePolicy } from '@/infrastructure/filesystem/workspace-policy/policy';
+import {
+  configureAgentSource,
+  configureInstructionSource,
+  configurePreconfigSource,
+} from '@/harnesses/prokop/context/sources';
+import { configureSessionSearchHost, getSessionSearchHost } from '@/harnesses/shared/session-search/host';
+import { getRuntimeHost as getProkopCompatibilityBindings } from '@/infrastructure/runtime/host';
+import { configureStorage, getStorage } from '@/infrastructure/storage/runtime';
+import { createInMemoryStorageBundle } from '@/infrastructure/storage/memory';
 import {
   capekContextAssemblerKey,
   capekContextSourcesKey,
@@ -26,17 +34,19 @@ import {
   capekStorageKey,
   capekToolResolverKey,
   capekWorkspaceToolDiscoveryKey,
+} from '@/harnesses/prokop/composition/plugins/service-keys';
+import {
   enterAgentScope,
   type AgentScopeHandle,
   type ProcessScopeHandle,
-} from '@capekai/core/composition';
-import * as focused from '@/adapters/capek';
-import { configureJean2SessionSearchHost } from '@/adapters/capek/session-search';
+} from '@/harnesses/prokop/composition/plugins/compose';
+import * as focused from '@/harnesses/prokop/host';
+import { configureProkopSessionSearchHost } from '@/harnesses/prokop/host/session-search';
 import { JEAN2_AGENT_PLUGIN_IDS, JEAN2_PROCESS_PLUGIN_IDS } from '@/harnesses/prokop/composition/profile';
-import { jean2CompatibilityBindings } from '@/harnesses/prokop/composition/bindings';
+import { prokopCompatibilityBindings } from '@/harnesses/prokop/composition/bindings';
 import { createWiredApplication } from '@/bootstrap/application';
 import { createRuntime } from '@/bootstrap/create-runtime';
-import { createJean2RuntimeComposition } from '@/harnesses/prokop/composition/composition';
+import { createProkopRuntimeComposition } from '@/harnesses/prokop/composition/composition';
 import { createMessage, createPart } from '@/infrastructure/sqlite/message-store';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { createTestTextPart, createTestUserMessage } from '#tests/factories';
@@ -49,15 +59,15 @@ const compositionRootPath = resolve(serverSourceRoot, 'bootstrap/create-runtime.
 
 const expectedCompositionSteps = [
   'installBuiltinToolsPort',
-  'configureJean2Storage',
-  'configureJean2RuntimeConfiguration',
-  'configureJean2WorkspacePolicy',
-  'configureJean2PreconfigSource',
-  'configureJean2AgentSource',
-  'configureJean2InstructionSource',
-  'configureJean2SessionSearchHost',
-  'configureJean2WorkspaceToolDiscovery',
-  'configureJean2Bindings',
+  'configureProkopStorage',
+  'configureProkopRuntimeConfiguration',
+  'configureProkopWorkspacePolicy',
+  'configureProkopPreconfigSource',
+  'configureProkopAgentSource',
+  'configureProkopInstructionSource',
+  'configureProkopSessionSearchHost',
+  'configureProkopWorkspaceToolDiscovery',
+  'configureProkopBindings',
   'installExecutionLifecyclePort',
 ];
 
@@ -115,18 +125,18 @@ describe('Čapek composition root', () => {
 
     expect(imports.length).toBeGreaterThan(0);
     const allowedSpecifiers = [
-      '@/adapters/capek',
-      '@/adapters/capek/storage',
-      '@/adapters/capek/session-search',
+      '@/harnesses/prokop/host',
+      '@/harnesses/prokop/host/storage',
+      '@/harnesses/prokop/host/session-search',
       '@/harnesses/prokop/composition/bindings',
       '@/harnesses/prokop/composition/execution-scope',
       '@/application/ports/execution-lifecycle',
-      '@/adapters/capek/tool-resolver',
+      '@/harnesses/prokop/host/tool-resolver',
       '@/bootstrap/application',
       '@/application/agents',
       '@/application/ports/builtin-tools',
       '@/harnesses/prokop/tools',
-      '@/adapters/jean2/session-repository',
+      '@/adapters/prokop/session-repository',
       '@/infrastructure/sqlite/session-search-query-repository',
       '@/infrastructure/sqlite/database',
       '@/infrastructure/sqlite/message-store',
@@ -144,18 +154,18 @@ describe('Čapek composition root', () => {
 
   test('createRuntime installs the full adapter set with preserved identities', () => {
     createRuntime();
-    const configured = getJean2CompatibilityBindings();
+    const configured = getProkopCompatibilityBindings();
 
-    expect(configured).toBe(jean2CompatibilityBindings);
-    expect(getRuntimeConfiguration()).toBe(focused.jean2RuntimeConfiguration);
-    expect(getStorage()).toBe(focused.jean2StorageBundle);
-    expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);
-    expect(getWorkspaceToolDiscovery()).toBe(focused.jean2WorkspaceToolDiscovery);
-    expect(focused.jean2WorkspacePolicyOptions.blockedPaths).toEqual([
+    expect(configured).toBe(prokopCompatibilityBindings);
+    expect(getRuntimeConfiguration()).toBe(focused.prokopRuntimeConfiguration);
+    expect(getStorage()).toBe(focused.prokopStorageBundle);
+    expect(getSessionSearchHost()).toBe(focused.prokopSessionSearchHost);
+    expect(getWorkspaceToolDiscovery()).toBe(focused.prokopWorkspaceToolDiscovery);
+    expect(focused.prokopWorkspacePolicyOptions.blockedPaths).toEqual([
       '/etc/', '/usr/', '/bin/', '/sbin/', '/boot/', '/dev/', '/proc/', '/sys/', '/root/',
     ]);
-    expect(focused.jean2WorkspacePolicyOptions.sensitivePatterns).toContain('.env');
-    expect(focused.jean2WorkspacePolicyOptions.sensitivePatterns).not.toContain('credentials');
+    expect(focused.prokopWorkspacePolicyOptions.sensitivePatterns).toContain('.env');
+    expect(focused.prokopWorkspacePolicyOptions.sensitivePatterns).not.toContain('credentials');
 
     const processCapability = createWorkspaceCapability({
       root: '/workspace',
@@ -184,14 +194,14 @@ describe('S5 session-search host wiring', () => {
   });
 
   afterEach(() => {
-    configureJean2SessionSearchHost();
+    configureProkopSessionSearchHost();
     configureSessionSearchHost();
     resetTestDatabase();
   });
 
   test('the installed host delegates search to the infrastructure sqlite repository', async () => {
     const host = getSessionSearchHost();
-    expect(host).toBe(focused.jean2SessionSearchHost);
+    expect(host).toBe(focused.prokopSessionSearchHost);
 
     seedWorkspace({ id: 'ws-composed' });
     const session = seedSession('ws-composed');
@@ -227,14 +237,14 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
   test('composes the installed Jean2 objects through process and agent providers by exact identity', async () => {
     createRuntime();
 
-    const composition = await createJean2RuntimeComposition();
+    const composition = await createProkopRuntimeComposition();
     processScope = composition.processScope;
     agentScope = composition.agentScope;
 
-    expect(agentScope.require(capekStorageKey)).toBe(focused.jean2StorageBundle);
-    expect(agentScope.require(capekRuntimeConfigurationKey)).toBe(focused.jean2RuntimeConfiguration);
-    expect(agentScope.require(capekRuntimeHostKey)).toBe(jean2CompatibilityBindings);
-    expect(agentScope.require(capekWorkspaceToolDiscoveryKey)).toBe(focused.jean2WorkspaceToolDiscovery);
+    expect(agentScope.require(capekStorageKey)).toBe(focused.prokopStorageBundle);
+    expect(agentScope.require(capekRuntimeConfigurationKey)).toBe(focused.prokopRuntimeConfiguration);
+    expect(agentScope.require(capekRuntimeHostKey)).toBe(prokopCompatibilityBindings);
+    expect(agentScope.require(capekWorkspaceToolDiscoveryKey)).toBe(focused.prokopWorkspaceToolDiscovery);
     expect(agentScope.require(capekSandboxControllerKey)).toBe(sandboxController);
     expect(agentScope.require(capekProviderOverridesKey)).toBeInstanceOf(Map);
     expect([...agentScope.require(capekProviderOverridesKey)]).toEqual([]);
@@ -249,25 +259,25 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
     expect(scopedCapability.isSensitivePath('/workspace/.env')).toBe(true);
 
     const sources = agentScope.require(capekContextSourcesKey);
-    expect(sources.preconfigs).toBe(focused.jean2PreconfigSource);
-    expect(sources.agents).toBe(focused.jean2AgentSource);
-    expect(sources.instructions).toBe(focused.jean2InstructionSource);
+    expect(sources.preconfigs).toBe(focused.prokopPreconfigSource);
+    expect(sources.agents).toBe(focused.prokopAgentSource);
+    expect(sources.instructions).toBe(focused.prokopInstructionSource);
 
-    expect(processScope.require(capekSessionSearchHostKey)).toBe(focused.jean2SessionSearchHost);
+    expect(processScope.require(capekSessionSearchHostKey)).toBe(focused.prokopSessionSearchHost);
     expect(typeof processScope.require(capekProviderRegistryKey).getProvider).toBe('function');
 
     // The accessors return the same focused adapter objects after composition.
-    expect(getJean2CompatibilityBindings()).toBe(jean2CompatibilityBindings);
-    expect(getRuntimeConfiguration()).toBe(focused.jean2RuntimeConfiguration);
-    expect(getStorage()).toBe(focused.jean2StorageBundle);
-    expect(getSessionSearchHost()).toBe(focused.jean2SessionSearchHost);
-    expect(getWorkspaceToolDiscovery()).toBe(focused.jean2WorkspaceToolDiscovery);
+    expect(getProkopCompatibilityBindings()).toBe(prokopCompatibilityBindings);
+    expect(getRuntimeConfiguration()).toBe(focused.prokopRuntimeConfiguration);
+    expect(getStorage()).toBe(focused.prokopStorageBundle);
+    expect(getSessionSearchHost()).toBe(focused.prokopSessionSearchHost);
+    expect(getWorkspaceToolDiscovery()).toBe(focused.prokopWorkspaceToolDiscovery);
   });
 
   test('composition keeps the Jean2 plugin inventory pinned', async () => {
     createRuntime();
 
-    const composition = await createJean2RuntimeComposition();
+    const composition = await createProkopRuntimeComposition();
     processScope = composition.processScope;
     agentScope = composition.agentScope;
 
@@ -282,7 +292,7 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
   test('diagnostics list every Jean2 seam with correct key scopes and provider ownership', async () => {
     createRuntime();
 
-    const composition = await createJean2RuntimeComposition();
+    const composition = await createProkopRuntimeComposition();
     processScope = composition.processScope;
     agentScope = composition.agentScope;
 
@@ -337,7 +347,7 @@ describe('C2 kernel composition of Jean2 dependencies', () => {
   test('provider plugin methods are the current registry functions', async () => {
     createRuntime();
 
-    const composition = await createJean2RuntimeComposition();
+    const composition = await createProkopRuntimeComposition();
     processScope = composition.processScope;
     agentScope = composition.agentScope;
 
@@ -385,7 +395,7 @@ describe('C4 coding bundle in the Jean2 composition', () => {
   test('exposes the exact standard contributed coding inventory through the scoped resolver', async () => {
     createRuntime();
 
-    const composition = await createJean2RuntimeComposition();
+    const composition = await createProkopRuntimeComposition();
     processScope = composition.processScope;
     agentScope = composition.agentScope;
 
@@ -471,7 +481,7 @@ describe('C3 ordered context in the Jean2 composition', () => {
       }],
     }));
 
-    const composition = await createJean2RuntimeComposition();
+    const composition = await createProkopRuntimeComposition();
     processScope = composition.processScope;
     agentScope = composition.agentScope;
 
@@ -493,7 +503,7 @@ describe('C3 ordered context in the Jean2 composition', () => {
       readMemoryFile: async (_id, filename) => filename === 'MEMORY.md' ? memory : 'Keep preferences',
     });
     try {
-      const composition = await createJean2RuntimeComposition();
+      const composition = await createProkopRuntimeComposition();
       processScope = composition.processScope;
       agentScope = composition.agentScope;
       const base = { ...contextData, workspaceId: undefined, workspacePath: undefined };
@@ -511,7 +521,7 @@ describe('C3 ordered context in the Jean2 composition', () => {
   test('diagnostics list the exact ordered sections with the assembler service pinned', async () => {
     createRuntime();
 
-    const composition = await createJean2RuntimeComposition();
+    const composition = await createProkopRuntimeComposition();
     processScope = composition.processScope;
     agentScope = composition.agentScope;
 

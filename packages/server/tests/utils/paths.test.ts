@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { resolve } from 'path';
-import { workspacePathPolicyPort } from '@/adapters/capek/workspace-paths';
+import { workspacePathPolicyPort } from '@/adapters/workspace-paths';
 
 describe('server workspace paths', () => {
   test('resolves workspace-relative and absolute paths', () => {

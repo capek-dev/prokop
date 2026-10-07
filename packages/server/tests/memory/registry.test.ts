@@ -3,7 +3,18 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-import { parseEntries, entriesToContent, loadMemoryFile, formatMemorySection, loadMemoryInstructions, addEntry, replaceEntry, removeEntry, USER_CHAR_LIMIT, MEMORY_CHAR_LIMIT } from '@capekai/core/hosts';
+import {
+  parseEntries,
+  entriesToContent,
+  loadMemoryFile,
+  formatMemorySection,
+  loadMemoryInstructions,
+  addEntry,
+  replaceEntry,
+  removeEntry,
+  USER_CHAR_LIMIT,
+  MEMORY_CHAR_LIMIT,
+} from '@/harnesses/shared/memory/registry';
 
 describe('memory registry', () => {
   let testDir: string;
@@ -335,13 +346,13 @@ describe('memory registry', () => {
 
   describe('formatEntriesForDisplay', () => {
     test('formats entries with numeric indices', () => {
-      const { formatEntriesForDisplay } = require('@capekai/core/hosts');
+      const { formatEntriesForDisplay } = require('@/harnesses/shared/memory/registry');
       const result = formatEntriesForDisplay(['- Alpha', '- Beta', '- Gamma']);
       expect(result).toEqual(['[0] Alpha', '[1] Beta', '[2] Gamma']);
     });
 
     test('returns empty array for no entries', () => {
-      const { formatEntriesForDisplay } = require('@capekai/core/hosts');
+      const { formatEntriesForDisplay } = require('@/harnesses/shared/memory/registry');
       const result = formatEntriesForDisplay([]);
       expect(result).toEqual([]);
     });
@@ -351,7 +362,7 @@ describe('memory registry', () => {
 
   describe('listEntries', () => {
     test('returns empty entries for non-existent file', async () => {
-      const { listEntries } = require('@capekai/core/hosts');
+      const { listEntries } = require('@/harnesses/shared/memory/registry');
       const result = await listEntries(testDir, 'memory');
       expect(result.success).toBe(true);
       expect(result.result.entries).toEqual([]);
@@ -360,7 +371,7 @@ describe('memory registry', () => {
     });
 
     test('returns formatted entries with usage', async () => {
-      const { listEntries } = require('@capekai/core/hosts');
+      const { listEntries } = require('@/harnesses/shared/memory/registry');
       writeMemoryFile('memory', '- First\n- Second');
       const result = await listEntries(testDir, 'memory');
       expect(result.success).toBe(true);

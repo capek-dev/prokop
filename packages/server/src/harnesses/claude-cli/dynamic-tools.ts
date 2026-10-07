@@ -5,7 +5,7 @@ import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';
 import { safeSkillDirectory,
-  type AgentSkillsDomainBridge, type MemoryDomainBridge, type SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
+  type AgentSkillsDomainBridge, type MemoryDomainBridge, type SessionSearchDomainBridge } from '@/harnesses/shared/domain-tools';
 
 /** The in-process server name; re-exported from the shared harness module. */
 export { PROKOP_MCP_SERVER } from '@/harnesses/shared/tool-viz';

@@ -257,7 +257,7 @@ export function getToolEnv(allowedEnv?: string[]): NodeJS.ProcessEnv {
   return env;
 }
 
-export function getJean2EnvValue(key: string): string | undefined {
+export function getProkopEnvValue(key: string): string | undefined {
   // Canonical resolution: the key as-is (callers pass full canonical
   // PROKOPAI_* keys), falling back to the legacy JEAN2_* twin.
   const overlay = envOverlay.get(key);
@@ -278,7 +278,7 @@ export function getJean2EnvValue(key: string): string | undefined {
   return undefined;
 }
 
-export function getAllJean2EnvKeys(): string[] {
+export function getAllProkopEnvKeys(): string[] {
   // Keys as present in the overlay; legacy keys surface with their legacy
   // prefix. Consumers categorize by prefix; tool-env handles both.
   return Array.from(envOverlay.keys());
@@ -288,7 +288,7 @@ export function wasEnvInjectedFromFile(key: string): boolean {
   return envFileInjectedKeys.has(key);
 }
 
-export function reloadJean2Env(): void {
+export function reloadProkopEnv(): void {
   for (const key of envFileInjectedKeys) {
     delete process.env[key];
   }

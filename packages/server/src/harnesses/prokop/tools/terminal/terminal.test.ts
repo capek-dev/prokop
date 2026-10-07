@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { resolve } from 'path';
-import type { PermissionAsk, ToolContext } from '@capekai/tool';
+import type { PermissionAsk, ToolContext } from '@prokopai/sdk/tool';
 import { execute, definition } from './tool';
 import { getTerminalManager, installTerminalSessionStore } from '@/transport/terminal';
 import type { TerminalSessionStorePort } from '@/application/ports/terminal';

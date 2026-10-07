@@ -1,7 +1,7 @@
 import { atomicWriteFile, readFileSafe } from './files';
 import { getEnvFilePath } from '@/infrastructure/runtime/paths';
-import { getJean2EnvValue, getAllJean2EnvKeys, reloadJean2Env } from '@/infrastructure/runtime/environment';
-import { listTools } from '@/adapters/capek/contracts';
+import { getProkopEnvValue, getAllProkopEnvKeys, reloadProkopEnv } from '@/infrastructure/runtime/environment';
+import { listTools } from '@/infrastructure/tools/registry';
 import { ENV_PRESETS, getPreset, isPresetKey } from './env-presets';
 import { ConfigurationPersistenceError, ConfigurationValidationError } from './errors';
 
@@ -44,11 +44,11 @@ export function isSensitiveEnvKey(key: string): boolean {
 
 export async function listToolEnvVars(): Promise<ToolEnvStatus> {
   const result = new Map<string, ToolEnvVarStatus>();
-  const configuredKeys = new Set(getAllJean2EnvKeys());
+  const configuredKeys = new Set(getAllProkopEnvKeys());
 
   // --- Presets ---
   for (const preset of ENV_PRESETS) {
-    const value = getJean2EnvValue(preset.key);
+    const value = getProkopEnvValue(preset.key);
     const configured = value !== undefined && value !== '';
     const status: ToolEnvVarStatus = {
       key: preset.key,
@@ -97,7 +97,7 @@ export async function listToolEnvVars(): Promise<ToolEnvStatus> {
   }
   for (const [key, usedBy] of envVarToolsMap) {
     if (result.has(key)) continue; // skip if already a preset
-    const value = getJean2EnvValue(key);
+    const value = getProkopEnvValue(key);
     const configured = value !== undefined && value !== '';
     const sensitive = isSensitiveEnvKey(key);
     const status: ToolEnvVarStatus = {
@@ -118,7 +118,7 @@ export async function listToolEnvVars(): Promise<ToolEnvStatus> {
   for (const key of configuredKeys) {
     if (excludedKeys.has(key)) continue;
     if (result.has(key)) continue;
-    const value = getJean2EnvValue(key);
+    const value = getProkopEnvValue(key);
     const configured = value !== undefined && value !== '';
     if (!configured) continue;
     const sensitive = isSensitiveEnvKey(key);
@@ -181,7 +181,7 @@ export async function setToolEnvVar(key: string, value: string): Promise<ToolEnv
     }
 
     await atomicWriteFile(getEnvFilePathForModule(), updatedLines.join('\n') + '\n');
-    reloadJean2Env();
+    reloadProkopEnv();
 
     const preset = getPreset(trimmedKey);
     const status: ToolEnvVarStatus = {
@@ -217,7 +217,7 @@ export async function clearToolEnvVar(key: string): Promise<ToolEnvVarStatus> {
   try {
     const content = await readFileSafe(getEnvFilePathForModule());
     if (!content) {
-      reloadJean2Env();
+      reloadProkopEnv();
       return {
         key: trimmedKey,
         configured: false,
@@ -244,7 +244,7 @@ export async function clearToolEnvVar(key: string): Promise<ToolEnvVarStatus> {
     });
 
     await atomicWriteFile(getEnvFilePathForModule(), updatedLines.join('\n') + '\n');
-    reloadJean2Env();
+    reloadProkopEnv();
 
     return {
       key: trimmedKey,

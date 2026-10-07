@@ -32,7 +32,7 @@ import { parseCodexContextUsage, publishCodexContextUsage } from './usage';
 import { createCodexMemoryTools } from './memory-tools';
 import { createCodexSessionSearchTools } from './session-search-tools';
 import { createCodexAgentSkillTools } from './agent-skill-tools';
-import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
+import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/harnesses/shared/domain-tools';
 import { applyRollback, clearRollbackIntent, getRollbackIntent, readRollbackHistory, readTurnIds, retargetReadyEdit, sameTurns, saveRollbackIntent, setRollbackPhase } from './rollback';
 import { forkCodexSession } from './fork';
 import { codexCliVersion } from './version';
@@ -53,9 +53,9 @@ interface CodexSessionConnection {
   preconfigId: string;
   instructions: string;
   parentNotify: ((event: CodexNotification) => void) | null;
-  parentHook: ((call: import('./hook-policy').CodexHookCall) => Promise<HookDecision>) | null;
+  parentHook: ((call: import('@/harnesses/codex-cli/hook-policy').CodexHookCall) => Promise<HookDecision>) | null;
   parentApproval: ((method: string, params: unknown) => Promise<{ decision: 'accept' | 'decline' }>) | null;
-  parentTool: ((params: unknown) => Promise<import('./mcp-tools').CodexMcpCallResult>) | null;
+  parentTool: ((params: unknown) => Promise<import('@/harnesses/codex-cli/mcp-tools').CodexMcpCallResult>) | null;
   idleTimer?: ReturnType<typeof setTimeout>;
 }
 

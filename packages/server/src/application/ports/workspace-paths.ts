@@ -1,7 +1,7 @@
 /**
  * Inward-facing workspace path policy port (S5, paired with C6 step 4).
  * The Capek workspace domain owns containment and path classification; the
- * Capek adapter (`adapters/capek/workspace-paths.ts`) fulfills this port
+ * Capek adapter (`adapters/workspace-paths.ts`) fulfills this port
  * through the compat barrel, so server consumers share one algorithm with
  * the tool runtime. Shapes are plain structural data; no filesystem I/O
  * crosses the boundary (the file services perform the I/O after the policy

@@ -4,11 +4,13 @@ import {
   DEFAULT_TOOL_OUTPUT_PAGE_CHARS,
   isToolOutputArtifactId,
   MAX_TOOL_OUTPUT_PAGE_CHARS,
-  type CreateToolOutputArtifact,
-  type ToolOutputArtifact,
-  type ToolOutputArtifactPage,
-  type ToolOutputArtifactStore,
-} from '@/adapters/capek/contracts';
+} from '@/infrastructure/storage/tool-output-artifacts';
+import type {
+  CreateToolOutputArtifact,
+  ToolOutputArtifact,
+  ToolOutputArtifactPage,
+  ToolOutputArtifactStore,
+} from '@/infrastructure/storage/contracts';
 import { getDatabase } from './database';
 
 export {
@@ -88,7 +90,7 @@ export function getToolOutputArtifactPage(
   return buildToolOutputArtifactPage(toArtifact(row), offset, limit);
 }
 
-export const jean2ToolOutputArtifactStore: ToolOutputArtifactStore = {
+export const prokopToolOutputArtifactStore: ToolOutputArtifactStore = {
   create: async input => createToolOutputArtifact(input),
   getPage: async (sessionId, artifactId, offset, limit) =>
     getToolOutputArtifactPage(sessionId, artifactId, offset, limit),

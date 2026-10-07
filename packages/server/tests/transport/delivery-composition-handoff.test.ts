@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
-import { type RuntimeDelivery, type RuntimeEvent } from '@capekai/core';
-import { jean2DeliveryBindings } from '@/adapters/capek/delivery';
-import { deliverCapekEvent } from '@/adapters/capek/events';
+import type { RuntimeDelivery, RuntimeEvent } from '@/infrastructure/runtime/events';
+import { prokopDeliveryBindings } from '@/harnesses/prokop/host/delivery';
+import { deliverCapekEvent } from '@/harnesses/prokop/host/events';
 import { createBunWebSocketAdapter } from '@/transport/websocket/bun-adapter';
 import { installDeliveryPort } from '@/transport/websocket/broadcast';
 import { unregisterConnection } from '@/transport/websocket/connection-registry';
@@ -26,7 +26,7 @@ function sessionCreatedEvent(): RuntimeEvent {
 
 describe('S2 C2 composition delivery handoff', () => {
   test('the C2 delivery binding emits through deliverCapekEvent by identity', () => {
-    expect(jean2DeliveryBindings.emit).toBe(deliverCapekEvent);
+    expect(prokopDeliveryBindings.emit).toBe(deliverCapekEvent);
   });
 
   test('deliverCapekEvent routes every host audience through the installed port', () => {
@@ -102,13 +102,13 @@ describe('S2 C2 composition delivery handoff', () => {
 
     // The composition delivery binding is what a composed run emits through.
     // S2 wires it to the production transport port at bootstrap.
-    jean2DeliveryBindings.emit({ audience: { scope: 'global' }, event: sessionCreatedEvent() });
+    prokopDeliveryBindings.emit({ audience: { scope: 'global' }, event: sessionCreatedEvent() });
 
     expect(sent).toEqual([JSON.stringify({ type: 'session.created', session: { id: 'sess-1' } })]);
   });
 
   test('S2 does not claim a live composed execution scope: the composition is a handoff representation only', () => {
-    // createJean2RuntimeComposition stays a representation that requires the
+    // createProkopRuntimeComposition stays a representation that requires the
     // full adapter installation from createRuntime(). S2 adopts only the
     // delivery handoff; production execution still runs on the current path.
     // This test pins that the handoff does not depend on composing a scope.

@@ -19,7 +19,7 @@ const applicationDir = resolve(serverSourceRoot, 'application');
 const domainsDir = resolve(serverSourceRoot, 'domains');
 const infrastructureDir = resolve(serverSourceRoot, 'infrastructure');
 const adaptersDir = resolve(serverSourceRoot, 'adapters');
-const adaptersCapekDir = resolve(adaptersDir, 'capek');
+const runtimeHostDir = resolve(serverSourceRoot, 'harnesses/prokop/host');
 const harnessesDir = resolve(serverSourceRoot, 'harnesses');
 const prokopHarnessDir = resolve(harnessesDir, 'prokop');
 const routesDir = resolve(serverSourceRoot, 'transport/http/routes');
@@ -28,7 +28,7 @@ const layerDirs = [bootstrapDir, transportDir, applicationDir, domainsDir, infra
 const infrastructureSqliteDir = resolve(infrastructureDir, 'sqlite');
 const prokopToolsDir = resolve(prokopHarnessDir, 'tools');
 
-const capekInternalPrefix = '@capekai/core/' + 'internal/';
+const capekInternalPrefix = '@prokopai/runtime/' + 'internal/';
 
 const honoMatchers: SpecifierMatcher[] = [
   { exact: 'hono' },
@@ -44,89 +44,89 @@ const compatBarrelExceptions: Record<string, string[]> = {};
 const serverWebSocketExceptions: Record<string, string[]> = {};
 
 const layerAdaptersLegacyExceptions: Record<string, string[]> = {
-  'packages/server/src/adapters/capek/context-sources.ts': [
+  'packages/server/src/harnesses/prokop/host/context-sources.ts': [
     '@/infrastructure/config/preconfig', '@/infrastructure/runtime/paths',
   ],
-  'packages/server/src/adapters/capek/events.ts': [
+  'packages/server/src/harnesses/prokop/host/events.ts': [
     '@/transport/websocket/broadcast',
   ],
-  'packages/server/src/adapters/capek/interaction.ts': [
+  'packages/server/src/harnesses/prokop/host/interaction.ts': [
     '@/infrastructure/sqlite/pending-asks', '@/infrastructure/sqlite/permissions', '@/infrastructure/sqlite/session-store', '@/infrastructure/runtime/environment',
   ],
-  'packages/server/src/adapters/capek/runtime-configuration.ts': [
+  'packages/server/src/harnesses/prokop/host/runtime-configuration.ts': [
     '@/config', '@/infrastructure/runtime/environment',
   ],
-  'packages/server/src/adapters/capek/sandbox.ts': ['@/infrastructure/sandbox'],
-  'packages/server/src/adapters/capek/storage.ts': [
+  'packages/server/src/harnesses/prokop/host/sandbox.ts': ['@/infrastructure/sandbox'],
+  'packages/server/src/harnesses/prokop/host/storage.ts': [
     '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/session-store',
     '@/infrastructure/sqlite/queued-messages', '@/infrastructure/sqlite/attachments',
     '@/infrastructure/sqlite/response-formats', '@/infrastructure/sqlite/tool-output-artifacts',
     '@/infrastructure/sqlite/workspaces',
   ],
-  'packages/server/src/adapters/capek/compaction-recovery.ts': [
+  'packages/server/src/harnesses/prokop/host/compaction-recovery.ts': [
     '@/transport/websocket/broadcast', '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/session-store',
   ],
-  'packages/server/src/adapters/capek/titles.ts': ['@/infrastructure/session-title'],
-  'packages/server/src/adapters/capek/tool-source.ts': [
+  'packages/server/src/harnesses/prokop/host/titles.ts': ['@/infrastructure/session-title'],
+  'packages/server/src/harnesses/prokop/host/tool-source.ts': [
     '@/config', '@/infrastructure/mcp', '@/infrastructure/runtime/paths',
     '@/infrastructure/runtime/env-compat',
     '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/workspaces',
   ],
-  'packages/server/src/adapters/capek/workspace.ts': [
+  'packages/server/src/harnesses/prokop/host/workspace.ts': [
     '@/infrastructure/sqlite/workspaces', '@/infrastructure/runtime/environment', '@/infrastructure/runtime/paths',
   ],
-  'packages/server/src/adapters/jean2/session-repository.ts': [
-    '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/queued-messages', '@/infrastructure/sqlite/tool-output-artifacts', '@/infrastructure/sqlite/attachments', '@/infrastructure/sqlite/pending-asks', '@/infrastructure/sqlite/workspaces', '@/adapters/capek/compaction-recovery', '@/infrastructure/session-title',
+  'packages/server/src/adapters/prokop/session-repository.ts': [
+    '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/message-store', '@/infrastructure/sqlite/queued-messages', '@/infrastructure/sqlite/tool-output-artifacts', '@/infrastructure/sqlite/attachments', '@/infrastructure/sqlite/pending-asks', '@/infrastructure/sqlite/workspaces', '@/harnesses/prokop/host/compaction-recovery', '@/infrastructure/session-title',
   ],
-  'packages/server/src/adapters/jean2/scheduled-job-repository.ts': [
+  'packages/server/src/adapters/prokop/scheduled-job-repository.ts': [
     '@/infrastructure/sqlite/scheduled-job-store',
   ],
-  'packages/server/src/adapters/jean2/scheduled-job-execution.ts': [
+  'packages/server/src/adapters/prokop/scheduled-job-execution.ts': [
     '@/config', '@/infrastructure/config/preconfig', '@/infrastructure/scheduling/scheduled-job-runner',
     '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/workspaces', '@/infrastructure/sqlite/scheduled-job-store',
   ],
-  'packages/server/src/adapters/jean2/terminal.ts': [
+  'packages/server/src/adapters/prokop/terminal.ts': [
     '@/infrastructure/sqlite/database', '@/infrastructure/sqlite/terminal-session-repository',
   ],
-  'packages/server/src/adapters/jean2/agent-workspace.ts': [
+  'packages/server/src/adapters/prokop/agent-workspace.ts': [
     '@/infrastructure/config/preconfig', '@/infrastructure/sqlite/workspaces',
   ],
-  'packages/server/src/adapters/jean2/workspace.ts': [
+  'packages/server/src/adapters/prokop/workspace.ts': [
     '@/infrastructure/sqlite/workspaces', '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/pinned-messages',
     '@/infrastructure/sqlite/scheduled-job-store', '@/transport/terminal', '@/infrastructure/mcp', '@/infrastructure/runtime/paths',
   ],
 
-  'packages/server/src/adapters/jean2/tools.ts': [
+  'packages/server/src/adapters/prokop/tools.ts': [
     '@/config/tool-env', '@/config/errors',
   ],
-  'packages/server/src/adapters/jean2/oauth.ts': [
+  'packages/server/src/adapters/prokop/oauth.ts': [
     '@/infrastructure/oauth/oauth-manager',
   ],
-  'packages/server/src/adapters/jean2/provider-credentials.ts': [
+  'packages/server/src/adapters/prokop/provider-credentials.ts': [
     '@/config/provider-credentials',
   ],
-  'packages/server/src/adapters/jean2/mcp.ts': [
+  'packages/server/src/adapters/prokop/mcp.ts': [
     '@/infrastructure/mcp/lifecycle', '@/infrastructure/sqlite/workspaces',
   ],
-  'packages/server/src/adapters/jean2/files.ts': [
+  'packages/server/src/adapters/prokop/files.ts': [
     '@/infrastructure/sqlite/workspaces', '@/infrastructure/filesystem/workspace-files',
     '@/infrastructure/filesystem/file-preview',
     '@/infrastructure/filesystem/file-mutations',
     '@/infrastructure/filesystem/file-tree',
     '@/infrastructure/filesystem/git-status',
   ],
-  'packages/server/src/adapters/jean2/notifications.ts': [
+  'packages/server/src/adapters/prokop/notifications.ts': [
     '@/infrastructure/sqlite/notification-repository', '@/infrastructure/web-push/sender',
     '@/infrastructure/sqlite/session-store', '@/infrastructure/sqlite/scheduled-job-store', '@/infrastructure/sqlite/pending-asks', '@/infrastructure/runtime/environment',
     '@/transport/websocket/control-registry',
   ],
-  'packages/server/src/adapters/jean2/permissions.ts': ['@/infrastructure/sqlite/permissions'],
-  'packages/server/src/adapters/jean2/configuration.ts': [
+  'packages/server/src/adapters/prokop/permissions.ts': ['@/infrastructure/sqlite/permissions'],
+  'packages/server/src/adapters/prokop/configuration.ts': [
     '@/config/models', '@/config/models-sync', '@/config/prompts',
     '@/config/preconfigs', '@/config/prompts-registry',
   ],
-  'packages/server/src/adapters/jean2/maintenance.ts': ['@/infrastructure/sqlite/cleanup'],
-  'packages/server/src/adapters/jean2/response-formats.ts': ['@/infrastructure/sqlite/response-formats'],
+  'packages/server/src/adapters/prokop/maintenance.ts': ['@/infrastructure/sqlite/cleanup'],
+  'packages/server/src/adapters/prokop/response-formats.ts': ['@/infrastructure/sqlite/response-formats'],
 };
 
 const sqliteExceptions: Record<string, string[]> = {};
@@ -186,7 +186,7 @@ const layerHttpRoutesLegacyExceptions: Record<string, string[]> = {};
 // here until the route is migrated onto a sandbox application port.
 const layerHttpRoutesSandboxExceptions: Record<string, string[]> = {
   'packages/server/src/transport/http/routes/sandbox.ts': [
-    '@/adapters/capek/contracts', '@/infrastructure/sandbox',
+    '@/infrastructure/sandbox/controller', '@/infrastructure/sandbox/types', '@/infrastructure/sandbox',
   ],
 };
 
@@ -203,7 +203,7 @@ const layerInfrastructureExceptions: Record<string, string[]> = {
   'packages/server/src/infrastructure/sqlite/session-repository.ts': ['@/config'],
   'packages/server/src/infrastructure/mcp/manager.ts': ['@/version'],
   'packages/server/src/infrastructure/daemon/index.ts': ['@/config'],
-  'packages/server/src/infrastructure/session-title.ts': ['@/config', '@/adapters/capek/contracts'],
+  'packages/server/src/infrastructure/session-title.ts': ['@/config'],
   'packages/server/src/infrastructure/providers/provider-credential-files.ts': [
     '@/config/errors', '@/config/files',
   ],
@@ -211,16 +211,16 @@ const layerInfrastructureExceptions: Record<string, string[]> = {
     '@/transport/websocket/broadcast',
   ],
   'packages/server/src/infrastructure/web-push/retry-scheduler.ts': [
-    '@/adapters/jean2/notifications',
+    '@/adapters/prokop/notifications',
   ],
 };
 
 const globalBaselineRules: DependencyRule[] = [
   {
     name: 'no-direct-compat-barrel',
-    rationale: 'No server file may import @capekai/core/compat/jean2. S8 retired the barrel and this rule prevents reintroduction.',
+    rationale: 'No server file may import @prokopai/runtime/compat/jean2. S8 retired the barrel and this rule prevents reintroduction.',
     appliesTo: [serverSourceRoot],
-    forbiddenSpecifiers: [{ exact: '@capekai/core/compat/jean2' }],
+    forbiddenSpecifiers: [{ exact: '@prokopai/runtime/compat/jean2' }],
     exceptions: compatBarrelExceptions,
   },
   {
@@ -241,7 +241,7 @@ const globalBaselineRules: DependencyRule[] = [
   },
   {
     name: 'no-direct-ai-sdk',
-    rationale: 'Model construction and invocation belong to Capek. Server AI SDK imports are forbidden.',
+    rationale: 'AI SDK imports belong to the Prokop engine and the named shared model/tool implementations.',
     appliesTo: [serverSourceRoot],
     forbiddenSpecifiers: [
       { exact: 'ai' },
@@ -250,6 +250,7 @@ const globalBaselineRules: DependencyRule[] = [
       { exact: 'vercel-minimax-ai-provider' },
       { exact: 'zhipu-ai-provider' },
     ],
+    allowedInDirs: [prokopHarnessDir, resolve(infrastructureDir, 'providers'), resolve(infrastructureDir, 'sandbox'), resolve(infrastructureDir, 'tools'), resolve(harnessesDir, 'shared/skills/skill-tool.ts')],
     exceptions: aiSdkExceptions,
   },
   {
@@ -261,7 +262,7 @@ const globalBaselineRules: DependencyRule[] = [
   },
   {
     name: 'no-direct-capek-internals',
-    rationale: 'Public Capek subpaths are the contract; internal paths are not resolvable outside packages/capek.',
+    rationale: 'Public runtime subpaths are the contract; retired internal paths must not be reintroduced.',
     appliesTo: [serverSourceRoot, serverTestsRoot],
     forbiddenSpecifiers: [{ prefix: capekInternalPrefix }],
     exceptions: {},
@@ -285,11 +286,12 @@ const layerRules: DependencyRule[] = [
       { exact: 'bun:sqlite' },
       { exact: 'ai' },
       { prefix: '@ai-sdk/' },
-      { prefix: '@capekai/core' },
+      { prefix: '@prokopai/runtime' },
     ],
-    allowedResolvedDirs: [transportDir, applicationDir, adaptersCapekDir],
+    allowedResolvedDirs: [transportDir, applicationDir, runtimeHostDir],
     exceptions: {
       ...layerTransportLegacyExceptions,
+      'packages/server/src/transport/websocket/handlers/misc.ts': ['@/infrastructure/sandbox/controller', '@/infrastructure/sandbox/types', '@/harnesses/prokop/permission/ask-user-api'],
       ...layerTransportRenameCompatExceptions,
       ...layerTransportAppExceptions,
     },
@@ -313,7 +315,7 @@ const layerRules: DependencyRule[] = [
       ...honoMatchers,
       { exact: 'bun' },
       { exact: 'bun:sqlite' },
-      { prefix: '@capekai/core' },
+      { prefix: '@prokopai/runtime' },
     ],
     allowedResolvedDirs: [domainsDir],
   },
@@ -321,22 +323,19 @@ const layerRules: DependencyRule[] = [
     name: 'layer-infrastructure',
     rationale: 'Infrastructure implements ports. It may import domains and application ports but not transport route handlers. The built-in tools catalog is a server-internal asset leaf (installer collision guard).',
     appliesTo: [infrastructureDir],
-    allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir, adaptersCapekDir],
+    allowedResolvedDirs: [infrastructureDir, domainsDir, applicationDir, runtimeHostDir],
     exceptions: layerInfrastructureExceptions,
   },
   {
     name: 'layer-adapters',
     rationale: 'Adapters translate Capek contracts and Jean2 ports. Transport-owned implementation exceptions are explicit and documented; the built-in tools catalog is a server-internal asset leaf (resolver and catalog seam).',
-    appliesTo: [adaptersDir],
-    allowedResolvedDirs: [adaptersDir, applicationDir, domainsDir],
+    appliesTo: [adaptersDir, runtimeHostDir],
+    allowedResolvedDirs: [adaptersDir, prokopHarnessDir, applicationDir, domainsDir,
+      resolve(harnessesDir, 'shared'), resolve(infrastructureDir, 'providers'),
+      resolve(infrastructureDir, 'storage'), resolve(infrastructureDir, 'tools'),
+      resolve(infrastructureDir, 'runtime/host'), resolve(infrastructureDir, 'runtime/events'),
+      resolve(infrastructureDir, 'filesystem/workspace-policy')],
     exceptions: layerAdaptersLegacyExceptions,
-  },
-  {
-    name: 'layer-adapters-capek-only',
-    rationale: 'Only the Capek adapter directory and the Prokop harness (its composed runtime) translate Capek contracts. SDK, client-event, and non-Prokop harness files must not import @capekai/core.',
-    appliesTo: [adaptersDir, harnessesDir],
-    forbiddenSpecifiers: [{ prefix: '@capekai/core' }],
-    allowedInDirs: [adaptersCapekDir, prokopHarnessDir],
   },
   {
     name: 'layer-http-routes',
@@ -346,7 +345,7 @@ const layerRules: DependencyRule[] = [
       { exact: 'bun:sqlite' },
       { exact: 'ai' },
       { prefix: '@ai-sdk/' },
-      { prefix: '@capekai/core' },
+      { prefix: '@prokopai/runtime' },
     ],
     allowedResolvedDirs: [routesDir, transportDir, applicationDir, utilsDir],
     exceptions: {
@@ -424,7 +423,7 @@ describe('server layer boundaries', () => {
           "import { authFromContext } from '../../../application/sessions/auth';",
           "import { getSessionStore } from '../../../store/sessions';",
           "import { streamText } from 'ai';",
-          "import { jean2Thing } from '@capekai/core/compat/jean2';",
+          "import { jean2Thing } from '@prokopai/runtime/compat/jean2';",
           "import { Database } from 'bun:sqlite';",
         ].join('\n'),
       },
@@ -435,7 +434,7 @@ describe('server layer boundaries', () => {
     expect(result.violations).toEqual([
       'packages/server/src/transport/http/routes/sessions.ts imports ../../../store/sessions (value) [rule: layer-http-routes]',
       'packages/server/src/transport/http/routes/sessions.ts imports ai (value) [rule: layer-http-routes]',
-      'packages/server/src/transport/http/routes/sessions.ts imports @capekai/core/compat/jean2 (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/sessions.ts imports @prokopai/runtime/compat/jean2 (value) [rule: layer-http-routes]',
       'packages/server/src/transport/http/routes/sessions.ts imports bun:sqlite (value) [rule: layer-http-routes]',
     ]);
   });
@@ -473,7 +472,7 @@ describe('server layer boundaries', () => {
           "import { Context } from 'hono';",
           "import type { ServerWebSocket } from 'bun';",
           "import { Database } from 'bun:sqlite';",
-          "import { createAgent } from '@capekai/core';",
+          "import { createAgent } from '@prokopai/runtime';",
           "import './participants';",
         ].join('\n'),
       },
@@ -485,7 +484,7 @@ describe('server layer boundaries', () => {
       'packages/server/src/domains/sessions/policy.ts imports hono (value) [rule: layer-domains]',
       'packages/server/src/domains/sessions/policy.ts imports bun (type) [rule: layer-domains]',
       'packages/server/src/domains/sessions/policy.ts imports bun:sqlite (value) [rule: layer-domains]',
-      'packages/server/src/domains/sessions/policy.ts imports @capekai/core (value) [rule: layer-domains]',
+      'packages/server/src/domains/sessions/policy.ts imports @prokopai/runtime (value) [rule: layer-domains]',
     ]);
   });
 
@@ -513,13 +512,13 @@ describe('server layer boundaries', () => {
   test('adapters layer flags transport imports and allows Capek contracts', () => {
     const files: ScannedFile[] = [
       {
-        path: resolve(adaptersDir, 'capek/storage.ts'),
+        path: resolve(runtimeHostDir, 'storage.ts'),
         sourceText: [
-          "import { transportThing } from '../../transport/ws/registry';",
-          "import { createAgent } from '@capekai/core';",
+          "import { transportThing } from '../../../transport/ws/registry';",
+          "import { createAgent } from '@prokopai/runtime';",
           "import './profile';",
-          "import '../../application/ports';",
-          "import '../../domains/ports';",
+          "import '../../../application/ports';",
+          "import '../../../domains/ports';",
         ].join('\n'),
       },
     ];
@@ -527,7 +526,7 @@ describe('server layer boundaries', () => {
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
 
     expect(result.violations).toEqual([
-      'packages/server/src/adapters/capek/storage.ts imports ../../transport/ws/registry (value) [rule: layer-adapters]',
+      'packages/server/src/harnesses/prokop/host/storage.ts imports ../../../transport/ws/registry (value) [rule: layer-adapters]',
     ]);
   });
 
@@ -556,11 +555,11 @@ describe('server layer boundaries', () => {
     const files: ScannedFile[] = [
       {
         path: resolve(serverSourceRoot, 'providers/codex.ts'),
-        sourceText: "import { x } from '@capekai/core/compat/jean2';\n",
+        sourceText: "import { x } from '@prokopai/runtime/compat/jean2';\n",
       },
       {
         path: resolve(routesDir, 'notifications.ts'),
-        sourceText: "import { y } from '@capekai/core/compat/jean2';\n",
+        sourceText: "import { y } from '@prokopai/runtime/compat/jean2';\n",
       },
     ];
 
@@ -570,8 +569,8 @@ describe('server layer boundaries', () => {
 
     // S8 emptied the exception map, so every barrel consumer is flagged.
     expect(result.violations).toEqual([
-      'packages/server/src/providers/codex.ts imports @capekai/core/compat/jean2 (value) [rule: no-direct-compat-barrel]',
-      'packages/server/src/transport/http/routes/notifications.ts imports @capekai/core/compat/jean2 (value) [rule: no-direct-compat-barrel]',
+      'packages/server/src/providers/codex.ts imports @prokopai/runtime/compat/jean2 (value) [rule: no-direct-compat-barrel]',
+      'packages/server/src/transport/http/routes/notifications.ts imports @prokopai/runtime/compat/jean2 (value) [rule: no-direct-compat-barrel]',
     ]);
     expect(compatBarrelExceptions).toEqual({});
   });
@@ -591,39 +590,6 @@ describe('server layer boundaries', () => {
 
     expect(result.violations).toEqual([
       'packages/server/src/transport/http/routes/sessions.ts imports @/store/sessions (value) [rule: layer-http-routes]',
-    ]);
-  });
-
-  test('only adapters/capek and the Prokop harness may import @capekai/core', () => {
-    const files: ScannedFile[] = [
-      {
-        path: resolve(adaptersCapekDir, 'storage.ts'),
-        sourceText: "import { createAgent } from '@capekai/core';\n",
-      },
-      {
-        path: resolve(prokopHarnessDir, 'composition/profile.ts'),
-        sourceText: "import { createAgent } from '@capekai/core';\n",
-      },
-      {
-        path: resolve(harnessesDir, 'codex-cli/execution.ts'),
-        sourceText: "import { createAgent } from '@capekai/core';\n",
-      },
-      {
-        path: resolve(adaptersDir, 'sdk/events.ts'),
-        sourceText: "import { createAgent } from '@capekai/core';\n",
-      },
-      {
-        path: resolve(adaptersDir, 'client-events/presenter.ts'),
-        sourceText: "import { x } from '@capekai/core/storage';\n",
-      },
-    ];
-
-    const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
-
-    expect(result.violations).toEqual([
-      'packages/server/src/harnesses/codex-cli/execution.ts imports @capekai/core (value) [rule: layer-adapters-capek-only]',
-      'packages/server/src/adapters/sdk/events.ts imports @capekai/core (value) [rule: layer-adapters-capek-only]',
-      'packages/server/src/adapters/client-events/presenter.ts imports @capekai/core/storage (value) [rule: layer-adapters-capek-only]',
     ]);
   });
 
@@ -729,7 +695,7 @@ describe('server layer boundaries', () => {
       if (imp.specifier === '@/store' || imp.specifier.startsWith('@/store/')) {
         offenders.push(`${repoFile} imports ${imp.specifier}`);
       }
-      if (imp.specifier.startsWith('@capekai/core')) {
+      if (imp.specifier.startsWith('@prokopai/runtime')) {
         offenders.push(`${repoFile} imports ${imp.specifier}`);
       }
     }
@@ -757,11 +723,11 @@ describe('server layer boundaries', () => {
   });
 
   test('S9 gate: Jean2 permission adapter is the only store-backed permission seam', () => {
-    const adapterPath = resolve(adaptersDir, 'jean2/permissions.ts');
+    const adapterPath = resolve(adaptersDir, 'prokop/permissions.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
     expect(Object.keys(layerAdaptersLegacyExceptions)).toContain(
-      'packages/server/src/adapters/jean2/permissions.ts',
+      'packages/server/src/adapters/prokop/permissions.ts',
     );
     expect(parseImports(file!.sourceText, file!.path).map((imp) => imp.specifier).sort()).toEqual([
       '@/application/ports/permissions',
@@ -771,16 +737,16 @@ describe('server layer boundaries', () => {
 
   test('S5 gate: the capek session-search adapter imports only capek contracts and application ports', () => {
     expect(Object.keys(layerAdaptersLegacyExceptions)).not.toContain(
-      'packages/server/src/adapters/capek/session-search.ts',
+      'packages/server/src/harnesses/prokop/host/session-search.ts',
     );
 
-    const adapterPath = resolve(adaptersCapekDir, 'session-search.ts');
+    const adapterPath = resolve(runtimeHostDir, 'session-search.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
     const imports = parseImports(file!.sourceText, file!.path);
 
     const allowedSpecifiers = [
-      '@capekai/core/hosts',
+      '@/harnesses/shared/session-search/host',
       '@prokopai/sdk',
       '@/application/ports/session-search',
     ];
@@ -797,9 +763,9 @@ describe('server layer boundaries', () => {
   test('S5 gate: the capek session-search adapter flags store and infrastructure imports', () => {
     const files: ScannedFile[] = [
       {
-        path: resolve(adaptersCapekDir, 'session-search.ts'),
+        path: resolve(runtimeHostDir, 'session-search.ts'),
         sourceText: [
-          "import { configureSessionSearchHost } from '@capekai/core/compat/jean2';",
+          "import { configureSessionSearchHost } from '@prokopai/runtime/compat/jean2';",
           "import { getDatabase } from '@/store';",
           "import { searchMessages } from '@/infrastructure/sqlite/session-search-query-repository';",
         ].join('\n'),
@@ -809,8 +775,8 @@ describe('server layer boundaries', () => {
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
 
     expect(result.violations).toEqual([
-      'packages/server/src/adapters/capek/session-search.ts imports @/store (value) [rule: layer-adapters]',
-      'packages/server/src/adapters/capek/session-search.ts imports @/infrastructure/sqlite/session-search-query-repository (value) [rule: layer-adapters]',
+      'packages/server/src/harnesses/prokop/host/session-search.ts imports @/store (value) [rule: layer-adapters]',
+      'packages/server/src/harnesses/prokop/host/session-search.ts imports @/infrastructure/sqlite/session-search-query-repository (value) [rule: layer-adapters]',
     ]);
   });
 
@@ -834,7 +800,7 @@ describe('server layer boundaries', () => {
     ];
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
 
-    const forbiddenPrefixes = ['@/store', '@/scheduler', '@capekai/core', '@/infrastructure', 'bun:sqlite'];
+    const forbiddenPrefixes = ['@/store', '@/scheduler', '@prokopai/runtime', '@/infrastructure', 'bun:sqlite'];
     for (const imp of imports) {
       for (const prefix of forbiddenPrefixes) {
         expect(imp.specifier.startsWith(prefix)).toBe(false);
@@ -862,16 +828,16 @@ describe('server layer boundaries', () => {
 
   test('S4/S5 gate: the capek scheduler adapter imports only capek contracts and application ports', () => {
     expect(Object.keys(layerAdaptersLegacyExceptions)).not.toContain(
-      'packages/server/src/adapters/capek/scheduler.ts',
+      'packages/server/src/harnesses/prokop/host/scheduler.ts',
     );
 
-    const adapterPath = resolve(adaptersCapekDir, 'scheduler.ts');
+    const adapterPath = resolve(runtimeHostDir, 'scheduler.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
     const imports = parseImports(file!.sourceText, file!.path);
 
     const allowedSpecifiers = [
-      '@capekai/core/hosts',
+      '@prokopai/runtime/host',
       '@/application/ports/scheduling',
     ];
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
@@ -887,9 +853,9 @@ describe('server layer boundaries', () => {
   test('S4/S5 gate: the capek scheduler adapter flags store and infrastructure imports', () => {
     const files: ScannedFile[] = [
       {
-        path: resolve(adaptersCapekDir, 'scheduler.ts'),
+        path: resolve(runtimeHostDir, 'scheduler.ts'),
         sourceText: [
-          "import { configureSchedulerHost } from '@capekai/core/compat/jean2';",
+          "import { configureSchedulerHost } from '@prokopai/runtime/compat/jean2';",
           "import { getScheduledJob } from '@/store/scheduled-jobs';",
           "import { runScheduledJob } from '@/scheduler/runner';",
         ].join('\n'),
@@ -898,8 +864,8 @@ describe('server layer boundaries', () => {
 
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
     expect(result.violations).toEqual([
-      'packages/server/src/adapters/capek/scheduler.ts imports @/store/scheduled-jobs (value) [rule: layer-adapters]',
-      'packages/server/src/adapters/capek/scheduler.ts imports @/scheduler/runner (value) [rule: layer-adapters]',
+      'packages/server/src/harnesses/prokop/host/scheduler.ts imports @/store/scheduled-jobs (value) [rule: layer-adapters]',
+      'packages/server/src/harnesses/prokop/host/scheduler.ts imports @/scheduler/runner (value) [rule: layer-adapters]',
     ]);
   });
 
@@ -935,23 +901,23 @@ describe('server layer boundaries', () => {
   });
 
   test('S9 gate: the capek compaction-recovery adapter wires domain recovery to owned storage and broadcasts', () => {
-    const adapterPath = resolve(adaptersCapekDir, 'compaction-recovery.ts');
+    const adapterPath = resolve(runtimeHostDir, 'compaction-recovery.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect([...new Set(imports.map((imp) => imp.specifier))].sort()).toEqual([
-      '@capekai/core/execution',
+      '@/harnesses/prokop/compaction/recovery', '@/infrastructure/runtime/events',
       '@/application/ports/session',
-      '@/adapters/capek/events',
+      '@/harnesses/prokop/host/events',
       '@/transport/websocket/broadcast',
       '@/infrastructure/sqlite/message-store',
       '@/infrastructure/sqlite/session-store',
     ].sort());
 
     const sourceText = file!.sourceText;
-    expect(sourceText).toContain('reconcileSessionCompactionWithDeps');
-    expect(sourceText).toContain('reconcileAllSessionsCompactionWithDeps');
+    expect(sourceText).toContain('return reconcileSessionWithDeps(');
+    expect(sourceText).toContain('return reconcileAllSessionsWithDeps(');
     expect(sourceText).toContain('reconcileSessionWithDeps');
     expect(sourceText).toContain('reconcileAllSessionsWithDeps');
     expect(sourceText).toContain('export interface ReconcileOptions');
@@ -973,7 +939,7 @@ describe('server layer boundaries', () => {
     // The scheduled-run eligibility policy is shared with the scheduling
     // domain through the Jean2 notification adapter; the compat dispatch
     // module forwards to the adapter-built application.
-    const adapterPath = resolve(adaptersDir, 'jean2/notifications.ts');
+    const adapterPath = resolve(adaptersDir, 'prokop/notifications.ts');
     const adapterFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(adapterFile).toBeDefined();
 
@@ -1043,7 +1009,7 @@ describe('server layer boundaries', () => {
   });
 
   test('S4 gate: the jean2 agent adapter imports only the preconfig and workspace store implementations', () => {
-    const adapterPath = resolve(adaptersDir, 'jean2/agent-workspace.ts');
+    const adapterPath = resolve(adaptersDir, 'prokop/agent-workspace.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
 
@@ -1205,7 +1171,7 @@ describe('server layer boundaries', () => {
     expect(file).toBeDefined();
 
     expect(parseImports(file!.sourceText, file!.path).map((imp) => imp.specifier).sort()).toEqual([
-      '@/adapters/capek/contracts',
+      '@/infrastructure/storage/contracts', '@/infrastructure/storage/tool-output-artifacts',
       './database',
       'node:crypto',
     ].sort());
@@ -1349,13 +1315,13 @@ describe('server layer boundaries', () => {
   });
 
   test('S4 gate: the jean2 workspace adapter imports only the store, terminal, mcp, paths, and policy implementations', () => {
-    const adapterPath = resolve(adaptersDir, 'jean2/workspace.ts');
+    const adapterPath = resolve(adaptersDir, 'prokop/workspace.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@/adapters/capek/workspace-paths',
+      '@/adapters/workspace-paths',
       '@/application/ports/workspace',
       '@/infrastructure/mcp',
       '@/infrastructure/runtime/paths',
@@ -1398,14 +1364,14 @@ describe('server layer boundaries', () => {
   });
 
   test('S5 gate: file mutations consume the Capek workspace policy through the adapter port', () => {
-    const mutationsPath = resolve(serverSourceRoot, 'adapters/jean2/files.ts');
+    const mutationsPath = resolve(serverSourceRoot, 'adapters/prokop/files.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === mutationsPath);
     expect(file).toBeDefined();
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(
       imports.some((imp) =>
-        imp.specifier === '@/adapters/capek/workspace-paths'
+        imp.specifier === '@/adapters/workspace-paths'
         && imp.names.includes('workspacePathPolicyPort')
       ),
     ).toBe(true);
@@ -1425,7 +1391,7 @@ describe('server layer boundaries', () => {
   });
 
   test('S5 gate: file preview containment resolves through the Capek workspace policy', () => {
-    const previewPath = resolve(serverSourceRoot, 'adapters/jean2/files.ts');
+    const previewPath = resolve(serverSourceRoot, 'adapters/prokop/files.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === previewPath);
     expect(file).toBeDefined();
 
@@ -1492,13 +1458,13 @@ describe('server layer boundaries', () => {
   });
 
   test('S5 gate: the jean2 files adapter imports only the store, the workspace path policy, and the filesystem infrastructure', () => {
-    const adapterPath = resolve(adaptersDir, 'jean2/files.ts');
+    const adapterPath = resolve(adaptersDir, 'prokop/files.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@/adapters/capek/workspace-paths',
+      '@/adapters/workspace-paths',
       '@/application/ports/files',
       '@/infrastructure/filesystem/file-mutations',
       '@/infrastructure/filesystem/file-preview',
@@ -1646,7 +1612,7 @@ describe('server layer boundaries', () => {
     ];
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([...allowedSpecifiers].sort());
 
-    const forbiddenPrefixes = ['@/store', '@/config', '@capekai/core', '@/tools'];
+    const forbiddenPrefixes = ['@/store', '@/config', '@prokopai/runtime', '@/tools'];
     for (const imp of imports) {
       for (const prefix of forbiddenPrefixes) {
         expect(imp.specifier.startsWith(prefix)).toBe(false);
@@ -1659,7 +1625,7 @@ describe('server layer boundaries', () => {
       {
         path: resolve(routesDir, 'tools.ts'),
         sourceText: [
-          "import { listTools } from '@capekai/core/compat/jean2';",
+          "import { listTools } from '@prokopai/runtime/compat/jean2';",
           "import * as toolEnv from '@/config/tool-env';",
         ].join('\n'),
       },
@@ -1667,7 +1633,7 @@ describe('server layer boundaries', () => {
 
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
     expect(result.violations).toEqual([
-      'packages/server/src/transport/http/routes/tools.ts imports @capekai/core/compat/jean2 (value) [rule: layer-http-routes]',
+      'packages/server/src/transport/http/routes/tools.ts imports @prokopai/runtime/compat/jean2 (value) [rule: layer-http-routes]',
       'packages/server/src/transport/http/routes/tools.ts imports @/config/tool-env (value) [rule: layer-http-routes]',
     ]);
   });
@@ -1720,7 +1686,7 @@ describe('server layer boundaries', () => {
 
 
   test('S5 gate: the jean2 mcp adapter imports only the mcp implementation and the workspace store', () => {
-    const adapterPath = resolve(adaptersDir, 'jean2/mcp.ts');
+    const adapterPath = resolve(adaptersDir, 'prokop/mcp.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
 
@@ -1733,7 +1699,7 @@ describe('server layer boundaries', () => {
   });
 
   test('S9 gate: the Jean2 configuration adapter is the concrete configuration seam', () => {
-    const adapterPath = resolve(adaptersDir, 'jean2/configuration.ts');
+    const adapterPath = resolve(adaptersDir, 'prokop/configuration.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
     expect(parseImports(file!.sourceText, file!.path).map((imp) => imp.specifier).sort()).toEqual([
@@ -1747,12 +1713,12 @@ describe('server layer boundaries', () => {
   });
 
   test('S4 gate: the Jean2 tool adapter imports only the catalog, environment, and Capek seams', () => {
-    const toolsPath = resolve(adaptersDir, 'jean2/tools.ts');
+    const toolsPath = resolve(adaptersDir, 'prokop/tools.ts');
     const toolsFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === toolsPath);
     expect(toolsFile).toBeDefined();
     const toolsImports = parseImports(toolsFile!.sourceText, toolsFile!.path);
     expect(toolsImports.map((imp) => imp.specifier).sort()).toEqual([
-      '@/adapters/capek/tool-source',
+      '@/harnesses/prokop/host/tool-source',
       '@/application/ports/tool-catalog',
       '@/config/errors',
       '@/config/tool-env',
@@ -1764,14 +1730,14 @@ describe('server layer boundaries', () => {
     const runner = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === runnerPath);
     expect(runner).toBeDefined();
     expect(parseImports(runner!.sourceText, runner!.path).map((imp) => imp.specifier).sort()).toEqual([
-      '@/adapters/capek/contracts',
+      '@/infrastructure/providers/model-selection',
       '@/application/ports/headless-execution',
       '@/application/ports/scheduling',
       '@prokopai/sdk',
       'crypto',
     ].sort());
 
-    const adapterPath = resolve(adaptersDir, 'jean2/scheduled-job-execution.ts');
+    const adapterPath = resolve(adaptersDir, 'prokop/scheduled-job-execution.ts');
     const adapter = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(adapter).toBeDefined();
     expect(parseImports(adapter!.sourceText, adapter!.path).map((imp) => imp.specifier).sort()).toEqual([
@@ -1792,7 +1758,7 @@ describe('server layer boundaries', () => {
     const execution = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === executionPath);
     expect(execution).toBeDefined();
     expect(parseImports(execution!.sourceText, execution!.path).map((imp) => imp.specifier)).toContain('@/harnesses/prokop/composition/execution-scope');
-    expect(execution!.sourceText).toContain('withJean2ExecutionScope');
+    expect(execution!.sourceText).toContain('withProkopExecutionScope');
 
     const scopePath = resolve(prokopHarnessDir, 'composition/execution-scope.ts');
     const scope = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === scopePath);
@@ -1844,9 +1810,16 @@ describe('server layer boundaries', () => {
     const offenders: string[] = [];
     for (const file of scanDirectory(serverSourceRoot)) {
       const relativePath = relative(serverSourceRoot, file.path);
+      // Existing host adapters retain these named runtime-binding edges after relocation.
+      const hostEdges: Record<string, string[]> = {
+        'adapters/prokop/tools.ts': ['@/harnesses/prokop/host/tool-source'],
+        'adapters/prokop/session-repository.ts': ['@/harnesses/prokop/host/compaction-recovery'],
+        'index.ts': ['@/harnesses/prokop/host/compaction-recovery'],
+        'transport/websocket/handlers/misc.ts': ['@/harnesses/prokop/permission/ask-user-api'],
+      };
       if (relativePath.startsWith(`harnesses${sep}`) || relativePath.startsWith(`bootstrap${sep}`)) continue;
       for (const imp of parseImports(file.sourceText, file.path)) {
-        if (imp.specifier.startsWith('@/harnesses/')) {
+        if (imp.specifier.startsWith('@/harnesses/') && !hostEdges[relativePath]?.includes(imp.specifier)) {
           offenders.push(`${relativePath} imports ${imp.specifier} [rule: layer-harnesses-isolation]`);
         }
       }
@@ -2028,7 +2001,7 @@ describe('server layer boundaries', () => {
     for (const imp of imports) {
       expect(imp.specifier).not.toBe('@/config/provider-credentials');
       expect(imp.specifier).not.toBe('@/infrastructure/oauth/oauth-manager');
-      expect(imp.specifier).not.toBe('@capekai/core/compat/jean2');
+      expect(imp.specifier).not.toBe('@prokopai/runtime/compat/jean2');
     }
     // The retired exception entries are pinned.
     expect(Object.keys(layerHttpRoutesLegacyExceptions)).not.toContain(
@@ -2069,30 +2042,30 @@ describe('server layer boundaries', () => {
     const files: ScannedFile[] = [
       {
         path: resolve(transportDir, 'websocket/handlers/providers.ts'),
-        sourceText: "import { connectProvider } from '@capekai/core/compat/jean2';\n",
+        sourceText: "import { connectProvider } from '@prokopai/runtime/compat/jean2';\n",
       },
     ];
 
     const result = evaluateRules(files, serverSourceRoot, repositoryRoot, layerRules);
     expect(result.violations).toEqual([
-      'packages/server/src/transport/websocket/handlers/providers.ts imports @capekai/core/compat/jean2 (value) [rule: layer-transport]',
+      'packages/server/src/transport/websocket/handlers/providers.ts imports @prokopai/runtime/compat/jean2 (value) [rule: layer-transport]',
     ]);
   });
 
   test('S4 gate: the capek provider-accounts adapter imports only the compat registry entrypoints', () => {
-    const adapterPath = resolve(adaptersCapekDir, 'provider-accounts.ts');
+    const adapterPath = resolve(adaptersDir, 'providers/runtime-registry.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@capekai/core/providers',
+      '@/infrastructure/providers/registry',
       '@/application/ports/provider-accounts',
     ].sort());
   });
 
   test('S4 gate: the jean2 oauth and credential adapters import only the wrapped implementations', () => {
-    const oauthPath = resolve(adaptersDir, 'jean2/oauth.ts');
+    const oauthPath = resolve(adaptersDir, 'prokop/oauth.ts');
     const oauthFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === oauthPath);
     expect(oauthFile).toBeDefined();
     const oauthImports = parseImports(oauthFile!.sourceText, oauthFile!.path);
@@ -2101,7 +2074,7 @@ describe('server layer boundaries', () => {
       '@/infrastructure/oauth/oauth-manager',
     ].sort());
 
-    const credentialPath = resolve(adaptersDir, 'jean2/provider-credentials.ts');
+    const credentialPath = resolve(adaptersDir, 'prokop/provider-credentials.ts');
     const credentialFile = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === credentialPath);
     expect(credentialFile).toBeDefined();
     const credentialImports = parseImports(credentialFile!.sourceText, credentialFile!.path);
@@ -2163,7 +2136,7 @@ describe('server layer boundaries', () => {
       const path = relative(harnessesDir, file.path);
       const specifiers = parseImports(file.sourceText, file.path).map(imp => imp.specifier);
       if (path.startsWith('codex-cli/') || path.startsWith('claude-cli/')) {
-        expect(specifiers.some(specifier => specifier.startsWith('@capekai/core'))).toBe(false);
+        expect(specifiers.some(specifier => specifier.startsWith('@prokopai/runtime'))).toBe(false);
         expect(specifiers.some(specifier => specifier.startsWith('@/infrastructure/providers/'))).toBe(false);
       }
       if (path.startsWith('prokop/')) {
@@ -2290,7 +2263,7 @@ describe('server layer boundaries', () => {
   });
 
   test('S4 gate: the jean2 notifications adapter imports only the store, web-push, and scheduling-domain implementations', () => {
-    const adapterPath = resolve(adaptersDir, 'jean2/notifications.ts');
+    const adapterPath = resolve(adaptersDir, 'prokop/notifications.ts');
     const file = scanDirectory(serverSourceRoot).find((candidate) => candidate.path === adapterPath);
     expect(file).toBeDefined();
 
@@ -2345,7 +2318,7 @@ describe('server layer boundaries', () => {
 
     const imports = parseImports(file!.sourceText, file!.path);
     expect(imports.map((imp) => imp.specifier).sort()).toEqual([
-      '@/adapters/jean2/notifications',
+      '@/adapters/prokop/notifications',
       '@/domains/notifications',
     ].sort());
   });

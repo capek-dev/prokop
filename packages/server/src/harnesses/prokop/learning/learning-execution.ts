@@ -1,6 +1,6 @@
 import { createLearningHomeTool } from './learning-home';
 import type { Database } from 'bun:sqlite';
-import { listDomainToolFallbackDefinitions } from '@capekai/core/tools';
+import { listDomainToolFallbackDefinitions } from '@/infrastructure/tools/domain-tool-source';
 import type { Workspace } from '@prokopai/sdk';
 import { createKnowledgeJournal } from '@/application/learning/knowledge-journal';
 import { createKnowledgeStagingMutator } from '@/application/learning/knowledge-staging';

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { createFilesApplication } from '@/application/files';
-import { createJean2FilesApplicationPort } from '@/adapters/jean2/files';
+import { createProkopFilesApplicationPort } from '@/adapters/prokop/files';
 import {
   ConflictError,
   ForbiddenError,
@@ -38,7 +38,7 @@ describe('file tree listing and mutations (S5 filesystem isolation)', () => {
   });
 
   function files() {
-    return createFilesApplication(createJean2FilesApplicationPort());
+    return createFilesApplication(createProkopFilesApplicationPort());
   }
 
   test('tree lists every visible path recursively, sorted', async () => {

@@ -1,7 +1,13 @@
 import type { RouterContext } from '@/transport/websocket/router-context';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { handleClientRegistration, getClientByClientId, getClientIdForConnection, getConnectionById } from '@/transport/websocket/connection-registry';
-import { sandboxController, capekResolveAsk, capekGetSessionIdForPendingAsk, capekGetAuthorityForPendingAsk, type SandboxRespondMessage } from '@/adapters/capek/contracts';
+import { sandboxController } from '@/infrastructure/sandbox/controller';
+import type { SandboxRespondMessage } from '@/infrastructure/sandbox/types';
+import {
+  resolveAsk as capekResolveAsk,
+  getSessionIdForPendingAsk as capekGetSessionIdForPendingAsk,
+  getAuthorityForPendingAsk as capekGetAuthorityForPendingAsk,
+} from '@/harnesses/prokop/permission/ask-user-api';
 import { getBrowserRequestsPort } from '@/application/ports/browser';
 import { getAskResolutionPort } from '@/application/ports/ask-resolution';
 import { getControlState } from '@/transport/websocket/control-registry';

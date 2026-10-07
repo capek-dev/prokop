@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
-import { sessionSearchDomainTools } from '@/adapters/capek/domain-tools';
+import { sessionSearchDomainTools } from '@/harnesses/shared/domain-tools';
 import { createCodexSessionSearchTools } from '@/harnesses/codex-cli/session-search-tools';
 import { createSession, updateSession } from '@/infrastructure/sqlite/session-store';
 import { updateWorkspace } from '@/infrastructure/sqlite/workspaces';

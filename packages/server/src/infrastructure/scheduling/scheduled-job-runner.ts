@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { Preconfig, ScheduledJob, Session } from '@prokopai/sdk';
-import { findProviderFromModel } from '@/adapters/capek/contracts';
+import { findProviderFromModel } from '@/infrastructure/providers/model-selection';
 import { modelVariantKeys, resolveSessionVariant } from '@/domains/sessions/variant';
 import { getHeadlessExecutionPort, type HeadlessSessionRunPort } from '@/application/ports/headless-execution';
 import type {

@@ -158,13 +158,13 @@ Available models depend on the integration and Prokop's supported model configur
 
 Git status, files, scheduled jobs, session lists, and running indicators receive server-pushed updates across open clients. External editor changes and commits made in a terminal are picked up on window focus or the next tool call, not by a continuous filesystem watcher.
 
-## Prokop and Capek
+## Runtime development
 
-**Prokop** is the coding workspace: server, client, sessions, projects, agents, terminals, permissions, and schedules.
+Prokop's built-in engine lives in `packages/server/src/harnesses/prokop`. Memory, skills, and session search are shared by all harnesses; providers, tool loading, storage helpers, and sandbox simulation live in server infrastructure. Shared runtime and tool contracts remain in the private `packages/sdk` workspace. There is no separate runtime package or release.
 
-**[Capek](https://github.com/capek-dev/capek)** powers Prokop's built-in harness. Claude Code and Codex CLI run through separate adapters to their installed CLIs, rather than through Capek's model providers.
+Claude Code and Codex CLI use separate adapters to their installed CLIs.
 
-Both are written in TypeScript and run on Bun.
+Run `bun install` to link all workspaces, `bun run test:engine` for runtime tests, or `bun run test` for the combined suites.
 
 ## Ownership and current limits
 

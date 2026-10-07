@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { lstat, opendir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
-import type { ToolDefinition, ToolResult } from '@capekai/tool';
+import type { ToolDefinition, ToolResult } from '@prokopai/sdk/tool';
 import type { KnowledgeFilePort } from '@/application/learning/knowledge-journal';
 import { isLearningHomePath } from '@/infrastructure/filesystem/learning-home-policy';
 

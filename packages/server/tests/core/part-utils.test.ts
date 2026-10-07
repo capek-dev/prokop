@@ -1,5 +1,12 @@
 import { describe, test, expect } from 'bun:test';
-import { isTextPart, isToolPart, isImagePart, isFilePart, parseToolInput, createStepPart } from '@capekai/core/execution';
+import {
+  isTextPart,
+  isToolPart,
+  isImagePart,
+  isFilePart,
+  parseToolInput,
+  createStepPart,
+} from '@/harnesses/prokop/execution/part-utils';
 import type { Part } from '@prokopai/sdk';
 
 describe('type guards', () => {

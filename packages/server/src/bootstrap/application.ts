@@ -37,16 +37,16 @@ import {
   type ResponseFormatsApplication,
 } from '@/application';
 import {
-  configureJean2AgentSource,
-  createJean2AskAuthorityPort,
-  configureJean2PreconfigSource,
-  createJean2ProviderRegistryPort,
-  jean2TitleBindings,
-} from '@/adapters/capek';
+  configureProkopAgentSource,
+  createProkopAskAuthorityPort,
+  configureProkopPreconfigSource,
+  prokopTitleBindings,
+} from '@/harnesses/prokop/host';
+import { createProkopProviderRegistryPort } from '@/adapters/providers/runtime-registry';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { listPreconfigs } from '@/infrastructure/config/preconfig';
 import { spawnCodexAppServer } from '@/harnesses/codex-cli/app-server';
-import { agentSkillsDomainTools, memoryDomainTools, sessionSearchDomainTools } from '@/adapters/capek/domain-tools';
+import { agentSkillsDomainTools, memoryDomainTools, sessionSearchDomainTools } from '@/harnesses/shared/domain-tools';
 import { createPretoolChannel } from '@/harnesses/codex-cli/pretool-hook';
 import { selectEmptySessionHarnessModel } from '@/infrastructure/sqlite/session-store';
 import { getModelsConfigWithStatus } from '@/config/models';
@@ -56,32 +56,32 @@ import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed
 import { countMessagesInSession } from '@/infrastructure/sqlite/message-store';
 import { createWorktreeGitPort } from '@/infrastructure/git-worktrees';
 import {
-  createJean2AgentPreconfigPort,
-  createJean2AgentWorkspacePort,
-  createJean2FilesApplicationPort,
-  createJean2McpLifecyclePort,
-  createJean2McpWorkspacePort,
-  createJean2OAuthFlowPort,
-  createJean2PendingAskPort,
-  createJean2PermissionRepositoryPort,
-  createJean2ConfigurationPorts,
-  createJean2MaintenanceApplication,
-  createJean2ResponseFormatsApplication,
-  createJean2ProviderCredentialPort,
-  createJean2ScheduledJobExecution,
-  createJean2ScheduledJobRepository,
-  createJean2SessionRepository,
-  createJean2ToolCatalogPort,
-  createJean2ToolEnvironmentPort,
-  createJean2WorkspaceCleanupPort,
-  getJean2NotificationsApplication,
-  createJean2WorkspaceDirectoryPort,
-  createJean2WorkspacePathConfigPort,
-  createJean2WorkspacePinnedPort,
-  createJean2WorkspaceRepositoryPort,
-  createJean2WorkspaceSessionListingPort,
-  createJean2WorkspaceTerminalPort,
-} from '@/adapters/jean2';
+  createProkopAgentPreconfigPort,
+  createProkopAgentWorkspacePort,
+  createProkopFilesApplicationPort,
+  createProkopMcpLifecyclePort,
+  createProkopMcpWorkspacePort,
+  createProkopOAuthFlowPort,
+  createProkopPendingAskPort,
+  createProkopPermissionRepositoryPort,
+  createProkopConfigurationPorts,
+  createProkopMaintenanceApplication,
+  createProkopResponseFormatsApplication,
+  createProkopProviderCredentialPort,
+  createProkopScheduledJobExecution,
+  createProkopScheduledJobRepository,
+  createProkopSessionRepository,
+  createProkopToolCatalogPort,
+  createProkopToolEnvironmentPort,
+  createProkopWorkspaceCleanupPort,
+  getProkopNotificationsApplication,
+  createProkopWorkspaceDirectoryPort,
+  createProkopWorkspacePathConfigPort,
+  createProkopWorkspacePinnedPort,
+  createProkopWorkspaceRepositoryPort,
+  createProkopWorkspaceSessionListingPort,
+  createProkopWorkspaceTerminalPort,
+} from '@/adapters/prokop';
 import { getTerminalManager, installTerminalSessionStore } from '@/transport/terminal';
 import { broadcastEvent, broadcastSessionUpdated, sendToConnectionEvent } from '@/transport/websocket/broadcast';
 import { addWorkspaceFilesChangedObserver } from '@/application/workspaces/files-changed';
@@ -89,7 +89,7 @@ import { getWorkspaceTools, setMcpChangeListener } from '@/infrastructure/mcp';
 import { browserService } from '@/infrastructure/browser/service';
 import { installBrowserRequestsPort } from '@/application/ports/browser';
 import { listWorkspaces } from '@/infrastructure/sqlite/workspaces';
-import { createJean2TerminalSessionPort } from '@/adapters/jean2/terminal';
+import { createProkopTerminalSessionPort } from '@/adapters/prokop/terminal';
 import { createTransportControllerPorts } from '@/transport/websocket/control-port';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
@@ -177,8 +177,8 @@ export function createWiredAgentsApplication(): AgentsApplication {
   return createAgentsApplication({
     dataDir: () => getDataDir(),
     directory: createAgentDirectoryPort(),
-    workspaces: createJean2AgentWorkspacePort(),
-    preconfigs: createJean2AgentPreconfigPort(),
+    workspaces: createProkopAgentWorkspacePort(),
+    preconfigs: createProkopAgentPreconfigPort(),
   });
 }
 
@@ -194,19 +194,19 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     }
   });
   const agents = existingAgents ?? createWiredAgentsApplication();
-  configureJean2PreconfigSource(agents);
-  configureJean2AgentSource(agents);
+  configureProkopPreconfigSource(agents);
+  configureProkopAgentSource(agents);
 
-  const repository = createJean2SessionRepository(agents);
+  const repository = createProkopSessionRepository(agents);
   // Universal server-side title generation shared by the external harnesses;
   // the Prokop harness keeps its Capek implementation.
-  const sessionTitleRegeneration = createSessionTitleRegeneration({ repository, titles: jean2TitleBindings });
+  const sessionTitleRegeneration = createSessionTitleRegeneration({ repository, titles: prokopTitleBindings });
   let refreshWorktreeAttachments: ((worktreeId: string) => void) | null = null;
   const worktreeAttachments = {
     changed: (worktreeId: string): void => refreshWorktreeAttachments?.(worktreeId),
   };
   installCodexApprovalPort(codexApprovals);
-  const notificationApplication = getJean2NotificationsApplication();
+  const notificationApplication = getProkopNotificationsApplication();
   installHarnessNotificationPort({
     notifyTerminalMessage: (message, sessionId) => notificationApplication.notifyTerminalMessage(message, sessionId),
     notifyPermissionRequired: (requestId, rootSessionId) =>
@@ -271,10 +271,10 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
         .filter(harness => harnessRegistrations[harness].headless !== undefined);
     },
   });
-  const askAuthority = createJean2AskAuthorityPort();
-  const pendingAsks = createJean2PendingAskPort();
+  const askAuthority = createProkopAskAuthorityPort();
+  const pendingAsks = createProkopPendingAskPort();
   const transportControl = createTransportControllerPorts();
-  const toolCatalog = createJean2ToolCatalogPort();
+  const toolCatalog = createProkopToolCatalogPort();
   const managedWorktrees = createManagedWorktreeRepository(getDatabase);
   const harnessSettings = createHarnessSettingsApplication(createServerSettingsRepository(getDatabase));
   const codexWorkspaceAvailable = (workspaceId: string): boolean => {
@@ -353,10 +353,10 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   );
 
   // Every job write (edits, runs, errors, schedule advances) tells clients to refetch that workspace's jobs.
-  const schedulingRepository = withScheduledJobChangeNotices(createJean2ScheduledJobRepository(),
+  const schedulingRepository = withScheduledJobChangeNotices(createProkopScheduledJobRepository(),
     (workspaceId) => broadcastEvent({ type: 'scheduler.changed', workspaceId }));
   // Scheduled runs create sessions outside any connection; announce them to every client.
-  const schedulingExecution = createJean2ScheduledJobExecution({
+  const schedulingExecution = createProkopScheduledJobExecution({
     announceSession: broadcastSessionUpdated,
     runs: schedulingRepository,
   });
@@ -376,13 +376,13 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   });
 
   const workspaces = createWorkspaceApplication({
-    repository: createJean2WorkspaceRepositoryPort(),
-    sessions: createJean2WorkspaceSessionListingPort(),
-    pinned: createJean2WorkspacePinnedPort(),
-    terminals: createJean2WorkspaceTerminalPort(),
-    cleanup: createJean2WorkspaceCleanupPort(),
-    directory: createJean2WorkspaceDirectoryPort(),
-    paths: createJean2WorkspacePathConfigPort(),
+    repository: createProkopWorkspaceRepositoryPort(),
+    sessions: createProkopWorkspaceSessionListingPort(),
+    pinned: createProkopWorkspacePinnedPort(),
+    terminals: createProkopWorkspaceTerminalPort(),
+    cleanup: createProkopWorkspaceCleanupPort(),
+    directory: createProkopWorkspaceDirectoryPort(),
+    paths: createProkopWorkspacePathConfigPort(),
     worktreeRoots,
   });
 
@@ -414,12 +414,12 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
 
   const tools = createToolsHttpApplication({
     catalog: toolCatalog,
-    environment: createJean2ToolEnvironmentPort(),
+    environment: createProkopToolEnvironmentPort(),
   });
 
   const mcp = createMcpHttpApplication({
-    lifecycle: createJean2McpLifecyclePort(),
-    workspaces: createJean2McpWorkspacePort(),
+    lifecycle: createProkopMcpLifecyclePort(),
+    workspaces: createProkopMcpWorkspacePort(),
   });
 
   codexAccounts.setChangeListener(status => broadcastEvent({
@@ -428,20 +428,20 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   }));
   const providers = createProvidersApplication({
     usage: createProviderUsagePort({ getKey: provider => getLLMApiKeys()[provider] }),
-    registry: createJean2ProviderRegistryPort(),
-    oauth: createJean2OAuthFlowPort(),
-    credentials: createJean2ProviderCredentialPort(),
+    registry: createProkopProviderRegistryPort(),
+    oauth: createProkopOAuthFlowPort(),
+    credentials: createProkopProviderCredentialPort(),
     accounts: codexAccounts,
     codexUsage: createCodexAccountUsagePort({ accounts: codexAccounts, runtime: codexAccountRuntime }),
   });
 
-  const notifications = getJean2NotificationsApplication();
+  const notifications = getProkopNotificationsApplication();
 
   const permissions = createPermissionsApplication({
-    repository: createJean2PermissionRepositoryPort(),
+    repository: createProkopPermissionRepositoryPort(),
   });
 
-  const files = createFilesApplication(createJean2FilesApplicationPort({
+  const files = createFilesApplication(createProkopFilesApplicationPort({
     listAvailableWorktreePaths: worktreeRoots.listAvailablePaths,
   }), (workspaceId, root) => broadcastEvent({ type: 'git.changed', workspaceId, root }), {
     deliverGitStatus: (subscriber, message) => sendToConnectionEvent(subscriber as ConnectionId, message),
@@ -451,7 +451,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   addWorkspaceFilesChangedObserver((workspaceId) => files.gitStatusFeed.filesChanged(workspaceId));
   addWorkspaceFilesChangedObserver((workspaceId) => files.fileTreeFeed.filesChanged(workspaceId));
   const configuration = createConfigurationApplication({
-    ...createJean2ConfigurationPorts(),
+    ...createProkopConfigurationPorts(),
     // Primary/both preconfigs materialize as agents on save. Materialization
     // failure must not fail an otherwise-successful config write.
     onPreconfigSaved: async (preconfigId) => {
@@ -462,10 +462,10 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
       }
     },
   });
-  const maintenance = createMaintenanceApplication(createJean2MaintenanceApplication());
-  const responseFormats = createResponseFormatsApplication(createJean2ResponseFormatsApplication());
+  const maintenance = createMaintenanceApplication(createProkopMaintenanceApplication());
+  const responseFormats = createResponseFormatsApplication(createProkopResponseFormatsApplication());
 
-  installTerminalSessionStore(createJean2TerminalSessionPort());
+  installTerminalSessionStore(createProkopTerminalSessionPort());
 
   return { learning: createWiredLearning(agents, createProkopLearningRuntime({ agents }), {
     // Harness-pinned reviewers resolve their effort from the cached CLI

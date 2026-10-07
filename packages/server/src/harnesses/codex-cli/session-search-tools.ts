@@ -1,4 +1,4 @@
-import type { SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
+import type { SessionSearchDomainBridge } from '@/harnesses/shared/domain-tools';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { codexObject } from './app-server';

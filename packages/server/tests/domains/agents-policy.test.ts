@@ -5,7 +5,7 @@ import {
   AGENT_MEMORY_USER_FILENAME,
   agentDirectoryPath,
   agentHomeDirectoryPath,
-  agentHomeDotJean2DirectoryPath,
+  agentHomeDotProkopDirectoryPath,
   agentHomeWorkspaceId,
   agentHomeWorkspaceSettings,
   agentMemoryFilename,
@@ -44,7 +44,7 @@ describe('agents domain: home directory semantics', () => {
     expect(agentDirectoryPath('/data', 'coder')).toBe('/data/agents/coder');
     expect(agentSkillsDirectoryPath('/data', 'coder')).toBe('/data/agents/coder/skills');
     expect(agentHomeDirectoryPath('/data', 'coder')).toBe('/data/agents/coder/home');
-    expect(agentHomeDotJean2DirectoryPath('/data', 'coder')).toBe('/data/agents/coder/home/.prokopai');
+    expect(agentHomeDotProkopDirectoryPath('/data', 'coder')).toBe('/data/agents/coder/home/.prokopai');
   });
 
   test('derives the home workspace id, memory filenames, and the exact home workspace template', () => {

@@ -9,27 +9,27 @@ Prokop is an AI agent monorepo built with TypeScript and Bun.
 - **Runtime and package manager**: Bun
 - **Workspaces**: `packages/*`
 - **Server**: Hono backend in `packages/server` (`@prokopai/server`), with HTTP, WebSocket, terminal, SQLite, MCP, scheduling, permissions, and product-specific domain logic
-- **Agent runtime**: External `@capekai/core` package, including execution, plugins, providers, tools, storage, compaction, goals, workflows, memory, skills, and sandbox behavior
-- **Runtime contracts**: External `@capekai/types` package
-- **Tool authoring contracts**: External `@capekai/tool` package
+- **Agent engine**: Built into `packages/server/src/harnesses/prokop`, including execution, composition, compaction, retry, goals, workflows, and subagents. Shared memory, skills, and session search live in `harnesses/shared`; provider, tool, storage, and sandbox implementations live in server infrastructure.
+- **Shared contracts**: SDK types (`@prokopai/sdk/types`) and tool interfaces (`@prokopai/sdk/tool`)
+- **Tool authoring contracts**: `@prokopai/sdk/tool`
 - **Client**: React 19, Vite 8, TanStack Router, TanStack Query, Zustand, shadcn/ui, Tailwind CSS v4, Storybook, and PWA support in `packages/client` (`@prokopai/client`)
 - **SDK**: Product wire protocol, REST clients, WebSocket namespaces, shared product types, and transports in `packages/sdk` (`@prokopai/sdk`)
 - **Browser extension**: Chrome extension for browser automation in `packages/browser` (`@prokopai/browser`)
 - **Sandbox CLI**: Interactive LLM-call simulator in `packages/sandbox-cli` (`@prokopai/sandbox-cli`)
-- **External tools**: User-prepared modules loaded from `~/.prokopai/tools/` through `@capekai/core`
+- **External tools**: User-prepared modules loaded from `~/.prokopai/tools/` through the server tool registry
 
 ## Architecture Boundaries
 
 Keep changes in the package that owns the behavior.
 
-- `@capekai/core` owns the reusable agent runtime and must remain independent of Prokop product packages.
-- `@capekai/types` and `@capekai/tool` own neutral public contracts shared by the runtime, host, SDK, and external tools.
-- `@prokopai/server` is the Prokop host. It composes Čapek, supplies storage and product adapters, and owns HTTP, WebSocket, CLI, MCP, SQLite, scheduling, notifications, permissions, and workspace behavior.
-- `@prokopai/sdk` owns product-facing REST and WebSocket contracts. Do not move generic Čapek contracts back into the SDK.
+- `server/src/harnesses/prokop` owns Prokop execution and composition. Shared services and other harnesses must not import its internals. Keep execution separate from HTTP, WebSocket, and UI concerns.
+- `@prokopai/sdk/types` and `@prokopai/sdk/tool` own shared data and tool contracts. These lightweight entrypoints must not import client transports or server implementations.
+- `@prokopai/server` is the Prokop host. It composes the runtime, supplies storage and product adapters, and owns HTTP, WebSocket, CLI, MCP, SQLite, scheduling, notifications, permissions, and workspace behavior.
+- `@prokopai/sdk` owns product-facing REST and WebSocket contracts. Keep shared contracts in its lightweight types/tool modules.
 - `@prokopai/client` consumes the SDK. Server-originated cache and store changes belong in mutation handlers or WebSocket handlers, not follow-up synchronization effects.
 - Compatibility forwarding modules are intentional boundaries. Do not remove one without checking its consumers and the relevant boundary tests.
 
-The current extraction and ownership record lives in `.architecture-v2/`. Read the relevant document before changing Čapek composition, server boundaries, compatibility shims, or public exports.
+The engine is part of the server. Shared contracts live in the SDK; no separate contracts or runtime package exists. The historical extraction and ownership record lives in `.architecture-v2/`. Read the relevant document before changing runtime composition, server boundaries, compatibility shims, or public exports.
 
 ## Commands
 
@@ -93,8 +93,11 @@ ESLint uses the flat config in `eslint.config.js`, with TypeScript, React, and R
 ### Tests
 
 ```bash
-# Root suite: server, SDK, then client
+# Root suite: engine, host server, SDK, browser, then client
 bun run test
+
+# Built-in runtime
+bun run test:engine
 
 # Server
 bun run test:server
@@ -103,9 +106,12 @@ bun run test:server:coverage
 # Client, using Vitest
 bun run test:client
 
+# Browser extension
+bun run test:browser
+
 ```
 
-During development, run the smallest relevant test target. Run the full root checks before committing or releasing.
+Engine tests live in `packages/server/tests/engine` and run in a separate Bun process to isolate module mocks from host tests. `test:server` excludes that directory. During development, run the smallest relevant test target. Run the full root checks before committing or releasing.
 
 - **Server**: Bun test runner with `bun:test`
 - **Client**: Vitest with `happy-dom`; Zustand stores can be tested through `useStore.getState()`
@@ -126,7 +132,7 @@ bun run storybook:build
 ### Imports
 
 - Use `import type` for type-only imports.
-- Group external libraries first, then workspace packages (`@capekai/*`, `@prokopai/*`), then package-local imports.
+- Group external libraries first, then workspace packages (`@prokopai/*`), then package-local imports.
 - Use the `@/*` alias for package-local imports where that package config defines it.
 - Import from a package's public export when crossing package boundaries. Avoid deep imports into another package's source tree.
 
@@ -144,7 +150,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 - Avoid `any`; use `unknown` when a value has not been validated.
 - Use `as const` for immutable literal definitions.
 - Prefix intentionally unused variables with `_`.
-- Keep public package types neutral. Product-specific fields belong in `@prokopai/sdk`, not `@capekai/types`.
+- Keep shared data types in the SDK and implementation-only types beside their server owners.
 
 ### Naming and Formatting
 
@@ -173,7 +179,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 - Catch asynchronous boundary failures and type caught values as `unknown`.
 - Preserve error context in logs without exposing credentials or tokens.
 - Validate external, wire, tool, and provider input before use.
-- Tool execution results use the contract defined by `@capekai/tool`; follow that package rather than introducing local lookalike types.
+- Tool execution results use the contract defined by `@prokopai/sdk/tool`; follow that package rather than introducing local lookalike types.
 - Malformed permission, ask, capability, or authority responses must fail closed.
 
 ### Environment and Data Paths
@@ -187,7 +193,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 
 ### AI SDK and Providers
 
-- Vercel AI SDK integration and provider registration live in the external `@capekai/core` package, not `packages/server`.
+- Vercel AI SDK adapters and provider registration live in `server/src/infrastructure/providers`; model execution lives in `harnesses/prokop`.
 - Current provider integrations include OpenAI, DeepSeek, OpenRouter, MiniMax, and Zhipu.
 - Prokop-specific provider accounts, credentials, and OAuth wiring live in the server adapters, application services, and provider-account domain.
 
@@ -195,8 +201,8 @@ import { useSessionStore } from '@/stores/sessionStore';
 
 The sandbox CLI in `packages/sandbox-cli` intercepts LLM calls through `/api/sandbox` so end-to-end flows can be tested without live model calls.
 
-- Runtime sandbox behavior: external `@capekai/core/sandbox` package subpath
-- Server composition adapter: `packages/server/src/adapters/capek/sandbox.ts`
+- Sandbox controller and provider: `packages/server/src/infrastructure/sandbox/`
+- Server composition adapter: `packages/server/src/harnesses/prokop/host/sandbox.ts`
 - HTTP routes: `packages/server/src/transport/http/routes/sandbox.ts`
 
 ## Project Structure
@@ -205,14 +211,15 @@ The sandbox CLI in `packages/sandbox-cli` intercepts LLM calls through `/api/san
 packages/
   server/                # @prokopai/server Prokop host
     src/
-      adapters/          # Čapek and compatibility adapters
+      adapters/          # Product ports, provider registry, workspace policy
       application/       # Use cases and ports
       bootstrap/         # Application and runtime composition
       cli/               # CLI commands and update tooling
       config/            # Models, credentials, schemas, and tool environment
       domains/           # Agents, controllers, notifications, providers, scheduling, tools, workspaces
+      harnesses/prokop/ # Execution, composition, context, host bindings, tools, and learning
+      harnesses/shared/ # Memory, skills, session search, and shared harness helpers
       infrastructure/    # Daemon, filesystem, MCP, OAuth, providers, runtime, scheduling, and SQLite
-      tools/builtin/     # Built-in file, shell, question, todo, and worktree tools
       transport/http/    # Hono app, middleware, and REST routes
       transport/terminal/ # Terminal framing and managers
       transport/websocket/ # WebSocket routing, delivery, handlers, and registries
@@ -252,7 +259,7 @@ changelogs/              # Client, SDK, server, and tool release notes
 install/                 # install-prokopai.sh and install-prokopai.ps1
 ```
 
-Built-in tools live in `packages/server/src/tools/builtin/`. External tools are prepared outside this repository and placed under `~/.prokopai/tools/<tool-name>/` as `tool.js` or `tool.ts` modules implementing the `@capekai/tool` contract. Prokop does not install, update, build, or release external tools.
+Built-in tools live in `packages/server/src/harnesses/prokop/tools/`. External tools are prepared outside this repository and placed under `~/.prokopai/tools/<tool-name>/` as `tool.js` or `tool.ts` modules implementing the `@prokopai/sdk/tool` contract. Prokop does not install, update, build, or release external tools.
 
 ## Working Practices
 

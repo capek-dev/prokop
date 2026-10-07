@@ -1,5 +1,5 @@
 import type { ProviderCredentialStatus, ProviderCredentialsResponse } from '@prokopai/sdk';
-import { getJean2EnvValue, reloadJean2Env } from '@/infrastructure/runtime/environment';
+import { getProkopEnvValue, reloadProkopEnv } from '@/infrastructure/runtime/environment';
 import { getEnvFilePath } from '@/infrastructure/runtime/paths';
 import { atomicWriteFile, readFileSafe } from '@/config/files';
 import {
@@ -41,7 +41,7 @@ export async function setProviderCredential(
     const content = await readFileSafe(getEnvFilePath());
     const merged = mergeEnvLine(content, credential.envKey, apiKey.trim());
     await atomicWriteFile(getEnvFilePath(), merged.content);
-    reloadJean2Env();
+    reloadProkopEnv();
     return { provider, configured: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -56,7 +56,7 @@ export async function clearProviderCredential(provider: string): Promise<Provide
   try {
     const content = await readFileSafe(getEnvFilePath());
     if (!content) {
-      reloadJean2Env();
+      reloadProkopEnv();
       return { provider, configured: false };
     }
 
@@ -68,7 +68,7 @@ export async function clearProviderCredential(provider: string): Promise<Provide
       updated = removeEnvLine(updated, legacyKey);
     }
     await atomicWriteFile(getEnvFilePath(), updated);
-    reloadJean2Env();
+    reloadProkopEnv();
     return { provider, configured: false };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -77,6 +77,6 @@ export async function clearProviderCredential(provider: string): Promise<Provide
 }
 
 function isProviderConfigured(envKey: string): boolean {
-  const value = getJean2EnvValue(envKey);
+  const value = getProkopEnvValue(envKey);
   return value !== undefined && value !== '';
 }

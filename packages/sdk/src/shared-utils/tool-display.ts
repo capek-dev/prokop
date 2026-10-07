@@ -1,4 +1,4 @@
 export {
   resolveToolSummary,
   resolveToolSummaryTemplate,
-} from '@capekai/types/tool-display';
+} from '../shared-types/tool-display';

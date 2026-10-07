@@ -1,20 +1,64 @@
-import type {
-  Session as CapekSession,
-} from '@capekai/types/session';
 import type { SessionWorktreeBinding } from './worktree';
 
-export type {
-  AutoApproveSeverity,
-  SessionStatus,
-  SubagentStatus,
-} from '@capekai/types/session';
+export type SessionStatus = 'active' | 'closed';
+
+export type SubagentStatus = 'running' | 'completed' | 'error' | 'interrupted';
+
+/** @deprecated Permissions-v2 hosts carry their own permission mode; this
+ * legacy five-level ladder remains exported only for backward compatibility. */
+export type AutoApproveSeverity = 'off' | 'none' | 'low' | 'medium' | 'high';
+
+export interface Session {
+  id: string;
+  workspaceId: string;  // FK to workspace
+  /** Opaque host-owned identifier for an alternate working root within the
+   * workspace. Hosts resolve and authorize this identifier before execution. */
+  workspaceRootId?: string | null;
+  preconfigId: string | null;
+  title: string | null;
+  status: SessionStatus;
+  createdAt: string;
+  updatedAt: string;
+  metadata: Record<string, unknown> | null;
+  selectedModel?: string | null;
+  selectedProvider?: string | null;
+  selectedVariant?: string | null;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  noCacheTokens?: number;
+  parentId: string | null;    // ID of parent session (null for top-level)
+  agentName: string | null;   // Name of the agent/preconfig running this session
+  subagentStatus?: SubagentStatus | null;  // Status for subagent sessions only
+  runningAt?: string | null;  // ISO timestamp when session started running, null when not running
+  compacting?: boolean;  // Whether compaction is in progress
+  tags?: string[];  // User-assigned tags for grouping (default: [])
+  /** @deprecated Legacy risk ceiling for permission auto-approval;
+   * permissions-v2 hosts decide via their own permission mode and
+   * classified asks instead. */
+  autoApproveSeverity?: AutoApproveSeverity | null;
+  agentId?: string | null;  // Which agent ran this session. Null for non-agent sessions.
+
+  /** Persisted execution owner; missing values from older hosts mean Prokop. */
+  harness?: SessionHarness;
+  /** Effective permission mode; the repository resolves the workspace
+   * default when the session stores none. Treat missing as 'standard'. */
+  permissionMode?: PermissionMode | null;
+  /** Server-normalized harness state derived from the persisted harness and
+   * its metadata; clients read these fields instead of per-harness metadata
+   * keys or identity checks. */
+  harnessState?: SessionHarnessState;
+  worktree?: SessionWorktreeBinding | null;
+}
 
 /**
  * Permissions v2 product mode (docs/plans/unified-permissions.md). The
  * server-normalized effective mode: a stored null inherits the workspace
  * default, and the repository resolves that at read time so the wire always
- * carries a concrete value. Replaces the capek `autoApproveSeverity` ladder
- * (kept only as an inherited, unused field until the capek contract drops it).
+ * carries a concrete value. The legacy `autoApproveSeverity` field remains
+ * available for stored-data compatibility.
  */
 export type PermissionMode = 'standard' | 'extended' | 'full';
 
@@ -23,7 +67,7 @@ export type SessionCategory = 'active' | 'archived' | 'scheduled';
 export type SessionCategoryCounts = Record<SessionCategory, number>;
 
 export interface SessionListFilter {
-  status?: import('@capekai/types/session').SessionStatus;
+  status?: SessionStatus;
   rootOnly?: boolean;
   category?: SessionCategory;
 }
@@ -126,18 +170,4 @@ export interface SessionHarnessState {
     /** Whether subagent activity marks ancestor sessions as running. */
     subagentActivityPropagates: boolean;
   };
-}
-
-export interface Session extends CapekSession {
-  /** Persisted execution owner; missing values from older hosts mean Prokop. */
-  harness?: SessionHarness;
-  /** Effective permission mode; the repository resolves the workspace
-   * default when the session stores none. Treat missing as 'standard'. */
-  permissionMode?: PermissionMode | null;
-  /** Server-normalized harness state derived from the persisted harness and
-   * its metadata; clients read these fields instead of per-harness metadata
-   * keys or identity checks. */
-  harnessState?: SessionHarnessState;
-  workspaceRootId?: string | null;
-  worktree?: SessionWorktreeBinding | null;
 }

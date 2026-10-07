@@ -5,7 +5,7 @@ import matter from 'gray-matter';
 import type { Preconfig, PreconfigMode } from '@prokopai/sdk';
 import { getPreconfigsDir as getPreconfigsDirPath } from '@/infrastructure/runtime/paths';
 import { knownSubagentIds, sanitizeCanSpawnSubagentsIds } from '@/domains/agents';
-import { DEFAULT_PREAMBLES } from '@/infrastructure/config/defaults/index';
+import { DEFAULT_PREAMBLES } from '@/infrastructure/config/defaults';
 
 // ── Slug utilities ─────────────────────────────────────────────
 

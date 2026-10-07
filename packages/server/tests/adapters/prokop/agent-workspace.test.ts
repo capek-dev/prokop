@@ -1,0 +1,95 @@
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { setupTestDatabase, resetTestDatabase } from '#tests/db';
+import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
+import { createAgentsApplication } from '@/application/agents';
+import {
+  createProkopAgentPreconfigPort,
+  createProkopAgentWorkspacePort,
+  createProkopSessionRepository,
+} from '@/adapters/prokop';
+import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
+import { agentHomeWorkspaceSettings } from '@/domains/agents';
+import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
+import { getDataDir } from '@/infrastructure/runtime/paths';
+
+describe('prokop agents adapters over the real store and filesystem', () => {
+  beforeEach(() => {
+    setupTestDatabase();
+    setupTestDataDir();
+  });
+
+  afterEach(() => {
+    resetTestDatabase();
+    resetTestDataDir();
+  });
+
+  test('promote creates the real home workspace with the exact settings and demote removes it', async () => {
+    const dataDir = getDataDir();
+    const preconfigsDir = join(dataDir, 'preconfigs');
+    await mkdir(preconfigsDir, { recursive: true });
+    await writeFile(
+      join(preconfigsDir, 'coder.md'),
+      '---\nid: coder\nname: Coder\ndescription: Writes code\nmode: both\n---\nBe concise.\n',
+    );
+
+    const application = createAgentsApplication({
+      dataDir: () => getDataDir(),
+      directory: createAgentDirectoryPort(),
+      workspaces: createProkopAgentWorkspacePort(),
+      preconfigs: createProkopAgentPreconfigPort(),
+    });
+
+    const agent = await application.promotePreconfig('coder');
+    expect(agent.id).toBe('coder');
+    expect(agent.hasHome).toBe(true);
+    expect(agent.systemPrompt).toBe('Be concise.');
+
+    const workspace = getWorkspace('coder-home');
+    expect(workspace).not.toBeNull();
+    expect(workspace!.path).toBe(join(getDataDir(), 'agents', 'coder', 'home'));
+    expect(workspace!.isVirtual).toBe(true);
+    // Read back through the store: the home policy plus the always-on
+    // session-search product policy applied at read time.
+    expect(workspace!.settings).toEqual({
+      ...agentHomeWorkspaceSettings('coder'),
+      permissionMode: 'standard',
+      sessionSearch: { enabled: true, permissionRisk: 'none', includeToolResults: false },
+    });
+
+    await application.demoteAgent('coder');
+    expect(getWorkspace('coder-home')).toBeNull();
+    expect(await application.getAgentDirectory('coder')).toBeNull();
+  });
+
+  test('promote uses the exact preconfig lookup and throws for unknown preconfigs', async () => {
+    const application = createAgentsApplication({
+      dataDir: () => getDataDir(),
+      directory: createAgentDirectoryPort(),
+      workspaces: createProkopAgentWorkspacePort(),
+      preconfigs: createProkopAgentPreconfigPort(),
+    });
+
+    await expect(application.promotePreconfig('missing')).rejects.toThrow('Preconfig not found');
+  });
+
+  test('session repository delegates preconfig lookup and synchronous agent detection to the composed application', async () => {
+    const calls: string[] = [];
+    const agents = {
+      async getPreconfigOrAgent(id: string) {
+        calls.push(`preconfig:${id}`);
+        return null;
+      },
+      isAgentSync(id: string) {
+        calls.push(`sync:${id}`);
+        return id === 'coder';
+      },
+    };
+    const repository = createProkopSessionRepository(agents);
+
+    expect(await repository.getPreconfigOrAgent('coder')).toBeNull();
+    expect(repository.isAgentSync('coder')).toBe(true);
+    expect(calls).toEqual(['preconfig:coder', 'sync:coder']);
+  });
+});

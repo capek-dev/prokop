@@ -1,5 +1,5 @@
 import { isAbsolute, join } from 'node:path';
-import { safeSkillDirectory, type AgentSkillsDomainBridge } from '@/adapters/capek/domain-tools';
+import { safeSkillDirectory, type AgentSkillsDomainBridge } from '@/harnesses/shared/domain-tools';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { codexObject } from './app-server';
 import type { CodexMemoryCallResult } from './memory-tools';

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { createRuntime } from '@/bootstrap/create-runtime';
-import { getModelWithMetadata } from '@capekai/core/execution';
+import { getModelWithMetadata } from '@/infrastructure/providers/model-resolution';
 import {
   configureRuntimeConfiguration,
   getRuntimeConfiguration,
-} from '@capekai/core/configuration';
-import { SandboxLanguageModel } from '@capekai/core/sandbox';
+} from '@/infrastructure/providers/configuration/runtime';
+import { SandboxLanguageModel } from '@/infrastructure/sandbox/model';
 import { activateSandbox, deactivateSandbox } from '@/infrastructure/sandbox';
 
 let originalRuntimeConfiguration: ReturnType<typeof getRuntimeConfiguration>;

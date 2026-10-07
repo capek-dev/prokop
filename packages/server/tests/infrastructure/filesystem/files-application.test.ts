@@ -4,7 +4,7 @@ import { homedir, tmpdir } from 'os';
 import { join, resolve } from 'path';
 import type { FileTreeMessage, GitStatusMessage } from '@prokopai/sdk';
 import { createFilesApplication } from '@/application/files';
-import { createJean2FilesApplicationPort } from '@/adapters/jean2/files';
+import { createProkopFilesApplicationPort } from '@/adapters/prokop/files';
 import { ConflictError } from '@/application/http-errors';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
@@ -39,7 +39,7 @@ describe('files application over the Jean2 port (S5 filesystem isolation)', () =
   });
 
   function files() {
-    return createFilesApplication(createJean2FilesApplicationPort());
+    return createFilesApplication(createProkopFilesApplicationPort());
   }
 
   test('Git add resolves available worktree roots and rejects unavailable roots', async () => {
@@ -50,7 +50,7 @@ describe('files application over the Jean2 port (S5 filesystem isolation)', () =
       writeFileSync(join(path, 'new.txt'), 'new');
     }
     let available = true;
-    const app = createFilesApplication(createJean2FilesApplicationPort({
+    const app = createFilesApplication(createProkopFilesApplicationPort({
       listAvailableWorktreePaths: () => available ? [worktree] : [],
     }));
     await expect(app.gitAdd(workspaceId, 'new.txt', worktree)).resolves.toEqual({ path: 'new.txt' });
@@ -65,7 +65,7 @@ describe('files application over the Jean2 port (S5 filesystem isolation)', () =
   });
 
   test('Rebase reads and mutations reject unavailable roots and emit after partial failures', async () => {
-    const port = createJean2FilesApplicationPort();
+    const port = createProkopFilesApplicationPort();
     const calls: string[] = [];
     const state = { active: false, token: null, branch: null, originalHead: null, onto: null, conflicts: [] };
     port.gitRebaseState = async (root) => { calls.push(root); return state; };
@@ -95,7 +95,7 @@ describe('files application over the Jean2 port (S5 filesystem isolation)', () =
   });
 
   test('Git revert emits a change event after success or failure', async () => {
-    const port = createJean2FilesApplicationPort();
+    const port = createProkopFilesApplicationPort();
     const calls: string[] = [];
     port.gitRevertModifiedFile = async (root, path) => {
       calls.push(`${root}:${path}`);
@@ -162,7 +162,7 @@ describe('files application over the Jean2 port (S5 filesystem isolation)', () =
   test('tree reads share the pushed feed and app file actions push the change', async () => {
     writeFileSync(join(main, 'a.txt'), 'a');
     const pushed: FileTreeMessage[] = [];
-    const app = createFilesApplication(createJean2FilesApplicationPort(), undefined, {
+    const app = createFilesApplication(createProkopFilesApplicationPort(), undefined, {
       deliverFileTree: (_subscriber, message) => { pushed.push(message); },
     });
     const until = async (check: () => boolean) => {
@@ -206,7 +206,7 @@ describe('files application over the Jean2 port (S5 filesystem isolation)', () =
     git('commit', '-q', '-m', 'init');
 
     const pushed: GitStatusMessage[] = [];
-    const app = createFilesApplication(createJean2FilesApplicationPort(), undefined, {
+    const app = createFilesApplication(createProkopFilesApplicationPort(), undefined, {
       deliverGitStatus: (_subscriber, message) => { pushed.push(message); },
     });
     const until = async (check: () => boolean) => {
@@ -320,7 +320,7 @@ describe('files application over the Jean2 port (S5 filesystem isolation)', () =
   });
 
   test('expands browse paths through the C6 workspace path policy', () => {
-    const port = createJean2FilesApplicationPort();
+    const port = createProkopFilesApplicationPort();
     const application = createFilesApplication(port);
 
     // `~/x` joins the active home directory exactly like the pre-slice
@@ -349,7 +349,7 @@ describe('files git diff containment (S5 review repair)', () => {
   });
 
   function files() {
-    return createFilesApplication(createJean2FilesApplicationPort());
+    return createFilesApplication(createProkopFilesApplicationPort());
   }
 
   test('denies sibling-prefix and traversal-to-sibling diff paths before any git work', async () => {

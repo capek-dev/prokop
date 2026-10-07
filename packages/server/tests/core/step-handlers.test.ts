@@ -3,7 +3,7 @@ import type { StepPart } from '@prokopai/sdk';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
 import { createMessage } from '@/infrastructure/sqlite/message-store';
-import { createStepCallbacks, type StepCallbacksContext } from '@capekai/core/execution';
+import { createStepCallbacks, type StepCallbacksContext } from '@/harnesses/prokop/execution/step-handlers';
 
 describe('step-handlers', () => {
   let sessionId: string;

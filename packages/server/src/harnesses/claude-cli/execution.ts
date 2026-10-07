@@ -28,7 +28,7 @@ import { cliWorkspaceAvailable } from '@/harnesses/shared/cli-workspace';
 import { notifyHarnessTurnFinished } from '@/harnesses/shared/notifications';
 import { notifySessionFilesChanged } from '@/harnesses/shared/files-changed';
 import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';
-import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/adapters/capek/domain-tools';
+import type { AgentSkillsDomainBridge, MemoryDomainBridge, SessionSearchDomainBridge } from '@/harnesses/shared/domain-tools';
 import { ensureSessionTempDir, sessionTempInstructions } from '@/infrastructure/filesystem/session-temp';
 import type { WorkspaceMcpToolsPort } from '@/application/ports/mcp-tools';
 import { createClaudeWorkspaceMcp } from './mcp-tools';

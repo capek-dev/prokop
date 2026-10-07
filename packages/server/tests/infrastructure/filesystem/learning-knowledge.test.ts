@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { mkdtemp, realpath, rm, mkdir, symlink, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { addEntry } from '@capekai/core/hosts';
+import { addEntry } from '@/harnesses/shared/memory/registry';
 import { createLearningKnowledgeFiles } from '@/infrastructure/filesystem/learning-knowledge';
 import { createAgentDirectoryPort } from '@/infrastructure/agents/agent-directory-filesystem';
 

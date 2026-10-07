@@ -1,15 +1,17 @@
 import {
   capekContextAssemblerKey,
+  type ContextAssemblyData,
+} from '@/harnesses/prokop/composition/plugins/service-keys';
+import {
   createAgentScope,
   createProcessScope,
   enterAgentScope,
   type AgentScopeHandle,
-  type ContextAssemblyData,
   type ProcessScopeHandle,
-} from '@capekai/core/composition';
-import { jean2AgentPlugins, jean2ProcessPlugins } from './profile';
+} from '@/harnesses/prokop/composition/plugins/compose';
+import { prokopAgentPlugins, prokopProcessPlugins } from './profile';
 
-export interface Jean2RuntimeComposition {
+export interface ProkopRuntimeComposition {
   processScope: ProcessScopeHandle;
   agentScope: AgentScopeHandle;
   /** Ordered context assembly through the composed agent scope. */
@@ -22,11 +24,11 @@ export interface Jean2RuntimeComposition {
  * The server owns the Jean2 plugin inventory and composes it through Capek's
  * generic process and agent scope factories after all adapters are installed.
  */
-export async function createJean2RuntimeComposition(): Promise<Jean2RuntimeComposition> {
-  const processScope = await createProcessScope([...jean2ProcessPlugins()]);
+export async function createProkopRuntimeComposition(): Promise<ProkopRuntimeComposition> {
+  const processScope = await createProcessScope([...prokopProcessPlugins()]);
   let agentScope: AgentScopeHandle | null = null;
   try {
-    const createdAgentScope = await createAgentScope(processScope, [...jean2AgentPlugins()]);
+    const createdAgentScope = await createAgentScope(processScope, [...prokopAgentPlugins()]);
     agentScope = createdAgentScope;
     const assembler = createdAgentScope.require(capekContextAssemblerKey);
     return {

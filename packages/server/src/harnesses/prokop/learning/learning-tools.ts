@@ -1,6 +1,8 @@
-import type { LoadedTool, ToolDefinition, ToolResult } from '@capekai/tool';
-import { capekToolResolverKey, type CapekPlugin } from '@capekai/core/composition';
-import { createContributedToolResolver, loadedToolsPlugin } from '@capekai/core/plugins';
+import type { LoadedTool, ToolDefinition, ToolResult } from '@prokopai/sdk/tool';
+import { capekToolResolverKey } from '@/harnesses/prokop/composition/plugins/service-keys';
+import type { RuntimePlugin } from '@/harnesses/prokop/composition/plugins/compose';
+import { createContributedToolResolver } from '@/harnesses/prokop/composition/plugins/tool-catalog';
+import { loadedToolsPlugin } from '@/harnesses/prokop/composition/plugins/loaded-tools';
 import type { LearningScope } from '@prokopai/sdk';
 import { learningHomeDefinition } from './learning-home';
 import type { LearningKnowledgeResult } from './learning-knowledge';
@@ -18,7 +20,7 @@ export interface LearningToolsOptions {
 
 /** Dedicated review composition only. Do not combine with memory/skills domain
  * plugins: these registry tools deliberately replace their execution path. */
-export function createLearningToolsPlugins(options: LearningToolsOptions): readonly CapekPlugin<unknown>[] {
+export function createLearningToolsPlugins(options: LearningToolsOptions): readonly RuntimePlugin<unknown>[] {
   const memory = options.scope === 'agent' ? 'agent_memory' : 'memory';
   const skills = options.scope === 'agent' ? 'agent_skill_manage' : 'skill_manage';
   const names = [memory, 'session_search', ...(options.scope === 'agent' && options.home ? ['home_files'] : []), ...(options.improveSkills ? [skills] : [])];

@@ -1,15 +1,15 @@
-import type { Session } from '@capekai/types/session';
+import type { Session } from '@prokopai/sdk/types/session';
 import type { InterruptReason } from '@prokopai/sdk';
+import { executeCompaction as executeCapekCompaction } from '@/harnesses/prokop/compaction/executor';
+import { forkSession as forkCapekSession } from '@/harnesses/prokop/execution/fork';
 import {
-  executeCompaction as executeCapekCompaction,
-  forkSession as forkCapekSession,
   handleChat as handleCapekChat,
   handleSessionEditMessage as handleCapekSessionEditMessage,
-  interruptManager,
   regenerateSessionTitle as regenerateCapekSessionTitle,
-  revertToStep as revertCapekToStep,
-} from '@capekai/core/execution';
-import { executeChildSession as capekExecuteChildSession } from '@capekai/core/providers';
+} from '@/harnesses/prokop/execution/chat-handler';
+import { interruptManager } from '@/harnesses/prokop/execution/interrupt';
+import { revertToStep as revertCapekToStep } from '@/harnesses/prokop/execution/revert';
+import { executeChildSession as capekExecuteChildSession } from '@/harnesses/prokop/subagent/child-session';
 import type {
   CompactionExecutionOutcome,
   ForkExecutionResult,
@@ -22,10 +22,10 @@ import type {
   HeadlessSessionRunResult,
 } from '@/application/ports/headless-execution';
 import type { SessionWirePorts } from '@/application/ports/delivery';
-import { createJean2RuntimeContext } from '@/adapters/capek/events';
-import { withJean2ComposedScopeSync, withJean2ExecutionScope } from '@/harnesses/prokop/composition/execution-scope';
+import { createProkopRuntimeContext } from '@/harnesses/prokop/host/events';
+import { withProkopComposedScopeSync, withProkopExecutionScope } from '@/harnesses/prokop/composition/execution-scope';
 
-export interface Jean2SessionExecutionDependencies {
+export interface ProkopSessionExecutionDependencies {
   handleChat?: typeof handleCapekChat;
   handleSessionEditMessage?: typeof handleCapekSessionEditMessage;
   regenerateSessionTitle?: typeof regenerateCapekSessionTitle;
@@ -40,7 +40,7 @@ function runtimeContext<Origin>(
   wire: SessionWirePorts<Origin>,
   onSessionChanged?: (session: Session) => void,
 ) {
-  return createJean2RuntimeContext({
+  return createProkopRuntimeContext({
     send: wire.delivery.send,
     broadcast: wire.delivery.broadcast,
     broadcastToSession: wire.delivery.broadcastToSession,
@@ -58,8 +58,8 @@ function runtimeContext<Origin>(
  * Jean2 agent scope for its full awaited duration. Wire-side interruption
  * enters the same composed scope to settle pending asks.
  */
-export function createJean2SessionExecution(
-  dependencies: Jean2SessionExecutionDependencies = {},
+export function createProkopSessionExecution(
+  dependencies: ProkopSessionExecutionDependencies = {},
 ): SessionExecutionPort {
   const handleChat = dependencies.handleChat ?? handleCapekChat;
   const handleSessionEditMessage = dependencies.handleSessionEditMessage ?? handleCapekSessionEditMessage;
@@ -80,7 +80,7 @@ export function createJean2SessionExecution(
       goalCondition?: string,
       goalMaxTurns?: number,
     ): Promise<void> {
-      return withJean2ExecutionScope(() => handleChat(
+      return withProkopExecutionScope(() => handleChat(
         runtimeContext(wire, onSessionChanged),
         origin,
         sessionId,
@@ -97,7 +97,7 @@ export function createJean2SessionExecution(
       origin: Origin,
       input: { sessionId: string; messageId: string; content: string },
     ): Promise<void> {
-      return withJean2ExecutionScope(() => handleSessionEditMessage(
+      return withProkopExecutionScope(() => handleSessionEditMessage(
         runtimeContext(wire, onSessionChanged),
         origin,
         input,
@@ -110,7 +110,7 @@ export function createJean2SessionExecution(
       sessionId: string,
       options?: { force?: boolean },
     ): Promise<void> {
-      return withJean2ExecutionScope(() => regenerateSessionTitle(
+      return withProkopExecutionScope(() => regenerateSessionTitle(
         runtimeContext(wire, onSessionChanged),
         origin,
         sessionId,
@@ -126,7 +126,7 @@ export function createJean2SessionExecution(
       // map: the question tool's ctx.ask() never settled and the session
       // stayed registered (bricked in "running"). Route through the composed
       // scope exactly like the other wire-side ask seams.
-      return withJean2ComposedScopeSync(() =>
+      return withProkopComposedScopeSync(() =>
         interruptManager.interruptSession(sessionId, (reason ?? 'user_request') as InterruptReason));
     },
 
@@ -135,17 +135,17 @@ export function createJean2SessionExecution(
     },
 
     async compact(sessionId: string, reason: 'manual'): Promise<CompactionExecutionOutcome> {
-      const result = await withJean2ExecutionScope(() => executeCompaction(sessionId, reason));
+      const result = await withProkopExecutionScope(() => executeCompaction(sessionId, reason));
       return result as CompactionExecutionOutcome;
     },
 
     async revert(input: { sessionId: string; targetMessageId: string }): Promise<RevertExecutionResult> {
-      const result = await withJean2ExecutionScope(() => revertToStep(input));
+      const result = await withProkopExecutionScope(() => revertToStep(input));
       return result as RevertExecutionResult;
     },
 
     async fork(input: { sessionId: string; targetMessageId: string; title?: string }): Promise<ForkExecutionResult> {
-      const result = await withJean2ExecutionScope(() => forkSession(input));
+      const result = await withProkopExecutionScope(() => forkSession(input));
       return result as unknown as ForkExecutionResult;
     },
   };
@@ -158,11 +158,11 @@ export function createJean2SessionExecution(
  * identity and model selection and never reaches harness internals. The
  * harness field is dispatch metadata and is dropped before the Capek call.
  */
-export function createJean2HeadlessExecution(
-  dependencies: Pick<Jean2SessionExecutionDependencies, 'executeChildSession'> = {},
+export function createProkopHeadlessExecution(
+  dependencies: Pick<ProkopSessionExecutionDependencies, 'executeChildSession'> = {},
 ): (input: HeadlessSessionRunInput) => Promise<HeadlessSessionRunResult> {
   const executeChildSession = dependencies.executeChildSession ?? capekExecuteChildSession;
-  return input => withJean2ExecutionScope(() => {
+  return input => withProkopExecutionScope(() => {
     const { harness: _harness, ...child } = input;
     return executeChildSession(child);
   });

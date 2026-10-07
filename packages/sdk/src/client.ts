@@ -1,4 +1,4 @@
-import type { ClientConfig, ClientMessage, ConnectionState } from './types';
+import type { ClientConfig, ClientMessage, ConnectionState } from './types/index';
 import type { ClientDescriptor } from './shared-protocol/client';
 import { TypedEventEmitter } from './emitter';
 import type { SdkEventMap } from './types/server-messages';

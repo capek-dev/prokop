@@ -1,16 +1,16 @@
-import { enterAgentScope, type AgentScopeHandle } from '@capekai/core/composition';
+import { enterAgentScope, type AgentScopeHandle } from '@/harnesses/prokop/composition/plugins/compose';
 import {
-  createJean2RuntimeComposition,
-  type Jean2RuntimeComposition,
+  createProkopRuntimeComposition,
+  type ProkopRuntimeComposition,
 } from './composition';
 
-type Jean2RuntimeCompositionFactory = () => Promise<Jean2RuntimeComposition>;
+type ProkopRuntimeCompositionFactory = () => Promise<ProkopRuntimeComposition>;
 type ExecutionLifecycle = 'open' | 'closing' | 'closed';
 
 const CLOSED_ERROR = 'Jean2 execution scope is shutting down';
 
-let executionCompositionPromise: Promise<Jean2RuntimeComposition> | null = null;
-let compositionFactory: Jean2RuntimeCompositionFactory = createJean2RuntimeComposition;
+let executionCompositionPromise: Promise<ProkopRuntimeComposition> | null = null;
+let compositionFactory: ProkopRuntimeCompositionFactory = createProkopRuntimeComposition;
 let lifecycle: ExecutionLifecycle = 'open';
 let disposalPromise: Promise<void> | null = null;
 let resolvedAgentScope: AgentScopeHandle | null = null;
@@ -22,7 +22,7 @@ function requireOpenLifecycle(): void {
   }
 }
 
-export function getJean2ExecutionComposition(): Promise<Jean2RuntimeComposition> {
+export function getProkopExecutionComposition(): Promise<ProkopRuntimeComposition> {
   requireOpenLifecycle();
   if (executionCompositionPromise === null) {
     const promise = Promise.resolve().then(compositionFactory);
@@ -43,7 +43,7 @@ export function getJean2ExecutionComposition(): Promise<Jean2RuntimeComposition>
   return executionCompositionPromise;
 }
 
-export function initializeJean2ExecutionScope(): Promise<Jean2RuntimeComposition> {
+export function initializeProkopExecutionScope(): Promise<ProkopRuntimeComposition> {
   if (lifecycle === 'closing') {
     throw new Error(CLOSED_ERROR);
   }
@@ -51,12 +51,12 @@ export function initializeJean2ExecutionScope(): Promise<Jean2RuntimeComposition
     lifecycle = 'open';
     disposalPromise = null;
   }
-  return getJean2ExecutionComposition();
+  return getProkopExecutionComposition();
 }
 
-export function withJean2ExecutionScope<T>(callback: () => Promise<T>): Promise<T> {
+export function withProkopExecutionScope<T>(callback: () => Promise<T>): Promise<T> {
   requireOpenLifecycle();
-  const composition = getJean2ExecutionComposition();
+  const composition = getProkopExecutionComposition();
   const execution = composition.then((resolved) =>
     enterAgentScope(resolved.agentScope, callback),
   );
@@ -74,12 +74,12 @@ export function withJean2ExecutionScope<T>(callback: () => Promise<T>): Promise<
  * composed permission runtime that owns the live waiters. When the
  * composition has not resolved yet, no composed waiter can exist, so the
  * callback runs unscoped against the process-default runtime. */
-export function withJean2ComposedScopeSync<T>(callback: () => T): T {
+export function withProkopComposedScopeSync<T>(callback: () => T): T {
   const scope = resolvedAgentScope;
   return scope === null ? callback() : enterAgentScope(scope, callback);
 }
 
-export function disposeJean2ExecutionScope(): Promise<void> {
+export function disposeProkopExecutionScope(): Promise<void> {
   if (disposalPromise !== null) return disposalPromise;
 
   lifecycle = 'closing';
@@ -89,7 +89,7 @@ export function disposeJean2ExecutionScope(): Promise<void> {
   const disposal = (async (): Promise<void> => {
     await Promise.allSettled(pendingExecutions);
 
-    let composition: Jean2RuntimeComposition | null = null;
+    let composition: ProkopRuntimeComposition | null = null;
     if (pendingComposition !== null) {
       try {
         composition = await pendingComposition;
@@ -115,14 +115,14 @@ export function disposeJean2ExecutionScope(): Promise<void> {
   return disposalPromise;
 }
 
-export function setJean2ExecutionCompositionFactoryForTests(
-  factory: Jean2RuntimeCompositionFactory,
+export function setProkopExecutionCompositionFactoryForTests(
+  factory: ProkopRuntimeCompositionFactory,
 ): void {
   compositionFactory = factory;
 }
 
-export function resetJean2ExecutionCompositionFactoryForTests(): void {
-  compositionFactory = createJean2RuntimeComposition;
+export function resetProkopExecutionCompositionFactoryForTests(): void {
+  compositionFactory = createProkopRuntimeComposition;
   lifecycle = 'open';
   disposalPromise = null;
   resolvedAgentScope = null;

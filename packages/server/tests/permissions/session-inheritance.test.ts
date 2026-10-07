@@ -6,7 +6,7 @@ function flush(): Promise<void> {
 
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace, seedSession } from '#tests/seed';
-import { requestPermission, resolvePermission } from '@capekai/core/ask-authority';
+import { requestPermission, resolvePermission } from '@/harnesses/prokop/permission/permission-request-manager';
 import {
   getWorkspaceGrants,
 } from '@/infrastructure/sqlite/permissions';

@@ -1,5 +1,5 @@
 import { RETRY_INTERVAL_MS } from '@/domains/notifications';
-import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
+import { getProkopNotificationsApplication } from '@/adapters/prokop/notifications';
 
 /**
  * S5 web-push delivery retry scheduler. The retry attempt classification,
@@ -12,7 +12,7 @@ import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications
 let retryInterval: ReturnType<typeof setInterval> | null = null;
 
 async function tick(): Promise<void> {
-  await getJean2NotificationsApplication().runRetryTick();
+  await getProkopNotificationsApplication().runRetryTick();
 }
 
 /**
@@ -53,7 +53,7 @@ export function stopPushRetryScheduler(): void {
  * Called at server startup. Deletes delivery records older than 30 days.
  */
 export function cleanupPushData(): void {
-  const deleted = getJean2NotificationsApplication().cleanup(Date.now());
+  const deleted = getProkopNotificationsApplication().cleanup(Date.now());
   if (deleted > 0) {
     console.log(`[web-push] Cleaned up ${deleted} old delivery record(s)`);
   }

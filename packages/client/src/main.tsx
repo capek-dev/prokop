@@ -6,7 +6,7 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ThemedToaster } from '@/components/providers/ThemedToaster';
 import { PWAUpdateBanner } from '@/components/app/PWAUpdateBanner';
 import { RouterApp } from './router';
-import { registerJean2ServiceWorker } from '@/pwa/registerServiceWorker';
+import { registerProkopServiceWorker } from '@/pwa/registerServiceWorker';
 import { startSessionCacheSync } from '@/lib/sessionCacheSync';
 import { isResizeObserverDeliveryWarning } from '@/lib/globalErrorHandling';
 import { preloadPierreDiffsHighlighter } from '@/lib/pierreDiffsPreload';
@@ -34,7 +34,7 @@ window.addEventListener('unhandledrejection', (event) => {
 document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => e.preventDefault());
 
-registerJean2ServiceWorker();
+registerProkopServiceWorker();
 
 // The query cache owns session-list hydration into the session read-model.
 startSessionCacheSync();

@@ -2,16 +2,16 @@ import { describe, expect, test } from 'bun:test';
 import { realpathSync } from 'node:fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { getRuntimeConfiguration } from '@capekai/core/configuration';
-import { getRuntimeHost as getJean2CompatibilityBindings } from '@capekai/core/hosts';
-import { jean2CompatibilityBindings } from '@/harnesses/prokop/composition/bindings';
+import { getRuntimeConfiguration } from '@/infrastructure/providers/configuration/runtime';
+import { getRuntimeHost as getProkopCompatibilityBindings } from '@/infrastructure/runtime/host';
+import { prokopCompatibilityBindings } from '@/harnesses/prokop/composition/bindings';
 import {
-  jean2RuntimeConfiguration,
-  jean2StorageBundle,
-} from '@/adapters/capek';
+  prokopRuntimeConfiguration,
+  prokopStorageBundle,
+} from '@/harnesses/prokop/host';
 import { createRuntime } from '@/bootstrap/create-runtime';
 
-const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, string[]> = {
+const expectedGroupOperations: Record<keyof typeof prokopCompatibilityBindings, string[]> = {
   interaction: [
     'createPendingAsk', 'removePendingAsk', 'removePendingAsksByToolCallId',
     'getPermissionRequestByRequestId',
@@ -31,23 +31,23 @@ const expectedGroupOperations: Record<keyof typeof jean2CompatibilityBindings, s
 describe('Čapek Jean2 adapter', () => {
   test('supplies every exact binding operation with no shadowed extras', () => {
     for (const [group, expected] of Object.entries(expectedGroupOperations)) {
-      expect(Object.keys(jean2CompatibilityBindings[group as keyof typeof jean2CompatibilityBindings]).sort())
+      expect(Object.keys(prokopCompatibilityBindings[group as keyof typeof prokopCompatibilityBindings]).sort())
         .toEqual([...expected].sort());
     }
   });
 
   test('configures the exact adapter value and preserves host function identity', () => {
     createRuntime();
-    const configured = getJean2CompatibilityBindings();
+    const configured = getProkopCompatibilityBindings();
 
-    expect(configured).toBe(jean2CompatibilityBindings);
+    expect(configured).toBe(prokopCompatibilityBindings);
     expect('store' in configured).toBe(false);
-    expect(typeof jean2StorageBundle.conversation.getSession).toBe('function');
-    expect(getRuntimeConfiguration()).toBe(jean2RuntimeConfiguration);
+    expect(typeof prokopStorageBundle.conversation.getSession).toBe('function');
+    expect(getRuntimeConfiguration()).toBe(prokopRuntimeConfiguration);
   });
 
   test('constructs per-call workspace host facts without path policy callbacks', () => {
-    const host = jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+    const host = prokopCompatibilityBindings.workspace.createToolWorkspaceHost({
       workspacePath: '/workspace/project',
       additionalPaths: ['/workspace/shared'],
       sessionId: 'session-1',

@@ -20,11 +20,11 @@ export function isLikelyStaleBuildError(value: unknown): boolean {
     || details.includes("unexpected token '<'");
 }
 
-export function isJean2Cache(cacheName: string): boolean {
+export function isProkopCache(cacheName: string): boolean {
   return cacheName.startsWith('workbox-precache-') || JEAN2_RUNTIME_CACHES.has(cacheName);
 }
 
-export async function reloadJean2(): Promise<void> {
+export async function reloadProkop(): Promise<void> {
   if (!('serviceWorker' in navigator)) {
     window.location.reload();
     return;
@@ -64,7 +64,7 @@ export async function resetDownloadedAppFiles(): Promise<void> {
     const cacheNames = await window.caches.keys();
     await Promise.all(
       cacheNames
-        .filter(isJean2Cache)
+        .filter(isProkopCache)
         .map((cacheName) => window.caches.delete(cacheName)),
     );
   } catch (err: unknown) {

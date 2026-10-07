@@ -28,7 +28,7 @@ function getProkopaiHomeDir(): string {
   return join(homedir(), PROKOPAI_DIR_NAME);
 }
 
-function getLegacyJean2HomeDir(): string {
+function getLegacyProkopHomeDir(): string {
   return join(homedir(), LEGACY_JEAN2_DIR_NAME);
 }
 
@@ -46,7 +46,7 @@ function resolveDefaultDataDir(): string {
     return prokopai;
   }
 
-  const legacy = getLegacyJean2HomeDir();
+  const legacy = getLegacyProkopHomeDir();
   if (existsSync(legacy)) {
     console.warn(
       `[prokop] Using legacy data directory ${legacy}. ` +

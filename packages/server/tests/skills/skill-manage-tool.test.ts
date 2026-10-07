@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, readFileSync, existsSync, mkdirSync, writeFileSync
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-import { executeSkillManageTool, buildSkillManageToolDescription } from '@capekai/core/hosts';
+import { executeSkillManageTool, buildSkillManageToolDescription } from '@/harnesses/shared/skills/skill-manage-tool';
 
 describe('skill_manage tool', () => {
   let testDir: string;

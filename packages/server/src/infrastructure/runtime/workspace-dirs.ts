@@ -21,7 +21,7 @@ export function getProkopaiWorkspaceDir(workspacePath: string): string {
   return join(workspacePath, PROKOPAI_DIR_NAME);
 }
 
-export function getLegacyJean2WorkspaceDir(workspacePath: string): string {
+export function getLegacyProkopWorkspaceDir(workspacePath: string): string {
   return join(workspacePath, LEGACY_JEAN2_DIR_NAME);
 }
 
@@ -35,7 +35,7 @@ export function resolveWorkspaceDir(workspacePath: string): string {
     return canonical;
   }
 
-  const legacy = getLegacyJean2WorkspaceDir(workspacePath);
+  const legacy = getLegacyProkopWorkspaceDir(workspacePath);
   if (existsSync(legacy)) {
     if (!warnedWorkspaces.has(workspacePath)) {
       warnedWorkspaces.add(workspacePath);

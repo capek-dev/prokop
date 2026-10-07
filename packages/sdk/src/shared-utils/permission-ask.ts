@@ -1,4 +1,4 @@
-import type { PermissionAsk } from '../shared-types';
+import type { PermissionAsk } from '../shared-types/index';
 
 /**
  * Permissions v2 ask details (docs/plans/unified-permissions.md).

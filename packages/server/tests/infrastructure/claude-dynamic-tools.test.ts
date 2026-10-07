@@ -7,8 +7,10 @@ import type { Options, SDKMessage, SdkMcpToolDefinition } from '@anthropic-ai/cl
 
 type ToolResult = Awaited<ReturnType<SdkMcpToolDefinition['handler']>>;
 import type { PermissionAsk } from '@prokopai/sdk';
-import { installMemoryToolFallback, installSessionSearchToolFallback, installSkillsToolFallback } from '@capekai/core/hosts';
-import { agentSkillsDomainTools, memoryDomainTools, sessionSearchDomainTools } from '@/adapters/capek/domain-tools';
+import { installMemoryToolFallback } from '@/harnesses/prokop/composition/plugins/memory-domain';
+import { installSessionSearchToolFallback } from '@/harnesses/prokop/composition/plugins/session-search-domain';
+import { installSkillsToolFallback } from '@/harnesses/prokop/composition/plugins/skills-domain';
+import { agentSkillsDomainTools, memoryDomainTools, sessionSearchDomainTools } from '@/harnesses/shared/domain-tools';
 import { claudeMemoryShape, claudeSessionSearchShape, claudeSkillManageShape,
   createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools } from '@/harnesses/claude-cli/dynamic-tools';
 import { claudeToolInput, claudeToolName, claudeToolSummary, claudeToolVisualization } from '@/harnesses/shared/tool-viz';

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { createJean2SessionRepository } from '@/adapters/jean2/session-repository';
+import { createProkopSessionRepository } from '@/adapters/prokop/session-repository';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
@@ -30,7 +30,7 @@ describe('session worktree binding projection', () => {
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
     });
-    const sessions = createJean2SessionRepository({
+    const sessions = createProkopSessionRepository({
       getPreconfigOrAgent: async () => null,
       isAgentSync: () => false,
     });

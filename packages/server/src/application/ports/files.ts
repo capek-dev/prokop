@@ -3,7 +3,7 @@
  * isolation). Structural contracts only; no store, service, or Hono types
  * cross this boundary. The files application use cases orchestrate every
  * routes/files.ts operation through this port; the Jean2 adapter
- * (`adapters/jean2/files.ts`) fills it with the infrastructure filesystem
+ * (`adapters/prokop/files.ts`) fills it with the infrastructure filesystem
  * implementations over the C6 workspace path policy.
  */
 

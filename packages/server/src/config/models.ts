@@ -2,8 +2,8 @@ import { resolveModelsPath, clearModelsCache, type ModelsConfig, type ModelDefin
 import { atomicWriteFile } from '@/config/files';
 import { existsSync, readFileSync } from 'fs';
 import { ConfigurationNotFoundError, ConfigurationValidationError, ConfigurationConflictError } from '@/config/errors';
-import { getJean2EnvValue } from '@/infrastructure/runtime/environment';
-import { getProviderStatus } from '@/adapters/capek/contracts';
+import { getProkopEnvValue } from '@/infrastructure/runtime/environment';
+import { getProviderStatus } from '@/infrastructure/providers/registry';
 import type {
   ModelsConfigResponse,
   ModelRuntimeStatus,
@@ -199,7 +199,7 @@ export function getModelRuntimeStatus(providerId: string): ModelRuntimeStatus {
   if (providerSupported) {
     const envKey = PROVIDER_ENV_KEYS[providerId];
     if (envKey) {
-      providerConfigured = getJean2EnvValue(envKey) !== undefined;
+      providerConfigured = getProkopEnvValue(envKey) !== undefined;
     }
 
     if (!providerConfigured) {

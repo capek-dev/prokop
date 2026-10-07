@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-import { executeMemoryTool } from '@capekai/core/hosts';
+import { executeMemoryTool } from '@/harnesses/shared/memory/memory-tool';
 
 describe('memory tool', () => {
   let testDir: string;

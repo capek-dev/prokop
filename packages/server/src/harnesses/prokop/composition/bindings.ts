@@ -1,33 +1,30 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  configureRuntimeHost,
-  fixedBuilderContextAssembler,
-  installMemoryToolFallback,
-  installSessionSearchToolFallback,
-  installSkillsToolFallback,
-  installTaskToolFallback,
-  installWorkflowToolFallback,
-  setDefaultContextAssembler,
-  type RuntimeHost,
-} from '@capekai/core/hosts';
+import { configureRuntimeHost, type RuntimeHost } from '@/infrastructure/runtime/host';
+import { fixedBuilderContextAssembler } from '@/harnesses/prokop/composition/plugins/legacy-system-message';
+import { installMemoryToolFallback } from '@/harnesses/prokop/composition/plugins/memory-domain';
+import { installSessionSearchToolFallback } from '@/harnesses/prokop/composition/plugins/session-search-domain';
+import { installSkillsToolFallback } from '@/harnesses/prokop/composition/plugins/skills-domain';
+import { installTaskToolFallback } from '@/harnesses/prokop/composition/plugins/subagent-domain';
+import { installWorkflowToolFallback } from '@/harnesses/prokop/composition/plugins/workflow-domain';
+import { setDefaultContextAssembler } from '@/harnesses/prokop/context/assembler';
 import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';
-import { jean2DeliveryBindings } from '@/adapters/capek/delivery';
-import { jean2InteractionBindings } from '@/adapters/capek/interaction';
-import { jean2SandboxBindings } from '@/adapters/capek/sandbox';
-import { jean2TitleBindings } from '@/adapters/capek/titles';
-import { jean2ToolPolicy } from '@/adapters/capek/tool-policy';
-import { jean2WorkspaceBindings } from '@/adapters/capek/workspace';
+import { prokopDeliveryBindings } from '@/harnesses/prokop/host/delivery';
+import { prokopInteractionBindings } from '@/harnesses/prokop/host/interaction';
+import { prokopSandboxBindings } from '@/harnesses/prokop/host/sandbox';
+import { prokopTitleBindings } from '@/harnesses/prokop/host/titles';
+import { prokopToolPolicy } from '@/harnesses/prokop/host/tool-policy';
+import { prokopWorkspaceBindings } from '@/harnesses/prokop/host/workspace';
 
-export type { RuntimeHost as Jean2CompatibilityBindings } from '@capekai/core/hosts';
+export type { RuntimeHost as ProkopCompatibilityBindings } from '@/infrastructure/runtime/host';
 
-export const jean2CompatibilityBindings = {
-  interaction: jean2InteractionBindings,
-  delivery: jean2DeliveryBindings,
-  titles: jean2TitleBindings,
-  workspace: jean2WorkspaceBindings,
-  toolPolicy: jean2ToolPolicy,
-  sandbox: jean2SandboxBindings,
+export const prokopCompatibilityBindings = {
+  interaction: prokopInteractionBindings,
+  delivery: prokopDeliveryBindings,
+  titles: prokopTitleBindings,
+  workspace: prokopWorkspaceBindings,
+  toolPolicy: prokopToolPolicy,
+  sandbox: prokopSandboxBindings,
   layout: {
     workspaceMemoryDir: (workspacePath: string) => resolveWorkspaceMemoryDir(workspacePath),
     workspaceSkillsDir: (workspacePath: string) => join(workspacePath, '.agents', 'skills'),
@@ -36,12 +33,12 @@ export const jean2CompatibilityBindings = {
   },
 } satisfies RuntimeHost;
 
-export function configureJean2Bindings(): void {
+export function configureProkopBindings(): void {
   // The unscoped Jean2 fallback keeps the legacy fixed-builder assembler as
   // the process default. Composed execution scopes seed their own ordered
   // assembler through enterAgentScope. The bootstrap owns this installation.
   setDefaultContextAssembler(fixedBuilderContextAssembler);
-  configureRuntimeHost(jean2CompatibilityBindings);
+  configureRuntimeHost(prokopCompatibilityBindings);
   installSessionSearchToolFallback();
   installTaskToolFallback();
   installWorkflowToolFallback();

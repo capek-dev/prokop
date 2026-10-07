@@ -1,4 +1,7 @@
-import { registerProvider, sandboxController, SandboxProvider, type AutoResponderRule, type SandboxControlEvent } from '@/adapters/capek/contracts';
+import { registerProvider } from '@/infrastructure/providers/registry';
+import { sandboxController } from '@/infrastructure/sandbox/controller';
+import { SandboxProvider } from '@/infrastructure/sandbox/provider';
+import type { AutoResponderRule, SandboxControlEvent } from '@/infrastructure/sandbox/types';
 
 const defaultAutoResponderRules: AutoResponderRule[] = [
   {

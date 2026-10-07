@@ -9,7 +9,7 @@ import {
   AGENT_MEMORY_USER_FILENAME,
   agentDirectoryPath,
   agentHomeDirectoryPath,
-  agentHomeDotJean2DirectoryPath,
+  agentHomeDotProkopDirectoryPath,
   agentHomeWorkspaceId,
   agentHomeWorkspaceSettings,
   agentMemoryFilename,
@@ -133,10 +133,10 @@ export function createAgentsApplication(deps: AgentsApplicationDeps): AgentsAppl
         agentDir: agentDir(id),
         skillsDir: agentSkillsDirectoryPath(deps.dataDir(), id),
         homeDir: agentHomeDirectoryPath(deps.dataDir(), id),
-        homeDotJean2Dir: agentHomeDotJean2DirectoryPath(deps.dataDir(), id),
+        homeDotProkopDir: agentHomeDotProkopDirectoryPath(deps.dataDir(), id),
       };
       if (!deps.directory.exists(layout.agentDir)) {
-        await deps.directory.makeDirectories(layout.skillsDir, layout.homeDotJean2Dir);
+        await deps.directory.makeDirectories(layout.skillsDir, layout.homeDotProkopDir);
       }
 
       // Create-or-heal the home workspace row; never clobber stored settings.

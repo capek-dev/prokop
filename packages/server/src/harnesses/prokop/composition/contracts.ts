@@ -15,21 +15,21 @@ import {
   getAuthorityForPendingAsk as capekGetAuthorityForPendingAsk,
   getSessionIdForPendingAsk as capekGetSessionIdForPendingAsk,
   resolveAsk as capekResolveAsk,
-} from '@capekai/core/ask-authority';
+} from '@/harnesses/prokop/permission/ask-user-api';
 import type { AskResolutionPort } from '@/application/ports/ask-resolution';
-import { withJean2ComposedScopeSync } from './execution-scope';
+import { withProkopComposedScopeSync } from './execution-scope';
 
 export const prokopAskResolution: AskResolutionPort = {
   resolveAsk(toolCallId, response, requestId) {
-    return withJean2ComposedScopeSync(() =>
+    return withProkopComposedScopeSync(() =>
       capekResolveAsk(toolCallId, response, requestId));
   },
   async getSessionIdForPendingAsk(toolCallId, requestId) {
-    return withJean2ComposedScopeSync(() =>
+    return withProkopComposedScopeSync(() =>
       capekGetSessionIdForPendingAsk(toolCallId, requestId));
   },
   getAuthorityForPendingAsk(toolCallId) {
-    return withJean2ComposedScopeSync(() =>
+    return withProkopComposedScopeSync(() =>
       capekGetAuthorityForPendingAsk(toolCallId));
   },
 };

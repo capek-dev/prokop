@@ -1,4 +1,5 @@
-import { executeMemoryTool, executeSkillManageTool } from '@capekai/core/hosts';
+import { executeMemoryTool } from '@/harnesses/shared/memory/memory-tool';
+import { executeSkillManageTool } from '@/harnesses/shared/skills/skill-manage-tool';
 import type { LearningScope } from '@prokopai/sdk';
 
 export interface LearningKnowledgeBoundary {

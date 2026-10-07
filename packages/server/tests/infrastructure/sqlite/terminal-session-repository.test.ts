@@ -4,7 +4,7 @@ import { seedWorkspace } from '#tests/seed';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { createTerminalSessionRepository } from '@/infrastructure/sqlite/terminal-session-repository';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
-import { createJean2TerminalSessionPort } from '@/adapters/jean2/terminal';
+import { createProkopTerminalSessionPort } from '@/adapters/prokop/terminal';
 import type { TerminalSessionRow } from '@/application/ports/terminal';
 
 function makeRepository() {
@@ -211,7 +211,7 @@ describe('terminal session SQLite repository (exact pre-slice SQL)', () => {
   });
 
   test('the jean2 adapter port is the repository over the store database', () => {
-    const port = createJean2TerminalSessionPort();
+    const port = createProkopTerminalSessionPort();
     port.createTerminalSession({
       id: 'term-adapter',
       workspaceId,

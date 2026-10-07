@@ -1,23 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import {
-  createAskApi,
-  requestPermission,
-} from '@capekai/core/ask-authority';
-import {
-  configureStorage,
-  createInMemoryStorageBundle,
-} from '@capekai/core/storage';
+import { createAskApi } from '@/harnesses/prokop/permission/ask-user-api';
+import { requestPermission } from '@/harnesses/prokop/permission/permission-request-manager';
+import { configureStorage } from '@/infrastructure/storage/runtime';
+import { createInMemoryStorageBundle } from '@/infrastructure/storage/memory';
 import type { AskRequestMessage, AskTimedOutMessage, PermissionAsk } from '@prokopai/sdk';
 import { prokopAskResolution } from '@/harnesses/prokop/composition/contracts';
-import { configureJean2Bindings } from '@/harnesses/prokop/composition/bindings';
-import { configureJean2RuntimeConfiguration } from '@/adapters/capek/runtime-configuration';
-import { configureJean2Storage } from '@/adapters/capek/storage';
-import { configureJean2WorkspaceToolDiscovery } from '@/adapters/capek/tool-source';
+import { configureProkopBindings } from '@/harnesses/prokop/composition/bindings';
+import { configureProkopRuntimeConfiguration } from '@/harnesses/prokop/host/runtime-configuration';
+import { configureProkopStorage } from '@/harnesses/prokop/host/storage';
+import { configureProkopWorkspaceToolDiscovery } from '@/harnesses/prokop/host/tool-source';
 import {
-  disposeJean2ExecutionScope,
-  initializeJean2ExecutionScope,
-  resetJean2ExecutionCompositionFactoryForTests,
-  withJean2ExecutionScope,
+  disposeProkopExecutionScope,
+  initializeProkopExecutionScope,
+  resetProkopExecutionCompositionFactoryForTests,
+  withProkopExecutionScope,
 } from '@/harnesses/prokop/composition/execution-scope';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspaceWithSession } from '#tests/seed';
@@ -63,16 +59,16 @@ describe('wire-side ask resolution reaches the composed runtime', () => {
     sessionId = seeded.sessionId;
     workspaceId = seeded.workspaceId;
 
-    configureJean2Storage();
-    configureJean2RuntimeConfiguration();
-    configureJean2WorkspaceToolDiscovery();
-    configureJean2Bindings();
-    await initializeJean2ExecutionScope();
+    configureProkopStorage();
+    configureProkopRuntimeConfiguration();
+    configureProkopWorkspaceToolDiscovery();
+    configureProkopBindings();
+    await initializeProkopExecutionScope();
   });
 
   afterEach(async () => {
-    await disposeJean2ExecutionScope();
-    resetJean2ExecutionCompositionFactoryForTests();
+    await disposeProkopExecutionScope();
+    resetProkopExecutionCompositionFactoryForTests();
     configureStorage(createInMemoryStorageBundle());
     resetTestDatabase();
   });
@@ -91,7 +87,7 @@ describe('wire-side ask resolution reaches the composed runtime', () => {
     };
 
     let permissionPromise: Promise<unknown> | undefined;
-    await withJean2ExecutionScope(async () => {
+    await withProkopExecutionScope(async () => {
       permissionPromise = requestPermission({
         sessionId,
         workspaceId,
@@ -130,7 +126,7 @@ describe('wire-side ask resolution reaches the composed runtime', () => {
     };
 
     let askPromise: Promise<unknown> | undefined;
-    await withJean2ExecutionScope(async () => {
+    await withProkopExecutionScope(async () => {
       const askApi = createAskApi(
         sessionId,
         'call_composed_2',

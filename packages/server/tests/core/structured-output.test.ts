@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { buildSchemaPromptInstruction, extractJsonFromText } from '@capekai/core/execution';
+import { buildSchemaPromptInstruction, extractJsonFromText } from '@/harnesses/prokop/execution/structured-output';
 
 const responseFormat = {
   id: 'format-1',

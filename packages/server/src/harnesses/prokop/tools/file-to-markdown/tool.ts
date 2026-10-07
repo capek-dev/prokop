@@ -1,6 +1,6 @@
 // MIT License — https://github.com/jojomondag/FileToMarkdown
 // Adapted from jojomondag/FileToMarkdown (MIT) — converted per-converter logic ported to TypeScript + Jean2 wrapper
-import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk/tool';
 import { fileConcernAsk, isToolPathAllowed } from '../file-permission';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;

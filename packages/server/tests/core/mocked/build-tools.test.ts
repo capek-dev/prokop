@@ -3,17 +3,15 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { tool, jsonSchema } from 'ai';
-import { configureWorkspaceToolDiscovery } from '@capekai/core/tools';
-import { configureAgentSource, configurePreconfigSource } from '@capekai/core/hosts';
-import {
-  configureStorage,
-  type StorageBundle,
-} from '@capekai/core/storage';
-import { configureJean2Bindings } from '@/harnesses/prokop/composition/bindings';
-import { jean2CompatibilityBindings } from '@/harnesses/prokop/composition/bindings';
-import { jean2StorageBundle } from '@/adapters/capek';
-import { buildAiSdkTools, type BuildToolsOptions } from '@capekai/core/execution';
-import { clearCache, scanTools } from '@capekai/core/tools';
+import { configureWorkspaceToolDiscovery } from '@/infrastructure/tools/tool-source';
+import { configureAgentSource, configurePreconfigSource } from '@/harnesses/prokop/context/sources';
+import { configureStorage } from '@/infrastructure/storage/runtime';
+import type { StorageBundle } from '@/infrastructure/storage/contracts';
+import { configureProkopBindings } from '@/harnesses/prokop/composition/bindings';
+import { prokopCompatibilityBindings } from '@/harnesses/prokop/composition/bindings';
+import { prokopStorageBundle } from '@/harnesses/prokop/host';
+import { buildAiSdkTools, type BuildToolsOptions } from '@/harnesses/prokop/execution/build-tools';
+import { clearCache, scanTools } from '@/infrastructure/tools/registry';
 import type { Preconfig, Session, Workspace } from '@prokopai/sdk';
 
 interface BindingOverrides {
@@ -28,9 +26,9 @@ let fixtureDir: string | null = null;
 
 function configureBindings(overrides: BindingOverrides = {}): void {
   const storage: StorageBundle = {
-    ...jean2StorageBundle,
+    ...prokopStorageBundle,
     conversation: {
-      ...jean2StorageBundle.conversation,
+      ...prokopStorageBundle.conversation,
       getSession: async (id) => {
         if (overrides.sessionNotFound) return null;
         const session = overrides.sessions?.[id];
@@ -40,12 +38,12 @@ function configureBindings(overrides: BindingOverrides = {}): void {
       },
     },
     workspaces: {
-      ...jean2StorageBundle.workspaces,
+      ...prokopStorageBundle.workspaces,
       get: async () => overrides.workspace ?? null,
     },
   };
   configureStorage(storage);
-  configureJean2Bindings();
+  configureProkopBindings();
   configurePreconfigSource({
     get: async () => null,
     getDefault: async () => null,
@@ -119,8 +117,8 @@ describe('build-tools binding integration', () => {
       rmSync(fixtureDir, { recursive: true, force: true });
       fixtureDir = null;
     }
-    configureStorage(jean2StorageBundle);
-    configureJean2Bindings();
+    configureStorage(prokopStorageBundle);
+    configureProkopBindings();
   });
 
   test('exposes only intrinsic artifact retrieval when no sources are enabled', async () => {
@@ -159,10 +157,10 @@ describe('build-tools binding integration', () => {
 
     expect(result).toEqual({
       workspacePath: '/workspace/project',
-      allowedPaths: [jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+      allowedPaths: [prokopCompatibilityBindings.workspace.createToolWorkspaceHost({
         sessionId: 'session-context',
       }).allowedRoots?.[0]],
-      tempDir: jean2CompatibilityBindings.workspace.createToolWorkspaceHost({
+      tempDir: prokopCompatibilityBindings.workspace.createToolWorkspaceHost({
         sessionId: 'session-context',
       }).tempDir,
       additionalAllowed: true,

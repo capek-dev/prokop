@@ -1,4 +1,4 @@
-import type { ClientDescriptor } from '@capekai/types';
+import type { ClientDescriptor } from './server';
 import type { HarnessModelChoice, SessionHarness } from '../shared-types/session';
 
 // No permission type imports needed — permission grant/deny messages removed.

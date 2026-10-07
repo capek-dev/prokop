@@ -1,6 +1,6 @@
 import type { DaemonResult } from '@/infrastructure/daemon';
 import { startDaemon } from '@/infrastructure/daemon';
-import { initJean2, type InitOptions, type InitResult } from '@/cli/init';
+import { initProkop, type InitOptions, type InitResult } from '@/cli/init';
 import { getClientUrl, openClient, waitForClient, type OpenClientResult } from '@/cli/open-client';
 
 export interface InitCommandDependencies {
@@ -19,7 +19,7 @@ export interface InitCommandResult {
 }
 
 const defaultDependencies: InitCommandDependencies = {
-  initialize: initJean2,
+  initialize: initProkop,
   start: () => startDaemon(),
   getClientUrl,
   waitUntilReady: waitForClient,

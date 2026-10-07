@@ -9,7 +9,7 @@ import {
 import { homedir } from 'os';
 import { isAbsolute, join, relative, resolve, sep } from 'path';
 import { clearConfigCache, resolveDatabasePath } from '@/config';
-import { reloadJean2Env, wasEnvInjectedFromFile } from '@/infrastructure/runtime/environment';
+import { reloadProkopEnv, wasEnvInjectedFromFile } from '@/infrastructure/runtime/environment';
 import { getDataDir, Paths, LEGACY_JEAN2_DIR_NAME, PROKOPAI_DIR_NAME } from '@/infrastructure/runtime/paths';
 import {
   checkpointDatabase,
@@ -458,7 +458,7 @@ export function runProkopaiRenameMigration(options?: RenameMigrationOptions): Re
       Paths.reset();
     }
     clearConfigCache();
-    reloadJean2Env();
+    reloadProkopEnv();
     if (resolve(getDataDir()) !== resolve(canonicalHome)) {
       throw new Error(`startup data directory resolves ${getDataDir()}, expected ${canonicalHome}`);
     }
@@ -485,7 +485,7 @@ export function runProkopaiRenameMigration(options?: RenameMigrationOptions): Re
         Paths.reset();
       }
       clearConfigCache();
-      reloadJean2Env();
+      reloadProkopEnv();
     } catch (rollbackErr: unknown) {
       const rollbackMessage = rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr);
       return failedResult(steps, 'startup-validation', `${message}; rollback failed: ${rollbackMessage}`);

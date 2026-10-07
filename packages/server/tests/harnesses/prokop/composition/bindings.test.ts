@@ -1,29 +1,29 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { getRuntimeHost as getJean2CompatibilityBindings } from '@capekai/core/hosts';
+import { getRuntimeHost as getProkopCompatibilityBindings } from '@/infrastructure/runtime/host';
 import {
-  configureJean2Bindings,
-  jean2CompatibilityBindings,
+  configureProkopBindings,
+  prokopCompatibilityBindings,
 } from '@/harnesses/prokop/composition/bindings';
-import { deliverCapekEvent } from '@/adapters/capek/events';
-import { jean2DeliveryBindings } from '@/adapters/capek/delivery';
-import { jean2InteractionBindings } from '@/adapters/capek/interaction';
-import { jean2SandboxBindings } from '@/adapters/capek/sandbox';
-import { jean2TitleBindings } from '@/adapters/capek/titles';
-import { jean2ToolPolicy } from '@/adapters/capek/tool-policy';
-import { jean2WorkspaceBindings } from '@/adapters/capek/workspace';
+import { deliverCapekEvent } from '@/harnesses/prokop/host/events';
+import { prokopDeliveryBindings } from '@/harnesses/prokop/host/delivery';
+import { prokopInteractionBindings } from '@/harnesses/prokop/host/interaction';
+import { prokopSandboxBindings } from '@/harnesses/prokop/host/sandbox';
+import { prokopTitleBindings } from '@/harnesses/prokop/host/titles';
+import { prokopToolPolicy } from '@/harnesses/prokop/host/tool-policy';
+import { prokopWorkspaceBindings } from '@/harnesses/prokop/host/workspace';
 import { generateSessionTitle, hasManualSessionTitle, isDefaultSessionTitle } from '@/infrastructure/session-title';
 import { isSandboxActive } from '@/infrastructure/sandbox';
 import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getDatabase } from '@/infrastructure/sqlite/database';
 import { createManagedWorktreeRepository } from '@/infrastructure/sqlite/managed-worktrees';
-import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
+import { getProkopNotificationsApplication } from '@/adapters/prokop/notifications';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { seedSession, seedWorkspace } from '#tests/seed';
 import { getTestDataDir, resetTestDataDir, setupTestDataDir } from '#tests/test-dir';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
-import type { ToolDefinition } from '@capekai/tool';
+import type { ToolDefinition } from '@prokopai/sdk/tool';
 
 describe('Čapek binding group adapters', () => {
   beforeEach(() => {
@@ -37,7 +37,7 @@ describe('Čapek binding group adapters', () => {
   });
 
   test('interaction group keeps the async operations and identities', async () => {
-    expect(Object.keys(jean2InteractionBindings).sort()).toEqual([
+    expect(Object.keys(prokopInteractionBindings).sort()).toEqual([
       'createPendingAsk', 'removePendingAsk', 'removePendingAsksByToolCallId',
       'getPermissionRequestByRequestId', 'resolvePermissionRequestByRequestId',
       'expirePermissionRequest', 'expireOldPermissionRequests', 'cancelPendingRequestsBySession',
@@ -46,10 +46,10 @@ describe('Čapek binding group adapters', () => {
       'getPermissionTimeoutMs', 'notifyPermissionRequired',
     ].sort());
 
-    expect(jean2InteractionBindings.getPermissionTimeoutMs).toBe(getPermissionTimeoutMs);
-    expect(typeof jean2InteractionBindings.createPendingAsk).toBe('function');
-    expect(typeof jean2InteractionBindings.notifyPermissionRequired).toBe('function');
-    expect(getJean2NotificationsApplication().notifyPermissionRequired).toBeDefined();
+    expect(prokopInteractionBindings.getPermissionTimeoutMs).toBe(getPermissionTimeoutMs);
+    expect(typeof prokopInteractionBindings.createPendingAsk).toBe('function');
+    expect(typeof prokopInteractionBindings.notifyPermissionRequired).toBe('function');
+    expect(getProkopNotificationsApplication().notifyPermissionRequired).toBeDefined();
   });
 
   test('interaction auto-approve severity reads the session record, inheriting the standard default', async () => {
@@ -57,38 +57,38 @@ describe('Čapek binding group adapters', () => {
     const withSeverity = seedSession('ws1', { permissionMode: 'extended' });
     const withoutSeverity = seedSession('ws1');
 
-    expect(await jean2InteractionBindings.getSessionAutoApproveSeverity?.(withSeverity.id)).toBe('medium');
-    expect(await jean2InteractionBindings.getSessionAutoApproveSeverity?.(withoutSeverity.id)).toBe('low');
-    expect(await jean2InteractionBindings.getSessionAutoApproveSeverity?.('missing')).toBeUndefined();
+    expect(await prokopInteractionBindings.getSessionAutoApproveSeverity?.(withSeverity.id)).toBe('medium');
+    expect(await prokopInteractionBindings.getSessionAutoApproveSeverity?.(withoutSeverity.id)).toBe('low');
+    expect(await prokopInteractionBindings.getSessionAutoApproveSeverity?.('missing')).toBeUndefined();
     expect(getSession(withSeverity.id)?.permissionMode).toBe('extended');
   });
 
   test('title, sandbox, and delivery groups keep the exact operations', () => {
-    expect(Object.keys(jean2TitleBindings).sort()).toEqual(
+    expect(Object.keys(prokopTitleBindings).sort()).toEqual(
       ['isDefaultSessionTitle', 'hasManualSessionTitle', 'generateSessionTitle'].sort(),
     );
-    expect(jean2TitleBindings.isDefaultSessionTitle).toBe(isDefaultSessionTitle);
-    expect(jean2TitleBindings.hasManualSessionTitle).toBe(hasManualSessionTitle);
-    expect(jean2TitleBindings.generateSessionTitle).toBe(generateSessionTitle);
+    expect(prokopTitleBindings.isDefaultSessionTitle).toBe(isDefaultSessionTitle);
+    expect(prokopTitleBindings.hasManualSessionTitle).toBe(hasManualSessionTitle);
+    expect(prokopTitleBindings.generateSessionTitle).toBe(generateSessionTitle);
 
-    expect(Object.keys(jean2SandboxBindings)).toEqual(['isSandboxActive']);
-    expect(jean2SandboxBindings.isSandboxActive).toBe(isSandboxActive);
+    expect(Object.keys(prokopSandboxBindings)).toEqual(['isSandboxActive']);
+    expect(prokopSandboxBindings.isSandboxActive).toBe(isSandboxActive);
 
-    expect(Object.keys(jean2DeliveryBindings)).toEqual(['emit']);
-    expect(jean2DeliveryBindings.emit).toBe(deliverCapekEvent);
+    expect(Object.keys(prokopDeliveryBindings)).toEqual(['emit']);
+    expect(prokopDeliveryBindings.emit).toBe(deliverCapekEvent);
   });
 
   test('bindings assemble the exact group objects in the original order', () => {
-    expect(Object.keys(jean2CompatibilityBindings)).toEqual([
+    expect(Object.keys(prokopCompatibilityBindings)).toEqual([
       'interaction', 'delivery', 'titles', 'workspace', 'toolPolicy', 'sandbox', 'layout',
     ]);
-    expect(jean2CompatibilityBindings.interaction).toBe(jean2InteractionBindings);
-    expect(jean2CompatibilityBindings.delivery).toBe(jean2DeliveryBindings);
-    expect(jean2CompatibilityBindings.titles).toBe(jean2TitleBindings);
-    expect(jean2CompatibilityBindings.workspace).toBe(jean2WorkspaceBindings);
-    expect(jean2CompatibilityBindings.toolPolicy).toBe(jean2ToolPolicy);
-    expect(jean2CompatibilityBindings.sandbox).toBe(jean2SandboxBindings);
-    expect('store' in jean2CompatibilityBindings).toBe(false);
+    expect(prokopCompatibilityBindings.interaction).toBe(prokopInteractionBindings);
+    expect(prokopCompatibilityBindings.delivery).toBe(prokopDeliveryBindings);
+    expect(prokopCompatibilityBindings.titles).toBe(prokopTitleBindings);
+    expect(prokopCompatibilityBindings.workspace).toBe(prokopWorkspaceBindings);
+    expect(prokopCompatibilityBindings.toolPolicy).toBe(prokopToolPolicy);
+    expect(prokopCompatibilityBindings.sandbox).toBe(prokopSandboxBindings);
+    expect('store' in prokopCompatibilityBindings).toBe(false);
   });
 
   // The compat bindings host has no unconfigured reset. Leaving Jean2
@@ -96,8 +96,8 @@ describe('Čapek binding group adapters', () => {
   // production startup path establish, so this install test does not leak
   // beyond that expected state.
   test('installs the module-level compatibility bindings by identity', () => {
-    configureJean2Bindings();
-    expect(getJean2CompatibilityBindings()).toBe(jean2CompatibilityBindings);
+    configureProkopBindings();
+    expect(getProkopCompatibilityBindings()).toBe(prokopCompatibilityBindings);
   });
 
   test('resolves available managed roots and fails closed for unavailable roots', async () => {
@@ -119,14 +119,14 @@ describe('Čapek binding group adapters', () => {
       updatedAt: '2026-01-01T00:00:00.000Z',
     });
 
-    expect(await jean2WorkspaceBindings.resolveSessionWorkspace?.({
+    expect(await prokopWorkspaceBindings.resolveSessionWorkspace?.({
       sessionId: 'session-1',
       workspaceId: 'ws1',
       workspaceRootId: 'worktree-1',
       workspacePath: '/repo',
       additionalPaths: ['/other'],
     })).toEqual({ workspacePath: path, additionalPaths: [] });
-    await expect(jean2WorkspaceBindings.resolveSessionWorkspace?.({
+    await expect(prokopWorkspaceBindings.resolveSessionWorkspace?.({
       sessionId: 'session-1',
       workspaceId: 'foreign-workspace',
       workspaceRootId: 'worktree-1',
@@ -134,7 +134,7 @@ describe('Čapek binding group adapters', () => {
     })).rejects.toThrow('not available');
 
     rmSync(path, { recursive: true });
-    await expect(jean2WorkspaceBindings.resolveSessionWorkspace?.({
+    await expect(prokopWorkspaceBindings.resolveSessionWorkspace?.({
       sessionId: 'session-1',
       workspaceId: 'ws1',
       workspaceRootId: 'worktree-1',
@@ -143,7 +143,7 @@ describe('Čapek binding group adapters', () => {
     expect(worktrees.get('worktree-1')?.state).toBe('missing');
 
     worktrees.update('worktree-1', { state: 'removed' });
-    await expect(jean2WorkspaceBindings.resolveSessionWorkspace?.({
+    await expect(prokopWorkspaceBindings.resolveSessionWorkspace?.({
       sessionId: 'session-1',
       workspaceId: 'ws1',
       workspaceRootId: 'worktree-1',
@@ -155,14 +155,14 @@ describe('Čapek binding group adapters', () => {
     const readFile = { name: 'read-file', description: 'Read files' } as ToolDefinition;
     const customTool = { name: 'custom-tool' } as ToolDefinition;
 
-    const resolved = await jean2ToolPolicy.resolveDefinition?.({
+    const resolved = await prokopToolPolicy.resolveDefinition?.({
       sessionId: 'session-1',
       definition: readFile,
     });
     expect(resolved?.description).toContain('Read files');
     expect(resolved?.description).toContain('jean2/session-1');
     expect(readFile.description).toBe('Read files');
-    expect(await jean2ToolPolicy.resolveDefinition?.({
+    expect(await prokopToolPolicy.resolveDefinition?.({
       sessionId: 'session-1',
       definition: customTool,
     })).toBe(customTool);

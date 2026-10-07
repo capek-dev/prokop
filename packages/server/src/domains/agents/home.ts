@@ -42,7 +42,7 @@ export function agentHomeDotDirectoryPath(dataDir: string, agentId: string): str
  * Same resolution: the `.prokopai` dir inside the agent home, falling back
  * to `.jean2` when only the legacy dir exists on disk.
  */
-export function agentHomeDotJean2DirectoryPath(dataDir: string, agentId: string): string {
+export function agentHomeDotProkopDirectoryPath(dataDir: string, agentId: string): string {
   const canonical = agentHomeDotDirectoryPath(dataDir, agentId);
   if (existsSync(canonical)) {
     return canonical;

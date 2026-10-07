@@ -1,8 +1,8 @@
-import { createCapabilityTool, type CapabilityTool } from '@/adapters/capek/contracts';
+import { createCapabilityTool, type CapabilityTool } from '@/infrastructure/providers/ai-sdk';
 import { CallToolResultSchema, type Tool as MCPToolDef } from '@modelcontextprotocol/sdk/types.js';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { getWorkspaceTools } from './manager';
-import { mcpModelOutput, mcpOutputForCapek } from '@/adapters/capek/mcp-output';
+import { mcpModelOutput, mcpOutputForCapek } from '@/infrastructure/mcp/model-output';
 
 export async function getTools(path: string, sessionId: string, authorized?: () => Promise<boolean>): Promise<Record<string, CapabilityTool>> {
   return Object.fromEntries((await getWorkspaceTools(path, sessionId)).map(tool => {

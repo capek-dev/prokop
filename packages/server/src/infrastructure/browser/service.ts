@@ -1,4 +1,4 @@
-import type { Ask, AskApi, PermissionAsk } from '@capekai/tool';
+import type { Ask, AskApi, PermissionAsk } from '@prokopai/sdk/tool';
 import type { AskAuthority } from '@prokopai/sdk';
 import type { BrowserRequestsPort } from '@/application/ports/browser';
 import type { WorkspaceMcpResult } from '@/application/ports/mcp-tools';
@@ -13,7 +13,7 @@ import { getAllClients, getConnectionById } from '@/transport/websocket/connecti
 import { getControllerConnections } from '@/transport/websocket/control-registry';
 import { broadcastToSessionEvent, sendToAskTargetsEvent, sendToConnectionEvent } from '@/transport/websocket/broadcast';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
-import { getJean2NotificationsApplication } from '@/adapters/jean2/notifications';
+import { getProkopNotificationsApplication } from '@/adapters/prokop/notifications';
 import { browserTools, validateBrowserInput } from './catalog';
 
 const CONTROLLER: AskAuthority = { visibilityScope: 'controller_only', resolutionMode: 'controller_only' };
@@ -158,7 +158,7 @@ export class BrowserService implements BrowserRequestsPort {
         if (connectionId) sendToConnectionEvent(connectionId, message);
         else {
           sendToAskTargetsEvent(sessionId, authority, message);
-          getJean2NotificationsApplication().notifyPermissionRequired(requestId, sessionId);
+          getProkopNotificationsApplication().notifyPermissionRequired(requestId, sessionId);
         }
       } catch (error: unknown) { finish(undefined, error instanceof Error ? error : new Error('Browser request delivery failed')); }
     });

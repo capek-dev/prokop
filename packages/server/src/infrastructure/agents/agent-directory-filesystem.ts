@@ -1,7 +1,7 @@
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { dirname } from 'node:path';
-import { withKnowledgeMutationLock } from '@capekai/core/hosts';
+import { withKnowledgeMutationLock } from '@/infrastructure/filesystem/knowledge-mutation-lock';
 import type { AgentDirectoryPort } from '@/application/ports/agents';
 
 /**

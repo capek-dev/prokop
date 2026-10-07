@@ -1,0 +1,50 @@
+import { getPermissionTimeoutMs } from '@/infrastructure/runtime/environment';
+import { getSession } from '@/infrastructure/sqlite/session-store';
+import {
+  cancelPendingRequestsBySession,
+  createPendingAsk,
+  expireOldPermissionRequests,
+  expirePermissionRequest,
+  getPermissionRequestByRequestId,
+  listPendingAsksByRootSession,
+  listPendingAsksBySession,
+  listPendingRequestsByRootSession,
+  removePendingAsk,
+  removePendingAsksByToolCallId,
+  resolvePermissionRequestByRequestId,
+} from '@/infrastructure/sqlite/pending-asks';
+import { createGrantFromOptions, matchGrant } from '@/infrastructure/sqlite/permissions';
+import { severityFromMode } from '@/domains/permissions';
+import { getProkopNotificationsApplication } from '@/adapters/prokop/notifications';
+import type { RuntimeHost as ProkopCompatibilityBindings } from '@/infrastructure/runtime/host';
+
+export const prokopInteractionBindings: ProkopCompatibilityBindings['interaction'] = {
+  createPendingAsk: async (record) => createPendingAsk(record),
+  removePendingAsk: async (id) => {
+    removePendingAsk(id);
+  },
+  removePendingAsksByToolCallId: async (toolCallId) => {
+    removePendingAsksByToolCallId(toolCallId);
+  },
+  getPermissionRequestByRequestId: async (requestId) => getPermissionRequestByRequestId(requestId),
+  resolvePermissionRequestByRequestId: async (requestId, status, resolution) =>
+    resolvePermissionRequestByRequestId(requestId, status, resolution),
+  expirePermissionRequest: async (id) => expirePermissionRequest(id),
+  expireOldPermissionRequests: async (maxAgeMs) => expireOldPermissionRequests(maxAgeMs),
+  cancelPendingRequestsBySession: async (sessionId) => cancelPendingRequestsBySession(sessionId),
+  listPendingAsksBySession: async (sessionId) => listPendingAsksBySession(sessionId),
+  listPendingAsksByRootSession: async (rootSessionId) => listPendingAsksByRootSession(rootSessionId),
+  listPendingRequestsByRootSession: async (rootSessionId) => listPendingRequestsByRootSession(rootSessionId),
+  matchGrant: async (params) => matchGrant(params),
+  createGrantFromOptions: async (params) => createGrantFromOptions(params),
+  getSessionAutoApproveSeverity: async (sessionId) => {
+    // Permissions v2 slice-2 shim: the capek runtime still consumes the
+    // legacy severity ladder; decide() replaces it in slice 4.
+    const session = getSession(sessionId);
+    return session ? severityFromMode(session.permissionMode ?? 'standard') : undefined;
+  },
+  getPermissionTimeoutMs,
+  notifyPermissionRequired: async (requestId: string, rootSessionId: string) => {
+    getProkopNotificationsApplication().notifyPermissionRequired(requestId, rootSessionId);
+  },
+};

@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeEach, expect, test } from 'bun:test';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { memoryDomainTools } from '@/adapters/capek/domain-tools';
+import { memoryDomainTools } from '@/harnesses/shared/domain-tools';
 import { createCodexMemoryTools } from '@/harnesses/codex-cli/memory-tools';
 import { createSession } from '@/infrastructure/sqlite/session-store';
 import { updateWorkspace } from '@/infrastructure/sqlite/workspaces';

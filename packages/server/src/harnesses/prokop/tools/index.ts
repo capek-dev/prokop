@@ -7,7 +7,7 @@
  * colliding names are shadowed (built-in wins).
  */
 
-import type { LoadedTool, ToolContext, ToolDefinition, ToolResult } from '@capekai/tool';
+import type { LoadedTool, ToolContext, ToolDefinition, ToolResult } from '@prokopai/sdk/tool';
 import * as edit from '@/harnesses/prokop/tools/edit/tool';
 import * as fileToMarkdown from '@/harnesses/prokop/tools/file-to-markdown/tool';
 import * as glob from '@/harnesses/prokop/tools/glob/tool';

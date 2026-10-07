@@ -3,8 +3,8 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
 import {
-  getJean2EnvValue,
-  reloadJean2Env,
+  getProkopEnvValue,
+  reloadProkopEnv,
   wasEnvInjectedFromFile,
 } from '@/infrastructure/runtime/environment';
 import {
@@ -37,7 +37,7 @@ describe('provider credential files', () => {
     };
 
     testDir = setupTestDataDir();
-    reloadJean2Env();
+    reloadProkopEnv();
     delete process.env[ENV_KEY];
     delete process.env[LEGACY_ENV_KEY];
   });
@@ -45,7 +45,7 @@ describe('provider credential files', () => {
   afterEach(() => {
     delete process.env[ENV_KEY];
     delete process.env[LEGACY_ENV_KEY];
-    reloadJean2Env();
+    reloadProkopEnv();
     resetTestDataDir();
 
     if (!savedCanonical.injectedFromFile && savedCanonical.value !== undefined) {
@@ -54,13 +54,13 @@ describe('provider credential files', () => {
     if (!savedLegacy.injectedFromFile && savedLegacy.value !== undefined) {
       process.env[LEGACY_ENV_KEY] = savedLegacy.value;
     }
-    reloadJean2Env();
+    reloadProkopEnv();
   });
 
   test('clearing a file credential removes its runtime value and configured status', async () => {
     await setProviderCredential('openai', 'sk-test');
 
-    expect(getJean2EnvValue(ENV_KEY)).toBe('sk-test');
+    expect(getProkopEnvValue(ENV_KEY)).toBe('sk-test');
     expect(listProviderCredentials().providers.find(({ provider }) => provider === 'openai')).toEqual({
       provider: 'openai',
       configured: true,
@@ -68,7 +68,7 @@ describe('provider credential files', () => {
 
     await clearProviderCredential('openai');
 
-    expect(getJean2EnvValue(ENV_KEY)).toBeUndefined();
+    expect(getProkopEnvValue(ENV_KEY)).toBeUndefined();
     expect(process.env[ENV_KEY]).toBeUndefined();
     expect(listProviderCredentials().providers.find(({ provider }) => provider === 'openai')).toEqual({
       provider: 'openai',

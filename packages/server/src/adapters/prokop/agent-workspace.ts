@@ -1,0 +1,38 @@
+import type { AgentPreconfigPort, AgentWorkspacePort } from '@/application/ports/agents';
+import { getPreconfig, listPreconfigs } from '@/infrastructure/config/preconfig';
+import {
+  createWorkspace,
+  deleteWorkspace,
+  getWorkspace,
+  updateWorkspace,
+} from '@/infrastructure/sqlite/workspaces';
+
+/**
+ * Prokop adapter for the agent workspace port (S4). Wraps the current
+ * workspace store functions exactly; the application use cases own the
+ * promotion and home settings policy.
+ */
+export function createProkopAgentWorkspacePort(): AgentWorkspacePort {
+  return {
+    create(input) {
+      return createWorkspace(input);
+    },
+    get(id) {
+      return getWorkspace(id);
+    },
+    applySettings(id, settings) {
+      updateWorkspace(id, { settings });
+    },
+    delete(id) {
+      deleteWorkspace(id);
+    },
+  };
+}
+
+/** Prokop adapter for the agent preconfig port. */
+export function createProkopAgentPreconfigPort(): AgentPreconfigPort {
+  return {
+    get: getPreconfig,
+    list: listPreconfigs,
+  };
+}

@@ -2,7 +2,7 @@ import { Component, type ReactNode } from 'react';
 
 import {
   isLikelyStaleBuildError,
-  reloadJean2,
+  reloadProkop,
   resetDownloadedAppFiles,
 } from '@/pwa/recovery';
 
@@ -50,7 +50,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private handleReload = (): void => {
     this.setState({ isRecovering: true });
-    void reloadJean2();
+    void reloadProkop();
   };
 
   private handleReset = (): void => {

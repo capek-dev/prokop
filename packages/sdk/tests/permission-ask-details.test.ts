@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { readPermissionAskDetails } from '../src';
-import type { PermissionAsk } from '../src';
+import { readPermissionAskDetails } from '../src/index';
+import type { PermissionAsk } from '../src/index';
 
 function ask(extra: Record<string, unknown>): PermissionAsk {
   return {

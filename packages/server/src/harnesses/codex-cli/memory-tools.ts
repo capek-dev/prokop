@@ -1,4 +1,4 @@
-import type { MemoryDomainBridge } from '@/adapters/capek/domain-tools';
+import type { MemoryDomainBridge } from '@/harnesses/shared/domain-tools';
 import { getSession } from '@/infrastructure/sqlite/session-store';
 import { getWorkspace } from '@/infrastructure/sqlite/workspaces';
 import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';

@@ -1,8 +1,15 @@
-import { capekContextAssemblerKey, createAgentScope, createProcessScope, enterAgentScope, type CapekPlugin } from '@capekai/core/composition';
-import { getRuntimeHost, runtimeHostValuePlugin } from '@capekai/core/plugins';
-import { executeChildSession } from '@capekai/core/providers';
+import { capekContextAssemblerKey } from '@/harnesses/prokop/composition/plugins/service-keys';
+import {
+  createAgentScope,
+  createProcessScope,
+  enterAgentScope,
+  type RuntimePlugin,
+} from '@/harnesses/prokop/composition/plugins/compose';
+import { getRuntimeHost } from '@/infrastructure/runtime/host';
+import { runtimeHostValuePlugin } from '@/harnesses/prokop/composition/plugins/value-plugins';
+import { executeChildSession } from '@/harnesses/prokop/subagent/child-session';
 import type { Preconfig } from '@prokopai/sdk';
-import { jean2AgentPlugins, jean2ProcessPlugins } from '@/harnesses/prokop/composition/profile';
+import { prokopAgentPlugins, prokopProcessPlugins } from '@/harnesses/prokop/composition/profile';
 import { createLearningToolsPlugins, type LearningToolsOptions } from './learning-tools';
 
 const OMITTED = new Set([
@@ -39,16 +46,16 @@ export async function executeLearningComposition(
       async createGrantFromOptions() { return null; },
     },
   };
-  const context: CapekPlugin = {
+  const context: RuntimePlugin = {
     id: 'prokopai.learning-context', scope: 'agent', provides: [capekContextAssemblerKey],
     setup(ctx) {
       ctx.provide(capekContextAssemblerKey, { id: 'prokopai.learning-context', async build() { return input.systemPrompt; } });
     },
   };
-  const process = await createProcessScope([...jean2ProcessPlugins()]);
+  const process = await createProcessScope([...prokopProcessPlugins()]);
   try {
     const agent = await createAgentScope(process, [
-      ...jean2AgentPlugins().filter(plugin => !OMITTED.has(plugin.id)),
+      ...prokopAgentPlugins().filter(plugin => !OMITTED.has(plugin.id)),
       runtimeHostValuePlugin('current.runtime-host', isolatedHost), context,
       ...createLearningToolsPlugins(input),
     ]);

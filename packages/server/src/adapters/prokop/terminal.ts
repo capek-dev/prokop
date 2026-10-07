@@ -1,0 +1,14 @@
+/**
+ * Prokop terminal session port adapter (S5 PTY/terminal persistence
+ * isolation). Fills the inward-facing `TerminalSessionStorePort` with the
+ * SQLite terminal session repository over the current store database
+ * accessor.
+ */
+
+import { getDatabase } from '@/infrastructure/sqlite/database';
+import { createTerminalSessionRepository } from '@/infrastructure/sqlite/terminal-session-repository';
+import type { TerminalSessionStorePort } from '@/application/ports/terminal';
+
+export function createProkopTerminalSessionPort(): TerminalSessionStorePort {
+  return createTerminalSessionRepository(() => getDatabase());
+}

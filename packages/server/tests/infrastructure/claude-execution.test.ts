@@ -589,7 +589,7 @@ test('a terminal failure (usage limit) keeps the session usable without replayin
   expect(calls[1].resume).toBe(calls[0].sessionId);
   expect(events.some(event => typeof (event as { message?: unknown }).message === 'string'
     && (event as { message: string }).message.includes('reconciliation'))).toBe(false);
-  expect(listMessagesWithParts('session').at(-1)?.message.status).toBe('completed');
+  expect(listMessagesWithParts('session').at(-1)?.message).toMatchObject({ status: 'completed' });
 });
 
 test('a turn that ends without a terminal result stays locked', async () => {

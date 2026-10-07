@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { updateSession } from '@/infrastructure/sqlite/session-store';
 import { resetTestDatabase, setupTestDatabase } from '#tests/db';
 import { seedSession, seedWorkspace } from '#tests/seed';
-import { collectSubagentAncestry, evaluateSubagentTarget, getSubagentResumeError, isSubagentSpawningDisabled, isValidSubagentPreconfig, isValidSubagentTargetPreconfig } from '@capekai/core/execution';
+import {
+  collectSubagentAncestry,
+  evaluateSubagentTarget,
+  getSubagentResumeError,
+  isSubagentSpawningDisabled,
+  isValidSubagentPreconfig,
+  isValidSubagentTargetPreconfig,
+} from '@/harnesses/prokop/subagent/policy';
 
 function evaluate(options: {
   target: string;

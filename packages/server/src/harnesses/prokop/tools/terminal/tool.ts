@@ -11,7 +11,7 @@
  * report completion early.
  */
 
-import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk/tool';
 import { createOutsideWorkspaceAsk, createShellPermissionAskStructured } from '@prokopai/sdk';
 import {
   classifyShellCommand,

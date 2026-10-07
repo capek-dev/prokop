@@ -23,14 +23,14 @@ export interface AgentPromotionLayout {
   agentDir: string;
   skillsDir: string;
   homeDir: string;
-  homeDotJean2Dir: string;
+  homeDotProkopDir: string;
 }
 
 export function buildPromotionLayout(layout: {
   agentDir: string;
   skillsDir: string;
   homeDir: string;
-  homeDotJean2Dir: string;
+  homeDotProkopDir: string;
 }): AgentPromotionLayout {
   return { ...layout };
 }

@@ -34,3 +34,6 @@ export * from './provider-usage';
 export * from './scheduled-job';
 export * from './notification';
 export * from './worktree';
+export * from './workflow';
+export * from './model-output';
+export * from './tool-display';

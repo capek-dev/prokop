@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
 import { tmpdir } from 'node:os';
-import { createAgentScope, createProcessScope } from '@capekai/core/composition';
-import { toolOutputPolicyPlugin } from '@capekai/core/plugins';
-import { mcpModelOutput, mcpOutputForCapek } from '@/adapters/capek/mcp-output';
+import { createAgentScope, createProcessScope } from '@/harnesses/prokop/composition/plugins/compose';
+import { toolOutputPolicyPlugin } from '@/harnesses/prokop/composition/plugins/tool-output-policy';
+import { mcpModelOutput, mcpOutputForCapek } from '@/infrastructure/mcp/model-output';
 
 test('large MCP screenshots survive the installed Capek output policy without base64 text', async () => {
   const process = await createProcessScope([]);

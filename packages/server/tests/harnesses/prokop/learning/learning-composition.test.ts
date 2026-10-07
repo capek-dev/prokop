@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test';
-import { buildAiSdkTools } from '@capekai/core/execution';
-import { getRuntimeHost } from '@capekai/core/hosts';
-import { listDomainToolFallbackDefinitions } from '@capekai/core/tools';
+import { buildAiSdkTools } from '@/harnesses/prokop/execution/build-tools';
+import { getRuntimeHost } from '@/infrastructure/runtime/host';
+import { listDomainToolFallbackDefinitions } from '@/infrastructure/tools/domain-tool-source';
 import type { Preconfig } from '@prokopai/sdk';
 import { executeLearningComposition } from '@/harnesses/prokop/learning/learning-composition';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';

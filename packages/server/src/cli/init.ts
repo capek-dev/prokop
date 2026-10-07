@@ -38,7 +38,7 @@ export interface InitResult {
   preconfigsInstalled: boolean;
 }
 
-async function initJean2Internal(options: InitOptions = {}): Promise<InitResult> {
+async function initProkopInternal(options: InitOptions = {}): Promise<InitResult> {
   const { databasePath, toolsPath, runMigrations: runMigrationsOption, installPreconfigs: installPreconfigsOption, force } = options;
 
   if (isInitialized() && !force) {
@@ -141,6 +141,6 @@ PROKOPAI_LLM_SUBAGENT_MAX_STEPS=500
   };
 }
 
-export async function initJean2(options: InitOptions = {}): Promise<InitResult> {
-  return initJean2Internal(options);
+export async function initProkop(options: InitOptions = {}): Promise<InitResult> {
+  return initProkopInternal(options);
 }

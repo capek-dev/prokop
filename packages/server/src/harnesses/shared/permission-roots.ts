@@ -16,7 +16,7 @@ export interface SessionPermissionRoots {
 
 /**
  * The one definition of "allowed paths" for native harness permission
- * checks, matching the Prokop tool host (adapters/capek/workspace.ts):
+ * checks, matching the Prokop tool host (harnesses/prokop/host/workspace.ts):
  * additional paths are workspace roots except in managed worktree sessions,
  * and the agent directory (skills, home, memory files) and uploads are
  * readable without an outside-workspace ask. Paths are symlink-resolved so

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Preconfig } from '@prokopai/sdk';
-import { agentSkillsDomainTools } from '@/adapters/capek/domain-tools';
+import { agentSkillsDomainTools } from '@/harnesses/shared/domain-tools';
 import { createCodexAgentSkillTools } from '@/harnesses/codex-cli/agent-skill-tools';
 import { formatCodexAgentSkills, listCodexAgentSkills } from '@/harnesses/codex-cli/agent-skills';
 import { codexDeveloperInstructions } from '@/harnesses/codex-cli/instructions';

@@ -323,7 +323,7 @@ export function getDefaultToolsPath(): string {
 }
 
 // Config interface for init
-export interface Jean2Config {
+export interface ProkopConfig {
   databasePath: string;
   toolsPath: string;
   port: number;
@@ -332,7 +332,7 @@ export interface Jean2Config {
 }
 
 // Save the config (creates directory if needed)
-export function saveConfig(config: Jean2Config): void {
+export function saveConfig(config: ProkopConfig): void {
   const configDir = getConfigDir();
   mkdirSync(configDir, { recursive: true });
   writeFileSync(getConfigFilePath(), JSON.stringify(config, null, 2));

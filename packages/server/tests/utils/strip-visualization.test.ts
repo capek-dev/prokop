@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { stripVisualization, extractVisualization } from '@capekai/core/tools';
+import { stripVisualization, extractVisualization } from '@/infrastructure/tools/strip-visualization';
 
 describe('stripVisualization', () => {
   test('returns null unchanged', () => {

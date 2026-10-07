@@ -133,7 +133,7 @@ my-tool/
 ### `tool.js` or `tool.ts`
 
 ```typescript
-import type { ToolDefinition, ToolContext, ToolResult } from '@capekai/tool';
+import type { ToolDefinition, ToolContext, ToolResult } from '@prokopai/sdk/tool';
 
 interface Input {
   message: string;
@@ -172,12 +172,14 @@ export async function execute(input: Input, ctx: ToolContext): Promise<ToolResul
 
 ### `package.json`
 
+The SDK is a private workspace in the Prokop checkout. For an external tool project, point the development dependency at your checkout (adjust the relative path below). Type-only imports disappear from the prepared JavaScript; bundle any runtime helpers you use into the tool.
+
 ```json
 {
   "name": "my-tool",
   "version": "1.0.0",
-  "dependencies": {
-    "@capekai/tool": "^1.0.0"
+  "devDependencies": {
+    "@prokopai/sdk": "file:../prokop/packages/sdk"
   }
 }
 ```
