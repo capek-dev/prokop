@@ -13,6 +13,7 @@ export * from './file';
 export * from './git';
 export * from './gitBranches';
 export * from './gitRebase';
+export * from './pullRequest';
 export * from './visualization';
 export * from './mcp';
 export * from './skill';

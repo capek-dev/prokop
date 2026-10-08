@@ -69,6 +69,6 @@ describe('session tab navigation', () => {
     store.removeInvalidSessions(new Set(['a']));
     expect(useSessionBoardStore.getState()).toMatchObject({ openSessionIds: ['a'], focusedSessionId: 'a' });
     store.clearBoard();
-    expect(useWorkspaceViewStore.getState().layout.groups.center.viewIds).toEqual(['conversations', 'editor']);
+    expect(useWorkspaceViewStore.getState().layout.groups.center.viewIds).toEqual(['conversations', 'editor', 'pull-requests']);
   });
 });

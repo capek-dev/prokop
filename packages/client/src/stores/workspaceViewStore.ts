@@ -7,7 +7,7 @@ const LEGACY_VIEW_IDS = ['sessions', 'conversations', 'files', 'editor', 'termin
 export const REPOSITORY_VIEW_IDS = ['explorer', 'changes', 'branches', 'worktrees'] as const;
 export type RepositoryViewId = typeof REPOSITORY_VIEW_IDS[number];
 const ORIGINAL_VIEW_IDS = ['sessions', 'conversations', ...REPOSITORY_VIEW_IDS, 'editor', 'terminals'] as const;
-export const WORKSPACE_VIEW_IDS = [...ORIGINAL_VIEW_IDS, 'usage'] as const;
+export const WORKSPACE_VIEW_IDS = [...ORIGINAL_VIEW_IDS, 'usage', 'pull-requests'] as const;
 export type WorkspaceToolViewId = typeof WORKSPACE_VIEW_IDS[number];
 export type FileViewId = `file:${string}`;
 export type SessionViewId = `session:${string}:${string}`;
@@ -64,7 +64,7 @@ export function createDefaultViewLayout(): WorkspaceViewLayout {
     roots: { left: { kind: 'group', groupId: 'left' }, center: { kind: 'group', groupId: 'center' }, right: { kind: 'group', groupId: 'right' }, bottom: { kind: 'group', groupId: 'bottom' } },
     groups: {
       left: { viewIds: ['sessions', 'usage'], activeId: 'sessions' },
-      center: { viewIds: ['conversations', 'editor'], activeId: 'conversations' },
+      center: { viewIds: ['conversations', 'editor', 'pull-requests'], activeId: 'conversations' },
       right: { viewIds: [...REPOSITORY_VIEW_IDS], activeId: 'explorer' },
       bottom: { viewIds: ['terminals'], activeId: 'terminals' },
     },
@@ -87,7 +87,7 @@ export function parseViewLayout(value: unknown): WorkspaceViewLayout | null {
   const legacy = value.version === 1 || value.version === 2;
   const requiredIds = legacy ? LEGACY_VIEW_IDS : ORIGINAL_VIEW_IDS;
   const validId = (id: unknown): id is string => typeof id === 'string'
-    && (requiredIds.some((required) => required === id) || (!legacy && id === 'usage') || (value.version !== 1 && isFileViewId(id)) || (value.version === 4 && isSessionViewId(id)));
+    && (requiredIds.some((required) => required === id) || (!legacy && (id === 'usage' || id === 'pull-requests')) || (value.version !== 1 && isFileViewId(id)) || (value.version === 4 && isSessionViewId(id)));
   if (!value.hidden.every(validId)) return null;
   const expand = (id: string): WorkspaceViewId[] => legacy && id === 'files'
     ? [...REPOSITORY_VIEW_IDS] : [id as WorkspaceViewId];
@@ -112,9 +112,13 @@ export function parseViewLayout(value: unknown): WorkspaceViewLayout | null {
 
 /** Older layouts gain Usage without changing their splits, selections, or hidden views. */
 function addUsageView(layout: WorkspaceViewLayout | null): WorkspaceViewLayout | null {
-  if (!layout || Object.values(layout.groups).some((group) => group.viewIds.includes('usage'))) return layout;
-  const group = layout.groups[treeGroups(layout.roots.left)[0]];
-  group.viewIds.push('usage');
+  if (!layout) return null;
+  if (!Object.values(layout.groups).some(group => group.viewIds.includes('usage'))) {
+    layout.groups[treeGroups(layout.roots.left)[0]].viewIds.push('usage');
+  }
+  if (!Object.values(layout.groups).some(group => group.viewIds.includes('pull-requests'))) {
+    layout.groups[treeGroups(layout.roots.center)[0]].viewIds.push('pull-requests');
+  }
   return layout;
 }
 

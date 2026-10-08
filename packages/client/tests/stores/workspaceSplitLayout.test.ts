@@ -46,6 +46,7 @@ describe('workspace splits', () => {
 
   test('closing or moving the last tab collapses its group and preserves legacy anchors', () => {
     const store = useWorkspaceViewStore.getState();
+    store.hideView('pull-requests');
     const first = sessionViewId('server', 'one');
     const second = sessionViewId('server', 'two');
     store.ensureViews([first, second]);

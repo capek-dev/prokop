@@ -14,6 +14,22 @@ vi.mock('@/components/modals/WorkspaceAdditionalPathsDialog', () => ({
 
 afterEach(cleanup);
 
+test('duplicate workspace names have distinct selections and searchable paths', async () => {
+  const user = userEvent.setup();
+  const old: Workspace = { id: 'old', name: 'jean2', path: '/projects/archive', isVirtual: false, additionalPaths: [], settings: {}, createdAt: '', updatedAt: '' };
+  const current: Workspace = { ...old, id: 'current', path: '/projects/current' };
+  const select = vi.fn();
+  render(<WorkspaceSwitcher selectionOnly workspaces={[old, current]} agents={[]} activeWorkspace={old} onSelectWorkspace={select} />);
+  await user.click(screen.getByRole('combobox', { name: 'Select workspace' }));
+  expect(screen.getByRole('option', { name: /archive/ })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: /\/projects\/current/ })).toBeInTheDocument();
+  await user.type(screen.getByPlaceholderText('Search workspace...'), '/projects/current');
+  expect(screen.queryByRole('option', { name: /archive/ })).not.toBeInTheDocument();
+  await user.keyboard('{Enter}');
+  expect(select).toHaveBeenCalledTimes(1);
+  expect(select).toHaveBeenCalledWith(expect.objectContaining({ id: 'current', path: '/projects/current' }));
+});
+
 test('removes a deleted agent home from an open selector while preserving workspace selection', async () => {
   const user = userEvent.setup();
   const project: Workspace = {

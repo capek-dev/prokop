@@ -6,6 +6,7 @@ import { useWorkspaceSessionTabs } from '@/hooks/useWorkspaceSessionTabs';
 import { FileEditorSurface, type FileEditorSurfaceHandle } from '@/components/editor/FileEditorSurface';
 import { WorkspaceViews } from '@/components/app/WorkspaceViews';
 import { WorkspaceUsageView } from '@/components/app/WorkspaceUsageView';
+import { PullRequestsView } from '@/components/pullRequests/PullRequestsView';
 import { FilesPanel } from '@/components/layout/FilesPanel';
 import { WorktreesPanel } from '@/components/worktrees/WorktreesPanel';
 import { useViewRefs } from '@/contexts/ViewRefsContext';
@@ -96,6 +97,7 @@ export function WorkspaceContentArea({
       ...resourceViews,
       sessions: left ?? (sessionsContent ? <>{sessionsHeader}{sessionsContent}</> : undefined),
       usage: <WorkspaceUsageView sdkClient={sdkClient} />,
+      'pull-requests': serverId && workspaceId && sdkClient ? <PullRequestsView key={`${serverId}:${workspaceId}`} client={sdkClient} serverId={serverId} workspaceId={workspaceId} /> : undefined,
       explorer: serverId && workspaceId ? <FilesPanel ref={filesPanelRef} sdkClient={sdkClient} view="explorer" embedded /> : undefined,
       changes: serverId && workspaceId ? <FilesPanel sdkClient={sdkClient} view="changes" embedded /> : undefined,
       branches: serverId && workspaceId ? <FilesPanel sdkClient={sdkClient} view="branches" embedded /> : undefined,

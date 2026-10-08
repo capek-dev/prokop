@@ -8,6 +8,7 @@ import { ProvidersRestNamespace } from './providers';
 import { PreconfigsRestNamespace } from './preconfigs';
 import { PromptsRestNamespace } from './prompts';
 import { FilesRestNamespace } from './files';
+import { PullRequestsRestNamespace } from './pull-requests';
 import { AttachmentsRestNamespace } from './attachments';
 import { TerminalsRestNamespace } from './terminals';
 import { McpRestNamespace } from './mcp';
@@ -45,6 +46,7 @@ export class HttpNamespace {
   readonly preconfigs: PreconfigsRestNamespace;
   readonly prompts: PromptsRestNamespace;
   readonly files: FilesRestNamespace;
+  readonly pullRequests: PullRequestsRestNamespace;
   readonly attachments: AttachmentsRestNamespace;
   readonly terminals: TerminalsRestNamespace;
   readonly mcp: McpRestNamespace;
@@ -63,6 +65,7 @@ export class HttpNamespace {
     this.preconfigs = new PreconfigsRestNamespace(http);
     this.prompts = new PromptsRestNamespace(http);
     this.files = new FilesRestNamespace(http);
+    this.pullRequests = new PullRequestsRestNamespace(http);
     this.attachments = new AttachmentsRestNamespace(http);
     this.terminals = new TerminalsRestNamespace(http);
     this.mcp = new McpRestNamespace(http);

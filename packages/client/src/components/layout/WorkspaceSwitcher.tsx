@@ -78,6 +78,11 @@ export function WorkspaceSwitcher({
   const [activitySnapshot, setActivitySnapshot] = useState<Record<string, number | null>>({});
   // Keep conversation-driven movement out of an open menu, but retain live names/deletions.
   const selectableWorkspaces = getSelectableWorkspaces(workspaces, agents);
+  const nameCounts = new Map<string, number>();
+  for (const workspace of selectableWorkspaces) {
+    const name = getWorkspaceDisplayName(workspace, agents);
+    nameCounts.set(name, (nameCounts.get(name) ?? 0) + 1);
+  }
   const orderedWorkspaces = sortWorkspaces(
     open ? selectableWorkspaces.map(workspace => ({ ...workspace, lastConversationAt: activitySnapshot[workspace.id] ?? null })) : selectableWorkspaces,
     agents,
@@ -170,6 +175,8 @@ export function WorkspaceSwitcher({
                 {group.items.map((workspace) => (
                 <CommandItem
                   key={workspace.id}
+                  value={workspace.id}
+                  keywords={[getWorkspaceDisplayName(workspace, agents), workspace.path]}
                   showCheck={false}
                   onSelect={() => {
                     if (renamingWorkspaceId === workspace.id) return;
@@ -208,9 +215,12 @@ export function WorkspaceSwitcher({
                         ) : (
                           <Folder className="size-4 flex-shrink-0 text-muted-foreground" />
                         )}
-                        <span className="truncate">
-                          {getWorkspaceDisplayName(workspace, agents)}
-                        </span>
+                        <div className="min-w-0">
+                          <span className="block truncate">{getWorkspaceDisplayName(workspace, agents)}</span>
+                          {(nameCounts.get(getWorkspaceDisplayName(workspace, agents)) ?? 0) > 1 && (
+                            <span className="block truncate text-xs text-muted-foreground" title={workspace.path}>{workspace.path}</span>
+                          )}
+                        </div>
                       </>
                     )}
                   </div>

@@ -480,7 +480,7 @@ export type ServerMessage =
   | AskTimedOutMessage
   | AskResponseRejectedMessage
   | AskPendingSyncMessage
-  | PingMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage | GitChangedMessage | LearningChangedMessage | McpChangedMessage | WorkspaceConversationActivityMessage | FilesChangedMessage | GitStatusMessage | FileTreeMessage | SchedulerChangedMessage;
+  | PingMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage | GitChangedMessage | PullRequestChangedMessage | LearningChangedMessage | McpChangedMessage | WorkspaceConversationActivityMessage | FilesChangedMessage | GitStatusMessage | FileTreeMessage | SchedulerChangedMessage;
 
 export interface WorktreeUpdatedMessage {
   type: 'worktree.updated';
@@ -496,6 +496,12 @@ export interface GitChangedMessage {
   type: 'git.changed';
   workspaceId: string;
   root: string;
+}
+
+export interface PullRequestChangedMessage {
+  type: 'pull-request.changed';
+  workspaceId: string;
+  repositoryKey: string;
 }
 
 export interface LearningChangedMessage {

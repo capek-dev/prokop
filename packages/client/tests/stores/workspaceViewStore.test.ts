@@ -6,6 +6,14 @@ import {
 } from '@/stores/workspaceViewStore';
 
 describe('workspace view placement', () => {
+  test('adds Pull requests to existing layouts without changing active views', () => {
+    const saved = createDefaultViewLayout();
+    saved.groups.center.viewIds = ['conversations', 'editor'];
+    saved.groups.center.activeId = 'editor';
+    const migrated = parseViewLayout({ version: 5, ...saved })!;
+    expect(migrated.groups.center).toEqual({ viewIds: ['conversations', 'editor', 'pull-requests'], activeId: 'editor' });
+    expect(parseViewLayout({ version: 5, ...migrated })).toEqual(migrated);
+  });
   test('adds Usage to saved left splits without resetting selections or placement', () => {
     const store = useWorkspaceViewStore.getState();
     store.moveView('explorer', 'left');
@@ -188,7 +196,7 @@ describe('workspace view placement', () => {
     expect(findViewRegion(useWorkspaceViewStore.getState().layout, second)).toBe('bottom');
     expect(parseViewLayout(JSON.parse(localStorage.getItem(VIEW_LAYOUT_STORAGE_KEY)!))).toEqual(useWorkspaceViewStore.getState().layout);
     useWorkspaceViewStore.getState().resetLayout();
-    expect(useWorkspaceViewStore.getState().layout.groups.center.viewIds).toEqual(['conversations', 'editor', first, second]);
+    expect(useWorkspaceViewStore.getState().layout.groups.center.viewIds).toEqual(['conversations', 'editor', 'pull-requests', first, second]);
   });
 
   test.each(['session:', 'session:a:', 'session::b', 'session:a:b:c', 'session:%zz:b', 'session:a:%61'])('rejects malformed session identities: %s', (id) => {
@@ -209,7 +217,7 @@ describe('workspace view placement', () => {
     store.hideView(second);
     store.removeView(second);
     expect(useWorkspaceViewStore.getState().layout.hidden).toEqual([]);
-    expect(useWorkspaceViewStore.getState().layout.groups.center.viewIds).toEqual(['conversations', 'editor']);
+    expect(useWorkspaceViewStore.getState().layout.groups.center.viewIds).toEqual(['conversations', 'editor', 'pull-requests']);
   });
 
   test.each(['file:', 'file:abc', 'file:%zz', 'file:a%01b%01c', 'file:a%01b%01%01', 'session:unknown'])('rejects malformed resource IDs: %s', (id) => {
