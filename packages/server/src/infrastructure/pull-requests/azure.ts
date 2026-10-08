@@ -4,10 +4,12 @@ import type {
   PullRequestSummary,
   PullRequestThread,
   PullRequestFile,
+  PullRequestMergeMethod,
 } from '@prokopai/sdk/types';
 import type { PullRequestProviderPort } from '@/application/ports/pull-requests';
 import { BadRequestError, ConflictError } from '@/application/http-errors';
-import { array, azureApi, integer, object, required, str, type RunCli } from './cli';
+import { array, integer, object, required, str } from './cli';
+import type { AzureApi } from './azure-rest';
 
 const actor = (value: unknown) => {
   const v = object(value);
@@ -21,15 +23,18 @@ const votes: Record<string, string> = {
   '-5': 'Waiting for author',
   '-10': 'Rejected',
 };
+const strategies: Record<PullRequestMergeMethod, string> = {
+  merge: 'noFastForward',
+  squash: 'squash',
+  rebase: 'rebase',
+  'rebase-merge': 'rebaseMerge',
+};
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PAGE = 30;
 
-export function createAzurePullRequests(
-  run: RunCli,
-  cwd: string,
-  repo: PullRequestRepository,
-): PullRequestProviderPort {
-  const api = azureApi(run, cwd, repo);
-  const raw = async (number: number) => object(await api('pullRequests', { pullRequestId: number }));
+export function createAzurePullRequests(api: AzureApi, repo: PullRequestRepository): PullRequestProviderPort {
+  const pr = (number: number, rest = '') => `pullrequests/${number}${rest}`;
+  const raw = async (number: number) => object(await api({ path: pr(number) }));
   const summary = (value: unknown): PullRequestSummary => {
     const v = object(value);
     if (!['active', 'abandoned', 'completed'].includes(str(v.status)))
@@ -47,52 +52,60 @@ export function createAzurePullRequests(
       head: required(object(v.lastMergeSourceCommit).commitId),
       base: required(object(v.lastMergeTargetCommit).commitId),
       updatedAt: str(v.closedDate) || required(v.creationDate),
-      requestedReviewerIds: array(v.reviewers)
+      requestedReviewerIds: array(v.reviewers ?? [])
         .map(object)
         .filter((r) => r.vote === 0)
         .map((r) => required(r.id)),
     };
   };
   const checked = async (number: number, head: string) => {
-    const pr = await raw(number);
-    if (summary(pr).head !== head) throw new ConflictError('The PR changed. Refresh before continuing.');
-    return pr;
+    const result = await raw(number);
+    if (summary(result).head !== head) throw new ConflictError('The PR changed. Refresh before continuing.');
+    return result;
   };
   const iteration = async (number: number) => {
-    const entries = values(await api('pullRequestIterations', { pullRequestId: number })).map(object);
+    const entries = values(await api({ path: pr(number, '/iterations') })).map(object);
     const latest = entries.sort((a, b) => integer(b.id) - integer(a.id))[0];
     if (!latest) throw new BadRequestError('Azure returned no PR iteration.');
     return latest;
   };
   const changes = async (number: number, id: number, skip: number, count = PAGE) => {
     const result = object(
-      await api(
-        'pullRequestIterationChanges',
-        { pullRequestId: number, iterationId: id },
-        { $compareTo: 0, $top: count, $skip: skip },
-      ),
+      await api({
+        path: pr(number, `/iterations/${id}/changes`),
+        query: { $compareTo: 0, $top: count, $skip: skip },
+      }),
     );
-    const files = array(result.changeEntries).map((value) => {
-      const v = object(value);
-      const item = object(v.item);
-      const oldPath = str(v.sourceServerItem) || str(v.originalPath);
-      return {
-        path: required(item.path),
-        ...(oldPath ? { oldPath } : {}),
-        status: required(v.changeType),
-        additions: null,
-        deletions: null,
-        changeTrackingId: integer(v.changeTrackingId),
-      } satisfies PullRequestFile;
-    });
+    const files = array(result.changeEntries)
+      .map(object)
+      .filter((v) => object(v.item).isFolder !== true)
+      .map((v) => {
+        const oldPath = str(v.sourceServerItem) || str(v.originalPath);
+        return {
+          path: required(object(v.item).path),
+          ...(oldPath ? { oldPath } : {}),
+          status: required(v.changeType),
+          additions: null,
+          deletions: null,
+          changeTrackingId: integer(v.changeTrackingId),
+        } satisfies PullRequestFile;
+      });
     const nextSkip = typeof result.nextSkip === 'number' && result.nextSkip > skip ? result.nextSkip : null;
     return { files, nextSkip };
   };
   const threads = async (number: number): Promise<PullRequestThread[]> =>
-    values(await api('pullRequestThreads', { pullRequestId: number }))
-      .filter((value) => object(value).isDeleted !== true)
-      .map((value) => {
-        const v = object(value);
+    values(await api({ path: pr(number, '/threads') }))
+      .map(object)
+      .filter((v) => v.isDeleted !== true)
+      .map((v) => ({
+        v,
+        // Votes, pushes and policy events arrive as system comments; they are not conversations.
+        comments: array(v.comments ?? [])
+          .map(object)
+          .filter((c) => c.isDeleted !== true && c.commentType !== 'system'),
+      }))
+      .filter(({ comments }) => comments.length > 0)
+      .map(({ v, comments }) => {
         const context = v.threadContext ? object(v.threadContext) : null;
         const right = context?.rightFileStart ? object(context.rightFileStart) : null;
         const left = context?.leftFileStart ? object(context.leftFileStart) : null;
@@ -114,27 +127,39 @@ export function createAzurePullRequests(
           ),
           outdated: false,
           canResolve: true,
-          comments: array(v.comments)
-            .filter((c) => !object(c).isDeleted)
-            .map((c) => {
-              const x = object(c);
-              return {
-                id: String(integer(x.id)),
-                author: actor(x.author),
-                body: str(x.content),
-                createdAt: required(x.publishedDate),
-              };
-            }),
+          comments: comments.map((x) => ({
+            id: String(integer(x.id)),
+            author: actor(x.author),
+            body: str(x.content),
+            createdAt: required(x.publishedDate),
+          })),
         };
       });
   const account = async () => {
-    // DevOps authenticates independently of az account (PATs and cross-tenant organizations).
-    const connection = object(await api('connectionData', {}, {}, 'GET', undefined, 'location'));
+    // Organization connection data names the identity Azure DevOps actually authenticated.
+    const connection = object(await api({ path: 'connectionData', scope: 'organization', version: '7.1-preview' }));
     const user = object(connection.authenticatedUser);
     return {
       id: required(user.id),
       name: str(user.providerDisplayName) || str(user.customDisplayName) || required(user.id),
     };
+  };
+  const identity = async (reviewer: string) => {
+    if (GUID.test(reviewer)) return reviewer;
+    const matches = values(
+      await api({
+        path: 'identities',
+        scope: 'identities',
+        query: { searchFilter: 'General', filterValue: reviewer, queryMembership: 'None' },
+      }),
+    ).map(object);
+    if (matches.length !== 1)
+      throw new BadRequestError(
+        matches.length
+          ? `"${reviewer}" matches several Azure DevOps users. Use the full e-mail address.`
+          : `No Azure DevOps user matches "${reviewer}". Use their e-mail address.`,
+      );
+    return required(matches[0].id);
   };
   return {
     account,
@@ -146,11 +171,10 @@ export function createAzurePullRequests(
         all: 'all',
       };
       const result = values(
-        await api(
-          'pullRequests',
-          {},
-          { 'searchCriteria.status': statuses[state], $top: PAGE, $skip: (page - 1) * PAGE },
-        ),
+        await api({
+          path: 'pullrequests',
+          query: { 'searchCriteria.status': statuses[state], $top: PAGE, $skip: (page - 1) * PAGE },
+        }),
       );
       return { items: result.map(summary), nextPage: result.length === PAGE ? page + 1 : null };
     },
@@ -158,8 +182,8 @@ export function createAzurePullRequests(
       return summary(await raw(number));
     },
     async detail(number) {
-      const pr = await raw(number);
-      const result = summary(pr);
+      const value = await raw(number);
+      const result = summary(value);
       const warnings: string[] = [];
       const optional = async <T>(label: string, read: () => Promise<T>, fallback: T): Promise<T> => {
         try {
@@ -169,26 +193,20 @@ export function createAzurePullRequests(
           return fallback;
         }
       };
-      const project = required(object(object(pr.repository).project).id);
+      const project = required(object(object(value.repository).project).id);
       const [allThreads, statuses, policies, latest] = await Promise.all([
         optional('Conversations', () => threads(number), []),
-        optional(
-          'Statuses',
-          async () => values(await api('pullRequestStatuses', { pullRequestId: number })),
-          [],
-        ),
+        optional('Statuses', async () => values(await api({ path: pr(number, '/statuses') })), []),
         optional(
           'Policies',
           async () =>
             values(
-              await api(
-                'evaluations',
-                {},
-                { artifactId: `vstfs:///CodeReview/CodeReviewId/${project}/${number}` },
-                'GET',
-                undefined,
-                'policy',
-              ),
+              await api({
+                path: 'policy/evaluations',
+                scope: 'project',
+                query: { artifactId: `vstfs:///CodeReview/CodeReviewId/${project}/${number}` },
+                version: '7.1-preview.1',
+              }),
             ),
           [],
         ),
@@ -196,35 +214,47 @@ export function createAzurePullRequests(
       ]);
       return {
         ...result,
-        autoMerge: pr.autoCompleteSetBy != null,
+        autoMerge: value.autoCompleteSetBy != null,
         comments: [],
         threads: allThreads,
-        reviewers: array(pr.reviewers).map((value) => {
-          const v = object(value);
+        reviewers: array(value.reviewers ?? []).map((reviewer) => {
+          const v = object(reviewer);
           return { ...actor(v), vote: votes[String(v.vote)] ?? 'Unknown vote' };
         }),
         warnings,
         checks: [
-          ...statuses.map((value) => {
-            const v = object(value);
+          ...statuses.map((status) => {
+            const v = object(status);
+            const context = object(v.context);
             return {
-              name: required(object(v.context).name),
+              name: [str(context.genre), required(context.name)].filter(Boolean).join('/'),
               state: required(v.state),
               url: str(v.targetUrl),
             };
           }),
-          ...policies.map((value) => {
-            const v = object(value);
+          ...policies.map((policy) => {
+            const v = object(policy);
+            const configuration = object(v.configuration);
+            // Build policies share a type name; their configured display name tells them apart.
+            const name =
+              str(object(configuration.settings ?? {}).displayName) ||
+              required(object(configuration.type).displayName);
+            const buildId = object(v.context ?? {}).buildId;
             return {
-              name: required(object(object(v.configuration).type).displayName),
+              name: configuration.isBlocking === false ? `${name} (optional)` : name,
               state: required(v.status),
+              ...(typeof buildId === 'number'
+                ? {
+                    url: `https://dev.azure.com/${repo.owner}/${encodeURIComponent(repo.project!)}/_build/results?buildId=${buildId}`,
+                  }
+                : {}),
             };
           }),
         ],
         mergeability:
-          pr.mergeStatus === 'succeeded'
+          value.mergeStatus === 'succeeded'
             ? 'mergeable'
-            : pr.mergeStatus === 'conflicts'
+            : value.mergeStatus === 'conflicts'
               ? 'conflicting'
               : 'unknown',
         mergeMethods: ['merge', 'squash', 'rebase', 'rebase-merge'],
@@ -257,10 +287,9 @@ export function createAzurePullRequests(
       if (!found) throw new BadRequestError('File is not in the available PR diff.');
       const read = async (filePath: string, commit: string) => {
         const item = object(
-          await api(
-            'items',
-            {},
-            {
+          await api({
+            path: 'items',
+            query: {
               path: filePath,
               'versionDescriptor.versionType': 'commit',
               'versionDescriptor.version': commit,
@@ -268,10 +297,10 @@ export function createAzurePullRequests(
               includeContentMetadata: 'true',
               $format: 'json',
             },
-          ),
+          }),
         );
         if (
-          object(item.contentMetadata).isBinary === true ||
+          object(item.contentMetadata ?? {}).isBinary === true ||
           typeof item.content !== 'string' ||
           item.content.length > 250_000
         )
@@ -281,8 +310,10 @@ export function createAzurePullRequests(
       const source = required(object(latest.sourceRefCommit).commitId);
       const baseCommit = required(object(latest.commonRefCommit).commitId);
       const oldPath = found.oldPath ?? path;
-      const oldText = /add/i.test(found.status) ? '' : await read(oldPath, baseCommit);
-      const newText = /delete/i.test(found.status) ? '' : await read(path, source);
+      const [oldText, newText] = await Promise.all([
+        /add/i.test(found.status) ? '' : read(oldPath, baseCommit),
+        /delete/i.test(found.status) ? '' : read(path, source),
+      ]);
       await checked(number, head);
       if (oldText === null || newText === null)
         return { patch: '', unavailable: 'Binary or large file. Open on Azure DevOps to view it.' };
@@ -303,46 +334,43 @@ export function createAzurePullRequests(
       if (input.sourceBranch.includes(':'))
         throw new BadRequestError('Choose a branch in the selected Azure repository.');
       return summary(
-        await api('pullRequests', {}, {}, 'POST', {
-          title: input.title,
-          description: input.body,
-          sourceRefName: `refs/heads/${input.sourceBranch}`,
-          targetRefName: `refs/heads/${input.targetBranch}`,
-          isDraft: input.draft,
+        await api({
+          path: 'pullrequests',
+          method: 'POST',
+          body: {
+            title: input.title,
+            description: input.body,
+            sourceRefName: `refs/heads/${input.sourceBranch}`,
+            targetRefName: `refs/heads/${input.targetBranch}`,
+            isDraft: input.draft,
+          },
         }),
       );
     },
     async action(number, input) {
       await checked(number, input.expectedHead);
-      const route = { pullRequestId: number };
+      const update = (body: unknown) => api({ path: pr(number), method: 'PATCH', body });
       const writeComment = (body: string) =>
-        api('pullRequestThreads', route, {}, 'POST', {
-          comments: [{ parentCommentId: 0, content: body, commentType: 1 }],
-          status: 1,
+        api({
+          path: pr(number, '/threads'),
+          method: 'POST',
+          body: { comments: [{ parentCommentId: 0, content: body, commentType: 1 }], status: 1 },
         });
       switch (input.action) {
         case 'edit':
-          await api('pullRequests', route, {}, 'PATCH', { title: input.title, description: input.body });
+          await update({ title: input.title, description: input.body });
           break;
         case 'close':
         case 'reopen':
-          await api('pullRequests', route, {}, 'PATCH', {
-            status: input.action === 'close' ? 'abandoned' : 'active',
-          });
+          await update({ status: input.action === 'close' ? 'abandoned' : 'active' });
           break;
         case 'ready':
         case 'draft':
-          await api('pullRequests', route, {}, 'PATCH', { isDraft: input.action === 'draft' });
+          await update({ isDraft: input.action === 'draft' });
           break;
         case 'merge': {
-          const strategies = {
-            merge: 'noFastForward',
-            squash: 'squash',
-            rebase: 'rebase',
-            'rebase-merge': 'rebaseMerge',
-          };
           const result = object(
-            await api('pullRequests', route, {}, 'PATCH', {
+            await update({
               status: 'completed',
               lastMergeSourceCommit: { commitId: input.expectedHead },
               completionOptions: {
@@ -359,14 +387,8 @@ export function createAzurePullRequests(
             throw new ConflictError('Azure did not complete the PR. Refresh its policy and merge status.');
           break;
         }
-        case 'enable-auto-merge': {
-          const strategies = {
-            merge: 'noFastForward',
-            squash: 'squash',
-            rebase: 'rebase',
-            'rebase-merge': 'rebaseMerge',
-          };
-          await api('pullRequests', route, {}, 'PATCH', {
+        case 'enable-auto-merge':
+          await update({
             autoCompleteSetBy: { id: input.accountId },
             completionOptions: {
               mergeStrategy: strategies[input.method],
@@ -375,15 +397,15 @@ export function createAzurePullRequests(
             },
           });
           break;
-        }
         case 'disable-auto-merge':
-          await api('pullRequests', route, {}, 'PATCH', { autoCompleteSetBy: null });
+          // Azure clears automatic completion when the setter is the empty identity.
+          await update({ autoCompleteSetBy: { id: '00000000-0000-0000-0000-000000000000' } });
           break;
         case 'review': {
           // Separate calls: if the vote fails after a comment, explicitly report partial completion.
           if (input.body) await writeComment(input.body);
           if (input.verdict !== 'comment') {
-            const value = {
+            const vote = {
               approve: 10,
               'approve-with-suggestions': 5,
               'request-changes': -10,
@@ -391,9 +413,10 @@ export function createAzurePullRequests(
               reset: 0,
             }[input.verdict];
             try {
-              await api('pullRequestReviewers', { ...route, reviewerId: input.accountId }, {}, 'PUT', {
-                id: input.accountId,
-                vote: value,
+              await api({
+                path: pr(number, `/reviewers/${input.accountId}`),
+                method: 'PUT',
+                body: { id: input.accountId, vote },
               });
             } catch (error: unknown) {
               if (input.body)
@@ -416,61 +439,49 @@ export function createAzurePullRequests(
             throw new ConflictError('The file review position changed. Reload Files before commenting.');
           const side = pos.side === 'LEFT' ? 'left' : 'right';
           // Equal iteration IDs anchor the left side to the common commit, as in our cumulative diff.
-          await api('pullRequestThreads', route, {}, 'POST', {
-            comments: [{ parentCommentId: 0, content: input.body, commentType: 1 }],
-            status: 1,
-            threadContext: {
-              filePath: pos.path,
-              [`${side}FileStart`]: { line: pos.line, offset: 1 },
-              [`${side}FileEnd`]: { line: pos.line, offset: 1 },
-            },
-            pullRequestThreadContext: {
-              changeTrackingId: pos.changeTrackingId,
-              iterationContext: {
-                firstComparingIteration: pos.iteration,
-                secondComparingIteration: pos.iteration,
+          await api({
+            path: pr(number, '/threads'),
+            method: 'POST',
+            body: {
+              comments: [{ parentCommentId: 0, content: input.body, commentType: 1 }],
+              status: 1,
+              threadContext: {
+                filePath: pos.path,
+                [`${side}FileStart`]: { line: pos.line, offset: 1 },
+                [`${side}FileEnd`]: { line: pos.line, offset: 1 },
+              },
+              pullRequestThreadContext: {
+                changeTrackingId: pos.changeTrackingId,
+                iterationContext: {
+                  firstComparingIteration: pos.iteration,
+                  secondComparingIteration: pos.iteration,
+                },
               },
             },
           });
           break;
         }
         case 'reviewer': {
-          // CLI resolves an email address or identity ID using the selected organization.
-          await run({
-            command: 'az',
-            cwd,
-            args: [
-              'repos',
-              'pr',
-              'reviewer',
-              input.remove ? 'remove' : 'add',
-              '--id',
-              String(number),
-              '--reviewers',
-              input.reviewer,
-              '--organization',
-              `https://dev.azure.com/${repo.owner}`,
-              '--detect',
-              'false',
-              '--only-show-errors',
-              '--output',
-              'json',
-            ],
-          });
+          const id = await identity(input.reviewer);
+          await api(
+            input.remove
+              ? { path: pr(number, `/reviewers/${id}`), method: 'DELETE' }
+              : { path: pr(number, `/reviewers/${id}`), method: 'PUT', body: { id, vote: 0 } },
+          );
           break;
         }
         case 'reply':
         case 'resolve': {
           const thread = (await threads(number)).find((t) => t.id === input.threadId);
           if (!thread) throw new BadRequestError('Conversation is not part of this pull request.');
-          const threadRoute = { ...route, threadId: input.threadId };
+          const path = pr(number, `/threads/${thread.id}`);
           if (input.action === 'reply')
-            await api('pullRequestThreadComments', threadRoute, {}, 'POST', {
-              content: input.body,
-              parentCommentId: 0,
-              commentType: 1,
+            await api({
+              path: `${path}/comments`,
+              method: 'POST',
+              body: { content: input.body, parentCommentId: 0, commentType: 1 },
             });
-          else await api('pullRequestThreads', threadRoute, {}, 'PATCH', { status: input.resolved ? 2 : 1 });
+          else await api({ path, method: 'PATCH', body: { status: input.resolved ? 2 : 1 } });
           break;
         }
       }
