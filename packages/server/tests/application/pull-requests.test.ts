@@ -140,6 +140,18 @@ test('discovery explains provider failures without returning arbitrary thrown te
   expect(result.connections[0].status).toBe('unavailable');
   expect(JSON.stringify(result)).not.toContain('secret');
 });
+test('discovery returns the setup command attached to a sign-in failure', async () => {
+  const f = fixture();
+  f.provider.account = async () => {
+    throw new BadRequestError('Azure CLI needs a sign-in.', { command: 'az login --tenant t' });
+  };
+  const result = await f.service.discover('ws', '/worktree');
+  expect(result.connections[0]).toMatchObject({
+    status: 'unavailable',
+    message: 'Azure CLI needs a sign-in.',
+    command: 'az login --tenant t',
+  });
+});
 test('routes reject malformed mutations before reaching a provider', async () => {
   const f = fixture();
   const app = new Hono();

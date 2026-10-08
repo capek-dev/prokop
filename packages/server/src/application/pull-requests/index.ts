@@ -53,6 +53,11 @@ export function createPullRequestsApplication(port: PullRequestsPort) {
             accountName: account.name,
           });
         } catch (error: unknown) {
+          const details = error instanceof BadRequestError ? error.details : undefined;
+          const command =
+            details && typeof details === 'object' && 'command' in details && typeof details.command === 'string'
+              ? details.command
+              : undefined;
           connections.push({
             repository,
             status: 'unavailable',
@@ -60,6 +65,7 @@ export function createPullRequestsApplication(port: PullRequestsPort) {
               error instanceof BadRequestError
                 ? error.message
                 : 'Could not connect. Check CLI installation and sign-in on the Prokop server.',
+            ...(command ? { command } : {}),
           });
         }
       }

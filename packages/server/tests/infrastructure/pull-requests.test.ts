@@ -1,9 +1,17 @@
 import { describe, expect, test } from 'bun:test';
-import { readFile } from 'node:fs/promises';
 import { parsePullRequestRemote } from '@/infrastructure/pull-requests/repositories';
 import { createGitHubPullRequests } from '@/infrastructure/pull-requests/github';
 import { createAzurePullRequests } from '@/infrastructure/pull-requests/azure';
 import type { CliRequest, RunCli } from '@/infrastructure/pull-requests/cli';
+import {
+  AzureSetupError,
+  azureRest,
+  createAzureCredentials,
+  type AzureApi,
+  type AzureRequest,
+  type FetchLike,
+} from '@/infrastructure/pull-requests/azure-rest';
+import { BadRequestError } from '@/application/http-errors';
 import { pullRequestActionSchema, pullRequestCreateSchema } from '@/transport/http/routes/pull-requests';
 
 const head = 'a'.repeat(40);
@@ -212,34 +220,27 @@ describe('GitHub CLI adapter', () => {
   });
 });
 
-function azureHarness(
-  answer?: (request: CliRequest, resource: string, body: Record<string, unknown> | undefined) => unknown,
-) {
-  const calls: { request: CliRequest; resource: string; body?: Record<string, unknown> }[] = [];
-  const run: RunCli = async (request) => {
-    const resource = request.args[request.args.indexOf('--resource') + 1];
-    const fileIndex = request.args.indexOf('--in-file');
-    const body =
-      fileIndex < 0
-        ? undefined
-        : (JSON.parse(await readFile(request.args[fileIndex + 1], 'utf8')) as Record<string, unknown>);
-    calls.push({ request, resource, body });
+function azureHarness(answer?: (request: AzureRequest) => unknown) {
+  const calls: AzureRequest[] = [];
+  const api: AzureApi = async (request) => {
+    calls.push(request);
     const result =
-      answer?.(request, resource, body) ??
-      (resource === 'pullRequests'
+      answer?.(request) ??
+      (/^pullrequests\/\d+$/.test(request.path)
         ? azPr
-        : resource === 'pullRequestIterations'
+        : request.path.endsWith('/iterations')
           ? { value: [{ id: 3, sourceRefCommit: { commitId: head }, commonRefCommit: { commitId: base } }] }
           : {});
-    return JSON.stringify(result);
+    return structuredClone(result);
   };
-  return { calls, provider: createAzurePullRequests(run, '/checkout', azureRepo) };
+  const writes = () => calls.filter((c) => c.method && c.method !== 'GET');
+  return { calls, writes, provider: createAzurePullRequests(api, azureRepo) };
 }
 
-describe('Azure CLI adapter', () => {
+describe('Azure adapter', () => {
   test('renamed patches read the original path at the common commit', async () => {
-    const { provider, calls } = azureHarness((request, resource) => {
-      if (resource === 'pullRequestIterationChanges')
+    const { provider, calls } = azureHarness((request) => {
+      if (request.path.endsWith('/changes'))
         return {
           changeEntries: [
             {
@@ -251,30 +252,31 @@ describe('Azure CLI adapter', () => {
           ],
           nextSkip: 0,
         };
-      if (resource === 'items')
+      if (request.path === 'items')
         return {
-          content: request.args.includes(`versionDescriptor.version=${base}`) ? 'old\n' : 'new\n',
+          content: request.query?.['versionDescriptor.version'] === base ? 'old\n' : 'new\n',
           contentMetadata: { isBinary: false },
         };
     });
     const result = await provider.patch(7, head, '/new.ts');
     expect(result.patch).toContain('--- a/old.ts');
     expect(result.patch).toContain('+++ b/new.ts');
-    const reads = calls.filter((c) => c.resource === 'items');
-    expect(reads[0].request.args).toContain('path=/old.ts');
-    expect(reads[0].request.args).toContain(`versionDescriptor.version=${base}`);
-    expect(reads[1].request.args).toContain(`versionDescriptor.version=${head}`);
+    const reads = calls.filter((c) => c.path === 'items');
+    expect(reads.map((r) => [r.query?.path, r.query?.['versionDescriptor.version']])).toEqual([
+      ['/old.ts', base],
+      ['/new.ts', head],
+    ]);
   });
   test.each([true, false])(
     'binary and oversized content are explicitly unavailable (binary=%s)',
     async (isBinary) => {
-      const { provider } = azureHarness((_request, resource) => {
-        if (resource === 'pullRequestIterationChanges')
+      const { provider } = azureHarness((request) => {
+        if (request.path.endsWith('/changes'))
           return {
             changeEntries: [{ item: { path: '/file' }, changeType: 'add', changeTrackingId: 8 }],
             nextSkip: 0,
           };
-        if (resource === 'items')
+        if (request.path === 'items')
           return { content: isBinary ? '' : 'x'.repeat(250_001), contentMetadata: { isBinary } };
       });
       expect(await provider.patch(7, head, '/file')).toMatchObject({
@@ -285,83 +287,150 @@ describe('Azure CLI adapter', () => {
   );
   test('rejects patches if the source changes while reading file content', async () => {
     let reads = 0;
-    const { provider } = azureHarness((_request, resource) => {
-      if (resource === 'pullRequests' && ++reads > 1)
+    const { provider } = azureHarness((request) => {
+      if (request.path === 'pullrequests/7' && ++reads > 1)
         return { ...azPr, lastMergeSourceCommit: { commitId: base } };
-      if (resource === 'pullRequestIterationChanges')
+      if (request.path.endsWith('/changes'))
         return {
           changeEntries: [{ item: { path: '/file' }, changeType: 'add', changeTrackingId: 8 }],
           nextSkip: 0,
         };
-      if (resource === 'items') return { content: 'hello', contentMetadata: { isBinary: false } };
+      if (request.path === 'items') return { content: 'hello', contentMetadata: { isBinary: false } };
     });
     await expect(provider.patch(7, head, '/file')).rejects.toThrow('changed');
   });
-  test('keeps file-level conversations and omits deleted threads', async () => {
-    const { provider } = azureHarness((_request, resource) => {
-      if (resource === 'pullRequestThreads')
+  test('folders are not listed as changed files', async () => {
+    const { provider } = azureHarness((request) =>
+      request.path.endsWith('/changes')
+        ? {
+            changeEntries: [
+              { item: { path: '/src', isFolder: true }, changeType: 'add', changeTrackingId: 1 },
+              { item: { path: '/src/a.ts' }, changeType: 'add', changeTrackingId: 2 },
+            ],
+          }
+        : undefined,
+    );
+    expect((await provider.files(7, head, 1)).files.map((f) => f.path)).toEqual(['/src/a.ts']);
+  });
+  test('keeps file-level conversations and omits deleted and system-only threads', async () => {
+    const author = { id: 'bob', displayName: 'Bob' };
+    const { provider } = azureHarness((request) => {
+      if (request.path.endsWith('/threads'))
         return {
           value: [
             { id: 1, threadContext: { filePath: '/a.ts' }, status: 'active', comments: [] },
+            {
+              id: 3,
+              threadContext: { filePath: '/a.ts' },
+              status: 'active',
+              comments: [
+                { id: 1, author, content: 'Why?', publishedDate: '2026-10-08', commentType: 'text' },
+              ],
+            },
             { id: 2, isDeleted: true },
+            {
+              id: 4,
+              comments: [
+                { id: 1, author, content: 'Bob voted 10', publishedDate: '2026-10-08', commentType: 'system' },
+              ],
+            },
           ],
         };
-      if (resource === 'pullRequestStatuses' || resource === 'evaluations') return { value: [] };
+      if (request.path.endsWith('/statuses') || request.path === 'policy/evaluations') return { value: [] };
     });
     const detail = await provider.detail(7);
     expect(detail.threads).toEqual([
-      { id: '1', path: '/a.ts', resolved: false, outdated: false, canResolve: true, comments: [] },
+      {
+        id: '3',
+        path: '/a.ts',
+        resolved: false,
+        outdated: false,
+        canResolve: true,
+        comments: [{ id: '1', author: { id: 'bob', name: 'Bob' }, body: 'Why?', createdAt: '2026-10-08' }],
+      },
     ]);
     expect(detail.warnings).toEqual([]);
   });
+  test('build policies keep their configured names and optional policies are marked', async () => {
+    const { provider } = azureHarness((request) =>
+      request.path === 'policy/evaluations'
+        ? {
+            value: [
+              {
+                status: 'queued',
+                configuration: {
+                  isBlocking: true,
+                  type: { displayName: 'Build' },
+                  settings: { displayName: 'CI' },
+                },
+                context: { buildId: 42 },
+              },
+              { status: 'approved', configuration: { isBlocking: false, type: { displayName: 'Reviewers' } } },
+            ],
+          }
+        : request.path.endsWith('/threads') || request.path.endsWith('/statuses')
+          ? { value: [] }
+          : undefined,
+    );
+    expect((await provider.detail(7)).checks).toEqual([
+      { name: 'CI', state: 'queued', url: 'https://dev.azure.com/acme/Product/_build/results?buildId=42' },
+      { name: 'Reviewers (optional)', state: 'approved' },
+    ]);
+  });
   test('automatic completion uses the viewer identity and preserves policy enforcement', async () => {
-    const { provider, calls } = azureHarness();
+    const { provider, writes } = azureHarness();
     await provider.action(7, { ...guard, action: 'enable-auto-merge', method: 'rebase-merge' });
-    expect(calls.at(-1)?.body).toEqual({
+    expect(writes().at(-1)?.body).toEqual({
       autoCompleteSetBy: { id: 'alice-id' },
       completionOptions: { mergeStrategy: 'rebaseMerge', deleteSourceBranch: false, bypassPolicy: false },
     });
   });
-  test('authenticates against organization connection data rather than an unrelated az subscription', async () => {
-    const { provider, calls } = azureHarness((_r, resource) =>
-      resource === 'connectionData'
+  test('disabling automatic completion sends the empty identity, which Azure treats as clear', async () => {
+    const { provider, writes } = azureHarness();
+    await provider.action(7, { ...guard, action: 'disable-auto-merge' });
+    expect(writes().at(-1)?.body).toEqual({
+      autoCompleteSetBy: { id: '00000000-0000-0000-0000-000000000000' },
+    });
+  });
+  test('identifies the viewer from organization connection data', async () => {
+    const { provider, calls } = azureHarness((request) =>
+      request.path === 'connectionData'
         ? { authenticatedUser: { id: 'pat-user', providerDisplayName: 'Pat user' } }
         : undefined,
     );
     expect(await provider.account()).toEqual({ id: 'pat-user', name: 'Pat user' });
-    expect(calls[0].request.args).toContain('location');
-    expect(calls[0].request.args).toContain('https://dev.azure.com/acme');
-    expect(calls[0].request.args).toContain('7.1-preview');
-    expect(calls[0].request.args).not.toContain('--route-parameters');
+    expect(calls[0]).toMatchObject({ scope: 'organization', version: '7.1-preview' });
   });
   test('completion preserves head guard and never bypasses policy', async () => {
-    const { provider, calls } = azureHarness();
+    const { provider, writes } = azureHarness();
     await provider.action(7, { ...guard, action: 'merge', method: 'rebase' });
-    expect(calls[1].body).toMatchObject({
+    expect(writes()[0].body).toMatchObject({
       lastMergeSourceCommit: { commitId: head },
       completionOptions: { mergeStrategy: 'rebase', bypassPolicy: false, deleteSourceBranch: false },
     });
   });
-  test('inline comment carries file tracking and iteration, and deletes its temporary JSON body', async () => {
-    const { provider, calls } = azureHarness();
+  test('inline comment carries file tracking and iteration', async () => {
+    const { provider, writes } = azureHarness();
     await provider.action(7, {
       ...guard,
       action: 'comment',
       body: 'Check this',
       position: { path: '/a.ts', line: 3, side: 'RIGHT', iteration: 3, changeTrackingId: 8 },
     });
-    const call = calls.at(-1)!;
-    expect(call.body).toMatchObject({
-      threadContext: { filePath: '/a.ts', rightFileStart: { line: 3, offset: 1 } },
-      pullRequestThreadContext: {
-        changeTrackingId: 8,
-        iterationContext: { firstComparingIteration: 3, secondComparingIteration: 3 },
+    expect(writes().at(-1)).toMatchObject({
+      path: 'pullrequests/7/threads',
+      method: 'POST',
+      body: {
+        threadContext: { filePath: '/a.ts', rightFileStart: { line: 3, offset: 1 } },
+        pullRequestThreadContext: {
+          changeTrackingId: 8,
+          iterationContext: { firstComparingIteration: 3, secondComparingIteration: 3 },
+        },
       },
     });
-    await expect(readFile(call.request.args[call.request.args.indexOf('--in-file') + 1])).rejects.toThrow();
   });
   test('rejects an outdated iteration before writing', async () => {
-    const { provider, calls } = azureHarness();
+    const { provider, writes } = azureHarness();
     await expect(
       provider.action(7, {
         ...guard,
@@ -370,7 +439,7 @@ describe('Azure CLI adapter', () => {
         position: { path: '/a.ts', line: 3, side: 'RIGHT', iteration: 2, changeTrackingId: 8 },
       }),
     ).rejects.toThrow('position changed');
-    expect(calls.every((c) => !c.body)).toBe(true);
+    expect(writes()).toEqual([]);
   });
   test.each([
     ['approve', 10],
@@ -379,18 +448,192 @@ describe('Azure CLI adapter', () => {
     ['wait', -5],
     ['reset', 0],
   ] as const)('preserves Azure vote %s', async (verdict, vote) => {
-    const { provider, calls } = azureHarness();
+    const { provider, writes } = azureHarness();
     await provider.action(7, { ...guard, action: 'review', verdict, body: '' });
-    expect(calls.at(-1)?.body).toEqual({ id: 'alice-id', vote });
+    expect(writes().at(-1)).toMatchObject({
+      path: 'pullrequests/7/reviewers/alice-id',
+      method: 'PUT',
+      body: { id: 'alice-id', vote },
+    });
   });
   test('reports a partial review without silently reposting its successful comment', async () => {
-    const { provider, calls } = azureHarness((_r, resource) => {
-      if (resource === 'pullRequestReviewers') throw new Error('denied');
+    const { provider, calls } = azureHarness((request) => {
+      if (request.path.includes('/reviewers/')) throw new Error('denied');
     });
     await expect(
       provider.action(7, { ...guard, action: 'review', verdict: 'approve', body: 'Looks good' }),
     ).rejects.toThrow('comment was posted');
-    expect(calls.filter((c) => c.resource === 'pullRequestThreads')).toHaveLength(1);
+    expect(calls.filter((c) => c.path.endsWith('/threads') && c.method === 'POST')).toHaveLength(1);
+  });
+  test('adds a reviewer by e-mail through an exact identity match', async () => {
+    const id = '11111111-2222-3333-4444-555555555555';
+    const { provider, writes, calls } = azureHarness((request) =>
+      request.path === 'identities' ? { value: [{ id }] } : undefined,
+    );
+    await provider.action(7, { ...guard, action: 'reviewer', reviewer: 'bob@example.com', remove: false });
+    expect(calls.find((c) => c.path === 'identities')).toMatchObject({
+      scope: 'identities',
+      query: { searchFilter: 'General', filterValue: 'bob@example.com' },
+    });
+    expect(writes()).toEqual([
+      { path: `pullrequests/7/reviewers/${id}`, method: 'PUT', body: { id, vote: 0 } },
+    ]);
+  });
+  test('refuses an ambiguous reviewer instead of guessing', async () => {
+    const { provider, writes } = azureHarness((request) =>
+      request.path === 'identities' ? { value: [{ id: 'a' }, { id: 'b' }] } : undefined,
+    );
+    await expect(
+      provider.action(7, { ...guard, action: 'reviewer', reviewer: 'bob', remove: false }),
+    ).rejects.toThrow('several');
+    expect(writes()).toEqual([]);
+  });
+  test('removes a reviewer identity without a lookup', async () => {
+    const id = '11111111-2222-3333-4444-555555555555';
+    const { provider, writes, calls } = azureHarness();
+    await provider.action(7, { ...guard, action: 'reviewer', reviewer: id, remove: true });
+    expect(calls.some((c) => c.path === 'identities')).toBe(false);
+    expect(writes()).toEqual([{ path: `pullrequests/7/reviewers/${id}`, method: 'DELETE' }]);
+  });
+});
+
+describe('Azure REST transport', () => {
+  const tenant = '479b24df-2b4c-4c28-9ced-2eebf82e9ab8';
+  function transport({
+    tenantHeader = tenant,
+    accounts = [] as Record<string, unknown>[],
+    token = (): unknown => ({ accessToken: 'token', expires_on: Math.floor(Date.now() / 1000) + 3600 }),
+    response = (): Response => Response.json({ ok: true }),
+    env = {} as Record<string, string>,
+  } = {}) {
+    const cli: CliRequest[] = [];
+    const requests: { url: string; init: RequestInit }[] = [];
+    const run: RunCli = async (request) => {
+      cli.push(request);
+      if (request.args[1] === 'list') return JSON.stringify(accounts);
+      return JSON.stringify(token());
+    };
+    const fetcher: FetchLike = async (url, init) => {
+      requests.push({ url, init });
+      if (init.method === 'HEAD')
+        return new Response(null, { status: 405, headers: { 'x-vss-resourcetenant': tenantHeader } });
+      return response();
+    };
+    const credentials = createAzureCredentials(run, fetcher, env);
+    return { cli, requests, api: azureRest(fetcher, credentials, azureRepo) };
+  }
+  const header = (init: RequestInit) => (init.headers as Record<string, string>).authorization;
+
+  test("mints a token for the organization's own tenant, not the default az tenant", async () => {
+    const { cli, requests, api } = transport();
+    await api({ path: 'pullrequests/7' });
+    expect(requests[0]).toMatchObject({ url: 'https://dev.azure.com/acme/_apis/connectionData' });
+    expect(cli.at(-1)?.args).toEqual([
+      'account',
+      'get-access-token',
+      '--resource',
+      '499b84ac-1321-427f-aa17-267ca6975798',
+      '--tenant',
+      tenant,
+      '--only-show-errors',
+      '--output',
+      'json',
+    ]);
+    expect(requests[1].url).toBe(
+      'https://dev.azure.com/acme/Product/_apis/git/repositories/App/pullrequests/7?api-version=7.1',
+    );
+    expect(header(requests[1].init)).toBe('Bearer token');
+  });
+  test('prefers the az account signed in to that tenant over the default account', async () => {
+    const { cli, api } = transport({
+      accounts: [
+        { id: 'default-sub', tenantId: 'other', isDefault: true },
+        { id: 'tenant-sub', tenantId: tenant.toUpperCase(), isDefault: false },
+      ],
+    });
+    await api({ path: 'pullrequests/7' });
+    expect(cli.at(-1)?.args).toContain('tenant-sub');
+    expect(cli.at(-1)?.args).not.toContain('--tenant');
+  });
+  test('organizations without a tenant use the default az account', async () => {
+    const { cli, api } = transport({ tenantHeader: '00000000-0000-0000-0000-000000000000' });
+    await api({ path: 'pullrequests/7' });
+    expect(cli).toHaveLength(1);
+    expect(cli[0].args).not.toContain('--tenant');
+  });
+  test('reuses one token across concurrent and later requests', async () => {
+    const { cli, api } = transport({ tenantHeader: '' });
+    await Promise.all([api({ path: 'a' }), api({ path: 'b' }), api({ path: 'c' })]);
+    await api({ path: 'd' });
+    expect(cli).toHaveLength(1);
+  });
+  test('mints again when the cached token is about to expire', async () => {
+    const { cli, api } = transport({
+      tenantHeader: '',
+      token: () => ({ accessToken: 'token', expires_on: Math.floor(Date.now() / 1000) + 60 }),
+    });
+    await api({ path: 'a' });
+    await api({ path: 'b' });
+    expect(cli).toHaveLength(2);
+  });
+  test('a tenant membership failure names the exact sign-in command', async () => {
+    const run: RunCli = async (request) => {
+      if (request.args[1] === 'list') return '[]';
+      throw new BadRequestError(
+        request.classify?.('AADSTS50020: User account does not exist in tenant') ?? 'generic',
+      );
+    };
+    const fetcher: FetchLike = async () =>
+      new Response(null, { status: 405, headers: { 'x-vss-resourcetenant': tenant } });
+    const failure = await azureRest(fetcher, createAzureCredentials(run, fetcher, {}), azureRepo)({
+      path: 'x',
+    }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(AzureSetupError);
+    expect((failure as AzureSetupError).message).toContain('not a member');
+    expect((failure as AzureSetupError).details).toEqual({
+      command: `az login --tenant ${tenant} --allow-no-subscriptions`,
+    });
+  });
+  test('a personal access token from AZURE_DEVOPS_EXT_PAT skips az entirely', async () => {
+    const { cli, requests, api } = transport({ env: { AZURE_DEVOPS_EXT_PAT: 'pat' } });
+    await api({ path: 'a' });
+    expect(cli).toEqual([]);
+    expect(header(requests.at(-1)!.init)).toBe(`Basic ${Buffer.from(':pat').toString('base64')}`);
+  });
+  test("surfaces Azure's own error message for rejected writes", async () => {
+    const { api } = transport({
+      response: () =>
+        Response.json({ message: 'TF401179: An active pull request already exists.' }, { status: 409 }),
+    });
+    await expect(api({ path: 'pullrequests', method: 'POST', body: {} })).rejects.toThrow('TF401179');
+  });
+  test('an HTML sign-in page is an authentication failure, not data, and drops the token', async () => {
+    let page = true;
+    const { cli, api } = transport({
+      tenantHeader: '',
+      response: () =>
+        page
+          ? new Response('<html>Sign in</html>', { status: 203, headers: { 'content-type': 'text/html' } })
+          : Response.json({}),
+    });
+    await expect(api({ path: 'a' })).rejects.toBeInstanceOf(AzureSetupError);
+    page = false;
+    await api({ path: 'a' });
+    expect(cli).toHaveLength(2);
+  });
+  test('sends JSON bodies with the requested method and API version', async () => {
+    const { requests, api } = transport({ tenantHeader: '' });
+    await api({
+      path: 'policy/evaluations',
+      scope: 'project',
+      query: { artifactId: 'vstfs:///x' },
+      version: '7.1-preview.1',
+    });
+    await api({ path: 'pullrequests/7', method: 'PATCH', body: { title: 'New' } });
+    expect(requests[1].url).toBe(
+      'https://dev.azure.com/acme/Product/_apis/policy/evaluations?artifactId=vstfs%3A%2F%2F%2Fx&api-version=7.1-preview.1',
+    );
+    expect(requests[2].init).toMatchObject({ method: 'PATCH', body: '{"title":"New"}' });
   });
 });
 

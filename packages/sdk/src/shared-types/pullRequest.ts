@@ -31,6 +31,8 @@ export interface PullRequestConnection {
   accountId?: string;
   accountName?: string;
   message?: string;
+  /** Server-side shell command that fixes an unavailable connection, for example a tenant sign-in. */
+  command?: string;
 }
 export interface PullRequestDiscovery {
   connections: PullRequestConnection[];

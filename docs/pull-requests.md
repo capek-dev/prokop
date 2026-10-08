@@ -21,13 +21,23 @@ For Azure DevOps Services, install
 [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli), then run:
 
 ```sh
-az extension add --name azure-devops
 az login
 ```
 
-Organizations using a personal access token can instead authenticate with
-`az devops login --organization https://dev.azure.com/YOUR_ORGANIZATION`.
-Enter the token at the CLI prompt. Do not put it into a PR or Prokop conversation.
+Prokop uses `az` only to obtain a token and calls the Azure DevOps REST API
+directly; the `azure-devops` extension is not needed. Each organization belongs
+to a Microsoft Entra tenant, which may differ from your default `az` tenant.
+Prokop reads the organization's tenant and requests a token for it, preferring
+an `az` account already signed in to that tenant. If none is, the Pull requests
+view shows the command to run, for example:
+
+```sh
+az login --tenant 00000000-0000-0000-0000-000000000000 --allow-no-subscriptions
+```
+
+To use a personal access token instead, set `AZURE_DEVOPS_EXT_PAT` in the Prokop
+server's environment. It then applies to every Azure organization. Do not put the
+token into a PR or Prokop conversation.
 
 The checkout must have a GitHub.com or Azure DevOps Services Git remote. HTTPS,
 SSH, and legacy `organization.visualstudio.com` and `vs-ssh.visualstudio.com` Azure remote URLs are recognized.
@@ -89,6 +99,7 @@ outside these limits.
   `packages/sdk/src/rest/pull-requests.ts`.
 - Server use cases: `packages/server/src/application/pull-requests/index.ts`;
   CLI transport and adapters: `packages/server/src/infrastructure/pull-requests/`.
+  Azure tenant resolution, tokens and REST calls live in `azure-rest.ts`.
 - Client workspace view: `packages/client/src/components/pullRequests/PullRequestsView.tsx`;
   event handling: `packages/client/src/handlers/serverMessage/pullRequestHandlers.ts`.
 
