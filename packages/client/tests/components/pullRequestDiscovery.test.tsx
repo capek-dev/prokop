@@ -107,3 +107,36 @@ test('switching to a same-named workspace discovers its own repository', async (
     ),
   );
 });
+
+test('an unavailable Azure connection shows the exact sign-in command from the server', async () => {
+  discover.mockResolvedValue({
+    branch: 'main',
+    connections: [
+      {
+        status: 'unavailable',
+        message: 'Azure CLI needs a sign-in for the tenant that owns "acme".',
+        command: 'az login --tenant 479b24df-2b4c-4c28-9ced-2eebf82e9ab8 --allow-no-subscriptions',
+        repository: {
+          provider: 'azure',
+          host: 'dev.azure.com',
+          owner: 'acme',
+          project: 'Product',
+          name: 'App',
+          remote: 'origin',
+          key: 'azure:acme/product/app',
+          url: 'https://dev.azure.com/acme/Product/_git/App',
+        },
+      },
+    ],
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <PullRequestsView client={client} serverId="server" workspaceId="old" />
+    </QueryClientProvider>,
+  );
+  expect(
+    await screen.findByText('az login --tenant 479b24df-2b4c-4c28-9ced-2eebf82e9ab8 --allow-no-subscriptions'),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Copy command' })).toBeInTheDocument();
+  expect(list).not.toHaveBeenCalled();
+});

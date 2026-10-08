@@ -1,10 +1,25 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ProkopaiClient, PullRequestScope } from '@prokopai/sdk';
+import {
+  Check,
+  CircleCheck,
+  CircleDashed,
+  CircleMinus,
+  CircleX,
+  Copy,
+  GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  GitPullRequestDraft,
+} from 'lucide-react';
+import type { ProkopaiClient, PullRequestScope, PullRequestSummary } from '@prokopai/sdk';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -109,6 +124,94 @@ export function PrSelect({
     </div>
   );
 }
+const stateStyles = {
+  draft: { icon: GitPullRequestDraft, label: 'Draft', className: 'text-muted-foreground' },
+  open: { icon: GitPullRequest, label: 'Open', className: 'text-success' },
+  merged: { icon: GitMerge, label: 'Merged', className: 'text-primary' },
+  closed: { icon: GitPullRequestClosed, label: 'Closed', className: 'text-destructive' },
+};
+function stateStyle(pr: Pick<PullRequestSummary, 'state' | 'draft'>) {
+  return stateStyles[pr.draft && pr.state === 'open' ? 'draft' : pr.state];
+}
+export function PrStateIcon({ pr, className }: { pr: Pick<PullRequestSummary, 'state' | 'draft'>; className?: string }) {
+  const style = stateStyle(pr);
+  const Icon = style.icon;
+  return <Icon aria-label={style.label} className={cn('size-4 shrink-0', style.className, className)} />;
+}
+export function PrStateBadge({ pr }: { pr: Pick<PullRequestSummary, 'state' | 'draft'> }) {
+  const style = stateStyle(pr);
+  const Icon = style.icon;
+  return (
+    <Badge variant="outline" className={style.className}>
+      <Icon />
+      {style.label}
+    </Badge>
+  );
+}
+
+/** Provider check, policy and vote states collapse into four visual outcomes. */
+export function statusTone(state: string): 'success' | 'failure' | 'pending' | 'neutral' {
+  const value = state.toLowerCase();
+  if (/^(success|succeeded|approved|completed|passed)$|^approved with/.test(value)) return 'success';
+  if (/fail|error|rejected|broken|cancel|timed_out|action_required|changes_requested/.test(value))
+    return 'failure';
+  if (/pending|queued|running|in_progress|waiting|expected|requested/.test(value)) return 'pending';
+  return 'neutral';
+}
+const toneIcons = {
+  success: { icon: CircleCheck, className: 'text-success' },
+  failure: { icon: CircleX, className: 'text-destructive' },
+  pending: { icon: CircleDashed, className: 'text-warning' },
+  neutral: { icon: CircleMinus, className: 'text-muted-foreground' },
+};
+export function StatusIcon({ state }: { state: string }) {
+  const tone = toneIcons[statusTone(state)];
+  const Icon = tone.icon;
+  return <Icon aria-hidden className={cn('size-4 shrink-0', tone.className)} />;
+}
+
+const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+export function relativeTime(iso: string, now = Date.now()): string {
+  const time = Date.parse(iso);
+  if (Number.isNaN(time)) return '';
+  const seconds = (time - now) / 1000;
+  for (const [unit, size] of [
+    ['year', 31_536_000],
+    ['month', 2_592_000],
+    ['week', 604_800],
+    ['day', 86_400],
+    ['hour', 3600],
+    ['minute', 60],
+  ] as const)
+    if (Math.abs(seconds) >= size) return relative.format(Math.round(seconds / size), unit);
+  return relative.format(0, 'second');
+}
+
+/** Azure paths are repository-absolute ("/src/a.ts"); show them like GitHub's. */
+export function displayPath(path: string): string {
+  return path.replace(/^\/+/, '');
+}
+
+export function CopyCommand({ command }: { command: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="flex items-start gap-1 rounded-md border bg-muted/50 p-2">
+      <pre className="min-w-0 flex-1 overflow-x-auto font-mono text-xs leading-5">{command}</pre>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        aria-label="Copy command"
+        onClick={() => {
+          void navigator.clipboard?.writeText(command).then(() => setCopied(true));
+        }}
+      >
+        {copied ? <Check /> : <Copy />}
+      </Button>
+    </div>
+  );
+}
+
 export function safePrUrl(value: string): string | undefined {
   try {
     const url = new URL(value);

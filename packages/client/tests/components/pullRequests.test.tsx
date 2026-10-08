@@ -4,7 +4,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ProkopaiClient, PullRequestDetail } from '@prokopai/sdk';
 import { PullRequestDetailView } from '@/components/pullRequests/PullRequestDetailView';
 import { PullRequestCreateForm } from '@/components/pullRequests/PullRequestCreateForm';
-import { draftKey, prKey, usePrDrafts, type PullRequestContext } from '@/components/pullRequests/shared';
+import {
+  displayPath,
+  draftKey,
+  prKey,
+  statusTone,
+  usePrDrafts,
+  type PullRequestContext,
+} from '@/components/pullRequests/shared';
 
 const head = 'a'.repeat(40);
 const pr: PullRequestDetail = {
@@ -181,4 +188,21 @@ test('query keys separate servers, checkouts and signed-in accounts', () => {
   expect(prKey(ctx)).not.toEqual(prKey({ ...ctx, serverId: 'another-server' }));
   expect(prKey(ctx)).not.toEqual(prKey({ ...ctx, accountId: 'another-user' }));
   expect(prKey(ctx)).not.toEqual(prKey({ ...ctx, scope: { ...ctx.scope, root: '/another-checkout' } }));
+});
+test.each([
+  ['succeeded', 'success'],
+  ['Approved with suggestions', 'success'],
+  ['APPROVED', 'success'],
+  ['CHANGES_REQUESTED', 'failure'],
+  ['Rejected', 'failure'],
+  ['queued', 'pending'],
+  ['Waiting for author', 'pending'],
+  ['No vote', 'neutral'],
+  ['notApplicable', 'neutral'],
+])('provider state %s renders as %s', (state, tone) => {
+  expect(statusTone(state)).toBe(tone);
+});
+test('Azure system paths display without their leading slash', () => {
+  expect(displayPath('/src/app.ts')).toBe('src/app.ts');
+  expect(displayPath('src/app.ts')).toBe('src/app.ts');
 });
