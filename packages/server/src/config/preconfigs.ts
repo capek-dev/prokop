@@ -43,7 +43,16 @@ export async function createValidatedPreconfig(
     ]);
   }
 
+  if (preconfig.isDefault) await clearOtherDefaults(preconfig.id);
+
   return preconfig;
+}
+
+/** Only one preconfig is the default: making one default moves the flag off the others. */
+async function clearOtherDefaults(id: string): Promise<void> {
+  for (const other of await listPreconfigs()) {
+    if (other.isDefault && other.id !== id) await updatePreconfig(other.id, { isDefault: false });
+  }
 }
 
 export async function updateValidatedPreconfig(
@@ -73,21 +82,12 @@ export async function updateValidatedPreconfig(
     }
   }
 
-  if (updates.isDefault === true && !existing.isDefault) {
-    const allPreconfigs = await listPreconfigs();
-    const currentDefault = allPreconfigs.find(p => p.isDefault && p.id !== id);
-    if (currentDefault) {
-      errors.push(`Cannot set as default: "${currentDefault.name}" is already the default. Unset it first.`);
-    }
-    if (errors.length > 0) {
-      throw new ConfigurationValidationError('Invalid preconfig data', errors);
-    }
-  }
-
   const updated = await updatePreconfig(id, updates);
   if (!updated) {
     throw new ConfigurationPersistenceError('Failed to update preconfig');
   }
+
+  if (updates.isDefault === true) await clearOtherDefaults(id);
 
   return updated;
 }

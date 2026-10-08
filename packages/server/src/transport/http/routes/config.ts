@@ -45,7 +45,7 @@ export function registerConfigRoutes(
         variant: body.variant ?? null,
         modelHarness: body.modelHarness ?? null,
         settings: body.settings ?? null,
-        isDefault: false,
+        isDefault: body.isDefault === true,
         mode: body.mode as 'primary' | 'subagent' | 'both' | undefined,
         canSpawnSubagents: body.canSpawnSubagents as boolean | string[] | undefined,
         allowSelfAsSubagent: body.allowSelfAsSubagent,
@@ -82,7 +82,7 @@ export function registerConfigRoutes(
         variant: body.variant,
         modelHarness: body.modelHarness,
         settings: body.settings,
-        isDefault: body.isDefault as boolean | undefined,
+        isDefault: body.isDefault,
         mode: body.mode as 'primary' | 'subagent' | 'both' | undefined,
         canSpawnSubagents: body.canSpawnSubagents as boolean | string[] | null | undefined,
         ...(body.allowSelfAsSubagent !== undefined

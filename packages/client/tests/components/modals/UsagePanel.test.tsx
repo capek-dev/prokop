@@ -148,7 +148,7 @@ test('shows every stored Codex account independently, even with no active accoun
   expect(await within(personal).findByText('37% used')).toBeInTheDocument();
   const work = screen.getByRole('region', { name: 'Codex · Work' });
   expect(await within(work).findByText('Could not read usage for this Codex account.')).toBeInTheDocument();
-  expect(screen.getByText('Reconnect this Codex account in LLM providers.')).toBeInTheDocument();
+  expect(screen.getByText('Reconnect this Codex account in Providers & Models.')).toBeInTheDocument();
   expect(screen.getByText('Codex CLI')).toBeInTheDocument();
   expect(providers.codexAccountUsage.mock.calls.map(call => call[0])).toEqual(['a', 'b']);
   expect(providers.codexAccountUsage.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);

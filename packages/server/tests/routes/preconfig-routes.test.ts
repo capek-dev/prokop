@@ -58,6 +58,27 @@ describe('preconfig routes', () => {
     mock.restore();
   });
 
+  test('forwards isDefault on create and update', async () => {
+    const app = new Hono();
+    registerConfigRoutes(app, fakeProviders(), fakeConfiguration());
+
+    const createResponse = await app.request('/api/preconfigs', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'New default', isDefault: true }),
+    });
+    expect(createResponse.status).toBe(201);
+    expect(createValidatedPreconfig.mock.calls[0]?.[0]).toMatchObject({ isDefault: true });
+
+    const updateResponse = await app.request('/api/preconfigs/existing', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ isDefault: true }),
+    });
+    expect(updateResponse.status).toBe(200);
+    expect(updateValidatedPreconfig.mock.calls[0]?.[1]).toMatchObject({ isDefault: true });
+  });
+
   test('forwards allowSelfAsSubagent on create and update', async () => {
     const app = new Hono();
     registerConfigRoutes(app, fakeProviders(), fakeConfiguration());

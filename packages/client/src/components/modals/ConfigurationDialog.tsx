@@ -8,6 +8,7 @@ import { useUIStore } from '@/stores/uiStore';
 import type { ConfigurationSection } from '@/stores/uiStore';
 import { SettingsDialogShell, PanelLoadingFallback, type SettingsGroup, type SettingsSection } from './SettingsDialogShell';
 import type { WorkspaceSettingsDraft, WorkspaceSettingsSection } from './configuration/WorkspaceSettingsEditor';
+import type { AgentEditorDraft } from './configuration/PreconfigsPanel';
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
 
 const MCPServersPanel = lazy(() => import('./configuration/MCPServersPanel').then(m => ({ default: m.MCPServersPanel })));
@@ -86,6 +87,7 @@ export function ConfigurationDialog({
   // The dialog mounts on open, capturing the workspace it was opened from.
   const [workspaceId, setWorkspaceId] = useState(() => useServerDataStore.getState().activeWorkspace?.id ?? null);
   const [workspaceDrafts, setWorkspaceDrafts] = useState<Record<string, WorkspaceSettingsDraft>>({});
+  const [agentDraft, setAgentDraft] = useState<AgentEditorDraft | null>(null);
   const updateVersion = useServerUpdate();
   const workspaces = useServerDataStore(s => s.workspaces);
   const agents = useServerDataStore(s => s.agents);
@@ -130,7 +132,7 @@ export function ConfigurationDialog({
           case 'usage':
             return <UsagePanel sdkClient={sdkClient} />;
           case 'preconfigs':
-            return <PreconfigsPanel sdkClient={sdkClient} />;
+            return <PreconfigsPanel sdkClient={sdkClient} draft={agentDraft} onDraftChange={setAgentDraft} />;
           case 'providers-models':
             return <ProvidersModelsPanel sdkClient={sdkClient} />;
           case 'prompts':

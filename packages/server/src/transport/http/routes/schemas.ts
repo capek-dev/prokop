@@ -229,6 +229,7 @@ export const createPreconfigSchema = z.object({
   allowSelfAsSubagent: z.boolean().optional(),
   skills: z.array(z.string()).nullable().optional(),
   capabilities: preconfigCapabilitiesSchema,
+  isDefault: z.boolean().optional(),
   format: z.enum(['md']).optional(),
 }).loose();
 
@@ -247,6 +248,7 @@ export const updatePreconfigSchema = z.object({
   allowSelfAsSubagent: z.boolean().optional(),
   skills: z.array(z.string()).nullable().optional(),
   capabilities: preconfigCapabilitiesSchema,
+  isDefault: z.boolean().optional(),
 }).loose();
 
 // ── Prompt schemas ─────────────────────────────────────────────

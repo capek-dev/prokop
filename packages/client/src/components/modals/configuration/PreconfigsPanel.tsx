@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { ProkopaiClient } from '@prokopai/sdk';
@@ -22,8 +22,18 @@ import { AgentModelPicker } from './AgentModelPicker';
 import { DisclosureRow } from './DisclosureRow';
 import { MemorySkillsControls } from './MemorySkillsControls';
 
+/** An open agent editor. `id` is null for a new agent; `initial` detects unsaved edits. */
+export interface AgentEditorDraft {
+  id: string | null;
+  form: PreconfigForm;
+  initial: PreconfigForm;
+}
+
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
+  /** Lifted by the settings dialog so an open editor survives switching sections. */
+  draft?: AgentEditorDraft | null;
+  onDraftChange?: Dispatch<SetStateAction<AgentEditorDraft | null>>;
 }
 
 interface Preconfig {
@@ -70,7 +80,7 @@ function getDuplicateName(name: string, existingNames: string[]): string {
   return `${copyName} ${copyNumber}`;
 }
 
-interface PreconfigForm {
+export interface PreconfigForm {
   name: string;
   description: string;
   systemPrompt: string;
@@ -122,7 +132,7 @@ const emptyForm: PreconfigForm = {
   learningSourceIds: [],
 };
 
-export function PreconfigsPanel({ sdkClient }: PanelProps) {
+export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: PanelProps) {
   const { data: preconfigsData, isLoading: loading } = usePreconfigsQuery(sdkClient);
   const { data: toolsData } = useToolsQuery(sdkClient);
   const createPreconfigMut = useCreatePreconfig(sdkClient);
@@ -131,10 +141,17 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
   const preconfigs: Preconfig[] = (preconfigsData?.preconfigs ?? []) as Preconfig[];
   const [error, setError] = useState<string | null>(null);
 
-  const [editingPreconfig, setEditingPreconfig] = useState<Preconfig | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
+  const [localDraft, setLocalDraft] = useState<AgentEditorDraft | null>(null);
+  const draft = onDraftChange ? (draftProp ?? null) : localDraft;
+  const setDraft = onDraftChange ?? setLocalDraft;
+  const isCreating = draft !== null && draft.id === null;
+  const editingPreconfig = draft?.id ? preconfigs.find(p => p.id === draft.id) ?? null : null;
+  const form = draft?.form ?? emptyForm;
+  const setForm = (next: PreconfigForm | ((prev: PreconfigForm) => PreconfigForm)) =>
+    setDraft(current => current && { ...current, form: typeof next === 'function' ? next(current.form) : next });
+  const isDirty = draft !== null && JSON.stringify(draft.form) !== JSON.stringify(draft.initial);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -154,6 +171,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
   const [homeSaving, setHomeSaving] = useState(false);
   const [homeDraft, setHomeDraft] = useState({ user: '', memory: '' });
   const [homeSkills, setHomeSkills] = useState<Array<{ name: string; description: string }>>([]);
+  const [homeReload, setHomeReload] = useState(0);
 
   const models = useServerDataStore((s) => s.models);
   const workspaces = useServerDataStore((s) => s.workspaces);
@@ -224,19 +242,15 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
         if (!cancelled) setHomeLoading(false);
       });
     return () => { cancelled = true; };
-  }, [editingPreconfig?.id, isMaterialized, sdkClient]);
+  }, [editingPreconfig?.id, isMaterialized, sdkClient, homeReload]);
 
   const handleCreate = () => {
-    setIsCreating(true);
-    setEditingPreconfig(null);
-    setForm(emptyForm);
+    setDraft({ id: null, form: emptyForm, initial: emptyForm });
   };
 
   const handleEdit = (preconfig: Preconfig) => {
-    setEditingPreconfig(preconfig);
-    setIsCreating(false);
     const learning = parseAgentLearningSettings(preconfig.settings);
-    setForm({
+    const next: PreconfigForm = {
       name: preconfig.name,
       description: preconfig.description || '',
       systemPrompt: preconfig.systemPrompt || '',
@@ -265,7 +279,8 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
       learningInstructions: learning?.instructions ?? '',
       learningSourcesMode: learning?.sources.mode === 'selected' ? 'selected' : 'all',
       learningSourceIds: learning?.sources.mode === 'selected' ? learning.sources.workspaceIds : [],
-    });
+    };
+    setDraft({ id: preconfig.id, form: next, initial: next });
   };
 
   const handleSave = async () => {
@@ -352,8 +367,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
       } else if (editingPreconfig) {
         await updatePreconfigMut.mutateAsync({ id: editingPreconfig.id, body });
       }
-      setIsCreating(false);
-      setEditingPreconfig(null);
+      setDraft(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save agent');
     } finally {
@@ -382,6 +396,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
         canSpawnSubagents: preconfig.canSpawnSubagents ?? false,
         allowSelfAsSubagent: preconfig.allowSelfAsSubagent ?? false,
         skills: null,
+        capabilities: preconfig.capabilities ?? null,
         format: 'md',
       });
       toast.success(`Duplicated agent as ${name}`);
@@ -440,9 +455,8 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
   };
 
   const handleCancel = () => {
-    setIsCreating(false);
-    setEditingPreconfig(null);
-    setForm(emptyForm);
+    if (isDirty) setDiscardOpen(true);
+    else setDraft(null);
   };
 
   if (isCreating || editingPreconfig) {
@@ -450,7 +464,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
       <div className="p-3 sm:p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleCancel}>
+            <Button variant="ghost" size="icon" onClick={handleCancel} aria-label="Back to agents">
               <ArrowLeft className="size-4" />
             </Button>
             <h3 className="text-sm font-medium">
@@ -652,10 +666,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
                   <Button
                     variant="ghost"
                     size="icon-xs"
-                    onClick={() => {
-                      // Re-run the loader by toggling the dependency through a refetch of agents.
-                      agentsData.refetch();
-                    }}
+                    onClick={() => setHomeReload(n => n + 1)}
                     title="Reload home data"
                   >
                     <RefreshCw className="size-3" />
@@ -728,13 +739,13 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
             label="Prokop Runtime"
             summary={
               [
-                form.tools.length > 0 ? `${form.tools.length} tools` : null,
+                `${form.tools.length} tool${form.tools.length === 1 ? '' : 's'}`,
                 form.canSpawnSubagentsMode === 'all' ? 'subagents: all'
                   : form.canSpawnSubagentsMode === 'specific' ? `${form.canSpawnSubagentsList.length} subagents` : null,
                 form.temperature.trim() ? `temp ${form.temperature.trim()}` : null,
               ]
                 .filter(Boolean)
-                .join(' · ') || 'Defaults'
+                .join(' · ')
             }
             defaultOpen={false}
           >
@@ -745,6 +756,9 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
 
               <div className="space-y-2">
                 <Label className="text-sm">Tools</Label>
+                <p className="text-[10px] text-muted-foreground">
+                  Only the selected tools are available. With none selected, this agent has no tools from this list.
+                </p>
               <Input
                 value={toolSearch}
                 onChange={(e) => setToolSearch(e.target.value)}
@@ -856,7 +870,7 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
                 <div>
                   <Label htmlFor="allow-self-as-subagent" className="text-sm">Allow Self as Subagent</Label>
                   <p className="text-[10px] text-muted-foreground">
-                    Allows this preconfig to delegate once to a new agent using the same preconfig. It cannot repeat again in that subagent chain.
+                    Allows this agent to delegate once to a new copy of itself. The copy cannot delegate to itself again.
                   </p>
                   {form.canSpawnSubagentsMode === 'none' && (
                     <p className="text-[10px] text-muted-foreground">Enable subagent spawning first.</p>
@@ -907,6 +921,19 @@ export function PreconfigsPanel({ sdkClient }: PanelProps) {
             </DialogContent>
           </Dialog>
         )}
+
+        <ConfirmDialog
+          open={discardOpen}
+          onOpenChange={setDiscardOpen}
+          title="Discard changes?"
+          description="Your edits to this agent have not been saved."
+          confirmLabel="Discard"
+          variant="destructive"
+          onConfirm={() => {
+            setDiscardOpen(false);
+            setDraft(null);
+          }}
+        />
       </div>
     );
   }

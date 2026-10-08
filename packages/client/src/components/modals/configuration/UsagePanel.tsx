@@ -172,7 +172,7 @@ function CodexAccountUsageCard({ sdkClient, account, active }: UsagePanelProps &
         <UsageRefreshButton label={`Refresh Codex ${account.label} usage`} fetching={isFetching}
           disabled={account.reauthRequired} onRefresh={() => void refetch()} />
       </div>
-      {account.reauthRequired ? <p className="text-xs text-muted-foreground">Reconnect this Codex account in LLM providers.</p>
+      {account.reauthRequired ? <p className="text-xs text-muted-foreground">Reconnect this Codex account in Providers &amp; Models.</p>
         : isLoading ? <Loader2 className="size-4 animate-spin text-muted-foreground" />
         : isError || !data ? <p className="text-xs text-muted-foreground">Could not read usage for this Codex account.</p>
         : data.unavailable ? <p className="text-xs text-muted-foreground">{data.unavailable.message}</p>
