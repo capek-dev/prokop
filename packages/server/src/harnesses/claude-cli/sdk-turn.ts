@@ -40,11 +40,15 @@ export interface ClaudeTurnInput {
   onToolOwner?: (toolUseId: string, parentToolUseId?: string) => void;
   /** Claude Code process stderr, kept for failure diagnostics. */
   stderr?: (data: string) => void;
+  /** How long a finished turn keeps stdin open for background Bash and other non-agent tasks. */
+  backgroundTaskWaitMs?: number;
   /** A fake query source for offline tests. */
   start?: (prompt: string | AsyncIterable<SDKUserMessage>, options: Options) => AsyncIterable<SDKMessage>;
 }
 
 const MAX_OUTPUT = 8_000;
+/** Covers backgrounded checks and tests; a backgrounded server must not hold the session forever. */
+const BACKGROUND_TASK_WAIT_MS = 10 * 60_000;
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
@@ -52,10 +56,12 @@ function record(value: unknown): Record<string, unknown> | null {
 /**
  * CLI notices that carry no turn content. The CLI watches its own config,
  * commands, and plugins, so activity elsewhere (another Claude Code window)
- * can surface one before this turn's init.
+ * can surface one before this turn's init. A resumed process also reports
+ * background tasks orphaned by the previous process (task_notification with
+ * reason worker_restart) before init; no task of this turn exists yet.
  */
 const PRE_INIT_NOTICES = new Set(['commands_changed', 'background_tasks_changed', 'session_state_changed',
-  'status', 'notification', 'informational', 'plugin_install', 'files_persisted']);
+  'status', 'notification', 'informational', 'plugin_install', 'files_persisted', 'task_notification']);
 
 function outsideTurn(message: SDKMessage): Error {
   // Only expose SDK event discriminants, never message content or arbitrary subtype text.
@@ -137,7 +143,8 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
   let releaseInput!: () => void;
   const inputReleased = new Promise<void>(resolve => { releaseInput = resolve; });
   // An exhausted streaming-input generator closes stdin and can stop background agents.
-  // Keep it open until the terminal result and every observed background Agent settles.
+  // Keep it open until the terminal result and every observed background Agent settles,
+  // and for a bounded time while background Bash tasks run, so the CLI can report them.
   const prompt = (async function* (): AsyncGenerator<SDKUserMessage> {
     try {
       yield { type: 'user', parent_tool_use_id: null,
@@ -159,9 +166,22 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
   let sawResult = false;
   const backgroundAgents = new Set<string>();
   const agentTasks = new Map<string, string>();
+  // Non-agent task IDs (local_bash and others), and whether each is backgrounded.
+  const otherTasks = new Map<string, boolean>();
+  let taskWaitTimer: ReturnType<typeof setTimeout> | undefined;
+  let taskWaitExpired = false;
   const streamedText = new Map<string, string>();
+  const backgroundTasksPending = (): boolean => !taskWaitExpired && [...otherTasks.values()].some(Boolean);
   const releaseIfSettled = (): void => {
-    if (finished && backgroundAgents.size === 0) releaseInput();
+    if (!finished || backgroundAgents.size > 0) return;
+    if (!backgroundTasksPending()) {
+      releaseInput();
+    } else if (!taskWaitTimer) {
+      taskWaitTimer = setTimeout(() => {
+        taskWaitExpired = true;
+        releaseIfSettled();
+      }, input.backgroundTaskWaitMs ?? BACKGROUND_TASK_WAIT_MS);
+    }
   };
   // Keep only fixed event labels and comparisons. SDK payloads may contain secrets.
   const goalEvents: string[] = [];
@@ -232,6 +252,8 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
       agentTasks.set(message.task_id, message.tool_use_id);
       if (message.is_backgrounded) backgroundAgents.add(message.tool_use_id);
       yield { type: 'child-start', id: message.tool_use_id, background: message.is_backgrounded === true };
+    } else if (message.type === 'system' && message.subtype === 'task_started' && message.task_id) {
+      otherTasks.set(message.task_id, message.is_backgrounded === true);
     }
     if (message.type === 'system' && message.subtype === 'task_updated'
       && message.patch.is_backgrounded === true) {
@@ -239,9 +261,12 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
       if (agentId) {
         backgroundAgents.add(agentId);
         yield { type: 'child-start', id: agentId, background: true };
+      } else if (otherTasks.has(message.task_id)) {
+        otherTasks.set(message.task_id, true);
       }
     }
     if (message.type === 'system' && message.subtype === 'task_notification') {
+      if (otherTasks.delete(message.task_id)) releaseIfSettled();
       const agentId = agentTasks.get(message.task_id);
       if (agentId) {
         agentTasks.delete(message.task_id);
@@ -332,6 +357,7 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
         activations: goalActivations, clears: goalClears, streamFailed: goalStreamFailed,
         aborted: input.controller.signal.aborted, eventCount: goalEventCount, recentEvents: goalEvents });
     }
+    if (taskWaitTimer) clearTimeout(taskWaitTimer);
     releaseInput();
     streamClosed = true;
     approvedToolIds.clear();
