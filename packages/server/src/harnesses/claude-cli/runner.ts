@@ -16,7 +16,7 @@ export const spawnClaude: ClaudeSpawn = (args, cwd) => {
   const { ANTHROPIC_API_KEY: _apiKey, ANTHROPIC_AUTH_TOKEN: _authToken,
     CLAUDE_CODE_USE_BEDROCK: _bedrock, CLAUDE_CODE_USE_VERTEX: _vertex,
     CLAUDE_CODE_USE_FOUNDRY: _foundry, ...env } = process.env;
-  const child = Bun.spawn(args, { cwd, env, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore' });
+  const child = Bun.spawn(args, { cwd, env, stdin: 'pipe', stdout: 'pipe', stderr: 'ignore', windowsHide: true });
   if (!child.stdin || !child.stdout || typeof child.stdin === 'number'
     || typeof child.stdout === 'number') {
     child.kill();

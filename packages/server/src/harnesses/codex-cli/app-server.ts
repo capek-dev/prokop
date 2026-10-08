@@ -35,7 +35,7 @@ function record(value: unknown): Record<string, unknown> | null {
 
 export function spawnCodexAppServer(args: string[] = [], env?: Record<string, string | undefined>): CodexConnection {
   const process = Bun.spawn(['codex', 'app-server', '--stdio', ...args], {
-    stdin: 'pipe', stdout: 'pipe', stderr: 'pipe', ...(env ? { env } : {}),
+    stdin: 'pipe', stdout: 'pipe', stderr: 'pipe', windowsHide: true, ...(env ? { env } : {}),
   });
   if (!process.stdin || !process.stdout || typeof process.stdin === 'number'
     || typeof process.stdout === 'number') {

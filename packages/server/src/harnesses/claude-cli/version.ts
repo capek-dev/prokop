@@ -10,7 +10,7 @@ export function claudeCliVersion(): string {
 }
 
 function probeClaudeCliVersion(): string {
-  const result = Bun.spawnSync(['claude', '--version'], { stdout: 'pipe', stderr: 'ignore' });
+  const result = Bun.spawnSync(['claude', '--version'], { stdout: 'pipe', stderr: 'ignore', windowsHide: true });
   if (result.exitCode !== 0) throw new Error(MIN_VERSION);
   const version = result.stdout.toString().trim();
   const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version);

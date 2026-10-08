@@ -68,6 +68,7 @@ async function runGit(cwd: string, args: string[]): Promise<GitResult> {
     process = Bun.spawn(['git', '-C', cwd, ...args], {
       stdout: 'pipe',
       stderr: 'pipe',
+      windowsHide: true,
       env: {
         ...Bun.env,
         LC_ALL: 'C',
