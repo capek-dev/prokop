@@ -1,7 +1,9 @@
 import { lazy, Suspense, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ExternalLink, Pencil, X } from 'lucide-react';
 import type {
   PullRequestAction,
   PullRequestDetail,
@@ -17,7 +19,21 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { draftKey, prKey, PrError, PrSelect, safePrUrl, usePrDraft, type PullRequestContext } from './shared';
+import { cn } from '@/lib/utils';
+import {
+  displayPath,
+  draftKey,
+  prKey,
+  PrError,
+  PrSelect,
+  PrStateBadge,
+  relativeTime,
+  safePrUrl,
+  StatusIcon,
+  statusTone,
+  usePrDraft,
+  type PullRequestContext,
+} from './shared';
 
 const PullRequestFilesView = lazy(() => import('./PullRequestFilesView'));
 export type ActOnPullRequest = (action: PullRequestAction) => Promise<void>;
@@ -65,74 +81,93 @@ export function PullRequestDetailView({
     if (pending) throw new Error('An operation is already in progress.');
     await mutation.mutateAsync(action);
   };
-  if (detail.isPending) return <Skeleton className="m-4 h-32" />;
+  if (detail.isPending)
+    return (
+      <div className="flex flex-col gap-3 p-4">
+        <Skeleton className="h-6 w-2/3" />
+        <Skeleton className="h-4 w-1/3" />
+        <Skeleton className="h-32" />
+      </div>
+    );
   if (!detail.data || detail.error)
     return (
-      <div className="p-4">
+      <div className="flex flex-col items-start gap-2 p-4">
         <PrError error={detail.error} />
-        <Button onClick={() => void detail.refetch()}>Retry</Button>
+        <Button variant="outline" onClick={() => void detail.refetch()}>
+          Retry
+        </Button>
       </div>
     );
   const pr = detail.data;
   if (pr.accountId !== ctx.accountId)
     return <PrError error="The CLI account changed. Rescan connections before continuing." />;
+  const conversations = pr.comments.length + pr.threads.length;
   return (
-    <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
-      <header className="flex shrink-0 flex-col gap-2 border-b p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{pr.draft ? 'Draft' : pr.state}</Badge>
-          <span className="text-xs text-muted-foreground">
-            #{number} · {pr.author.name}
-          </span>
-          <a
-            className="ml-auto text-xs underline"
-            href={safePrUrl(pr.url)}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Open on {ctx.provider === 'github' ? 'GitHub' : 'Azure'}
-          </a>
+    <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col gap-0">
+      <header className="flex shrink-0 flex-col gap-2 border-b px-4 pt-3">
+        <div className="flex items-start gap-3">
+          <h2 className="min-w-0 flex-1 text-lg font-semibold leading-snug">
+            {pr.title} <span className="font-normal text-muted-foreground">#{number}</span>
+          </h2>
+          <Button variant="ghost" size="sm" asChild>
+            <a href={safePrUrl(pr.url)} target="_blank" rel="noopener noreferrer">
+              Open on {ctx.provider === 'github' ? 'GitHub' : 'Azure'}
+              <ExternalLink />
+            </a>
+          </Button>
         </div>
-        <h2 className="text-lg font-medium">{pr.title}</h2>
-        <p className="break-all text-xs text-muted-foreground">
-          {pr.sourceBranch} → {pr.targetBranch}
-        </p>
-        <TabsList>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <PrStateBadge pr={pr} />
+          <span>
+            {pr.author.name}
+            {pr.updatedAt && ` · updated ${relativeTime(pr.updatedAt)}`}
+          </span>
+          <span className="flex min-w-0 items-center gap-1 font-mono">
+            <code className="truncate rounded bg-muted px-1.5 py-0.5">{pr.sourceBranch}</code>→
+            <code className="truncate rounded bg-muted px-1.5 py-0.5">{pr.targetBranch}</code>
+          </span>
+        </div>
+        <TabsList variant="line" className="-mb-px">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="files">Files</TabsTrigger>
-          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="activity">
+            Activity
+            {conversations > 0 && (
+              <Badge variant="secondary" className="h-4 px-1.5">
+                {conversations}
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
       </header>
-      <div className="min-h-0 flex-1 overflow-auto p-3">
-        <PrError error={records.at(-1)?.error} />
-        {records.at(-1)?.status === 'success' && (
-          <p role="status" className="mb-2 text-xs text-muted-foreground">
-            Action accepted. Remote merges and checks may still be processing.
-          </p>
-        )}
-        {pr.warnings.map((w) => (
-          <p key={w} role="status" className="mb-2 text-sm text-muted-foreground">
-            {w}
-          </p>
-        ))}
+      <div className="@container min-h-0 flex-1 overflow-auto p-4">
+        <div className="mb-3 flex flex-col gap-2 empty:hidden">
+          <PrError error={records.at(-1)?.error} />
+          {records.at(-1)?.status === 'success' && (
+            <p role="status" className="text-xs text-muted-foreground">
+              Action accepted. Remote merges and checks may still be processing.
+            </p>
+          )}
+          {pr.warnings.map((w) => (
+            <p key={w} role="status" className="text-sm text-warning">
+              {w}
+            </p>
+          ))}
+        </div>
         <TabsContent value="overview">
           <Overview key={`${pr.head}:${pr.targetBranch}`} ctx={ctx} pr={pr} act={act} busy={pending} />
         </TabsContent>
-        <TabsContent value="activity" className="flex flex-col gap-4">
+        <TabsContent value="activity" className="flex flex-col gap-3">
           {pr.comments.map((c) => (
             <article key={`${c.id}:${c.createdAt}`} className="rounded-md border p-3">
-              <p className="mb-2 text-xs text-muted-foreground">
-                {c.author.name} · {new Date(c.createdAt).toLocaleString()}
-              </p>
+              <CommentMeta name={c.author.name} createdAt={c.createdAt} />
               <Markdown body={c.body} />
             </article>
           ))}
           {pr.threads.map((t) => (
             <Thread key={t.id} ctx={ctx} pr={pr} thread={t} act={act} busy={pending} />
           ))}
-          {!pr.comments.length && !pr.threads.length && (
-            <p className="text-sm text-muted-foreground">No conversation yet.</p>
-          )}
+          {!conversations && <p className="text-sm text-muted-foreground">No conversation yet.</p>}
           <ReviewForm ctx={ctx} pr={pr} act={act} busy={pending} />
         </TabsContent>
         <TabsContent value="files">
@@ -149,7 +184,7 @@ export function PullRequestDetailView({
 
 export function Markdown({ body }: { body: string }) {
   return (
-    <div className="prose prose-sm max-w-none break-words text-sm">
+    <div className="prose prose-sm max-w-none break-words text-sm dark:prose-invert">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -172,6 +207,32 @@ export function Markdown({ body }: { body: string }) {
   );
 }
 
+function CommentMeta({ name, createdAt }: { name: string; createdAt: string }) {
+  return (
+    <p className="mb-1 text-xs text-muted-foreground">
+      <span className="font-medium text-foreground">{name}</span>
+      {createdAt && (
+        <time dateTime={createdAt} title={new Date(createdAt).toLocaleString()}>
+          {' · '}
+          {relativeTime(createdAt)}
+        </time>
+      )}
+    </p>
+  );
+}
+
+function Section({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="flex-1">{title}</span>
+        {aside}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
 function Overview({
   ctx,
   pr,
@@ -190,165 +251,221 @@ function Overview({
   const perform = (action: PullRequestAction) => {
     void act(action).catch(() => {});
   };
+  const passed = pr.checks.filter((c) => statusTone(c.state) === 'success').length;
+  const failed = pr.checks.filter((c) => statusTone(c.state) === 'failure').length;
+  const complete = ctx.provider === 'azure' ? 'Complete' : 'Merge';
   return (
-    <div className="flex flex-col gap-5">
-      {editing ? (
-        <EditForm ctx={ctx} pr={pr} act={act} busy={busy} close={() => setEditing(false)} />
-      ) : (
-        <div className="flex flex-col gap-2">
-          <Markdown body={pr.body || 'No description.'} />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="self-start"
-            onClick={() => setEditing(true)}
-            disabled={busy || pr.state === 'merged'}
-          >
-            Edit title and description
-          </Button>
-        </div>
-      )}
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium">Reviewers</h3>
-        {pr.reviewers.map((r) => (
-          <div key={r.id} className="flex items-center gap-2 text-sm">
-            <span className="min-w-0 flex-1 truncate">
-              {r.name} · {r.vote}
-            </span>
-            {pr.state === 'open' && (ctx.provider === 'azure' || pr.requestedReviewerIds?.includes(r.id)) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  perform({
-                    action: 'reviewer',
-                    reviewer: ctx.provider === 'github' ? r.name : r.id,
-                    remove: true,
-                  })
+    <div className="grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="flex min-w-0 flex-col gap-5">
+        {editing ? (
+          <EditForm ctx={ctx} pr={pr} act={act} busy={busy} close={() => setEditing(false)} />
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="rounded-md border p-3">
+              {pr.body ? (
+                <Markdown body={pr.body} />
+              ) : (
+                <p className="text-sm text-muted-foreground">No description.</p>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="self-start"
+              onClick={() => setEditing(true)}
+              disabled={busy || pr.state === 'merged'}
+            >
+              <Pencil />
+              Edit title and description
+            </Button>
+          </div>
+        )}
+        <ReviewForm ctx={ctx} pr={pr} act={act} busy={busy} />
+      </div>
+      <aside className="flex min-w-0 flex-col gap-6">
+        <Section title="Reviewers">
+          {pr.reviewers.length === 0 && <p className="text-sm text-muted-foreground">No reviewers yet.</p>}
+          {pr.reviewers.map((r) => (
+            <div key={r.id} className="flex items-center gap-2 text-sm">
+              <StatusIcon state={r.vote} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{r.name}</span>
+                <span className="block truncate text-xs text-muted-foreground">{r.vote}</span>
+              </span>
+              {pr.state === 'open' &&
+                (ctx.provider === 'azure' || pr.requestedReviewerIds?.includes(r.id)) && (
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    disabled={busy}
+                    aria-label={`${ctx.provider === 'github' ? 'Cancel review request for' : 'Remove'} ${r.name}`}
+                    onClick={() =>
+                      perform({
+                        action: 'reviewer',
+                        reviewer: ctx.provider === 'github' ? r.name : r.id,
+                        remove: true,
+                      })
+                    }
+                  >
+                    <X />
+                  </Button>
+                )}
+            </div>
+          ))}
+          {pr.state === 'open' && (
+            <form
+              className="flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void act({ action: 'reviewer', reviewer: reviewer.trim(), remove: false })
+                  .then(() => setReviewer(''))
+                  .catch(() => {});
+              }}
+            >
+              <Input
+                aria-label="Reviewer"
+                placeholder={ctx.provider === 'github' ? 'GitHub username' : 'Reviewer e-mail'}
+                value={reviewer}
+                onChange={(e) => setReviewer(e.target.value)}
+              />
+              <Button type="submit" variant="outline" disabled={busy || !reviewer.trim()}>
+                Request review
+              </Button>
+            </form>
+          )}
+        </Section>
+        <Section
+          title={ctx.provider === 'azure' ? 'Checks and policies' : 'Checks'}
+          aside={
+            pr.checks.length > 0 && (
+              <span className={cn('normal-case tracking-normal', failed ? 'text-destructive' : '')}>
+                {passed}/{pr.checks.length} passed
+              </span>
+            )
+          }
+        >
+          {pr.checks.length ? (
+            pr.checks.map((c, i) => (
+              <div key={`${c.name}:${i}`} className="flex items-center gap-2 text-sm">
+                <StatusIcon state={c.state} />
+                <span className="min-w-0 flex-1 truncate">
+                  {c.url ? (
+                    <a
+                      href={safePrUrl(c.url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline"
+                    >
+                      {c.name}
+                    </a>
+                  ) : (
+                    c.name
+                  )}
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">{c.state}</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">No check results reported.</p>
+          )}
+        </Section>
+        <Section title={ctx.provider === 'azure' ? 'Completion' : 'Merge'}>
+          <div className="flex flex-col gap-3 rounded-md border p-3">
+            <p className="flex items-center gap-2 text-sm">
+              <StatusIcon
+                state={
+                  pr.mergeability === 'mergeable'
+                    ? 'success'
+                    : pr.mergeability === 'conflicting'
+                      ? 'failure'
+                      : 'pending'
                 }
-              >
-                {ctx.provider === 'github' ? 'Cancel request' : 'Remove'}
+              />
+              {pr.mergeability === 'mergeable'
+                ? 'No merge conflicts'
+                : pr.mergeability === 'conflicting'
+                  ? 'Merge conflicts must be resolved'
+                  : 'Merge status not yet known'}
+            </p>
+            {pr.state === 'merged' && <p className="text-sm text-muted-foreground">This PR is merged.</p>}
+            {pr.state === 'closed' && (
+              <Button variant="outline" disabled={busy} onClick={() => perform({ action: 'reopen' })}>
+                Reopen PR
               </Button>
             )}
-          </div>
-        ))}
-        {pr.state === 'open' && (
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void act({ action: 'reviewer', reviewer, remove: false })
-                .then(() => setReviewer(''))
-                .catch(() => {});
-            }}
-          >
-            <Input
-              aria-label="Reviewer"
-              placeholder={ctx.provider === 'github' ? 'GitHub username' : 'Reviewer email or identity ID'}
-              value={reviewer}
-              onChange={(e) => setReviewer(e.target.value)}
-            />
-            <Button type="submit" variant="outline" disabled={busy || !reviewer.trim()}>
-              Request review
-            </Button>
-          </form>
-        )}
-      </section>
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium">Checks and policies</h3>
-        {pr.checks.length ? (
-          pr.checks.map((c, i) => (
-            <div key={`${c.name}:${i}`} className="flex items-center gap-2 text-sm">
-              <span className="min-w-0 flex-1 truncate">
-                {c.url ? (
-                  <a href={safePrUrl(c.url)} target="_blank" rel="noopener noreferrer" className="underline">
-                    {c.name}
-                  </a>
-                ) : (
-                  c.name
+            {pr.state === 'open' && (
+              <>
+                {!pr.draft && pr.mergeMethods.length > 0 && (
+                  <>
+                    <PrSelect
+                      label="Merge method"
+                      value={method}
+                      onChange={(v) => setMethod(v as PullRequestMergeMethod)}
+                      options={pr.mergeMethods.map((value) => ({
+                        value,
+                        label:
+                          value === 'rebase-merge'
+                            ? 'Rebase with merge commit'
+                            : value[0].toUpperCase() + value.slice(1),
+                      }))}
+                    />
+                    <Button
+                      disabled={busy || pr.mergeability === 'conflicting' || !pr.mergeMethods.includes(method)}
+                      onClick={() => setConfirm('merge')}
+                    >
+                      {complete} PR
+                    </Button>
+                    <Button
+                      variant="outline"
+                      disabled={busy || (!pr.autoMerge && !pr.mergeMethods.includes(method))}
+                      onClick={() =>
+                        pr.autoMerge ? perform({ action: 'disable-auto-merge' }) : setConfirm('auto')
+                      }
+                    >
+                      {pr.autoMerge ? 'Disable automatic merge' : 'Merge when checks pass'}
+                    </Button>
+                    {pr.autoMerge && (
+                      <p className="text-xs text-success">Automatic merge is on.</p>
+                    )}
+                  </>
                 )}
-              </span>
-              <Badge variant="secondary">{c.state}</Badge>
-            </div>
-          ))
-        ) : (
-          <p className="text-sm text-muted-foreground">No check results reported.</p>
-        )}
-        <p className="text-xs text-muted-foreground">
-          Merge status: {pr.mergeability}. The provider enforces repository policies.
-        </p>
-      </section>
-      {pr.state !== 'merged' && (
-        <div className="flex flex-wrap items-end gap-2">
-          {pr.state === 'open' ? (
-            <>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => perform({ action: pr.draft ? 'ready' : 'draft' })}
-              >
-                {pr.draft ? 'Ready for review' : 'Convert to draft'}
-              </Button>
-              <Button variant="ghost" disabled={busy} onClick={() => setConfirm('close')}>
-                {ctx.provider === 'azure' ? 'Abandon' : 'Close'} PR
-              </Button>
-              {!pr.draft && pr.mergeMethods.length > 0 && (
-                <>
-                  <PrSelect
-                    label="Merge method"
-                    value={method}
-                    onChange={(v) => setMethod(v as PullRequestMergeMethod)}
-                    options={pr.mergeMethods.map((value) => ({
-                      value,
-                      label:
-                        value === 'rebase-merge'
-                          ? 'Rebase with merge commit'
-                          : value[0].toUpperCase() + value.slice(1),
-                    }))}
-                  />
+                <div className="flex flex-wrap gap-2">
                   <Button
-                    disabled={busy || pr.mergeability === 'conflicting' || !pr.mergeMethods.includes(method)}
-                    onClick={() => setConfirm('merge')}
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => perform({ action: pr.draft ? 'ready' : 'draft' })}
                   >
-                    {ctx.provider === 'azure' ? 'Complete' : 'Merge'} PR
+                    {pr.draft ? 'Ready for review' : 'Convert to draft'}
                   </Button>
-                </>
-              )}
-            </>
-          ) : (
-            <Button disabled={busy} onClick={() => perform({ action: 'reopen' })}>
-              Reopen PR
-            </Button>
-          )}
-        </div>
-      )}
-      {pr.state === 'open' && !pr.draft && (
-        <div className="flex flex-col items-start gap-1">
-          <Button
-            variant="outline"
-            disabled={busy || (!pr.autoMerge && !pr.mergeMethods.includes(method))}
-            onClick={() => (pr.autoMerge ? perform({ action: 'disable-auto-merge' }) : setConfirm('auto'))}
-          >
-            {pr.autoMerge ? 'Disable automatic merge' : 'Merge when checks pass'}
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Automatic merging follows repository policies and may happen immediately if already eligible.
-          </p>
-        </div>
-      )}
-      <ReviewForm ctx={ctx} pr={pr} act={act} busy={busy} />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    disabled={busy}
+                    onClick={() => setConfirm('close')}
+                  >
+                    {ctx.provider === 'azure' ? 'Abandon' : 'Close'} PR
+                  </Button>
+                </div>
+              </>
+            )}
+            <p className="text-xs text-muted-foreground">The provider enforces repository policies.</p>
+          </div>
+        </Section>
+      </aside>
       <ConfirmationDialog
         open={confirm !== null}
         onOpenChange={(open) => {
           if (!open) setConfirm(null);
         }}
+        variant={confirm === 'close' ? 'destructive' : 'default'}
         title={
           confirm === 'auto'
             ? `Enable automatic merge for #${pr.number}?`
             : confirm === 'merge'
-              ? `Merge #${pr.number}?`
-              : `Close #${pr.number}?`
+              ? `${complete} #${pr.number}?`
+              : `${ctx.provider === 'azure' ? 'Abandon' : 'Close'} #${pr.number}?`
         }
         description={
           confirm === 'auto'
@@ -358,7 +475,11 @@ function Overview({
               : 'This closes the remote pull request without merging it.'
         }
         confirmLabel={
-          confirm === 'auto' ? 'Enable automatic merge' : confirm === 'merge' ? 'Merge PR' : 'Close PR'
+          confirm === 'auto'
+            ? 'Enable automatic merge'
+            : confirm === 'merge'
+              ? `${complete} PR`
+              : `${ctx.provider === 'azure' ? 'Abandon' : 'Close'} PR`
         }
         loading={busy}
         onConfirm={() => {
@@ -474,10 +595,12 @@ export function ReviewForm({
     ...(canReview
       ? [
           { value: 'approve', label: 'Approve' },
+          ...(ctx.provider === 'azure'
+            ? [{ value: 'approve-with-suggestions', label: 'Approve with suggestions' }]
+            : []),
           { value: 'request-changes', label: ctx.provider === 'azure' ? 'Reject' : 'Request changes' },
           ...(ctx.provider === 'azure'
             ? [
-                { value: 'approve-with-suggestions', label: 'Approve with suggestions' },
                 { value: 'wait', label: 'Wait for author' },
                 { value: 'reset', label: 'Reset vote' },
               ]
@@ -487,7 +610,7 @@ export function ReviewForm({
   ];
   return (
     <form
-      className="flex flex-col gap-2 border-t pt-3"
+      className="flex flex-col gap-2 rounded-md border p-3"
       onSubmit={(e) => {
         e.preventDefault();
         void act(verdict === 'comment' ? { action: 'comment', body } : { action: 'review', verdict, body })
@@ -498,27 +621,31 @@ export function ReviewForm({
           .catch(() => {});
       }}
     >
-      <PrSelect
-        label="Review"
-        value={verdict}
-        onChange={(v) => setVerdict(v as PullRequestVote)}
-        options={options}
-      />
       <Textarea
         aria-label="Review feedback"
-        placeholder="Write a comment…"
+        placeholder="Leave a comment…"
         value={body}
         onChange={(e) => setBody(e.target.value)}
         rows={4}
         maxLength={60000}
       />
-      <Button
-        type="submit"
-        className="self-start"
-        disabled={busy || (['comment', 'request-changes'].includes(verdict) && !body.trim())}
-      >
-        {busy ? 'Submitting…' : verdict === 'comment' ? 'Post comment' : 'Submit review'}
-      </Button>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="w-56">
+          <PrSelect
+            label="Review"
+            value={verdict}
+            onChange={(v) => setVerdict(v as PullRequestVote)}
+            options={options}
+          />
+        </div>
+        <Button
+          type="submit"
+          className="ml-auto"
+          disabled={busy || (['comment', 'request-changes'].includes(verdict) && !body.trim())}
+        >
+          {busy ? 'Submitting…' : verdict === 'comment' ? 'Post comment' : 'Submit review'}
+        </Button>
+      </div>
     </form>
   );
 }
@@ -537,59 +664,76 @@ export function Thread({
   busy: boolean;
 }) {
   const [reply, setReply, clearReply] = usePrDraft(draftKey(ctx, pr.number, `reply:${thread.id}`));
+  const [expanded, setExpanded] = useState(!thread.resolved);
   return (
-    <article className="flex flex-col gap-3 rounded-md border bg-background p-3 text-foreground">
+    <article
+      className={cn(
+        'flex flex-col gap-3 rounded-md border bg-background p-3 text-foreground',
+        thread.resolved && 'bg-muted/30',
+      )}
+    >
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="min-w-0 flex-1 break-all">
-          {thread.path}
-          {thread.line ? `:${thread.line}` : ''}
+        <span className="min-w-0 flex-1 break-all font-mono text-muted-foreground">
+          {thread.path ? `${displayPath(thread.path)}${thread.line ? `:${thread.line}` : ''}` : 'General'}
         </span>
         {thread.outdated && <Badge variant="secondary">Outdated</Badge>}
-        <Badge variant="secondary">{thread.resolved ? 'Resolved' : 'Open'}</Badge>
-      </div>
-      {thread.comments.map((c) => (
-        <div key={c.id}>
-          <p className="mb-1 text-xs text-muted-foreground">{c.author.name}</p>
-          <Markdown body={c.body} />
-        </div>
-      ))}
-      <form
-        className="flex flex-col gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void act({ action: 'reply', threadId: thread.id, body: reply })
-            .then(clearReply)
-            .catch(() => {});
-        }}
-      >
-        <Textarea
-          aria-label="Reply to conversation"
-          value={reply}
-          onChange={(e) => setReply(e.target.value)}
-          rows={2}
-          maxLength={60000}
-        />
-        <div className="flex gap-2">
-          <Button type="submit" size="sm" disabled={busy || !reply.trim()}>
-            Reply
+        <Badge variant="outline" className={thread.resolved ? 'text-success' : 'text-warning'}>
+          {thread.resolved ? 'Resolved' : 'Open'}
+        </Badge>
+        {thread.resolved && (
+          <Button type="button" variant="ghost" size="xs" onClick={() => setExpanded(!expanded)}>
+            {expanded ? 'Collapse' : 'Show'}
           </Button>
-          {thread.canResolve && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              disabled={busy}
-              onClick={() => {
-                void act({ action: 'resolve', threadId: thread.id, resolved: !thread.resolved }).catch(
-                  () => {},
-                );
-              }}
-            >
-              {thread.resolved ? 'Reopen conversation' : 'Resolve'}
-            </Button>
-          )}
-        </div>
-      </form>
+        )}
+      </div>
+      {expanded && (
+        <>
+          {thread.comments.map((c) => (
+            <div key={c.id}>
+              <CommentMeta name={c.author.name} createdAt={c.createdAt} />
+              <Markdown body={c.body} />
+            </div>
+          ))}
+          <form
+            className="flex flex-col gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void act({ action: 'reply', threadId: thread.id, body: reply })
+                .then(clearReply)
+                .catch(() => {});
+            }}
+          >
+            <Textarea
+              aria-label="Reply to conversation"
+              placeholder="Reply…"
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              rows={2}
+              maxLength={60000}
+            />
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" disabled={busy || !reply.trim()}>
+                Reply
+              </Button>
+              {thread.canResolve && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    void act({ action: 'resolve', threadId: thread.id, resolved: !thread.resolved }).catch(
+                      () => {},
+                    );
+                  }}
+                >
+                  {thread.resolved ? 'Reopen conversation' : 'Resolve'}
+                </Button>
+              )}
+            </div>
+          </form>
+        </>
+      )}
     </article>
   );
 }

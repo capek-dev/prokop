@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, GitPullRequest, RefreshCw } from 'lucide-react';
+import { ArrowLeft, GitPullRequest, Plus, RefreshCw } from 'lucide-react';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { useWorkspaceViewVisible } from '@/components/app/WorkspaceViewHost';
 import { useServerDataStore } from '@/stores/serverDataStore';
@@ -12,10 +12,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { PullRequestDetailView } from './PullRequestDetailView';
 import { PullRequestCreateForm } from './PullRequestCreateForm';
-import { PrError, PrSelect, prKey, type PullRequestContext } from './shared';
+import {
+  CopyCommand,
+  PrError,
+  PrSelect,
+  PrStateIcon,
+  prKey,
+  relativeTime,
+  type PullRequestContext,
+} from './shared';
 
 export function PullRequestsView({
   client,
@@ -176,13 +186,13 @@ function RepositoryView({
         <div className="flex flex-col gap-3 p-3">
           <PrError error={connection.message} />
           <p className="text-sm text-muted-foreground">
-            Run setup on the machine hosting Prokop, then rescan.
+            Run this in a terminal on the machine hosting Prokop, then rescan.
           </p>
-          <pre className="overflow-auto text-xs">
-            {connection.repository.provider === 'github'
-              ? 'gh auth login'
-              : 'az extension add --name azure-devops\naz login'}
-          </pre>
+          <CopyCommand
+            command={
+              connection.command ?? (connection.repository.provider === 'github' ? 'gh auth login' : 'az login')
+            }
+          />
         </div>
       )}
       {connection?.status === 'connected' && connection.accountId && (
@@ -257,8 +267,14 @@ function RepositoryInbox({
         <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
           Signed in as {accountName}
         </span>
-        <Button size="sm" variant="ghost" onClick={refresh} disabled={list.isFetching}>
-          Refresh
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          aria-label="Refresh pull requests"
+          onClick={refresh}
+          disabled={list.isFetching}
+        >
+          <RefreshCw className={list.isFetching ? 'animate-spin' : undefined} />
         </Button>
         <Button
           size="sm"
@@ -267,6 +283,7 @@ function RepositoryInbox({
             setSelected(null);
           }}
         >
+          <Plus />
           New PR
         </Button>
       </div>
@@ -278,35 +295,43 @@ function RepositoryInbox({
           )}
         >
           <div className="flex flex-col gap-2 p-3">
-            <Input
-              aria-label="Search loaded pull requests"
-              placeholder="Search loaded pull requests"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <PrSelect
-              label="State"
-              value={state}
-              onChange={setState}
-              options={['open', 'closed', 'merged', 'all'].map((value) => ({
-                value,
-                label: value[0].toUpperCase() + value.slice(1),
-              }))}
-            />
-            <PrSelect
-              label="Involvement"
-              value={involvement}
-              onChange={setInvolvement}
-              options={[
-                { value: 'all', label: 'Everyone' },
-                { value: 'mine', label: 'Authored by me' },
-                { value: 'reviewing', label: 'Review requested' },
-              ]}
-            />
+            <Tabs value={state} onValueChange={setState}>
+              <TabsList className="w-full" aria-label="State">
+                {['open', 'merged', 'closed', 'all'].map((value) => (
+                  <TabsTrigger key={value} value={value}>
+                    {value[0].toUpperCase() + value.slice(1)}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            <div className="flex gap-2">
+              <Input
+                aria-label="Search loaded pull requests"
+                placeholder="Search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <Select value={involvement} onValueChange={setInvolvement}>
+                <SelectTrigger aria-label="Involvement" className="w-36 shrink-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Everyone</SelectItem>
+                  <SelectItem value="mine">Authored by me</SelectItem>
+                  <SelectItem value="reviewing">Review requested</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto p-2">
+          <div className="min-h-0 flex-1 overflow-auto px-2 pb-2">
             <PrError error={list.error} />
-            {list.isPending && <Skeleton className="h-24" />}
+            {list.isPending && (
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-16" />
+                <Skeleton className="h-16" />
+                <Skeleton className="h-16" />
+              </div>
+            )}
             {filtered.map((pr) => (
               <button
                 key={pr.number}
@@ -317,35 +342,47 @@ function RepositoryInbox({
                 }}
                 aria-pressed={selected === pr.number}
                 className={cn(
-                  'flex w-full flex-col gap-1 rounded-md p-2 text-left hover:bg-muted',
+                  'flex w-full gap-2 rounded-md p-2 text-left hover:bg-muted',
                   selected === pr.number && 'bg-muted',
                 )}
               >
-                <span className="line-clamp-2 text-sm">
-                  <span className="text-muted-foreground">#{pr.number}</span> {pr.title}
-                </span>
-                <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="secondary">{pr.draft ? 'Draft' : pr.state}</Badge>
-                  <span className="truncate">{pr.author.name}</span>
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {pr.sourceBranch} → {pr.targetBranch}
+                <PrStateIcon pr={pr} className="mt-0.5" />
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className="line-clamp-2 text-sm font-medium">{pr.title}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    #{pr.number} · {pr.author.name}
+                    {pr.updatedAt && ` · ${relativeTime(pr.updatedAt)}`}
+                  </span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate font-mono text-[11px] text-muted-foreground">
+                      {pr.sourceBranch} → {pr.targetBranch}
+                    </span>
+                    {pr.requestedReviewerIds?.includes(ctx.accountId) && (
+                      <Badge variant="outline" className="text-warning">
+                        Review requested
+                      </Badge>
+                    )}
+                    {pr.author.id === ctx.accountId && <Badge variant="secondary">Yours</Badge>}
+                  </span>
                 </span>
               </button>
             ))}
             {!list.isPending && !list.error && !filtered.length && (
               <p className="p-2 text-sm text-muted-foreground">
-                No matching pull requests in the loaded results.
+                {items.length
+                  ? 'No loaded pull requests match these filters.'
+                  : `No ${state === 'all' ? '' : `${state} `}pull requests.`}
               </p>
             )}
             {list.hasNextPage && (
               <Button
                 variant="ghost"
                 size="sm"
+                className="w-full"
                 onClick={() => void list.fetchNextPage()}
                 disabled={list.isFetchingNextPage}
               >
-                Load more
+                {list.isFetchingNextPage ? 'Loading…' : 'Load more'}
               </Button>
             )}
           </div>
