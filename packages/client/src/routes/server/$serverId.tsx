@@ -54,6 +54,10 @@ export const Route = createFileRoute('/server/$serverId')({
     }
     return { server };
   },
+  // Bootstrap data only. Stores and mutations own it afterwards, so navigation within the
+  // server must not refetch it. router.invalidate() (configuration close) still reloads.
+  staleTime: Infinity,
+  shouldReload: false,
   loader: async ({ params, context, abortController }): Promise<CriticalServerData> => {
     const server = context.serverRegistry.getServer(params.serverId);
     if (!server) {
