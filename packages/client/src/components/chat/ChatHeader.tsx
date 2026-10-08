@@ -100,7 +100,7 @@ export function ChatHeader({
     staleTime: 60_000,
     retry: false,
   });
-  const claudeKey = ['claude-models', serverUrl, session.id, session.updatedAt];
+  const claudeKey = ['claude-models', serverUrl, session.id, session.selectedModel];
   const claudeSelection = useQuery({
     queryKey: claudeKey,
     queryFn: () => sdkClient!.http.sessions.claudeModels(session.id),
@@ -133,7 +133,7 @@ export function ChatHeader({
     staleTime: 60_000,
     retry: false,
   });
-  const codexKey = ['codex-models', serverUrl, session.id, session.updatedAt];
+  const codexKey = ['codex-models', serverUrl, session.id, session.selectedModel];
   const codexSelection = useQuery({
     queryKey: codexKey,
     queryFn: () => sdkClient!.http.sessions.codexModels(session.id),
