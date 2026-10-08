@@ -96,19 +96,26 @@ export function PrSelect({
   onChange,
   options,
   disabled,
+  compact,
+  title,
 }: {
   label: string;
   value: string;
   onChange(value: string): void;
   options: { value: string; label: string }[];
   disabled?: boolean;
+  /** Toolbar style: small trigger, label only for assistive technology. */
+  compact?: boolean;
+  title?: string;
 }) {
   const id = useId();
   return (
-    <div className="flex min-w-0 flex-col gap-1">
-      <Label htmlFor={id}>{label}</Label>
+    <div className={cn('flex min-w-0 flex-col gap-1', compact && 'max-w-72')}>
+      <Label htmlFor={id} className={compact ? 'sr-only' : undefined}>
+        {label}
+      </Label>
       <Select value={value} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger id={id} className="w-full">
+        <SelectTrigger id={id} size={compact ? 'sm' : 'default'} title={title} className="w-full">
           <SelectValue placeholder={label} />
         </SelectTrigger>
         <SelectContent>

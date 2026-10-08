@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+import { useInfiniteQuery, useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, GitPullRequest, Plus, RefreshCw } from 'lucide-react';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { useWorkspaceViewVisible } from '@/components/app/WorkspaceViewHost';
@@ -75,24 +76,35 @@ function PullRequestsContent({
     allowedRoots: options.map((o) => o.value),
   });
   const root = resolution.isPrimary ? undefined : resolution.selectedRoot;
+  const checkout = (
+    <>
+      <GitPullRequest className="size-4 shrink-0 text-muted-foreground" />
+      <PrSelect
+        compact
+        label="Checkout"
+        title={resolution.selectedRoot}
+        value={resolution.selectedRoot}
+        onChange={setChosenRoot}
+        options={options}
+      />
+      <span
+        aria-label="Checkout path"
+        title={resolution.selectedRoot}
+        className="hidden max-w-64 truncate text-xs text-muted-foreground @4xl:inline"
+      >
+        {resolution.selectedRoot}
+      </span>
+    </>
+  );
   return (
-    <section aria-label="Pull requests" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-end gap-2 border-b p-3">
-        <GitPullRequest className="mb-2 size-4 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <PrSelect
-            label="Checkout"
-            value={resolution.selectedRoot}
-            onChange={setChosenRoot}
-            options={options}
-          />
-          <p className="mt-1 break-all text-xs text-muted-foreground" aria-label="Checkout path">
-            {resolution.selectedRoot}
-          </p>
-        </div>
-      </div>
+    <section aria-label="Pull requests" className="@container flex min-h-0 flex-1 flex-col overflow-hidden">
       {resolution.blocked ? (
-        <PrError error="This session's checkout is unavailable. Select an available checkout to browse PRs." />
+        <>
+          <Toolbar left={checkout} />
+          <div className="p-3">
+            <PrError error="This session's checkout is unavailable. Select an available checkout to browse PRs." />
+          </div>
+        </>
       ) : (
         <RepositoryView
           key={`${workspaceId}:${root ?? ''}`}
@@ -101,9 +113,20 @@ function PullRequestsContent({
           workspaceId={workspaceId}
           root={root}
           visible={visible}
+          checkout={checkout}
+          checkoutPath={resolution.selectedRoot}
         />
       )}
     </section>
+  );
+}
+
+function Toolbar({ left, right }: { left: ReactNode; right?: ReactNode }) {
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+      {left}
+      <div className="ml-auto flex items-center gap-1">{right}</div>
+    </div>
   );
 }
 
@@ -113,12 +136,16 @@ function RepositoryView({
   workspaceId,
   root,
   visible,
+  checkout,
+  checkoutPath,
 }: {
   client: ProkopaiClient;
   serverId: string;
   workspaceId: string;
   root?: string;
   visible: boolean;
+  checkout: ReactNode;
+  checkoutPath: string;
 }) {
   const cache = useQueryClient();
   const [remote, setRemote] = useState<string | null>(null);
@@ -132,23 +159,31 @@ function RepositoryView({
   const connection =
     connections.data?.connections.find((c) => c.repository.remote === remote) ??
     connections.data?.connections[0];
-  const rescan = () => {
-    // Drop data authenticated as a previous CLI account before discovering its replacement.
-    cache.removeQueries({
+  const fetching = useIsFetching({
+    predicate: (q) =>
+      q.queryKey[0] === 'pull-requests' && q.queryKey[1] === serverId && q.queryKey[2] === workspaceId,
+  });
+  // One refresh for everything: re-check the CLI sign-in and reload every visible PR query.
+  // Queries are keyed by account, so data from a previous CLI account is never shown.
+  const refresh = () => {
+    void connections.refetch();
+    void cache.invalidateQueries({
       predicate: (q) =>
         q.queryKey[0] === 'pull-requests' &&
         q.queryKey[1] === serverId &&
         q.queryKey[2] === workspaceId &&
         q.queryKey[3] !== 'connections',
     });
-    void connections.refetch();
   };
-  return (
-    <>
-      <div className="flex shrink-0 items-end gap-2 p-3">
-        {!!connections.data?.connections.length && (
-          <div className="min-w-0 flex-1">
+  const hasConnections = !!connections.data?.connections.length;
+  const toolbar = (right?: ReactNode) => (
+    <Toolbar
+      left={
+        <>
+          {checkout}
+          {hasConnections && (
             <PrSelect
+              compact
               label="Repository"
               value={connection?.repository.remote ?? ''}
               onChange={setRemote}
@@ -157,28 +192,39 @@ function RepositoryView({
                 label: `${c.repository.provider === 'github' ? 'GitHub' : 'Azure'} · ${c.repository.project ?? c.repository.owner}/${c.repository.name} (${c.repository.remote})`,
               }))}
             />
-          </div>
-        )}
-        <Button
-          variant="ghost"
-          size={connections.data?.connections.length ? 'icon' : 'sm'}
-          aria-label="Rescan CLI connections"
-          onClick={rescan}
-          disabled={connections.isFetching}
-        >
-          <RefreshCw className={connections.isFetching ? 'animate-spin' : undefined} />
-          {!connections.data?.connections.length &&
-            (connections.isFetching ? 'Checking repositories…' : 'Check again')}
-        </Button>
-      </div>
-      {connections.isPending && <Skeleton className="mx-3 h-16" />}
+          )}
+        </>
+      }
+      right={
+        <>
+          <Button
+            variant="ghost"
+            size={hasConnections ? 'icon-sm' : 'sm'}
+            aria-label="Rescan CLI connections"
+            title="Refresh sign-in and pull requests"
+            onClick={refresh}
+            disabled={connections.isFetching}
+          >
+            <RefreshCw className={fetching ? 'animate-spin' : undefined} />
+            {!hasConnections && (connections.isFetching ? 'Checking repositories…' : 'Check again')}
+          </Button>
+          {right}
+        </>
+      }
+    />
+  );
+  return (
+    <>
+      {!(connection?.status === 'connected' && connection.accountId) && toolbar()}
+      {connections.isPending && <Skeleton className="m-3 h-16" />}
       <PrError error={connections.error} />
       {!connections.error && !connections.isFetching && connections.data?.connections.length === 0 && (
         <div className="flex flex-col gap-2 p-3 text-sm text-muted-foreground">
           <p>No GitHub or Azure DevOps remote was found in this checkout.</p>
+          <p className="break-all font-mono text-xs">{checkoutPath}</p>
           <p>
-            Check the path above. To use another project, choose it in the workspace selector beside Sessions.
-            For another checkout of this project, use Checkout above.
+            To use another project, choose it in the workspace selector beside Sessions. For another checkout of
+            this project, use the checkout selector above.
           </p>
         </div>
       )}
@@ -201,6 +247,7 @@ function RepositoryView({
           visible={visible}
           branch={connections.data?.branch ?? ''}
           accountName={connection.accountName ?? ''}
+          toolbar={toolbar}
           ctx={{
             client,
             serverId,
@@ -220,11 +267,13 @@ function RepositoryInbox({
   branch,
   accountName,
   visible,
+  toolbar,
 }: {
   ctx: PullRequestContext;
   branch: string;
   accountName: string;
   visible: boolean;
+  toolbar(right: ReactNode): ReactNode;
 }) {
   const [state, setState] = useState('open');
   const [query, setQuery] = useState('');
@@ -263,30 +312,26 @@ function RepositoryInbox({
   };
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 pb-3">
-        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-          Signed in as {accountName}
-        </span>
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          aria-label="Refresh pull requests"
-          onClick={refresh}
-          disabled={list.isFetching}
-        >
-          <RefreshCw className={list.isFetching ? 'animate-spin' : undefined} />
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => {
-            setCreating(true);
-            setSelected(null);
-          }}
-        >
-          <Plus />
-          New PR
-        </Button>
-      </div>
+      {toolbar(
+        <>
+          <span
+            className="hidden max-w-48 truncate px-1 text-xs text-muted-foreground @2xl:inline"
+            title={`Signed in as ${accountName}`}
+          >
+            {accountName}
+          </span>
+          <Button
+            size="sm"
+            onClick={() => {
+              setCreating(true);
+              setSelected(null);
+            }}
+          >
+            <Plus />
+            New PR
+          </Button>
+        </>,
+      )}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <aside
           className={cn(
@@ -362,7 +407,6 @@ function RepositoryInbox({
                         Review requested
                       </Badge>
                     )}
-                    {pr.author.id === ctx.accountId && <Badge variant="secondary">Yours</Badge>}
                   </span>
                 </span>
               </button>

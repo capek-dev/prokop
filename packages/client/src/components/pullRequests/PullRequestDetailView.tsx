@@ -1,9 +1,8 @@
 import { lazy, Suspense, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { ExternalLink, Pencil, X } from 'lucide-react';
+import type { Components } from 'react-markdown';
+import { ExternalLink, Pencil, UserPlus, X } from 'lucide-react';
 import type {
   PullRequestAction,
   PullRequestDetail,
@@ -16,9 +15,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 import { cn } from '@/lib/utils';
 import {
   displayPath,
@@ -182,28 +183,26 @@ export function PullRequestDetailView({
   );
 }
 
+/** PR text is untrusted: only https links, and no remote images (they would leak the viewer's IP). */
+const untrusted: Components = {
+  img: ({ alt }) => <span className="text-muted-foreground">[{alt || 'Image'}, open on provider]</span>,
+  a: ({ href, children }) => (
+    <a
+      href={href ? safePrUrl(href) : undefined}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-primary underline underline-offset-2 hover:text-primary/80"
+    >
+      {children}
+    </a>
+  ),
+};
+
 export function Markdown({ body }: { body: string }) {
   return (
-    <div className="prose prose-sm max-w-none break-words text-sm dark:prose-invert">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          img: ({ alt }) => <span>{alt || 'Image'} (open on provider)</span>,
-          a: ({ href, children }) => (
-            <a
-              href={href ? safePrUrl(href) : undefined}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
-              {children}
-            </a>
-          ),
-        }}
-      >
-        {body}
-      </ReactMarkdown>
-    </div>
+    <MarkdownRenderer overrides={untrusted} className="space-y-2 text-sm [&_li]:my-0.5">
+      {body}
+    </MarkdownRenderer>
   );
 }
 
@@ -260,24 +259,27 @@ function Overview({
         {editing ? (
           <EditForm ctx={ctx} pr={pr} act={act} busy={busy} close={() => setEditing(false)} />
         ) : (
-          <div className="flex flex-col gap-2">
-            <div className="rounded-md border p-3">
+          <div className="rounded-md border">
+            <div className="flex items-center gap-2 border-b px-3 py-1.5 text-xs text-muted-foreground">
+              <span className="flex-1">Description</span>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Edit title and description"
+                title="Edit title and description"
+                onClick={() => setEditing(true)}
+                disabled={busy || pr.state === 'merged'}
+              >
+                <Pencil />
+              </Button>
+            </div>
+            <div className="p-3">
               {pr.body ? (
                 <Markdown body={pr.body} />
               ) : (
                 <p className="text-sm text-muted-foreground">No description.</p>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="self-start"
-              onClick={() => setEditing(true)}
-              disabled={busy || pr.state === 'merged'}
-            >
-              <Pencil />
-              Edit title and description
-            </Button>
           </div>
         )}
         <ReviewForm ctx={ctx} pr={pr} act={act} busy={busy} />
@@ -314,7 +316,7 @@ function Overview({
           ))}
           {pr.state === 'open' && (
             <form
-              className="flex gap-2"
+              className="flex gap-1"
               onSubmit={(e) => {
                 e.preventDefault();
                 void act({ action: 'reviewer', reviewer: reviewer.trim(), remove: false })
@@ -324,12 +326,20 @@ function Overview({
             >
               <Input
                 aria-label="Reviewer"
-                placeholder={ctx.provider === 'github' ? 'GitHub username' : 'Reviewer e-mail'}
+                className="h-7 text-xs"
+                placeholder={ctx.provider === 'github' ? 'Add GitHub username' : 'Add reviewer e-mail'}
                 value={reviewer}
                 onChange={(e) => setReviewer(e.target.value)}
               />
-              <Button type="submit" variant="outline" disabled={busy || !reviewer.trim()}>
-                Request review
+              <Button
+                type="submit"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Request review"
+                title="Request review"
+                disabled={busy || !reviewer.trim()}
+              >
+                <UserPlus />
               </Button>
             </form>
           )}
@@ -346,7 +356,7 @@ function Overview({
         >
           {pr.checks.length ? (
             pr.checks.map((c, i) => (
-              <div key={`${c.name}:${i}`} className="flex items-center gap-2 text-sm">
+              <div key={`${c.name}:${i}`} className="flex items-center gap-2 text-sm" title={`${c.name}: ${c.state}`}>
                 <StatusIcon state={c.state} />
                 <span className="min-w-0 flex-1 truncate">
                   {c.url ? (
@@ -362,7 +372,9 @@ function Overview({
                     c.name
                   )}
                 </span>
-                <span className="shrink-0 text-xs text-muted-foreground">{c.state}</span>
+                {statusTone(c.state) !== 'success' && (
+                  <span className="shrink-0 text-xs text-muted-foreground">{c.state}</span>
+                )}
               </div>
             ))
           ) : (
@@ -629,18 +641,24 @@ export function ReviewForm({
         rows={4}
         maxLength={60000}
       />
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="w-56">
-          <PrSelect
-            label="Review"
-            value={verdict}
-            onChange={(v) => setVerdict(v as PullRequestVote)}
-            options={options}
-          />
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {options.length > 1 && (
+          <Select value={verdict} onValueChange={(v) => setVerdict(v as PullRequestVote)}>
+            <SelectTrigger aria-label="Review" size="sm" className="w-52">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Button
           type="submit"
-          className="ml-auto"
+          size="sm"
           disabled={busy || (['comment', 'request-changes'].includes(verdict) && !body.trim())}
         >
           {busy ? 'Submitting…' : verdict === 'comment' ? 'Post comment' : 'Submit review'}

@@ -86,11 +86,13 @@ export interface MarkdownRendererProps {
   children: string;
   className?: string;
   inverted?: boolean;
+  /** Replace individual element renderers, e.g. to sanitize links in untrusted content. */
+  overrides?: Components;
 }
 
 type ComponentProps<T extends ElementType> = ComponentPropsWithoutRef<T>;
 
-export const MarkdownRenderer = memo(function MarkdownRenderer({ children, className, inverted = false }: MarkdownRendererProps) {
+export const MarkdownRenderer = memo(function MarkdownRenderer({ children, className, inverted = false, overrides }: MarkdownRendererProps) {
   const { resolvedMode } = useTheme();
   const isDark = resolvedMode === 'dark';
 
@@ -196,7 +198,8 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ children, class
         </td>
       );
     },
-  }), [inverted, codeTheme]);
+    ...overrides,
+  }), [inverted, codeTheme, overrides]);
 
   return (
     <div className={cn('w-full markdown-render overflow-x-auto break-words', className)}>
