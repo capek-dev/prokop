@@ -1,18 +1,36 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { useDockStore } from '@/stores/dockStore';
 import {
-  activeGroupView, createDefaultViewLayout, fileViewId, findViewRegion, isFileViewId, isSessionViewId, sessionViewId, parseViewLayout,
+  activeGroupView, createDefaultViewLayout, fileViewId, findViewRegion, isFileViewId, isViewOpen, isSessionViewId, sessionViewId, parseViewLayout,
   useWorkspaceViewStore, VIEW_LAYOUT_STORAGE_KEY, VIEW_REGIONS, WORKSPACE_VIEW_IDS, REPOSITORY_VIEW_IDS,
 } from '@/stores/workspaceViewStore';
 
 describe('workspace view placement', () => {
-  test('adds Pull requests to existing layouts without changing active views', () => {
-    const saved = createDefaultViewLayout();
-    saved.groups.center.viewIds = ['conversations', 'editor'];
-    saved.groups.center.activeId = 'editor';
-    const migrated = parseViewLayout({ version: 5, ...saved })!;
-    expect(migrated.groups.center).toEqual({ viewIds: ['conversations', 'editor', 'pull-requests'], activeId: 'editor' });
-    expect(parseViewLayout({ version: 5, ...migrated })).toEqual(migrated);
+  test('Pull requests is closed by default and opens as the active center tab', () => {
+    const store = useWorkspaceViewStore.getState();
+    expect(isViewOpen(store.layout, 'pull-requests')).toBe(false);
+    store.openInCenter('pull-requests');
+    const layout = useWorkspaceViewStore.getState().layout;
+    expect(layout.groups.center).toEqual({ viewIds: ['conversations', 'editor', 'pull-requests'], activeId: 'pull-requests' });
+    expect(parseViewLayout({ version: 5, ...layout })).toEqual(layout);
+  });
+  test('reopening Pull requests docked elsewhere moves it back to the center', () => {
+    const store = useWorkspaceViewStore.getState();
+    store.openInCenter('pull-requests');
+    store.moveView('pull-requests', 'right');
+    expect(findViewRegion(useWorkspaceViewStore.getState().layout, 'pull-requests')).toBe('right');
+    store.openInCenter('pull-requests');
+    const layout = useWorkspaceViewStore.getState().layout;
+    expect(findViewRegion(layout, 'pull-requests')).toBe('center');
+    expect(layout.groups.right.viewIds).not.toContain('pull-requests');
+  });
+  test('closing Pull requests removes it and returns to the previous center tab', () => {
+    const store = useWorkspaceViewStore.getState();
+    store.openInCenter('pull-requests');
+    store.removeView('pull-requests');
+    const layout = useWorkspaceViewStore.getState().layout;
+    expect(isViewOpen(layout, 'pull-requests')).toBe(false);
+    expect(layout.groups.center.activeId).toBe('editor');
   });
   test('adds Usage to saved left splits without resetting selections or placement', () => {
     const store = useWorkspaceViewStore.getState();
@@ -50,7 +68,7 @@ describe('workspace view placement', () => {
     const { layout } = useWorkspaceViewStore.getState();
     expect(layout.groups.left).toEqual({ viewIds: ['sessions', 'usage', 'terminals'], activeId: 'terminals' });
     expect(layout.groups.bottom).toEqual({ viewIds: [], activeId: null });
-    expect(Object.values(layout.groups).flatMap((group) => group.viewIds).sort()).toEqual([...WORKSPACE_VIEW_IDS].sort());
+    expect(Object.values(layout.groups).flatMap((group) => group.viewIds).sort()).toEqual(WORKSPACE_VIEW_IDS.filter((id) => id !== 'pull-requests').sort());
     expect(useDockStore.getState().docks.left.open).toBe(true);
     expect(useDockStore.getState().docks.bottom.open).toBe(false);
     expect(parseViewLayout(JSON.parse(localStorage.getItem(VIEW_LAYOUT_STORAGE_KEY)!))).toEqual(layout);
@@ -70,7 +88,7 @@ describe('workspace view placement', () => {
     expect(layout.groups.right.viewIds).toEqual(['explorer', 'terminals', 'changes', 'branches', 'worktrees']);
     expect(layout.groups.right.activeId).toBe('terminals');
     expect(layout.groups.bottom.viewIds).toEqual([]);
-    expect(Object.values(layout.groups).flatMap((group) => group.viewIds).sort()).toEqual([...WORKSPACE_VIEW_IDS].sort());
+    expect(Object.values(layout.groups).flatMap((group) => group.viewIds).sort()).toEqual(WORKSPACE_VIEW_IDS.filter((id) => id !== 'pull-requests').sort());
     expect(parseViewLayout(JSON.parse(localStorage.getItem(VIEW_LAYOUT_STORAGE_KEY)!))).toEqual(layout);
   });
 
@@ -196,7 +214,7 @@ describe('workspace view placement', () => {
     expect(findViewRegion(useWorkspaceViewStore.getState().layout, second)).toBe('bottom');
     expect(parseViewLayout(JSON.parse(localStorage.getItem(VIEW_LAYOUT_STORAGE_KEY)!))).toEqual(useWorkspaceViewStore.getState().layout);
     useWorkspaceViewStore.getState().resetLayout();
-    expect(useWorkspaceViewStore.getState().layout.groups.center.viewIds).toEqual(['conversations', 'editor', 'pull-requests', first, second]);
+    expect(useWorkspaceViewStore.getState().layout.groups.center.viewIds).toEqual(['conversations', 'editor', first, second]);
   });
 
   test.each(['session:', 'session:a:', 'session::b', 'session:a:b:c', 'session:%zz:b', 'session:a:%61'])('rejects malformed session identities: %s', (id) => {
@@ -217,7 +235,7 @@ describe('workspace view placement', () => {
     store.hideView(second);
     store.removeView(second);
     expect(useWorkspaceViewStore.getState().layout.hidden).toEqual([]);
-    expect(useWorkspaceViewStore.getState().layout.groups.center.viewIds).toEqual(['conversations', 'editor', 'pull-requests']);
+    expect(useWorkspaceViewStore.getState().layout.groups.center.viewIds).toEqual(['conversations', 'editor']);
   });
 
   test.each(['file:', 'file:abc', 'file:%zz', 'file:a%01b%01c', 'file:a%01b%01%01', 'session:unknown'])('rejects malformed resource IDs: %s', (id) => {

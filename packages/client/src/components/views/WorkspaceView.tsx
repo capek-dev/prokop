@@ -154,7 +154,7 @@ export default function WorkspaceView() {
         />
         <TooltipProvider>
           <Tooltip>
-            <TooltipTrigger asChild><Button variant="ghost" size="icon-xs" aria-label="Pull requests" disabled={!sidebarData.connected} onClick={() => { useWorkspaceViewStore.getState().activateView('pull-requests'); useChatLayoutStore.getState().setMobileSurface('pull-requests'); }}><GitPullRequest /></Button></TooltipTrigger>
+            <TooltipTrigger asChild><Button variant="ghost" size="icon-xs" aria-label="Pull requests" disabled={!sidebarData.connected} onClick={() => { useWorkspaceViewStore.getState().openInCenter('pull-requests'); useChatLayoutStore.getState().setMobileSurface('pull-requests'); }}><GitPullRequest /></Button></TooltipTrigger>
             <TooltipContent>Pull requests</TooltipContent>
           </Tooltip>
           <Tooltip>

@@ -12,7 +12,7 @@ import { WorktreesPanel } from '@/components/worktrees/WorktreesPanel';
 import { useViewRefs } from '@/contexts/ViewRefsContext';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { isDocDirty, useFileEditorStore } from '@/stores/fileEditorStore';
-import { fileViewId, type WorkspaceViewId } from '@/stores/workspaceViewStore';
+import { fileViewId, isViewOpen, useWorkspaceViewStore, type WorkspaceViewId } from '@/stores/workspaceViewStore';
 import type { WorkspaceTab } from '@/components/app/workspaceTab';
 import { getWorkspaceDisplayName } from '@/lib/workspaceKind';
 
@@ -79,6 +79,16 @@ export function WorkspaceContentArea({
       onClose: () => editorHandles.current.get(docId)?.requestClose(),
     };
   }
+  const pullRequestsOpen = useWorkspaceViewStore((state) => isViewOpen(state.layout, 'pull-requests'));
+  if (pullRequestsOpen && serverId && workspaceId && sdkClient) {
+    resourceViews['pull-requests'] = (
+      <PullRequestsView key={`${serverId}:${workspaceId}`} client={sdkClient} serverId={serverId} workspaceId={workspaceId} />
+    );
+    tabs['pull-requests'] = {
+      label: 'Pull requests',
+      onClose: () => useWorkspaceViewStore.getState().removeView('pull-requests'),
+    };
+  }
   const mobileEditorId = activeDocId && scopedDocIds.includes(activeDocId)
     ? fileViewId(activeDocId) : scopedDocIds[0] ? fileViewId(scopedDocIds[0]) : undefined;
 
@@ -97,7 +107,6 @@ export function WorkspaceContentArea({
       ...resourceViews,
       sessions: left ?? (sessionsContent ? <>{sessionsHeader}{sessionsContent}</> : undefined),
       usage: <WorkspaceUsageView sdkClient={sdkClient} />,
-      'pull-requests': serverId && workspaceId && sdkClient ? <PullRequestsView key={`${serverId}:${workspaceId}`} client={sdkClient} serverId={serverId} workspaceId={workspaceId} /> : undefined,
       explorer: serverId && workspaceId ? <FilesPanel ref={filesPanelRef} sdkClient={sdkClient} view="explorer" embedded /> : undefined,
       changes: serverId && workspaceId ? <FilesPanel sdkClient={sdkClient} view="changes" embedded /> : undefined,
       branches: serverId && workspaceId ? <FilesPanel sdkClient={sdkClient} view="branches" embedded /> : undefined,
