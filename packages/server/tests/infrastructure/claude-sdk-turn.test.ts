@@ -415,12 +415,77 @@ test('tracks a foreground agent moved to the background by task ID', async () =>
   ]);
 });
 
+test('keeps input open for background Bash until its notification and admits the follow-up turn', async () => {
+  let inputClosed = false;
+  const collected = [];
+  for await (const item of runClaudeTurn({ ...base,
+    canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
+    start: (prompt) => {
+      async function* stream(): AsyncGenerator<SDKMessage> {
+        if (typeof prompt === 'string') throw new Error('Expected streaming input');
+        const reader = prompt[Symbol.asyncIterator]();
+        await reader.next();
+        const end = reader.next().then(value => { inputClosed = value.done === true; });
+        yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+        yield event({ type: 'system', subtype: 'task_started', session_id: base.sessionId,
+          task_id: 'bash-1', task_type: 'local_bash', tool_use_id: 'tool-bash', is_backgrounded: false });
+        yield event({ type: 'system', subtype: 'task_updated', session_id: base.sessionId,
+          task_id: 'bash-1', patch: { is_backgrounded: true } });
+        yield event({ type: 'result', subtype: 'success', session_id: base.sessionId, result: 'checks running' });
+        await Bun.sleep(5);
+        expect(inputClosed).toBe(false);
+        yield event({ type: 'system', subtype: 'task_notification', session_id: base.sessionId,
+          task_id: 'bash-1', status: 'completed', output_file: '', summary: '' });
+        yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+        yield event({ type: 'assistant', session_id: base.sessionId, parent_tool_use_id: null,
+          message: { content: [{ type: 'text', text: 'typecheck passed' }] } });
+        yield event({ type: 'result', subtype: 'success', session_id: base.sessionId, result: 'typecheck passed' });
+        await end;
+        expect(inputClosed).toBe(true);
+      }
+      return stream();
+    },
+  })) collected.push(item);
+  expect(collected).toEqual([
+    { type: 'result', text: 'checks running', success: true, usage: null },
+    { type: 'text-final', text: 'typecheck passed', streamed: '' },
+    { type: 'result', text: 'typecheck passed', success: true, usage: null },
+  ]);
+});
+
+test('stops waiting for background Bash after the cap', async () => {
+  let inputClosed = false;
+  for await (const _item of runClaudeTurn({ ...base, backgroundTaskWaitMs: 10,
+    canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
+    start: (prompt) => {
+      async function* stream(): AsyncGenerator<SDKMessage> {
+        if (typeof prompt === 'string') throw new Error('Expected streaming input');
+        const reader = prompt[Symbol.asyncIterator]();
+        await reader.next();
+        const end = reader.next().then(value => { inputClosed = value.done === true; });
+        yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
+        yield event({ type: 'system', subtype: 'task_started', session_id: base.sessionId,
+          task_id: 'server-1', task_type: 'local_bash', is_backgrounded: true });
+        yield event({ type: 'result', subtype: 'success', session_id: base.sessionId, result: 'server started' });
+        expect(inputClosed).toBe(false);
+        await end;
+        expect(inputClosed).toBe(true);
+      }
+      return stream();
+    },
+  })) { /* consume */ }
+  expect(inputClosed).toBe(true);
+});
+
 test('content-free CLI notices before init do not fail the turn', async () => {
   const collected = [];
   for await (const item of runClaudeTurn({ ...base,
     canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
     start: async function* () {
       yield event({ type: 'system', subtype: 'commands_changed', session_id: base.sessionId });
+      // A resumed process reports background Bash tasks orphaned by the previous process.
+      yield event({ type: 'system', subtype: 'task_notification', session_id: base.sessionId,
+        task_id: 'old-bash', status: 'stopped', reason: 'worker_restart', output_file: '', summary: '' });
       yield event({ type: 'system', subtype: 'init', session_id: base.sessionId });
       yield event({ type: 'result', subtype: 'success', session_id: base.sessionId, result: 'done' });
     },
@@ -433,10 +498,10 @@ test('pre-init events still fail closed', async () => {
     for await (const _message of runClaudeTurn({ ...base,
       canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
       start: async function* () {
-        yield event({ type: 'system', subtype: 'task_notification', session_id: base.sessionId });
+        yield event({ type: 'system', subtype: 'task_started', session_id: base.sessionId });
       },
     })) { /* consume */ }
-  }).toThrow('Claude CLI event outside turn (before init: system/task_notification)');
+  }).toThrow('Claude CLI event outside turn (before init: system/task_started)');
 });
 
 test('SDK hook fails closed on denied tools and rejects changed session identity', async () => {
