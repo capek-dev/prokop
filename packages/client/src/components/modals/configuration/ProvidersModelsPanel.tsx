@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ProviderCard } from './providers-models/ProviderCard';
+import { SettingsLoading } from './SettingsPrimitives';
 
 const FALLBACK_PROVIDER_NAMES: Record<string, string> = {
   minimax: 'MiniMax',
@@ -204,11 +205,7 @@ export function ProvidersModelsPanel({ sdkClient }: ProvidersModelsPanelProps) {
   const { data: oauthData } = useProvidersQuery(sdkClient);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <SettingsLoading />;
   }
 
   const credentials: ProviderCredentialStatus[] = credentialsData?.providers ?? [];

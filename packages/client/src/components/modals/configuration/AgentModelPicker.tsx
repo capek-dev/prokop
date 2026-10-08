@@ -16,6 +16,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AnthropicMark, OpenAIMark, ProkopMark } from '@/components/branding/BrandMarks';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
@@ -122,7 +123,7 @@ export function AgentModelPicker({ models, codexModels, claudeModels, value, onC
             role="combobox"
             aria-label="Model"
             aria-expanded={open}
-            className="w-full justify-between font-mono text-sm h-9"
+            className="w-full justify-between text-sm font-normal h-8"
           >
             <div className="flex items-center gap-2 truncate">
               {triggerLabel
@@ -269,17 +270,22 @@ export function AgentModelPicker({ models, codexModels, claudeModels, value, onC
       {variantOptions.length > 0 && (
         <div className="mt-2">
           <Label className="text-sm">{modelHarness === 'prokop' ? 'Variant' : 'Effort'}</Label>
-          <select
+          <Select
             value={variantOptions.includes(value.variant) ? value.variant : variantOptions[0] ?? ''}
-            onChange={(e) => onChange({ ...value, variant: e.target.value })}
-            className="w-full h-9 rounded-md border bg-background px-3 text-sm"
-            aria-label={modelHarness === 'prokop' ? 'Variant' : 'Effort'}
+            onValueChange={(variant) => onChange({ ...value, variant })}
           >
-            {variantOptions.map(v => (
-              <option key={v} value={v}>{v}</option>
-            ))}
-          </select>
-          <p className="text-[10px] text-muted-foreground mt-1">
+            <SelectTrigger className="w-full" aria-label={modelHarness === 'prokop' ? 'Variant' : 'Effort'}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {variantOptions.map(v => (
+                  <SelectItem key={v} value={v}>{v}</SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-1">
             {modelHarness === 'prokop'
               ? 'Model variant from models.json (e.g., reasoning effort)'
               : 'Reasoning effort from the harness model catalog'}

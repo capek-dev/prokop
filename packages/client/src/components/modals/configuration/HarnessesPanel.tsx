@@ -1,9 +1,9 @@
 import type { ProkopaiClient, SessionHarness } from '@prokopai/sdk';
-import { Loader2 } from 'lucide-react';
 import { useHarnessesQuery, useSetHarnessEnabled, isHarnessEnabled } from '@/hooks/queries';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { AnthropicMark, OpenAIMark, ProkopMark } from '@/components/branding/BrandMarks';
+import { SettingsLoading } from './SettingsPrimitives';
 
 interface HarnessesPanelProps {
   sdkClient: ProkopaiClient | null;
@@ -21,11 +21,7 @@ export function HarnessesPanel({ sdkClient }: HarnessesPanelProps) {
   const harnesses = data?.harnesses;
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <SettingsLoading />;
   }
 
   return (

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -22,6 +22,7 @@ vi.mock('@/components/modals/configuration/NotificationSettings', () => ({
 }));
 
 import { AppearancePanel } from '@/components/modals/configuration/AppearancePanel';
+import { NotificationsPanel } from '@/components/modals/configuration/NotificationsPanel';
 import { useUIStore } from '@/stores/uiStore';
 
 describe('AppearancePanel', () => {
@@ -58,9 +59,31 @@ describe('AppearancePanel', () => {
     expect(container.querySelectorAll('.light.neutral')).toHaveLength(1);
   });
 
+  test('file open mode uses the same segmented pill as theme mode', async () => {
+    const user = userEvent.setup();
+    useUIStore.setState({ defaultFileOpenMode: 'preview' });
+    render(<AppearancePanel />);
+
+    const group = screen.getByRole('group', { name: 'File open mode' });
+    expect(within(group).getByRole('button', { name: /preview files/i })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(within(group).getByRole('button', { name: /edit files/i }));
+    expect(useUIStore.getState().defaultFileOpenMode).toBe('edit');
+  });
+
+  test('leaves notification sounds to the Notifications section', () => {
+    render(<AppearancePanel />);
+    expect(screen.queryByRole('switch', { name: 'Chat completion sound' })).not.toBeInTheDocument();
+  });
+});
+
+describe('NotificationsPanel', () => {
+  beforeEach(() => {
+    useUIStore.setState({ chatFinishSoundEnabled: true, permissionSoundEnabled: true });
+  });
+
   test('sound toggles use the Switch contract against uiStore', async () => {
     const user = userEvent.setup();
-    render(<AppearancePanel />);
+    render(<NotificationsPanel />);
 
     const chatToggle = screen.getByRole('switch', { name: 'Chat completion sound' });
     expect(chatToggle).toHaveAttribute('aria-checked', 'true');

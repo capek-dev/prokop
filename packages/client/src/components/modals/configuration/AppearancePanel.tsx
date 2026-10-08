@@ -1,7 +1,5 @@
-import { Sun, Moon, Monitor, Volume2, VolumeX, Eye, Pencil } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Sun, Moon, Monitor, Eye, Pencil } from 'lucide-react';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useShallow } from 'zustand/react/shallow';
 import { useTheme } from '@/components/providers/ThemeProvider';
@@ -9,7 +7,6 @@ import type { ThemeMode, ThemeScheme } from '@/components/providers/ThemeProvide
 import { useUIStore } from '@/stores/uiStore';
 import type { DefaultFileOpenMode } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
-import { NotificationSettings } from './NotificationSettings';
 import { WorkspaceOrderControl } from '@/components/layout/WorkspaceOrderControl';
 
 const SCHEMES: ThemeScheme[] = ['neutral', 'ocean', 'forest', 'sunset', 'amethyst'];
@@ -62,7 +59,7 @@ function SchemeButton({ scheme, currentScheme, onClick }: {
           <div className="size-3 rounded-full bg-primary/20" />
         </div>
       </div>
-      <span className="text-[10px] text-muted-foreground capitalize">{scheme}</span>
+      <span className="text-xs text-muted-foreground capitalize">{scheme}</span>
     </button>
   );
 }
@@ -78,21 +75,40 @@ const OPEN_MODES: { value: DefaultFileOpenMode; icon: typeof Eye; label: string 
   { value: 'edit', icon: Pencil, label: 'Edit files' },
 ];
 
+/** Segmented pill matching the shell's tab idiom. */
+function SegmentedControl<T extends string>({ label, options, value, onChange }: {
+  label: string;
+  options: { value: T; icon: typeof Sun; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="inline-flex items-center rounded-lg bg-muted p-0.5" role="group" aria-label={label}>
+      {options.map(({ value: option, icon: Icon, label: optionLabel }) => (
+        <button
+          key={option}
+          type="button"
+          aria-pressed={value === option}
+          onClick={() => onChange(option)}
+          className={cn(
+            'flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',
+            value === option
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          <Icon className="size-3.5" />
+          {optionLabel}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function AppearancePanel() {
   const { mode, scheme, setMode, setScheme } = useTheme();
-  const {
-    chatFinishSoundEnabled,
-    setChatFinishSoundEnabled,
-    permissionSoundEnabled,
-    setPermissionSoundEnabled,
-    defaultFileOpenMode,
-    setDefaultFileOpenMode,
-  } = useUIStore(
+  const { defaultFileOpenMode, setDefaultFileOpenMode } = useUIStore(
     useShallow((s) => ({
-      chatFinishSoundEnabled: s.chatFinishSoundEnabled,
-      setChatFinishSoundEnabled: s.setChatFinishSoundEnabled,
-      permissionSoundEnabled: s.permissionSoundEnabled,
-      setPermissionSoundEnabled: s.setPermissionSoundEnabled,
       defaultFileOpenMode: s.defaultFileOpenMode,
       setDefaultFileOpenMode: s.setDefaultFileOpenMode,
     })),
@@ -105,32 +121,13 @@ export function AppearancePanel() {
         <p className="text-sm text-muted-foreground mb-3">
           Choose light, dark, or system theme
         </p>
-        {/* Segmented pill matching the shell's tab idiom */}
-        <div className="inline-flex items-center rounded-lg bg-muted p-0.5" role="group" aria-label="Theme mode">
-          {MODES.map(({ value, icon: Icon, label }) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={mode === value}
-              onClick={() => setMode(value)}
-              className={cn(
-                'flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',
-                mode === value
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <Icon className="size-3.5" />
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl label="Theme mode" options={MODES} value={mode} onChange={setMode} />
       </div>
 
       <Separator />
 
       <div>
-        <Label className="text-sm font-medium">Color Scheme</Label>
+        <Label className="text-sm font-medium">Color scheme</Label>
         <p className="text-sm text-muted-foreground mb-3">
           Previews render the live tokens for both modes
         </p>
@@ -148,40 +145,6 @@ export function AppearancePanel() {
 
       <Separator />
 
-      <div>
-        <Label className="text-sm font-medium mb-3 block">Notification Sounds</Label>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Volume2 className="size-4 text-muted-foreground" />
-              <span className="text-sm">Chat completion</span>
-            </div>
-            <Switch
-              checked={chatFinishSoundEnabled}
-              onCheckedChange={setChatFinishSoundEnabled}
-              aria-label="Chat completion sound"
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <VolumeX className="size-4 text-muted-foreground" />
-              <span className="text-sm">Permission requests</span>
-            </div>
-            <Switch
-              checked={permissionSoundEnabled}
-              onCheckedChange={setPermissionSoundEnabled}
-              aria-label="Permission request sound"
-            />
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      <NotificationSettings />
-
-      <Separator />
-
       <div className="flex flex-col gap-2">
         <Label htmlFor="workspace-order">Workspace order</Label>
         <WorkspaceOrderControl />
@@ -191,23 +154,12 @@ export function AppearancePanel() {
       <Separator />
 
       <div>
-        <Label className="text-sm font-medium">File Open Mode</Label>
+        <Label className="text-sm font-medium">File open mode</Label>
         <p className="text-sm text-muted-foreground mb-3">
           Choose what happens when you click a file. Right-click always offers both actions.
         </p>
-        <div className="grid grid-cols-2 gap-2">
-          {OPEN_MODES.map(({ value, icon: Icon, label }) => (
-            <Button
-              key={value}
-              variant={defaultFileOpenMode === value ? 'default' : 'outline'}
-              className="justify-start"
-              onClick={() => setDefaultFileOpenMode(value)}
-            >
-              <Icon className="size-4" data-icon="inline-start" />
-              {label}
-            </Button>
-          ))}
-        </div>
+        <SegmentedControl label="File open mode" options={OPEN_MODES} value={defaultFileOpenMode}
+          onChange={setDefaultFileOpenMode} />
       </div>
     </div>
   );

@@ -2,12 +2,13 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import type { ProkopaiClient, ResponseFormat } from '@prokopai/sdk';
 import { useResponseFormatsQuery, useCreateResponseFormat, useUpdateResponseFormat, useDeleteResponseFormat } from '@/hooks/queries';
-import { Braces, Plus, Pencil, Trash2, ArrowLeft, Loader2, GripVertical, Code, Eye, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Code, Eye, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
+import { SettingsEditorHeader, SettingsEmpty, SettingsError, SettingsListRow, SettingsLoading } from './SettingsPrimitives';
 
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
@@ -674,23 +675,10 @@ export function ResponseFormatsPanel({ sdkClient }: PanelProps) {
   if (isCreating || editingFormat) {
     return (
       <div className="p-3 sm:p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleCancel}>
-              <ArrowLeft className="size-4" />
-            </Button>
-            <h3 className="text-sm font-medium">
-              {isCreating ? 'New Response Format' : `Edit: ${editingFormat?.name}`}
-            </h3>
-          </div>
-          <Button size="sm" onClick={handleSave} disabled={saving || !editName.trim()}>
-            {saving ? <Loader2 className="size-3 animate-spin" /> : 'Save'}
-          </Button>
-        </div>
+        <SettingsEditorHeader title={isCreating ? 'New format' : 'Edit format'} onBack={handleCancel}
+          backLabel="Back to formats" onSave={handleSave} saving={saving} canSave={!!editName.trim()} />
 
-        {error && (
-          <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{error}</div>
-        )}
+        {error && <SettingsError>{error}</SettingsError>}
 
         <div>
           <label className="text-sm font-medium mb-1 block">Name</label>
@@ -774,13 +762,7 @@ export function ResponseFormatsPanel({ sdkClient }: PanelProps) {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  if (loading) return <SettingsLoading />;
 
   return (
     <div className="p-3 sm:p-4 space-y-4">
@@ -794,16 +776,12 @@ export function ResponseFormatsPanel({ sdkClient }: PanelProps) {
         </Button>
       </div>
 
-      {error && (
-        <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{error}</div>
-      )}
+      {error && <SettingsError>{error}</SettingsError>}
 
       {formats.length === 0 ? (
-        <div className="text-center py-8 text-sm text-muted-foreground">
-          No response formats yet. Create one to get started.
-        </div>
+        <SettingsEmpty>No response formats yet. Create one to get started.</SettingsEmpty>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {formats.map((format) => {
             const propCount = Object.keys(
               (format.schema as Record<string, unknown>)?.properties
@@ -812,42 +790,24 @@ export function ResponseFormatsPanel({ sdkClient }: PanelProps) {
             ).length;
 
             return (
-              <div
+              <SettingsListRow
                 key={format.id}
-                className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg border hover:bg-muted/50 cursor-pointer min-w-0 overflow-hidden"
-                onClick={() => handleEdit(format)}
-              >
-                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                  <Braces className="size-4 text-muted-foreground shrink-0 hidden sm:block" />
-                  <div className="flex flex-col flex-1 min-w-0 gap-0.5 sm:gap-1 overflow-hidden">
-                    <span className="text-sm font-medium truncate">{format.name}</span>
-                    {format.description && (
-                      <div className="text-xs text-muted-foreground line-clamp-1">{format.description}</div>
-                    )}
-                    <div className="text-xs text-muted-foreground">
-                      {propCount} propert{propCount !== 1 ? 'ies' : 'y'}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-0.5 sm:gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    onClick={() => handleEdit(format)}
-                    title="Edit format"
-                  >
-                    <Pencil className="size-3" />
-                  </Button>
+                title={format.name}
+                description={format.description}
+                meta={`${propCount} propert${propCount !== 1 ? 'ies' : 'y'}`}
+                onOpen={() => handleEdit(format)}
+                actions={(
                   <Button
                     size="icon-xs"
                     variant="ghost"
                     onClick={() => setDeleteTarget({ id: format.id, name: format.name })}
+                    aria-label={`Delete format ${format.name}`}
                     title="Delete format"
                   >
                     <Trash2 className="size-3" />
                   </Button>
-                </div>
-              </div>
+                )}
+              />
             );
           })}
         </div>

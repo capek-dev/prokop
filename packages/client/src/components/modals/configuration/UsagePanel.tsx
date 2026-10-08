@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { AnthropicMark, OpenAIMark } from '@/components/branding/BrandMarks';
 import { cn } from '@/lib/utils';
+import { SettingsLoading } from './SettingsPrimitives';
 
 interface UsagePanelProps {
   sdkClient: ProkopaiClient | null;
@@ -190,11 +191,7 @@ export function UsagePanel({ sdkClient }: UsagePanelProps) {
     credentials.data?.providers.some(entry => entry.provider === provider.id && entry.configured));
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <SettingsLoading />;
   }
 
   return (

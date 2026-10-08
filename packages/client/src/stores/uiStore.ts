@@ -16,6 +16,7 @@ export type ConfigurationSection =
   // Preferences
   | 'system'
   | 'appearance'
+  | 'notifications'
   | 'keybinds'
   // Server (shared across harnesses; prompts are client-level shortcuts)
   | 'harnesses'

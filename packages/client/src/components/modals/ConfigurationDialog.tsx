@@ -1,6 +1,6 @@
 import { Suspense, lazy, useState } from 'react';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { Boxes, FileText, Cog, GraduationCap, Shield, Bot, Braces, MonitorCog, Palette, Keyboard, CircuitBoard, Gauge } from 'lucide-react';
+import { Bell, Boxes, Cpu, FileText, Cog, GraduationCap, Shield, Bot, Braces, MonitorCog, Palette, Keyboard, CircuitBoard, Gauge } from 'lucide-react';
 import { getSelectableWorkspaces } from '@/lib/workspaceKind';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useServerUpdate } from '@/hooks/useServerUpdate';
@@ -21,6 +21,7 @@ const PreconfigsPanel = lazy(() => import('./configuration/PreconfigsPanel').the
 const ResponseFormatsPanel = lazy(() => import('./configuration/ResponseFormatsPanel').then((m) => ({ default: m.ResponseFormatsPanel })));
 const SystemPanel = lazy(() => import('./configuration/SystemPanel').then((m) => ({ default: m.SystemPanel })));
 const AppearancePanel = lazy(() => import('./configuration/AppearancePanel').then((m) => ({ default: m.AppearancePanel })));
+const NotificationsPanel = lazy(() => import('./configuration/NotificationsPanel').then((m) => ({ default: m.NotificationsPanel })));
 const KeybindsPanel = lazy(() => import('./configuration/KeybindsPanel').then((m) => ({ default: m.KeybindsPanel })));
 
 interface ConfigurationDialogProps {
@@ -35,6 +36,7 @@ interface ConfigurationDialogProps {
 const SECTIONS: SettingsSection[] = [
   // Preferences
   { value: 'appearance', label: 'Appearance', icon: Palette, group: 'preferences' },
+  { value: 'notifications', label: 'Notifications', icon: Bell, group: 'preferences' },
   { value: 'keybinds', label: 'Keybinds', icon: Keyboard, group: 'preferences' },
   // Server: shared across harnesses (prompts are client-level text shortcuts, harness-agnostic)
   { value: 'mcp', label: 'MCP Servers', icon: Boxes, group: 'server' },
@@ -43,7 +45,7 @@ const SECTIONS: SettingsSection[] = [
   { value: 'preconfigs', label: 'Agents', icon: Bot, group: 'server' },
   { value: 'prompts', label: 'Prompts', icon: FileText, group: 'server' },
   // Prokop runtime
-  { value: 'providers-models', label: 'Providers & Models', icon: Boxes, group: 'prokop' },
+  { value: 'providers-models', label: 'Providers & Models', icon: Cpu, group: 'prokop' },
   { value: 'response-formats', label: 'Formats', icon: Braces, group: 'prokop' },
   // System: connection/version, pinned to the bottom
   { value: 'system', label: 'System', icon: MonitorCog, group: 'system' },
@@ -123,6 +125,8 @@ export function ConfigurationDialog({
             return <SystemPanel apiToken={apiToken} isConnected={isConnected} onLogout={onLogout} sdkClient={sdkClient} open={open} />;
           case 'appearance':
             return <AppearancePanel />;
+          case 'notifications':
+            return <NotificationsPanel />;
           case 'keybinds':
             return <KeybindsPanel />;
           case 'mcp':

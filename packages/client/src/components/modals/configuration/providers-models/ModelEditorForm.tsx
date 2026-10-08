@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SettingsError } from '../SettingsPrimitives';
 
 interface ModelFormData {
   id: string;
@@ -206,7 +208,7 @@ export function ModelEditorForm({ sdkClient, providerId, providerName, model, on
       </div>
 
       {error && (
-        <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{error}</div>
+        <SettingsError>{error}</SettingsError>
       )}
 
       <div className="space-y-3">
@@ -220,7 +222,7 @@ export function ModelEditorForm({ sdkClient, providerId, providerName, model, on
             className="mt-1 font-mono"
           />
           {model && (
-            <p className="text-[10px] text-muted-foreground mt-1">ID cannot be changed</p>
+            <p className="text-xs text-muted-foreground mt-1">ID cannot be changed</p>
           )}
         </div>
         <div>
@@ -297,16 +299,22 @@ export function ModelEditorForm({ sdkClient, providerId, providerName, model, on
           </div>
           <div>
             <Label className="text-xs">Structured Output</Label>
-            <select
+            <Select
               value={form.capabilities?.structuredOutput?.mode ?? 'none'}
-              onChange={(e) => setForm(prev => updateStructuredOutputMode(prev, e.target.value as 'native' | 'prompt' | 'none'))}
-              className="mt-1 h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              onValueChange={(mode) => setForm(prev => updateStructuredOutputMode(prev, mode as 'native' | 'prompt' | 'none'))}
             >
-              <option value="none">Default (native)</option>
-              <option value="native">Native (json_schema)</option>
-              <option value="prompt">Prompt-based (schema in system prompt)</option>
-            </select>
-            <p className="text-[10px] text-muted-foreground mt-1">
+              <SelectTrigger size="sm" className="mt-1 w-full" aria-label="Structured Output">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="none">Default (native)</SelectItem>
+                  <SelectItem value="native">Native (json_schema)</SelectItem>
+                  <SelectItem value="prompt">Prompt-based (schema in system prompt)</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
               Use Prompt-based for providers that strip JSON schema (GLM, MiniMax). Native works for OpenAI-compatible APIs.
             </p>
           </div>
@@ -346,7 +354,7 @@ export function ModelEditorForm({ sdkClient, providerId, providerName, model, on
                     rows={3}
                   />
                   {variantJsonErrors[key] && (
-                    <p className="text-[10px] text-destructive">Invalid JSON</p>
+                    <p className="text-xs text-destructive">Invalid JSON</p>
                   )}
                 </div>
               ))}

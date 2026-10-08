@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { usePromptsQuery, useCreatePrompt, useUpdatePrompt, useDeletePrompt } from '@/hooks/queries';
-import { FileText, Plus, Pencil, Trash2, ArrowLeft, Loader2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
+import { SettingsEditorHeader, SettingsEmpty, SettingsError, SettingsListRow, SettingsLoading } from './SettingsPrimitives';
 
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
@@ -88,23 +89,10 @@ export function PromptsPanel({ sdkClient }: PanelProps) {
   if (isCreating || editingPrompt) {
     return (
       <div className="p-3 sm:p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleCancel}>
-              <ArrowLeft className="size-4" />
-            </Button>
-            <h3 className="text-sm font-medium">
-              {isCreating ? 'New Prompt' : `Edit: ${editingPrompt?.name}`}
-            </h3>
-          </div>
-          <Button size="sm" onClick={handleSave} disabled={saving || !editName.trim()}>
-            {saving ? <Loader2 className="size-3 animate-spin" /> : 'Save'}
-          </Button>
-        </div>
+        <SettingsEditorHeader title={isCreating ? 'New prompt' : 'Edit prompt'} onBack={handleCancel}
+          backLabel="Back to prompts" onSave={handleSave} saving={saving} canSave={!!editName.trim()} />
 
-        {error && (
-          <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{error}</div>
-        )}
+        {error && <SettingsError>{error}</SettingsError>}
 
         <div>
           <label className="text-sm font-medium mb-1 block">Name</label>
@@ -130,13 +118,7 @@ export function PromptsPanel({ sdkClient }: PanelProps) {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  if (loading) return <SettingsLoading />;
 
   return (
     <div className="p-3 sm:p-4 space-y-4">
@@ -150,50 +132,30 @@ export function PromptsPanel({ sdkClient }: PanelProps) {
         </Button>
       </div>
 
-      {error && (
-        <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{error}</div>
-      )}
+      {error && <SettingsError>{error}</SettingsError>}
 
       {prompts.length === 0 ? (
-        <div className="text-center py-8 text-sm text-muted-foreground">
-          No prompts yet. Create one to get started.
-        </div>
+        <SettingsEmpty>No prompts yet. Create one to get started.</SettingsEmpty>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {prompts.map((prompt) => (
-            <div
+            <SettingsListRow
               key={prompt.name}
-              className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg border hover:bg-muted/50 cursor-pointer min-w-0 overflow-hidden"
-              onClick={() => handleEdit(prompt)}
-            >
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                <FileText className="size-4 text-muted-foreground shrink-0 hidden sm:block" />
-                <div className="flex flex-col flex-1 min-w-0 gap-0.5 sm:gap-1 overflow-hidden">
-                  <div className="text-sm font-medium truncate">{prompt.name}</div>
-                  {prompt.description && (
-                    <div className="text-xs text-muted-foreground line-clamp-1">{prompt.description}</div>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-0.5 sm:gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  onClick={() => handleEdit(prompt)}
-                  title="Edit prompt"
-                >
-                  <Pencil className="size-3" />
-                </Button>
+              title={prompt.name}
+              description={prompt.description}
+              onOpen={() => handleEdit(prompt)}
+              actions={(
                 <Button
                   size="icon-xs"
                   variant="ghost"
                   onClick={() => setDeleteTarget(prompt.name)}
+                  aria-label={`Delete prompt ${prompt.name}`}
                   title="Delete prompt"
                 >
                   <Trash2 className="size-3" />
                 </Button>
-              </div>
-            </div>
+              )}
+            />
           ))}
         </div>
       )}

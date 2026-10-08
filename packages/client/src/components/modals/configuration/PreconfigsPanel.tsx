@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { defaultLearningCadence, parseAgentLearningSettings } from '@prokopai/sdk';
 import { usePreconfigsQuery, useCreatePreconfig, useUpdatePreconfig, useDeletePreconfig, useToolsQuery, useAgentsQuery, useDemoteAgent } from '@/hooks/queries';
-import { Bot, Plus, Pencil, Copy, Trash2, ArrowLeft, Loader2, Star, Check, RefreshCw } from 'lucide-react';
+import { Plus, Copy, Trash2, Loader2, Star, Check, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,6 +21,8 @@ import { LearningHistory } from './LearningHistory';
 import { AgentModelPicker } from './AgentModelPicker';
 import { DisclosureRow } from './DisclosureRow';
 import { MemorySkillsControls } from './MemorySkillsControls';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SettingsEditorHeader, SettingsEmpty, SettingsError, SettingsListRow, SettingsLoading } from './SettingsPrimitives';
 
 /** An open agent editor. `id` is null for a new agent; `initial` detects unsaved edits. */
 export interface AgentEditorDraft {
@@ -150,6 +152,9 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
   const setForm = (next: PreconfigForm | ((prev: PreconfigForm) => PreconfigForm)) =>
     setDraft(current => current && { ...current, form: typeof next === 'function' ? next(current.form) : next });
   const isDirty = draft !== null && JSON.stringify(draft.form) !== JSON.stringify(draft.initial);
+  /** Codex and Claude pins run on their own CLI, which ignores Prokop tools, subagents, and temperature. */
+  const externalHarness = form.modelHarness === 'codex-cli' ? 'Codex CLI'
+    : form.modelHarness === 'claude-cli' ? 'Claude CLI' : null;
   const [discardOpen, setDiscardOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -462,23 +467,10 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
   if (isCreating || editingPreconfig) {
     return (
       <div className="p-3 sm:p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={handleCancel} aria-label="Back to agents">
-              <ArrowLeft className="size-4" />
-            </Button>
-            <h3 className="text-sm font-medium">
-              {isCreating ? 'New Agent' : `Edit: ${editingPreconfig?.name}`}
-            </h3>
-          </div>
-          <Button size="sm" onClick={handleSave} disabled={saving || !form.name.trim()}>
-            {saving ? <Loader2 className="size-3 animate-spin" /> : 'Save'}
-          </Button>
-        </div>
+        <SettingsEditorHeader title={isCreating ? 'New agent' : 'Edit agent'} onBack={handleCancel}
+          backLabel="Back to agents" onSave={handleSave} saving={saving} canSave={!!form.name.trim()} />
 
-        {error && (
-          <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{error}</div>
-        )}
+        {error && <SettingsError>{error}</SettingsError>}
 
         <div key={isCreating ? 'new' : (editingPreconfig?.id ?? 'edit')} className="space-y-3">
           <div>
@@ -499,21 +491,24 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
           </div>
           <div>
             <Label className="text-sm">Mode</Label>
-            <select
-              value={form.mode}
-              onChange={(e) => setForm({ ...form, mode: e.target.value as 'primary' | 'subagent' | 'both' })}
-              className="w-full h-9 rounded-md border bg-background px-3 text-sm"
-            >
-              {MODE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+            <Select value={form.mode} onValueChange={(mode) => setForm({ ...form, mode: mode as PreconfigForm['mode'] })}>
+              <SelectTrigger className="w-full" aria-label="Mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {MODE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center justify-between gap-3">
             <div>
               <Label className="text-sm">Default agent</Label>
-              <p className="text-[10px] text-muted-foreground">New sessions start with this agent; only one can be the default</p>
+              <p className="text-xs text-muted-foreground">New sessions start with this agent; only one can be the default</p>
             </div>
             <Switch
               checked={form.isDefault}
@@ -535,9 +530,11 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
               }}
               onChange={(next) => setForm(prev => ({ ...prev, ...next }))}
             />
-            <p className="text-[10px] text-muted-foreground">
-              Provider is set automatically based on the selected model
-            </p>
+            {!externalHarness && (
+              <p className="text-xs text-muted-foreground">
+                Provider is set automatically based on the selected model
+              </p>
+            )}
           </div>
 
           <DisclosureRow label="System Prompt" summary={form.systemPrompt.trim() ? 'Custom' : 'None'} defaultOpen={false}>
@@ -576,7 +573,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <Label htmlFor="agent-learning-enabled" className="text-sm">Automatic learning</Label>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Reviews this agent's sessions when idle and saves durable lessons to its personal memory.
                       </p>
                     </div>
@@ -598,10 +595,10 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                   )}
                   {form.learningEnabled && (
                     <div className="space-y-2">
-                      {(form.modelHarness === 'codex-cli' || form.modelHarness === 'claude-cli') && (
-                        <p className="text-[10px] text-muted-foreground">
-                          Reviews run on {form.modelHarness === 'codex-cli' ? 'Codex CLI' : 'Claude CLI'} (from the
-                          agent's model pin) with that harness's own tools; harness reviews can't be undone from history.
+                      {externalHarness && (
+                        <p className="text-xs text-muted-foreground">
+                          Reviews run on {externalHarness} (from the agent's model pin) with that harness's own
+                          tools; harness reviews can't be undone from history.
                         </p>
                       )}
                       <DisclosureRow label="Timing" defaultOpen={false}
@@ -610,7 +607,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                         <div className="grid grid-cols-3 gap-1.5">
                           {LEARNING_FIELDS.map(field => (
                             <div key={field.key} className="space-y-1">
-                              <Label htmlFor={field.key} className="text-[10px] font-normal text-muted-foreground">{field.label}</Label>
+                              <Label htmlFor={field.key} className="text-xs font-normal text-muted-foreground">{field.label}</Label>
                               <Input
                                 id={field.key}
                                 type="number"
@@ -633,16 +630,22 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                           placeholder="What this agent should focus on when learning..."
                         />
                       </DisclosureRow>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Which workspaces feed this agent's learning</p>
-                        <select
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Which workspaces feed this agent's learning</p>
+                        <Select
                           value={form.learningSourcesMode}
-                          onChange={(e) => setForm({ ...form, learningSourcesMode: e.target.value as 'all' | 'selected' })}
-                          className="w-full h-9 rounded-md border bg-background px-3 text-sm"
+                          onValueChange={(mode) => setForm({ ...form, learningSourcesMode: mode as PreconfigForm['learningSourcesMode'] })}
                         >
-                          <option value="all">All workspaces</option>
-                          <option value="selected">Selected workspaces</option>
-                        </select>
+                          <SelectTrigger className="w-full" aria-label="Learning sources">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectItem value="all">All workspaces</SelectItem>
+                              <SelectItem value="selected">Selected workspaces</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
                         {form.learningSourcesMode === 'selected' && (
                           <LearningSourcePicker
                             workspaces={workspaces}
@@ -659,22 +662,21 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
           )}
 
           {editingPreconfig && isMaterialized && (
-            <DisclosureRow label="Home & Memory" summary={`${homeSkills.length} skills`} defaultOpen={false}>
+            <DisclosureRow label="Personal files" summary={`${homeSkills.length} skill${homeSkills.length === 1 ? '' : 's'}`} defaultOpen={false}>
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Home & Memory</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">Memory and skills stored in this agent's home directory.</p>
                   <Button
                     variant="ghost"
                     size="icon-xs"
                     onClick={() => setHomeReload(n => n + 1)}
                     title="Reload home data"
+                    aria-label="Reload home data"
                   >
                     <RefreshCw className="size-3" />
                   </Button>
                 </div>
-                {homeError && (
-                  <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{homeError}</div>
-                )}
+                {homeError && <SettingsError>{homeError}</SettingsError>}
                 {homeLoading ? (
                   <div className="flex items-center justify-center py-4">
                     <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -682,7 +684,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                 ) : (
                   <>
                     <div>
-                      <p className="text-[10px] text-muted-foreground">User preferences (USER.md)</p>
+                      <p className="text-xs text-muted-foreground">User preferences (USER.md)</p>
                       <textarea
                         value={homeDraft.user}
                         onChange={(e) => setHomeDraft({ ...homeDraft, user: e.target.value })}
@@ -690,7 +692,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                       />
                     </div>
                     <div>
-                      <p className="text-[10px] text-muted-foreground">Memory (MEMORY.md)</p>
+                      <p className="text-xs text-muted-foreground">Memory (MEMORY.md)</p>
                       <textarea
                         value={homeDraft.memory}
                         onChange={(e) => setHomeDraft({ ...homeDraft, memory: e.target.value })}
@@ -703,8 +705,8 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                       </Button>
                     </div>
                     <div>
-                      <p className="text-[10px] text-muted-foreground">
-                        Personal skills ({homeSkills.length}) — read-only; the agent manages them at runtime.
+                      <p className="text-xs text-muted-foreground">
+                        Personal skills ({homeSkills.length}). Read-only; the agent manages them at runtime.
                       </p>
                       {homeSkills.length > 0 && (
                         <div className="rounded-md border divide-y">
@@ -712,7 +714,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                             <div key={skill.name} className="px-2.5 py-1.5">
                               <p className="font-mono text-xs truncate">{skill.name}</p>
                               {skill.description && (
-                                <p className="text-[10px] text-muted-foreground line-clamp-1">{skill.description}</p>
+                                <p className="text-xs text-muted-foreground line-clamp-1">{skill.description}</p>
                               )}
                             </div>
                           ))}
@@ -726,7 +728,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                         onClick={() => setDemoteTarget(editingPreconfig.id)}
                       >
                         <Trash2 className="size-3" />
-                        Remove home & memory
+                        Remove personal files
                       </Button>
                     </div>
                   </>
@@ -737,26 +739,26 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
 
           <DisclosureRow
             label="Prokop Runtime"
-            summary={
-              [
-                `${form.tools.length} tool${form.tools.length === 1 ? '' : 's'}`,
-                form.canSpawnSubagentsMode === 'all' ? 'subagents: all'
-                  : form.canSpawnSubagentsMode === 'specific' ? `${form.canSpawnSubagentsList.length} subagents` : null,
-                form.temperature.trim() ? `temp ${form.temperature.trim()}` : null,
-              ]
-                .filter(Boolean)
-                .join(' · ')
-            }
+            summary={externalHarness ? `Not used by ${externalHarness}` : [
+              `${form.tools.length} tool${form.tools.length === 1 ? '' : 's'}`,
+              form.canSpawnSubagentsMode === 'all' ? 'subagents: all'
+                : form.canSpawnSubagentsMode === 'specific'
+                  ? `${form.canSpawnSubagentsList.length} subagent${form.canSpawnSubagentsList.length === 1 ? '' : 's'}` : null,
+              form.temperature.trim() ? `temp ${form.temperature.trim()}` : null,
+            ].filter(Boolean).join(' · ')}
             defaultOpen={false}
           >
             <div className="space-y-4">
-              <p className="text-[10px] text-muted-foreground">
-                Applies only when this agent runs on the Prokop harness — Codex and Claude sessions use their own tools, agents, and sampling settings.
+              <p className={cn('text-xs text-muted-foreground', externalHarness && 'rounded-md bg-muted/50 px-2.5 py-2 text-foreground')}>
+                {externalHarness
+                  ? `This agent runs on ${externalHarness}, which uses its own tools, subagents, and sampling. These settings apply only if you switch it to a Prokop model.`
+                  : 'Applies only when this agent runs on the Prokop harness. Codex and Claude sessions use their own tools, agents, and sampling settings.'}
               </p>
 
+              <div className={cn('space-y-4', externalHarness && 'opacity-60')}>
               <div className="space-y-2">
                 <Label className="text-sm">Tools</Label>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Only the selected tools are available. With none selected, this agent has no tools from this list.
                 </p>
               <Input
@@ -794,7 +796,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                         <div className="flex flex-col min-w-0">
                           <span className="font-mono text-xs truncate">{tool.name}</span>
                           {tool.description && (
-                            <span className="text-[10px] text-muted-foreground truncate">{tool.description}</span>
+                            <span className="text-xs text-muted-foreground truncate">{tool.description}</span>
                           )}
                         </div>
                         <div className={cn(
@@ -812,19 +814,25 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
               <div className="space-y-3 border-t pt-3">
                 <Label className="text-sm">Subagents</Label>
               <div className="space-y-2">
-                <select
+                <Select
                   value={form.canSpawnSubagentsMode}
-                  onChange={(e) => setForm({ ...form, canSpawnSubagentsMode: e.target.value as 'all' | 'none' | 'specific' })}
-                  className="w-full h-9 rounded-md border bg-background px-3 text-sm"
+                  onValueChange={(mode) => setForm({ ...form, canSpawnSubagentsMode: mode as PreconfigForm['canSpawnSubagentsMode'] })}
                 >
-                  <option value="none">No — cannot spawn subagents</option>
-                  <option value="all">Yes — all available subagents</option>
-                  <option value="specific">Specific — choose which subagents</option>
-                </select>
+                  <SelectTrigger className="w-full" aria-label="Subagents">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="none">None: cannot spawn subagents</SelectItem>
+                      <SelectItem value="all">All available subagents</SelectItem>
+                      <SelectItem value="specific">Specific subagents</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
 
                 {form.canSpawnSubagentsMode === 'specific' && (
                   <div className="space-y-1.5">
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Select which subagents this agent can spawn
                     </p>
 
@@ -860,7 +868,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                     )}
 
                     {availableSubagents.length === 0 && (
-                      <p className="text-[10px] text-muted-foreground">No subagent-mode agents available yet.</p>
+                      <p className="text-xs text-muted-foreground">No subagent-mode agents available yet.</p>
                     )}
                   </div>
                 )}
@@ -869,14 +877,14 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <Label htmlFor="allow-self-as-subagent" className="text-sm">Allow Self as Subagent</Label>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Allows this agent to delegate once to a new copy of itself. The copy cannot delegate to itself again.
                   </p>
                   {form.canSpawnSubagentsMode === 'none' && (
-                    <p className="text-[10px] text-muted-foreground">Enable subagent spawning first.</p>
+                    <p className="text-xs text-muted-foreground">Enable subagent spawning first.</p>
                   )}
                   {form.mode === 'primary' && (
-                    <p className="text-[10px] text-muted-foreground">This setting has no effect while the mode is Primary.</p>
+                    <p className="text-xs text-muted-foreground">This setting has no effect while the mode is Primary.</p>
                   )}
                 </div>
                 <Switch
@@ -890,7 +898,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
 
               <div className="space-y-2 border-t pt-3">
                 <Label className="text-sm">Temperature</Label>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Sampling temperature (0.1–0.9); leave empty for the server default. Not applied to GPT models on the Codex provider.
                 </p>
                 <Input
@@ -903,6 +911,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                   step="0.1"
                   className="font-mono"
                 />
+              </div>
               </div>
             </div>
           </DisclosureRow>
@@ -938,13 +947,18 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  if (loading) return <SettingsLoading />;
+
+  /** The model an agent is pinned to, as people scan for it in the list. */
+  const modelLabel = (preconfig: Preconfig): string => {
+    if (!preconfig.model) return 'Server default';
+    if (preconfig.modelHarness === 'codex-cli' || preconfig.modelHarness === 'claude-cli') {
+      const catalog = preconfig.modelHarness === 'codex-cli' ? codexCatalogModels : claudeCatalogModels;
+      const name = catalog.find(m => m.model === preconfig.model)?.name ?? preconfig.model;
+      return `${preconfig.modelHarness === 'codex-cli' ? 'Codex' : 'Claude'} · ${name}`;
+    }
+    return models.find(m => m.id === preconfig.model)?.name ?? preconfig.model;
+  };
 
   return (
     <div className="p-3 sm:p-4 space-y-4">
@@ -953,82 +967,63 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
           {preconfigs.length} agent{preconfigs.length !== 1 ? 's' : ''}
         </p>
         <Button size="sm" onClick={handleCreate}>
-          <Plus className="size-3" />
-          <span className="hidden sm:inline">New Agent</span>
+          <Plus className="size-3" data-icon="inline-start" />
+          New Agent
         </Button>
       </div>
 
-      {error && (
-        <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{error}</div>
-      )}
+      {error && <SettingsError>{error}</SettingsError>}
 
       {preconfigs.length === 0 ? (
-        <div className="text-center py-8 text-sm text-muted-foreground">
-          No agents yet. Create one to get started.
-        </div>
+        <SettingsEmpty>No agents yet. Create one to get started.</SettingsEmpty>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {preconfigs.map((preconfig) => (
-            <div
+            <SettingsListRow
               key={preconfig.id}
-              className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
-              onClick={() => handleEdit(preconfig)}
-            >
-              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                <Bot className="size-4 text-muted-foreground shrink-0 hidden sm:block" />
-                <div className="flex flex-col flex-1 min-w-0 gap-0.5 sm:gap-1 overflow-hidden">
-                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                    <span className="text-sm font-medium truncate">{preconfig.name}</span>
-                    {preconfig.isDefault && (
-                      <Badge variant="default" className="text-[10px] px-1 sm:px-1.5 py-0">
-                        <Star className="size-2.5 sm:mr-0.5" />
-                        <span className="hidden sm:inline">Default</span>
-                      </Badge>
-                    )}
-                    {preconfig.mode && preconfig.mode !== 'primary' && (
-                      <Badge variant="secondary" className="text-[10px] px-1 sm:px-1.5 py-0">
-                        <span className="hidden sm:inline">{preconfig.mode}</span>
-                        <span className="sm:hidden">{preconfig.mode === 'subagent' ? 'SA' : 'B'}</span>
-                      </Badge>
-                    )}
-                  </div>
-                  {preconfig.description && (
-                    <div className="text-xs text-muted-foreground line-clamp-1">{preconfig.description}</div>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-0.5 sm:gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  onClick={() => handleEdit(preconfig)}
-                  title="Edit agent"
-                >
-                  <Pencil className="size-3" />
-                </Button>
+              title={preconfig.name}
+              description={preconfig.description}
+              meta={modelLabel(preconfig)}
+              onOpen={() => handleEdit(preconfig)}
+              badges={<>
+                {preconfig.isDefault && (
+                  <Badge variant="outline" className="h-4 shrink-0 gap-0.5 px-1.5 py-0 text-[10px]">
+                    <Star className="size-2.5" />
+                    Default
+                  </Badge>
+                )}
+                {preconfig.mode && preconfig.mode !== 'primary' && (
+                  <Badge variant="secondary" className="h-4 shrink-0 px-1.5 py-0 text-[10px]">
+                    {preconfig.mode === 'subagent' ? 'Subagent' : 'Primary + subagent'}
+                  </Badge>
+                )}
+              </>}
+              actions={<>
                 <Button
                   size="icon-xs"
                   variant="ghost"
                   onClick={() => handleDuplicate(preconfig)}
                   disabled={duplicatingId !== null}
+                  aria-label={`Duplicate agent ${preconfig.name}`}
                   title="Duplicate agent"
                 >
                   {duplicatingId === preconfig.id
                     ? <Loader2 className="size-3 animate-spin" />
                     : <Copy className="size-3" />}
                 </Button>
-                {!preconfig.isDefault && (
+                {preconfig.isDefault ? <span className="size-6" aria-hidden /> : (
                   <Button
                     size="icon-xs"
                     variant="ghost"
                     onClick={() => setDeleteTarget(preconfig.id)}
+                    aria-label={`Delete agent ${preconfig.name}`}
                     title="Delete agent"
                   >
                     <Trash2 className="size-3" />
                   </Button>
                 )}
-              </div>
-            </div>
+              </>}
+            />
           ))}
         </div>
       )}
@@ -1047,7 +1042,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
       <ConfirmDialog
         open={demoteTarget !== null}
         onOpenChange={(open) => { if (!open) setDemoteTarget(null); }}
-        title="Remove Home & Memory"
+        title="Remove personal files"
         description="This removes the agent directory and its home workspace. Sessions created in the home workspace will be deleted. The agent definition is preserved."
         confirmLabel="Remove"
         variant="destructive"

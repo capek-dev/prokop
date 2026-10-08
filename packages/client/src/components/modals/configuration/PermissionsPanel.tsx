@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PermissionListItem } from '../PermissionListItem';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { SettingsEmpty } from './SettingsPrimitives';
 
 const MODE_OPTIONS: { value: PermissionMode; label: string; icon: typeof ShieldCheck }[] = [
   { value: 'standard', label: 'Standard', icon: ShieldCheck },
@@ -96,11 +97,7 @@ export function PermissionsPanel({
 
       <div className="dialog-scrollbar min-h-0 overflow-y-auto" style={{ maxHeight: '50vh' }}>
         {activePermissions.length === 0 && revokedPermissions.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            No saved permissions yet.
-            <br />
-            Saved permission grants will appear here after approval.
-          </div>
+          <SettingsEmpty>No saved permissions yet. Saved permission grants will appear here after approval.</SettingsEmpty>
         )}
 
         {activePermissions.length > 0 && (

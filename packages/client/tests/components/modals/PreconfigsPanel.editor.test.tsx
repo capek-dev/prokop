@@ -113,7 +113,7 @@ test('reload home data reads the agent memory again', async () => {
   renderPanel(sdkClient);
   await user.click(screen.getByText('Test agent'));
   await waitFor(() => expect(getMemory).toHaveBeenCalledTimes(1));
-  await user.click(screen.getByRole('button', { name: /^Home & Memory/ }));
+  await user.click(screen.getByRole('button', { name: /^Personal files/ }));
   await user.click(await screen.findByTitle('Reload home data'));
   await waitFor(() => expect(getMemory).toHaveBeenCalledTimes(2));
 });

@@ -5,6 +5,7 @@ import type { ProkopaiClient, ProviderAccountStatus } from '@prokopai/sdk';
 import { useProvidersQuery, useConnectProvider, useDisconnectProvider, useCompleteOAuth, useProviderAccountMutation } from '@/hooks/queries';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { SettingsEmpty, SettingsError, SettingsLoading } from './SettingsPrimitives';
 
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
@@ -206,11 +207,7 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false, provider: fil
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <SettingsLoading />;
   }
 
   return (
@@ -235,13 +232,11 @@ export function OAuthProvidersPanel({ sdkClient, embedded = false, provider: fil
       )}
 
       {error && (
-        <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{error}</div>
+        <SettingsError>{error}</SettingsError>
       )}
 
       {providers.length === 0 ? (
-        <div className="text-center py-8 text-sm text-muted-foreground">
-          No OAuth providers available.
-        </div>
+        <SettingsEmpty>No OAuth providers available.</SettingsEmpty>
       ) : (
         <div className="flex flex-col gap-3">
           {providers.map((provider) => (

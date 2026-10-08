@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { McpServerForm } from './McpServerForm';
+import { SettingsEmpty } from './SettingsPrimitives';
 
 interface Props { workspaceId: string | null | undefined; sdkClient: ProkopaiClient | null }
 const statusLabels: Record<McpStatus['status'], string> = {
@@ -55,7 +56,7 @@ function McpSettings({ workspaceId, client }: { workspaceId: string | null; clie
         await action.mutateAsync(() => client.http.mcp.save(workspaceId, name, config)); setEditing(undefined);
       }} />}
     {status.isLoading ? <Skeleton className="h-16" /> : servers.length === 0
-      ? <p className="py-4 text-sm text-muted-foreground">No MCP servers yet. Add a remote URL or a local command.</p>
+      ? <SettingsEmpty>No MCP servers yet. Add a remote URL or a local command.</SettingsEmpty>
       : <>
         {servers.length > 5 && <Input aria-label="Search MCP servers" placeholder="Search servers…" value={search} onChange={e => setSearch(e.target.value)} />}
         <div className="flex flex-col divide-y">

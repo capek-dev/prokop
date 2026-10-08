@@ -5,6 +5,7 @@ import { Key, Check, X, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { SettingsError, SettingsLoading } from './SettingsPrimitives';
 
 interface PanelProps {
   sdkClient: ProkopaiClient | null;
@@ -67,11 +68,7 @@ export function ProviderCredentialsPanel({ sdkClient, embedded = false, provider
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <SettingsLoading />;
   }
 
   if (error && providers.length === 0) {
@@ -89,7 +86,7 @@ export function ProviderCredentialsPanel({ sdkClient, embedded = false, provider
       )}
 
       {error && (
-        <div className="p-2 rounded bg-destructive/10 text-sm text-destructive">{error}</div>
+        <SettingsError>{error}</SettingsError>
       )}
 
       <div className="space-y-2">
