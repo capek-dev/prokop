@@ -23,7 +23,7 @@ export function codexCliVersion(): string {
 }
 
 function probeCodexCliVersion(): string {
-  const result = Bun.spawnSync(['codex', '--version'], { stdout: 'pipe', stderr: 'ignore' });
+  const result = Bun.spawnSync(['codex', '--version'], { stdout: 'pipe', stderr: 'ignore', windowsHide: true });
   if (result.exitCode !== 0) throw new Error(MINIMUM_CODEX_VERSION);
   return validateCodexCliVersion(result.stdout.toString().trim());
 }

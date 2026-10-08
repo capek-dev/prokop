@@ -45,7 +45,7 @@ export function openClient(): OpenClientResult {
     const args = process.platform === 'win32'
       ? ['/c', 'start', url]
       : [url];
-    Bun.spawn([command, ...args], { detached: true });
+    Bun.spawn([command, ...args], { detached: true, windowsHide: true });
     return { opened: true, url };
   } catch {
     console.log(`Could not open browser. Open manually: ${url}`);
