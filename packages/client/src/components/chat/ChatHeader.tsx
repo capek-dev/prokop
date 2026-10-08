@@ -11,13 +11,17 @@ import { TokenMeter } from './TokenMeter';
 import { ModelVariantConfigSelector } from './ModelVariantConfigSelector';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
-import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useSessionControlStore } from '@/stores/sessionControlStore';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import type { SessionUsage } from '@/stores/sessionStore';
 
 import { useClientIdentityStore } from '@/stores/clientIdentityStore';
 import {useIsCompact, useIsMobile} from '@/hooks/use-mobile';
+import { useElementWidth } from '@/hooks/use-element-width';
+
+// Header widths (px) below which the model selector collapses.
+const ICON_ONLY_SELECTOR_MAX_WIDTH = 420;
+const COMPACT_SELECTOR_MAX_WIDTH = 640;
 
 interface Model {
   id: string;
@@ -160,8 +164,11 @@ export function ChatHeader({
   };
   const isMobile = useIsMobile();
   const isCompact = useIsCompact();
-  const hasMultipleOpenSessions = useSessionBoardStore((s) => s.openSessionIds.length > 1);
-  const showFullModelSelector = isMobile || hasMultipleOpenSessions;
+  // Size the selector from this header's own width, so split panes only
+  // shrink it when the pane is actually narrow.
+  const [headerRef, headerWidth] = useElementWidth<HTMLDivElement>();
+  const showIconOnlySelector = isMobile || (headerWidth !== null && headerWidth < ICON_ONLY_SELECTOR_MAX_WIDTH);
+  const showCompactSelector = isCompact || (headerWidth !== null && headerWidth < COMPACT_SELECTOR_MAX_WIDTH);
 
   const controlState = useSessionControlStore((s) => s.controlBySessionId[session.id]);
   const myClientId = useClientIdentityStore((s) => s.clientId);
@@ -223,7 +230,7 @@ export function ChatHeader({
     : null;
 
   return (
-    <div className="flex-1 min-w-0 flex items-center justify-between gap-1">
+    <div ref={headerRef} className="flex-1 min-w-0 flex items-center justify-between gap-1">
       <TooltipProvider delayDuration={300}>
         <div className="flex items-center justify-between gap-1 w-full min-w-0">
           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -293,8 +300,8 @@ export function ChatHeader({
               onChangePreconfig={onChangePreconfig}
               disabled={session.status === 'closed' || !!session.parentId || isObserver || ((codexSession || claudeSession) && !!isStreaming)}
               lockPreconfig={lockPreconfig}
-              iconOnly={showFullModelSelector}
-              compact={isCompact}
+              iconOnly={showIconOnlySelector}
+              compact={showCompactSelector}
             />
 
             {onCompact && !isObserver && (
