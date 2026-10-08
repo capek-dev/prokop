@@ -4,7 +4,7 @@ import { useSessionBoardStore } from './sessionBoardStore';
 
 export type FilesPanelTab = 'project' | 'changes' | 'branches' | 'worktrees';
 export type WorkbenchSurface = 'explorer' | 'changes' | 'branches' | 'worktrees' | 'editor';
-export type MobileSurface = 'chat' | 'sessions' | 'files' | 'editor';
+export type MobileSurface = 'chat' | 'sessions' | 'files' | 'editor' | 'pull-requests';
 
 interface SessionFilesLayout {
   filesPanelTab: FilesPanelTab;

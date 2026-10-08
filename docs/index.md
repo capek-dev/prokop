@@ -11,6 +11,7 @@ New to Prokop? Start here.
 - **[Getting Started](./getting-started.md)** - Install, initialize, and run your first session
 - **[Configuration](./configuration.md)** - Set up LLM providers, API keys, models, capabilities, and MCP
 - **[Client Guide](./client.md)** - Connect with the embedded web client, PWA, or browser extension
+- **[Manage Pull Requests](./pull-requests.md)** - Connect GitHub or Azure CLI, create PRs, review changes, and merge
 - **[CLI Reference](./cli.md)** - All available commands and flags
 
 ## Core Concepts

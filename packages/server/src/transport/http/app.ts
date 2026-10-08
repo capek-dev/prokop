@@ -32,6 +32,7 @@ import { registerLearningRoutes } from '@/transport/http/routes/learning';
 import { registerWorkspaceRoutes } from '@/transport/http/routes/workspaces';
 import { registerWorktreeRoutes } from '@/transport/http/routes/worktrees';
 import { registerFileRoutes } from '@/transport/http/routes/files';
+import { registerPullRequestRoutes } from '@/transport/http/routes/pull-requests';
 import { registerToolRoutes } from '@/transport/http/routes/tools';
 import { registerMcpRoutes } from '@/transport/http/routes/mcp';
 import { registerConfigRoutes } from '@/transport/http/routes/config';
@@ -150,6 +151,7 @@ export function createApp(application?: WiredApplication, options?: CreateAppOpt
   registerLearningRoutes(app, wired.learning.api);
   registerWorktreeRoutes(app, wired.worktrees);
   registerFileRoutes(app, wired.files);
+  registerPullRequestRoutes(app, wired.pullRequests);
   registerToolRoutes(app, wired.tools);
   registerMcpRoutes(app, wired.mcp);
   registerConfigRoutes(app, wired.providers, wired.configuration);

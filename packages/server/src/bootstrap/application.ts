@@ -1,4 +1,7 @@
 import { existsSync } from 'node:fs';
+import { createPullRequestsApplication, type PullRequestsApplication } from '@/application/pull-requests';
+import { createProkopPullRequestsPort } from '@/adapters/prokop/pull-requests';
+import { createCliPullRequestProviders } from '@/infrastructure/pull-requests';
 import {
   createAgentsApplication,
   createFilesApplication,
@@ -154,6 +157,7 @@ export interface WiredApplication {
   permissions: PermissionsApplication;
   /** The wired files list/search/preview/edit/git use cases (S5). */
   files: FilesApplication;
+  pullRequests: PullRequestsApplication;
   /** The wired configuration use cases (S9). */
   configuration: ConfigurationApplication;
   maintenance: MaintenanceApplication;
@@ -441,9 +445,15 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
     repository: createProkopPermissionRepositoryPort(),
   });
 
-  const files = createFilesApplication(createProkopFilesApplicationPort({
+  const filesPort = createProkopFilesApplicationPort({
     listAvailableWorktreePaths: worktreeRoots.listAvailablePaths,
-  }), (workspaceId, root) => broadcastEvent({ type: 'git.changed', workspaceId, root }), {
+  });
+  const pullRequests = createPullRequestsApplication(createProkopPullRequestsPort(
+    filesPort,
+    (workspaceId, repositoryKey) => broadcastEvent({ type: 'pull-request.changed', workspaceId, repositoryKey }),
+    createCliPullRequestProviders(),
+  ));
+  const files = createFilesApplication(filesPort, (workspaceId, root) => broadcastEvent({ type: 'git.changed', workspaceId, root }), {
     deliverGitStatus: (subscriber, message) => sendToConnectionEvent(subscriber as ConnectionId, message),
     deliverFileTree: (subscriber, message) => sendToConnectionEvent(subscriber as ConnectionId, message),
   });
@@ -485,5 +495,5 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
       if (harness === 'codex-cli') saveCodexModelSelection(sessionId, { model, effort });
       else saveClaudeModelSelection(sessionId, { model, effort });
     },
-  }), session, control, http, scheduling, schedulerTicker, agents, workspaces, worktrees, tools, mcp, providers, notifications, permissions, files, configuration, maintenance, responseFormats };
+  }), session, control, http, scheduling, schedulerTicker, agents, workspaces, worktrees, tools, mcp, providers, notifications, permissions, files, pullRequests, configuration, maintenance, responseFormats };
 }

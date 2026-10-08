@@ -11,6 +11,12 @@ reuses Settings > Usage for account balances, limits, CLI usage, and refresh
 controls. Its content mounts only while visible and shares the query cache with
 settings. Existing saved layouts gain Usage in their first left group without
 changing selections or splits; moved and hidden Usage placements are retained.
+Pull requests is a workspace-scoped tool tab in the default center group, with a
+shortcut beside the workspace selector. Existing layouts gain it without changing
+their active selection. It mounts on first reveal, retains browsing state while
+hidden, and disables its overview/inbox queries while hidden. It follows the
+focused session checkout unless explicitly pinned to another checkout. See
+[Manage pull requests](./pull-requests.md) for CLI setup and review behavior.
 
 Each region can contain multiple independent tab groups. Left and right use
 vertical splits, bottom uses horizontal splits, and center supports nested splits

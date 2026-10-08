@@ -1,5 +1,7 @@
 import { useCallback, useMemo } from 'react';
-import { SquarePen } from 'lucide-react';
+import { GitPullRequest, SquarePen } from 'lucide-react';
+import { useWorkspaceViewStore } from '@/stores/workspaceViewStore';
+import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { toast } from 'sonner';
 import { useViewRefs } from '@/contexts/ViewRefsContext';
 import { useSessionManager } from '@/contexts/SessionManagerContext';
@@ -151,6 +153,10 @@ export default function WorkspaceView() {
           isUpdatingWorkspace={isUpdatingWorkspace}
         />
         <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild><Button variant="ghost" size="icon-xs" aria-label="Pull requests" disabled={!sidebarData.connected} onClick={() => { useWorkspaceViewStore.getState().activateView('pull-requests'); useChatLayoutStore.getState().setMobileSurface('pull-requests'); }}><GitPullRequest /></Button></TooltipTrigger>
+            <TooltipContent>Pull requests</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

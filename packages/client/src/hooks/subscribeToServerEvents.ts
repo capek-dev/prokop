@@ -13,6 +13,7 @@ import { queryClient } from '@/components/providers/QueryProvider';
 import { handleGitChanged, handleGitStatus } from '@/handlers/serverMessage/gitHandlers';
 import { handleFileTree, handleFilesChanged } from '@/handlers/serverMessage/fileHandlers';
 import { handleSchedulerChanged } from '@/handlers/serverMessage/schedulerHandlers';
+import { handlePullRequestChanged } from '@/handlers/serverMessage/pullRequestHandlers';
 import { useChatRetryStore } from '@/stores/chatRetryStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { handleWorkspaceActivity } from '@/handlers/serverMessage/workspaceActivity';
@@ -98,6 +99,12 @@ export function subscribeToServerEvents(
   add('git.changed', (workspaceId: unknown) => {
     if (typeof workspaceId === 'string') handleGitChanged(workspaceId);
   });
+  add('pull-request.changed', (workspaceId: unknown, repositoryKey: unknown) => {
+    if (typeof workspaceId !== 'string' || typeof repositoryKey !== 'string') return;
+    const serverId = ctx()?.serverId;
+    if (serverId) handlePullRequestChanged(serverId, workspaceId, repositoryKey);
+  });
+  add('connected', () => { const serverId = ctx()?.serverId; if (serverId) handlePullRequestChanged(serverId); });
   add('files.changed', (workspaceId: unknown) => {
     if (typeof workspaceId === 'string') handleFilesChanged(workspaceId);
   });

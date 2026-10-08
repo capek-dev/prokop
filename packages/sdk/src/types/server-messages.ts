@@ -98,6 +98,7 @@ export interface SdkEventMap {
   'learning.changed': [workspaceId: string];
   'mcp.changed': [workspaceId: string | null];
   'git.changed': [workspaceId: string, root: string];
+  'pull-request.changed': [workspaceId: string, repositoryKey: string];
   'files.changed': [workspaceId: FilesChangedMessage['workspaceId']];
   'git.status': [workspaceId: GitStatusMessage['workspaceId'], root: GitStatusMessage['root'], status: GitStatusMessage['status']];
   'files.tree': [workspaceId: FileTreeMessage['workspaceId'], root: FileTreeMessage['root'], update: FileTreeMessage['update']];
@@ -282,6 +283,9 @@ export function routeServerMessage(
       break;
     case 'git.changed':
       emitter.emit('git.changed', msg.workspaceId, msg.root);
+      break;
+    case 'pull-request.changed':
+      emitter.emit('pull-request.changed', msg.workspaceId, msg.repositoryKey);
       break;
     case 'files.changed':
       emitter.emit('files.changed', msg.workspaceId);
