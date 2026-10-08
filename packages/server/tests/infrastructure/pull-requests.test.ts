@@ -377,6 +377,31 @@ describe('Azure adapter', () => {
       { name: 'Reviewers (optional)', state: 'approved' },
     ]);
   });
+  test('a status without a state (Azure omits the default notSet) still loads the PR', async () => {
+    const { provider } = azureHarness((request) =>
+      request.path.endsWith('/statuses')
+        ? { value: [{ id: 1, context: { name: 'codecoverage', genre: 'ci-gradle' } }] }
+        : request.path.endsWith('/threads') || request.path === 'policy/evaluations'
+          ? { value: [] }
+          : undefined,
+    );
+    const detail = await provider.detail(7);
+    expect(detail.checks).toEqual([{ name: 'ci-gradle/codecoverage', state: 'notSet', url: '' }]);
+    expect(detail.warnings).toEqual([]);
+  });
+  test('a malformed check becomes a warning instead of failing the whole PR', async () => {
+    const { provider } = azureHarness((request) =>
+      request.path.endsWith('/statuses')
+        ? { value: [{ id: 1, context: {} }] }
+        : request.path.endsWith('/threads') || request.path === 'policy/evaluations'
+          ? { value: [] }
+          : undefined,
+    );
+    const detail = await provider.detail(7);
+    expect(detail.number).toBe(7);
+    expect(detail.checks).toEqual([]);
+    expect(detail.warnings).toEqual(['Statuses unavailable. Refresh or open on Azure DevOps.']);
+  });
   test('automatic completion uses the viewer identity and preserves policy enforcement', async () => {
     const { provider, writes } = azureHarness();
     await provider.action(7, { ...guard, action: 'enable-auto-merge', method: 'rebase-merge' });

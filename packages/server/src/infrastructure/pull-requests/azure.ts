@@ -161,6 +161,33 @@ export function createAzurePullRequests(api: AzureApi, repo: PullRequestReposito
       );
     return required(matches[0].id);
   };
+  // Azure omits enum fields that hold their default value (status state "notSet").
+  const statusCheck = (status: unknown) => {
+    const v = object(status);
+    const context = object(v.context);
+    return {
+      name: [str(context.genre), required(context.name)].filter(Boolean).join('/'),
+      state: str(v.state) || 'notSet',
+      url: str(v.targetUrl),
+    };
+  };
+  const policyCheck = (policy: unknown) => {
+    const v = object(policy);
+    const configuration = object(v.configuration);
+    // Build policies share a type name; their configured display name tells them apart.
+    const name =
+      str(object(configuration.settings ?? {}).displayName) || required(object(configuration.type).displayName);
+    const buildId = object(v.context ?? {}).buildId;
+    return {
+      name: configuration.isBlocking === false ? `${name} (optional)` : name,
+      state: str(v.status) || 'queued',
+      ...(typeof buildId === 'number'
+        ? {
+            url: `https://dev.azure.com/${repo.owner}/${encodeURIComponent(repo.project!)}/_build/results?buildId=${buildId}`,
+          }
+        : {}),
+    };
+  };
   return {
     account,
     async list(state, page) {
@@ -196,7 +223,11 @@ export function createAzurePullRequests(api: AzureApi, repo: PullRequestReposito
       const project = required(object(object(value.repository).project).id);
       const [allThreads, statuses, policies, latest] = await Promise.all([
         optional('Conversations', () => threads(number), []),
-        optional('Statuses', async () => values(await api({ path: pr(number, '/statuses') })), []),
+        optional(
+          'Statuses',
+          async () => values(await api({ path: pr(number, '/statuses') })).map(statusCheck),
+          [],
+        ),
         optional(
           'Policies',
           async () =>
@@ -207,7 +238,7 @@ export function createAzurePullRequests(api: AzureApi, repo: PullRequestReposito
                 query: { artifactId: `vstfs:///CodeReview/CodeReviewId/${project}/${number}` },
                 version: '7.1-preview.1',
               }),
-            ),
+            ).map(policyCheck),
           [],
         ),
         optional('Review iteration', () => iteration(number), null),
@@ -222,35 +253,7 @@ export function createAzurePullRequests(api: AzureApi, repo: PullRequestReposito
           return { ...actor(v), vote: votes[String(v.vote)] ?? 'Unknown vote' };
         }),
         warnings,
-        checks: [
-          ...statuses.map((status) => {
-            const v = object(status);
-            const context = object(v.context);
-            return {
-              name: [str(context.genre), required(context.name)].filter(Boolean).join('/'),
-              state: required(v.state),
-              url: str(v.targetUrl),
-            };
-          }),
-          ...policies.map((policy) => {
-            const v = object(policy);
-            const configuration = object(v.configuration);
-            // Build policies share a type name; their configured display name tells them apart.
-            const name =
-              str(object(configuration.settings ?? {}).displayName) ||
-              required(object(configuration.type).displayName);
-            const buildId = object(v.context ?? {}).buildId;
-            return {
-              name: configuration.isBlocking === false ? `${name} (optional)` : name,
-              state: required(v.status),
-              ...(typeof buildId === 'number'
-                ? {
-                    url: `https://dev.azure.com/${repo.owner}/${encodeURIComponent(repo.project!)}/_build/results?buildId=${buildId}`,
-                  }
-                : {}),
-            };
-          }),
-        ],
+        checks: [...statuses, ...policies],
         mergeability:
           value.mergeStatus === 'succeeded'
             ? 'mergeable'
