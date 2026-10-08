@@ -64,7 +64,7 @@ export function createDefaultViewLayout(): WorkspaceViewLayout {
     roots: { left: { kind: 'group', groupId: 'left' }, center: { kind: 'group', groupId: 'center' }, right: { kind: 'group', groupId: 'right' }, bottom: { kind: 'group', groupId: 'bottom' } },
     groups: {
       left: { viewIds: ['sessions', 'usage'], activeId: 'sessions' },
-      center: { viewIds: ['conversations', 'editor', 'pull-requests'], activeId: 'conversations' },
+      center: { viewIds: ['conversations', 'editor'], activeId: 'conversations' },
       right: { viewIds: [...REPOSITORY_VIEW_IDS], activeId: 'explorer' },
       bottom: { viewIds: ['terminals'], activeId: 'terminals' },
     },
@@ -116,10 +116,14 @@ function addUsageView(layout: WorkspaceViewLayout | null): WorkspaceViewLayout |
   if (!Object.values(layout.groups).some(group => group.viewIds.includes('usage'))) {
     layout.groups[treeGroups(layout.roots.left)[0]].viewIds.push('usage');
   }
-  if (!Object.values(layout.groups).some(group => group.viewIds.includes('pull-requests'))) {
-    layout.groups[treeGroups(layout.roots.center)[0]].viewIds.push('pull-requests');
-  }
   return layout;
+}
+
+/** Tool views that open on demand like files: present in the layout only while open. */
+export type ClosableToolViewId = 'pull-requests';
+
+export function isViewOpen(layout: WorkspaceViewLayout, id: WorkspaceViewId): boolean {
+  return Object.values(layout.groups).some((group) => group.viewIds.includes(id));
 }
 
 function parseSplitLayout(value: Record<string, unknown>): WorkspaceViewLayout | null {
@@ -237,7 +241,9 @@ interface WorkspaceViewStore {
   splitView: (id: WorkspaceViewId, direction: SplitDirection, available: readonly WorkspaceViewId[]) => string | null;
   resizeSplit: (id: string, ratio: number) => void;
   hideView: (id: WorkspaceViewId) => void;
-  removeView: (id: FileViewId | SessionViewId) => void;
+  /** Open a closable tool view in the center, moving it back there if it was docked elsewhere. */
+  openInCenter: (id: ClosableToolViewId) => void;
+  removeView: (id: FileViewId | SessionViewId | ClosableToolViewId) => void;
   replaceView: (id: SessionViewId, replacement: SessionViewId) => void;
   resetLayout: () => void;
 }
@@ -326,6 +332,25 @@ export const useWorkspaceViewStore = create<WorkspaceViewStore>((set, get) => {
       if (layout.hidden.includes(id)) return;
       update(pruneEmptyGroups({ ...layout, hidden: [...layout.hidden, id] }));
     },
+    openInCenter: (id) => {
+      const layout = get().layout;
+      const centerGroups = treeGroups(layout.roots.center);
+      const current = Object.keys(layout.groups).find((key) => layout.groups[key].viewIds.includes(id));
+      // Same placement as files: the editor's group when it is in the center.
+      const editorGroup = findViewGroup(layout, 'editor');
+      const target = current && centerGroups.includes(current) ? current
+        : centerGroups.includes(editorGroup) ? editorGroup : centerGroups[0];
+      const groups = { ...layout.groups };
+      if (current && current !== target) {
+        const viewIds = groups[current].viewIds.filter((viewId) => viewId !== id);
+        groups[current] = { viewIds, activeId: groups[current].activeId === id ? viewIds[0] ?? null : groups[current].activeId };
+      }
+      groups[target] = {
+        viewIds: groups[target].viewIds.includes(id) ? groups[target].viewIds : [...groups[target].viewIds, id],
+        activeId: id,
+      };
+      update(pruneEmptyGroups({ ...layout, groups, hidden: layout.hidden.filter((viewId) => viewId !== id) }));
+    },
     removeView: (id) => {
       const layout = get().layout;
       const region = findViewGroup(layout, id);
@@ -362,8 +387,11 @@ export const useWorkspaceViewStore = create<WorkspaceViewStore>((set, get) => {
       });
     },
     resetLayout: () => {
-      const resources = Object.values(get().layout.groups).flatMap((group) => group.viewIds.filter(isResourceViewId));
-      update(resolveViewLayout(createDefaultViewLayout(), resources));
+      const layout = get().layout;
+      const resources = Object.values(layout.groups).flatMap((group) => group.viewIds.filter(isResourceViewId));
+      // Open tool tabs stay open; unplaced tool views resolve to the center.
+      const open: WorkspaceViewId[] = isViewOpen(layout, 'pull-requests') ? ['pull-requests'] : [];
+      update(resolveViewLayout(createDefaultViewLayout(), [...resources, ...open]));
       useDockStore.getState().setDockOpen('left', true);
       useDockStore.getState().setDockOpen('right', false);
       useDockStore.getState().setDockOpen('bottom', false);
