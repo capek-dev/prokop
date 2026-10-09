@@ -13,12 +13,26 @@ import { registerProkopServiceWorker } from '@/pwa/registerServiceWorker';
 import { startSessionCacheSync } from '@/lib/sessionCacheSync';
 import { isResizeObserverDeliveryWarning } from '@/lib/globalErrorHandling';
 import { preloadPierreDiffsHighlighter } from '@/lib/pierreDiffsPreload';
+import { startPierreWorkerPool } from '@/lib/pierreWorkerPool';
+import { PierreWorkerPoolProvider } from '@/components/providers/PierreWorkerPoolProvider';
+import PierreDiffsWorker from '@pierre/diffs/worker/worker.js?worker';
 import { installDesktopChrome, requestPersistentStorage } from '@/lib/desktopChrome';
 import './index.css';
 
 // Warm the shared Pierre diffs highlighter before any code surface mounts,
 // so the first diff/code block never renders empty (see module comment).
+// Must run before the worker pool starts: workers copy the custom extension
+// map (.kt/.kts) at initialization.
 preloadPierreDiffsHighlighter();
+
+// Move highlighting off the main thread once startup work is done. Surfaces
+// mounted before the pool is ready keep main-thread highlighting.
+const startWorkers = () => void startPierreWorkerPool(() => new PierreDiffsWorker());
+if (typeof requestIdleCallback === 'function') {
+  requestIdleCallback(startWorkers, { timeout: 2000 });
+} else {
+  setTimeout(startWorkers, 500);
+}
 
 // Global error handlers for debugging uncaught errors
 window.addEventListener('error', (event) => {
@@ -59,7 +73,9 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <QueryProvider>
         <ThemeProvider defaultMode="system" defaultScheme="neutral">
-          <App />
+          <PierreWorkerPoolProvider>
+            <App />
+          </PierreWorkerPoolProvider>
           <ThemedToaster />
         </ThemeProvider>
       </QueryProvider>

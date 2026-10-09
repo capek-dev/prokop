@@ -4,11 +4,12 @@ import { preloadHighlighter, setCustomExtension } from '@pierre/diffs';
  * Warm the shared Shiki highlighter used by every @pierre/diffs surface
  * (editor, previews, chat visualizations).
  *
- * Why: when the first surface mounts before the shared highlighter instance
- * finishes creating, the renderer returns an empty result and mounts an empty
- * code block. The lib only self-schedules that repaint through a worker pool,
- * which this app does not use, so the block stays blank until it is remounted
- * (e.g. toggling expand twice). Preloading the highlighter plus the two themes
+ * Why: the main-thread highlighter still serves the editor (which opts out
+ * of the worker pool) and every surface that mounts before the pool in
+ * `lib/pierreWorkerPool.ts` is ready. When such a surface mounts before the
+ * shared highlighter instance finishes creating, the renderer returns an
+ * empty result and mounts an empty code block that stays blank until it is
+ * remounted (e.g. toggling expand twice). Preloading the highlighter plus the two themes
  * every surface requests removes that race window entirely. Languages attach
  * per-surface on demand; a rare language renders plain text for one frame and
  * then highlights, which does not need startup help.

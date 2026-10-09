@@ -135,10 +135,11 @@ export function PierreCodeEditor({
             newFile={file}
             options={diffOptions}
             edit={!saving}
+            disableWorkerPool
             className="min-h-full w-full"
           />
         ) : (
-          <PierreFile file={file} selectedLines={selectedLines} options={fileOptions} edit={!saving} className="min-h-full w-full" />
+          <PierreFile file={file} selectedLines={selectedLines} options={fileOptions} edit={!saving} disableWorkerPool className="min-h-full w-full" />
         )}
       </div>
     </EditProvider>

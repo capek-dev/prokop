@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { memo, useMemo, type ComponentProps } from 'react';
-import { PatchDiff } from '@pierre/diffs/react';
+import { parsePatchFiles } from '@pierre/diffs';
+import { FileDiff, PatchDiff } from '@pierre/diffs/react';
 import type { DiffHunk } from '@/utils/diff';
 import { cn } from '@/lib/utils';
 import { pathBasename } from '@/lib/platform';
@@ -10,8 +11,10 @@ import { useTheme } from '@/components/providers/ThemeProvider';
 import { RENDER_BUDGETS } from '@/lib/renderBudgets';
 import { hunksToPatch } from '@/lib/hunksToPatch';
 import { useVizExpanded } from '@/lib/vizExpansion';
+import { PIERRE_THEME_PAIR } from '@/lib/pierreDiffsTheme';
+import { pierreCacheKey } from '@/lib/pierreCacheKey';
 
-type PatchDiffOptions = ComponentProps<typeof PatchDiff>['options'];
+type DiffOptions = ComponentProps<typeof FileDiff>['options'];
 
 interface DiffViewerProps {
   hunks: DiffHunk[];
@@ -70,9 +73,18 @@ export const DiffViewer = memo(function DiffViewer({
 
   const patch = useMemo(() => hunksToPatch(previewHunks, path), [previewHunks, path]);
 
-  const options = useMemo<PatchDiffOptions>(
+  // Parsed here rather than by PatchDiff so the diff carries a content cache
+  // key: remounts (scroll-back, collapse/expand) then reuse the worker pool's
+  // highlight instead of re-tokenizing. Anything other than exactly one file
+  // falls through to PatchDiff, which keeps its own error behavior.
+  const fileDiff = useMemo(() => {
+    const parsed = parsePatchFiles(patch, pierreCacheKey(`diff:${path}`, patch));
+    return parsed.length === 1 && parsed[0].files.length === 1 ? parsed[0].files[0] : null;
+  }, [patch, path]);
+
+  const options = useMemo<DiffOptions>(
     () => ({
-      theme: { dark: 'github-dark', light: 'github-light' },
+      theme: PIERRE_THEME_PAIR,
       themeType: resolvedMode,
       disableFileHeader: true,
       diffStyle: 'unified',
@@ -142,7 +154,11 @@ export const DiffViewer = memo(function DiffViewer({
             applies whenever the body is visible. */}
         {expanded && (
           <div className="tool-output-scroll">
-            <PatchDiff patch={patch} options={options} className="pierre-viz-host" />
+            {fileDiff ? (
+              <FileDiff fileDiff={fileDiff} options={options} className="pierre-viz-host" />
+            ) : (
+              <PatchDiff patch={patch} options={options} className="pierre-viz-host" />
+            )}
           </div>
         )}
       </div>

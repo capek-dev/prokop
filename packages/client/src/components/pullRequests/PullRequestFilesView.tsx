@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { parsePatchFiles } from '@pierre/diffs';
 import { FileDiff } from '@pierre/diffs/react';
+import { PIERRE_THEME_PAIR } from '@/lib/pierreDiffsTheme';
+import { pierreCacheKey } from '@/lib/pierreCacheKey';
 import { Check } from 'lucide-react';
 import type { PullRequestDetail, PullRequestFile, PullRequestPosition } from '@prokopai/sdk';
 import { useTheme } from '@/components/providers/ThemeProvider';
@@ -197,13 +199,13 @@ function FileReview({
   const parsed = useMemo(() => {
     try {
       return {
-        files: patch.data?.patch ? parsePatchFiles(patch.data.patch, undefined, true).flatMap((p) => p.files) : [],
+        files: patch.data?.patch ? parsePatchFiles(patch.data.patch, pierreCacheKey(`pr:${file.path}`, patch.data.patch), true).flatMap((p) => p.files) : [],
         error: null,
       };
     } catch {
       return { files: [], error: 'This patch could not be rendered. Open the file on the provider website.' };
     }
-  }, [patch.data?.patch]);
+  }, [patch.data?.patch, file.path]);
   const threads = pr.threads.filter((t) => t.path === file.path || t.path === file.oldPath);
   return (
     <div className="flex flex-col gap-3">
@@ -252,6 +254,7 @@ function FileReview({
             key={index}
             fileDiff={diff}
             options={{
+              theme: PIERRE_THEME_PAIR,
               themeType: resolvedMode,
               diffStyle: style,
               onLineNumberClick: (line) =>

@@ -5,6 +5,7 @@ import type { GitDiffHunk } from '@prokopai/sdk';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { headFromHunks } from '@/lib/gitHeadReconstruct';
 import { pierreDiffsBaseOptions, resolvePierreLang } from '@/lib/pierreDiffsTheme';
+import { pierreCacheKey } from '@/lib/pierreCacheKey';
 
 interface FileCodeViewProps {
   content: string;
@@ -34,7 +35,12 @@ function FileCodeViewInner({ content, language, name, diff }: FileCodeViewProps)
   }, [content, diff]);
 
   const newFile = useMemo<FileContents>(
-    () => ({ name: fileName, contents: content, lang }),
+    () => ({
+      name: fileName,
+      contents: content,
+      lang,
+      cacheKey: pierreCacheKey(`file:${fileName}:${lang ?? ''}`, content),
+    }),
     [content, fileName, lang],
   );
 
@@ -48,7 +54,14 @@ function FileCodeViewInner({ content, language, name, diff }: FileCodeViewProps)
     );
   }
 
-  const oldFileContents: FileContents = { name: fileName, contents: head, lang };
+  // Keys on both sides: without them Pierre keys the diff by file name alone
+  // and the worker cache would serve a stale highlight after edits.
+  const oldFileContents: FileContents = {
+    name: fileName,
+    contents: head,
+    lang,
+    cacheKey: pierreCacheKey(`head:${fileName}:${lang ?? ''}`, head),
+  };
 
   // Deleted-file preview: empty working copy with all-removal hunks renders
   // only the old side (newFile: null).

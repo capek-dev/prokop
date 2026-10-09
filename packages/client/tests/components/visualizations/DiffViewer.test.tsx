@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
+import type { FileDiffMetadata } from '@pierre/diffs';
 import { DiffViewer } from '@/components/visualizations/DiffViewer';
 
 vi.mock('@/stores/uiStore', () => ({
@@ -16,10 +17,19 @@ vi.mock('@/stores/serverDataStore', () => ({
 }));
 
 // Pierre renders into shadow DOM, invisible to light-DOM text queries; the
-// mock surfaces the serialized patch so content assertions stay behavioral.
+// mock surfaces the parsed diff (real parsePatchFiles) so content assertions
+// stay behavioral.
 vi.mock('@pierre/diffs/react', () => ({
+  FileDiff: ({ fileDiff }: { fileDiff: FileDiffMetadata }) => (
+    <div data-testid="patch-diff" data-name={fileDiff.name} data-cache-key={fileDiff.cacheKey}>
+      {fileDiff.hunks.map((hunk) => hunk.hunkSpecs).join('\n')}
+      {'\n'}
+      {fileDiff.deletionLines.map((line) => `-${line}`).join('')}
+      {fileDiff.additionLines.map((line) => `+${line}`).join('')}
+    </div>
+  ),
   PatchDiff: ({ patch }: { patch: string }) => (
-    <div data-testid="patch-diff">{patch}</div>
+    <div data-testid="patch-diff-fallback">{patch}</div>
   ),
 }));
 
@@ -46,12 +56,36 @@ describe('DiffViewer', () => {
   it('serializes hunks into the rendered patch', () => {
     render(<DiffViewer hunks={sampleHunks} path="src/app-serialize.tsx" />);
     const patchEl = screen.getByTestId('patch-diff');
-    expect(patchEl.textContent).toContain('--- a/src/app-serialize.tsx');
-    expect(patchEl.textContent).toContain('+++ b/src/app-serialize.tsx');
+    // hunksToPatch emits plain ---/+++ headers, so Pierre keeps the b/ prefix.
+    expect(patchEl.getAttribute('data-name')).toBe('b/src/app-serialize.tsx');
     expect(patchEl.textContent).toContain('@@ -1,3 +1,3 @@');
     expect(patchEl.textContent).toContain('-old line');
     expect(patchEl.textContent).toContain('+new line');
-    expect(patchEl.textContent).toContain(' unchanged line');
+    expect(patchEl.textContent).toContain('unchanged line');
+  });
+
+  it('keys the diff by content so remounts reuse the worker highlight cache', () => {
+    const { unmount } = render(<DiffViewer hunks={sampleHunks} path="src/app-key.tsx" />);
+    const firstKey = screen.getByTestId('patch-diff').getAttribute('data-cache-key');
+    unmount();
+    render(<DiffViewer hunks={sampleHunks} path="src/app-key.tsx" />);
+    expect(screen.getByTestId('patch-diff').getAttribute('data-cache-key')).toBe(firstKey);
+    expect(firstKey).toBeTruthy();
+  });
+
+  it('changes the cache key when the diff content changes', () => {
+    const { unmount } = render(<DiffViewer hunks={sampleHunks} path="src/app-rekey.tsx" />);
+    const firstKey = screen.getByTestId('patch-diff').getAttribute('data-cache-key');
+    unmount();
+    const edited = [{
+      ...sampleHunks[0],
+      changes: [
+        ...sampleHunks[0].changes.slice(0, 2),
+        { type: 'added' as const, content: 'other line', newLineNumber: 2 },
+      ],
+    }];
+    render(<DiffViewer hunks={edited} path="src/app-rekey.tsx" />);
+    expect(screen.getByTestId('patch-diff').getAttribute('data-cache-key')).not.toBe(firstKey);
   });
 
   it('displays additions and deletions count', () => {

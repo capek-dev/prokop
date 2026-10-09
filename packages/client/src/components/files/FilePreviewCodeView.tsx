@@ -3,6 +3,7 @@ import { File as PierreFile } from '@pierre/diffs/react';
 import type { FileContents } from '@pierre/diffs/react';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { pierreDiffsBaseOptions, resolvePierreLang } from '@/lib/pierreDiffsTheme';
+import { pierreCacheKey } from '@/lib/pierreCacheKey';
 
 export interface FilePreviewCodeViewProps {
   content: string;
@@ -25,7 +26,10 @@ export default function FilePreviewCodeView({
   );
   const name = path.split('/').pop() ?? path;
   const lang = useMemo(() => resolvePierreLang(name, language), [name, language]);
-  const file = useMemo<FileContents>(() => ({ name, contents: content, lang }), [name, content, lang]);
+  const file = useMemo<FileContents>(
+    () => ({ name, contents: content, lang, cacheKey: pierreCacheKey(`preview:${path}:${lang ?? ''}`, content) }),
+    [name, path, content, lang],
+  );
 
   // Vertical scroll container: Pierre's [data-code] only scrolls x and
   // expects an overflow-y-auto ancestor for wheel/touch scrolling.

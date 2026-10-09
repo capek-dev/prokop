@@ -7,7 +7,8 @@ import { useServerDataStore } from '@/stores/serverDataStore';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { pathBasename } from '@/lib/platform';
 import { RENDER_BUDGETS } from '@/lib/renderBudgets';
-import { resolvePierreLang } from '@/lib/pierreDiffsTheme';
+import { PIERRE_THEME_PAIR, resolvePierreLang } from '@/lib/pierreDiffsTheme';
+import { pierreCacheKey } from '@/lib/pierreCacheKey';
 import { useVizExpanded } from '@/lib/vizExpansion';
 
 type PierreFileOptions = ComponentProps<typeof PierreFile>['options'];
@@ -68,13 +69,18 @@ export const CodeBlock: FC<CodeBlockProps> = memo(({
   const lang = useMemo(() => resolvePierreLang(name, language), [name, language]);
 
   const file = useMemo(
-    () => ({ name, contents: previewContent, lang }),
+    () => ({
+      name,
+      contents: previewContent,
+      lang,
+      cacheKey: pierreCacheKey(`code:${name}:${lang ?? ''}`, previewContent),
+    }),
     [name, previewContent, lang],
   );
 
   const options = useMemo<PierreFileOptions>(
     () => ({
-      theme: { dark: 'github-dark', light: 'github-light' },
+      theme: PIERRE_THEME_PAIR,
       themeType: resolvedMode,
       disableFileHeader: true,
       overflow: 'scroll',

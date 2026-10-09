@@ -18,8 +18,14 @@ vi.mock('@/stores/serverDataStore', () => ({ useServerDataStore: (selector: (sta
 vi.mock('@/stores/uiStore', () => ({
   useUIStore: (selector: (s: Record<string, unknown>) => unknown) => selector({ openFilePreview: vi.fn(), setShowConfiguration: mocks.close }),
 }));
-// Pierre renders into shadow DOM, invisible to light-DOM queries; the mock surfaces the serialized patch.
+// Pierre renders into shadow DOM, invisible to light-DOM queries; the mock surfaces the parsed diff lines.
 vi.mock('@pierre/diffs/react', () => ({
+  FileDiff: ({ fileDiff }: { fileDiff: { deletionLines: string[]; additionLines: string[] } }) => (
+    <div data-testid="patch-diff">
+      {fileDiff.deletionLines.map((line) => `-${line}`).join('')}
+      {fileDiff.additionLines.map((line) => `+${line}`).join('')}
+    </div>
+  ),
   PatchDiff: ({ patch }: { patch: string }) => <div data-testid="patch-diff">{patch}</div>,
 }));
 import { LearningHistory } from '@/components/modals/configuration/LearningHistory';

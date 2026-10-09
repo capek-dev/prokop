@@ -13,14 +13,19 @@ export interface PierreDiffsBaseOptions {
   overflow: 'scroll';
 }
 
-const THEME_PAIR: ThemesType = {
+/**
+ * The one Shiki theme pair every surface uses. The worker pool's theme
+ * overrides per-surface options, so surfaces must agree with it to look the
+ * same whether they highlight on the main thread or in a worker.
+ */
+export const PIERRE_THEME_PAIR: ThemesType = {
   dark: 'github-dark',
   light: 'github-light',
 };
 
 export function pierreDiffsBaseOptions(resolvedMode: 'dark' | 'light'): PierreDiffsBaseOptions {
   return {
-    theme: THEME_PAIR,
+    theme: PIERRE_THEME_PAIR,
     themeType: resolvedMode,
     disableFileHeader: true,
     overflow: 'scroll',

@@ -83,6 +83,11 @@ export default defineConfig({
   build: {
     outDir: 'dist',
   },
+  // Module workers: Pierre's highlight worker lazy-imports Shiki's WASM
+  // engine, and code-splitting is unavailable in the default IIFE format.
+  worker: {
+    format: 'es',
+  },
   server: {
     port: 5173,
     strictPort: true,
