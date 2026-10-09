@@ -61,6 +61,9 @@ export function startSessionCacheSync(): void {
         if (belongs) useSessionStore.getState().removeSessionById(id);
       }
       useSessionStore.getState().mergeSessions(incoming.filter(s => previous?.get(s.id) !== s && current.get(s.id) === baseline.get(s.id)));
+      // A session opened by URL can land in the store before its list. The
+      // first page fixes its position; later refetches update rows in place.
+      if (!previous) useSessionStore.getState().orderSessions(incoming.map(s => s.id));
       mergedPages.set(hash, new Map(incoming.map(s => [s.id, s])));
       snapshots.delete(hash);
       return;

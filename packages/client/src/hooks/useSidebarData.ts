@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useParams } from '@tanstack/react-router';
 import type { Session, Workspace, SavedServer, QuickConnection } from '@prokopai/sdk';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useAskStore, type PendingAskRequest } from '@/stores/askStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
@@ -51,9 +52,14 @@ export const useSidebarData = (): UseSidebarDataReturn => {
   const serverId = params?.serverId as string | undefined;
   const sessionIdFromUrl = params?.sessionId as string | undefined;
 
+  // The board focus is set synchronously when a session is opened; the URL
+  // follows after the router commits. Preferring the board highlights the
+  // clicked row in the same frame as the new pane instead of ~100ms later.
+  const focusedBoardSessionId = useSessionBoardStore(s => s.focusedSessionId);
+  const selectedSessionId = focusedBoardSessionId ?? sessionIdFromUrl;
   const currentSession = useMemo(
-    () => sessionIdFromUrl ? allSessions.find(s => s.id === sessionIdFromUrl) ?? null : null,
-    [sessionIdFromUrl, allSessions],
+    () => selectedSessionId ? allSessions.find(s => s.id === selectedSessionId) ?? null : null,
+    [selectedSessionId, allSessions],
   );
   const currentSessionId = currentSession?.id ?? null;
 

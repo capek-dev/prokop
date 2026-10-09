@@ -168,7 +168,7 @@ export function useSessionCommands({
 
     if (!session && client && client.connected) {
       client.http.sessions.get(sessionId).then((response: { session: Session }) => {
-        useSessionStore.getState().addSessionToFront(response.session);
+        useSessionStore.getState().upsertSession(response.session);
         // Deep links (e.g. learning history) can target a session outside the
         // active workspace; the stale `sessions` lookup above could not switch
         // for it, so switch here once the workspace is known.

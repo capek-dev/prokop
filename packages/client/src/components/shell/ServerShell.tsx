@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useEffect } from 'react';
 import { useParams, useRouter, Outlet } from '@tanstack/react-router';
 import { useServerContext } from '@/contexts/ServerContext';
 import { ViewRefsContext } from '@/contexts/ViewRefsContext';
-import { SessionManagerContext } from '@/contexts/SessionManagerContext';
+import { SessionManagerContext, type SessionManagerValue } from '@/contexts/SessionManagerContext';
 import { ServerClientProvider, useServerClientMemo } from '@/contexts/ServerClientContext';
 import { SessionCommandsProvider, type SessionCommandsValue } from '@/contexts/SessionCommandsContext';
 import {
@@ -141,6 +141,21 @@ export default function ServerShell() {
     } satisfies SessionCommandsValue;
   }, []);
 
+  // The manager context carries the stable commands plus the few values its
+  // consumers read. Passing the manager object itself re-rendered the whole
+  // workspace (sidebar, every pane header) on any session, ask, or usage change.
+  const { sdkClient, serverUrl, primaryPreconfigs, isCreatingWorkspace, deletingWorkspaceId, isUpdatingWorkspace, setCompactionSuccess } = sessionManager;
+  const managerValue = useMemo<SessionManagerValue>(() => ({
+    ...commandsValue,
+    sdkClient,
+    serverUrl,
+    primaryPreconfigs,
+    isCreatingWorkspace,
+    deletingWorkspaceId,
+    isUpdatingWorkspace,
+    setCompactionSuccess,
+  }), [commandsValue, sdkClient, serverUrl, primaryPreconfigs, isCreatingWorkspace, deletingWorkspaceId, isUpdatingWorkspace, setCompactionSuccess]);
+
   if (!hasConnectedOnce) {
     if (sessionManager.connectionTimedOut || sessionManager.retryCount > 0 || sessionManager.authError) {
       return (
@@ -187,7 +202,7 @@ export default function ServerShell() {
             )}
           </div>
 
-          <SessionManagerContext.Provider value={sessionManager}>
+          <SessionManagerContext.Provider value={managerValue}>
             <div className="flex flex-1 min-h-0 p-0">
               <SessionCommandsProvider value={commandsValue}>
                 <ViewRefsContext.Provider value={viewRefs}>

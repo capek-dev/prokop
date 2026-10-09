@@ -132,7 +132,11 @@ interface SessionActions {
   // --- Session List ---
   setSessions: (updater: SessionsUpdater) => void;
   addSessionToFront: (session: Session) => void;
+  /** Refreshes a known session where it is, so the list never reorders under the pointer. Unknown sessions join at the top. */
+  upsertSession: (session: Session) => void;
   mergeSessions: (sessions: Session[]) => void;
+  /** Moves the listed sessions to the front in the given order; others keep their order. */
+  orderSessions: (ids: string[]) => void;
   replaceSessionsForWorkspace: (workspaceId: string, sessions: Session[]) => void;
   removeSessionsForWorkspace: (workspaceId: string) => void;
   updateSession: (session: Session) => void;
@@ -230,6 +234,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       sessions: [session, ...state.sessions.filter((s) => s.id !== session.id)],
     })),
 
+  upsertSession: (session) =>
+    set((state) => (state.sessions.some((s) => s.id === session.id)
+      ? { sessions: state.sessions.map((s) => (s.id === session.id ? session : s)) }
+      : { sessions: [session, ...state.sessions] })),
+
   mergeSessions: (incoming) =>
     set((state) => {
       const existing = new Map(state.sessions.map((s) => [s.id, s]));
@@ -237,6 +246,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         existing.set(session.id, session);
       }
       return { sessions: [...existing.values()] };
+    }),
+
+  orderSessions: (ids) =>
+    set((state) => {
+      const rank = new Map(ids.map((id, index) => [id, index]));
+      const listed = state.sessions.filter((s) => rank.has(s.id))
+        .sort((a, b) => rank.get(a.id)! - rank.get(b.id)!);
+      const next = [...listed, ...state.sessions.filter((s) => !rank.has(s.id))];
+      return next.every((s, index) => s === state.sessions[index]) ? state : { sessions: next };
     }),
 
   replaceSessionsForWorkspace: (workspaceId, sessions) =>

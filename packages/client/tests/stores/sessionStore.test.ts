@@ -89,6 +89,24 @@ describe('sessionStore pagination operations (Phase 6)', () => {
     expect(sessions[0].title).toBe('Updated');
   });
 
+  test('upsertSession refreshes a known session in place without reordering', () => {
+    const store = useSessionStore.getState();
+    store.setSessions([makeSession('s1', 'ws1'), makeSession('s2', 'ws1')]);
+    store.upsertSession(makeSession('s2', 'ws1', { title: 'Updated' }));
+
+    const sessions = useSessionStore.getState().sessions;
+    expect(sessions.map((s) => s.id)).toEqual(['s1', 's2']);
+    expect(sessions[1].title).toBe('Updated');
+  });
+
+  test('upsertSession prepends an unknown session', () => {
+    const store = useSessionStore.getState();
+    store.setSessions([makeSession('s1', 'ws1')]);
+    store.upsertSession(makeSession('s2', 'ws1'));
+
+    expect(useSessionStore.getState().sessions.map((s) => s.id)).toEqual(['s2', 's1']);
+  });
+
   test('addSessionToFront prepends new session', () => {
     const store = useSessionStore.getState();
     store.setSessions([makeSession('s1', 'ws1')]);

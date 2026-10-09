@@ -1,4 +1,5 @@
 import { useMemo, useEffect } from 'react';
+import { useParams } from '@tanstack/react-router';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import type { Part } from '@prokopai/sdk';
 import { useViewRefs } from '@/contexts/ViewRefsContext';
@@ -18,8 +19,6 @@ export default function SessionContent() {
   const {
     sdkClient,
     serverUrl,
-    currentSession,
-    isSessionLoading,
     resumeSession,
     revertSession,
     forkSession,
@@ -31,6 +30,11 @@ export default function SessionContent() {
     handleInterruptSession,
     setCompactionSuccess,
   } = sessionManager;
+  // The manager syncs the URL session into the store; loading means the URL
+  // names a session the store does not have yet.
+  const { sessionId: sessionIdFromUrl } = useParams({ strict: false });
+  const currentSession = useSessionStore((state) => state.currentSession);
+  const isSessionLoading = sessionIdFromUrl != null && currentSession == null;
 
   const contentMeta = useSessionStore((state) =>
     currentSession ? state.contentMetaBySession[currentSession.id] : undefined,

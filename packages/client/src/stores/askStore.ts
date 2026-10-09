@@ -102,6 +102,12 @@ export const useAskStore = create<AskStore>((set, get) => ({
     set((state) => {
       // Keep only non-permission pending requests, then add the new permission set
       const nonPermission = state.pendingRequests.filter((r) => r.ask.type !== 'permission');
+      // An empty server set over an empty local set is a no-op; new array
+      // identities would re-render every subscriber (sidebar, panes).
+      if (requests.length === 0 && nonPermission.length === state.pendingRequests.length
+        && state.timedOutRequestIds.size === 0) {
+        return state;
+      }
       // Clear timedOutRequestIds — the authoritative server set supersedes local stale tracking
       return {
         timedOutRequestIds: new Set(),
@@ -112,11 +118,12 @@ export const useAskStore = create<AskStore>((set, get) => ({
   clearPendingRequests: () => set({ pendingRequests: [], timedOutRequestIds: new Set() }),
 
   clearPendingRequestsBySessionId: (sessionId) =>
-    set((state) => ({
-      pendingRequests: state.pendingRequests.filter(
+    set((state) => {
+      const pendingRequests = state.pendingRequests.filter(
         (r) => r.sessionId !== sessionId && r.originSessionId !== sessionId,
-      ),
-    })),
+      );
+      return pendingRequests.length === state.pendingRequests.length ? state : { pendingRequests };
+    }),
 
   registerHandler: (target, handler) => {
     set((state) => {

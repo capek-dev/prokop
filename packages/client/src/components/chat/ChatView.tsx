@@ -131,11 +131,8 @@ function mergeMessagesWithQueue(
 }
 
 export function ChatView(props: ChatViewProps) {
-  return (
-    <DeferredConversation key={props.session.id}>
-      <ChatViewContent {...props} />
-    </DeferredConversation>
-  );
+  // Keyed by session so per-session view state (auto-follow, drafts) resets.
+  return <ChatViewContent key={props.session.id} {...props} />;
 }
 
 function ChatViewContent({
@@ -293,6 +290,9 @@ function ChatViewContent({
     <div className="relative flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
       {/* Transcript area with floating auto-follow button */}
       <div className="relative flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
+        {/* Only the transcript yields a frame; header and input mount with the
+            pane so it appears in one piece instead of assembling over frames. */}
+        <DeferredConversation>
         {/* Virtualized transcript - handles scrolling for messages only */}
         <VirtualizedTranscript
           displayItems={displayItems}
@@ -350,6 +350,7 @@ function ChatViewContent({
             <Eye className="size-3.5" />
           )}
         </button>
+        </DeferredConversation>
       </div>
 
       <PendingAskDock

@@ -45,6 +45,8 @@ interface WorkspaceSelectionProps {
   onSelectHostWorkspace?: (serverId: string, workspace: Workspace | null) => void;
   /** Lets the parent fetch other machines' workspaces only while the menu is open. */
   onOpenChange?: (open: boolean) => void;
+  /** A workspace of this machine is highlighted (hover or arrow keys); the parent may preload it. */
+  onPreviewWorkspace?: (workspaceId: string) => void;
   /** Approvals and questions waiting on each other machine, by server id. */
   waitingByHost?: Record<string, number>;
   sdkClient?: ProkopaiClient | null;
@@ -76,6 +78,7 @@ export function WorkspaceSwitcher({
   otherHosts = [],
   onSelectHostWorkspace,
   onOpenChange,
+  onPreviewWorkspace,
   waitingByHost = {},
   onCreateVirtualWorkspace,
   onCreatePhysicalWorkspace,
@@ -181,7 +184,12 @@ export function WorkspaceSwitcher({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="max-h-[min(80vh,var(--radix-popover-content-available-height))] w-[320px] overflow-hidden p-0">
-        <Command className="h-auto max-h-[inherit]">
+        <Command
+          className="h-auto max-h-[inherit]"
+          onValueChange={(value) => {
+            if (onPreviewWorkspace && workspaces.some(workspace => workspace.id === value)) onPreviewWorkspace(value);
+          }}
+        >
           <div className="flex items-end gap-1 pr-1">
             <div className="min-w-0 flex-1"><CommandInput placeholder="Search workspace..." /></div>
             <WorkspaceOrderControl compact />

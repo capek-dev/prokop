@@ -8,13 +8,15 @@ import { useViewRefs } from '@/contexts/ViewRefsContext';
 import { useSessionManager } from '@/contexts/SessionManagerContext';
 import { useSidebarData } from '@/hooks/useSidebarData';
 import { useSessionCategories } from '@/hooks/useSessionCategories';
-import { useWorkspaceSessions } from '@/hooks/useWorkspaceSessions';
+import { prefetchWorkspaceSessions, useWorkspaceSessions } from '@/hooks/useWorkspaceSessions';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspaceTagsQuery, useInvalidateWorkspaceTags } from '@/hooks/queries';
 import { useScheduledJobs, usePauseScheduledJob, useResumeScheduledJob, useTriggerScheduledJob, useDeleteScheduledJob } from '@/hooks/queries';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useBoardRouteSync } from '@/hooks/useBoardRouteSync';
 import { useOverviewRouteSessionLoader } from '@/hooks/useOverviewRouteSessionLoader';
 import { useServerDataStore } from '@/stores/serverDataStore';
+import { useConnectionStore } from '@/stores/connectionStore';
 import { useUIStore } from '@/stores/uiStore';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
@@ -34,10 +36,42 @@ import { useAttentionStore } from '@/lib/attention';
 import { useShallow } from 'zustand/react/shallow';
 import { STORAGE_KEYS } from '@/lib/storage';
 
+/**
+ * The workspace frame subscribes only to what routing needs. Session list,
+ * streaming, and ask state live in WorkspaceSidebar, so a session update from
+ * any client re-renders the sidebar instead of every workspace view.
+ */
 export default function WorkspaceView() {
+  const { sdkClient, serverUrl } = useSessionManager();
+  const { terminalPanelRef } = useViewRefs();
+  const activeWorkspaceId = useServerDataStore(s => s.activeWorkspace?.id ?? null);
+  const connected = useConnectionStore(s => s.connected);
+
+  // Sync board state with URL search params
+  useBoardRouteSync({ scope: { kind: 'workspace', workspaceId: activeWorkspaceId } });
+  useOverviewRouteSessionLoader(sdkClient, connected);
+
+  return (
+    <WorkspaceContentArea
+      sdkClient={sdkClient}
+      serverUrl={serverUrl}
+      left={<WorkspaceSidebar />}
+      bottom={(
+        <AppPanels
+          embedded
+          sdkClient={sdkClient}
+          terminalPanelRef={terminalPanelRef}
+        />
+      )}
+    />
+  );
+}
+
+function WorkspaceSidebar() {
+  const queryClient = useQueryClient();
   const sessionManager = useSessionManager();
   const sidebarData = useSidebarData();
-  const { sidebarRef, chatInputRef, terminalPanelRef } = useViewRefs();
+  const { sidebarRef, chatInputRef } = useViewRefs();
   const activeWorkspace = useServerDataStore(s => s.activeWorkspace);
   const agents = useServerDataStore(s => s.agents);
   const allPreconfigs = useServerDataStore(s => s.preconfigs);
@@ -65,10 +99,6 @@ export default function WorkspaceView() {
     if (workspace) localStorage.setItem(STORAGE_KEYS.ACTIVE_WORKSPACE_ID, workspace.id);
     void navigate({ to: '/server/$serverId/workspace', params: { serverId: targetServerId } });
   }, [navigate]);
-
-  // Sync board state with URL search params
-  useBoardRouteSync({ scope: { kind: 'workspace', workspaceId: activeWorkspace?.id ?? null } });
-  useOverviewRouteSessionLoader(sessionManager.sdkClient, sidebarData.connected);
 
   const {
     sdkClient,
@@ -175,6 +205,9 @@ export default function WorkspaceView() {
           otherHosts={otherHosts}
           onSelectHostWorkspace={selectHostWorkspace}
           onOpenChange={setSwitcherOpen}
+          onPreviewWorkspace={(workspaceId) => {
+            if (sdkClient && workspaceId !== activeWorkspace?.id) prefetchWorkspaceSessions(queryClient, sdkClient, workspaceId);
+          }}
           waitingByHost={waitingByHost}
           onCreateVirtualWorkspace={handleCreateVirtualWorkspace}
           onCreatePhysicalWorkspace={handleCreatePhysicalWorkspace}
@@ -292,33 +325,18 @@ export default function WorkspaceView() {
   );
 
   return (
-    <WorkspaceContentArea
-      sdkClient={sdkClient}
-      serverUrl={sessionManager.serverUrl}
-      sessionsHeader={sidebarHeader}
-      sessionsContent={sessionsPanelContent}
-      left={(
-        <AppSidebar
-          embedded
-          ref={sidebarRef}
-          header={sidebarHeader}
-          currentSessionId={sidebarData.currentSessionId}
-          onEscape={() => {
-            if (sidebarData.currentSessionId) {
-              chatInputRef.current?.focus();
-            }
-          }}
-        >
-          {sessionsPanelContent}
-        </AppSidebar>
-      )}
-      bottom={(
-        <AppPanels
-          embedded
-          sdkClient={sdkClient}
-          terminalPanelRef={terminalPanelRef}
-        />
-      )}
-    />
+    <AppSidebar
+      embedded
+      ref={sidebarRef}
+      header={sidebarHeader}
+      currentSessionId={sidebarData.currentSessionId}
+      onEscape={() => {
+        if (sidebarData.currentSessionId) {
+          chatInputRef.current?.focus();
+        }
+      }}
+    >
+      {sessionsPanelContent}
+    </AppSidebar>
   );
 }

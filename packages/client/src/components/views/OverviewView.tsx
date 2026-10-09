@@ -10,6 +10,7 @@ import { useInvalidateWorkspaceTags } from '@/hooks/queries';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useMobileSessionSelection } from '@/hooks/useMobileSessionSelection';
 import { useServerDataStore } from '@/stores/serverDataStore';
+import { useConnectionStore } from '@/stores/connectionStore';
 import { useBoardRouteSync } from '@/hooks/useBoardRouteSync';
 import { useFocusedSessionWorkspaceContext } from '@/hooks/useFocusedSessionWorkspaceContext';
 import { useOverviewRouteSessionLoader } from '@/hooks/useOverviewRouteSessionLoader';
@@ -17,10 +18,44 @@ import { WorkspaceOverview } from '@/components/layout/WorkspaceOverview';
 import { OtherMachinesOverview } from '@/components/layout/OtherMachinesOverview';
 import { WorkspaceContentArea } from '@/components/app/WorkspaceContentArea';
 
+/**
+ * The overview frame subscribes only to what routing needs; OverviewSidebar
+ * owns the reactive session data, so updates re-render the sidebar alone.
+ */
 export default function OverviewView() {
+  const { sdkClient, serverUrl } = useSessionManager();
+  const { terminalPanelRef } = useViewRefs();
+  const connected = useConnectionStore(s => s.connected);
+
+  // Overview scope: sessions from any accessible workspace are valid.
+  useBoardRouteSync({ scope: { kind: 'overview' } });
+
+  // Synchronize focused session's workspace to shared workspace context.
+  useFocusedSessionWorkspaceContext();
+
+  // Fetch unknown route session IDs directly (F5 restoration).
+  useOverviewRouteSessionLoader(sdkClient, connected);
+
+  return (
+    <WorkspaceContentArea
+      sdkClient={sdkClient}
+      serverUrl={serverUrl}
+      left={<OverviewSidebar />}
+      bottom={(
+        <AppPanels
+          embedded
+          sdkClient={sdkClient}
+          terminalPanelRef={terminalPanelRef}
+        />
+      )}
+    />
+  );
+}
+
+function OverviewSidebar() {
   const sessionManager = useSessionManager();
   const sidebarData = useSidebarData();
-  const { sidebarRef, chatInputRef, terminalPanelRef } = useViewRefs();
+  const { sidebarRef, chatInputRef } = useViewRefs();
   const updateSession = useSessionStore(s => s.updateSession);
   const invalidateWorkspaceTags = useInvalidateWorkspaceTags();
   const agents = useServerDataStore(state => state.agents);
@@ -41,16 +76,6 @@ export default function OverviewView() {
         : [],
     [overviewGroups.isHydrated, overviewGroups.activeWorkspaceIds],
   );
-
-
-  // Overview scope: sessions from any accessible workspace are valid.
-  useBoardRouteSync({ scope: { kind: 'overview' } });
-
-  // Synchronize focused session's workspace to shared workspace context.
-  useFocusedSessionWorkspaceContext();
-
-  // Fetch unknown route session IDs directly (F5 restoration).
-  useOverviewRouteSessionLoader(sessionManager.sdkClient, sidebarData.connected);
 
   const {
     sessionsByWorkspace,
@@ -134,31 +159,17 @@ export default function OverviewView() {
   );
 
   return (
-    <WorkspaceContentArea
-      sdkClient={sessionManager.sdkClient}
-      serverUrl={sessionManager.serverUrl}
-      sessionsContent={sidebarContent}
-      left={(
-        <AppSidebar
-          embedded
-          ref={sidebarRef}
-          currentSessionId={sidebarData.currentSessionId}
-          onEscape={() => {
-            if (sidebarData.currentSessionId) {
-              chatInputRef.current?.focus();
-            }
-          }}
-        >
-          {sidebarContent}
-        </AppSidebar>
-      )}
-      bottom={(
-        <AppPanels
-          embedded
-          sdkClient={sessionManager.sdkClient}
-          terminalPanelRef={terminalPanelRef}
-        />
-      )}
-    />
+    <AppSidebar
+      embedded
+      ref={sidebarRef}
+      currentSessionId={sidebarData.currentSessionId}
+      onEscape={() => {
+        if (sidebarData.currentSessionId) {
+          chatInputRef.current?.focus();
+        }
+      }}
+    >
+      {sidebarContent}
+    </AppSidebar>
   );
 }

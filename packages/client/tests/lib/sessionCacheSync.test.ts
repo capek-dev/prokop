@@ -64,6 +64,18 @@ describe('sessionCacheSync', () => {
     expect(useSessionStore.getState().sessions).toEqual([]);
   });
 
+  test('a session opened by URL before its list takes its server position on first load', () => {
+    const active = queryKeys.sessions.byWorkspaceInfinite({ workspaceId: 'ws1', category: 'active', limit: 100 });
+    useSessionStore.getState().upsertSession(s1);
+    queryClient.setQueryData(active, { pages: [{ sessions: [s3, s2, s1] }], pageParams: [undefined] });
+    expect(useSessionStore.getState().sessions.map((s) => s.id)).toEqual(['s3', 's2', 's1']);
+
+    // Later refetches keep rows where they are.
+    const s1Updated = makeSession('s1', 'ws1', '2025-01-09T00:00:00.000Z');
+    queryClient.setQueryData(active, { pages: [{ sessions: [s1Updated, s3, s2] }], pageParams: [undefined] });
+    expect(useSessionStore.getState().sessions.map((s) => s.id)).toEqual(['s3', 's2', 's1']);
+  });
+
   test('category pages merge without erasing other categories or replaying stale pages', () => {
     const active = queryKeys.sessions.byWorkspaceInfinite({ workspaceId: 'ws1', category: 'active', limit: 100 });
     const archived = queryKeys.sessions.byWorkspaceInfinite({ workspaceId: 'ws1', category: 'archived', limit: 100 });

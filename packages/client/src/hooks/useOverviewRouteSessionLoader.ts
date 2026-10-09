@@ -19,7 +19,7 @@ export function useOverviewRouteSessionLoader(
   connected: boolean,
 ): void {
   const sessions = useSessionStore(s => s.sessions);
-  const addSessionToFront = useSessionStore(s => s.addSessionToFront);
+  const upsertSession = useSessionStore(s => s.upsertSession);
   const fetchedRef = useRef<Set<string>>(new Set());
   const generationRef = useRef(0);
 
@@ -67,11 +67,12 @@ export function useOverviewRouteSessionLoader(
       fetchedRef.current.add(id);
       sdkClient.http.sessions.get(id).then((response: { session: import('@prokopai/sdk').Session }) => {
         if (generation !== generationRef.current) return;
-        addSessionToFront(response.session);
+        // The list may have loaded meanwhile; refresh in place instead of moving it.
+        upsertSession(response.session);
       }).catch(() => {
         // Session not found or error - leave it absent.
         // Route sync will eventually filter it out.
       });
     }
-  }, [sdkClient, connected, searchOpen, sessionIdFromUrl, sessions, addSessionToFront]);
+  }, [sdkClient, connected, searchOpen, sessionIdFromUrl, sessions, upsertSession]);
 }

@@ -22,7 +22,7 @@ import type { ProkopaiClient } from '@prokopai/sdk';
 import type { SessionHandlersContext, ModelInfo } from '@/handlers/serverMessage/types';
 
 import { useServerContext } from '@/contexts/ServerContext';
-import { useSessionStore, type ResumeSessionOptions, type SessionUsage, evictToBudget } from '@/stores/sessionStore';
+import { useSessionStore, type ResumeSessionOptions, evictToBudget } from '@/stores/sessionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useAskStore, type PendingAskRequest } from '@/stores/askStore';
@@ -67,11 +67,7 @@ export interface UseServerSessionManagerReturn {
   queuedMessages: Record<string, QueuedMessage[]>;
   permissions: PermissionGrant[];
 
-  sessionUsage: SessionUsage;
-  currentModel: string;
-  selectedVariant: string | null;
   isCompacting: boolean;
-  compactionSuccess: boolean;
   isPrimarySession: boolean;
   isSessionLoading: boolean;
 
@@ -249,18 +245,14 @@ export function useServerSessionManager({
     })),
   );
 
+  // Setters only: the focused-session singletons are written for legacy readers,
+  // and subscribing to them here re-rendered the shell after every switch.
   const {
-    sessionUsage,
-    currentModel,
-    selectedVariant,
     setSessionUsage,
     setCurrentModel,
     setSelectedVariant,
   } = useSessionStore(
     useShallow((s) => ({
-      sessionUsage: s.sessionUsage,
-      currentModel: s.currentModel,
-      selectedVariant: s.selectedVariant,
       setSessionUsage: s.setSessionUsage,
       setCurrentModel: s.setCurrentModel,
       setSelectedVariant: s.setSelectedVariant,
@@ -355,12 +347,7 @@ export function useServerSessionManager({
   const nextRetryIn = useConnectionStore(s => s.nextRetryIn);
   const connected = useConnectionStore(s => s.connected);
   const isCompacting = currentSession?.compacting ?? false;
-  const { compactionSuccess, setCompactionSuccess } = useSessionStore(
-    useShallow((s) => ({
-      compactionSuccess: s.compactionSuccess,
-      setCompactionSuccess: s.setCompactionSuccess,
-    })),
-  );
+  const setCompactionSuccess = useSessionStore(s => s.setCompactionSuccess);
 
   const { playChatFinishSound, playPermissionSound } = useNotificationSound();
 
@@ -885,7 +872,7 @@ export function useServerSessionManager({
     };
   });
 
-  const primaryPreconfigs = preconfigs.filter(p => p.mode !== 'subagent');
+  const primaryPreconfigs = useMemo(() => preconfigs.filter(p => p.mode !== 'subagent'), [preconfigs]);
 
   const {
     createSession,
@@ -968,11 +955,7 @@ export function useServerSessionManager({
     pendingAskRequests,
     queuedMessages,
 
-    sessionUsage,
-    currentModel,
-    selectedVariant,
     isCompacting,
-    compactionSuccess,
     isPrimarySession,
     isSessionLoading,
 

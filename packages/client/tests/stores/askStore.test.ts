@@ -26,6 +26,21 @@ describe('askStore', () => {
     }
   });
 
+  describe('no-op updates keep identity so subscribers do not re-render', () => {
+    test('replacing an empty permission set with an empty set', () => {
+      const before = useAskStore.getState().pendingRequests;
+      useAskStore.getState().replacePendingPermissionRequests([]);
+      expect(useAskStore.getState().pendingRequests).toBe(before);
+    });
+
+    test('clearing a session with no pending requests', () => {
+      useAskStore.getState().addPendingRequest(makeRequest({ sessionId: 'other' }));
+      const before = useAskStore.getState().pendingRequests;
+      useAskStore.getState().clearPendingRequestsBySessionId('s1');
+      expect(useAskStore.getState().pendingRequests).toBe(before);
+    });
+  });
+
   describe('initial state', () => {
     test('starts with empty pending requests', () => {
       expect(useAskStore.getState().pendingRequests).toEqual([]);

@@ -2,12 +2,21 @@ import { useMemo } from 'react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ChatHeader } from '@/components/chat/ChatHeader';
 import { useSessionCommands } from '@/contexts/SessionCommandsContext';
-import { useSessionManager } from '@/contexts/SessionManagerContext';
-import { useSessionStore } from '@/stores/sessionStore';
+import { useServerClient } from '@/contexts/ServerClientContext';
+import { useSessionStore, type SessionUsage } from '@/stores/sessionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { getWorkspacePreconfigs } from '@/lib/workspacePreconfigs';
 import { useScopedServerData } from '@/contexts/HostScopeContext';
+
+const EMPTY_USAGE: SessionUsage = {
+  promptTokens: 0,
+  completionTokens: 0,
+  totalTokens: 0,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
+  noCacheTokens: 0,
+};
 
 /**
  * Slim per-session header inside the primary card. Shell-level panel toggles
@@ -20,16 +29,14 @@ export function WorkspaceHeader({ sessionId }: { sessionId?: string } = {}) {
   const defaultModel = useScopedServerData(s => s.defaultModel);
   const allWorkspaces = useScopedServerData(s => s.workspaces);
   const sessionManager = useSessionCommands();
-  const { sdkClient, serverUrl } = useSessionManager();
+  // Scoped client: the pane may show a session from another machine.
+  const { sdkClient, serverUrl } = useServerClient();
 
   const focusedSessionId = useSessionBoardStore(s => s.focusedSessionId);
   const openSessionIds = useSessionBoardStore(s => s.openSessionIds);
   const displayedSessionId = sessionId ?? focusedSessionId ?? openSessionIds[0] ?? null;
-  const allSessions = useSessionStore(s => s.sessions);
-  const currentSession = useMemo(
-    () => displayedSessionId ? allSessions.find(s => s.id === displayedSessionId) ?? null : null,
-    [displayedSessionId, allSessions],
-  );
+  // Per-session selectors: other sessions' updates must not re-render this header.
+  const currentSession = useSessionStore(s => displayedSessionId ? s.sessions.find(x => x.id === displayedSessionId) ?? null : null);
 
   // Resolve the workspace from the displayed session's workspaceId,
   // not from the global activeWorkspace which may not have synced yet.
@@ -44,23 +51,25 @@ export function WorkspaceHeader({ sessionId }: { sessionId?: string } = {}) {
   const preconfigs = getWorkspacePreconfigs(sessionWorkspace, allPreconfigs);
   const lockPreconfig = !!sessionWorkspace?.settings?.isAgentHome;
 
-  const usageBySessionId = useSessionStore(s => s.usageBySessionId);
-  const modelBySessionId = useSessionStore(s => s.modelBySessionId);
-  const variantBySessionId = useSessionStore(s => s.variantBySessionId);
-  const sessionUsage = (currentSession ? usageBySessionId[currentSession.id] : undefined) ?? {
-    promptTokens: 0,
-    completionTokens: 0,
-    totalTokens: 0,
-    cacheReadTokens: 0,
-    cacheWriteTokens: 0,
-    noCacheTokens: 0,
-  };
-  const currentModel = currentSession ? modelBySessionId[currentSession.id] ?? '' : '';
-  const selectedVariant = currentSession ? variantBySessionId[currentSession.id] ?? null : null;
+  // Until the resume reply fills the per-session maps, show what the session
+  // record already carries, so the header renders complete in the first frame.
+  const storedUsage = useSessionStore(s => (displayedSessionId ? s.usageBySessionId[displayedSessionId] : undefined));
+  const storedModel = useSessionStore(s => (displayedSessionId ? s.modelBySessionId[displayedSessionId] : undefined));
+  const storedVariant = useSessionStore(s => (displayedSessionId ? s.variantBySessionId[displayedSessionId] : undefined));
+  const sessionUsage = storedUsage ?? (currentSession?.totalTokens ? {
+    promptTokens: currentSession.promptTokens ?? 0,
+    completionTokens: currentSession.completionTokens ?? 0,
+    totalTokens: currentSession.totalTokens,
+    cacheReadTokens: currentSession.cacheReadTokens ?? 0,
+    cacheWriteTokens: currentSession.cacheWriteTokens ?? 0,
+    noCacheTokens: currentSession.noCacheTokens ?? 0,
+  } : EMPTY_USAGE);
+  const currentModel = storedModel ?? currentSession?.selectedModel ?? '';
+  const selectedVariant = storedVariant !== undefined ? storedVariant : currentSession?.selectedVariant ?? null;
   const currentSessionMessages = useSessionStore((s) =>
     currentSession ? s.messagesBySession[currentSession.id] : undefined,
   );
-  const streamingSessionIds = useConnectionStore((s) => s.streamingSessionIds);
+  const isSessionStreaming = useConnectionStore((s) => displayedSessionId ? s.streamingSessionIds.has(displayedSessionId) : false);
   const compactableMessageCount = useMemo(
     () => currentSessionMessages?.filter((message) => message.role !== 'system').length ?? 0,
     [currentSessionMessages],
@@ -98,7 +107,7 @@ export function WorkspaceHeader({ sessionId }: { sessionId?: string } = {}) {
                   ? () => sessionManager.resumeSession(currentSession.parentId!)
                   : undefined
               }
-              isStreaming={streamingSessionIds.has(currentSession.id) || !!currentSession.runningAt}
+              isStreaming={isSessionStreaming || !!currentSession.runningAt}
               onCompact={compactableMessageCount >= 2 ? () => sessionManager.compactSession(currentSession.id) : undefined}
               isCompacting={isCompacting}
               canCompact={compactableMessageCount >= 2}

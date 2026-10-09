@@ -19,7 +19,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useCompletionStore, selectCompletionRecord, COMPLETION_FLASH_DURATION_MS } from '@/stores/completionStore';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
@@ -36,7 +35,7 @@ export type SessionDerivedValuesMap = Map<string, {
   isRunning: boolean;
 }>;
 
-interface SessionMenuButtonProps {
+export interface SessionMenuButtonProps {
   session: Session;
   childrenMap: ChildrenMap;
   sessionDerivedValues: SessionDerivedValuesMap;
@@ -295,6 +294,33 @@ function relativeSessionTime(iso?: string | null): string | null {
   return `${Math.floor(days / 30)}mo`;
 }
 
+function derivedEqual(prev: SessionDerivedValuesMap, next: SessionDerivedValuesMap, id: string): boolean {
+  const a = prev.get(id);
+  const b = next.get(id);
+  return a === b || (!!a && !!b && a.isStreaming === b.isStreaming
+    && a.hasPendingPermission === b.hasPendingPermission && a.isRunning === b.isRunning);
+}
+
+/**
+ * A row re-renders only when its own session, children, or status change.
+ * The shared maps and `currentSessionId` are rebuilt on every session update
+ * anywhere; comparing them by identity re-rendered all rows on each change.
+ */
+export function sessionRowPropsEqual(prev: SessionMenuButtonProps, next: SessionMenuButtonProps): boolean {
+  for (const key of Object.keys(next) as Array<keyof SessionMenuButtonProps>) {
+    if (key === 'childrenMap' || key === 'sessionDerivedValues' || key === 'currentSessionId') continue;
+    if (!Object.is(prev[key], next[key])) return false;
+  }
+  const id = next.session.id;
+  const prevChildren = prev.childrenMap.get(id) ?? [];
+  const nextChildren = next.childrenMap.get(id) ?? [];
+  if (prevChildren.length !== nextChildren.length || prevChildren.some((child, index) => child !== nextChildren[index])) return false;
+  // Children receive the maps and current id; any change below this row re-renders it.
+  if (nextChildren.length > 0 && (prev.currentSessionId !== next.currentSessionId
+    || prev.childrenMap !== next.childrenMap || prev.sessionDerivedValues !== next.sessionDerivedValues)) return false;
+  return derivedEqual(prev.sessionDerivedValues, next.sessionDerivedValues, id);
+}
+
 export const SessionMenuButton = React.memo(function SessionMenuButton({
   session,
   childrenMap,
@@ -499,236 +525,220 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
 
   if (!hasChildren) {
     return (
-      <TooltipProvider>
-        <SidebarMenuItem>
-          <div
-            className={cn('relative flex w-full items-center rounded-md', rowClassName, highlightClass)}
-            onClick={selectionMode ? handleRowClick : undefined}
-          >
-            {isEditing ? (
-              <input
-                ref={inputRef}
-                type="text"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onBlur={handleRenameCommit}
-                onClick={(e) => e.stopPropagation()}
-                aria-label={`Rename session: ${session.title || 'Untitled'}`}
-                className="flex-1 min-w-0 h-8 px-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            ) : (
-              <div
-                role="button"
-                tabIndex={0}
-                data-sidebar="menu-button"
-                data-session-id={session.id}
-                data-active={isActive}
-                onClick={handleRowClick}
-                onKeyDown={handleRowKeyDown}
-                className={cn(
-                  'peer/menu-button group/row flex min-w-0 flex-1 flex-col gap-1 rounded-md px-2 py-1.5 text-left outline-none transition-colors',
-                  'hover:bg-sidebar-accent/60 focus-visible:ring-1 focus-visible:ring-ring',
-                  isActive && 'bg-primary/10 hover:bg-primary/15',
-                )}
-              >
-                <div className="flex min-w-0 items-center gap-2 pr-7">
-                  {selectionMode ? (
-                    <button
-                      type="button"
-                      className="flex size-4 shrink-0 items-center justify-center rounded transition-colors hover:bg-accent/70"
-                      onClick={handleCheckboxClick}
-                      aria-label={selected ? 'Deselect session' : 'Select session'}
-                    >
-                      {selected ? (
-                        <CheckSquare className="size-4 text-primary" />
-                      ) : (
-                        <Square className="size-4 text-muted-foreground" />
-                      )}
-                    </button>
-                  ) : (
-                    <SessionStatusDot state={statusState} />
-                  )}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="min-w-0 flex-1 truncate text-sm">
-                        {session.title || 'Untitled'}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="max-w-xs">
-                      {session.title || 'Untitled'}
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className="flex min-w-0 items-center gap-1.5 pl-3.5 text-[10px] leading-none text-muted-foreground/80">
-                  {metaParts.map((part, index) => (
-                    <React.Fragment key={index}>
-                      {index > 0 && <span className="text-muted-foreground/40">·</span>}
-                      {part}
-                    </React.Fragment>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <SessionActionsDropdown
-              isClosed={isClosed}
-              isEditing={isEditing}
-              selectionMode={selectionMode}
-              onRename={handleRenameStart}
-              onRegenerateTitle={onRegenerateTitle ? () => onRegenerateTitle(session.id) : undefined}
-              onReopen={() => onReopenSession(session.id)}
-              onClose={() => onCloseSession(session.id)}
-              onDelete={() => onDeleteSession(session.id)}
-              sessionTags={session.tags ?? []}
-              allWorkspaceTags={allWorkspaceTags}
-              onAddTag={onAddTag ? (tag) => onAddTag(session.id, tag) : undefined}
-              onRemoveTag={onRemoveTag ? (tag) => onRemoveTag(session.id, tag) : undefined}
-              sessionId={session.id}
-              onOpenAlongside={onOpenAlongside ? () => onOpenAlongside(session.id) : undefined}
+      <SidebarMenuItem>
+        <div
+          className={cn('relative flex w-full items-center rounded-md', rowClassName, highlightClass)}
+          onClick={selectionMode ? handleRowClick : undefined}
+        >
+          {isEditing ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={handleRenameCommit}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Rename session: ${session.title || 'Untitled'}`}
+              className="flex-1 min-w-0 h-8 px-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
             />
-          </div>
-        </SidebarMenuItem>
-      </TooltipProvider>
+          ) : (
+            <div
+              role="button"
+              tabIndex={0}
+              data-sidebar="menu-button"
+              data-session-id={session.id}
+              data-active={isActive}
+              onClick={handleRowClick}
+              onKeyDown={handleRowKeyDown}
+              className={cn(
+                'peer/menu-button group/row flex min-w-0 flex-1 flex-col gap-1 rounded-md px-2 py-1.5 text-left outline-none transition-colors',
+                'hover:bg-sidebar-accent/60 focus-visible:ring-1 focus-visible:ring-ring',
+                isActive && 'bg-primary/10 hover:bg-primary/15',
+              )}
+            >
+              <div className="flex min-w-0 items-center gap-2 pr-7">
+                {selectionMode ? (
+                  <button
+                    type="button"
+                    className="flex size-4 shrink-0 items-center justify-center rounded transition-colors hover:bg-accent/70"
+                    onClick={handleCheckboxClick}
+                    aria-label={selected ? 'Deselect session' : 'Select session'}
+                  >
+                    {selected ? (
+                      <CheckSquare className="size-4 text-primary" />
+                    ) : (
+                      <Square className="size-4 text-muted-foreground" />
+                    )}
+                  </button>
+                ) : (
+                  <SessionStatusDot state={statusState} />
+                )}
+                {/* Plain title: the app tooltip layer renders it. A Radix tooltip per row cost more than the row. */}
+                <span className="min-w-0 flex-1 truncate text-sm" title={session.title || 'Untitled'}>
+                  {session.title || 'Untitled'}
+                </span>
+              </div>
+              <div className="flex min-w-0 items-center gap-1.5 pl-3.5 text-[10px] leading-none text-muted-foreground/80">
+                {metaParts.map((part, index) => (
+                  <React.Fragment key={index}>
+                    {index > 0 && <span className="text-muted-foreground/40">·</span>}
+                    {part}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <SessionActionsDropdown
+            isClosed={isClosed}
+            isEditing={isEditing}
+            selectionMode={selectionMode}
+            onRename={handleRenameStart}
+            onRegenerateTitle={onRegenerateTitle ? () => onRegenerateTitle(session.id) : undefined}
+            onReopen={() => onReopenSession(session.id)}
+            onClose={() => onCloseSession(session.id)}
+            onDelete={() => onDeleteSession(session.id)}
+            sessionTags={session.tags ?? []}
+            allWorkspaceTags={allWorkspaceTags}
+            onAddTag={onAddTag ? (tag) => onAddTag(session.id, tag) : undefined}
+            onRemoveTag={onRemoveTag ? (tag) => onRemoveTag(session.id, tag) : undefined}
+            sessionId={session.id}
+            onOpenAlongside={onOpenAlongside ? () => onOpenAlongside(session.id) : undefined}
+          />
+        </div>
+      </SidebarMenuItem>
     );
   }
 
   return (
-    <TooltipProvider>
-      <Collapsible
-        defaultOpen={isActive || hasActiveChild || derived.hasPendingPermission || hasPendingPermissionInSubtree}
-        className="group/collapsible"
-      >
-        <SidebarMenuItem>
-          <div
-            className={cn('relative flex w-full items-center rounded-md', rowClassName, highlightClass)}
-            onClick={selectionMode ? handleRowClick : undefined}
-          >
-            {isEditing ? (
-              <input
-                ref={inputRef}
-                type="text"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onBlur={handleRenameCommit}
-                onClick={(e) => e.stopPropagation()}
-                aria-label={`Rename session: ${session.title || 'Untitled'}`}
-                className="flex-1 min-w-0 h-8 px-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            ) : (
-              <div
-                role="button"
-                tabIndex={0}
-                data-sidebar="menu-button"
-                data-session-id={session.id}
-                data-active={isActive}
-                onClick={handleRowClick}
-                onKeyDown={handleRowKeyDown}
-                className={cn(
-                  'peer/menu-button group/row relative flex min-w-0 flex-1 flex-col gap-1 rounded-md px-2 py-1.5 text-left outline-none transition-colors',
-                  'hover:bg-sidebar-accent/60 focus-visible:ring-1 focus-visible:ring-ring',
-                  isActive && 'bg-primary/10 hover:bg-primary/15',
+    <Collapsible
+      defaultOpen={isActive || hasActiveChild || derived.hasPendingPermission || hasPendingPermissionInSubtree}
+      className="group/collapsible"
+    >
+      <SidebarMenuItem>
+        <div
+          className={cn('relative flex w-full items-center rounded-md', rowClassName, highlightClass)}
+          onClick={selectionMode ? handleRowClick : undefined}
+        >
+          {isEditing ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={handleRenameCommit}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Rename session: ${session.title || 'Untitled'}`}
+              className="flex-1 min-w-0 h-8 px-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          ) : (
+            <div
+              role="button"
+              tabIndex={0}
+              data-sidebar="menu-button"
+              data-session-id={session.id}
+              data-active={isActive}
+              onClick={handleRowClick}
+              onKeyDown={handleRowKeyDown}
+              className={cn(
+                'peer/menu-button group/row relative flex min-w-0 flex-1 flex-col gap-1 rounded-md px-2 py-1.5 text-left outline-none transition-colors',
+                'hover:bg-sidebar-accent/60 focus-visible:ring-1 focus-visible:ring-ring',
+                isActive && 'bg-primary/10 hover:bg-primary/15',
+              )}
+            >
+              <div className="flex min-w-0 items-center gap-2 pr-14">
+                {selectionMode ? (
+                  <button
+                    type="button"
+                    className="flex size-4 shrink-0 items-center justify-center rounded transition-colors hover:bg-accent/70"
+                    onClick={handleCheckboxClick}
+                    aria-label={selected ? 'Deselect session' : 'Select session'}
+                  >
+                    {selected ? (
+                      <CheckSquare className="size-4 text-primary" />
+                    ) : (
+                      <Square className="size-4 text-muted-foreground" />
+                    )}
+                  </button>
+                ) : (
+                  <SessionStatusDot state={statusState} />
                 )}
-              >
-                <div className="flex min-w-0 items-center gap-2 pr-14">
-                  {selectionMode ? (
+                {/* Plain title: the app tooltip layer renders it. A Radix tooltip per row cost more than the row. */}
+                <span className="min-w-0 flex-1 truncate text-sm" title={session.title || 'Untitled'}>
+                  {session.title || 'Untitled'}
+                </span>
+                {!selectionMode && (
+                  <CollapsibleTrigger asChild>
                     <button
                       type="button"
-                      className="flex size-4 shrink-0 items-center justify-center rounded transition-colors hover:bg-accent/70"
-                      onClick={handleCheckboxClick}
-                      aria-label={selected ? 'Deselect session' : 'Select session'}
+                      className="absolute top-1/2 right-7 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      aria-label="Toggle subagent runs"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      {selected ? (
-                        <CheckSquare className="size-4 text-primary" />
-                      ) : (
-                        <Square className="size-4 text-muted-foreground" />
-                      )}
+                      <ChevronRight className="size-3.5 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
                     </button>
-                  ) : (
-                    <SessionStatusDot state={statusState} />
-                  )}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="min-w-0 flex-1 truncate text-sm">
-                        {session.title || 'Untitled'}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="max-w-xs">
-                      {session.title || 'Untitled'}
-                    </TooltipContent>
-                  </Tooltip>
-                  {!selectionMode && (
-                    <CollapsibleTrigger asChild>
-                      <button
-                        type="button"
-                        className="absolute top-1/2 right-7 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        aria-label="Toggle subagent runs"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ChevronRight className="size-3.5 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
-                      </button>
-                    </CollapsibleTrigger>
-                  )}
-                </div>
-                <div className="flex min-w-0 items-center gap-1.5 pl-3.5 text-[10px] leading-none text-muted-foreground/80">
-                  {metaParts.map((part, index) => (
-                    <React.Fragment key={index}>
-                      {index > 0 && <span className="text-muted-foreground/40">·</span>}
-                      {part}
-                    </React.Fragment>
-                  ))}
-                </div>
+                  </CollapsibleTrigger>
+                )}
               </div>
-            )}
+              <div className="flex min-w-0 items-center gap-1.5 pl-3.5 text-[10px] leading-none text-muted-foreground/80">
+                {metaParts.map((part, index) => (
+                  <React.Fragment key={index}>
+                    {index > 0 && <span className="text-muted-foreground/40">·</span>}
+                    {part}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
 
-            <SessionActionsDropdown
-              isClosed={isClosed}
-              isEditing={isEditing}
-              selectionMode={selectionMode}
-              onRename={handleRenameStart}
-              onRegenerateTitle={onRegenerateTitle ? () => onRegenerateTitle(session.id) : undefined}
-              onReopen={() => onReopenSession(session.id)}
-              onClose={() => onCloseSession(session.id)}
-              onDelete={() => onDeleteSession(session.id)}
-              sessionTags={session.tags ?? []}
-              allWorkspaceTags={allWorkspaceTags}
-              onAddTag={onAddTag ? (tag) => onAddTag(session.id, tag) : undefined}
-              onRemoveTag={onRemoveTag ? (tag) => onRemoveTag(session.id, tag) : undefined}
-              sessionId={session.id}
-              onOpenAlongside={onOpenAlongside ? () => onOpenAlongside(session.id) : undefined}
-            />
-          </div>
+          <SessionActionsDropdown
+            isClosed={isClosed}
+            isEditing={isEditing}
+            selectionMode={selectionMode}
+            onRename={handleRenameStart}
+            onRegenerateTitle={onRegenerateTitle ? () => onRegenerateTitle(session.id) : undefined}
+            onReopen={() => onReopenSession(session.id)}
+            onClose={() => onCloseSession(session.id)}
+            onDelete={() => onDeleteSession(session.id)}
+            sessionTags={session.tags ?? []}
+            allWorkspaceTags={allWorkspaceTags}
+            onAddTag={onAddTag ? (tag) => onAddTag(session.id, tag) : undefined}
+            onRemoveTag={onRemoveTag ? (tag) => onRemoveTag(session.id, tag) : undefined}
+            sessionId={session.id}
+            onOpenAlongside={onOpenAlongside ? () => onOpenAlongside(session.id) : undefined}
+          />
+        </div>
 
-          <CollapsibleContent>
-            <SidebarMenuSub>
-              {childSessions.map((child) => (
-                <SessionMenuButton
-                  key={child.id}
-                  session={child}
-                  childrenMap={childrenMap}
-                  sessionDerivedValues={sessionDerivedValues}
-                  isActive={currentSessionId === child.id}
-                  currentSessionId={currentSessionId}
-                  onResumeSession={onResumeSession}
-                  onOpenAlongside={onOpenAlongside}
-                  onCloseSession={onCloseSession}
-                  onReopenSession={onReopenSession}
-                  onDeleteSession={onDeleteSession}
-                  onRename={onRename}
-                  onRegenerateTitle={onRegenerateTitle}
-                  selectionMode={selectionMode}
-                  selected={selected}
-                  onToggleSelect={onToggleSelect}
-                  allWorkspaceTags={allWorkspaceTags}
-                  onAddTag={onAddTag}
-                  onRemoveTag={onRemoveTag}
-                />
-              ))}
-            </SidebarMenuSub>
-          </CollapsibleContent>
-        </SidebarMenuItem>
-      </Collapsible>
-    </TooltipProvider>
+        <CollapsibleContent>
+          <SidebarMenuSub>
+            {childSessions.map((child) => (
+              <SessionMenuButton
+                key={child.id}
+                session={child}
+                childrenMap={childrenMap}
+                sessionDerivedValues={sessionDerivedValues}
+                isActive={currentSessionId === child.id}
+                currentSessionId={currentSessionId}
+                onResumeSession={onResumeSession}
+                onOpenAlongside={onOpenAlongside}
+                onCloseSession={onCloseSession}
+                onReopenSession={onReopenSession}
+                onDeleteSession={onDeleteSession}
+                onRename={onRename}
+                onRegenerateTitle={onRegenerateTitle}
+                selectionMode={selectionMode}
+                selected={selected}
+                onToggleSelect={onToggleSelect}
+                allWorkspaceTags={allWorkspaceTags}
+                onAddTag={onAddTag}
+                onRemoveTag={onRemoveTag}
+              />
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </SidebarMenuItem>
+    </Collapsible>
   );
-});
+}, sessionRowPropsEqual);
