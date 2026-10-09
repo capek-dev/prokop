@@ -20,6 +20,7 @@
 ### Fixed
 
 - **The selected session no longer flickers when switching projects**: Opening a session from another project keeps it highlighted instead of briefly clearing the highlight.
+- **Live alerts and pairing requests stay connected**: The streams that report approvals and finished sessions on other machines, and the wait for a pairing approval, are no longer cut every 10 seconds when nothing changes. The browser console no longer fills with `ERR_INCOMPLETE_CHUNKED_ENCODING` for `/api/attention/events`.
 - **The installed app's title bar keeps the theme color after a reload**: Pressing F5 no longer turns the title bar back to the default gray.
 - **Opening Prokop over plain HTTP from another device works**: The app no longer shows a blank page when opened at a LAN or VPN address without HTTPS. Installing the app and notifications still need HTTPS.
 

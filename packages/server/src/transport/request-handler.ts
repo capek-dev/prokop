@@ -41,6 +41,12 @@ export function createRequestHandler(deps: RequestHandlerDeps) {
     const upgrade = deps.transport.handleUpgrade(req, (data: WsData) => listener.upgrade(req, { data }), principal, { viaNetwork });
     if (upgrade.handled) return upgrade.response;
 
+    // Bun closes a response that sends nothing for 10 s, which cuts quiet
+    // Server-Sent Event streams mid-body (browsers report
+    // ERR_INCOMPLETE_CHUNKED_ENCODING and reconnect). Event streams stay open
+    // until the client aborts; every other request keeps the idle guard.
+    if (req.headers.get('Accept')?.includes('text/event-stream')) listener.timeout(req, 0);
+
     return deps.app.fetch(req, { principal });
   };
 }
