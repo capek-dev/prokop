@@ -1,0 +1,4 @@
+### Changed
+
+- **Long conversations are easier to follow**: Two or more tool calls in a row fold into one line that names the tools and shows failures, lines added and removed, and how long they took. The line stays open while the agent works in it and folds when the reply continues, and clicking it keeps it the way you left it. The agent's progress notes between tool calls stay visible. Finished thinking folds to "Thought for 12s". Each tool shows how long it took, a timer while it runs, why it was stopped, and the first line of its error without opening it. Hovering a reply shows its model, duration, and token count. The prompt map beside the conversation also marks failed turns and compaction points. This works for existing conversations too.
+- **Quieter tool rows**: Shell commands that succeed no longer show a `[0]` exit code; failing ones still show theirs.

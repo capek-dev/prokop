@@ -41,8 +41,14 @@ describe('tool summaries', () => {
   test('uses eager presentation data when raw input and output are omitted', () => {
     expect(getToolRowInfo(makeProjectedPart())).toEqual({
       summary: 'echo hello',
-      chips: [{ label: '[0]', tone: 'neutral' }],
+      chips: [],
     });
+  });
+
+  test('only a failing exit code earns a chip', () => {
+    const failed = makeProjectedPart();
+    failed.presentation!.visualization = { type: 'shell-output', command: 'false', stderr: 'boom', exitCode: 2 };
+    expect(getToolRowInfo(failed).chips).toEqual([{ label: '[2]', tone: 'error' }]);
   });
 
   test('keeps dotted summary template resolution', () => {

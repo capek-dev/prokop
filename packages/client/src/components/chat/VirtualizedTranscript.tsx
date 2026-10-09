@@ -25,6 +25,9 @@ import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 import { StructuredResponse } from '@/components/visualizations';
 import { splitStreamingText } from './streamingText';
 import { getToolPreviewCutoff } from '@/lib/toolPreviewPolicy';
+import { estimateReasoningMs, groupTurnParts } from '@/lib/turnParts';
+import { ReasoningBlock } from './ReasoningBlock';
+import { ToolGroup } from './ToolGroup';
 
 const USER_SCROLL_INPUT_WINDOW_MS = 200;
 
@@ -311,107 +314,133 @@ const MessageParts = memo(function MessageParts({
   serverUrl?: string;
   collapseToolPreviews?: boolean;
 }) {
+  const renderPart = (part: Part, index: number): ReactNode => {
+    // Parts stream sequentially, so only the last part of a streaming
+    // message animates; any part with a successor snaps to full text.
+    const animate = isStreaming && index === parts.length - 1;
+    switch (part.type) {
+      case 'text': {
+        const text = inverted && part.text
+          ? formatInvertedText(part.text)
+          : (part.text || '...');
+        if (isStreaming && !inverted) STREAMED_PART_IDS.add(part.id);
+        const streamingPath = !inverted && (isStreaming || STREAMED_PART_IDS.has(part.id));
+        return (
+          <div key={part.id} className="min-w-0">
+            {streamingPath ? (
+              <StreamingText text={text} active={animate} />
+            ) : (
+              <MarkdownRenderer inverted={inverted}>{text}</MarkdownRenderer>
+            )}
+          </div>
+        );
+      }
+
+      case 'reasoning':
+        if (!animate) {
+          return (
+            <ReasoningBlock
+              key={part.id}
+              expansionKey={`reasoning:${serverUrl ?? ''}:${sessionId}:${part.id}`}
+              durationMs={estimateReasoningMs(parts, index)}
+            >
+              {part.text}
+            </ReasoningBlock>
+          );
+        }
+        return (
+          <div
+            key={part.id}
+            className="visualization-container text-muted-foreground text-sm italic border-l-2 border-muted-foreground/30 pl-3 my-2 wrap-break-word"
+          >
+            <StreamingReasoning text={part.text} active={animate} />
+          </div>
+        );
+
+      case 'tool':
+        return (
+          <ToolCall
+            key={part.id}
+            sessionId={sessionId}
+            part={part}
+            collapsePreview={collapseToolPreviews && part.state.status === 'completed'}
+            onNavigateToSubagent={onNavigateToSubagent}
+          />
+        );
+
+      case 'image': {
+        const fullUrl = serverUrl ? buildApiUrl(serverUrl, part.url) : part.url;
+        return (
+          <img
+            key={part.id}
+            src={fullUrl}
+            alt=""
+            className={cn(
+              'max-w-full max-h-64 rounded-xl mt-2 object-contain',
+              inverted && 'ring-2 ring-white/20'
+            )}
+          />
+        );
+      }
+
+      case 'file': {
+        const fullUrl = serverUrl ? buildApiUrl(serverUrl, part.url) : part.url;
+        const ext = getFileExtensionBadge(part.mimeType, part.filename);
+        const filename = part.filename || '';
+        const displayName = filename.length > 30
+          ? filename.slice(0, 27) + '...'
+          : (filename || 'unnamed');
+        return (
+          <a
+            key={part.id}
+            href={fullUrl}
+            className={cn(
+              'mt-2 p-2 rounded-lg text-sm flex items-center gap-2 transition-colors',
+              inverted
+                ? 'bg-white/15 hover:bg-white/25 text-primary-foreground'
+                : 'bg-muted hover:bg-accent'
+            )}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <FileIcon className="size-4 shrink-0" />
+            <span className="truncate">{displayName}</span>
+            {ext && (
+              <span className={cn(
+                'px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ml-auto shrink-0',
+                inverted
+                  ? 'bg-white/25 text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground'
+              )}>
+                {ext}
+              </span>
+            )}
+            <Download className="size-3.5 shrink-0 opacity-60" />
+          </a>
+        );
+      }
+
+      default:
+        return null;
+    }
+  };
+
+  if (inverted) return <>{parts.map(renderPart)}</>;
+
   return (
     <>
-      {parts.map((part, index) => {
-        // Parts stream sequentially, so only the last part of a streaming
-        // message animates; any part with a successor snaps to full text.
-        const animate = isStreaming && index === parts.length - 1;
-        switch (part.type) {
-          case 'text': {
-            const text = inverted && part.text
-              ? formatInvertedText(part.text)
-              : (part.text || '...');
-            if (isStreaming && !inverted) STREAMED_PART_IDS.add(part.id);
-            const streamingPath = !inverted && (isStreaming || STREAMED_PART_IDS.has(part.id));
-            return (
-              <div key={part.id} className="min-w-0">
-                {streamingPath ? (
-                  <StreamingText text={text} active={animate} />
-                ) : (
-                  <MarkdownRenderer inverted={inverted}>{text}</MarkdownRenderer>
-                )}
-              </div>
-            );
-          }
-
-          case 'reasoning':
-            return (
-              <div
-                key={part.id}
-                className="visualization-container text-muted-foreground text-sm italic border-l-2 border-muted-foreground/30 pl-3 my-2 wrap-break-word"
-              >
-                <StreamingReasoning text={part.text} active={animate} />
-              </div>
-            );
-
-          case 'tool':
-            return (
-              <ToolCall
-                key={part.id}
-                sessionId={sessionId}
-                part={part}
-                collapsePreview={collapseToolPreviews && part.state.status === 'completed'}
-                onNavigateToSubagent={onNavigateToSubagent}
-              />
-            );
-
-          case 'image': {
-            const fullUrl = serverUrl ? buildApiUrl(serverUrl, part.url) : part.url;
-            return (
-              <img
-                key={part.id}
-                src={fullUrl}
-                alt=""
-                className={cn(
-                  'max-w-full max-h-64 rounded-xl mt-2 object-contain',
-                  inverted && 'ring-2 ring-white/20'
-                )}
-              />
-            );
-          }
-
-          case 'file': {
-            const fullUrl = serverUrl ? buildApiUrl(serverUrl, part.url) : part.url;
-            const ext = getFileExtensionBadge(part.mimeType, part.filename);
-            const filename = part.filename || '';
-            const displayName = filename.length > 30
-              ? filename.slice(0, 27) + '...'
-              : (filename || 'unnamed');
-            return (
-              <a
-                key={part.id}
-                href={fullUrl}
-                className={cn(
-                  'mt-2 p-2 rounded-lg text-sm flex items-center gap-2 transition-colors',
-                  inverted
-                    ? 'bg-white/15 hover:bg-white/25 text-primary-foreground'
-                    : 'bg-muted hover:bg-accent'
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <FileIcon className="size-4 shrink-0" />
-                <span className="truncate">{displayName}</span>
-                {ext && (
-                  <span className={cn(
-                    'px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ml-auto shrink-0',
-                    inverted
-                      ? 'bg-white/25 text-primary-foreground'
-                      : 'bg-secondary text-secondary-foreground'
-                  )}>
-                    {ext}
-                  </span>
-                )}
-                <Download className="size-3.5 shrink-0 opacity-60" />
-              </a>
-            );
-          }
-
-          default:
-            return null;
-        }
-      })}
+      {groupTurnParts(parts).map(segment => segment.kind === 'part'
+        ? renderPart(segment.part, segment.index)
+        : (
+          <ToolGroup
+            key={`group:${segment.id}`}
+            expansionKey={`tools:${serverUrl ?? ''}:${sessionId}:${segment.id}`}
+            parts={segment.items.map(item => item.part)}
+            live={isStreaming && segment.items[segment.items.length - 1].index === parts.length - 1}
+          >
+            {segment.items.map(item => renderPart(item.part, item.index))}
+          </ToolGroup>
+        ))}
     </>
   );
 }, (prev, next) => {

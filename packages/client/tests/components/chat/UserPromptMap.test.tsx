@@ -64,6 +64,38 @@ describe('UserPromptMap', () => {
     ]);
   });
 
+  it('adds failed turn and compaction markers without renumbering prompts', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    const onNavigate = vi.fn();
+    const failed = {
+      message: { id: 'assistant-failed', role: 'assistant', status: 'error', error: 'Provider\n timeout' },
+      parts: [] as Part[],
+    };
+    const compacted = {
+      message: { id: 'assistant-compacted', role: 'assistant', status: 'completed' },
+      parts: [{ id: 'c', messageId: 'assistant-compacted', createdAt: 1, type: 'compaction', auto: true }] as Part[],
+    };
+
+    render(
+      <UserPromptMap
+        displayItems={[
+          item('user-1', 'user', 'First'),
+          failed,
+          item('user-2', 'user', 'Second'),
+          compacted,
+          item('codex-boundary', 'assistant', 'Reply'),
+        ]}
+        compactedAfterMessageId="codex-boundary"
+        onNavigate={onNavigate}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Go to prompt 2: Second' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Go to context compaction' })).toHaveLength(2);
+    await userEvent.click(screen.getByRole('button', { name: 'Go to failed turn: Turn failed: Provider timeout' }));
+    expect(onNavigate).toHaveBeenCalledWith('assistant-failed');
+  });
+
   it('only reserves the map when the chat container has spare width', () => {
     expect(canShowUserPromptMap(927)).toBe(false);
     expect(canShowUserPromptMap(928)).toBe(true);

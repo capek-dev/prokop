@@ -54,3 +54,22 @@ export function useVizExpanded(
 
   return [expanded, setExpandedPersisted];
 }
+
+/**
+ * Like useVizExpanded, but the default may change while mounted (a tool
+ * group opens while its tools run and folds once they finish). Only a
+ * user toggle is persisted; until then the live default wins.
+ */
+export function useVizExpandedOverride(
+  key: string,
+  defaultExpanded: boolean,
+): [boolean, (expanded: boolean) => void] {
+  const [override, setOverride] = useState(() => readPersisted(key));
+
+  const setExpanded = useCallback((expanded: boolean) => {
+    writePersisted(key, expanded);
+    setOverride(expanded);
+  }, [key]);
+
+  return [override ?? defaultExpanded, setExpanded];
+}

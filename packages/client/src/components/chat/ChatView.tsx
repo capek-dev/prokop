@@ -333,6 +333,7 @@ function ChatViewContent({
         {onNavigateToMessage && (
           <UserPromptMap
             displayItems={displayItems}
+            compactedAfterMessageId={harnessState?.compaction.boundaryMessageId ?? undefined}
             targetMessageId={targetMessageId}
             onNavigate={onNavigateToMessage}
           />

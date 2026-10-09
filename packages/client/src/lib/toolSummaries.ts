@@ -7,6 +7,12 @@ import {
 
 export type ToolRowChipTone = 'neutral' | 'success' | 'error';
 
+export const toolChipToneClass: Record<ToolRowChipTone, string> = {
+  neutral: 'bg-muted text-muted-foreground',
+  success: 'bg-success/15 text-success',
+  error: 'bg-destructive/10 text-destructive',
+};
+
 export interface ToolRowChip {
   label: string;
   tone: ToolRowChipTone;
@@ -47,31 +53,17 @@ export function chipsFromVisualization(viz: AnyVisualization): ToolRowChip[] {
   const chips: ToolRowChip[] = [];
 
   switch (viz.type) {
-    case 'diff': {
-      const a = viz.additions ?? 0;
-      const d = viz.deletions ?? 0;
-      if (a > 0) chips.push({ label: `+${a}`, tone: 'success' });
-      if (d > 0) chips.push({ label: `-${d}`, tone: 'error' });
-      break;
-    }
+    case 'diff':
     case 'diffs': {
-      let a = 0;
-      let d = 0;
-      for (const item of viz.items) {
-        a += item.additions ?? 0;
-        d += item.deletions ?? 0;
-      }
-      if (a > 0) chips.push({ label: `+${a}`, tone: 'success' });
-      if (d > 0) chips.push({ label: `-${d}`, tone: 'error' });
+      const { additions, deletions } = getDiffTotals(viz);
+      if (additions > 0) chips.push({ label: `+${additions}`, tone: 'success' });
+      if (deletions > 0) chips.push({ label: `-${deletions}`, tone: 'error' });
       break;
     }
     case 'shell-output': {
+      // Success is the norm and the status icon already shows it.
       const code = viz.exitCode ?? 0;
-      chips.push(
-        code === 0
-          ? { label: '[0]', tone: 'neutral' }
-          : { label: `[${code}]`, tone: 'error' },
-      );
+      if (code !== 0) chips.push({ label: `[${code}]`, tone: 'error' });
       break;
     }
     case 'file-list': {
@@ -132,21 +124,40 @@ export function getToolRowInfo(
     : '');
 
   const chips: ToolRowChip[] = [];
-  let visualization = part.presentation?.visualization;
-  if (!visualization && state.status === 'completed' && 'output' in state) {
-    const output = state.output;
-    if (output && typeof output === 'object') {
-      visualization =
-        '_visualization' in output &&
-        output._visualization &&
-        typeof output._visualization === 'object'
-          ? (output._visualization as AnyVisualization)
-          : undefined;
-    }
-  }
+  const visualization = getToolPartVisualization(part);
   if (visualization) {
     chips.push(...chipsFromVisualization(visualization));
   }
 
   return { summary, chips };
+}
+
+/** Server presentation first, then the legacy `_visualization` in completed output. */
+export function getToolPartVisualization(part: ToolPart): AnyVisualization | undefined {
+  if (part.presentation?.visualization) return part.presentation.visualization;
+  const state = part.state;
+  if (state.status !== 'completed' || !('output' in state)) return undefined;
+  const output = state.output;
+  if (!output || typeof output !== 'object' || !('_visualization' in output)) return undefined;
+  return output._visualization && typeof output._visualization === 'object'
+    ? output._visualization as AnyVisualization
+    : undefined;
+}
+
+export interface DiffTotals {
+  additions: number;
+  deletions: number;
+}
+
+export function getDiffTotals(visualization: AnyVisualization | undefined): DiffTotals {
+  if (visualization?.type === 'diff') {
+    return { additions: visualization.additions ?? 0, deletions: visualization.deletions ?? 0 };
+  }
+  if (visualization?.type === 'diffs') {
+    return visualization.items.reduce<DiffTotals>((totals, item) => ({
+      additions: totals.additions + (item.additions ?? 0),
+      deletions: totals.deletions + (item.deletions ?? 0),
+    }), { additions: 0, deletions: 0 });
+  }
+  return { additions: 0, deletions: 0 };
 }

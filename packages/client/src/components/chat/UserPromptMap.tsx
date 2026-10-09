@@ -11,12 +11,18 @@ interface PromptMapSourceItem {
   message: {
     id: string;
     role: string;
+    status?: string;
+    mode?: string;
+    error?: string;
   };
   parts: Part[];
   isQueued?: boolean;
 }
 
+export type UserPromptMapItemKind = 'prompt' | 'error' | 'compaction';
+
 export interface UserPromptMapItem {
+  kind: UserPromptMapItemKind;
   messageId: string;
   label: string;
   preview: string;
@@ -25,8 +31,15 @@ export interface UserPromptMapItem {
 
 interface UserPromptMapProps {
   displayItems: PromptMapSourceItem[];
+  /** Harness-reported boundary (Codex), for sessions without a compaction part. */
+  compactedAfterMessageId?: string;
   targetMessageId?: string | null;
   onNavigate: (messageId: string) => void;
+}
+
+function isFailedTurn(message: PromptMapSourceItem['message']): boolean {
+  return message.role === 'assistant'
+    && (message.status === 'error' || message.mode === 'compact_failed' || message.mode === 'retry_failed');
 }
 
 function getPromptText(parts: Part[]): string {
@@ -45,19 +58,79 @@ function truncatePrompt(text: string, maxLength: number): string {
 
 export function buildUserPromptMapItems(
   displayItems: PromptMapSourceItem[],
+  compactedAfterMessageId?: string,
 ): UserPromptMapItem[] {
-  return displayItems.flatMap((item) => {
-    if (item.message.role !== 'user' || item.isQueued) return [];
+  return displayItems.flatMap((item): UserPromptMapItem[] => {
+    if (item.isQueued) return [];
+    const messageId = item.message.id;
 
-    const promptText = getPromptText(item.parts);
-    const label = truncatePrompt(promptText, MAX_PROMPT_LABEL_LENGTH);
-    return [{
-      messageId: item.message.id,
-      label,
-      preview: truncatePrompt(promptText, MAX_PROMPT_PREVIEW_LENGTH),
-      markerWidth: Math.min(28, Math.max(10, 8 + Math.sqrt(label.length) * 2)),
-    }];
+    if (item.message.role === 'user') {
+      const promptText = getPromptText(item.parts);
+      const label = truncatePrompt(promptText, MAX_PROMPT_LABEL_LENGTH);
+      return [{
+        kind: 'prompt',
+        messageId,
+        label,
+        preview: truncatePrompt(promptText, MAX_PROMPT_PREVIEW_LENGTH),
+        markerWidth: Math.min(28, Math.max(10, 8 + Math.sqrt(label.length) * 2)),
+      }];
+    }
+
+    if (isFailedTurn(item.message)) {
+      const reason = item.message.error?.replace(/\s+/g, ' ').trim();
+      return [{
+        kind: 'error',
+        messageId,
+        label: 'Turn failed',
+        preview: truncatePrompt(reason ? `Turn failed: ${reason}` : 'Turn failed', MAX_PROMPT_PREVIEW_LENGTH),
+        markerWidth: 14,
+      }];
+    }
+
+    if (messageId === compactedAfterMessageId || item.parts.some(part => part.type === 'compaction')) {
+      return [{
+        kind: 'compaction',
+        messageId,
+        label: 'Context compacted',
+        preview: 'Context compacted',
+        markerWidth: 18,
+      }];
+    }
+
+    return [];
   });
+}
+
+const MARKER_CLASS: Record<UserPromptMapItemKind, { idle: string; active: string }> = {
+  prompt: {
+    idle: 'h-px rounded-full bg-muted-foreground/45 group-hover:h-0.5 group-hover:bg-foreground',
+    active: 'h-0.5 bg-foreground',
+  },
+  error: {
+    idle: 'h-0.5 rounded-full bg-destructive/70 group-hover:bg-destructive',
+    active: 'bg-destructive',
+  },
+  compaction: {
+    idle: 'h-0 border-t border-dashed border-muted-foreground/50 group-hover:border-foreground',
+    active: 'border-foreground',
+  },
+};
+
+function markerLabel(item: UserPromptMapItem, promptNumber: number): string {
+  if (item.kind === 'prompt') return `Go to prompt ${promptNumber}: ${item.label}`;
+  if (item.kind === 'error') return `Go to failed turn: ${item.preview}`;
+  return 'Go to context compaction';
+}
+
+/** Prompts keep their own 1-based numbering; other markers do not count. */
+function buildMarkerLabels(items: UserPromptMapItem[]): string[] {
+  const labels: string[] = [];
+  let promptNumber = 0;
+  for (const item of items) {
+    if (item.kind === 'prompt') promptNumber += 1;
+    labels.push(markerLabel(item, promptNumber));
+  }
+  return labels;
 }
 
 export function canShowUserPromptMap(width: number): boolean {
@@ -66,13 +139,15 @@ export function canShowUserPromptMap(width: number): boolean {
 
 export function UserPromptMap({
   displayItems,
+  compactedAfterMessageId,
   targetMessageId,
   onNavigate,
 }: UserPromptMapProps) {
   const promptItems = useMemo(
-    () => buildUserPromptMapItems(displayItems),
-    [displayItems],
+    () => buildUserPromptMapItems(displayItems, compactedAfterMessageId),
+    [displayItems, compactedAfterMessageId],
   );
+  const markerLabels = useMemo(() => buildMarkerLabels(promptItems), [promptItems]);
   const [hasRoom, setHasRoom] = useState(false);
   const observerRef = useRef<ResizeObserver | null>(null);
   const resizeFrameRef = useRef<number | null>(null);
@@ -129,14 +204,15 @@ export function UserPromptMap({
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      aria-label={`Go to prompt ${index + 1}: ${item.label}`}
+                      aria-label={markerLabels[index]}
                       onClick={() => onNavigate(item.messageId)}
                       className="group pointer-events-auto flex h-3 w-8 shrink-0 items-center justify-end rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
                       <span
                         className={cn(
-                          'block h-px rounded-full bg-muted-foreground/45 transition-all group-hover:h-0.5 group-hover:bg-foreground',
-                          targetMessageId === item.messageId && 'h-0.5 bg-foreground',
+                          'block transition-all',
+                          MARKER_CLASS[item.kind].idle,
+                          targetMessageId === item.messageId && MARKER_CLASS[item.kind].active,
                         )}
                         style={{ width: `${item.markerWidth}px` }}
                       />

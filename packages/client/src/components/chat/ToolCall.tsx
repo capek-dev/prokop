@@ -1,13 +1,13 @@
-import { memo, useState, useMemo } from 'react';
+import { memo, useEffect, useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, ExternalLink, Copy, Check, Loader2, CheckCircle, XCircle, Clock, Pause } from 'lucide-react';
-import type { ToolPart, AnyVisualization } from '@prokopai/sdk';
+import type { ToolPart } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { VisualizationRenderer } from '@/components/visualizations';
 import { TerminalOutput } from '@/components/visualizations/TerminalOutput';
 import { RENDER_BUDGETS } from '@/lib/renderBudgets';
-import { getToolRowInfo, showToolRawData } from '@/lib/toolSummaries';
-import type { ToolRowChip } from '@/lib/toolSummaries';
+import { getToolPartVisualization, getToolRowInfo, showToolRawData, toolChipToneClass } from '@/lib/toolSummaries';
+import { firstLine, formatDuration, formatElapsed, getInterruptReasonLabel, getToolDurationMs } from '@/lib/turnStats';
 import { useSdkClient, useServerUrl } from '@/contexts/ServerClientContext';
 import { useToolDebugQuery, useToolDisplayCatalog } from '@/hooks/queries';
 import { cn } from '@/lib/utils';
@@ -90,18 +90,21 @@ function extractTaskSessionId(part: ToolPart): string | null {
   return null;
 }
 
-function extractVisualization(output: unknown): AnyVisualization | undefined {
-  if (output && typeof output === 'object' && '_visualization' in output) {
-    return (output as Record<string, unknown>)._visualization as AnyVisualization;
-  }
-  return undefined;
-}
+/** Ticks once per second; mounted only while a tool runs. */
+function ElapsedTime({ startedAt }: { startedAt: number }) {
+  const [now, setNow] = useState(() => Date.now());
 
-const chipToneClass: Record<ToolRowChip['tone'], string> = {
-  neutral: 'bg-muted text-muted-foreground',
-  success: 'bg-success/15 text-success',
-  error: 'bg-destructive/10 text-destructive',
-};
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/70">
+      {formatElapsed(now - startedAt)}
+    </span>
+  );
+}
 
 const areToolCallPropsEqual = (
   prev: ToolCallProps,
@@ -128,10 +131,10 @@ export const ToolCall = memo(function ToolCall({
 
   const state = part.state;
   const status = state.status;
-  const visualization = part.presentation?.visualization
-    ?? (status === 'completed' && 'output' in state
-      ? extractVisualization(state.output)
-      : undefined);
+  const visualization = getToolPartVisualization(part);
+  const durationMs = getToolDurationMs(state);
+  const interruptReason = getInterruptReasonLabel(state);
+  const errorLine = state.status === 'error' && typeof state.error === 'string' ? firstLine(state.error) : '';
   const debugOpen = showToolRawData(isOpen, visualization, debugExpanded);
   const sdkClient = useSdkClient();
   const shouldLoadDebug = part.presentation?.debugAvailable === true;
@@ -210,11 +213,25 @@ export const ToolCall = memo(function ToolCall({
             {chips.map((chip) => (
               <span
                 key={chip.label}
-                className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 hidden sm:inline ${chipToneClass[chip.tone]}`}
+                className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 hidden sm:inline ${toolChipToneClass[chip.tone]}`}
               >
                 {chip.label}
               </span>
             ))}
+
+            {interruptReason && (
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ${toolChipToneClass.neutral}`}>
+                {interruptReason}
+              </span>
+            )}
+
+            {state.status === 'running' && <ElapsedTime startedAt={state.startedAt} />}
+
+            {durationMs !== undefined && (
+              <span className="hidden shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/70 sm:inline">
+                {formatDuration(durationMs)}
+              </span>
+            )}
 
             {taskSessionId && onNavigateToSubagent && (
               <Button
@@ -236,6 +253,12 @@ export const ToolCall = memo(function ToolCall({
             )}
           </div>
         </CollapsibleTrigger>
+
+        {!isOpen && errorLine && (
+          <div className="truncate pl-9 text-xs text-destructive/90" title={errorLine}>
+            {errorLine}
+          </div>
+        )}
 
         {isOpen && <CollapsibleContent>
           <div className="pl-5 pb-2 flex flex-col gap-2">

@@ -1,10 +1,12 @@
 import { Copy, Check, X, Clock, Undo2, GitBranch, Pin, PinOff, Pencil, X as XIcon, Loader2 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { Message } from '@prokopai/sdk';
+import { isAssistantMessage } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
+import { getTurnMeta } from '@/lib/turnStats';
 import { cn } from '@/lib/utils';
 
 interface MessageBubbleProps {
@@ -129,6 +131,14 @@ export function MessageBubble({
   const forkDisabled = Boolean(forkUnavailableReason);
   const showAssistantFork = message.role === 'assistant' && canFork && (Boolean(onFork) || forkDisabled);
   const hoverActionClass = 'opacity-0 transition-opacity group-hover/msg:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100';
+  const turnMeta = isAssistantMessage(message) ? getTurnMeta(message) : null;
+  const turnMetaParts = turnMeta
+    ? [
+      turnMeta.model && { key: 'model', label: turnMeta.model },
+      turnMeta.duration && { key: 'duration', label: turnMeta.duration },
+      turnMeta.tokens && { key: 'tokens', label: turnMeta.tokens, title: turnMeta.tokensTitle },
+    ].filter((part): part is { key: string; label: string; title?: string } => Boolean(part))
+    : [];
 
   const renderAssistantActions = () => (
     <>
@@ -256,7 +266,21 @@ export function MessageBubble({
             </span>
           </>
         ) : (
-          <span>Assistant</span>
+          <>
+            <span>Assistant</span>
+            {turnMetaParts.length > 0 && (
+              <span
+                className={cn('flex min-w-0 items-center gap-1 font-normal text-muted-foreground/60', hoverActionClass)}
+                data-testid="turn-meta"
+              >
+                {turnMetaParts.map(({ key, label, title }) => (
+                  <span key={key} className="truncate tabular-nums" title={title}>
+                    · {label}
+                  </span>
+                ))}
+              </span>
+            )}
+          </>
         )}
       </div>
 
