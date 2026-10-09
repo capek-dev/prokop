@@ -122,7 +122,7 @@ export function AppHeader() {
         </TooltipProvider>
       </header>
 
-      <header className="hidden md:flex h-11 shrink-0 items-center justify-between gap-2 px-2">
+      <header className="app-titlebar hidden md:flex h-11 shrink-0 items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <ServerSwitcher compact />
           <div className="flex items-center rounded-lg bg-muted p-0.5">

@@ -582,7 +582,7 @@ function ActiveFileBody({
 
   if (doc.status === 'loading') {
     return (
-      <div className="flex flex-1 items-center justify-center">
+      <div className="animate-appear-late flex flex-1 items-center justify-center">
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
       </div>
     );

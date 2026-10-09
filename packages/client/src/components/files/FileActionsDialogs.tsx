@@ -201,7 +201,7 @@ function RenameDialog({
           onSubmit={submitRename}
           footerExtra={
             renameConflict && target && !target.isDirectory ? (
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-sm">
                 <Checkbox
                   checked={overwrite}
                   onCheckedChange={(checked) => setOverwrite(checked === true)}

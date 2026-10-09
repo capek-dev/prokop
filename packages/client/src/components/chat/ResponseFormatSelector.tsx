@@ -37,7 +37,7 @@ export function ResponseFormatSelector({
 
   if (disabled) {
     return (
-      <TooltipProvider delayDuration={300}>
+      <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -58,7 +58,7 @@ export function ResponseFormatSelector({
 
   return (
     <DropdownMenu>
-      <TooltipProvider delayDuration={300}>
+      <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>

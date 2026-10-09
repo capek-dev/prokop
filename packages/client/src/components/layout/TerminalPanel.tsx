@@ -648,7 +648,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         <div
           key={tab.serverSessionId}
           className={cn(
-            'group flex items-center gap-1.5 px-2 py-1 text-xs cursor-pointer rounded-sm whitespace-nowrap border border-transparent',
+            'group flex items-center gap-1.5 px-2 py-1 text-xs rounded-sm whitespace-nowrap border border-transparent',
             tab.serverSessionId === activeTabServerId
               ? 'bg-muted text-foreground'
               : 'text-muted-foreground hover:bg-muted'
@@ -722,7 +722,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             <div
               key={tab.serverSessionId}
               className={cn(
-                'group flex items-center gap-1.5 px-2 py-0.5 text-xs cursor-pointer rounded-sm whitespace-nowrap border border-transparent',
+                'group flex items-center gap-1.5 px-2 py-0.5 text-xs rounded-sm whitespace-nowrap border border-transparent',
                 tab.serverSessionId === activeTabServerId
                   ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted'

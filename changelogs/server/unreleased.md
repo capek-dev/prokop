@@ -10,6 +10,7 @@
 ### Changed
 
 - **Local only by default**: The server now listens on `127.0.0.1` instead of every network interface, so other devices on your Wi-Fi can no longer reach it unless you choose to share it. To use Prokop from another device, turn on remote access in Settings → Devices or with `prokop remote on`, then pair the device. Nothing changes when you use Prokop on the same machine.
+- **The app feels like a desktop app**: Startup and connecting show the app frame instead of a full-window spinner, and opening a conversation no longer flashes a loading spinner. In the installed app with the title bar hidden, the header is the title bar and drags the window. Interface text no longer selects when you drag across it (conversations, code, and errors still do), the browser's own right-click menu stays out of the interface (Shift+right-click still opens it), buttons and menus no longer jump or zoom, and every tooltip uses the same style and delay.
 - **Pairing replaces the API token field**: Add Server asks only for a name and an address (or a pairing link). A machine that requires pairing shows the pairing screen when you open it. Machines already saved with a token keep working, and `PROKOPAI_AUTH_TOKEN` remains for scripts and the CLI.
 
 ### Fixed

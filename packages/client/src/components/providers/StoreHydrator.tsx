@@ -12,6 +12,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { mark } from '@/lib/perf';
 import { useServerContext } from '@/contexts/ServerContext';
 import { useForeignSessionsStore } from '@/stores/foreignSessionsStore';
+import { AppFrameSkeleton } from '@/components/shell/AppFrameSkeleton';
 
 interface StoreHydratorProps {
   children: ReactNode;
@@ -136,14 +137,7 @@ export function StoreHydrator({ children }: StoreHydratorProps) {
   }, []);
 
   if (!data) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background text-foreground">
-        <div className="text-center space-y-2">
-          <div className="h-8 w-8 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-muted-foreground">Loading server data...</p>
-        </div>
-      </div>
-    );
+    return <AppFrameSkeleton />;
   }
 
   return <>{children}</>;

@@ -495,12 +495,11 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
 
   const rowClassName = cn(
     selected && selectionMode && 'bg-accent/50',
-    selectionMode && 'cursor-pointer',
   );
 
   if (!hasChildren) {
     return (
-      <TooltipProvider delayDuration={300}>
+      <TooltipProvider>
         <SidebarMenuItem>
           <div
             className={cn('relative flex w-full items-center rounded-md', rowClassName, highlightClass)}
@@ -528,7 +527,7 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
                 onClick={handleRowClick}
                 onKeyDown={handleRowKeyDown}
                 className={cn(
-                  'peer/menu-button group/row flex min-w-0 flex-1 cursor-pointer flex-col gap-1 rounded-md px-2 py-1.5 text-left outline-none transition-colors',
+                  'peer/menu-button group/row flex min-w-0 flex-1 flex-col gap-1 rounded-md px-2 py-1.5 text-left outline-none transition-colors',
                   'hover:bg-sidebar-accent/60 focus-visible:ring-1 focus-visible:ring-ring',
                   isActive && 'bg-primary/10 hover:bg-primary/15',
                 )}
@@ -595,7 +594,7 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
   }
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider>
       <Collapsible
         defaultOpen={isActive || hasActiveChild || derived.hasPendingPermission || hasPendingPermissionInSubtree}
         className="group/collapsible"
@@ -627,7 +626,7 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
                 onClick={handleRowClick}
                 onKeyDown={handleRowKeyDown}
                 className={cn(
-                  'peer/menu-button group/row relative flex min-w-0 flex-1 cursor-pointer flex-col gap-1 rounded-md px-2 py-1.5 text-left outline-none transition-colors',
+                  'peer/menu-button group/row relative flex min-w-0 flex-1 flex-col gap-1 rounded-md px-2 py-1.5 text-left outline-none transition-colors',
                   'hover:bg-sidebar-accent/60 focus-visible:ring-1 focus-visible:ring-ring',
                   isActive && 'bg-primary/10 hover:bg-primary/15',
                 )}

@@ -42,6 +42,7 @@ function PairRoute() {
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4 text-foreground">
+      <div className="app-drag-strip" aria-hidden="true" />
       <div className="max-w-sm space-y-3 text-center">
         {error ? (
           <>

@@ -266,21 +266,21 @@ export function ModelEditorForm({ sdkClient, providerId, providerName, model, on
         <div className="space-y-2">
           <Label className="text-xs font-medium">Capabilities</Label>
           <div className="flex items-center gap-4">
-            <label className="flex items-center gap-1.5 cursor-pointer">
+            <label className="flex items-center gap-1.5">
               <Switch
                 checked={form.capabilities?.input?.text ?? false}
                 onCheckedChange={(checked) => setForm(prev => updateCapabilities(prev, 'text', checked))}
               />
               <span className="text-xs">Text</span>
             </label>
-            <label className="flex items-center gap-1.5 cursor-pointer">
+            <label className="flex items-center gap-1.5">
               <Switch
                 checked={form.capabilities?.input?.image ?? false}
                 onCheckedChange={(checked) => setForm(prev => updateCapabilities(prev, 'image', checked))}
               />
               <span className="text-xs">Image</span>
             </label>
-            <label className="flex items-center gap-1.5 cursor-pointer">
+            <label className="flex items-center gap-1.5">
               <Switch
                 checked={form.capabilities?.input?.video ?? false}
                 onCheckedChange={(checked) => setForm(prev => updateCapabilities(prev, 'video', checked))}

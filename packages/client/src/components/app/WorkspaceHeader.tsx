@@ -73,7 +73,7 @@ export function WorkspaceHeader({ sessionId }: { sessionId?: string } = {}) {
   const hasSession = !!currentSession;
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider>
       <div
         data-slot="primary-dock-header"
         className="flex h-10 shrink-0 items-stretch"

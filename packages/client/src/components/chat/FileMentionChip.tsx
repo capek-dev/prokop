@@ -16,7 +16,7 @@ export function FileMentionChip({ path, onRemove, onPreview }: FileMentionChipPr
       <button
         type="button"
         onClick={() => onPreview?.(path)}
-        className="min-w-0 flex-1 text-left cursor-pointer"
+        className="min-w-0 flex-1 text-left"
       >
         <div className="text-xs truncate">
           <span className="text-muted-foreground">{directory}</span>

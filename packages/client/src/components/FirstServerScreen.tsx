@@ -87,8 +87,9 @@ export default function FirstServerScreen({ error }: FirstServerScreenProps) {
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-background dark:bg-gradient-to-br dark:from-muted dark:via-background dark:to-muted p-4">
+      <div className="app-drag-strip" aria-hidden="true" />
       <div className="w-full max-w-md">
-        <div className="bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
+        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
           {/* Header */}
           <div className="px-6 pt-6 pb-4 text-center border-b border-border relative">
             <button

@@ -241,7 +241,7 @@ export function WorkspaceSessionContent({
                           selectAll();
                         }
                       }}
-                      className="hover:underline cursor-pointer"
+                      className="transition-colors hover:text-foreground"
                     >
                       {selectedIds.size === activeSessions.length ? 'Deselect all' : 'Select all'}
                     </button>
@@ -252,7 +252,7 @@ export function WorkspaceSessionContent({
                         e.stopPropagation();
                         selectAll();
                       }}
-                      className="hover:underline cursor-pointer"
+                      className="transition-colors hover:text-foreground"
                     >
                       Select all
                     </button>

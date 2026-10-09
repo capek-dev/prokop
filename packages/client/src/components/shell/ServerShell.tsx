@@ -15,7 +15,7 @@ import { useDockStore } from '@/stores/dockStore';
 import { SidebarProvider } from '@/components/ui/sidebar';
 
 import { AppHeader } from '@/components/app/AppHeader';
-import { ConnectingState } from '@/components/shared/LoadingSkeleton';
+import { AppFrameSkeleton } from './AppFrameSkeleton';
 import { OfflineState } from '@/components/shared/OfflineState';
 import { Button } from '@/components/ui/button';
 import { AppKeyboardHandlersMount } from '@/hooks/useAppKeyboardHandlers';
@@ -144,7 +144,7 @@ export default function ServerShell() {
   if (!hasConnectedOnce) {
     if (sessionManager.connectionTimedOut || sessionManager.retryCount > 0 || sessionManager.authError) {
       return (
-        <div className="flex min-h-screen w-full items-center justify-center bg-background">
+        <AppFrameSkeleton>
           <OfflineState
             serverUrl={sessionManager.serverUrl ?? ''}
             authError={sessionManager.authError}
@@ -153,22 +153,21 @@ export default function ServerShell() {
             onRetry={sessionManager.handleRetry}
             onLogout={sessionManager.handleLogout}
           />
-        </div>
+        </AppFrameSkeleton>
       );
     }
 
     return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center gap-4 bg-background">
-        <ConnectingState />
+      <AppFrameSkeleton status="Connecting to server…">
         <Button
           variant="ghost"
           size="sm"
           onClick={sessionManager.handleLogout}
           className="text-muted-foreground"
         >
-          Change Server
+          Change server
         </Button>
-      </div>
+      </AppFrameSkeleton>
     );
   }
 

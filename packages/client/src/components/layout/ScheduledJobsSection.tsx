@@ -167,7 +167,7 @@ export function ScheduledJobsSection({
                         <CollapsibleTrigger asChild>
                           <button
                             type="button"
-                            className="flex items-center gap-2 min-w-0 flex-1 px-2 py-1.5 text-left cursor-pointer"
+                            className="flex items-center gap-2 min-w-0 flex-1 px-2 py-1.5 text-left"
                             onClick={() => onEditJob(job)}
                           >
                             <Clock className="size-4 shrink-0 text-muted-foreground" />

@@ -47,7 +47,7 @@ interface SettingsDialogShellProps {
 
 export function PanelLoadingFallback() {
   return (
-    <div className="flex items-center justify-center h-32 text-muted-foreground">
+    <div className="animate-appear-late flex items-center justify-center h-32 text-muted-foreground">
       <div className="h-5 w-5 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
     </div>
   );

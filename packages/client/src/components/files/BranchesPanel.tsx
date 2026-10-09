@@ -161,7 +161,7 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
   const sync = selected ? branchSync(selected) : null;
   const stale = isFetchStale(data?.lastFetchedAt ?? null, now);
   const fetched = fetchedLabel(data?.lastFetchedAt ?? null, now);
-  const countClass = 'shrink-0 rounded-sm font-medium tabular-nums underline-offset-2 enabled:hover:underline disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+  const countClass = 'shrink-0 rounded-sm font-medium tabular-nums enabled:hover:text-foreground disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
   const syncTitle = stale ? `May be outdated: ${fetched.toLowerCase()}. Fetch to update.` : `Relative to the last fetch (${fetched.toLowerCase()})`;
   const syncStatus = (() => {
     if (!sync) return null;
@@ -351,7 +351,7 @@ function CommitDetails({ sdkClient, workspaceId, serverId, root, entry, onBack }
       {details.isPending && <p className="text-xs text-muted-foreground">Loading commit…</p>}
       {details.error && <p role="alert" className="text-xs text-destructive">{details.error.message}</p>}
       {details.data && <>
-        <details className="text-xs"><summary className="cursor-pointer">{details.data.files.length} changed files</summary><ul className="py-1">{details.data.files.map((path) => <li key={path} className="truncate py-0.5">{path.split('/').pop()}<span className="ml-1.5 text-muted-foreground/70">{path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''}</span></li>)}</ul></details>
+        <details className="text-xs"><summary>{details.data.files.length} changed files</summary><ul className="py-1">{details.data.files.map((path) => <li key={path} className="truncate py-0.5">{path.split('/').pop()}<span className="ml-1.5 text-muted-foreground/70">{path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''}</span></li>)}</ul></details>
         {details.data.patch ? <CommitPatch patch={details.data.patch} themeType={resolvedMode} /> : <p className="text-xs text-muted-foreground">No file changes</p>}
       </>}
     </div>
@@ -400,7 +400,7 @@ function BranchPush({ sdkClient, serverId, workspaceId, root, source, remotes, o
         <p className="font-mono text-xs text-muted-foreground">{source.name} → {review.target.remote}/{review.target.branch}</p>
         <p className="text-xs text-muted-foreground">{review.result.outgoingCount} outgoing · {review.result.remoteOnlyCount} remote-only{review.result.outgoingCount === 0 && review.result.remoteOnlyCount === 0 ? ' · Nothing to push' : ''}</p>
         {review.result.outgoing.length > 0 && <ul className="text-xs">{review.result.outgoing.map((entry) => <li className="truncate py-0.5" key={entry.head} title={entry.subject}><span className="font-mono text-muted-foreground">{entry.head.slice(0, 8)}</span> {entry.subject}</li>)}</ul>}
-        {review.result.remoteOnlyCount > 0 && <details className="text-xs"><summary className="cursor-pointer text-muted-foreground">Remote commits that force push removes</summary><ul>{review.result.remoteOnly.map((entry) => <li className="truncate py-1" key={entry.head}>{entry.head.slice(0, 8)} {entry.subject}</li>)}</ul></details>}
+        {review.result.remoteOnlyCount > 0 && <details className="text-xs"><summary className="text-muted-foreground">Remote commits that force push removes</summary><ul>{review.result.remoteOnly.map((entry) => <li className="truncate py-1" key={entry.head}>{entry.head.slice(0, 8)} {entry.subject}</li>)}</ul></details>}
         {(review.result.outgoingCount > 50 || review.result.remoteOnlyCount > 50) && <p className="text-xs text-muted-foreground">Showing the first 50 commits in each list.</p>}
         <div className="flex flex-wrap justify-end gap-1">
           <Button size="sm" variant="ghost" disabled={busy || (!review.result.outgoingCount && !review.result.remoteOnlyCount)} onClick={() => setConfirm(true)}>Force with lease…</Button>

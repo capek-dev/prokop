@@ -185,7 +185,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
     const link = (
       <button
         type="button"
-        className="text-xs text-primary underline-offset-4 hover:underline disabled:pointer-events-none disabled:opacity-50"
+        className="text-xs text-primary transition-opacity hover:opacity-80 disabled:pointer-events-none disabled:opacity-50"
         disabled={preview.isPending}
         onClick={() => preview.mutate(item.id)}
       >
@@ -207,7 +207,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
           <button
             type="button"
             aria-label="Learning history"
-            className="w-fit text-xs text-primary underline-offset-4 hover:underline"
+            className="w-fit text-xs text-primary transition-opacity hover:opacity-80"
             onClick={() => setHistoryOpen(true)}
           >
             History

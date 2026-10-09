@@ -244,7 +244,7 @@ export function OverviewGroupDialog({
                     />
                     <label
                       htmlFor={`overview-group-workspace-${workspace.id}`}
-                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2"
+                      className="flex min-w-0 flex-1 items-center gap-2"
                     >
                       {isAgentHomeWorkspace(workspace) ? (
                         <Bot className="size-4 text-muted-foreground" />

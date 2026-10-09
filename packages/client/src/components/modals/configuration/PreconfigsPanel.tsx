@@ -586,7 +586,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                   {homeWorkspaceId && (
                     <button
                       type="button"
-                      className="w-fit text-xs text-primary underline-offset-4 hover:underline"
+                      className="w-fit text-xs text-primary transition-opacity hover:opacity-80"
                       aria-label="Learning history"
                       onClick={() => setHistoryOpen(true)}
                     >
@@ -678,7 +678,7 @@ export function PreconfigsPanel({ sdkClient, draft: draftProp, onDraftChange }: 
                 </div>
                 {homeError && <SettingsError>{homeError}</SettingsError>}
                 {homeLoading ? (
-                  <div className="flex items-center justify-center py-4">
+                  <div className="animate-appear-late flex items-center justify-center py-4">
                     <Loader2 className="size-4 animate-spin text-muted-foreground" />
                   </div>
                 ) : (

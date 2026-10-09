@@ -41,7 +41,7 @@ export function HeaderPanelToggles({
   const tooltipSide = isWindows() ? 'bottom' : undefined;
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider>
       <div className="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>

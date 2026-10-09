@@ -357,7 +357,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
 
     if (isLoading && paths.length === 0) {
       return (
-        <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+        <div className="animate-appear-late flex h-32 items-center justify-center text-sm text-muted-foreground">
           <Loader2 className="mr-2 size-4 animate-spin" />
           Loading files...
         </div>

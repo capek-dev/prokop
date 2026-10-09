@@ -328,7 +328,7 @@ function FieldRow({ field, path, onChange, onRemove, onAddChild, depth }: FieldR
               placeholder="Description (optional)"
               className="text-xs h-7 flex-1"
             />
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 cursor-pointer">
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
               <Switch
                 checked={field.required}
                 onCheckedChange={(checked) => onChange(path, (f) => ({ ...f, required: checked }))}

@@ -6,11 +6,9 @@ export const router = createRouter({
   routeTree,
   context: { serverRegistry },
   defaultPreload: 'intent',
-  defaultPendingComponent: () => (
-    <div className="flex items-center justify-center min-h-screen bg-background">
-      <div className="h-8 w-8 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
-    </div>
-  ),
+  // Pending routes keep the current screen; the server route renders the app
+  // frame itself, so a generic pending view only ever needs to hold space.
+  defaultPendingComponent: () => <div className="size-full bg-background" />,
 });
 
 declare module '@tanstack/react-router' {

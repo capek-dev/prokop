@@ -122,7 +122,7 @@ export function UserPromptMap({
           aria-label="User prompts"
           className="absolute top-6 right-3 bottom-16 flex w-8 items-center"
         >
-          <TooltipProvider delayDuration={250}>
+          <TooltipProvider>
             <div className="flex max-h-full w-full flex-col gap-1 overflow-y-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {promptItems.map((item, index) => (
                 <Tooltip key={item.messageId}>
@@ -131,7 +131,7 @@ export function UserPromptMap({
                       type="button"
                       aria-label={`Go to prompt ${index + 1}: ${item.label}`}
                       onClick={() => onNavigate(item.messageId)}
-                      className="group pointer-events-auto flex h-3 w-8 shrink-0 cursor-pointer items-center justify-end rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      className="group pointer-events-auto flex h-3 w-8 shrink-0 items-center justify-end rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
                       <span
                         className={cn(

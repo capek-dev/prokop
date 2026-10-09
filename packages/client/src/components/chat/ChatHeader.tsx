@@ -231,7 +231,7 @@ export function ChatHeader({
 
   return (
     <div ref={headerRef} className="flex-1 min-w-0 flex items-center justify-between gap-1">
-      <TooltipProvider delayDuration={300}>
+      <TooltipProvider>
         <div className="flex items-center justify-between gap-1 w-full min-w-0">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             {session.parentId && onNavigateBack && (
@@ -259,7 +259,7 @@ export function ChatHeader({
               />
             ) : (
               <h2
-                className="text-base font-semibold leading-none cursor-pointer px-2 py-1.5 -mx-2 rounded hover:bg-accent transition-colors truncate min-w-0"
+                className="text-base font-semibold leading-none px-2 py-1.5 -mx-2 rounded hover:bg-accent transition-colors truncate min-w-0"
                 onDoubleClick={handleTitleDoubleClick}
               >
                 {session.title || 'Untitled Session'}

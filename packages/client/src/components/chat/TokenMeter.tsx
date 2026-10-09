@@ -49,12 +49,12 @@ export function TokenMeter({ usage = null }: TokenMeterProps) {
     : [['Usage', 'Not reported']];
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
           <button
             type="button"
-            className="flex items-center gap-1.5 cursor-pointer select-none"
+            className="flex items-center gap-1.5 select-none"
             onClick={() => setShowTokens((current) => !current)}
             aria-label={`Token usage: ${percentage}% of context window`}
           >

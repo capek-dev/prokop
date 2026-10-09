@@ -131,7 +131,7 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {detail.data.sessionId && (
-                  <button type="button" className="text-sm text-primary underline-offset-4 hover:underline"
+                  <button type="button" className="text-sm text-primary transition-opacity hover:opacity-80"
                     onClick={() => openSession(detail.data.sessionId!)}>
                     Open learning session
                   </button>
@@ -154,7 +154,7 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
               {!detail.data.changes.length && <p className="text-sm text-muted-foreground">No knowledge changes.</p>}
               {detail.data.changes.map(change => (
                 <details key={change.id} className="rounded-md border">
-                  <summary className="cursor-pointer break-all px-3 py-2 text-sm">
+                  <summary className="break-all px-3 py-2 text-sm">
                     {change.path} ({change.status}{change.undoPending ? ', undo pending' : ''})
                   </summary>
                   <div className="flex flex-col gap-2 border-t px-3 py-2">
@@ -174,7 +174,7 @@ export function LearningHistory({ workspaceId }: { workspaceId: string }) {
                 <div className="flex flex-col">
                   {sourceSessions.map(source => (
                     <button key={source.sessionId} type="button"
-                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm text-primary underline-offset-4 hover:bg-muted/50 hover:underline"
+                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm text-primary hover:bg-muted/50"
                       onClick={() => openSession(source.sessionId)}>
                       <span className="truncate">{sessionTitle(source.title)}</span>
                       {source.count > 1 && <span className="shrink-0 text-xs text-muted-foreground">{source.count} messages</span>}

@@ -39,7 +39,7 @@ const LazyOutput = memo(function LazyOutput({ content, className }: LazyOutputPr
       <pre className={className}>{isExpanded ? content : preview}</pre>
       <button
         type="button"
-        className="text-xs text-muted-foreground hover:text-foreground mt-1 transition-colors cursor-pointer"
+        className="text-xs text-muted-foreground hover:text-foreground mt-1 transition-colors"
         onClick={() => setIsExpanded(prev => !prev)}
       >
         {isExpanded ? 'Show less' : `Show full output (${sizeLabel})`}
@@ -187,7 +187,7 @@ export const ToolCall = memo(function ToolCall({
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
           <div
-            className="group/tool-row flex items-center gap-2 py-1 cursor-pointer hover:text-foreground transition-colors text-muted-foreground"
+            className="group/tool-row flex items-center gap-2 py-1 hover:text-foreground transition-colors text-muted-foreground"
           >
             {getStatusIcon(status)}
 

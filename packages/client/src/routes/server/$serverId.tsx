@@ -1,10 +1,12 @@
 import { createFileRoute, Link, redirect, useParams, useRouter } from '@tanstack/react-router';
 import { AuthError } from '@prokopai/sdk';
+import { Button } from '@/components/ui/button';
 import { PairDeviceScreen } from '@/components/PairDeviceScreen';
 import { useServerContext } from '@/contexts/ServerContext';
 import { fetchCriticalServerData, type CriticalServerData } from '@/lib/fetchServerData';
 import { StoreHydrator } from '@/components/providers/StoreHydrator';
 import ServerShell from '@/components/shell/ServerShell';
+import { AppFrameSkeleton } from '@/components/shell/AppFrameSkeleton';
 import { setLastSelectedServerId } from '@/config/servers';
 import { mark } from '@/lib/perf';
 import { retryServerLoad } from '@/lib/retryServerLoad';
@@ -40,6 +42,7 @@ function ServerErrorComponent({
 
   return (
     <div className="flex w-full items-center justify-center min-h-screen bg-background text-foreground">
+      <div className="app-drag-strip" aria-hidden="true" />
       <div className="text-center space-y-4 p-8 max-w-lg w-full">
         <h2 className="text-lg font-semibold">Server Connection Error</h2>
         <p className="text-muted-foreground text-sm">
@@ -120,16 +123,14 @@ export const Route = createFileRoute('/server/$serverId')({
     </StoreHydrator>
   ),
   errorComponent: ServerErrorComponent,
+  // Paint the app frame immediately instead of a blank window.
+  pendingMs: 0,
+  pendingMinMs: 0,
   pendingComponent: () => (
-    <div className="w-full flex items-center justify-center min-h-screen bg-background text-foreground">
-      <div className="text-center space-y-2">
-        <div className="h-8 w-8 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin mx-auto" />
-        <p role="status" className="text-sm text-muted-foreground">Connecting to server...</p>
-        <p className="text-xs text-muted-foreground">If the server is offline, this page will retry automatically.</p>
-        <Link to="/" search={{ select: true }} replace className="block text-sm underline underline-offset-4">
-          Back to Server Selection
-        </Link>
-      </div>
-    </div>
+    <AppFrameSkeleton status="Connecting to server…">
+      <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
+        <Link to="/" search={{ select: true }} replace>Change server</Link>
+      </Button>
+    </AppFrameSkeleton>
   ),
 });

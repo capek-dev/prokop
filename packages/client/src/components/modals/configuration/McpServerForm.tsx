@@ -78,7 +78,7 @@ export function McpServerForm({ name: originalName, config, names, pending, onSa
           <Label htmlFor={id + '-oauth'}>Sign in with OAuth</Label>
           <Switch id={id + '-oauth'} checked={oauth} onCheckedChange={setOauth} />
         </div>
-        <details><summary className="cursor-pointer text-sm text-muted-foreground">Authentication details</summary>
+        <details><summary className="text-sm text-muted-foreground">Authentication details</summary>
           <div className="mt-3 flex flex-col gap-3">
             {oauth && <>
               <p className="text-xs text-muted-foreground">Leave client details empty if the server supports automatic registration.</p>

@@ -237,7 +237,7 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
                         {getWorkspaceDisplayName(workspace, agents)}
                       </span>
                     </CollapsibleTrigger>
-                    <TooltipProvider delayDuration={300}>
+                    <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button

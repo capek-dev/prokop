@@ -111,7 +111,7 @@ export const CodeBlock: FC<CodeBlockProps> = memo(({
           <button
             type="button"
             onClick={handlePathClick}
-            className="flex items-center gap-1 font-mono hover:text-foreground transition-colors cursor-pointer rounded px-1 py-0.5 -mx-1 hover:bg-muted min-w-0 flex-1 text-left"
+            className="flex items-center gap-1 font-mono hover:text-foreground transition-colors rounded px-1 py-0.5 -mx-1 hover:bg-muted min-w-0 flex-1 text-left"
             title={path}
           >
             <span className="truncate">{path}</span>

@@ -28,7 +28,7 @@ export function SettingsEmpty({ children }: { children: ReactNode }) {
 
 export function SettingsLoading() {
   return (
-    <div className="flex items-center justify-center p-8" role="status" aria-label="Loading">
+    <div className="animate-appear-late flex items-center justify-center p-8" role="status" aria-label="Loading">
       <Loader2 className="size-5 animate-spin text-muted-foreground" />
     </div>
   );

@@ -243,7 +243,7 @@ export function SessionCheckoutSelector({ session, sdkClient, disabled }: Checko
   const tooltip = `Session checkout: ${label}`;
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
           <Popover open={open} onOpenChange={setOpen}>

@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import type { SavedServer } from '@prokopai/sdk';
 import {
-  LoaderCircle,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -10,6 +9,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { AppFrameSkeleton } from '@/components/shell/AppFrameSkeleton';
 import { RenameServerDialog } from '@/components/modals/RenameServerDialog';
 import { Button } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
@@ -84,25 +84,14 @@ function LandingPage() {
   };
 
   if (showStartup) {
-    return (
-      <div className="flex size-full items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <LoaderCircle className="size-7 animate-spin text-muted-foreground" />
-          <div>
-            <p className="font-medium text-foreground">Opening Prokop</p>
-            <p className="text-sm text-muted-foreground">
-              Looking for your home server…
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    return <AppFrameSkeleton status="Looking for your home server…" />;
   }
 
   return (
     <div className="flex size-full items-center justify-center bg-background p-4">
+      <div className="app-drag-strip" aria-hidden="true" />
       <div className="w-full max-w-2xl">
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           <div className="border-b border-border px-6 pt-6 pb-4 text-center">
             <div className="flex items-center justify-center gap-2">
               <h1 className="text-2xl font-bold text-foreground">Select a Server</h1>

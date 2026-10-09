@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { syncThemeColor } from '@/lib/desktopChrome';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type ThemeScheme = 'neutral' | 'ocean' | 'forest' | 'sunset' | 'amethyst';
@@ -110,6 +111,7 @@ export function ThemeProvider({
 
     root.classList.add(resolved);
     root.classList.add(scheme);
+    syncThemeColor();
 
     setResolvedMode(resolved);
   }, []);

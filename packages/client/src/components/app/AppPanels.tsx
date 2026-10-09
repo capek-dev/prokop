@@ -20,7 +20,7 @@ interface AppPanelsProps {
 
 function TerminalLoadingFallback() {
   return (
-    <div className="flex items-center justify-center h-full min-h-[200px] text-muted-foreground">
+    <div className="animate-appear-late flex items-center justify-center h-full min-h-[200px] text-muted-foreground">
       <div className="h-6 w-6 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
     </div>
   );

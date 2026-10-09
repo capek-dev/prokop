@@ -162,7 +162,7 @@ function CompactionDivider({ part }: { part: CompactionPart }) {
     <div className="flex flex-col items-center py-3">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
         {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
         <span className="border-b border-dashed border-muted-foreground/40 pb-px">
@@ -447,7 +447,7 @@ const StructuredOutputMessage = memo(function StructuredOutputMessage({
     <>
       <Collapsible open={rawOpen} onOpenChange={setRawOpen}>
         <CollapsibleTrigger asChild>
-          <div className="flex items-center gap-2 py-1 cursor-pointer hover:text-foreground transition-colors text-muted-foreground">
+          <div className="flex items-center gap-2 py-1 hover:text-foreground transition-colors text-muted-foreground">
             <Braces className="size-3 text-primary" />
             {rawOpen ? (
               <ChevronDown className="size-4 text-muted-foreground" />
@@ -1091,7 +1091,7 @@ export function VirtualizedTranscript({
       // History rows change height as they are measured or previews are expanded.
       maintainVisibleContentPosition={{ data: true, size: true }}
       onScroll={handleScroll}
-      className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative chat-transcript-scrollbar"
+      className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative chat-transcript-scrollbar select-text"
       style={{ WebkitOverflowScrolling: 'touch' }}
       ListHeaderComponent={header}
       ListEmptyComponent={emptyContent ? () => emptyContent : EmptyTranscript}

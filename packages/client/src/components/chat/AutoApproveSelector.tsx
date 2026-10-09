@@ -89,7 +89,7 @@ export function AutoApproveSelector({
 
   if (disabled) {
     return (
-      <TooltipProvider delayDuration={300}>
+      <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -110,7 +110,7 @@ export function AutoApproveSelector({
 
   return (
     <DropdownMenu>
-      <TooltipProvider delayDuration={300}>
+      <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>

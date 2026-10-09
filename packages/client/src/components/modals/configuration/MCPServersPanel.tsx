@@ -96,7 +96,7 @@ function McpSettings({ workspaceId, client }: { workspaceId: string | null; clie
                   onClick={() => run(() => client.http.mcp.remove(workspaceId, name))}><Trash2 /></Button></>}
               </div>
               {config.type === 'builtin' && <details className="text-sm">
-                <summary className="cursor-pointer text-muted-foreground">Set up browser extension</summary>
+                <summary className="text-muted-foreground">Set up browser extension</summary>
                 <ol className="mt-2 flex list-inside list-decimal flex-col gap-2 text-xs text-muted-foreground">
                   <li><a className="underline" href="https://github.com/rabbyte-tech/jean2/releases?q=browser%2F&expanded=true" target="_blank" rel="noopener noreferrer">Download the Prokop Browser extension</a> ZIP from a browser release and extract it.</li>
                   <li>Open <code>chrome://extensions</code>, enable Developer mode, choose Load unpacked, and select the extracted folder containing <code>manifest.json</code>.</li>

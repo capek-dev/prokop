@@ -53,7 +53,7 @@ function PinnedMessageItem({
   return (
     <div
       className={cn(
-        'group flex min-w-0 max-w-full flex-col gap-1 rounded-md p-2 cursor-pointer overflow-hidden',
+        'group flex min-w-0 max-w-full flex-col gap-1 rounded-md p-2 overflow-hidden',
         'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
         'transition-colors',
         isCurrentSession && 'bg-sidebar-accent/60',
@@ -101,7 +101,7 @@ export function PinnedMessagesPanel({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-4">
+      <div className="animate-appear-late flex items-center justify-center py-4">
         <Loader2 className="size-4 animate-spin text-muted-foreground" />
       </div>
     );
@@ -117,7 +117,7 @@ export function PinnedMessagesPanel({
       <Collapsible open={open} onOpenChange={setOpen} className="group/collapsible min-w-0">
         <SidebarGroup className="min-w-0 overflow-hidden">
           <SidebarGroupLabel asChild>
-            <CollapsibleTrigger className="flex min-w-0 cursor-pointer items-center justify-between gap-2">
+            <CollapsibleTrigger className="flex min-w-0 items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-2">
                 <ChevronRight className="size-3 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                 <Pin className="size-3 shrink-0" />

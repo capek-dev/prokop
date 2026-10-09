@@ -6,6 +6,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#1c1c1c" />
     <title>Prokopai</title>
     <script>
       (function() {
@@ -37,6 +38,8 @@
         var root = document.documentElement;
         root.classList.remove('light', 'dark', 'neutral', 'primary');
         root.classList.add(mode, scheme);
+        var themeColor = document.querySelector('meta[name="theme-color"]');
+        if (themeColor && mode === 'light') themeColor.setAttribute('content', '#eff0f3');
       })();
     </script>
   </head>

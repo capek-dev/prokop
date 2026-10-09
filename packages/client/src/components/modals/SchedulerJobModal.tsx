@@ -263,7 +263,7 @@ export function SchedulerJobModal({
                   <div className="text-sm text-muted-foreground">Run on</div>
                   <div className="flex flex-wrap gap-2">
                     {DAYS.map(day => (
-                      <label key={day.value} className="flex items-center gap-1.5 cursor-pointer">
+                      <label key={day.value} className="flex items-center gap-1.5">
                         <Checkbox
                           checked={weeklyDays.includes(day.value)}
                           onCheckedChange={() => toggleDay(day.value)}
@@ -341,7 +341,7 @@ export function SchedulerJobModal({
               checked={reuseSession}
               onCheckedChange={(checked) => setReuseSession(checked === true)}
             />
-            <Label htmlFor="job-reuse-session" className="text-sm font-normal cursor-pointer">
+            <Label htmlFor="job-reuse-session" className="text-sm font-normal">
               Reuse same session for each run
             </Label>
           </div>
@@ -353,7 +353,7 @@ export function SchedulerJobModal({
                 checked={includeHistory}
                 onCheckedChange={(checked) => setIncludeHistory(checked === true)}
               />
-              <Label htmlFor="job-include-history" className="text-sm font-normal cursor-pointer">
+              <Label htmlFor="job-include-history" className="text-sm font-normal">
                 Include previous run history (agent sees past context)
               </Label>
             </div>

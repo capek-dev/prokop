@@ -108,7 +108,7 @@ export function DockRegion({ position, children, overlay = false }: DockRegionPr
         data-state={dock.open ? 'expanded' : 'collapsed'}
         className={overlay ? 'contents' : cn(
           'flex min-h-0 min-w-0 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground',
-          dock.open ? 'rounded-xl border border-border/50 shadow-sm' : 'invisible pointer-events-none',
+          dock.open ? 'rounded-xl border border-border/50' : 'invisible pointer-events-none',
         )}
         style={overlay ? undefined : {
           '--dock-size': `${size}px`,

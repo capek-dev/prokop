@@ -271,7 +271,7 @@ export function FolderPickerDialog({
           
           <ScrollArea className="h-64 border rounded-md">
             {loading ? (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
+              <div className="animate-appear-late flex items-center justify-center h-full text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 Loading...
               </div>

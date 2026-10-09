@@ -22,6 +22,8 @@
   --animate-blink: blink 1s ease-in-out infinite;
   --animate-stream-cursor: stream-cursor 1s ease-in-out infinite;
   --animate-completion-flash: completion-flash 5s ease-out forwards;
+  /* Loading indicators stay invisible for fast loads, then fade in. */
+  --animate-appear-late: fade-in 120ms ease-out 300ms both;
 }
 
 @keyframes fade-in {
@@ -107,6 +109,54 @@
     overflow: hidden;
     @apply bg-background text-foreground font-sans antialiased;
     overscroll-behavior: none;
+    /* Desktop chrome: the interface is not a document. Content opts back in
+       with `select-text` (transcript, code, previews, error text). */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    cursor: default;
+  }
+
+  input,
+  textarea,
+  [contenteditable]:not([contenteditable="false"]),
+  pre,
+  code,
+  kbd,
+  diffs-container,
+  .markdown-render,
+  .visualization-container,
+  .tool-output-scroll,
+  [role="alert"],
+  [data-slot="dialog-description"],
+  [data-sonner-toast] [data-content],
+  [data-selectable] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  img {
+    -webkit-user-drag: none;
+  }
+
+  /* Thin, theme-aware scrollbars everywhere (scrollbar-color inherits). */
+  :root {
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent) transparent;
+  }
+
+  * {
+    scrollbar-width: thin;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *:not(.animate-spin),
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 
   #root {
@@ -157,7 +207,7 @@
   --border: oklch(0.895 0.006 265);
   --input: oklch(0.90 0.006 265);
   --ring: oklch(0.205 0.006 265);
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --sidebar: oklch(0.975 0.003 265);
   --sidebar-foreground: oklch(0.155 0.006 265);
   --sidebar-primary: oklch(0.205 0.006 265);
@@ -1032,4 +1082,37 @@ main {
   --diffs-light-bg: var(--card);
   --diffs-dark-bg: var(--card);
   --diffs-font-size: 12px;
+}
+
+/* ==========================================================================
+   WINDOW TITLE BAR (installed PWA, window-controls-overlay)
+   The env() values exist only while the overlay is active; elsewhere the
+   fallbacks leave the header as an ordinary toolbar.
+   ========================================================================== */
+
+.app-titlebar {
+  -webkit-app-region: drag;
+  app-region: drag;
+  min-height: env(titlebar-area-height, 2.75rem);
+  padding-left: max(0.5rem, env(titlebar-area-x, 0px));
+  padding-right: max(
+    0.5rem,
+    calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw))
+  );
+}
+
+.app-titlebar :is(button, a, input, select, textarea, [role="button"], [role="tab"], [role="combobox"], [data-no-drag]) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* Full-page screens without the app header still need a grabbable strip. */
+.app-drag-strip {
+  position: fixed;
+  top: 0;
+  left: env(titlebar-area-x, 0px);
+  width: env(titlebar-area-width, 0px);
+  height: env(titlebar-area-height, 0px);
+  -webkit-app-region: drag;
+  app-region: drag;
 }

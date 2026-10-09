@@ -109,7 +109,7 @@ export default function FilePreviewOverlay({
         <div
           role="status"
           aria-label="Loading file preview"
-          className="flex items-center justify-center h-full"
+          className="animate-appear-late flex items-center justify-center h-full"
         >
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
         </div>
