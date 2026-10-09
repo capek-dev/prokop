@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useRouter } from '@tanstack/react-router';
 import { GitPullRequest, SquarePen } from 'lucide-react';
-import { useWorkspaceViewStore } from '@/stores/workspaceViewStore';
+import { pullRequestsViewId, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { toast } from 'sonner';
 import { useViewRefs } from '@/contexts/ViewRefsContext';
@@ -193,6 +193,13 @@ function WorkspaceSidebar() {
     }
   }, [sdkClient, sidebarData.activeWorkspace?.id, invalidateWorkspaceTags, updateSession]);
 
+  // This workspace's pull requests tab; other workspaces keep their own tabs.
+  const openPullRequests = () => {
+    if (!activeWorkspace) return;
+    useWorkspaceViewStore.getState().openInCenter(pullRequestsViewId(serverId, activeWorkspace.id));
+    useChatLayoutStore.getState().setMobileSurface('pull-requests');
+  };
+
   const sidebarHeader = (
     <SidebarHeader className="p-1">
       <div className="flex min-w-0 items-center gap-1">
@@ -222,7 +229,7 @@ function WorkspaceSidebar() {
         />
         <TooltipProvider>
           <Tooltip>
-            <TooltipTrigger asChild><Button variant="ghost" size="icon-xs" aria-label="Pull requests" disabled={!sidebarData.connected} onClick={() => { useWorkspaceViewStore.getState().openInCenter('pull-requests'); useChatLayoutStore.getState().setMobileSurface('pull-requests'); }}><GitPullRequest /></Button></TooltipTrigger>
+            <TooltipTrigger asChild><Button variant="ghost" size="icon-xs" aria-label="Pull requests" disabled={!sidebarData.connected || !activeWorkspace} onClick={openPullRequests}><GitPullRequest /></Button></TooltipTrigger>
             <TooltipContent>Pull requests</TooltipContent>
           </Tooltip>
           <Tooltip>

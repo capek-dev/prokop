@@ -8,11 +8,34 @@ const LEGACY_VIEW_IDS = ['sessions', 'conversations', 'files', 'editor', 'termin
 export const REPOSITORY_VIEW_IDS = ['explorer', 'changes', 'branches', 'worktrees'] as const;
 export type RepositoryViewId = typeof REPOSITORY_VIEW_IDS[number];
 const ORIGINAL_VIEW_IDS = ['sessions', 'conversations', ...REPOSITORY_VIEW_IDS, 'editor', 'terminals'] as const;
-export const WORKSPACE_VIEW_IDS = [...ORIGINAL_VIEW_IDS, 'usage', 'pull-requests'] as const;
+export const WORKSPACE_VIEW_IDS = [...ORIGINAL_VIEW_IDS, 'usage'] as const;
 export type WorkspaceToolViewId = typeof WORKSPACE_VIEW_IDS[number];
 export type FileViewId = `file:${string}`;
 export type SessionViewId = `session:${string}:${string}`;
-export type WorkspaceViewId = WorkspaceToolViewId | FileViewId | SessionViewId;
+/** Pull requests of one workspace; several can be open side by side, like files. */
+export type PullRequestsViewId = `prs:${string}:${string}`;
+export type ResourceViewId = FileViewId | SessionViewId | PullRequestsViewId;
+export type WorkspaceViewId = WorkspaceToolViewId | ResourceViewId;
+
+/** The single pull requests tab of earlier layouts; dropped when a layout loads. */
+const LEGACY_PULL_REQUESTS_VIEW = 'pull-requests';
+
+export function pullRequestsViewId(serverId: string, workspaceId: string): PullRequestsViewId {
+  return `prs:${encodeURIComponent(serverId)}:${encodeURIComponent(workspaceId)}`;
+}
+
+export function parsePullRequestsViewId(id: string): { serverId: string; workspaceId: string } | null {
+  if (!id.startsWith('prs:')) return null;
+  const parts = id.slice(4).split(':');
+  try {
+    if (parts.length !== 2 || !parts.every((part) => !!part && encodeURIComponent(decodeURIComponent(part)) === part)) return null;
+    return { serverId: decodeURIComponent(parts[0]), workspaceId: decodeURIComponent(parts[1]) };
+  } catch { return null; }
+}
+
+export function isPullRequestsViewId(id: string): id is PullRequestsViewId {
+  return parsePullRequestsViewId(id) !== null;
+}
 
 export function sessionViewId(serverId: string, sessionId: string): SessionViewId {
   return `session:${encodeURIComponent(serverId)}:${encodeURIComponent(sessionId)}`;
@@ -26,8 +49,8 @@ export function isSessionViewId(id: string): id is SessionViewId {
   } catch { return false; }
 }
 
-export function isResourceViewId(id: string): id is FileViewId | SessionViewId {
-  return isFileViewId(id) || isSessionViewId(id);
+export function isResourceViewId(id: string): id is ResourceViewId {
+  return isFileViewId(id) || isSessionViewId(id) || isPullRequestsViewId(id);
 }
 
 export function fileViewId(docId: string): FileViewId {
@@ -81,14 +104,27 @@ export function isWorkspaceViewId(value: unknown): value is WorkspaceViewId {
   return WORKSPACE_VIEW_IDS.some((id) => id === value) || (typeof value === 'string' && isResourceViewId(value));
 }
 
-export function parseViewLayout(value: unknown): WorkspaceViewLayout | null {
+/** Removes the legacy single pull requests tab from a stored layout before it is validated. */
+function dropLegacyPullRequests(value: Record<string, unknown>): Record<string, unknown> {
+  if (!isRecord(value.groups) || !Array.isArray(value.hidden)) return value;
+  const groups: Record<string, unknown> = {};
+  for (const [key, group] of Object.entries(value.groups)) {
+    if (!isRecord(group) || !Array.isArray(group.viewIds)) { groups[key] = group; continue; }
+    const viewIds = group.viewIds.filter((id) => id !== LEGACY_PULL_REQUESTS_VIEW);
+    groups[key] = { ...group, viewIds, activeId: group.activeId === LEGACY_PULL_REQUESTS_VIEW ? viewIds[0] ?? null : group.activeId };
+  }
+  return { ...value, groups, hidden: value.hidden.filter((id) => id !== LEGACY_PULL_REQUESTS_VIEW) };
+}
+
+export function parseViewLayout(stored: unknown): WorkspaceViewLayout | null {
+  const value = isRecord(stored) ? dropLegacyPullRequests(stored) : stored;
   if (isRecord(value) && value.version === 5) return addUsageView(parseSplitLayout(value));
   if (!isRecord(value) || (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4) || !isRecord(value.groups)
     || !Array.isArray(value.hidden)) return null;
   const legacy = value.version === 1 || value.version === 2;
   const requiredIds = legacy ? LEGACY_VIEW_IDS : ORIGINAL_VIEW_IDS;
   const validId = (id: unknown): id is string => typeof id === 'string'
-    && (requiredIds.some((required) => required === id) || (!legacy && (id === 'usage' || id === 'pull-requests')) || (value.version !== 1 && isFileViewId(id)) || (value.version === 4 && isSessionViewId(id)));
+    && (requiredIds.some((required) => required === id) || (!legacy && id === 'usage') || (value.version !== 1 && isFileViewId(id)) || (value.version === 4 && isSessionViewId(id)));
   if (!value.hidden.every(validId)) return null;
   const expand = (id: string): WorkspaceViewId[] => legacy && id === 'files'
     ? [...REPOSITORY_VIEW_IDS] : [id as WorkspaceViewId];
@@ -119,9 +155,6 @@ function addUsageView(layout: WorkspaceViewLayout | null): WorkspaceViewLayout |
   }
   return layout;
 }
-
-/** Tool views that open on demand like files: present in the layout only while open. */
-export type ClosableToolViewId = 'pull-requests';
 
 export function isViewOpen(layout: WorkspaceViewLayout, id: WorkspaceViewId): boolean {
   return Object.values(layout.groups).some((group) => group.viewIds.includes(id));
@@ -192,7 +225,7 @@ export function groupRegion(layout: WorkspaceViewLayout, groupId: string): ViewR
 
 export function findViewGroup(layout: WorkspaceViewLayout, id: WorkspaceViewId): string {
   return Object.keys(layout.groups).find((key) => layout.groups[key].viewIds.includes(id))
-    ?? (isFileViewId(id) ? findViewGroup(layout, 'editor') : isSessionViewId(id) ? findViewGroup(layout, 'conversations') : treeGroups(layout.roots.center)[0]);
+    ?? (isFileViewId(id) || isPullRequestsViewId(id) ? findViewGroup(layout, 'editor') : isSessionViewId(id) ? findViewGroup(layout, 'conversations') : treeGroups(layout.roots.center)[0]);
 }
 
 function pruneEmptyGroups(layout: WorkspaceViewLayout): WorkspaceViewLayout {
@@ -242,9 +275,9 @@ interface WorkspaceViewStore {
   splitView: (id: WorkspaceViewId, direction: SplitDirection, available: readonly WorkspaceViewId[]) => string | null;
   resizeSplit: (id: string, ratio: number) => void;
   hideView: (id: WorkspaceViewId) => void;
-  /** Open a closable tool view in the center, moving it back there if it was docked elsewhere. */
-  openInCenter: (id: ClosableToolViewId) => void;
-  removeView: (id: FileViewId | SessionViewId | ClosableToolViewId) => void;
+  /** Open a pull requests tab in the center, moving it back there if it was docked elsewhere. */
+  openInCenter: (id: PullRequestsViewId) => void;
+  removeView: (id: ResourceViewId) => void;
   replaceView: (id: SessionViewId, replacement: SessionViewId) => void;
   resetLayout: () => void;
 }
@@ -389,10 +422,9 @@ export const useWorkspaceViewStore = create<WorkspaceViewStore>((set, get) => {
     },
     resetLayout: () => {
       const layout = get().layout;
+      // Open files, sessions, and pull requests stay open in their default places.
       const resources = Object.values(layout.groups).flatMap((group) => group.viewIds.filter(isResourceViewId));
-      // Open tool tabs stay open; unplaced tool views resolve to the center.
-      const open: WorkspaceViewId[] = isViewOpen(layout, 'pull-requests') ? ['pull-requests'] : [];
-      update(resolveViewLayout(createDefaultViewLayout(), [...resources, ...open]));
+      update(resolveViewLayout(createDefaultViewLayout(), resources));
       useDockStore.getState().setDockOpen('left', true);
       useDockStore.getState().setDockOpen('right', false);
       useDockStore.getState().setDockOpen('bottom', false);

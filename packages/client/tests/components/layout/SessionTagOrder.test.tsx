@@ -87,4 +87,25 @@ describe('session panel ordering', () => {
     />);
     expect(visibleSessions()).toEqual(['untagged', 'tagged', 'tagged', 'untagged']);
   });
+
+  test('overview opens pull requests for a repository workspace, not a virtual one', async () => {
+    const workspaces = [
+      { id: 'repo', name: 'Repo', settings: {} },
+      { id: 'scratch', name: 'Scratch', isVirtual: true, settings: {} },
+    ] as Workspace[];
+    const onOpenPullRequests = vi.fn();
+    render(<WorkspaceOverview
+      {...panelProps}
+      sessionsByWorkspace={{ repo: [], scratch: [] }}
+      tagGroupsByWorkspace={{}} orderedTagNamesByWorkspace={{}} allWorkspaceTagsByWorkspace={{}}
+      workspaceIds={['repo', 'scratch']} workspaces={workspaces} agents={[]}
+      activeWorkspace={null} currentSession={null} isHydrated
+      groups={[{ id: 'group', serverId: 'server', name: 'Group', workspaceIds: ['repo', 'scratch'] }]}
+      activeGroup={null} groupActions={{} as ComponentProps<typeof WorkspaceOverview>['groupActions']}
+      serverId="server" onCreateSessionInWorkspace={vi.fn()} onOpenPullRequests={onOpenPullRequests} connected
+    />);
+    expect(screen.queryByRole('button', { name: 'Pull requests in Scratch' })).toBeNull();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Pull requests in Repo' }));
+    expect(onOpenPullRequests).toHaveBeenCalledWith('repo');
+  });
 });

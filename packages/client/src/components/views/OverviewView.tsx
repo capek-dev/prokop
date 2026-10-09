@@ -10,6 +10,8 @@ import { useInvalidateWorkspaceTags } from '@/hooks/queries';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useMobileSessionSelection } from '@/hooks/useMobileSessionSelection';
 import { useServerDataStore } from '@/stores/serverDataStore';
+import { pullRequestsViewId, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
+import { useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useBoardRouteSync } from '@/hooks/useBoardRouteSync';
 import { useFocusedSessionWorkspaceContext } from '@/hooks/useFocusedSessionWorkspaceContext';
@@ -104,6 +106,14 @@ function OverviewSidebar() {
   } = sessionManager;
   const handleResumeSession = useMobileSessionSelection(resumeSession);
 
+  // Each workspace gets its own pull requests tab, like files; the active workspace is untouched.
+  const serverId = sidebarData.activeServer?.id;
+  const handleOpenPullRequests = useCallback((workspaceId: string) => {
+    if (!serverId) return;
+    useWorkspaceViewStore.getState().openInCenter(pullRequestsViewId(serverId, workspaceId));
+    useChatLayoutStore.getState().setMobileSurface('pull-requests');
+  }, [serverId]);
+
   const handleAddTag = useCallback(async (sessionId: string, tag: string) => {
     if (!sdkClient) return;
     const newTags = [tag];
@@ -148,6 +158,7 @@ function OverviewSidebar() {
       onRenameSession={handleRenameSession}
       onRegenerateSessionTitle={regenerateSessionTitle}
       onCreateSessionInWorkspace={createSessionInWorkspace}
+      onOpenPullRequests={handleOpenPullRequests}
       onAddTag={handleAddTag}
       onRemoveTag={handleRemoveTag}
       connected={sidebarData.connected}

@@ -12,7 +12,8 @@ import { WorktreesPanel } from '@/components/worktrees/WorktreesPanel';
 import { useViewRefs } from '@/contexts/ViewRefsContext';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { isDocDirty, useFileEditorStore } from '@/stores/fileEditorStore';
-import { fileViewId, isViewOpen, useWorkspaceViewStore, type WorkspaceViewId } from '@/stores/workspaceViewStore';
+import { fileViewId, isPullRequestsViewId, parsePullRequestsViewId, useWorkspaceViewStore, type WorkspaceViewId } from '@/stores/workspaceViewStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { WorkspaceTab } from '@/components/app/workspaceTab';
 import { getWorkspaceDisplayName } from '@/lib/workspaceKind';
 
@@ -79,14 +80,21 @@ export function WorkspaceContentArea({
       onClose: () => editorHandles.current.get(docId)?.requestClose(),
     };
   }
-  const pullRequestsOpen = useWorkspaceViewStore((state) => isViewOpen(state.layout, 'pull-requests'));
-  if (pullRequestsOpen && serverId && workspaceId && sdkClient) {
-    resourceViews['pull-requests'] = (
-      <PullRequestsView key={`${serverId}:${workspaceId}`} client={sdkClient} serverId={serverId} workspaceId={workspaceId} />
+  // One tab per workspace, like files: each keeps its own workspace whatever is active.
+  const pullRequestIds = useWorkspaceViewStore(useShallow((state) => Object.values(state.layout.groups)
+    .flatMap((group) => group.viewIds).filter(isPullRequestsViewId)));
+  for (const viewId of pullRequestIds) {
+    const target = parsePullRequestsViewId(viewId);
+    const workspace = target && target.serverId === serverId ? workspaces.find((item) => item.id === target.workspaceId) : undefined;
+    if (!workspace || !serverId || !sdkClient) continue;
+    const name = getWorkspaceDisplayName(workspace, agents) || 'Workspace';
+    resourceViews[viewId] = (
+      <PullRequestsView key={viewId} client={sdkClient} serverId={serverId} workspaceId={workspace.id} />
     );
-    tabs['pull-requests'] = {
-      label: 'Pull requests',
-      onClose: () => useWorkspaceViewStore.getState().removeView('pull-requests'),
+    tabs[viewId] = {
+      label: `Pull requests · ${name}`,
+      description: workspace.path,
+      onClose: () => useWorkspaceViewStore.getState().removeView(viewId),
     };
   }
   const mobileEditorId = activeDocId && scopedDocIds.includes(activeDocId)

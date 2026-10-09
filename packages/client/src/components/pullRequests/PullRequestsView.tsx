@@ -148,6 +148,8 @@ function RepositoryView({
   checkoutPath: string;
 }) {
   const cache = useQueryClient();
+  // Overview and Workspace mount their own copy of this view, so the mode is fixed per instance.
+  const [inOverview] = useState(() => window.location.pathname.includes('/overview'));
   const [remote, setRemote] = useState<string | null>(null);
   const connections = useQuery({
     queryKey: ['pull-requests', serverId, workspaceId, 'connections', root ?? ''],
@@ -223,8 +225,10 @@ function RepositoryView({
           <p>No GitHub or Azure DevOps remote was found in this checkout.</p>
           <p className="break-all font-mono text-xs">{checkoutPath}</p>
           <p>
-            To use another project, choose it in the workspace selector beside Sessions. For another checkout of
-            this project, use the checkout selector above.
+            {inOverview
+              ? 'To use another project, use the pull requests button on its header in the session list.'
+              : 'To use another project, choose it in the workspace selector beside Sessions.'}
+            {' '}For another checkout of this project, use the checkout selector above.
           </p>
         </div>
       )}

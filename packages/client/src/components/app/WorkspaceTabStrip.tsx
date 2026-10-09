@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 
 export const VIEW_LABELS: Record<WorkspaceToolViewId, string> = {
   usage: 'Usage',
-  'pull-requests': 'Pull requests',
   sessions: 'Sessions', conversations: 'Conversations', explorer: 'Explorer', changes: 'Changes', branches: 'Branches', worktrees: 'Worktrees', editor: 'Editor', terminals: 'Terminals',
 };
 

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { Bot, Folder, Box, ChevronRight, SquarePen, Tag, Archive, MoreHorizontal, Layers } from 'lucide-react';
+import { Bot, Folder, Box, ChevronRight, GitPullRequest, SquarePen, Tag, Archive, MoreHorizontal, Layers } from 'lucide-react';
 import type { Agent, Session, Workspace } from '@prokopai/sdk';
 import {
   SidebarGroup,
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
@@ -59,6 +60,8 @@ interface WorkspaceOverviewProps {
   onRenameSession: (sessionId: string, title: string) => void;
   onRegenerateSessionTitle?: (sessionId: string) => void;
   onCreateSessionInWorkspace: (workspaceId: string, options?: CreateSessionOptions) => void;
+  /** Opens the pull requests view for a repository workspace. */
+  onOpenPullRequests?: (workspaceId: string) => void;
   onAddTag?: (sessionId: string, tag: string) => void;
   onRemoveTag?: (sessionId: string, tag: string) => void;
   connected: boolean;
@@ -93,6 +96,7 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
   onRenameSession,
   onRegenerateSessionTitle,
   onCreateSessionInWorkspace,
+  onOpenPullRequests,
   onAddTag,
   onRemoveTag,
   connected,
@@ -239,6 +243,23 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
                       </span>
                     </CollapsibleTrigger>
                     <TooltipProvider>
+                      {onOpenPullRequests && !workspace.isVirtual && !isAgentHomeWorkspace(workspace) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => onOpenPullRequests(workspace.id)}
+                              disabled={!connected}
+                              className="ml-auto shrink-0"
+                              aria-label={`Pull requests in ${getWorkspaceDisplayName(workspace, agents)}`}
+                            >
+                              <GitPullRequest className="size-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Pull requests</TooltipContent>
+                        </Tooltip>
+                      )}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -249,7 +270,7 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
                               getCreateSessionOptions(event),
                             )}
                             disabled={!connected}
-                            className="ml-auto shrink-0"
+                            className={cn('shrink-0', !(onOpenPullRequests && !workspace.isVirtual && !isAgentHomeWorkspace(workspace)) && 'ml-auto')}
                             aria-label={`New Chat in ${getWorkspaceDisplayName(workspace, agents)}`}
                           >
                             <SquarePen className="size-3.5" />

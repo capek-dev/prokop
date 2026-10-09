@@ -14,7 +14,7 @@ import { useIsCompact, useIsMobile } from '@/hooks/use-mobile';
 import { useSessionChatLayoutStore as useChatLayoutStore } from '@/stores/chatLayoutStore';
 import { useDockStore } from '@/stores/dockStore';
 import {
-  activeGroupView, findViewGroup, findViewRegion, isFileViewId, isSessionViewId, REPOSITORY_VIEW_IDS, resolveViewLayout, useWorkspaceViewStore,
+  activeGroupView, findViewGroup, findViewRegion, isFileViewId, isPullRequestsViewId, isSessionViewId, REPOSITORY_VIEW_IDS, resolveViewLayout, useWorkspaceViewStore,
   type ViewRegion, type WorkspaceViewId,
 } from '@/stores/workspaceViewStore';
 
@@ -61,7 +61,11 @@ export function WorkspaceViews({ views, tabs = {}, mobileEditorId, mobileSession
   const repositoryIds = REPOSITORY_VIEW_IDS.filter((id) => available.includes(id));
   const repositoryView = repositoryTab === 'project' ? 'explorer' : repositoryTab;
   const chatView = selectedSession ?? 'conversations';
-  const requestedMobileView = mobileSurface === 'chat' ? chatView : mobileSurface === 'files' ? repositoryView : mobileSurface;
+  // Several pull requests tabs can be open (one per workspace); show the one last activated.
+  const pullRequestIds = available.filter(isPullRequestsViewId);
+  const pullRequestsView = pullRequestIds.find((id) => layout.groups[findViewGroup(layout, id)]?.activeId === id) ?? pullRequestIds.at(-1);
+  const requestedMobileView: WorkspaceViewId = mobileSurface === 'chat' ? chatView : mobileSurface === 'files' ? repositoryView
+    : mobileSurface === 'pull-requests' ? pullRequestsView ?? chatView : mobileSurface;
   const mobileView = requestedMobileView === 'editor' && hasEditor ? 'editor' : available.includes(requestedMobileView) ? requestedMobileView
     : (requestedMobileView === 'editor' || mobileSurface === 'files') && available.includes('explorer') ? 'explorer' : chatView;
   const isRepositoryView = repositoryIds.some((id) => id === mobileView);

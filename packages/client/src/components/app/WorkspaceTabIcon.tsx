@@ -5,7 +5,6 @@ import type { WorkspaceToolViewId, WorkspaceViewId } from '@/stores/workspaceVie
 
 const VIEW_ICONS: Record<WorkspaceToolViewId, LucideIcon> = {
   usage: Gauge,
-  'pull-requests': GitPullRequest,
   sessions: List,
   conversations: MessageSquare,
   explorer: FolderTree,
@@ -18,6 +17,6 @@ const VIEW_ICONS: Record<WorkspaceToolViewId, LucideIcon> = {
 
 export function WorkspaceTabIcon({ id }: { id: WorkspaceViewId }): ReactElement {
   const Icon = id.startsWith('session:') ? MessageSquare
-    : id.startsWith('file:') ? FileText : VIEW_ICONS[id as WorkspaceToolViewId];
+    : id.startsWith('file:') ? FileText : id.startsWith('prs:') ? GitPullRequest : VIEW_ICONS[id as WorkspaceToolViewId];
   return <Icon aria-hidden="true" className="size-3.5 shrink-0" />;
 }
