@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Session, Message, Part, MessageWithParts, QueuedMessage } from '@prokopai/sdk';
+import type { TranscriptAnchor } from '@/lib/transcriptFollow';
 
 // --- Session Usage ---
 export type SessionUsage = {
@@ -22,7 +23,8 @@ const DEFAULT_USAGE: SessionUsage = {
 
 export type SessionNavigationIntent =
   | { mode: 'follow' }
-  | { mode: 'free' }
+  /** `anchor` restores the reading position when the transcript remounts. */
+  | { mode: 'free'; anchor?: TranscriptAnchor }
   | { mode: 'target-message'; messageId: string };
 
 export interface ResumeSessionOptions {

@@ -17,6 +17,7 @@ import { RetryStatus } from './RetryStatus';
 import { UserPromptMap } from './UserPromptMap';
 import { EmptySessionCheckout } from './EmptySessionCheckout';
 import { DeferredConversation } from './DeferredConversation';
+import type { TranscriptAnchor } from '@/lib/transcriptFollow';
 
 export interface DisplayItem {
   message: import('@prokopai/sdk').Message;
@@ -248,11 +249,47 @@ function ChatViewContent({
     return unsub;
   }, [session.id, showRejectionNotice]);
 
-  const [autoFollow, setAutoFollow] = useState(navigationIntent.mode === 'follow');
+  const displayItems = useMemo(
+    () => mergeMessagesWithQueue(
+      messagesWithParts,
+      queuedMessages,
+      sdkClient?.http.attachments.getUrl ?? ((sessionId, attachmentId, key) =>
+        `/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/content?key=${encodeURIComponent(key)}`
+      )
+    ),
+    [messagesWithParts, queuedMessages, sdkClient]
+  );
 
+  // Free mode resumes at the saved reading position. Without one that is
+  // still loaded there is nothing to return to, so the session follows.
+  const [initialAnchor] = useState(() => {
+    if (navigationIntent.mode !== 'free' || !navigationIntent.anchor) return undefined;
+    const { anchor } = navigationIntent;
+    return displayItems.some(item => item.message.id === anchor.messageId) ? anchor : undefined;
+  });
+  const [autoFollow, setAutoFollow] = useState(navigationIntent.mode === 'follow'
+    || (navigationIntent.mode === 'free' && !initialAnchor));
+  // Item count when following stopped; growth past it marks unseen output.
+  const [itemsWhenLeft, setItemsWhenLeft] = useState(displayItems.length);
+
+  // `free` from outside (a handled jump) keeps the current mode; only an
+  // explicit follow or a new jump changes it.
   useLayoutEffect(() => {
-    setAutoFollow(navigationIntent.mode === 'follow');
-  }, [session.id, navigationIntent.mode]);
+    if (navigationIntent.mode === 'follow') setAutoFollow(true);
+    else if (navigationIntent.mode === 'target-message') setAutoFollow(false);
+  }, [navigationIntent.mode]);
+
+  const handleAutoScrollChange = useCallback((enabled: boolean) => {
+    setAutoFollow(enabled);
+    if (!enabled) setItemsWhenLeft(displayItems.length);
+  }, [displayItems.length]);
+
+  const handleSavePosition = useCallback((anchor: TranscriptAnchor | null) => {
+    useSessionStore.getState().setNavigationIntentForSession(
+      session.id,
+      anchor ? { mode: 'free', anchor } : { mode: 'follow' },
+    );
+  }, [session.id]);
 
   const handleToggleAutoFollow = useCallback(() => {
     setAutoFollow((prev) => {
@@ -262,7 +299,10 @@ function ChatViewContent({
       }
       return newValue;
     });
-  }, [scrollToBottomRef]);
+    setItemsWhenLeft(displayItems.length);
+  }, [scrollToBottomRef, displayItems.length]);
+
+  const hasUnseenOutput = isStreaming || displayItems.length > itemsWhenLeft;
 
   // Expose toggle function via ref for keyboard shortcuts
   useEffect(() => {
@@ -274,17 +314,6 @@ function ChatViewContent({
       };
     }
   }, [autoFollowToggleRef, handleToggleAutoFollow]);
-
-  const displayItems = useMemo(
-    () => mergeMessagesWithQueue(
-      messagesWithParts,
-      queuedMessages,
-      sdkClient?.http.attachments.getUrl ?? ((sessionId, attachmentId, key) =>
-        `/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/content?key=${encodeURIComponent(key)}`
-      )
-    ),
-    [messagesWithParts, queuedMessages, sdkClient]
-  );
 
   return (
     <div className="relative flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
@@ -313,7 +342,9 @@ function ChatViewContent({
           onCompact={onCompactForMode}
           isMainActiveSession={isMainActiveSession}
           autoFollow={autoFollow}
-          onAutoScrollChange={setAutoFollow}
+          onAutoScrollChange={handleAutoScrollChange}
+          initialAnchor={initialAnchor}
+          onSavePosition={handleSavePosition}
           scrollToBottomRef={scrollToBottomRef}
           serverUrl={serverUrl}
           pinnedMessageIds={pinnedMessageIds}
@@ -339,18 +370,21 @@ function ChatViewContent({
           />
         )}
 
-        {/* Floating auto-follow toggle button - positioned within transcript area */}
-        <button
-          onClick={handleToggleAutoFollow}
-          className="absolute bottom-4 right-4 z-50 flex items-center p-1.5 text-xs rounded-full transition-colors bg-background/80 backdrop-blur-sm hover:bg-background border border-border/50 shadow-sm pointer-events-auto"
-          title={autoFollow ? 'Auto-follow enabled (Cmd+Shift+F)' : 'Auto-follow disabled (Cmd+Shift+F)'}
-        >
-          {autoFollow ? (
+        {/* Only free mode needs a way back; following is the quiet default. */}
+        {!autoFollow && (
+          <button
+            type="button"
+            onClick={handleToggleAutoFollow}
+            className="absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-3 py-1 text-xs text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-background hover:text-foreground pointer-events-auto"
+            title="Jump to latest and follow (Cmd+Shift+F)"
+          >
             <ArrowDown className="size-3.5" />
-          ) : (
-            <Eye className="size-3.5" />
-          )}
-        </button>
+            Latest
+            {hasUnseenOutput && (
+              <span className="size-1.5 rounded-full bg-primary" data-testid="unseen-output" />
+            )}
+          </button>
+        )}
         </DeferredConversation>
       </div>
 

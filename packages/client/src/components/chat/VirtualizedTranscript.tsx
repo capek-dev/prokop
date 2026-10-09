@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback, useMemo, memo, useLayoutEffect } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { buildApiUrl } from '@/config/urls';
 import { LegendList, type LegendListRef } from '@legendapp/list/react';
 import { ChevronDown, ChevronRight, Download, FileIcon, Braces, Loader2 } from 'lucide-react';
@@ -25,11 +26,18 @@ import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 import { StructuredResponse } from '@/components/visualizations';
 import { splitStreamingText } from './streamingText';
 import { getToolPreviewCutoff } from '@/lib/toolPreviewPolicy';
+import {
+  decideFollow,
+  isUpwardScrollKey,
+  isUpwardWheel,
+  nestedScrollerTakesWheelUp,
+  USER_SCROLL_INPUT_WINDOW_MS,
+} from '@/lib/transcriptFollow';
+import type { TranscriptAnchor } from '@/lib/transcriptFollow';
 import { estimateReasoningMs, groupTurnParts } from '@/lib/turnParts';
 import { ReasoningBlock } from './ReasoningBlock';
 import { ToolGroup } from './ToolGroup';
 
-const USER_SCROLL_INPUT_WINDOW_MS = 200;
 
 export interface DisplayItem {
   message: Message;
@@ -71,6 +79,20 @@ interface VirtualizedTranscriptProps {
   loadOlderError?: string | null;
   onLoadOlder?: () => void;
   emptyContent?: ReactNode;
+  /** Free-mode reading position to restore on mount. */
+  initialAnchor?: TranscriptAnchor;
+  /** Called on unmount with the reading position, or null while following. */
+  onSavePosition?: (anchor: TranscriptAnchor | null) => void;
+}
+
+/** First visible message and how far it is scrolled into, in list coordinates. */
+function readAnchor(state: ReturnType<LegendListRef['getState']>): TranscriptAnchor | null {
+  const item = state.data[state.start] as DisplayItem | undefined;
+  if (!item) return null;
+  return {
+    messageId: item.message.id,
+    offset: Math.max(0, state.scroll - state.positionAtIndex(state.start)),
+  };
 }
 
 function getTextContent(parts: Part[]): string {
@@ -719,6 +741,8 @@ export function VirtualizedTranscript({
   loadOlderError = null,
   onLoadOlder,
   emptyContent,
+  initialAnchor,
+  onSavePosition,
 }: VirtualizedTranscriptProps) {
   const displayItems = useMemo(() => {
     const cutoff = getToolPreviewCutoff(sourceItems);
@@ -729,72 +753,76 @@ export function VirtualizedTranscript({
   }, [sourceItems]);
   const listRef = useRef<LegendListRef | null>(null);
   const autoScrollRef = useRef(autoFollow);
-  const isProgrammaticScrollRef = useRef(false);
-  const followScrollRafRef = useRef<number | null>(null);
-  const followScrollTimeoutRef = useRef<number | null>(null);
+  const endCheckRafRef = useRef<number | null>(null);
   const targetMessageIdRef = useRef(targetMessageId);
   const lastUserScrollAtRef = useRef(0);
+  const lastScrollTopRef = useRef(0);
+  const anchorRef = useRef<TranscriptAnchor | null>(initialAnchor ?? null);
+  const onSavePositionRef = useRef(onSavePosition);
 
   const [maintainAutoFollow, setMaintainAutoFollow] = useState(autoFollow);
   const onAutoScrollChangeRef = useRef(onAutoScrollChange);
   useEffect(() => {
     onAutoScrollChangeRef.current = onAutoScrollChange;
-  }, [onAutoScrollChange]);
+    onSavePositionRef.current = onSavePosition;
+  }, [onAutoScrollChange, onSavePosition]);
+
+  // Resolved once: a remount restores where the reader left this session.
+  const [initialScroll] = useState(() => {
+    if (!initialAnchor || targetMessageId) return undefined;
+    const index = displayItems.findIndex(item => item.message.id === initialAnchor.messageId);
+    return index >= 0 ? { index, viewOffset: -initialAnchor.offset } : undefined;
+  });
 
   useLayoutEffect(() => {
     targetMessageIdRef.current = targetMessageId;
   }, [targetMessageId]);
   const [showCompactionBanner, setShowCompactionBanner] = useState(false);
 
-  const scrollToEndForFollow = useCallback(() => {
-    if (targetMessageIdRef.current || !autoScrollRef.current) return;
-
-    isProgrammaticScrollRef.current = true;
-    const scrollResult = listRef.current?.scrollToEnd({ animated: false });
-    void Promise.resolve(scrollResult).finally(() => {
-      window.setTimeout(() => {
-        isProgrammaticScrollRef.current = false;
-      }, 100);
+  /**
+   * LegendList's maintainScrollAtEnd keeps a following list pinned through
+   * data, item size and layout changes. This is the one fallback for cases
+   * it cannot see (first data after mount, a re-follow request): at most one
+   * check per frame, and it scrolls only when the view is not at the end.
+   */
+  const scheduleEndCheck = useCallback(() => {
+    if (endCheckRafRef.current !== null) cancelAnimationFrame(endCheckRafRef.current);
+    endCheckRafRef.current = requestAnimationFrame(() => {
+      endCheckRafRef.current = null;
+      if (targetMessageIdRef.current || !autoScrollRef.current) return;
+      const scrollEl = listRef.current?.getScrollableNode() as HTMLElement | null | undefined;
+      if (scrollEl && scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight <= 1) return;
+      void listRef.current?.scrollToEnd({ animated: false });
     });
   }, []);
 
-  const scheduleFollowScrollToEnd = useCallback(() => {
-    if (targetMessageIdRef.current || !autoScrollRef.current) return;
-
-    if (followScrollRafRef.current !== null) {
-      cancelAnimationFrame(followScrollRafRef.current);
+  const setFollowing = useCallback((next: boolean) => {
+    if (autoScrollRef.current === next) return;
+    autoScrollRef.current = next;
+    if (next) {
+      setMaintainAutoFollow(true);
+    } else {
+      if (endCheckRafRef.current !== null) {
+        cancelAnimationFrame(endCheckRafRef.current);
+        endCheckRafRef.current = null;
+      }
+      // LegendList pins on item resize, which can run in the same frame as
+      // the scroll. A batched update would arrive after that pin and undo
+      // the user's scroll, so turning it off commits synchronously.
+      flushSync(() => setMaintainAutoFollow(false));
     }
-    if (followScrollTimeoutRef.current !== null) {
-      window.clearTimeout(followScrollTimeoutRef.current);
-    }
-
-    followScrollRafRef.current = requestAnimationFrame(() => {
-      followScrollRafRef.current = requestAnimationFrame(() => {
-        followScrollRafRef.current = null;
-        scrollToEndForFollow();
-      });
-    });
-
-    followScrollTimeoutRef.current = window.setTimeout(() => {
-      scrollToEndForFollow();
-      followScrollTimeoutRef.current = window.setTimeout(() => {
-        followScrollTimeoutRef.current = null;
-        scrollToEndForFollow();
-      }, 300);
-    }, 120);
-  }, [scrollToEndForFollow]);
+    onAutoScrollChangeRef.current?.(next);
+  }, []);
 
   useLayoutEffect(() => {
     setShowCompactionBanner(isCompacting);
   }, [isCompacting]);
 
   useEffect(() => () => {
-    if (followScrollRafRef.current !== null) {
-      cancelAnimationFrame(followScrollRafRef.current);
-    }
-    if (followScrollTimeoutRef.current !== null) {
-      window.clearTimeout(followScrollTimeoutRef.current);
-    }
+    if (endCheckRafRef.current !== null) cancelAnimationFrame(endCheckRafRef.current);
+    // A pending jump owns the position; saving would overwrite it.
+    if (targetMessageIdRef.current) return;
+    onSavePositionRef.current?.(autoScrollRef.current ? null : anchorRef.current);
   }, []);
 
   useEffect(() => {
@@ -817,47 +845,33 @@ export function VirtualizedTranscript({
     setMaintainAutoFollow(autoFollow);
   }, [autoFollow, targetMessageId]);
 
-  const disableAutoFollowForUserIntent = useCallback(() => {
-    if (!autoScrollRef.current) return;
-
-    autoScrollRef.current = false;
-    setMaintainAutoFollow(false);
-    onAutoScrollChangeRef.current?.(false);
-  }, []);
-
-  useLayoutEffect(() => {
-    if (displayItems.length === 0) return;
-    if (targetMessageId) return;
-
-    autoScrollRef.current = autoFollow;
-    setMaintainAutoFollow(autoFollow);
-    if (autoFollow) {
-      scheduleFollowScrollToEnd();
-    }
-  }, [sessionId, autoFollow, displayItems.length, targetMessageId, scheduleFollowScrollToEnd]);
-
   useLayoutEffect(() => {
     if (displayItems.length === 0 || targetMessageId || !autoFollow) return;
-
-    scheduleFollowScrollToEnd();
-  }, [displayItems, messagesWithParts, autoFollow, targetMessageId, scheduleFollowScrollToEnd]);
+    scheduleEndCheck();
+  }, [displayItems, autoFollow, targetMessageId, scheduleEndCheck]);
 
   useLayoutEffect(() => {
     if (scrollToBottomRef) {
       scrollToBottomRef.current = () => {
         autoScrollRef.current = true;
         setMaintainAutoFollow(true);
-        scheduleFollowScrollToEnd();
+        scheduleEndCheck();
       };
     }
-  }, [scrollToBottomRef, scheduleFollowScrollToEnd]);
+  }, [scrollToBottomRef, scheduleEndCheck]);
 
   useEffect(() => {
     const scrollEl = listRef.current?.getScrollableNode() as HTMLElement | null | undefined;
     if (!scrollEl) return;
 
-    let touchStartY = 0;
-    let scrollbarDragging = false;
+    // Inputs that clearly scroll up stop following before the browser
+    // scrolls, so a fast stream never gets a frame to pull the view back.
+    // Everything else only marks the moment and handleScroll decides from
+    // the resulting movement (scrollbar drags, selection, find in page).
+    let pointerHeld = false;
+    let touchY: number | null = null;
+    const canScrollUp = (target: EventTarget | null) =>
+      scrollEl.scrollTop > 0 && !nestedScrollerTakesWheelUp(target, scrollEl);
 
     const markUserScrollInput = () => {
       lastUserScrollAtRef.current = Date.now();
@@ -865,42 +879,51 @@ export function VirtualizedTranscript({
 
     const onWheel = (event: WheelEvent) => {
       markUserScrollInput();
-      if (event.deltaY < 0) {
-        disableAutoFollowForUserIntent();
-      }
+      if (isUpwardWheel(event.deltaX, event.deltaY) && canScrollUp(event.target)) setFollowing(false);
     };
 
     const onTouchStart = (event: TouchEvent) => {
       markUserScrollInput();
-      touchStartY = event.touches[0]?.clientY ?? 0;
+      touchY = event.touches[0]?.clientY ?? null;
     };
 
+    // A finger moving down drags the content down, which scrolls up.
     const onTouchMove = (event: TouchEvent) => {
       markUserScrollInput();
-      const currentY = event.touches[0]?.clientY ?? 0;
-      if (currentY > touchStartY + 5) {
-        disableAutoFollowForUserIntent();
+      const y = event.touches[0]?.clientY;
+      if (touchY !== null && y !== undefined && y > touchY + 3 && canScrollUp(event.target)) {
+        setFollowing(false);
       }
     };
 
-    const onMouseDown = (_event: MouseEvent) => {
+    const onKeyDown = (event: KeyboardEvent) => {
       markUserScrollInput();
-      scrollbarDragging = true;
+      const target = event.target;
+      const editing = target instanceof HTMLElement
+        && (target.isContentEditable || target.tagName === 'TEXTAREA' || target.tagName === 'INPUT');
+      if (!editing && isUpwardScrollKey(event.key, event.shiftKey) && scrollEl.scrollTop > 0) {
+        setFollowing(false);
+      }
     };
 
+    const onMouseDown = () => {
+      pointerHeld = true;
+      markUserScrollInput();
+    };
+
+    // Scrollbar drags and text selection that auto-scrolls both hold the button.
     const onMouseMove = () => {
-      if (scrollbarDragging) {
-        markUserScrollInput();
-      }
+      if (pointerHeld) markUserScrollInput();
     };
 
     const onMouseUp = () => {
-      scrollbarDragging = false;
+      pointerHeld = false;
     };
 
     scrollEl.addEventListener('wheel', onWheel, { passive: true });
     scrollEl.addEventListener('touchstart', onTouchStart, { passive: true });
     scrollEl.addEventListener('touchmove', onTouchMove, { passive: true });
+    scrollEl.addEventListener('keydown', onKeyDown, { passive: true });
     scrollEl.addEventListener('mousedown', onMouseDown, { passive: true });
     window.addEventListener('mousemove', onMouseMove, { passive: true });
     window.addEventListener('mouseup', onMouseUp, { passive: true });
@@ -909,11 +932,12 @@ export function VirtualizedTranscript({
       scrollEl.removeEventListener('wheel', onWheel);
       scrollEl.removeEventListener('touchstart', onTouchStart);
       scrollEl.removeEventListener('touchmove', onTouchMove);
+      scrollEl.removeEventListener('keydown', onKeyDown);
       scrollEl.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
     };
-  }, [disableAutoFollowForUserIntent]);
+  }, [setFollowing]);
 
   useEffect(() => {
     if (!targetMessageId) return;
@@ -925,11 +949,7 @@ export function VirtualizedTranscript({
     setMaintainAutoFollow(false);
     onAutoScrollChangeRef.current?.(false);
 
-    isProgrammaticScrollRef.current = true;
     listRef.current?.scrollToIndex?.({ index: targetIndex, animated: true });
-    setTimeout(() => {
-      isProgrammaticScrollRef.current = false;
-    }, 300);
 
     const timeout = window.setTimeout(() => {
       onTargetMessageHandled?.();
@@ -939,35 +959,31 @@ export function VirtualizedTranscript({
   }, [targetMessageId, displayItems, onTargetMessageHandled]);
 
   const handleScroll = useCallback(() => {
-    if (isProgrammaticScrollRef.current) return;
+    const scrollEl = listRef.current?.getScrollableNode() as HTMLElement | null | undefined;
+    if (!scrollEl) return;
+    const previousScrollTop = lastScrollTopRef.current;
+    lastScrollTopRef.current = scrollEl.scrollTop;
 
     if (targetMessageIdRef.current) return;
 
-    const state = listRef.current?.getState();
-    if (!state) return;
-
-    if (hasOlder && !isLoadingOlder && onLoadOlder) {
-      const scrollEl = listRef.current?.getScrollableNode() as HTMLElement | null | undefined;
-      if (scrollEl && scrollEl.scrollTop < 200) {
-        onLoadOlder();
-      }
+    if (hasOlder && !isLoadingOlder && onLoadOlder && scrollEl.scrollTop < 200) {
+      onLoadOlder();
     }
 
-    if (state.isAtEnd || state.isWithinMaintainScrollAtEndThreshold) {
-      // Re-enable follow only on user-driven scrolls (wheel, touch, scrollbar drag).
-      // LegendList's internal MVCP corrections use el.scrollBy, which also emits scroll
-      // events; treating those as user intent silently re-enables follow on panel toggles.
-      const isUserDriven = Date.now() - lastUserScrollAtRef.current < USER_SCROLL_INPUT_WINDOW_MS;
-      if (!autoScrollRef.current && isUserDriven) {
-        autoScrollRef.current = true;
-        setMaintainAutoFollow(true);
-        onAutoScrollChangeRef.current?.(true);
-      }
-      return;
+    const next = decideFollow({
+      scrollTop: scrollEl.scrollTop,
+      previousScrollTop,
+      scrollHeight: scrollEl.scrollHeight,
+      clientHeight: scrollEl.clientHeight,
+      userDriven: Date.now() - lastUserScrollAtRef.current < USER_SCROLL_INPUT_WINDOW_MS,
+    }, autoScrollRef.current);
+    if (next !== null) setFollowing(next);
+
+    if (!autoScrollRef.current) {
+      const state = listRef.current?.getState();
+      if (state) anchorRef.current = readAnchor(state);
     }
-
-
-  }, [hasOlder, isLoadingOlder, onLoadOlder]);
+  }, [hasOlder, isLoadingOlder, onLoadOlder, setFollowing]);
 
   const revertMessageIds = useMemo(() => {
     const ids = new Map<string, string | null>();
@@ -1115,6 +1131,7 @@ export function VirtualizedTranscript({
       estimatedItemSize={100}
       drawDistance={800}
       initialScrollAtEnd={!targetMessageId && autoFollow}
+      initialScrollIndex={initialScroll}
       maintainScrollAtEnd={!targetMessageId && maintainAutoFollow ? { animated: false } : false}
       maintainScrollAtEndThreshold={0.1}
       // History rows change height as they are measured or previews are expanded.
