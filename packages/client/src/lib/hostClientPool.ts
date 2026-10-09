@@ -227,7 +227,9 @@ function start(server: SavedServer): () => void {
       try {
         await next.connect();
       } catch (error: unknown) {
-        if (error instanceof AuthError || (error as { status?: number })?.status === 401) {
+        // Not paired: 401, or a cross-site 403 when this page is served by another machine.
+        const refusal = error as { status?: number; code?: string } | null;
+        if (error instanceof AuthError || refusal?.status === 401 || refusal?.code === 'foreign-origin') {
           teardown();
           setStatus(server.id, 'unpaired');
           return;

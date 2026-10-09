@@ -30,6 +30,7 @@ const openHere = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock('@/lib/openSessionHere', () => ({ openSessionHere: openHere }));
 
 import { AttentionStreams } from '@/components/app/AttentionStreams';
+import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 
 const ask = { id: 'a1', kind: 'approval' as const, sessionId: 's1', sessionTitle: 'Deploy', workspaceId: 'w1', workspaceName: 'site', toolName: 'bash', createdAt: 1 };
 const running = { sessionId: 's2', sessionTitle: 'Build', workspaceId: 'w1', workspaceName: 'site', runningAt: 'x' };
@@ -85,6 +86,14 @@ describe('AttentionStreams', () => {
 
     expect(toastMock.dismiss).toHaveBeenCalledWith('attention-laptop-a1');
     expect(toastMock).toHaveBeenCalledWith('Finished on Laptop', expect.objectContaining({ description: 'Build · site' }));
+  });
+
+  test('stays quiet for sessions already open as tabs, which show their own approvals', () => {
+    useSessionBoardStore.setState({ openSessionIds: ['s1'], focusedSessionId: 's1' });
+    render(<AttentionStreams />);
+    act(() => emitters.get('laptop')!(null, { revision: 1, asks: [ask], running: [] }));
+    expect(toastMock).not.toHaveBeenCalled();
+    useSessionBoardStore.setState({ openSessionIds: [], focusedSessionId: null });
   });
 
   test('stays quiet for the machine on screen, which shows its own asks', () => {

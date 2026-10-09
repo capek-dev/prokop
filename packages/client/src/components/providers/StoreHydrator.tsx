@@ -11,6 +11,7 @@ import { queryClient } from '@/components/providers/QueryProvider';
 import { queryKeys } from '@/lib/queryKeys';
 import { mark } from '@/lib/perf';
 import { useServerContext } from '@/contexts/ServerContext';
+import { useForeignSessionsStore } from '@/stores/foreignSessionsStore';
 
 interface StoreHydratorProps {
   children: ReactNode;
@@ -43,6 +44,8 @@ export function StoreHydrator({ children }: StoreHydratorProps) {
     mark('shell:first-render');
 
     const usableModels = (data.models || []).filter((m) => m.runtimeStatus?.usable);
+    // This machine's sessions opened earlier as tabs from another machine are local now.
+    if (serverId) useForeignSessionsStore.getState().removeServer(serverId);
     useServerDataStore.getState().hydrateCritical(serverId ?? '', {
       workspaces: data.workspaces,
       preconfigs: data.preconfigs,
@@ -120,6 +123,8 @@ export function StoreHydrator({ children }: StoreHydratorProps) {
       clearSessionState();
       // Detach this server's open tabs while retaining saved dock placements.
       useSessionBoardStore.setState({ openSessionIds: [], focusedSessionId: null });
+      // Tabs from other machines close with the board, so forget them too.
+      for (const id of Object.keys(useForeignSessionsStore.getState().byId)) useForeignSessionsStore.getState().remove(id);
       useServerDataStore.getState().clearAll();
       queryClient.removeQueries({ queryKey: ['sessions'] });
       queryClient.removeQueries({ queryKey: ['config'] });

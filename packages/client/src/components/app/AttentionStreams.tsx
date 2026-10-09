@@ -6,6 +6,7 @@ import { useServerContext } from '@/contexts/ServerContext';
 import { diffAttention, startAttentionStream, useAttentionStore } from '@/lib/attention';
 import { STORAGE_KEYS } from '@/lib/storage';
 import { openSessionHere } from '@/lib/openSessionHere';
+import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 
 /** Server id of the machine shown right now, from the URL. */
 function activeServerId(pathname: string): string | null {
@@ -77,7 +78,9 @@ export function AttentionStreams() {
       const changes = diffAttention(previous, next);
       for (const id of changes.resolvedAskIds) toast.dismiss(`attention-${server.id}-${id}`);
       if (activeServerId(router.state.location.pathname) === server.id) return;
-      for (const ask of changes.newAsks) promptAsk(server, ask);
+      // A session already open as a tab shows its own approvals there.
+      const open = new Set(useSessionBoardStore.getState().openSessionIds);
+      for (const ask of changes.newAsks) if (!open.has(ask.sessionId)) promptAsk(server, ask);
       for (const session of changes.finished) promptFinished(server, session);
     }));
     const ids = new Set(serversRef.current.map((server) => server.id));

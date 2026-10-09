@@ -142,6 +142,14 @@ describe('host client pool', () => {
     expect(useForeignSessionsStore.getState().byId['remote-1']).toBeUndefined();
   });
 
+  test('a cross-site refusal also counts as not paired', async () => {
+    sdk.FakeClient.nextConnect = async () => { throw Object.assign(new Error('nope'), { status: 403, code: 'foreign-origin' }); };
+    acquireHostClient(laptop);
+    await flush();
+    await flush();
+    expect(useHostClientStore.getState().status.laptop).toBe('unpaired');
+  });
+
   test('an unpaired machine stops without retrying', async () => {
     sdk.FakeClient.nextConnect = async () => { throw new sdk.AuthError('not paired'); };
     acquireHostClient(laptop);

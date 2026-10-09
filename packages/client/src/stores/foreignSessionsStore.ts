@@ -22,6 +22,8 @@ interface ForeignSessionsState {
   /** Updates a tracked session; returns false for sessions this board does not track. */
   update: (session: Session) => boolean;
   remove: (sessionId: string) => void;
+  /** Forgets every session of a machine (it became the active machine, so its sessions are local). */
+  removeServer: (serverId: string) => void;
 }
 
 function load(): Record<string, ForeignSession> {
@@ -57,6 +59,12 @@ export const useForeignSessionsStore = create<ForeignSessionsState>((set, get) =
     set({ byId });
     save(byId);
     return true;
+  },
+  removeServer: (serverId) => {
+    const byId = Object.fromEntries(Object.entries(get().byId).filter(([, entry]) => entry.serverId !== serverId));
+    if (Object.keys(byId).length === Object.keys(get().byId).length) return;
+    set({ byId });
+    save(byId);
   },
   remove: (sessionId) => {
     if (!get().byId[sessionId]) return;

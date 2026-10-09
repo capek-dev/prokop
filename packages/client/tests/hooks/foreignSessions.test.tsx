@@ -107,6 +107,13 @@ describe('sessions from another machine', () => {
     expect(useForeignSessionsStore.getState().byId['remote-1']).toBeUndefined();
   });
 
+  test('switching to a machine turns its foreign sessions into local ones', () => {
+    useForeignSessionsStore.getState().add('studio', { id: 'studio-tab', workspaceId: 'w-local', title: 'Was foreign' } as Session);
+    useForeignSessionsStore.getState().removeServer('studio');
+    expect(useForeignSessionsStore.getState().byId['studio-tab']).toBeUndefined();
+    expect(useForeignSessionsStore.getState().byId['remote-1']).toBeDefined();
+  });
+
   test('foreign sessions persist across reloads', async () => {
     expect(JSON.parse(localStorage.getItem('prokopai_foreign_sessions')!)).toMatchObject({ 'remote-1': { serverId: 'laptop' } });
   });
