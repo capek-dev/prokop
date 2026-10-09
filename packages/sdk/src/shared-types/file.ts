@@ -220,6 +220,12 @@ export interface FileTreeResponse {
   isMain: boolean;
   /** Every visible file and directory path, POSIX separators, presorted. */
   paths: string[];
+  /**
+   * Listed paths that are Git-ignored (outside Git: node_modules and build
+   * folders). Directories end with `/` and were not walked; load their
+   * contents with `files.treeChildren` when expanded.
+   */
+  ignored?: string[];
   truncated: boolean;
   /** Increases whenever the server's tree for this root changes; ignore older ones. */
   revision?: number;
@@ -240,6 +246,16 @@ export type FileTreeUpdate =
       removed: string[];
       truncated: boolean;
     };
+
+/** One level of a folder the tree walk skipped; everything in it is ignored too. */
+export interface FileTreeChildrenResponse {
+  root: string;
+  /** The folder, root-relative. */
+  path: string;
+  /** Root-relative children, directories with a trailing `/`, presorted. */
+  paths: string[];
+  truncated: boolean;
+}
 
 /** Shared mutation result shape for file create/rename/delete. */
 export interface FileMutationResult {

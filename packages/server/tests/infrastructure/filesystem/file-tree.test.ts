@@ -61,14 +61,58 @@ describe('file tree listing and mutations (S5 filesystem isolation)', () => {
     ]);
   });
 
-  test('tree excludes node_modules and .git by name', async () => {
+  test('outside Git, node_modules and build folders are listed as ignored but never walked', async () => {
     mkdirSync(join(main, 'node_modules/pkg'), { recursive: true });
     writeFileSync(join(main, 'node_modules/pkg/index.js'), 'x');
+    mkdirSync(join(main, 'dist'), { recursive: true });
+    writeFileSync(join(main, 'dist/app.js'), 'x');
     mkdirSync(join(main, '.git'), { recursive: true });
     writeFileSync(join(main, '.git/config'), 'x');
+    writeFileSync(join(main, '.DS_Store'), 'x');
 
     const result = await files().listTreePaths(workspaceId, {});
-    expect(result.paths).toEqual([]);
+
+    expect(result.paths).toEqual(['dist/', 'node_modules/']);
+    expect(result.ignored).toEqual(['dist/', 'node_modules/']);
+  });
+
+  test('in a Git repository, ignored entries come from .gitignore and ignored folders are not walked', async () => {
+    Bun.spawnSync(['git', 'init', '-q', main]);
+    writeFileSync(join(main, '.gitignore'), '*.log\ncoverage/\n');
+    writeFileSync(join(main, 'app.ts'), 'x');
+    writeFileSync(join(main, 'debug.log'), 'x');
+    mkdirSync(join(main, 'coverage'), { recursive: true });
+    writeFileSync(join(main, 'coverage/lcov.info'), 'x');
+    mkdirSync(join(main, 'dist'), { recursive: true });
+    writeFileSync(join(main, 'dist/app.js'), 'x');
+    mkdirSync(join(main, 'packages/web/node_modules/react'), { recursive: true });
+    writeFileSync(join(main, 'packages/web/node_modules/react/index.js'), 'x');
+
+    const result = await files().listTreePaths(workspaceId, {});
+
+    // dist is not ignored here, so it is an ordinary folder; node_modules is never walked.
+    expect(result.paths).toEqual([
+      '.gitignore', 'app.ts', 'coverage/', 'debug.log', 'dist/', 'dist/app.js',
+      'packages/', 'packages/web/', 'packages/web/node_modules/',
+    ]);
+    expect(result.ignored).toEqual(['coverage/', 'debug.log', 'packages/web/node_modules/']);
+  });
+
+  test('an ignored folder loads one level at a time', async () => {
+    mkdirSync(join(main, 'node_modules/react/cjs'), { recursive: true });
+    writeFileSync(join(main, 'node_modules/react/index.js'), 'x');
+    writeFileSync(join(main, 'node_modules/react/cjs/react.js'), 'x');
+    mkdirSync(join(main, 'node_modules/.bin'), { recursive: true });
+
+    const top = await files().listTreeChildren(workspaceId, { path: 'node_modules' });
+    expect(top.paths).toEqual(['node_modules/.bin/', 'node_modules/react/']);
+
+    const react = await files().listTreeChildren(workspaceId, { path: 'node_modules/react' });
+    expect(react).toMatchObject({ path: 'node_modules/react', paths: ['node_modules/react/cjs/', 'node_modules/react/index.js'], truncated: false });
+  });
+
+  test('loading a folder outside the root is refused', async () => {
+    await expect(files().listTreeChildren(workspaceId, { path: '../elsewhere' })).rejects.toThrow();
   });
 
   test('tree includes paths matched by gitignore rules', async () => {

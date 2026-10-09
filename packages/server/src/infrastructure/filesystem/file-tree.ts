@@ -13,8 +13,8 @@ import type {
   DeleteFileResponse,
   RenameFileResponse,
 } from '@prokopai/sdk';
-import { IGNORE_PATTERNS } from './workspace-files';
 import { isBinaryExtension } from './binary-detection';
+import { listIgnoredPaths } from './git-status';
 import {
   BadRequestError,
   ConflictError,
@@ -24,6 +24,15 @@ import {
 
 /** Hard cap so a runaway workspace cannot exhaust memory in one response. */
 const FILE_TREE_MAX_ENTRIES = 50_000;
+/** One expanded folder inside node_modules or an ignored folder. */
+const FILE_TREE_CHILDREN_MAX_ENTRIES = 10_000;
+
+/** Never shown: Git internals and OS litter. */
+const HIDDEN_ENTRY_NAMES = new Set(['.git', '.DS_Store', 'Thumbs.db']);
+/** Never walked, even when not ignored (a repo without a .gitignore). */
+const UNWALKED_DIRECTORY_NAMES = new Set(['node_modules']);
+/** Outside Git there is no .gitignore; these build folders count as ignored. */
+const FALLBACK_IGNORED_DIRECTORY_NAMES = new Set(['node_modules', 'dist', 'build', '.next']);
 
 /** Refuses pathological segment names that are valid on disk but harmful in trees. */
 export function validateSegmentName(name: string): void {
@@ -73,16 +82,46 @@ export interface WorkspaceLike {
   additionalPaths: string[];
 }
 
-/** Names hidden at every depth, matching listDirectory's name filter. */
-const IGNORED_ENTRY_NAMES = new Set(IGNORE_PATTERNS.map((pattern) => pattern.split('/')[0]));
+/** Git-ignored paths under one root, split for lookups during the walk. */
+interface IgnoredLookup {
+  /** Root-relative directories, without the trailing slash. */
+  directories: Set<string>;
+  files: Set<string>;
+  /** False outside Git, where the fallback directory names apply. */
+  git: boolean;
+}
+
+async function loadIgnoredLookup(rootAbs: string): Promise<IgnoredLookup> {
+  const paths = await listIgnoredPaths(rootAbs);
+  const directories = new Set<string>();
+  const files = new Set<string>();
+  for (const path of paths ?? []) {
+    if (path.endsWith('/')) directories.add(path.slice(0, -1));
+    else files.add(path);
+  }
+  return { directories, files, git: paths !== null };
+}
+
+function isIgnoredDirectory(relPath: string, name: string, ignored: IgnoredLookup): boolean {
+  return ignored.directories.has(relPath)
+    || UNWALKED_DIRECTORY_NAMES.has(name)
+    || (!ignored.git && FALLBACK_IGNORED_DIRECTORY_NAMES.has(name));
+}
+
+interface WalkOutput {
+  paths: string[];
+  /** Ignored paths that were listed; ignored directories were not descended into. */
+  ignored: string[];
+  truncated: boolean;
+}
 
 /** Walks the workspace root collecting root-relative POSIX paths. */
 async function walkDirectory(
   dirAbs: string,
   prefix: string,
   showHidden: boolean,
-  out: string[],
-  truncatedFlag: { value: boolean },
+  ignoredLookup: IgnoredLookup,
+  out: WalkOutput,
 ): Promise<void> {
   let entries;
   try {
@@ -93,15 +132,12 @@ async function walkDirectory(
   }
 
   for (const entry of entries) {
-    if (out.length >= FILE_TREE_MAX_ENTRIES) {
-      truncatedFlag.value = true;
+    if (out.paths.length >= FILE_TREE_MAX_ENTRIES) {
+      out.truncated = true;
       return;
     }
-    if (entry.name === '.git') continue;
+    if (HIDDEN_ENTRY_NAMES.has(entry.name)) continue;
     if (!showHidden && entry.name.startsWith('.')) continue;
-    // Name-based hiding mirrors listDirectory: node_modules, dist, build,
-    // .next, .DS_Store, Thumbs.db are dropped regardless of showHidden.
-    if (IGNORED_ENTRY_NAMES.has(entry.name)) continue;
     const relPath = `${prefix}${prefix.length > 0 ? '/' : ''}${entry.name}`;
 
     // Directory entries carry a trailing slash (find-style) so consumers can
@@ -109,10 +145,19 @@ async function walkDirectory(
     // treat a bare parent name followed by descendants as a file/dir
     // collision otherwise.
     const isDir = entry.isDirectory();
-    out.push(isDir ? `${relPath}/` : relPath);
-    if (!isDir) continue;
+    out.paths.push(isDir ? `${relPath}/` : relPath);
+    if (!isDir) {
+      if (ignoredLookup.files.has(relPath)) out.ignored.push(relPath);
+      continue;
+    }
 
-    await walkDirectory(join(dirAbs, entry.name), relPath, showHidden, out, truncatedFlag);
+    // Ignored folders (node_modules, build output) are listed but not walked:
+    // their contents load one level at a time when the folder is expanded.
+    if (isIgnoredDirectory(relPath, entry.name, ignoredLookup)) {
+      out.ignored.push(`${relPath}/`);
+      continue;
+    }
+    await walkDirectory(join(dirAbs, entry.name), relPath, showHidden, ignoredLookup, out);
   }
 }
 
@@ -222,24 +267,55 @@ export function createFileTreeOps(policy: TreeWorkspacePolicy) {
   async function listTreePaths(
     workspace: WorkspaceLike,
     input: { root?: string; showHidden?: boolean },
-  ): Promise<{ root: string; isMain: boolean; paths: string[]; truncated: boolean }> {
+  ): Promise<{ root: string; isMain: boolean; paths: string[]; ignored: string[]; truncated: boolean }> {
     const selection = policy.selectEditableRoot(workspace, input.root);
     if (!selection.valid) {
       throw new BadRequestError('Invalid workspace root');
     }
     const root = selection.root;
     const rootAbs = resolve(root);
+    const out: WalkOutput = { paths: [], ignored: [], truncated: false };
+    await walkDirectory(rootAbs, '', input.showHidden ?? true, await loadIgnoredLookup(rootAbs), out);
+    out.paths.sort((a, b) => a.localeCompare(b));
+    out.ignored.sort((a, b) => a.localeCompare(b));
+    return {
+      root,
+      isMain: rootAbs === resolve(workspace.path),
+      paths: out.paths,
+      ignored: out.ignored,
+      truncated: out.truncated,
+    };
+  }
+
+  /**
+   * One level of a folder the walk skipped (node_modules, ignored output).
+   * Everything inside is ignored too, so the client loads deeper folders the
+   * same way when they are expanded.
+   */
+  async function listTreeChildren(
+    workspace: WorkspaceLike,
+    input: { root?: string; path: string },
+  ): Promise<{ root: string; path: string; paths: string[]; truncated: boolean }> {
+    const { root, canonicalRoot } = await prepareRoot(workspace, input.root);
+    const directory = await resolveMutationTarget(workspace, root, input.path);
+    await ensureDeepestExistingAncestorInside(policy, directory, canonicalRoot);
+    const prefix = toPosixRootRelative(directory, root);
+
+    let entries;
+    try {
+      entries = await fsp.readdir(directory, { withFileTypes: true });
+    } catch {
+      throw new NotFoundError('Folder not found');
+    }
     const paths: string[] = [];
-    const truncatedFlag = { value: false };
-    await walkDirectory(
-      rootAbs,
-      '',
-      input.showHidden ?? true,
-      paths,
-      truncatedFlag,
-    );
-    paths.sort((a, b) => a.localeCompare(b));
-    return { root, isMain: rootAbs === resolve(workspace.path), paths, truncated: truncatedFlag.value };
+    for (const entry of entries) {
+      if (HIDDEN_ENTRY_NAMES.has(entry.name)) continue;
+      if (paths.length >= FILE_TREE_CHILDREN_MAX_ENTRIES) {
+        return { root, path: prefix, paths: paths.sort((a, b) => a.localeCompare(b)), truncated: true };
+      }
+      paths.push(entry.isDirectory() ? `${prefix}/${entry.name}/` : `${prefix}/${entry.name}`);
+    }
+    return { root, path: prefix, paths: paths.sort((a, b) => a.localeCompare(b)), truncated: false };
   }
 
   async function createFileOrDirectory(
@@ -378,5 +454,5 @@ export function createFileTreeOps(policy: TreeWorkspacePolicy) {
     return { path: toPosixRootRelative(target, root), recursive: Boolean(input.recursive) };
   }
 
-  return { listTreePaths, createFileOrDirectory, renameFileEntry, deleteFileEntry };
+  return { listTreePaths, listTreeChildren, createFileOrDirectory, renameFileEntry, deleteFileEntry };
 }

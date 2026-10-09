@@ -180,6 +180,11 @@ export const fileTreeQuerySchema = z.object({
   refresh: z.enum(['true', 'false']).optional(),
 }).loose();
 
+export const fileTreeChildrenQuerySchema = z.object({
+  root: z.string().optional(),
+  path: z.string().min(1),
+}).loose();
+
 export const createFileSchema = z.object({
   path: relativePathSchema,
   kind: z.enum(['file', 'directory']).default('file'),

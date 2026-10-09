@@ -19,6 +19,7 @@ import {
   gitRevertModifiedFileSchema,
   gitCommitSchema, gitPushSchema, gitPushPreviewSchema,
   fileTreeQuerySchema,
+  fileTreeChildrenQuerySchema,
   createFileSchema,
   renameFileSchema,
   deleteFileSchema,
@@ -115,6 +116,20 @@ export function registerFileRoutes(app: Hono, files: FilesApplication): void {
           ...(query.refresh === 'true' ? { fresh: true } : {}),
         });
         return c.json(result);
+      } catch (err) {
+        mapApplicationError(err);
+      }
+    },
+  );
+
+  app.get(
+    '/api/workspaces/:id/files/tree/children',
+    validate('query', fileTreeChildrenQuerySchema),
+    async (c) => {
+      const workspaceId = c.req.param('id');
+      const query = c.req.valid('query') as { root?: string; path: string };
+      try {
+        return c.json(await files.listTreeChildren(workspaceId, { root: query.root, path: query.path }));
       } catch (err) {
         mapApplicationError(err);
       }

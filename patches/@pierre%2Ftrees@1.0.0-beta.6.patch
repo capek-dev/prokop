@@ -1,0 +1,25 @@
+diff --git a/dist/model/gitStatus.js b/dist/model/gitStatus.js
+index 1e57ee3cbdcbfafaa4c42186008015383ecd390f..52c485aef8b8a7d3bf3984e05b36e3b367a7ce91 100644
+--- a/dist/model/gitStatus.js
++++ b/dist/model/gitStatus.js
+@@ -106,13 +106,18 @@ function removeGitStatusPath({ canonicalPath, changeCountByDirectoryPath, direct
+ 	if (previousStatus == null) return false;
+ 	statusByPath.delete(canonicalPath);
+ 	if (previousStatus === "ignored" && canonicalPath.endsWith("/")) ignoredDirectoryPaths.delete(canonicalPath);
+-	decrementAncestorChangeCounts(changeCountByDirectoryPath, directoriesWithChanges, canonicalPath);
++	// Ignored entries are not changes: they never counted toward ancestors.
++	if (previousStatus !== "ignored") decrementAncestorChangeCounts(changeCountByDirectoryPath, directoriesWithChanges, canonicalPath);
+ 	return true;
+ }
+ function setGitStatusPath({ canonicalPath, changeCountByDirectoryPath, directoriesWithChanges, ignoredDirectoryPaths, isDirectory, status, statusByPath }) {
+ 	const previousStatus = statusByPath.get(canonicalPath);
+ 	if (previousStatus === status) return false;
+-	if (previousStatus == null) incrementAncestorChangeCounts(changeCountByDirectoryPath, directoriesWithChanges, canonicalPath);
++	// Ignored entries are not changes, so they do not mark parent folders as changed.
++	const wasChange = previousStatus != null && previousStatus !== "ignored";
++	const isChange = status !== "ignored";
++	if (!wasChange && isChange) incrementAncestorChangeCounts(changeCountByDirectoryPath, directoriesWithChanges, canonicalPath);
++	else if (wasChange && !isChange) decrementAncestorChangeCounts(changeCountByDirectoryPath, directoriesWithChanges, canonicalPath);
+ 	statusByPath.set(canonicalPath, status);
+ 	if (status === "ignored" && isDirectory) ignoredDirectoryPaths.add(canonicalPath);
+ 	else if (isDirectory) ignoredDirectoryPaths.delete(canonicalPath);

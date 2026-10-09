@@ -303,6 +303,19 @@ async function addUntrackedFile(
   return { path: inputPath };
 }
 
+/**
+ * Git-ignored paths under `root`, relative to it; directories end with `/`
+ * and are reported once instead of file by file (`--directory`), so a
+ * `node_modules` costs one line. Null when `root` is not in a Git repository.
+ */
+export async function listIgnoredPaths(root: string): Promise<string[] | null> {
+  const availability = await detectGitAvailability(root);
+  if (!availability.available) return null;
+  const result = await execGit(['-C', root, 'ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z']);
+  if (result.exitCode !== 0) return null;
+  return result.stdout.split('\0').filter(Boolean);
+}
+
 export async function getGitStatus(workspacePath: string): Promise<GitStatusResult> {
   const existing = inflight.get(workspacePath);
   if (existing) return existing;

@@ -15,7 +15,7 @@ import type {
   GitFileDiffResponse,
   Workspace,
 } from '@prokopai/sdk';
-import type { EditableFileResponse, SaveFileResponse, GitRepositoryState, GitCommitInput, GitCommitResult, GitPushInput, GitPushResult, GitPushPreviewInput } from '@prokopai/sdk';
+import type { EditableFileResponse, FileTreeChildrenResponse, SaveFileResponse, GitRepositoryState, GitCommitInput, GitCommitResult, GitPushInput, GitPushResult, GitPushPreviewInput } from '@prokopai/sdk';
 import type {
   CreateFileResponse,
   DeleteFileResponse,
@@ -106,7 +106,13 @@ export interface FilesApplicationPort {
   listTreePaths(
     workspace: EditableFileWorkspaceLike,
     input: { root?: string; showHidden?: boolean },
-  ): Promise<{ root: string; isMain: boolean; paths: string[]; truncated: boolean }>;
+  ): Promise<{ root: string; isMain: boolean; paths: string[]; ignored: string[]; truncated: boolean }>;
+
+  /** One level of a folder the tree walk skipped (node_modules, ignored output). */
+  listTreeChildren(
+    workspace: EditableFileWorkspaceLike,
+    input: { root?: string; path: string },
+  ): Promise<FileTreeChildrenResponse>;
 
   /** Create an empty file or directory (with parent creation). */
   createFileEntry(

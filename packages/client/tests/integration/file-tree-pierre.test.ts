@@ -246,3 +246,28 @@ describe('FileTree incremental sync from pushed tree changes', () => {
     expect(fileTreeSyncOperations(['a.ts'], next, () => false)).toBeNull();
   });
 });
+
+
+describe('ignored entries (patched @pierre/trees, patches/@pierre%2Ftrees@1.0.0-beta.6.patch)', () => {
+  test('ignored entries do not mark parent folders as changed; real changes still do', async () => {
+    // Internal module, imported by file path: the package exports map hides it.
+    const { resolveFileTreeGitStatusState } = await import(
+      '../../node_modules/@pierre/trees/dist/model/gitStatus.js' as string
+    ) as { resolveFileTreeGitStatusState: (entries: Array<{ path: string; status: string }>) => {
+      directoriesWithChanges: Set<string>; ignoredDirectoryPaths: Set<string>;
+    } };
+
+    const ignoredOnly = resolveFileTreeGitStatusState([
+      { path: 'packages/web/node_modules/', status: 'ignored' },
+      { path: 'packages/web/.env', status: 'ignored' },
+    ]);
+    expect([...ignoredOnly.directoriesWithChanges]).toEqual([]);
+    expect([...ignoredOnly.ignoredDirectoryPaths]).toEqual(['packages/web/node_modules/']);
+
+    const withChange = resolveFileTreeGitStatusState([
+      { path: 'packages/web/node_modules/', status: 'ignored' },
+      { path: 'packages/web/src.ts', status: 'modified' },
+    ]);
+    expect([...withChange.directoriesWithChanges].sort()).toEqual(['packages/', 'packages/web/']);
+  });
+});

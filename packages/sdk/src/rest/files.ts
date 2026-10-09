@@ -21,6 +21,7 @@ import type {
   CreateFileRequest,
   RenameFileRequest,
   DeleteFileRequest,
+  FileTreeChildrenResponse,
 } from '../shared';
 
 interface BrowseOptions {
@@ -151,6 +152,18 @@ export class FilesRestNamespace {
     }
     return this.http.get(`/workspaces/${encodeURIComponent(workspaceId)}/files/tree`, {
       params: Object.keys(params).length > 0 ? params : undefined,
+      signal: options?.signal,
+    });
+  }
+
+  /** One level of a folder the tree listed without walking (node_modules, ignored output). */
+  async treeChildren(
+    workspaceId: string,
+    path: string,
+    options?: { root?: string; signal?: AbortSignal },
+  ): Promise<FileTreeChildrenResponse> {
+    return this.http.get(`/workspaces/${encodeURIComponent(workspaceId)}/files/tree/children`, {
+      params: { path, ...(options?.root !== undefined ? { root: options.root } : {}) },
       signal: options?.signal,
     });
   }

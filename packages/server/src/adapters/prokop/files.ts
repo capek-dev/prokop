@@ -68,6 +68,7 @@ export function createProkopFilesApplicationPort(
     saveFile: (workspace, input) => editableOps.saveFile(workspace, input),
 
     listTreePaths: (workspace, input) => treeOps.listTreePaths(workspace, input),
+    listTreeChildren: (workspace, input) => treeOps.listTreeChildren(workspace, input),
 
     createFileEntry: (workspace, input) => treeOps.createFileOrDirectory(workspace, input),
 

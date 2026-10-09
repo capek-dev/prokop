@@ -19,6 +19,7 @@ import { refreshFileTree } from '@/lib/rootFeedRefresh';
 import { useFileActions } from './useFileActions';
 import { FileActionsDialogs } from './FileActionsDialogs';
 import { PierreTreeActionMenu, type PierreTreeActionMenuActions } from './PierreTreeActionMenu';
+import { useLazyTreeFolders } from './useLazyTreeFolders';
 
 /**
  * Maps our shadcn palette onto @pierre/trees' shadow-DOM custom properties.
@@ -38,6 +39,9 @@ const TREE_THEME_CSS = `
      * focus rings with this, and the raw border color reads too heavy). */
     --trees-border-color-override: color-mix(in oklab, var(--sidebar-foreground) 14%, transparent);
     --trees-accent-override: var(--primary);
+    /* Ignored names: Pierre's default (#4a4a4e on dark) is barely readable;
+     * muted, but clearly legible, on both themes. */
+    --trees-git-ignored-color-override: color-mix(in oklab, var(--sidebar-foreground) 62%, var(--sidebar));
 
     /* Interaction states */
     --trees-selected-bg-override: var(--accent);
@@ -62,6 +66,24 @@ const TREE_THEME_CSS = `
     --trees-theme-input-fg-override: var(--foreground);
   }
 `;
+
+/**
+ * Ignored rows (Git-ignored entries, node_modules) get a faint warm tint, as
+ * in JetBrains IDEs. Injected into Pierre's shadow root; it only swaps the
+ * row's base color, so hover and selection still win, and the name's
+ * truncation fade (which paints --trees-bg) matches the tint.
+ */
+const IGNORED_ROW_CSS = `
+  [data-type="item"][data-item-git-status="ignored"] {
+    --trees-bg: color-mix(in oklab, var(--warning) 9%, var(--sidebar));
+  }
+  /* Pierre halves ignored icons; on the tint that loses them. */
+  [data-type="item"][data-item-git-status="ignored"] > [data-item-section="icon"] {
+    opacity: 0.75;
+  }
+`;
+
+const NO_IGNORED: readonly string[] = [];
 
 function toPierreGitStatus(files: Array<{ path: string; git: GitDiffSummary }>): GitStatusEntry[] {
   const statusMap: Record<string, GitStatusEntry['status']> = {
@@ -119,6 +141,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     const { data: pathsData, isLoading, error, refetch } = pathsQuery;
     const gitStatusQuery = useGitStatusQuery(sdkClient, workspaceId, root);
     const paths = useMemo(() => pathsData?.paths ?? [], [pathsData?.paths]);
+    const ignored = pathsData?.ignored ?? NO_IGNORED;
     /** Tree identity for expansion persistence (workspace + selected root). */
     const stateKey = `${workspaceId}:${root ?? ''}`;
 
@@ -138,6 +161,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       fileTreeSearchMode: 'hide-non-matches',
       dragAndDrop: false,
       renaming: false,
+      unsafeCSS: IGNORED_ROW_CSS,
       onSelectionChange: ((selectedPaths: readonly string[]) => {
         const first = selectedPaths[0];
         if (!first) return;
@@ -231,6 +255,10 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       [menuActions],
     );
 
+    // node_modules and ignored folders are listed but not walked; their
+    // contents load one level at a time when expanded.
+    const { reset: resetLazyFolders } = useLazyTreeFolders({ model, sdkClient, workspaceId, root, ignored });
+
     // Pushed tree changes usually add or remove a few paths: patch the model
     // in place, which keeps expansion, selection, and scroll. The first load,
     // large changes, and failed patches rebuild it with resetPaths, which
@@ -253,7 +281,9 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
         }
       }
       model.resetPaths(paths, { initialExpandedPaths: fileTreeExpandedPaths(stateKey) });
-    }, [paths, model, stateKey]);
+      // The rebuild dropped folder contents loaded on expand; open ones load again.
+      resetLazyFolders();
+    }, [paths, model, stateKey, resetLazyFolders]);
 
     // Capture expansion changes so refreshes and reloads keep your place.
     // An expanded directory is always a visible row, so one flat scan
@@ -282,13 +312,19 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     const statusFiles = gitStatusQuery.data?.files;
 
     useEffect(() => {
-      if (!statusFiles) return;
-      const entries = toPierreGitStatus(statusFiles);
+      if (!statusFiles && ignored.length === 0) return;
+      // Ignored entries come with the tree walk, not Git status, so the
+      // Changes view never lists them. Pierre greys everything inside an
+      // ignored folder.
+      const entries = [
+        ...(statusFiles ? toPierreGitStatus(statusFiles) : []),
+        ...ignored.map((path) => ({ path, status: 'ignored' as const })),
+      ];
       const signature = JSON.stringify(entries);
       if (signature === appliedGitSignature.current) return;
       appliedGitSignature.current = signature;
       model.setGitStatus(entries);
-    }, [statusFiles, model]);
+    }, [statusFiles, ignored, model]);
 
     // Reveal the active editor file when it changes under this root.
     const revealedActive = useRef('');

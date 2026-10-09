@@ -25,6 +25,7 @@ import type {
   GitStatusMessage,
   FileTreeMessage,
   FileTreeResponse,
+  FileTreeChildrenResponse,
 } from '@prokopai/sdk';
 import type {
   FilesApplicationPort,
@@ -95,6 +96,7 @@ export interface FilesApplication {
     /** `fresh` rewalks a watched root instead of serving its cached tree (manual refresh). */
     input: { root?: string; showHidden?: boolean; fresh?: boolean },
   ): Promise<FileTreeResponse>;
+  listTreeChildren(workspaceId: string, input: { root?: string; path: string }): Promise<FileTreeChildrenResponse>;
   /** Pushed file tree per root; subscribers are opaque connection ids. */
   fileTreeFeed: FileTreeFeed<string>;
   createFileEntry(
@@ -374,6 +376,10 @@ export function createFilesApplication(
         return port.listTreePaths(workspace, input);
       }
       return fileTreeFeed.read(workspaceId, input.root, { fresh: input.fresh });
+    },
+
+    listTreeChildren(workspaceId, input) {
+      return port.listTreeChildren(resolveWorkspace(workspaceId), input);
     },
 
     fileTreeFeed,

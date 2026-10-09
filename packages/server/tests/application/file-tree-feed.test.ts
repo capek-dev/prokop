@@ -29,6 +29,7 @@ function harness(paths: string[]) {
     delivered,
     computes,
     setPaths(next: string[]) { snapshot = { ...snapshot, paths: next }; },
+    setIgnored(next: string[]) { snapshot = { ...snapshot, ignored: next }; },
     updates: (to: string): FileTreeUpdate[] => delivered.filter(d => d.to === to).map(d => d.message.update),
     advance(ms: number) {
       const end = time + ms;
@@ -105,6 +106,20 @@ test('a change touching most of the tree is sent as a snapshot', async () => {
   h.advance(2_000);
   await h.finish();
   expect(h.updates('c1')[1]).toMatchObject({ kind: 'snapshot', tree: { paths: ['other/', 'other/x.ts'] } });
+});
+
+test('a changed ignore set alone is sent as a snapshot that carries it', async () => {
+  const h = harness(base);
+  h.feed.subscribe('c1', 'ws');
+  h.advance(0);
+  await h.finish();
+
+  // A .gitignore edit: same paths, different ignored ones.
+  h.setIgnored(['src/lib/']);
+  h.feed.filesChanged('ws');
+  h.advance(2_000);
+  await h.finish();
+  expect(h.updates('c1')[1]).toMatchObject({ kind: 'snapshot', tree: { paths: base, ignored: ['src/lib/'] } });
 });
 
 test('a late subscriber gets the whole tree while existing ones get the delta', async () => {

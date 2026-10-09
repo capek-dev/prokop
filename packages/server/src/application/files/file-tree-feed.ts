@@ -44,9 +44,11 @@ export function createFileTreeFeed<Subscriber>(
     ...deps,
     same: (previous, next) => previous.isMain === next.isMain
       && previous.truncated === next.truncated
-      && samePaths(previous.paths, next.paths),
+      && samePaths(previous.paths, next.paths)
+      && samePaths(previous.ignored ?? [], next.ignored ?? []),
     message: ({ workspaceId, root, current, previous }) => {
-      if (previous) {
+      // A changed ignore set (a .gitignore edit) is rare; the snapshot carries it.
+      if (previous && samePaths(previous.ignored ?? [], current.ignored ?? [])) {
         const { added, removed } = diffTreePaths(previous.paths, current.paths);
         // A branch switch can touch most of the tree; then the snapshot is smaller.
         if (added.length + removed.length < current.paths.length) {
