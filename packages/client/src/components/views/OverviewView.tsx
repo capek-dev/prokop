@@ -14,6 +14,7 @@ import { useBoardRouteSync } from '@/hooks/useBoardRouteSync';
 import { useFocusedSessionWorkspaceContext } from '@/hooks/useFocusedSessionWorkspaceContext';
 import { useOverviewRouteSessionLoader } from '@/hooks/useOverviewRouteSessionLoader';
 import { WorkspaceOverview } from '@/components/layout/WorkspaceOverview';
+import { OtherMachinesOverview } from '@/components/layout/OtherMachinesOverview';
 import { WorkspaceContentArea } from '@/components/app/WorkspaceContentArea';
 
 export default function OverviewView() {
@@ -94,6 +95,8 @@ export default function OverviewView() {
   }, [sdkClient, updateSession, invalidateWorkspaceTags]);
 
   const sidebarContent = (
+    <>
+    {activeServer && <OtherMachinesOverview activeServerId={activeServer.id} />}
     <WorkspaceOverview
       sessionsByWorkspace={sessionsByWorkspace}
       tagGroupsByWorkspace={tagGroupsByWorkspace}
@@ -127,6 +130,7 @@ export default function OverviewView() {
       loadingMoreWorkspace={loadingMoreWorkspace}
       onLoadMoreWorkspace={fetchNextPageForWorkspace}
     />
+    </>
   );
 
   return (

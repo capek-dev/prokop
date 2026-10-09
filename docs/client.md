@@ -44,7 +44,9 @@ A machine can be reached at several addresses (for example LAN at home and Tails
 
 Inside another machine's app, pair a new machine with a pairing code: approval prompts only work when you open that machine's own address.
 
-While you work on one machine, the client keeps listening to the others. When a session on another machine needs an approval or an answer, a prompt names the machine and session; **Open** switches to it. Finished runs on other machines get a short notice. The workspace switcher shows a dot when something is waiting elsewhere, and each machine's heading shows how many items wait there.
+While you work on one machine, the client keeps listening to the others. When a session on another machine needs an approval or an answer, a prompt names the machine and session. Finished runs on other machines get a short notice. The workspace switcher shows a dot when something is waiting elsewhere, and each machine's heading shows how many items wait there.
+
+**Open** on a prompt, or a row in the **Other machines** section at the top of the Overview, opens that session as a tab beside this machine's sessions, without switching machines. Its tab is labelled with the machine name, and you can chat, answer approvals, and stop it as usual; it runs on its own machine. The tab keeps a connection to that machine while it is open and survives a reload. Creating sessions and changing workspace settings still happen on the machine you switched to.
 
 ## Client Features
 

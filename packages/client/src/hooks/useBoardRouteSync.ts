@@ -6,6 +6,7 @@ import {
   useSessionBoardStore,
   parseOpenSessionIds,
 } from '@/stores/sessionBoardStore';
+import { useForeignSessionsStore } from '@/stores/foreignSessionsStore';
 
 export type BoardScope =
   | { kind: 'workspace'; workspaceId: string | null }
@@ -48,6 +49,7 @@ export function useBoardRouteSync({ scope }: BoardRouteSyncOptions): void {
   const sessions = useSessionStore(s => s.sessions);
   const workspaces = useServerDataStore(s => s.workspaces);
   const serverId = useServerDataStore(s => s.serverId);
+  const foreignById = useForeignSessionsStore(s => s.byId);
 
   useEffect(() => {
     // Build the valid session set based on scope
@@ -69,6 +71,9 @@ export function useBoardRouteSync({ scope }: BoardRouteSyncOptions): void {
         }
       }
     }
+
+    // Sessions from other machines were opened deliberately; they are valid in any scope.
+    for (const id of Object.keys(foreignById)) validIds.add(id);
 
     // Parse open param
     let openIds = parseOpenSessionIds(searchOpen);
@@ -95,5 +100,5 @@ export function useBoardRouteSync({ scope }: BoardRouteSyncOptions): void {
     lastSyncKey.current = syncKey;
 
     useSessionBoardStore.getState().hydrateFromRoute(focusedId, openIds);
-  }, [serverId, searchOpen, sessionIdFromUrl, sessions, workspaces, scope]);
+  }, [serverId, searchOpen, sessionIdFromUrl, sessions, workspaces, scope, foreignById]);
 }

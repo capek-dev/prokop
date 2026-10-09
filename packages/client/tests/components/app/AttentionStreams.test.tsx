@@ -26,6 +26,9 @@ vi.mock('@/lib/attention', async (importOriginal) => ({
   },
 }));
 
+const openHere = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('@/lib/openSessionHere', () => ({ openSessionHere: openHere }));
+
 import { AttentionStreams } from '@/components/app/AttentionStreams';
 
 const ask = { id: 'a1', kind: 'approval' as const, sessionId: 's1', sessionTitle: 'Deploy', workspaceId: 'w1', workspaceName: 'site', toolName: 'bash', createdAt: 1 };
@@ -42,7 +45,7 @@ afterEach(() => {
 });
 
 describe('AttentionStreams', () => {
-  test('prompts for approvals on another machine and opens the session from the prompt', () => {
+  test('prompts for approvals on another machine and opens the session beside your work', async () => {
     render(<AttentionStreams />);
     act(() => emitters.get('laptop')!(null, { revision: 1, asks: [ask], running: [] }));
 
@@ -52,11 +55,26 @@ describe('AttentionStreams', () => {
       duration: Infinity,
     }));
     toastMock.mock.calls[0]![1].action.onClick();
-    expect(localStorage.getItem('activeWorkspaceId')).toBe('w1');
-    expect(routerState.navigate).toHaveBeenCalledWith({
+    await vi.waitFor(() => expect(openHere).toHaveBeenCalledWith(expect.objectContaining({
+      server: expect.objectContaining({ id: 'laptop' }),
+      sessionId: 's1',
+      activeServerId: 'studio',
+      viewPath: '/workspace',
+    })));
+    expect(routerState.navigate).not.toHaveBeenCalled();
+  });
+
+  test('switches machines when opening beside your work fails', async () => {
+    openHere.mockRejectedValueOnce(new Error('unreachable'));
+    render(<AttentionStreams />);
+    act(() => emitters.get('laptop')!(null, { revision: 1, asks: [ask], running: [] }));
+    toastMock.mock.calls[0]![1].action.onClick();
+
+    await vi.waitFor(() => expect(routerState.navigate).toHaveBeenCalledWith({
       to: '/server/$serverId/workspace/session/$sessionId',
       params: { serverId: 'laptop', sessionId: 's1' },
-    });
+    }));
+    expect(localStorage.getItem('activeWorkspaceId')).toBe('w1');
   });
 
   test('reports finished runs and clears prompts that were answered elsewhere', () => {

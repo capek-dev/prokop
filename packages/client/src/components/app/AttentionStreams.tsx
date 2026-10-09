@@ -5,6 +5,7 @@ import type { AttentionAsk, AttentionRunningSession, SavedServer } from '@prokop
 import { useServerContext } from '@/contexts/ServerContext';
 import { diffAttention, startAttentionStream, useAttentionStore } from '@/lib/attention';
 import { STORAGE_KEYS } from '@/lib/storage';
+import { openSessionHere } from '@/lib/openSessionHere';
 
 /** Server id of the machine shown right now, from the URL. */
 function activeServerId(pathname: string): string | null {
@@ -32,9 +33,26 @@ export function AttentionStreams() {
   );
 
   useEffect(() => {
-    const open = (serverId: string, sessionId: string, workspaceId: string | null) => {
+    const switchTo = (serverId: string, sessionId: string, workspaceId: string | null) => {
       if (workspaceId) localStorage.setItem(STORAGE_KEYS.ACTIVE_WORKSPACE_ID, workspaceId);
       void router.navigate({ to: '/server/$serverId/workspace/session/$sessionId', params: { serverId, sessionId } });
+    };
+    // On another machine's board, open the session as a tab beside your work;
+    // without a board on screen (or if that fails), switch machines instead.
+    const open = (server: SavedServer, sessionId: string, workspaceId: string | null) => {
+      const pathname = router.state.location.pathname;
+      const active = activeServerId(pathname);
+      if (!active || active === server.id) {
+        switchTo(server.id, sessionId, workspaceId);
+        return;
+      }
+      void openSessionHere({
+        server,
+        sessionId,
+        activeServerId: active,
+        viewPath: pathname.includes('/overview') ? '/overview' : '/workspace',
+        navigate: (options) => void router.navigate(options as never),
+      }).catch(() => switchTo(server.id, sessionId, workspaceId));
     };
     const label = (title: string | null, workspaceName: string | null) =>
       [title ?? 'Untitled session', workspaceName].filter(Boolean).join(' · ');
@@ -44,14 +62,14 @@ export function AttentionStreams() {
         id: `attention-${server.id}-${ask.id}`,
         description: label(ask.sessionTitle, ask.workspaceName),
         duration: Infinity,
-        action: { label: 'Open', onClick: () => open(server.id, ask.sessionId, ask.workspaceId) },
+        action: { label: 'Open', onClick: () => open(server, ask.sessionId, ask.workspaceId) },
       });
     };
     const promptFinished = (server: SavedServer, session: AttentionRunningSession) => {
       toast(`Finished on ${server.name}`, {
         id: `attention-${server.id}-finished-${session.sessionId}`,
         description: label(session.sessionTitle, session.workspaceName),
-        action: { label: 'Open', onClick: () => open(server.id, session.sessionId, session.workspaceId) },
+        action: { label: 'Open', onClick: () => open(server, session.sessionId, session.workspaceId) },
       });
     };
 

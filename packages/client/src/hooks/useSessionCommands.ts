@@ -16,6 +16,9 @@ import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
 import { getSessionCreateBoardAction } from '@/lib/sessionCreate';
 import type { CreateSessionOptions } from '@/lib/sessionCreate';
 import { randomUUID } from '@/lib/randomId';
+import { foreignClientFor } from '@/lib/hostClientPool';
+import { foreignSession } from '@/stores/foreignSessionsStore';
+import { useAskStore } from '@/stores/askStore';
 
 interface UseSessionCommandsParams {
   clientRef: React.RefObject<ProkopaiClient | null>;
@@ -94,6 +97,15 @@ export function useSessionCommands({
   serverId,
   viewPath,
 }: UseSessionCommandsParams): UseSessionCommandsReturn {
+  // A session from another machine is served by that machine's pooled connection.
+  const clientFor = useCallback(
+    (sessionId: string | null | undefined) => foreignClientFor(sessionId) ?? clientRef.current,
+    [clientRef],
+  );
+  const sessionFor = useCallback(
+    (sessionId: string) => sessions.find(s => s.id === sessionId) ?? foreignSession(sessionId),
+    [sessions],
+  );
 
   const createSession = useCallback((preconfigId?: string, title?: string, options?: CreateSessionOptions) => {
     const client = clientRef.current;
@@ -128,7 +140,7 @@ export function useSessionCommands({
   }, [clientRef, partAppendRafRef, pendingPartAppendsRef, pendingSessionCreateRef, activeWorkspace, primaryPreconfigs]);
 
   const resumeSession = useCallback((sessionId: string, options?: ResumeSessionOptions) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     const store = useSessionStore.getState();
     const alreadyOpen = useSessionBoardStore.getState().openSessionIds.includes(sessionId);
     if (!alreadyOpen || options?.targetMessageId) store.setNavigationIntentForSession(
@@ -138,7 +150,7 @@ export function useSessionCommands({
         : { mode: 'follow' }
     );
     store.setCompactionSuccessForSession(sessionId, false);
-    const session = sessions.find(s => s.id === sessionId);
+    const session = sessionFor(sessionId);
     if (session?.workspaceId && session.workspaceId !== activeWorkspace?.id) {
       const targetWorkspace = workspaces.find(w => w.id === session.workspaceId);
       if (targetWorkspace) {
@@ -193,70 +205,70 @@ export function useSessionCommands({
       params: { serverId, sessionId: newBoard.focusedSessionId ?? sessionId },
       ...(openParam ? { search: { open: openParam } as Record<string, unknown> } : {}),
     });
-  }, [clientRef, sessions, workspaces, activeWorkspace, setActiveWorkspace, navigate, serverId, viewPath]);
+  }, [clientFor, sessions, workspaces, activeWorkspace, setActiveWorkspace, navigate, serverId, viewPath, sessionFor]);
 
   const openAlongside = useCallback((sessionId: string) => resumeSession(sessionId), [resumeSession]);
 
   const closeSession = useCallback((sessionId: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       client.sessions.close(sessionId);
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const revertSession = useCallback((sessionId: string, messageId: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       usePendingOperationsStore.getState().startOperation({ type: 'revert', sessionId, messageId, startedAt: Date.now() });
       client.sessions.revert(sessionId, messageId);
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const forkSession = useCallback((sessionId: string, messageId: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       usePendingOperationsStore.getState().startOperation({ type: 'fork', sessionId, messageId, startedAt: Date.now() });
       client.sessions.fork(sessionId, messageId);
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const editMessage = useCallback((sessionId: string, messageId: string, content: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       usePendingOperationsStore.getState().startOperation({ type: 'edit', sessionId, messageId, startedAt: Date.now() });
       client.sessions.editMessage(sessionId, messageId, content);
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const compactSession = useCallback((sessionId: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       usePendingOperationsStore.getState().startOperation({ type: 'compact', sessionId, startedAt: Date.now() });
       client.sessions.compact(sessionId);
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const reopenSession = useCallback((sessionId: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       client.sessions.reopen(sessionId);
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const permanentlyDeleteSession = useCallback((sessionId: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       usePendingOperationsStore.getState().startOperation({ type: 'delete', sessionId, startedAt: Date.now() });
       client.sessions.delete(sessionId);
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const updateSessionPreconfigForSession = useCallback((sessionId: string, preconfigId: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       client.sessions.update(sessionId, { preconfigId });
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const updateSessionPreconfig = useCallback((preconfigId: string) => {
     if (currentSession) {
@@ -265,14 +277,14 @@ export function useSessionCommands({
   }, [currentSession, updateSessionPreconfigForSession]);
 
   const updateSessionModelForSession = useCallback((sessionId: string, modelId: string, providerId: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     const store = useSessionStore.getState();
     store.setModelForSession(sessionId, modelId);
     store.setVariantForSession(sessionId, null);
     if (client && client.connected) {
       client.sessions.updateModel(sessionId, { modelId, providerId });
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const updateSessionModel = useCallback((modelId: string, providerId: string) => {
     if (currentSession) {
@@ -281,8 +293,8 @@ export function useSessionCommands({
   }, [currentSession, updateSessionModelForSession]);
 
   const updateSessionVariantForSession = useCallback((sessionId: string, variant: string | null) => {
-    const client = clientRef.current;
-    const session = sessions.find(s => s.id === sessionId);
+    const client = clientFor(sessionId);
+    const session = sessionFor(sessionId);
     const store = useSessionStore.getState();
     const sessionModel = session?.selectedModel || store.getModelForSession(sessionId);
     if (client && client.connected && session) {
@@ -293,7 +305,7 @@ export function useSessionCommands({
       });
       store.setVariantForSession(sessionId, variant);
     }
-  }, [clientRef, sessions]);
+  }, [clientFor, sessions, sessionFor]);
 
   const updateSessionVariant = useCallback((variant: string | null) => {
     if (currentSession) {
@@ -302,20 +314,20 @@ export function useSessionCommands({
   }, [currentSession, updateSessionVariantForSession]);
 
   const handleRenameSession = useCallback((sessionId: string, title: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       usePendingOperationsStore.getState().startOperation({ type: 'rename', sessionId, startedAt: Date.now() });
       client.sessions.rename(sessionId, title);
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const regenerateSessionTitle = useCallback((sessionId: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       usePendingOperationsStore.getState().startOperation({ type: 'regenerate_title', sessionId, startedAt: Date.now() });
       client.sessions.generateTitle(sessionId);
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const handleNavigateBack = useCallback(() => {
     if (currentSession?.parentId) {
@@ -324,22 +336,24 @@ export function useSessionCommands({
   }, [currentSession, resumeSession]);
 
   const addToQueue = useCallback((sessionId: string, content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       client.queue.add(sessionId, content, { attachments, responseFormatId });
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const removeFromQueue = useCallback((queueId: string) => {
-    const client = clientRef.current;
+    const queued = useSessionStore.getState().queuedMessages;
+    const owner = Object.keys(queued).find(sessionId => queued[sessionId]?.some(item => item.id === queueId));
+    const client = clientFor(owner);
     if (client && client.connected) {
       client.queue.remove(queueId);
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const sendChatMessageForSession = useCallback((sessionId: string, content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }) => {
-    const client = clientRef.current;
-    const session = sessions.find(s => s.id === sessionId);
+    const client = clientFor(sessionId);
+    const session = sessionFor(sessionId);
     if (!session || session.compacting) return;
     if (session.runningAt || streamingSessionIds.has(sessionId)) {
       addToQueue(sessionId, content, attachments, responseFormatId);
@@ -353,7 +367,7 @@ export function useSessionCommands({
         );
       }
     }
-  }, [clientRef, sessions, streamingSessionIds, addToQueue]);
+  }, [clientFor, sessionFor, streamingSessionIds, addToQueue]);
 
   const sendChatMessage = useCallback((content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }) => {
     if (!currentSession) return;
@@ -361,7 +375,9 @@ export function useSessionCommands({
   }, [currentSession, sendChatMessageForSession]);
 
   const handleAskResponse = useCallback((toolCallId: string, response: AskResponse, requestId?: string) => {
-    const client = clientRef.current;
+    const request = useAskStore.getState().pendingRequests.find(item =>
+      item.toolCallId === toolCallId && (!requestId || item.requestId === requestId));
+    const client = clientFor(request?.sessionId);
     // For permission asks, use requestId as canonical identity
     if (requestId) {
       removePendingPermissionRequest(requestId, toolCallId);
@@ -376,14 +392,14 @@ export function useSessionCommands({
         requestId,
       });
     }
-  }, [clientRef, removePendingAskRequest, removePendingPermissionRequest]);
+  }, [clientFor, removePendingAskRequest, removePendingPermissionRequest]);
 
   const handleInterruptSessionById = useCallback((sessionId: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       client.sessions.interrupt(sessionId);
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   const handleInterruptSession = useCallback(() => {
     if (currentSession) {
@@ -442,11 +458,11 @@ export function useSessionCommands({
   }, [clientRef]);
 
   const claimControl = useCallback((sessionId: string) => {
-    const client = clientRef.current;
+    const client = clientFor(sessionId);
     if (client && client.connected) {
       client.control.claim(sessionId);
     }
-  }, [clientRef]);
+  }, [clientFor]);
 
   return {
     createSession,

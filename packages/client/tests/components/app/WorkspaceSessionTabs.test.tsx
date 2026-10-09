@@ -16,6 +16,8 @@ import { useAskStore, type PendingAskRequest } from '@/stores/askStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useDockStore } from '@/stores/dockStore';
 import { createDefaultViewLayout, sessionViewId, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
+import { useForeignSessionsStore } from '@/stores/foreignSessionsStore';
+import { ServerContext } from '@/contexts/ServerContext';
 
 const mocks = vi.hoisted(() => ({ mobile: false, navigate: vi.fn(), send: vi.fn(), interrupt: vi.fn(), ask: vi.fn(), mount: vi.fn(), unmount: vi.fn() }));
 vi.mock('@tanstack/react-router', () => ({
@@ -23,6 +25,7 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => mocks.navigate,
   useRouterState: ({ select }: { select: (state: unknown) => unknown }) => select({ location: { pathname: '/server/server/workspace' } }),
 }));
+vi.mock('@/components/app/ForeignSessionView', () => ({ ForeignSessionView: ({ serverId, sessionId }: { serverId: string; sessionId: string }) => <div>Foreign {sessionId} on {serverId}</div> }));
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => mocks.mobile, useIsCompact: () => false }));
 vi.mock('@/components/layout/FilesPanel', () => ({ FilesPanel: () => <div>Repository tool</div> }));
 vi.mock('@/components/app/WorkspaceUsageView', () => ({ WorkspaceUsageView: () => <div>Usage</div> }));
@@ -234,5 +237,32 @@ describe('individual session tabs', () => {
     expect(screen.getByText('Open a session or add a view.')).toBeInTheDocument();
     expect(document.querySelector('[data-workspace-view="explorer"]')).toBeInTheDocument();
     expect(mocks.interrupt).not.toHaveBeenCalled();
+  });
+});
+
+describe('tabs from another machine', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useSessionStore.setState({ ...useSessionStore.getInitialState(), sessions: [{ id: 'local', workspaceId: 'workspace', title: 'Local' } as Session] });
+    useWorkspaceViewStore.setState({ layout: createDefaultViewLayout() });
+    useAskStore.setState({ pendingRequests: [] });
+    useConnectionStore.setState({ connected: false, streamingSessionIds: new Set(['remote']) });
+    useServerDataStore.setState({ serverId: 'server', agents: [], activeWorkspace: { id: 'workspace' } as Workspace, workspaces: [{ id: 'workspace', name: 'Project' } as Workspace] });
+    useForeignSessionsStore.setState({ byId: {} });
+    useForeignSessionsStore.getState().add('laptop', { id: 'remote', workspaceId: 'w-remote', title: 'Deploy' } as Session);
+    useSessionBoardStore.setState({ openSessionIds: [], focusedSessionId: null });
+    useSessionBoardStore.getState().hydrateFromRoute('remote', ['local', 'remote']);
+  });
+  afterEach(() => { cleanup(); localStorage.clear(); });
+
+  test('are labelled with the machine, show live status, and render through the machine\'s own view', () => {
+    const servers = [{ id: 'laptop', name: 'Laptop', url: 'laptop', createdAt: '' }];
+    render(<ServerContext value={{ servers } as never}><Harness /></ServerContext>);
+
+    const tab = screen.getByRole('tab', { name: 'Laptop / Deploy' });
+    expect(within(tab).getByRole('img', { name: 'Running' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Project / Local' })).toBeInTheDocument();
+    expect(document.getElementById(`workspace-view-${sessionViewId('laptop', 'remote')}`)).not.toBeNull();
+    expect(screen.getByText('Foreign remote on laptop')).toBeInTheDocument();
   });
 });

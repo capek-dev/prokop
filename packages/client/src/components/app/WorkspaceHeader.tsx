@@ -6,19 +6,19 @@ import { useSessionManager } from '@/contexts/SessionManagerContext';
 import { useSessionStore } from '@/stores/sessionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useConnectionStore } from '@/stores/connectionStore';
-import { useServerDataStore } from '@/stores/serverDataStore';
 import { getWorkspacePreconfigs } from '@/lib/workspacePreconfigs';
+import { useScopedServerData } from '@/contexts/HostScopeContext';
 
 /**
  * Slim per-session header inside the primary card. Shell-level panel toggles
  * live in the global AppHeader title bar.
  */
 export function WorkspaceHeader({ sessionId }: { sessionId?: string } = {}) {
-  const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
-  const allPreconfigs = useServerDataStore(s => s.preconfigs);
-  const models = useServerDataStore(s => s.models);
-  const defaultModel = useServerDataStore(s => s.defaultModel);
-  const allWorkspaces = useServerDataStore(s => s.workspaces);
+  const activeWorkspace = useScopedServerData(s => s.activeWorkspace);
+  const allPreconfigs = useScopedServerData(s => s.preconfigs);
+  const models = useScopedServerData(s => s.models);
+  const defaultModel = useScopedServerData(s => s.defaultModel);
+  const allWorkspaces = useScopedServerData(s => s.workspaces);
   const sessionManager = useSessionCommands();
   const { sdkClient, serverUrl } = useSessionManager();
 

@@ -9,7 +9,7 @@ import { useSessionStore, type SessionNavigationIntent } from '@/stores/sessionS
 import { useAskStore } from '@/stores/askStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useSessionCommands } from '@/contexts/SessionCommandsContext';
-import { useServerDataStore } from '@/stores/serverDataStore';
+import { useScopedServerData, useSessionById } from '@/contexts/HostScopeContext';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useBoardFocus } from '@/hooks/useBoardFocus';
 import {
@@ -39,19 +39,20 @@ export function SessionPane({
 }: SessionPaneProps) {
   const commands = useSessionCommands();
 
-  const session = useSessionStore(s => s.sessions.find(sess => sess.id === sessionId));
+  const session = useSessionById(sessionId);
   const contentMeta = useSessionStore(s => s.contentMetaBySession[sessionId]);
   const sessionMessages = useSessionStore(s => s.messagesBySession[sessionId]);
   const sessionParts = useSessionStore(s => s.partsBySession[sessionId]);
   const compactionSuccess = useSessionStore(s => s.compactionSuccessBySessionId[sessionId] ?? false);
   const navigationIntent = useSessionStore(s => s.navigationIntentBySessionId[sessionId] ?? DEFAULT_NAV_INTENT);
   const queuedMessages = useSessionStore(s => s.queuedMessages[sessionId] ?? EMPTY_QUEUE);
-  const sessionModel = useSessionStore(s => s.modelBySessionId[sessionId] ?? s.sessions.find(sess => sess.id === sessionId)?.selectedModel ?? '');
+  const storedModel = useSessionStore(s => s.modelBySessionId[sessionId]);
+  const sessionModel = storedModel ?? session?.selectedModel ?? '';
   const pendingAskRequests = useAskStore(
     useShallow(s => s.pendingRequests.filter(r => r.sessionId === sessionId || r.originSessionId === sessionId)),
   );
-  const prompts = useServerDataStore(s => s.prompts);
-  const models = useServerDataStore(s => s.models);
+  const prompts = useScopedServerData(s => s.prompts);
+  const models = useScopedServerData(s => s.models);
 
   // Pane-scoped pinned messages: resolve the session's workspaceId and
   // query pin state for that workspace. Each pane builds its own pin set,

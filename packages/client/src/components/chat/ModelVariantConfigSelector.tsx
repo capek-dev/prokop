@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Check, ChevronsUpDown, Brain, Bot, Cpu } from 'lucide-react';
 import type { CodexModel, Preconfig } from '@prokopai/sdk';
-import { useServerDataStore } from '@/stores/serverDataStore';
 import { AnthropicMark, OpenAIMark, ProkopMark } from '@/components/branding/BrandMarks';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +26,7 @@ import {
 } from '@/components/ui/sheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { useScopedServerData } from '@/contexts/HostScopeContext';
 
 interface Model {
   id: string;
@@ -126,7 +126,7 @@ export function ModelVariantConfigSelector({
   const [openSection, setOpenSection] = useState<Section | null>(null);
   const [modelTab, setModelTab] = useState<ModelTab>('prokop');
   const isMobile = useIsMobile();
-  const agents = useServerDataStore((s) => s.agents);
+  const agents = useScopedServerData(s => s.agents);
   const isAgentPreconfig = (id: string) => agents.some(a => a.id === id);
 
   const defaultModelTab: ModelTab = claudeSession ? 'anthropic' : codexSession ? 'openai' : 'prokop';

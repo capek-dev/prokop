@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useSessionStore } from '@/stores/sessionStore';
 import type { ProkopaiClient } from '@prokopai/sdk';
+import { foreignServerOf } from '@/stores/foreignSessionsStore';
 
 /**
  * Automatically resume sessions that are visible on the board but don't have
@@ -23,6 +24,8 @@ export function useBoardSessionLoader(
     if (!sdkClient || !connected) return;
 
     for (const sessionId of openSessionIds) {
+      // Sessions from other machines load through their own pooled connection.
+      if (foreignServerOf(sessionId)) continue;
       const hasMessages = !!useSessionStore.getState().messagesBySession[sessionId]?.length;
       const contentMeta = useSessionStore.getState().contentMetaBySession[sessionId];
       const isLoaded = contentMeta?.status === 'ready' || hasMessages;

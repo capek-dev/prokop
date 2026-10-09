@@ -2,6 +2,8 @@ import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } fr
 import { useShallow } from 'zustand/react/shallow';
 import { useParams, useRouter, useRouterState } from '@tanstack/react-router';
 import { resolveHostUrl, useEffectiveServerUrl } from '@/lib/hostRoutes';
+import { setForeignHandlerContextProvider } from '@/lib/hostClientPool';
+import { foreignServerOf, useForeignSessionsStore } from '@/stores/foreignSessionsStore';
 import type {
   Session,
   Workspace,
@@ -182,9 +184,13 @@ export function useServerSessionManager({
   const sessionIdFromUrl = params?.sessionId as string | undefined;
   const currentPathname = useRouterState({ select: (s) => s.location.pathname });
   const viewPath = currentPathname.includes('/overview') ? '/overview' : '/workspace';
+  // A focused session from another machine is shown too; it is never resumed on this machine.
+  const foreignById = useForeignSessionsStore(s => s.byId);
   const currentSession = useMemo(
-    () => sessionIdFromUrl ? sessions.find(s => s.id === sessionIdFromUrl) ?? null : null,
-    [sessionIdFromUrl, sessions],
+    () => sessionIdFromUrl
+      ? sessions.find(s => s.id === sessionIdFromUrl) ?? foreignById[sessionIdFromUrl]?.session ?? null
+      : null,
+    [sessionIdFromUrl, sessions, foreignById],
   );
 
   const isSessionLoading = sessionIdFromUrl != null && currentSession == null;
@@ -454,6 +460,7 @@ export function useServerSessionManager({
     if (
       sessionIdFromUrl &&
       currentSession &&
+      !foreignServerOf(sessionIdFromUrl) &&
       connected &&
       sdkClientRef.current &&
       !hasResumedRef.current.has(sessionIdFromUrl)
@@ -476,6 +483,12 @@ export function useServerSessionManager({
   useLayoutEffect(() => {
     sessionsRef.current = sessions;
   }, [sessions]);
+
+  // Connections to other machines handle their events with a context derived from this one.
+  useEffect(() => {
+    setForeignHandlerContextProvider(() => handlerContextRef.current);
+    return () => setForeignHandlerContextProvider(() => null);
+  }, []);
 
 
 

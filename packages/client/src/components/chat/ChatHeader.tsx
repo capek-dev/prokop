@@ -10,7 +10,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { TokenMeter } from './TokenMeter';
 import { ModelVariantConfigSelector } from './ModelVariantConfigSelector';
 import { useSessionStore } from '@/stores/sessionStore';
-import { useServerDataStore } from '@/stores/serverDataStore';
 import { useSessionControlStore } from '@/stores/sessionControlStore';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import type { SessionUsage } from '@/stores/sessionStore';
@@ -18,6 +17,7 @@ import type { SessionUsage } from '@/stores/sessionStore';
 import { useClientIdentityStore } from '@/stores/clientIdentityStore';
 import {useIsCompact, useIsMobile} from '@/hooks/use-mobile';
 import { useElementWidth } from '@/hooks/use-element-width';
+import { useScopedServerData } from '@/contexts/HostScopeContext';
 
 // Header widths (px) below which the model selector collapses.
 const ICON_ONLY_SELECTOR_MAX_WIDTH = 420;
@@ -81,7 +81,7 @@ export function ChatHeader({
   const contentMeta = useSessionStore(s => s.contentMetaBySession[session.id]);
   const messages = useSessionStore(s => s.messagesBySession[session.id]);
   const queued = useSessionStore(s => s.queuedMessages[session.id]);
-  const workspace = useServerDataStore(s => s.workspaces.find(w => w.id === session.workspaceId));
+  const workspace = useScopedServerData(s => s.workspaces.find(w => w.id === session.workspaceId));
   const emptyRoot = !session.parentId && session.status === 'active' && !session.runningAt
     && !isStreaming && contentMeta?.status === 'ready' && !contentMeta.hasOlder
     && messages?.length === 0 && !queued?.length;

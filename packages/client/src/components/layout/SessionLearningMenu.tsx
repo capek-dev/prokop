@@ -2,12 +2,13 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Eye, EyeOff } from 'lucide-react';
 import { useSdkClient } from '@/contexts/ServerClientContext';
+import { useSessionById } from '@/contexts/HostScopeContext';
 import { useSessionStore } from '@/stores/sessionStore';
 import { DropdownMenuGroup, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 
 export function SessionLearningMenu({ sessionId }: { sessionId: string }) {
   const client = useSdkClient();
-  const session = useSessionStore(state => state.sessions.find(s => s.id === sessionId));
+  const session = useSessionById(sessionId);
   const policy = session?.metadata?.learning as { excluded?: boolean; includeAutomated?: boolean } | undefined;
   const mutation = useMutation({
     mutationFn: async () => {

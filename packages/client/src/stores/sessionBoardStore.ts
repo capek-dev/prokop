@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import { sessionViewId, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
+import { foreignServerOf, useForeignSessionsStore } from '@/stores/foreignSessionsStore';
 
 function viewId(sessionId: string) {
-  const serverId = useServerDataStore.getState().serverId;
+  // A session from another machine keeps that machine's id in its view id.
+  const serverId = foreignServerOf(sessionId) ?? useServerDataStore.getState().serverId;
   return serverId ? sessionViewId(serverId, sessionId) : null;
 }
 
@@ -15,6 +17,8 @@ function revealSession(sessionId: string): void {
 function removeSessionView(sessionId: string): void {
   const id = viewId(sessionId);
   if (id) useWorkspaceViewStore.getState().removeView(id);
+  // A closed tab from another machine is forgotten; its connection is released by the view.
+  useForeignSessionsStore.getState().remove(sessionId);
 }
 
 /** Legacy command intent remains accepted; both actions now open a session tab. */

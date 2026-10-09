@@ -1,7 +1,10 @@
-import type { ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { WorkspaceSessionView } from '@/components/app/WorkspaceSessionView';
+import { ForeignSessionView } from '@/components/app/ForeignSessionView';
+import { useForeignSessionsStore } from '@/stores/foreignSessionsStore';
+import { ServerContext } from '@/contexts/ServerContext';
 import type { WorkspaceTab } from '@/components/app/workspaceTab';
 import { useBoardFocus } from '@/hooks/useBoardFocus';
 import { useBoardSessionLoader } from '@/hooks/useBoardSessionLoader';
@@ -22,7 +25,10 @@ export function useWorkspaceSessionTabs(serverId: string | undefined, sdkClient:
 } {
   const openIds = useSessionBoardStore((state) => state.openSessionIds);
   const focusedId = useSessionBoardStore((state) => state.focusedSessionId);
-  const sessions = useSessionStore((state) => state.sessions);
+  const localSessions = useSessionStore((state) => state.sessions);
+  const foreignById = useForeignSessionsStore((state) => state.byId);
+  // Machine names only label tabs from other machines; optional outside the app shell.
+  const servers = useContext(ServerContext)?.servers ?? [];
   const requests = useAskStore((state) => state.pendingRequests);
   const streamingIds = useConnectionStore((state) => state.streamingSessionIds);
   const connected = useConnectionStore((state) => state.connected);
@@ -37,7 +43,11 @@ export function useWorkspaceSessionTabs(serverId: string | undefined, sdkClient:
   const views: Partial<Record<WorkspaceViewId, ReactNode>> = {};
   const tabs: Partial<Record<WorkspaceViewId, WorkspaceTab>> = {};
   if (!serverId) return { views, tabs };
+  const foreignSessions = Object.values(foreignById).map((entry) => entry.session);
+  const sessions = [...localSessions, ...foreignSessions];
   const sessionsById = new Map(sessions.map((session) => [session.id, session]));
+  const serverNames = new Map(servers.map((server) => [server.id, server.name]));
+  const viewIdFor = (id: string) => sessionViewId(foreignById[id]?.serverId ?? serverId, id);
   const workspaceNames = new Map(workspaces.map((workspace) => [workspace.id, getWorkspaceDisplayName(workspace, agents)]));
   const needsInputIds = new Set<string>();
   const runningIds = new Set(streamingIds);
@@ -62,12 +72,16 @@ export function useWorkspaceSessionTabs(serverId: string | undefined, sdkClient:
   }
   for (const id of openIds) {
     const session = sessionsById.get(id);
-    const viewId = sessionViewId(serverId, id);
-    const workspaceName = session && workspaceNames.get(session.workspaceId);
+    const foreignServerId = foreignById[id]?.serverId;
+    const viewId = viewIdFor(id);
+    // Another machine's tab is labelled with that machine instead of a local workspace.
+    const workspaceName = foreignServerId ? serverNames.get(foreignServerId) : session && workspaceNames.get(session.workspaceId);
     const title = session?.title || 'Untitled session';
     const label = workspaceName ? `${workspaceName} / ${title}` : title;
     const status = needsInputIds.has(id) ? 'Needs input' : runningIds.has(id) ? 'Running' : undefined;
-    views[viewId] = <WorkspaceSessionView sessionId={id} sdkClient={sdkClient} serverUrl={serverUrl} />;
+    views[viewId] = foreignServerId
+      ? <ForeignSessionView serverId={foreignServerId} sessionId={id} />
+      : <WorkspaceSessionView sessionId={id} sdkClient={sdkClient} serverUrl={serverUrl} />;
     tabs[viewId] = {
       label,
       status,
@@ -99,5 +113,5 @@ export function useWorkspaceSessionTabs(serverId: string | undefined, sdkClient:
     };
   }
   const selected = focusedId && openIds.includes(focusedId) ? focusedId : openIds[0];
-  return { views, tabs, mobileSessionId: selected ? sessionViewId(serverId, selected) : undefined };
+  return { views, tabs, mobileSessionId: selected ? viewIdFor(selected) : undefined };
 }

@@ -19,8 +19,8 @@ import { Popover, PopoverContent, PopoverAnchor } from '@/components/ui/popover'
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { useUIStore } from '@/stores/uiStore';
-import { useServerDataStore } from '@/stores/serverDataStore';
 import { randomUUID } from '@/lib/randomId';
+import { useScopedServerData } from '@/contexts/HostScopeContext';
 
 type AutocompleteMode = 'none' | 'files' | 'prompts';
 
@@ -126,7 +126,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
   const mentions = useMemo(() => extractMentionsFromText(input), [input]);
 
   const openFilePreview = useUIStore((s) => s.openFilePreview);
-  const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
+  const activeWorkspace = useScopedServerData(s => s.activeWorkspace);
   // Disabled: canvas background highlight overlay was not working well
   // const mentionPaths = useMemo(() => mentions.map(m => m.path), [mentions]);
   // useHighlightBackground(textareaRef, input, mentionPaths);

@@ -16,6 +16,7 @@ import {
 import type { PermissionMode } from '@prokopai/sdk';
 import type { ProkopaiClient } from '@prokopai/sdk';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useSessionById } from '@/contexts/HostScopeContext';
 
 interface AutoApproveSelectorProps {
   sessionId: string;
@@ -66,10 +67,8 @@ export function AutoApproveSelector({
   sdkClient,
   disabled,
 }: AutoApproveSelectorProps) {
-  const sessions = useSessionStore((s) => s.sessions);
   const updateSession = useSessionStore((s) => s.updateSession);
-
-  const session = sessions.find((s) => s.id === sessionId);
+  const session = useSessionById(sessionId);
   const currentMode: PermissionMode = session?.permissionMode ?? 'standard';
   const config = MODE_CONFIGS[currentMode];
   const Icon = config.icon;
