@@ -20,6 +20,7 @@
 
 ### Fixed
 
+- **Deleting a session also deletes its subagent sessions**: Subagent sessions used to stay behind after their parent was deleted, out of sight but still taking up space and appearing in session search. Deleting a session now removes its subagents too, and the next start removes the ones left over from earlier deletions (this one-time cleanup can make that start take longer).
 - **The selected session no longer flickers when switching sessions**: Switching quickly between sessions, in the same project or another one, keeps the one you picked highlighted instead of briefly highlighting the previous one or none.
 - **Live alerts and pairing requests stay connected**: The streams that report approvals and finished sessions on other machines, and the wait for a pairing approval, are no longer cut every 10 seconds when nothing changes. The browser console no longer fills with `ERR_INCOMPLETE_CHUNKED_ENCODING` for `/api/attention/events`.
 - **The installed app's title bar keeps the theme color after a reload**: Pressing F5 no longer turns the title bar back to the default gray.

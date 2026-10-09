@@ -9,6 +9,7 @@ export interface CleanupStats {
   orphanedAttachments: number;
   orphanedPinnedMessages: number;
   orphanedSessions: number;
+  orphanedSubsessions: number;
   orphanedPermissionGrants: number;
   orphanedWorkspacePaths: number;
   orphanedTerminalSessions: number;
@@ -25,6 +26,7 @@ export function cleanupOrphanedData(): CleanupStats {
     orphanedAttachments: 0,
     orphanedPinnedMessages: 0,
     orphanedSessions: 0,
+    orphanedSubsessions: 0,
     orphanedPermissionGrants: 0,
     orphanedWorkspacePaths: 0,
     orphanedTerminalSessions: 0,
@@ -32,6 +34,24 @@ export function cleanupOrphanedData(): CleanupStats {
   };
 
   db.transaction(() => {
+    // Subsessions whose parent was deleted, with their descendants. parent_id
+    // has no foreign key, and deletes used to remove only the parent row.
+    // Runs first: the session delete cascades to messages, parts, and tool
+    // output artifacts, and the statements below clear their search rows.
+    // Counted separately: Bun's `changes` includes rows removed by the cascade.
+    const orphanedSubsessionTree = `
+      WITH RECURSIVE tree(id) AS (
+        SELECT id FROM sessions
+        WHERE parent_id IS NOT NULL AND parent_id NOT IN (SELECT id FROM sessions)
+        UNION SELECT s.id FROM sessions s JOIN tree ON s.parent_id = tree.id
+      )
+      SELECT id FROM tree
+    `;
+    stats.orphanedSubsessions = (db.query(`SELECT COUNT(*) AS n FROM (${orphanedSubsessionTree})`).get() as { n: number }).n;
+    if (stats.orphanedSubsessions > 0) {
+      db.run(`DELETE FROM sessions WHERE id IN (${orphanedSubsessionTree})`);
+    }
+
     stats.orphanedParts = db.run('DELETE FROM parts WHERE message_id NOT IN (SELECT id FROM messages)').changes;
     stats.orphanedParts += db.run('DELETE FROM parts WHERE session_id NOT IN (SELECT id FROM sessions)').changes;
 

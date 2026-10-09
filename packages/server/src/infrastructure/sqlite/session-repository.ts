@@ -345,24 +345,37 @@ export function createSessionRepository(
     return getSession(id);
   }
 
+  /**
+   * Deletes the session and its whole subsession tree. `parent_id` has no
+   * foreign key, so without this every subagent of a deleted session stayed
+   * behind: unreachable from any parent, yet still indexed for search.
+   */
   function deleteSession(id: string): boolean {
     const db = getDb();
+    const sessionIds = (db.query(`
+      WITH RECURSIVE tree(id) AS (
+        SELECT id FROM sessions WHERE id = ?
+        UNION SELECT s.id FROM sessions s JOIN tree ON s.parent_id = tree.id
+      )
+      SELECT id FROM tree
+    `).all(id) as Array<{ id: string }>).map((row) => row.id);
+    if (sessionIds.length === 0) return false;
 
-    const deleted = db.transaction(() => {
-      hooks.deleteAttachmentsForSession(id);
+    db.transaction(() => {
+      for (const sessionId of sessionIds) hooks.deleteAttachmentsForSession(sessionId);
       // FK ON DELETE CASCADE removes messages, parts, queued_messages,
       // pending_asks, pinned_messages automatically.
-      const result = db.run('DELETE FROM sessions WHERE id = ?', [id]);
-      return result.changes > 0;
+      const placeholders = sessionIds.map(() => '?').join(', ');
+      db.run(`DELETE FROM sessions WHERE id IN (${placeholders})`, sessionIds);
     })();
 
-    if (deleted) {
-      hooks.events.publish({ type: 'session.deleted', sessionId: id });
-      hooks.cleanupSessionOutputDir(id);
-      notifyAttentionChanged();
+    for (const sessionId of sessionIds) {
+      hooks.events.publish({ type: 'session.deleted', sessionId });
+      hooks.cleanupSessionOutputDir(sessionId);
     }
+    notifyAttentionChanged();
 
-    return deleted;
+    return true;
   }
 
   function deleteSessionsByWorkspace(workspaceId: string): void {

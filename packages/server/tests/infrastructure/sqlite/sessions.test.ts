@@ -250,6 +250,37 @@ describe('sessions store', () => {
     test('returns false for non-existent session', () => {
       expect(deleteSession('nonexistent')).toBe(false);
     });
+
+    test('deletes the whole subsession tree with its messages, leaving siblings alone', () => {
+      seedWorkspace({ id: 'ws1' });
+      createSession(makeSession({ id: 'root', workspaceId: 'ws1', title: 'Root', status: 'active' }));
+      createSession(makeSession({ id: 'child', workspaceId: 'ws1', title: 'Child', status: 'active', parentId: 'root' }));
+      createSession(makeSession({ id: 'grandchild', workspaceId: 'ws1', title: 'Grandchild', status: 'active', parentId: 'child' }));
+      createSession(makeSession({ id: 'other', workspaceId: 'ws1', title: 'Other', status: 'active' }));
+      createSession(makeSession({ id: 'other-child', workspaceId: 'ws1', title: 'Other child', status: 'active', parentId: 'other' }));
+      getDatabase().run(
+        "INSERT INTO messages (id, session_id, role, created_at) VALUES ('m1', 'grandchild', 'user', 1)",
+      );
+
+      expect(deleteSession('root')).toBe(true);
+
+      expect(getSession('root')).toBeNull();
+      expect(getSession('child')).toBeNull();
+      expect(getSession('grandchild')).toBeNull();
+      expect(getDatabase().query("SELECT COUNT(*) AS n FROM messages WHERE session_id = 'grandchild'").get()).toEqual({ n: 0 });
+      expect(getSession('other')).not.toBeNull();
+      expect(getSession('other-child')).not.toBeNull();
+    });
+
+    test('deleting a subsession keeps its parent', () => {
+      seedWorkspace({ id: 'ws1' });
+      createSession(makeSession({ id: 'root', workspaceId: 'ws1', title: 'Root', status: 'active' }));
+      createSession(makeSession({ id: 'child', workspaceId: 'ws1', title: 'Child', status: 'active', parentId: 'root' }));
+
+      expect(deleteSession('child')).toBe(true);
+      expect(getSession('child')).toBeNull();
+      expect(getSession('root')).not.toBeNull();
+    });
   });
 
   describe('listSessions', () => {

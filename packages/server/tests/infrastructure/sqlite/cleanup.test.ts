@@ -237,11 +237,35 @@ describe('cascade deletes and cleanup', () => {
       expect(stats.orphanedPendingAsks).toBeGreaterThan(0);
     });
 
+    test('removes subsession trees whose parent is gone, with their messages and search rows', () => {
+      const db = getDatabase();
+      createSession({ ...makeSession({ id: 'kept-child', workspaceId, title: 'Kept', status: 'active' }), parentId: sessionId });
+      createSession({ ...makeSession({ id: 'orphan-child', workspaceId, title: 'Orphan', status: 'active' }), parentId: 'deleted-parent' });
+      createSession({ ...makeSession({ id: 'orphan-grandchild', workspaceId, title: 'Orphan 2', status: 'active' }), parentId: 'orphan-child' });
+      const message = createMessage(createTestUserMessage('orphan-grandchild'));
+      createPart(createTestTextPart(message.id), 'orphan-grandchild');
+      db.run(
+        "INSERT INTO messages_fts (message_id, session_id, workspace_id, role, content) VALUES (?, 'orphan-grandchild', ?, 'user', 'orphan text')",
+        [message.id, workspaceId],
+      );
+
+      const stats = cleanupOrphanedData();
+
+      expect(stats.orphanedSubsessions).toBe(2);
+      expect(getSession('orphan-child')).toBeNull();
+      expect(getSession('orphan-grandchild')).toBeNull();
+      expect(db.query("SELECT COUNT(*) AS n FROM parts WHERE session_id = 'orphan-grandchild'").get()).toEqual({ n: 0 });
+      expect(db.query("SELECT COUNT(*) AS n FROM messages_fts WHERE session_id = 'orphan-grandchild'").get()).toEqual({ n: 0 });
+      expect(getSession('kept-child')).not.toBeNull();
+      expect(getSession(sessionId)).not.toBeNull();
+    });
+
     test('returns zero stats for clean database', () => {
       const stats = cleanupOrphanedData();
       expect(stats.orphanedMessages).toBe(0);
       expect(stats.orphanedParts).toBe(0);
       expect(stats.orphanedPendingAsks).toBe(0);
+      expect(stats.orphanedSubsessions).toBe(0);
     });
   });
 

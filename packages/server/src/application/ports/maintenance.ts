@@ -6,6 +6,7 @@ export interface CleanupStats {
   orphanedAttachments: number;
   orphanedPinnedMessages: number;
   orphanedSessions: number;
+  orphanedSubsessions: number;
   orphanedPermissionGrants: number;
   orphanedWorkspacePaths: number;
   orphanedTerminalSessions: number;
