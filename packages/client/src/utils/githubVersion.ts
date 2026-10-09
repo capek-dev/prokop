@@ -1,4 +1,4 @@
-const GITHUB_REPO = 'capek-dev/prokop';
+const GITHUB_REPO = 'prokopai/prokop';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const FETCH_TIMEOUT = 10_000; // 10 seconds
 

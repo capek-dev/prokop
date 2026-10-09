@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/capek-dev/prokop/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/capek-dev/prokop?color=6366f1"></a>
+  <a href="https://github.com/prokopai/prokop/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/prokopai/prokop?color=6366f1"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache%202.0-6366f1"></a>
   <a href="https://bun.sh"><img alt="Bun" src="https://img.shields.io/badge/runtime-Bun-6366f1?logo=bun"></a>
   <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-6366f1?logo=typescript"></a>
@@ -20,7 +20,7 @@
   <a href="https://prokopai.dev/get-started/">Get Started</a> ·
   <a href="https://prokopai.dev/docs">Documentation</a> ·
   <a href="https://prokopai.dev/how-to">Video Walkthroughs</a> ·
-  <a href="https://github.com/capek-dev/prokop/releases">Releases</a> ·
+  <a href="https://github.com/prokopai/prokop/releases">Releases</a> ·
   <a href="https://chromewebstore.google.com/detail/jean2browser/jpahdfmmfmmnacapmkchljmcijoedcpj">Chrome Extension</a>
 </p>
 
@@ -39,7 +39,7 @@ Most coding agents are capable inside one session. Prokop improves the work arou
 - **Desktop and phone:** Use the same responsive PWA through networking you control.
 - **Open stack:** No required Prokop account, no telemetry, Apache 2.0.
 
-**New in 1.18.0:** Claude Code and Codex CLI sessions, learning across all three runtimes, shared permission modes, and branch history with push/pull status. [Read the release notes](https://github.com/capek-dev/prokop/releases/tag/server/v1.18.0).
+**New in 1.18.0:** Claude Code and Codex CLI sessions, learning across all three runtimes, shared permission modes, and branch history with push/pull status. [Read the release notes](https://github.com/prokopai/prokop/releases/tag/server/v1.18.0).
 
 ## See it in use
 
@@ -65,7 +65,7 @@ curl -fsSL https://prokopai.dev/install.sh | bash
 irm https://prokopai.dev/install.ps1 | iex
 ```
 
-Prefer to inspect the installer or download a binary yourself? See the [macOS/Linux script](install/install-prokopai.sh), [PowerShell script](install/install-prokopai.ps1), and [release downloads](https://github.com/capek-dev/prokop/releases).
+Prefer to inspect the installer or download a binary yourself? See the [macOS/Linux script](install/install-prokopai.sh), [PowerShell script](install/install-prokopai.ps1), and [release downloads](https://github.com/prokopai/prokop/releases).
 
 Then run:
 

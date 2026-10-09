@@ -12,13 +12,13 @@ Install Prokopai, run one setup command, then add an LLM provider in the client.
 **macOS / Linux:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/capek-dev/prokop/main/install/install-prokopai.sh | bash
+curl -fsSL https://raw.githubusercontent.com/prokopai/prokop/main/install/install-prokopai.sh | bash
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/capek-dev/prokop/main/install/install-prokopai.ps1 | iex
+irm https://raw.githubusercontent.com/prokopai/prokop/main/install/install-prokopai.ps1 | iex
 ```
 
 The installer downloads the latest binary to `~/.prokopai/bin/prokop` and adds it to your `PATH`.

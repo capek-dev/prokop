@@ -38,7 +38,7 @@ describe.each(['ws', null])('MCP settings for %s', workspaceId => {
     expect(screen.queryByRole('button', { name: 'Remove Prokop Browser' })).not.toBeInTheDocument();
     await user.click(screen.getByText('Set up browser extension'));
     expect(screen.getByRole('link', { name: 'Download the Prokop Browser extension' })).toHaveAttribute('href',
-      'https://github.com/rabbyte-tech/jean2/releases?q=browser%2F&expanded=true');
+      'https://github.com/prokopai/prokop/releases?q=browser%2F&expanded=true');
     await user.click(screen.getByRole('switch', { name: 'Enable Prokop Browser' }));
     await waitFor(() => expect(api.save).toHaveBeenCalledWith(workspaceId, 'Prokop Browser',
       { type: 'builtin', id: 'browser', enabled: true }));

@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-VERSION_FILE_URL="https://raw.githubusercontent.com/capek-dev/prokop/refs/heads/main/packages/server/VERSION"
-REPO="capek-dev/prokop"
+VERSION_FILE_URL="https://raw.githubusercontent.com/prokopai/prokop/refs/heads/main/packages/server/VERSION"
+REPO="prokopai/prokop"
 INSTALL_DIR="${HOME}/.prokopai/bin"
 BINARY_NAME="prokop"
 LEGACY_BINARY_NAME="jean2"

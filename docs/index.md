@@ -78,5 +78,5 @@ LLM Providers (Anthropic, OpenAI, Google, DeepSeek, OpenRouter, MiniMax, Zhipu)
 
 ## External Links
 
-- [GitHub](https://github.com/capek-dev/prokop)
+- [GitHub](https://github.com/prokopai/prokop)
 - [Getting Started](./getting-started.md)

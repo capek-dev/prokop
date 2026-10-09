@@ -1,7 +1,7 @@
 Set-StrictMode -Version Latest
 
-$VERSION_FILE_URL = "https://raw.githubusercontent.com/capek-dev/prokop/refs/heads/main/packages/server/VERSION"
-$REPO = "capek-dev/prokop"
+$VERSION_FILE_URL = "https://raw.githubusercontent.com/prokopai/prokop/refs/heads/main/packages/server/VERSION"
+$REPO = "prokopai/prokop"
 $INSTALL_DIR = Join-Path $HOME ".prokopai\bin"
 $BINARY_NAME = "prokop.exe"
 $LEGACY_BINARY_NAME = "jean2.exe"

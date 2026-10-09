@@ -27,8 +27,8 @@ export interface UpdateResult {
   newVersion?: string;
 }
 
-const VERSION_FILE_URL = 'https://raw.githubusercontent.com/capek-dev/prokop/refs/heads/main/packages/server/VERSION';
-const REPO = 'capek-dev/prokop';
+const VERSION_FILE_URL = 'https://raw.githubusercontent.com/prokopai/prokop/refs/heads/main/packages/server/VERSION';
+const REPO = 'prokopai/prokop';
 
 export function detectPlatform(): 'darwin' | 'linux' | 'windows' {
   switch (process.platform) {
