@@ -122,7 +122,9 @@ export function TitleTooltipLayer() {
     <div
       ref={bubbleRef}
       role="tooltip"
-      className="pointer-events-none fixed z-[100] w-max max-w-xs rounded-md bg-foreground px-3 py-1.5 text-xs whitespace-pre-line text-background animate-in fade-in-0 duration-100"
+      // animation-duration, not duration: Tailwind's duration-* also sets a
+      // transition, which slid the bubble from 0,0 to its measured position.
+      className="pointer-events-none fixed z-[100] w-max max-w-xs rounded-md bg-foreground px-3 py-1.5 text-xs whitespace-pre-line text-background animate-in fade-in-0 animation-duration-100"
       style={{ left: 0, top: 0, visibility: 'hidden' }}
     >
       {active.text}
