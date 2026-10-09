@@ -21,11 +21,13 @@ import {
   removeQuickConnectionForWorkspace,
   renameQuickConnectionsForServer,
   reorderQuickConnections,
+  SERVERS_CHANGED_EVENT,
 } from '@/config/servers';
 import type { SavedServer, QuickConnection } from '@prokopai/sdk';
 import { normalizeServerUrl } from '@/config/auth';
 import { discoverServerNoAuth } from '@/lib/validateServerAuth';
 import { useOverviewGroupsStore } from '@/stores/overviewGroupsStore';
+import { randomUUID } from '@/lib/randomId';
 
 interface ServerContextValue {
   servers: SavedServer[];
@@ -78,6 +80,13 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     setQuickConnections(loadedQuickConnections);
     setIsDiscovering(loadedServers.length === 0);
     setIsHydrated(true);
+
+    const reload = () => {
+      setServers(getSavedServers());
+      setQuickConnections(getQuickConnections());
+    };
+    window.addEventListener(SERVERS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(SERVERS_CHANGED_EVENT, reload);
   }, []);
 
   useEffect(() => {
@@ -103,7 +112,7 @@ export const ServerProvider = ({ children }: ServerProviderProps) => {
     const normalizedUrl = normalizeServerUrl(url);
 
     const newServer: SavedServer = {
-      id: crypto.randomUUID(),
+      id: randomUUID(),
       name,
       url: normalizedUrl,
       ...(token ? { token } : {}),

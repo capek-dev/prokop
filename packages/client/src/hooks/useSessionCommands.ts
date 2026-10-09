@@ -15,6 +15,7 @@ import type { ResumeSessionOptions } from '@/stores/sessionStore';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
 import { getSessionCreateBoardAction } from '@/lib/sessionCreate';
 import type { CreateSessionOptions } from '@/lib/sessionCreate';
+import { randomUUID } from '@/lib/randomId';
 
 interface UseSessionCommandsParams {
   clientRef: React.RefObject<ProkopaiClient | null>;
@@ -96,7 +97,7 @@ export function useSessionCommands({
 
   const createSession = useCallback((preconfigId?: string, title?: string, options?: CreateSessionOptions) => {
     const client = clientRef.current;
-    const sessionId = crypto.randomUUID();
+    const sessionId = randomUUID();
     pendingSessionCreateRef.current = activeWorkspace
       ? {
           sessionId,
@@ -401,7 +402,7 @@ export function useSessionCommands({
     const client = clientRef.current;
     const ws = workspaces.find(w => w.id === workspaceId) || null;
     setActiveWorkspace(ws);
-    const sessionId = crypto.randomUUID();
+    const sessionId = randomUUID();
     pendingSessionCreateRef.current = {
       sessionId,
       workspaceId,

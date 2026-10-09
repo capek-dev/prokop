@@ -18,6 +18,30 @@ export {
 
 export { version } from './version';
 
+export {
+  ACCESS_REVOKED_CLOSE_CODE,
+  PairingError,
+  getAccessStatus,
+  readPairingLink,
+  redeemPairingCode,
+  requestDeviceAccess,
+  socketAuthQuery,
+  waitForAccessDecision,
+} from './pairing';
+export type {
+  AccessDecision,
+  AccessRequestTicket,
+  AccessStatus,
+  DeviceKind,
+  IssuedDeviceToken,
+  PairedDevice,
+  PendingAccessRequest,
+} from './pairing';
+export { AccessRestNamespace } from './rest/access';
+export type { AccessOverviewResponse, CreatePairingCodeResponse } from './rest/access';
+export { RemoteAccessRestNamespace } from './rest/remote-access';
+export type { RemoteAccessKind, RemoteAccessStatus } from './rest/remote-access';
+
 export type { SdkEventMap } from './types/server-messages';
 export { routeServerMessage } from './types/server-messages';
 

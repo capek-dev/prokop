@@ -28,7 +28,9 @@ class FakeSocket {
   open(): void { this.readyState = 1; this.onopen?.(); }
 }
 const latest = () => FakeSocket.instances.at(-1)!;
-const flush = async () => { await act(async () => { await Promise.resolve(); }); };
+// Several microtasks: preflight, then the socket-ticket fetch and its JSON body.
+const flush = async () => { await act(async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); }); };
+const handleAccessLost = vi.fn();
 function mount() {
   return renderHook(() => useConnectionLifecycle({
     apiToken: 'fake',
@@ -36,12 +38,16 @@ function mount() {
     currentSessionIdRef: { current: null },
     handlerContextRef: { current: null },
     handleLogout: vi.fn(),
+    handleAccessLost,
   }));
 }
 
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal('WebSocket', FakeSocket);
+  // Token holders exchange their token for a single-use socket ticket first.
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ ticket: 'ticket-1', expiresAt: 0 })));
+  handleAccessLost.mockClear();
   FakeSocket.instances = [];
   useConnectionStore.getState().resetConnection();
   useSessionBoardStore.setState({ openSessionIds: [], focusedSessionId: null });
@@ -123,6 +129,7 @@ describe('connection lifecycle', () => {
     expect(verify).toHaveBeenCalledTimes(1);
     expect(FakeSocket.instances).toHaveLength(0);
     expect(useConnectionStore.getState().authError).toContain('Authentication failed');
+    expect(handleAccessLost).toHaveBeenCalledTimes(1);
     hook.unmount();
   });
 

@@ -1,4 +1,5 @@
 import type { TerminalEvent, TerminalSessionInit, TerminalSessionInfo } from '../shared';
+import { socketAuthQuery } from '../pairing';
 import { ConnectionError } from '../errors';
 import { TypedEventEmitter } from '../emitter';
 
@@ -441,9 +442,9 @@ export class TerminalNamespace {
     const params = new URLSearchParams({
       cwd: options.cwd,
       workspaceId: options.workspaceId,
+      ...await socketAuthQuery(this.config.url, this.config.token),
     });
 
-    if (this.config.token) params.set('token', this.config.token);
     if (options.shell) params.set('shell', options.shell);
     if (options.sessionId) params.set('sessionId', options.sessionId);
 
@@ -549,9 +550,9 @@ export class TerminalNamespace {
 
     const params = new URLSearchParams({
       workspaceId,
+      ...await socketAuthQuery(this.config.url, this.config.token),
     });
 
-    if (this.config.token) params.set('token', this.config.token);
 
     const wsUrl = `${proto}://${clean}/ws/terminal/events?${params.toString()}`;
 

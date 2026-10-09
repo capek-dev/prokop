@@ -111,7 +111,7 @@ PROKOPAI_LLM_SUBAGENT_MAX_STEPS=500
     databasePath: finalDbPath,
     toolsPath: finalToolsPath,
     port: 8742,
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     initializedAt: new Date().toISOString(),
   });
 

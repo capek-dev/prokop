@@ -18,6 +18,7 @@ import {
 import type { InitOptions } from '@/cli/init';
 import { runInitCommand } from '@/cli/init-command';
 import { openClient } from '@/cli/open-client';
+import { runAuthCommand, runPairCommand, runRemoteCommand } from '@/cli/device-access';
 import {
   isProkopServerReachable,
   runProkopaiRenameMigration,
@@ -103,13 +104,22 @@ Commands:
 
   server [options]    Start server in foreground (for systemd)
     -p, --port <port>  Port to listen on (default: 8742)
-    -h, --host <host>  Host to bind to (default: 0.0.0.0)
+    -h, --host <host>  Host to bind to (default: 127.0.0.1)
 
   open                 Open the built-in client in browser
 
   logs                 Tail server logs
 
-  auth                 Show authentication configuration
+  remote               Show how other devices can reach Prokop
+    on | off             Listen on your network, or only on this computer
+    add <url>            Add an address (VPN, proxy, tunnel)
+    remove <url>         Remove an address
+    tailscale on|off     Share over Tailscale HTTPS (tailscale serve)
+
+  pair                 Show a QR code and link to pair another device
+
+  auth                 List paired devices
+    revoke <device-id>   Remove a device's access
 
   init                 Set up Prokop, start it, and open the client
     --db-path <path>   Custom database path
@@ -257,19 +267,20 @@ async function main(): Promise<void> {
     }
 
     case 'auth': {
-      const token = readEnv('AUTH_TOKEN');
-      if (token) {
-        const masked = token.length > 8
-          ? `${token.slice(0, 4)}...${token.slice(-4)}`
-          : '****';
-        console.log(`\nAuthentication: enabled`);
-        console.log(`Token:          ${masked}`);
-        console.log(`\nSet via PROKOPAI_AUTH_TOKEN environment variable.`);
-        console.log(`Change it in ~/.prokopai/.env or your shell environment.\n`);
-      } else {
-        console.log(`\nAuthentication: disabled`);
-        console.log(`\nSet PROKOPAI_AUTH_TOKEN in ~/.prokopai/.env or your shell environment to enable.\n`);
+      if (readEnv('AUTH_TOKEN')) {
+        console.log('\nA shared PROKOPAI_AUTH_TOKEN is also set; it still works as a password for every device.');
       }
+      process.exitCode = await runAuthCommand(args[1], args[2]);
+      break;
+    }
+
+    case 'pair': {
+      process.exitCode = await runPairCommand();
+      break;
+    }
+
+    case 'remote': {
+      process.exitCode = await runRemoteCommand(args.slice(1));
       break;
     }
 

@@ -29,16 +29,20 @@ The [ProkopaiBrowser](https://chromewebstore.google.com/detail/jean2browser/jpah
 
 ## Connecting to a Remote Server
 
-The client opens a connection finder automatically. You can also:
+First turn on remote access on that machine (**Settings → Devices → Remote access**, or `prokop remote`), then either:
 
-1. Click the server switcher in the sidebar
-2. Enter the server URL (e.g., `https://my-vps.example.com:8742`)
-3. If auth is enabled, enter the token
+- Open its address on the other device. The device asks for approval and shows a four-digit code; approve it on the machine.
+- Or click the server switcher, choose **Add Server**, and paste a pairing link from `prokop pair` or **Settings → Devices → Pair a device**.
 
-Prokop works over:
-- **Local network**: `http://192.168.1.x:8742`
-- **Tailscale / VPN**: `http://prokopai-server:8742`
-- **Public internet**: requires TLS and auth. Set up a reverse proxy (nginx, Caddy) with HTTPS, then point the client at the domain.
+See [Security & Authentication](./auth.md#using-prokop-from-another-device) for LAN, Tailscale, VPN, and proxy setups.
+
+## Several machines
+
+Once two or more machines are saved, the workspace switcher lists the workspaces on every machine, grouped by machine name. Pick one to switch machines and open it in one step. Machines that are unreachable show their last known workspaces; machines this device is not paired with offer pairing.
+
+A machine can be reached at several addresses (for example LAN at home and Tailscale away). After the first connection, the client learns them and switches automatically when the current one stops answering. An address that answers as a different machine is never used. If the same machine was added twice under different addresses, the entries are merged.
+
+Inside another machine's app, pair a new machine with a pairing code: approval prompts only work when you open that machine's own address.
 
 ## Client Features
 

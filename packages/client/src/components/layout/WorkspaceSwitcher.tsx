@@ -1,6 +1,6 @@
 import type { Agent, ProkopaiClient } from '@prokopai/sdk';
 import { useState, useEffect, useRef } from 'react';
-import { Bot, Check, ChevronsUpDown, Folder, Box, Plus, MoreHorizontal, Trash2, Pencil, FolderInput, FolderSymlink, Loader2 } from 'lucide-react';
+import { Bot, Check, ChevronsUpDown, Folder, Box, Plus, MoreHorizontal, Trash2, Pencil, FolderInput, FolderSymlink, Loader2, Server } from 'lucide-react';
 import type { Workspace } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { FolderPickerDialog } from '@/components/modals/FolderPickerDialog';
@@ -30,12 +30,21 @@ import { cn } from '@/lib/utils';
 import { sortWorkspaces } from '@/lib/workspaceOrder';
 import { useUIStore } from '@/stores/uiStore';
 import { WorkspaceOrderControl } from './WorkspaceOrderControl';
+import type { HostWorkspaces } from '@/hooks/useHostWorkspaces';
 
 interface WorkspaceSelectionProps {
   workspaces: Workspace[];
   agents: Agent[];
   activeWorkspace: Workspace | null;
   onSelectWorkspace: (workspace: Workspace) => void;
+  /** Name of this machine; shown as the first group heading when other machines are listed. */
+  currentHostName?: string;
+  /** Workspaces on other saved machines; picking one switches machines in one step. */
+  otherHosts?: HostWorkspaces[];
+  /** `workspace` is null when the machine needs pairing first. */
+  onSelectHostWorkspace?: (serverId: string, workspace: Workspace | null) => void;
+  /** Lets the parent fetch other machines' workspaces only while the menu is open. */
+  onOpenChange?: (open: boolean) => void;
   sdkClient?: ProkopaiClient | null;
   isCreatingWorkspace?: boolean;
   deletingWorkspaceId?: string | null;
@@ -61,6 +70,10 @@ export function WorkspaceSwitcher({
   agents,
   activeWorkspace,
   onSelectWorkspace,
+  currentHostName,
+  otherHosts = [],
+  onSelectHostWorkspace,
+  onOpenChange,
   onCreateVirtualWorkspace,
   onCreatePhysicalWorkspace,
   onDeleteWorkspace,
@@ -91,7 +104,9 @@ export function WorkspaceSwitcher({
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) setActivitySnapshot(Object.fromEntries(workspaces.map(workspace => [workspace.id, workspace.lastConversationAt ?? null])));
     setOpen(nextOpen);
+    onOpenChange?.(nextOpen);
   };
+  const multipleHosts = otherHosts.length > 0;
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [workspaceToMove, setWorkspaceToMove] = useState<Workspace | null>(null);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null);
@@ -163,7 +178,7 @@ export function WorkspaceSwitcher({
             <CommandEmpty>No workspace found.</CommandEmpty>
             {[
               {
-                heading: 'Workspaces',
+                heading: multipleHosts && currentHostName ? currentHostName : 'Workspaces',
                 items: orderedWorkspaces.filter(workspace => !isAgentHomeWorkspace(workspace)),
               },
               {
@@ -288,6 +303,47 @@ export function WorkspaceSwitcher({
                      </DropdownMenu>
                      )}
                   </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
+            {otherHosts.map(host => (
+              <CommandGroup
+                key={host.server.id}
+                heading={host.state === 'offline' ? `${host.server.name} · offline` : host.server.name}
+              >
+                {host.state === 'unpaired' ? (
+                  <CommandItem
+                    value={`pair:${host.server.id}`}
+                    keywords={[host.server.name]}
+                    showCheck={false}
+                    onSelect={() => {
+                      onSelectHostWorkspace?.(host.server.id, null);
+                      setOpen(false);
+                    }}
+                  >
+                    <Server className="size-4 flex-shrink-0 text-muted-foreground" />
+                    <span className="truncate text-muted-foreground">Pair this device to see its workspaces</span>
+                  </CommandItem>
+                ) : host.workspaces.length === 0 ? (
+                  <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                    {host.state === 'loading' ? 'Loading…' : host.state === 'offline' ? 'Not reachable right now.' : 'No workspaces yet.'}
+                  </p>
+                ) : host.workspaces.map(workspace => (
+                  <CommandItem
+                    key={workspace.id}
+                    value={`${host.server.id}:${workspace.id}`}
+                    keywords={[workspace.name, workspace.path, host.server.name]}
+                    showCheck={false}
+                    onSelect={() => {
+                      onSelectHostWorkspace?.(host.server.id, workspace);
+                      setOpen(false);
+                    }}
+                  >
+                    {workspace.isVirtual
+                      ? <Box className="size-4 flex-shrink-0 text-muted-foreground" />
+                      : <Folder className="size-4 flex-shrink-0 text-muted-foreground" />}
+                    <span className="truncate">{workspace.name}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>

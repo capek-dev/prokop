@@ -7,10 +7,11 @@ import {
   serializePushSubscription,
   urlBase64ToApplicationServerKey,
 } from './notificationSupport';
+import { randomUUID } from '@/lib/randomId';
 
 async function getClientId(): Promise<string> {
   const existing = await storage.get<string>(STORAGE_KEYS.CLIENT_ID);
-  return existing ?? crypto.randomUUID();
+  return existing ?? randomUUID();
 }
 
 const SERVICE_WORKER_READY_TIMEOUT_MS = 10_000;

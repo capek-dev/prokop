@@ -17,6 +17,8 @@ import { ResponseFormatsRestNamespace } from './response-formats';
 import { SchedulerRestNamespace } from './scheduler';
 import { AgentsRestNamespace } from './agents';
 import { NotificationsRestNamespace } from './notifications';
+import { AccessRestNamespace } from './access';
+import { RemoteAccessRestNamespace } from './remote-access';
 
 /**
  * Result of loading all initial server data.
@@ -55,6 +57,8 @@ export class HttpNamespace {
   readonly scheduler: SchedulerRestNamespace;
   readonly agents: AgentsRestNamespace;
   readonly notifications: NotificationsRestNamespace;
+  readonly access: AccessRestNamespace;
+  readonly remoteAccess: RemoteAccessRestNamespace;
 
   constructor(http: HttpClient) {
     this.sessions = new SessionsRestNamespace(http);
@@ -74,6 +78,8 @@ export class HttpNamespace {
     this.scheduler = new SchedulerRestNamespace(http);
     this.agents = new AgentsRestNamespace(http);
     this.notifications = new NotificationsRestNamespace(http);
+    this.access = new AccessRestNamespace(http);
+    this.remoteAccess = new RemoteAccessRestNamespace(http);
   }
 
   /**

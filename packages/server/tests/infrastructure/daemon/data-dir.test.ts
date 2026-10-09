@@ -5,7 +5,7 @@ import { join } from 'path';
 import { startDaemon } from '@/infrastructure/daemon';
 import { Paths } from '@/infrastructure/runtime/paths';
 
-const envKeys = ['PROKOPAI_DATA_DIR', 'JEAN2_DATA_DIR', 'DAEMON_TEST_SECRET'] as const;
+const envKeys = ['PROKOPAI_DATA_DIR', 'JEAN2_DATA_DIR', 'DAEMON_TEST_SECRET', 'PROKOPAI_HOST', 'JEAN2_HOST'] as const;
 
 describe('daemon data-directory isolation', () => {
   let root: string;
@@ -70,4 +70,16 @@ describe('daemon data-directory isolation', () => {
       });
     }
   }
+
+  test('without an explicit host the server chooses its own bind address', async () => {
+    process.argv[1] = '/fake/prokop';
+    process.env.PROKOPAI_DATA_DIR = root;
+
+    await startDaemon({ port: 8842 });
+
+    const [command, options] = spawn.mock.calls[0] as unknown as [string[], { env: NodeJS.ProcessEnv }];
+    expect(command).not.toContain('--host');
+    expect(options.env.PROKOPAI_HOST).toBeUndefined();
+    expect(options.env.JEAN2_HOST).toBeUndefined();
+  });
 });

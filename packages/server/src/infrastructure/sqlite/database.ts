@@ -6,6 +6,7 @@ import { isPerfDiagnosticsEnabled } from '@/utils/perf';
 import { initializeSessionMessageSchema } from './session-message-schema';
 import { initializeLearningSchema } from './learning-schema';
 import { seedBuiltinResponseFormats } from './response-formats';
+import { initializeDeviceAccessSchema } from './device-access';
 import { initializeFts, migrateFtsForAgents } from '@/infrastructure/session-search/fts';
 
 const PERF_DIAGNOSTICS_ENABLED = isPerfDiagnosticsEnabled();
@@ -390,6 +391,8 @@ export function initializeSchema(db: Database): void {
     value TEXT NOT NULL,
     updated_at INTEGER NOT NULL
   )`);
+
+  initializeDeviceAccessSchema(db);
 
   initializeFts(db);
   migrateFtsForAgents(db);

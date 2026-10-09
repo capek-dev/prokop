@@ -78,7 +78,6 @@ describe('S2 C2 composition delivery handoff', () => {
 
   test('the production transport port installed into the composition path reaches sockets', () => {
     const adapter = createBunWebSocketAdapter({
-      auth: { isAuthEnabled: () => false, validateToken: () => true },
       terminal: {
         getManager: () => ({}) as never,
         getEventManager: () => ({}) as never,
@@ -113,7 +112,6 @@ describe('S2 C2 composition delivery handoff', () => {
     // delivery handoff; production execution still runs on the current path.
     // This test pins that the handoff does not depend on composing a scope.
     const adapter = createBunWebSocketAdapter({
-      auth: { isAuthEnabled: () => false, validateToken: () => true },
       terminal: {
         getManager: () => ({}) as never,
         getEventManager: () => ({}) as never,

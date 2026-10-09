@@ -1,8 +1,9 @@
 import type { ClientDescriptor } from '@prokopai/sdk';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
+import { randomUUID } from '@/lib/randomId';
 
 function generateClientId(): string {
-  return crypto.randomUUID();
+  return randomUUID();
 }
 
 async function getOrCreateClientId(): Promise<string> {

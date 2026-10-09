@@ -20,6 +20,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { useUIStore } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
+import { randomUUID } from '@/lib/randomId';
 
 type AutocompleteMode = 'none' | 'files' | 'prompts';
 
@@ -236,7 +237,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
       const attachment = await sdkClient?.http.attachments.upload(sessionId, file);
 
       return {
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         kind: attachment.kind as AttachmentKind,
         filename: attachment.filename,
         size: attachment.size,
@@ -286,7 +287,7 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
         : 'file' as const;
 
       const previewItem: PendingAttachmentData = {
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         kind: localKind,
         filename: file.name,
         size: file.size,

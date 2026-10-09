@@ -50,7 +50,6 @@ describe('terminal frame adaptation', () => {
     };
     const calls: string[] = [];
     const adapter = createBunWebSocketAdapter({
-      auth: { isAuthEnabled: () => false, validateToken: () => true },
       terminal: {
         getManager: () => ({
           listSessionsByWorkspaceId: () => [],
@@ -86,7 +85,6 @@ describe('terminal frame adaptation', () => {
 
   test('terminal open with an unknown session sends an ERROR frame and closes', () => {
     const adapter = createBunWebSocketAdapter({
-      auth: { isAuthEnabled: () => false, validateToken: () => true },
       terminal: {
         getManager: () => ({
           listSessionsByWorkspaceId: () => [],
@@ -119,7 +117,6 @@ describe('terminal frame adaptation', () => {
   test('terminal message input frames reach handleInput and resize frames reach handleResize', async () => {
     const calls: string[] = [];
     const adapter = createBunWebSocketAdapter({
-      auth: { isAuthEnabled: () => false, validateToken: () => true },
       terminal: {
         getManager: () => ({
           listSessionsByWorkspaceId: () => [],
@@ -157,7 +154,6 @@ describe('terminal frame adaptation', () => {
   test('terminal events open subscribes and sends the snapshot', () => {
     const subscribeCalls: Array<{ workspaceId: string }> = [];
     const adapter = createBunWebSocketAdapter({
-      auth: { isAuthEnabled: () => false, validateToken: () => true },
       terminal: {
         getManager: () => ({
           listSessionsByWorkspaceId: () => [{ id: 'sess-1' }] as unknown as TerminalSessionInfo[],
@@ -197,7 +193,6 @@ describe('terminal frame adaptation', () => {
   test('terminal close unsubscribes events and removes the terminal client', () => {
     const calls: string[] = [];
     const adapter = createBunWebSocketAdapter({
-      auth: { isAuthEnabled: () => false, validateToken: () => true },
       terminal: {
         getManager: () => ({
           listSessionsByWorkspaceId: () => [],

@@ -82,7 +82,9 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: serverOrigin,
-        changeOrigin: true,
+        // Keep the browser's Host: the server trusts loopback requests addressed to
+        // localhost, so a rewritten Host would make a phone on the dev server look local.
+        changeOrigin: false,
         secure: false
       },
       '/ws': {
@@ -100,7 +102,9 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: serverOrigin,
-        changeOrigin: true,
+        // Keep the browser's Host: the server trusts loopback requests addressed to
+        // localhost, so a rewritten Host would make a phone on the dev server look local.
+        changeOrigin: false,
         secure: false
       },
       '/ws': {

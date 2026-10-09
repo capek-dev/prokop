@@ -1,5 +1,6 @@
 import type { ClientMessage, ServerMessage } from '../shared';
 import { ConnectionError } from '../errors';
+import { socketAuthQuery } from '../pairing';
 
 export interface WebSocketTransportConfig {
   url: string;
@@ -19,6 +20,8 @@ export class WebSocketTransport {
   private heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
   private lastMessageAt = 0;
   private static readonly HEARTBEAT_TIMEOUT_MS = 90_000;
+  /** Bumped whenever a socket is released, so a slow ticket fetch cannot revive a replaced attempt. */
+  private attempt = 0;
 
   onOpen: (() => void) | null = null;
   onMessage: ((message: ServerMessage) => void) | null = null;
@@ -31,11 +34,15 @@ export class WebSocketTransport {
 
   async connect(): Promise<void> {
     this.closeSocket(1000, 'Connection replaced', false);
+    const attempt = this.attempt;
+    // Without a token the socket opens synchronously; with one, a ticket is fetched first.
+    const wsUrl = this.config.token ? await this.buildAuthenticatedWsUrl() : this.wsBaseUrl();
+    if (attempt !== this.attempt) throw new ConnectionError('Connection replaced');
     return new Promise((resolve, reject) => {
       const WsConstructor = this.config.wsConstructor ?? globalThis.WebSocket;
       let ws: WebSocket;
       try {
-        ws = new WsConstructor(this.buildWsUrl());
+        ws = new WsConstructor(wsUrl);
       } catch (error: unknown) {
         reject(error);
         return;
@@ -142,6 +149,7 @@ export class WebSocketTransport {
   }
 
   private releaseSocket(reason: string): WebSocket | null {
+    this.attempt++;
     const ws = this._ws;
     this._ws = null;
     this._state = 'disconnected';
@@ -170,12 +178,14 @@ export class WebSocketTransport {
     }
   }
 
-  private buildWsUrl(): string {
+  private wsBaseUrl(): string {
     const proto = this.config.url.startsWith('https') ? 'wss' : 'ws';
     const clean = this.config.url.replace(/^https?:\/\//, '');
-    if (this.config.token) {
-      return `${proto}://${clean}/ws?token=${encodeURIComponent(this.config.token)}`;
-    }
     return `${proto}://${clean}/ws`;
+  }
+
+  private async buildAuthenticatedWsUrl(): Promise<string> {
+    const query = new URLSearchParams(await socketAuthQuery(this.config.url, this.config.token)).toString();
+    return `${this.wsBaseUrl()}?${query}`;
   }
 }

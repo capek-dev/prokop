@@ -64,7 +64,8 @@ describe('Jean2 tool output artifacts', () => {
     const app = createApp();
     const path = `/api/sessions/session-1/tool-output-artifacts/${artifact.id}`;
 
-    expect((await app.request(path)).status).toBe(401);
+    // Another device (non-loopback Host) needs a credential; the same machine does not.
+    expect((await app.request(`http://prokop.example.com${path}`)).status).toBe(401);
     const response = await app.request(`${path}?offset=7&limit=11`, {
       headers: { Authorization: 'Bearer secret' },
     });

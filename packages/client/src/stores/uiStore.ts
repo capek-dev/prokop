@@ -20,6 +20,7 @@ export type ConfigurationSection =
   | 'keybinds'
   // Server (shared across harnesses; prompts are client-level shortcuts)
   | 'harnesses'
+  | 'devices'
   | 'usage'
   | 'preconfigs'
   | 'prompts'

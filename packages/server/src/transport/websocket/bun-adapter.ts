@@ -1,6 +1,7 @@
 import type { ServerWebSocket, WebSocketHandler } from 'bun';
 import type { AskAuthority, ClientMessage, ServerMessage } from '@prokopai/sdk';
 import type { ConnectionId } from './connection-id';
+import type { AccessPrincipal } from '@/application/device-access/service';
 import { registerConnection, unregisterConnection, touchConnection, getConnectionBySocket } from './connection-registry';
 import { handleConnectionDisconnect } from './control-registry';
 import { createDeliveryPort, participantConnectionIdsFor, controllerConnectionIdsFor, type DeliveryPort } from './delivery';
@@ -15,18 +16,20 @@ import { stallMonitor } from '@/utils/stall-monitor';
 export interface WsData {
   path: string;
   params?: Record<string, string>;
+  /** Paired device that opened this socket; absent for same-machine and shared-token callers. */
+  deviceId?: string;
+  /** Arrived from another machine directly (not through a same-machine proxy). */
+  viaNetwork?: boolean;
 }
 
 export type BunWebSocketConfig = WebSocketHandler<WsData>;
 
 export const HEARTBEAT_INTERVAL_MS = 30_000;
+/** Close code for sockets whose device was revoked; clients must pair again instead of reconnecting. */
+export const ACCESS_REVOKED_CLOSE_CODE = 4401;
 export const MAX_MISSED_PINGS = 3;
 
 export interface BunWebSocketAdapterDeps {
-  auth: {
-    isAuthEnabled(): boolean;
-    validateToken(token: string): boolean;
-  };
   terminal: {
     getManager(): TerminalManager;
     getEventManager(): TerminalEventManager;
@@ -40,10 +43,17 @@ export interface BunWebSocketAdapterDeps {
 export interface BunWebSocketAdapter {
   websocket: BunWebSocketConfig;
   delivery: DeliveryPort;
+  /** `principal` is resolved by the listener; null means the caller is not authorized. */
   handleUpgrade(
     req: Request,
     upgrade: (data: WsData) => boolean,
+    principal: AccessPrincipal | null,
+    connection?: { viaNetwork: boolean },
   ): { handled: true; response: Response | undefined } | { handled: false };
+  /** Closes every socket opened by a revoked device. */
+  closeDeviceSockets(deviceId: string): void;
+  /** Closes sockets that arrived over the network, after network listening is turned off. */
+  closeNetworkSockets(): void;
   startTimers(): void;
   stopTimers(): void;
   shutdown(): void;
@@ -116,25 +126,35 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
   function handleUpgrade(
     req: Request,
     upgrade: (data: WsData) => boolean,
+    principal: AccessPrincipal | null,
+    connection?: { viaNetwork: boolean },
   ): { handled: true; response: Response | undefined } | { handled: false } {
     const url = new URL(req.url);
-    if (shuttingDown && ['/ws', '/ws/terminal', '/ws/terminal/events'].includes(url.pathname)) {
+    if (!['/ws', '/ws/terminal', '/ws/terminal/events'].includes(url.pathname)) {
+      return { handled: false };
+    }
+    if (shuttingDown) {
       return { handled: true, response: new Response('Server shutting down', { status: 503 }) };
     }
+    if (principal === null) {
+      return {
+        handled: true,
+        response: new Response(
+          JSON.stringify({
+            error: 'Unauthorized',
+            reason: 'pairing-required',
+            message: 'This device is not paired with this server.',
+          }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        ),
+      };
+    }
+    const identity = {
+      ...(principal.kind === 'device' ? { deviceId: principal.deviceId } : {}),
+      ...(connection?.viaNetwork ? { viaNetwork: true } : {}),
+    };
 
     if (url.pathname === '/ws/terminal/events') {
-      if (deps.auth.isAuthEnabled()) {
-        const token = url.searchParams.get('token');
-        if (!token || !deps.auth.validateToken(token)) {
-          return {
-            handled: true,
-            response: new Response(
-              JSON.stringify({ error: 'Unauthorized', message: 'Invalid or missing API token' }),
-              { status: 401, headers: { 'Content-Type': 'application/json' } }
-            ),
-          };
-        }
-      }
 
       const workspaceId = url.searchParams.get('workspaceId') || '';
       if (!workspaceId) {
@@ -147,7 +167,7 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
         };
       }
 
-      const upgraded = upgrade({ path: '/ws/terminal/events', params: { workspaceId } });
+      const upgraded = upgrade({ path: '/ws/terminal/events', params: { workspaceId }, ...identity });
       if (!upgraded) {
         return { handled: true, response: new Response('WebSocket upgrade failed', { status: 400 }) };
       }
@@ -155,24 +175,6 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
     }
 
     if (url.pathname === '/ws/terminal') {
-      if (deps.auth.isAuthEnabled()) {
-        const token = url.searchParams.get('token');
-        if (!token || !deps.auth.validateToken(token)) {
-          return {
-            handled: true,
-            response: new Response(
-              JSON.stringify({
-                error: 'Unauthorized',
-                message: 'Invalid or missing API token for terminal connection',
-              }),
-              {
-                status: 401,
-                headers: { 'Content-Type': 'application/json' },
-              }
-            ),
-          };
-        }
-      }
 
       const cwd = url.searchParams.get('cwd');
       const workspaceId = url.searchParams.get('workspaceId') || 'default';
@@ -192,7 +194,7 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
       const params: Record<string, string> = { cwd, workspaceId };
       if (shell) params.shell = shell;
       if (sessionId) params.sessionId = sessionId;
-      const upgraded = upgrade({ path: '/ws/terminal', params });
+      const upgraded = upgrade({ path: '/ws/terminal', params, ...identity });
       if (!upgraded) {
         return { handled: true, response: new Response('WebSocket upgrade failed', { status: 400 }) };
       }
@@ -200,27 +202,8 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
     }
 
     if (url.pathname === '/ws') {
-      if (deps.auth.isAuthEnabled()) {
-        const token = url.searchParams.get('token');
 
-        if (!token || !deps.auth.validateToken(token)) {
-          return {
-            handled: true,
-            response: new Response(
-              JSON.stringify({
-                error: 'Unauthorized',
-                message: 'Invalid or missing API token for WebSocket connection'
-              }),
-              {
-                status: 401,
-                headers: { 'Content-Type': 'application/json' }
-              }
-            ),
-          };
-        }
-      }
-
-      const upgraded = upgrade({ path: '/ws' });
+      const upgraded = upgrade({ path: '/ws', ...identity });
       if (!upgraded) {
         return { handled: true, response: new Response('WebSocket upgrade failed', { status: 400 }) };
       }
@@ -417,6 +400,16 @@ export function createBunWebSocketAdapter(deps: BunWebSocketAdapterDeps): BunWeb
     websocket,
     delivery,
     handleUpgrade,
+    closeDeviceSockets(deviceId) {
+      for (const socket of allSockets) {
+        if (socket.data.deviceId === deviceId) socket.close(ACCESS_REVOKED_CLOSE_CODE, 'Access revoked');
+      }
+    },
+    closeNetworkSockets() {
+      for (const socket of allSockets) {
+        if (socket.data.viaNetwork) socket.close(1001, 'Network access turned off');
+      }
+    },
     startTimers() {
       if (!shuttingDown && !heartbeatInterval) {
         heartbeatInterval = setInterval(heartbeatTick, HEARTBEAT_INTERVAL_MS);

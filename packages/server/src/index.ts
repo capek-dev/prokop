@@ -8,7 +8,7 @@ import { createWiredApplication } from '@/bootstrap/application';
 import { installDeliveryPort } from '@/transport/websocket/broadcast';
 import { installWireApplication } from '@/transport/websocket/application';
 import { resolveAskDeliveryTargets, type AskDeliveryInventories } from '@/domains/controllers';
-import { createBunWebSocketAdapter, type WsData } from '@/transport/websocket/bun-adapter';
+import { createBunWebSocketAdapter } from '@/transport/websocket/bun-adapter';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import {
   getAllClients,
@@ -34,8 +34,15 @@ import { disposeExecutionLifecycle, initializeExecutionLifecycle } from '@/appli
 import { reconcileAllOrphanedToolCalls } from '@/infrastructure/sqlite/message-store';
 import { cleanupAllPendingAsks } from '@/infrastructure/sqlite/pending-asks';
 import { cleanupOrphanedData } from '@/infrastructure/sqlite/cleanup';
-import { getPort, getHost } from '@/config';
-import { validateToken, isAuthEnabled } from '@/transport/http/middleware/token';
+import { getPort } from '@/config';
+import { validateToken, isAuthDisabled } from '@/transport/http/middleware/token';
+import { createRequestHandler } from '@/transport/request-handler';
+import { createListenerSet, type ListenerEndpoint, type ListenerSet } from '@/transport/listeners';
+import { createRemoteAccessService, type RemoteAccessService } from '@/application/remote-access/service';
+import type { ListenerControl } from '@/application/ports/remote-access';
+import { createRemoteAccessSettingsRepository } from '@/infrastructure/sqlite/remote-access-settings';
+import { createRemoteAccessNetwork } from '@/infrastructure/network/remote-access-network';
+import { updateDaemonPidHost } from '@/infrastructure/daemon';
 import { ensurePromptsDir } from '@/config/prompts-registry';
 // Static side-effect: OAuth providers register with Capek at module load,
 // before any provider lookup (P2 requirement).
@@ -53,10 +60,13 @@ import {
   getLocalHost,
   listenersOverlap,
   resolveTlsPort,
+  isLoopbackHost,
+  isWildcardHost,
 } from '@/infrastructure/runtime/environment';
 import { activateSandbox } from '@/infrastructure/sandbox';
 import { getEmbeddedClientAssetsRoot } from '@/infrastructure/runtime/client-assets';
 import { getOrCreateInstallationId } from '@/infrastructure/runtime/installation-id';
+import { buildPairingUrl } from '@/infrastructure/runtime/pairing-urls';
 import { startPushRetryScheduler, stopPushRetryScheduler, cleanupPushData } from '@/infrastructure/web-push/retry-scheduler';
 import { stopProviderAccountLifecycle } from '@/infrastructure/providers';
 import { startStallMonitor } from '@/utils/stall-monitor';
@@ -67,8 +77,8 @@ export interface ServerOptions {
 }
 
 export interface ServerInstance {
-  server: ReturnType<typeof Bun.serve>;
-  localServer?: ReturnType<typeof Bun.serve>;
+  listeners: ListenerSet;
+  remoteAccess: RemoteAccessService;
   cleanup: () => Promise<void>;
 }
 
@@ -140,12 +150,10 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   cleanupPushData();
 
   const port = options?.port ?? getPort();
-  const host = options?.host ?? getHost();
 
   console.log('Starting AI Agent Server...');
 
   const transport = createBunWebSocketAdapter({
-    auth: { isAuthEnabled, validateToken },
     terminal: {
       getManager: () => getTerminalManager(),
       getEventManager: () => getTerminalEventManager(),
@@ -158,6 +166,9 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     },
   });
   installDeliveryPort(transport.delivery);
+  application.deviceAccess.subscribe({
+    deviceRevoked: (deviceId) => transport.closeDeviceSockets(deviceId),
+  });
 
   const availableProviders: string[] = [];
   if (getLLMOpenRouterApiKey()) availableProviders.push('openrouter');
@@ -176,7 +187,26 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
   const tools = await scanTools();
   console.log(`Found ${tools.length} tools: ${tools.map(t => t.definition.name).join(', ')}`);
 
-  const app = createApp(application, { installationId: getOrCreateInstallationId() });
+  // Remote access decides the bind address (unless PROKOPAI_HOST or --host does)
+  // and controls the listeners created below; `listenerControl` is late-bound.
+  const remoteAccess = createRemoteAccessService({
+    repository: createRemoteAccessSettingsRepository(getDatabase),
+    network: createRemoteAccessNetwork(),
+    environment: {
+      bindOverride: options?.host ?? readEnv('HOST') ?? null,
+      extraHosts: (readEnv('ALLOWED_HOSTS') ?? '').split(',').map((entry) => entry.trim()).filter(Boolean),
+    },
+    listeners: () => listenerControl,
+    onChanged: () => transport.delivery.broadcast({ type: 'access.changed' }),
+    onNetworkListeningDisabled: () => transport.closeNetworkSockets(),
+  });
+  const host = remoteAccess.bindHost();
+
+  const app = createApp(application, {
+    installationId: getOrCreateInstallationId(),
+    remoteAccess,
+    pairingLinks: (code) => remoteAccess.pairingBaseUrls().map((baseUrl) => buildPairingUrl(baseUrl, code)),
+  });
 
   if (readEnv('SANDBOX') === 'true') {
     activateSandbox((event) => {
@@ -219,8 +249,40 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     console.log(`[local] HTTP listener on http://${localHost}:${port}`);
   }
 
-  let server: ReturnType<typeof Bun.serve> | undefined;
-  let localServer: ReturnType<typeof Bun.serve> | undefined;
+  const handleRequest = createRequestHandler({
+    app,
+    transport,
+    deviceAccess: application.deviceAccess,
+    validateLegacyToken: validateToken,
+    isAuthDisabled,
+    isKnownHostname: (hostname) => remoteAccess.isKnownHostname(hostname),
+  });
+
+  const listeners = createListenerSet({ fetch: handleRequest, websocket: transport.websocket });
+  const mainEndpointFor = (bindHost: string): ListenerEndpoint => ({
+    hostname: bindHost,
+    port: tls ? resolveTlsPort(bindHost, port, localHttpEnabled) : port,
+    ...(tls && { tls }),
+  });
+  const listenerControl: ListenerControl = {
+    endpoint: () => {
+      const main = listeners.main() ?? mainEndpointFor(host);
+      return { host: main.hostname, port: main.port, protocol };
+    },
+    loopbackTarget: () => {
+      const local = listeners.local();
+      if (local) return `http://${local.hostname}:${local.port}`;
+      const main = listeners.main() ?? mainEndpointFor(host);
+      const target = isLoopbackHost(main.hostname) || isWildcardHost(main.hostname) ? '127.0.0.1' : main.hostname;
+      return tls ? `https+insecure://${target}:${main.port}` : `http://${target}:${main.port}`;
+    },
+    rebind: async (bindHost) => {
+      listeners.rebindMain(mainEndpointFor(bindHost));
+      updateDaemonPidHost(bindHost);
+      const main = listeners.main()!;
+      console.log(`[listen] Now listening on ${protocol}://${main.hostname}:${main.port}`);
+    },
+  };
   let cleanupPromise: Promise<void> | null = null;
   const stopStallMonitor = startStallMonitor();
   let onSigterm: (() => void) | undefined;
@@ -246,8 +308,8 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
       attempt(() => application.schedulerTicker.stop());
       attempt(() => stopPushRetryScheduler());
       attempt(() => stopProviderAccountLifecycle());
-      attempt(() => server?.stop());
-      attempt(() => localServer?.stop());
+      attempt(() => listeners.stop());
+      attempt(() => application.deviceAccess.dispose());
       attempt(() => getTerminalManager().destroyAllSessions());
       try {
         await disposeExecutionLifecycle();
@@ -269,40 +331,9 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     await initializeExecutionLifecycle();
     // Recovery and subscription are complete before accepting HTTP mutations.
     await application.learning.start();
-    server = Bun.serve({
-      port: tlsPort ?? port,
-      hostname: host,
-      ...(tls && { tls }),
-
-      async fetch(req: Request): Promise<Response | undefined> {
-        const upgrade = transport.handleUpgrade(req, (data: WsData) => server!.upgrade(req, { data }));
-        if (upgrade.handled) {
-          return upgrade.response;
-        }
-
-        return app.fetch(req);
-      },
-
-      websocket: transport.websocket,
-    });
-
-    if (localHttpEnabled) {
-      localServer = Bun.serve({
-        port,
-        hostname: localHost,
-
-        async fetch(req: Request): Promise<Response | undefined> {
-          const upgrade = transport.handleUpgrade(req, (data: WsData) => localServer!.upgrade(req, { data }));
-          if (upgrade.handled) {
-            return upgrade.response;
-          }
-
-          return app.fetch(req);
-        },
-
-        websocket: transport.websocket,
-      });
-    }
+    listeners.start(mainEndpointFor(host), localHttpEnabled ? { hostname: localHost, port } : null);
+    // The machine's Tailscale name is trusted for `tailscale serve`; detection must not delay startup.
+    void remoteAccess.refreshTailscale().catch((error: unknown) => console.warn('[remote-access] Tailscale detection failed:', error));
 
     transport.startTimers();
 
@@ -314,11 +345,11 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     if (clientAssetsRoot !== null) {
       const clientHost = host === '0.0.0.0' ? 'localhost' : host;
       console.log(`[client] Running at ${protocol}://${clientHost}:${tlsPort ?? port}`);
-      if (localServer) {
+      if (listeners.local()) {
         console.log(`[client] Running locally at http://${localHost}:${port}`);
       }
     } else if (getClientEnabled()) {
-      console.log('[client] Embedded client assets unavailable in source development');
+      console.log('[client] Embedded client assets unavailable in source development (use `bun run dev:remote` to serve a built client for other devices)');
     } else {
       console.log('[client] Built-in client disabled (PROKOPAI_CLIENT_ENABLED=false)');
     }
@@ -341,7 +372,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
     process.on('SIGTERM', onSigterm);
     process.on('SIGINT', onSigint);
 
-    return { server, cleanup, localServer };
+    return { listeners, remoteAccess, cleanup };
   } catch (error: unknown) {
     try {
       await cleanup();

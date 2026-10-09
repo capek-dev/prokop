@@ -1,6 +1,7 @@
 import type { QuickConnection } from '@prokopai/sdk';
 import { storage, STORAGE_KEYS } from '@/lib/storage';
 import type { OverviewGroup, OverviewGroupsDocument } from './overviewGroupsTypes';
+import { randomUUID } from '@/lib/randomId';
 
 const TAG = '[overviewGroups]';
 
@@ -167,7 +168,7 @@ function migrateFromQuickConnections(
         deduped.push(id);
       }
     }
-    const groupId = crypto.randomUUID();
+    const groupId = randomUUID();
     groups.push({ id: groupId, serverId, name: 'Favorites', workspaceIds: deduped });
     activeMap[serverId] = groupId;
   }

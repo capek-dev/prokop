@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
 import type { TerminalSessionInfo } from '@prokopai/sdk';
 import {
+  ACCESS_REVOKED_CLOSE_CODE,
   createBunWebSocketAdapter,
   MAX_MISSED_PINGS,
   runHeartbeatTick,
@@ -11,6 +12,7 @@ import { getConnectionBySocket, unregisterConnection } from '@/transport/websock
 import { removeSessionControl } from '@/transport/websocket/control-registry';
 import type { ConnectionId } from '@/transport/websocket/connection-id';
 import type { ClientEntry } from '@/transport/websocket/router-context';
+import type { AccessPrincipal } from '@/application/device-access/service';
 
 interface FakeSocket {
   data: WsData;
@@ -22,6 +24,7 @@ interface FakeSocket {
 }
 
 const fakeSockets: FakeSocket[] = [];
+const LOCAL: AccessPrincipal = { kind: 'local' };
 
 afterEach(() => {
   for (const socket of fakeSockets.splice(0)) {
@@ -66,10 +69,6 @@ function makeAdapter(overrides: Partial<Parameters<typeof createBunWebSocketAdap
   };
 
   return createBunWebSocketAdapter({
-    auth: {
-      isAuthEnabled: () => false,
-      validateToken: () => true,
-    },
     terminal: {
       getManager: () => manager as never,
       getEventManager: () => eventManager as never,
@@ -94,7 +93,7 @@ describe('bun websocket adapter', () => {
       expect(socket.closedWith).toEqual({ code: 1001, reason: 'Server shutting down' });
     }
     let upgraded = false;
-    const result = adapter.handleUpgrade(new Request('http://test/ws'), () => { upgraded = true; return true; });
+    const result = adapter.handleUpgrade(new Request('http://test/ws'), () => { upgraded = true; return true; }, LOCAL);
     expect(result.handled && result.response?.status).toBe(503);
     expect(upgraded).toBe(false);
     const lateSocket = makeSocket('/ws');
@@ -229,45 +228,36 @@ describe('bun websocket adapter', () => {
 
   test('handleUpgrade preserves auth, parameter, and upgrade behavior for each path', () => {
     const upgrades: WsData[] = [];
-    const adapter = makeAdapter({
-      auth: {
-        isAuthEnabled: () => true,
-        validateToken: (token) => token === 'good',
-      },
-    });
+    const adapter = makeAdapter();
+    const record = (data: WsData) => {
+      upgrades.push(data);
+      return true;
+    };
 
-    const wsResult = adapter.handleUpgrade(
-      new Request('http://localhost/ws?token=good'),
-      (data) => {
-        upgrades.push(data);
-        return true;
-      },
-    );
+    const wsResult = adapter.handleUpgrade(new Request('http://localhost/ws'), record, LOCAL);
     expect(wsResult.handled).toBe(true);
     expect(upgrades).toEqual([{ path: '/ws' }]);
 
-    const unauthorized = adapter.handleUpgrade(
-      new Request('http://localhost/ws?token=bad'),
-      () => true,
-    );
-    expect(unauthorized.handled).toBe(true);
-    if (unauthorized.handled) {
-      expect(unauthorized.response?.status).toBe(401);
+    for (const path of ['/ws', '/ws/terminal?cwd=/tmp', '/ws/terminal/events?workspaceId=w1']) {
+      const unauthorized = adapter.handleUpgrade(new Request(`http://localhost${path}`), () => true, null);
+      expect(unauthorized.handled).toBe(true);
+      if (unauthorized.handled) {
+        expect(unauthorized.response?.status).toBe(401);
+      }
     }
 
     const terminalEvents = adapter.handleUpgrade(
-      new Request('http://localhost/ws/terminal/events?token=good&workspaceId=w1'),
-      (data) => {
-        upgrades.push(data);
-        return true;
-      },
+      new Request('http://localhost/ws/terminal/events?workspaceId=w1'),
+      record,
+      LOCAL,
     );
     expect(terminalEvents.handled).toBe(true);
     expect(upgrades[1]).toEqual({ path: '/ws/terminal/events', params: { workspaceId: 'w1' } });
 
     const terminalMissingWorkspace = adapter.handleUpgrade(
-      new Request('http://localhost/ws/terminal/events?token=good'),
+      new Request('http://localhost/ws/terminal/events'),
       () => true,
+      LOCAL,
     );
     expect(terminalMissingWorkspace.handled).toBe(true);
     if (terminalMissingWorkspace.handled) {
@@ -275,20 +265,58 @@ describe('bun websocket adapter', () => {
     }
 
     const terminal = adapter.handleUpgrade(
-      new Request('http://localhost/ws/terminal?token=good&cwd=/tmp&workspaceId=w1&shell=/bin/zsh&sessionId=s1'),
-      (data) => {
-        upgrades.push(data);
-        return true;
-      },
+      new Request('http://localhost/ws/terminal?cwd=/tmp&workspaceId=w1&shell=/bin/zsh&sessionId=s1'),
+      record,
+      { kind: 'device', deviceId: 'device-1', label: 'Phone' },
     );
     expect(terminal.handled).toBe(true);
     expect(upgrades[2]).toEqual({
       path: '/ws/terminal',
       params: { cwd: '/tmp', workspaceId: 'w1', shell: '/bin/zsh', sessionId: 's1' },
+      deviceId: 'device-1',
     });
 
-    const appRoute = adapter.handleUpgrade(new Request('http://localhost/api/sessions'), () => true);
+    const appRoute = adapter.handleUpgrade(new Request('http://localhost/api/sessions'), () => true, null);
     expect(appRoute.handled).toBe(false);
+  });
+
+  test('network sockets are marked at upgrade and closed when network access is turned off', () => {
+    const adapter = makeAdapter();
+    const upgrades: WsData[] = [];
+    adapter.handleUpgrade(new Request('http://localhost/ws'), (data) => { upgrades.push(data); return true; }, LOCAL, { viaNetwork: true });
+    adapter.handleUpgrade(new Request('http://localhost/ws'), (data) => { upgrades.push(data); return true; }, LOCAL, { viaNetwork: false });
+    expect(upgrades).toEqual([{ path: '/ws', viaNetwork: true }, { path: '/ws' }]);
+
+    const remote = makeSocket('/ws');
+    remote.data.viaNetwork = true;
+    const proxied = makeSocket('/ws');
+    for (const socket of [remote, proxied]) adapter.websocket.open!(socket as unknown as ServerWebSocket<WsData>);
+
+    adapter.closeNetworkSockets();
+
+    expect(remote.closedWith).toEqual({ code: 1001, reason: 'Network access turned off' });
+    expect(proxied.closedWith).toBeUndefined();
+  });
+
+  test('closeDeviceSockets closes only the revoked device sockets', () => {
+    const adapter = makeAdapter();
+    const phone = makeSocket('/ws');
+    phone.data.deviceId = 'phone';
+    const phoneTerminal = makeSocket('/ws/terminal/events', { workspaceId: 'w1' });
+    phoneTerminal.data.deviceId = 'phone';
+    const laptop = makeSocket('/ws');
+    laptop.data.deviceId = 'laptop';
+    const local = makeSocket('/ws');
+    for (const socket of [phone, phoneTerminal, laptop, local]) {
+      adapter.websocket.open!(socket as unknown as ServerWebSocket<WsData>);
+    }
+
+    adapter.closeDeviceSockets('phone');
+
+    expect(phone.closedWith).toEqual({ code: ACCESS_REVOKED_CLOSE_CODE, reason: 'Access revoked' });
+    expect(phoneTerminal.closedWith).toEqual({ code: ACCESS_REVOKED_CLOSE_CODE, reason: 'Access revoked' });
+    expect(laptop.closedWith).toBeUndefined();
+    expect(local.closedWith).toBeUndefined();
   });
 
   test('terminal open dispatches to the terminal manager and sends INIT_ACK on reconnect', () => {

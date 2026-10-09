@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useEffectiveServerUrl } from '@/lib/hostRoutes';
 import { useLoaderData, useParams } from '@tanstack/react-router';
 import { clearSessionState } from '@/stores/sessionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
@@ -26,7 +27,7 @@ export function StoreHydrator({ children }: StoreHydratorProps) {
 
   const { servers, quickConnections, isHydrated: isServerContextHydrated } = useServerContext();
   const activeServer = servers.find(s => s.id === serverId) ?? null;
-  const serverUrl = activeServer?.url ?? null;
+  const serverUrl = useEffectiveServerUrl(activeServer);
   const apiToken = activeServer?.token ?? undefined;
 
   const secondaryLoadedRef = useRef<string | null>(null);

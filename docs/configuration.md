@@ -51,7 +51,8 @@ When conversations grow too large for the context window, Prokop automatically c
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PROKOPAI_PORT` | `8742` | Server port |
-| `PROKOPAI_HOST` | `0.0.0.0` | Bind address |
+| `PROKOPAI_HOST` | (setting) | Fixed bind address. When unset, **Settings → Devices → Remote access** (or `prokop remote on/off`) chooses between `127.0.0.1` and `0.0.0.0` |
+| `PROKOPAI_ALLOWED_HOSTS` | (none) | Comma-separated hostnames or URLs other devices use through a proxy, added to the remote-access addresses |
 | `PROKOPAI_DATA_DIR` | `~/.prokopai` | Root data directory |
 | `PROKOPAI_DATABASE_PATH` | `~/.prokopai/data/agent.db` | SQLite database path |
 | `PROKOPAI_TOOLS_PATH` | `~/.prokopai/tools` | Tool modules directory |

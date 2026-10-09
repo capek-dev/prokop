@@ -2,6 +2,7 @@ import { existsSync, statSync } from 'node:fs';
 import { basename, extname, isAbsolute, join, normalize, resolve, sep } from 'node:path';
 
 import { getClientEnabled } from '@/infrastructure/runtime/environment';
+import { readEnv } from '@/infrastructure/runtime/env-compat';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -41,12 +42,19 @@ function isFile(filePath: string): boolean {
   }
 }
 
+/**
+ * The release binary serves its embedded client. In source development the
+ * client normally runs on Vite instead; PROKOPAI_CLIENT_DIR points the server
+ * at a built client (`bun run dev:remote`) so other devices can open pages such
+ * as `/pair` through this server, exactly as they would in a release.
+ */
 export function getEmbeddedClientAssetsRoot(): string | null {
+  if (!getClientEnabled()) return null;
   const bunRuntime = Bun as typeof Bun & { isStandaloneExecutable?: boolean };
-  if (!getClientEnabled() || bunRuntime.isStandaloneExecutable !== true) return null;
-
-  const root = join(import.meta.dir, 'dist');
-  return isFile(join(root, 'index.html')) ? root : null;
+  const root = bunRuntime.isStandaloneExecutable === true
+    ? join(import.meta.dir, 'dist')
+    : readEnv('CLIENT_DIR') ? resolve(readEnv('CLIENT_DIR')!) : null;
+  return root !== null && isFile(join(root, 'index.html')) ? root : null;
 }
 
 export function resolveClientAssetPath(root: string, relativePath: string): string | null {

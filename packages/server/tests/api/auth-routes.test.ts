@@ -11,6 +11,12 @@ async function json(res: Response): Promise<any> {
 }
 
 const VALID_TOKEN = 'test-secret-token-for-api-tests-12345';
+const REMOTE_ORIGIN = 'http://prokop.example.com';
+
+/** A request from another device: a non-loopback Host, so same-machine trust does not apply. */
+function remote(app: ReturnType<typeof createApp>, path: string, init?: RequestInit): Response | Promise<Response> {
+  return app.request(`${REMOTE_ORIGIN}${path}`, init);
+}
 
 describe('API Auth Middleware', () => {
   let app: ReturnType<typeof createApp>;
@@ -24,6 +30,7 @@ describe('API Auth Middleware', () => {
     resetTestDatabase();
     resetTestDataDir();
     delete process.env.JEAN2_AUTH_TOKEN;
+    delete process.env.PROKOPAI_AUTH;
   });
 
   // ── Public Routes (always accessible) ──────────────────────────
@@ -33,7 +40,7 @@ describe('API Auth Middleware', () => {
       delete process.env.JEAN2_AUTH_TOKEN;
       app = createApp();
 
-      const res = await app.request('/');
+      const res = await remote(app, '/');
       expect(res.status).toBe(200);
     });
 
@@ -41,7 +48,7 @@ describe('API Auth Middleware', () => {
       process.env.JEAN2_AUTH_TOKEN = VALID_TOKEN;
       app = createApp();
 
-      const res = await app.request('/');
+      const res = await remote(app, '/');
       expect(res.status).toBe(200);
     });
 
@@ -49,7 +56,7 @@ describe('API Auth Middleware', () => {
       delete process.env.JEAN2_AUTH_TOKEN;
       app = createApp();
 
-      const res = await app.request('/api/health');
+      const res = await remote(app, '/api/health');
       expect(res.status).toBe(200);
     });
 
@@ -57,7 +64,7 @@ describe('API Auth Middleware', () => {
       process.env.JEAN2_AUTH_TOKEN = VALID_TOKEN;
       app = createApp();
 
-      const res = await app.request('/api/health');
+      const res = await remote(app, '/api/health');
       expect(res.status).toBe(200);
     });
 
@@ -65,7 +72,7 @@ describe('API Auth Middleware', () => {
       delete process.env.JEAN2_AUTH_TOKEN;
       app = createApp();
 
-      const res = await app.request('/api/info');
+      const res = await remote(app, '/api/info');
       expect(res.status).toBe(200);
     });
 
@@ -73,46 +80,58 @@ describe('API Auth Middleware', () => {
       process.env.JEAN2_AUTH_TOKEN = VALID_TOKEN;
       app = createApp();
 
-      const res = await app.request('/api/info');
+      const res = await remote(app, '/api/info');
       expect(res.status).toBe(200);
     });
   });
 
   // ── Protected Routes with Auth Disabled ────────────────────────
 
-  describe('Protected routes — auth disabled', () => {
+  describe('Protected routes — same machine needs no token', () => {
     beforeEach(() => {
-      delete process.env.JEAN2_AUTH_TOKEN;
+      process.env.JEAN2_AUTH_TOKEN = VALID_TOKEN;
       app = createApp();
     });
 
-    test('GET /api/sessions returns 200 without token', async () => {
+    test('GET /api/sessions returns 200 without token from this machine', async () => {
       const res = await app.request('/api/sessions');
       expect(res.status).toBe(200);
     });
 
-    test('GET /api/workspaces returns 200 without token', async () => {
+    test('GET /api/workspaces returns 200 without token from this machine', async () => {
       const res = await app.request('/api/workspaces');
       expect(res.status).toBe(200);
     });
 
-    test('GET /api/tools returns 200 without token', async () => {
+    test('GET /api/tools returns 200 without token from this machine', async () => {
       const res = await app.request('/api/tools');
       expect(res.status).toBe(200);
     });
 
-    test('GET /api/models returns 200 without token', async () => {
+    test('GET /api/models returns 200 without token from this machine', async () => {
       const res = await app.request('/api/models');
       expect(res.status).toBe(200);
     });
 
-    test('GET /api/config/providers returns 200 without token', async () => {
+    test('GET /api/config/providers returns 200 without token from this machine', async () => {
       const res = await app.request('/api/config/providers');
       expect(res.status).toBe(200);
     });
   });
 
   // ── Protected Routes with Auth Enabled — No Token ──────────────
+
+  describe('Protected routes — PROKOPAI_AUTH=off', () => {
+    beforeEach(() => {
+      process.env.PROKOPAI_AUTH = 'off';
+      app = createApp();
+    });
+
+    test('GET /api/sessions returns 200 from another device without pairing', async () => {
+      const res = await remote(app, '/api/sessions');
+      expect(res.status).toBe(200);
+    });
+  });
 
   describe('Protected routes — auth enabled, no token', () => {
     beforeEach(() => {
@@ -121,47 +140,46 @@ describe('API Auth Middleware', () => {
     });
 
     test('GET /api/sessions returns 401 without token', async () => {
-      const res = await app.request('/api/sessions');
+      const res = await remote(app, '/api/sessions');
       expect(res.status).toBe(401);
 
       const body = await json(res);
       expect(body.error).toBe('Unauthorized');
-      expect(body.message).toContain('Invalid or missing API token');
-      expect(body.hint).toContain('Bearer');
+      expect(body.reason).toBe('pairing-required');
     });
 
     test('GET /api/workspaces returns 401 without token', async () => {
-      const res = await app.request('/api/workspaces');
+      const res = await remote(app, '/api/workspaces');
       expect(res.status).toBe(401);
     });
 
     test('GET /api/tools returns 401 without token', async () => {
-      const res = await app.request('/api/tools');
+      const res = await remote(app, '/api/tools');
       expect(res.status).toBe(401);
     });
 
     test('GET /api/models returns 401 without token', async () => {
-      const res = await app.request('/api/models');
+      const res = await remote(app, '/api/models');
       expect(res.status).toBe(401);
     });
 
     test('GET /api/config/providers returns 401 without token', async () => {
-      const res = await app.request('/api/config/providers');
+      const res = await remote(app, '/api/config/providers');
       expect(res.status).toBe(401);
     });
 
     test('GET /api/providers returns 401 without token', async () => {
-      const res = await app.request('/api/providers');
+      const res = await remote(app, '/api/providers');
       expect(res.status).toBe(401);
     });
 
     test('GET /api/prompts returns 401 without token', async () => {
-      const res = await app.request('/api/prompts');
+      const res = await remote(app, '/api/prompts');
       expect(res.status).toBe(401);
     });
 
     test('POST /api/sessions returns 401 without token', async () => {
-      const res = await app.request('/api/sessions', {
+      const res = await remote(app, '/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Test' }),
@@ -170,7 +188,7 @@ describe('API Auth Middleware', () => {
     });
 
     test('PUT /api/sessions/s1 returns 401 without token', async () => {
-      const res = await app.request('/api/sessions/s1', {
+      const res = await remote(app, '/api/sessions/s1', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Test' }),
@@ -179,22 +197,22 @@ describe('API Auth Middleware', () => {
     });
 
     test('DELETE /api/sessions/s1 returns 401 without token', async () => {
-      const res = await app.request('/api/sessions/s1', { method: 'DELETE' });
+      const res = await remote(app, '/api/sessions/s1', { method: 'DELETE' });
       expect(res.status).toBe(401);
     });
 
     test('GET /api/config/models returns 401 without token', async () => {
-      const res = await app.request('/api/config/models');
+      const res = await remote(app, '/api/config/models');
       expect(res.status).toBe(401);
     });
 
     test('GET /api/fs/browse returns 401 without token', async () => {
-      const res = await app.request('/api/fs/browse?path=/tmp');
+      const res = await remote(app, '/api/fs/browse?path=/tmp');
       expect(res.status).toBe(401);
     });
 
     test('GET /api/fs/drives returns 401 without token', async () => {
-      const res = await app.request('/api/fs/drives');
+      const res = await remote(app, '/api/fs/drives');
       expect(res.status).toBe(401);
     });
   });
@@ -208,7 +226,7 @@ describe('API Auth Middleware', () => {
     });
 
     test('GET /api/sessions returns 401 with wrong Bearer token', async () => {
-      const res = await app.request('/api/sessions', {
+      const res = await remote(app, '/api/sessions', {
         headers: { Authorization: 'Bearer wrong-token-value' },
       });
       expect(res.status).toBe(401);
@@ -218,21 +236,21 @@ describe('API Auth Middleware', () => {
     });
 
     test('GET /api/sessions returns 401 with malformed Authorization header', async () => {
-      const res = await app.request('/api/sessions', {
+      const res = await remote(app, '/api/sessions', {
         headers: { Authorization: 'Basic abc123' },
       });
       expect(res.status).toBe(401);
     });
 
     test('GET /api/sessions returns 401 with empty Bearer', async () => {
-      const res = await app.request('/api/sessions', {
+      const res = await remote(app, '/api/sessions', {
         headers: { Authorization: 'Bearer ' },
       });
       expect(res.status).toBe(401);
     });
 
     test('GET /api/sessions returns 401 with wrong query param token', async () => {
-      const res = await app.request('/api/sessions?token=wrong-token');
+      const res = await remote(app, '/api/sessions?token=wrong-token');
       expect(res.status).toBe(401);
     });
   });
@@ -246,28 +264,28 @@ describe('API Auth Middleware', () => {
     });
 
     test('GET /api/sessions returns 200 with valid Bearer token', async () => {
-      const res = await app.request('/api/sessions', {
+      const res = await remote(app, '/api/sessions', {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
       expect(res.status).toBe(200);
     });
 
     test('GET /api/workspaces returns 200 with valid Bearer token', async () => {
-      const res = await app.request('/api/workspaces', {
+      const res = await remote(app, '/api/workspaces', {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
       expect(res.status).toBe(200);
     });
 
     test('GET /api/tools returns 200 with valid Bearer token', async () => {
-      const res = await app.request('/api/tools', {
+      const res = await remote(app, '/api/tools', {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
       expect(res.status).toBe(200);
     });
 
     test('GET /api/models returns 200 with valid Bearer token', async () => {
-      const res = await app.request('/api/models', {
+      const res = await remote(app, '/api/models', {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
       expect(res.status).toBe(200);
@@ -276,7 +294,7 @@ describe('API Auth Middleware', () => {
     test('POST /api/sessions creates session with valid Bearer token', async () => {
       seedWorkspace({ id: 'ws1' });
 
-      const res = await app.request('/api/sessions', {
+      const res = await remote(app, '/api/sessions', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${VALID_TOKEN}`,
@@ -291,49 +309,49 @@ describe('API Auth Middleware', () => {
     });
 
     test('GET /api/config/providers returns 200 with valid Bearer token', async () => {
-      const res = await app.request('/api/config/providers', {
+      const res = await remote(app, '/api/config/providers', {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
       expect(res.status).toBe(200);
     });
 
     test('GET /api/config/models returns 200 with valid Bearer token', async () => {
-      const res = await app.request('/api/config/models', {
+      const res = await remote(app, '/api/config/models', {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
       expect(res.status).toBe(200);
     });
 
     test('GET /api/providers returns 200 with valid Bearer token', async () => {
-      const res = await app.request('/api/providers', {
+      const res = await remote(app, '/api/providers', {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
       expect(res.status).toBe(200);
     });
 
     test('GET /api/prompts returns 200 with valid Bearer token', async () => {
-      const res = await app.request('/api/prompts', {
+      const res = await remote(app, '/api/prompts', {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
       expect(res.status).toBe(200);
     });
 
     test('GET /api/preconfigs returns 200 with valid Bearer token', async () => {
-      const res = await app.request('/api/preconfigs', {
+      const res = await remote(app, '/api/preconfigs', {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
       expect(res.status).toBe(200);
     });
 
     test('GET /api/fs/browse returns 200 with valid Bearer token', async () => {
-      const res = await app.request('/api/fs/browse?path=/tmp', {
+      const res = await remote(app, '/api/fs/browse?path=/tmp', {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
       expect(res.status).toBe(200);
     });
 
     test('GET /api/fs/drives returns 200 with valid Bearer token', async () => {
-      const res = await app.request('/api/fs/drives', {
+      const res = await remote(app, '/api/fs/drives', {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
       expect(res.status).toBe(200);
@@ -349,17 +367,17 @@ describe('API Auth Middleware', () => {
     });
 
     test('GET /api/sessions returns 200 with valid ?token= param', async () => {
-      const res = await app.request(`/api/sessions?token=${VALID_TOKEN}`);
+      const res = await remote(app, `/api/sessions?token=${VALID_TOKEN}`);
       expect(res.status).toBe(200);
     });
 
     test('GET /api/workspaces returns 200 with valid ?token= param', async () => {
-      const res = await app.request(`/api/workspaces?token=${VALID_TOKEN}`);
+      const res = await remote(app, `/api/workspaces?token=${VALID_TOKEN}`);
       expect(res.status).toBe(200);
     });
 
     test('GET /api/tools returns 200 with valid ?token= param', async () => {
-      const res = await app.request(`/api/tools?token=${VALID_TOKEN}`);
+      const res = await remote(app, `/api/tools?token=${VALID_TOKEN}`);
       expect(res.status).toBe(200);
     });
   });
@@ -372,7 +390,7 @@ describe('API Auth Middleware', () => {
       app = createApp();
 
       // The attachment content route is public — it uses its own access key
-      const res = await app.request('/api/sessions/s1/attachments/att1/content?key=some-key');
+      const res = await remote(app, '/api/sessions/s1/attachments/att1/content?key=some-key');
       // Will return 404 (no attachment) but NOT 401 (auth bypass)
       expect(res.status).not.toBe(401);
     });
@@ -384,7 +402,7 @@ describe('API Auth Middleware', () => {
       seedWorkspace({ id: 'ws1' });
       seedSession('ws1', { id: 's1' });
 
-      const res = await app.request('/api/sessions/s1/attachments/att1/content?key=some-key');
+      const res = await remote(app, '/api/sessions/s1/attachments/att1/content?key=some-key');
       // Returns 404 for unknown key, not 401
       expect(res.status).toBe(404);
     });
@@ -397,7 +415,7 @@ describe('API Auth Middleware', () => {
       delete process.env.JEAN2_AUTH_TOKEN;
       app = createApp();
 
-      const res = await app.request('/ws');
+      const res = await remote(app, '/ws');
       // /ws is NOT under /api/* so the auth middleware never runs
       expect(res.status).toBe(400);
     });
@@ -406,7 +424,7 @@ describe('API Auth Middleware', () => {
       process.env.JEAN2_AUTH_TOKEN = VALID_TOKEN;
       app = createApp();
 
-      const res = await app.request('/ws');
+      const res = await remote(app, '/ws');
       // /ws is NOT under /api/* so the auth middleware never runs
       expect(res.status).toBe(400);
     });
@@ -436,14 +454,13 @@ describe('API Auth Middleware', () => {
       ];
 
       for (const route of routes) {
-        const res = await app.request(route);
+        const res = await remote(app, route);
         expect(res.status).toBe(401);
 
         const body = await json(res);
         expect(body.error).toBe('Unauthorized');
-        expect(body.message).toBe('Invalid or missing API token');
-        expect(body.hint).toBeDefined();
-        expect(typeof body.hint).toBe('string');
+        expect(body.reason).toBe('pairing-required');
+        expect(typeof body.message).toBe('string');
       }
     });
   });

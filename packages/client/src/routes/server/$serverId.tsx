@@ -1,10 +1,14 @@
-import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect, useParams, useRouter } from '@tanstack/react-router';
+import { AuthError } from '@prokopai/sdk';
+import { PairDeviceScreen } from '@/components/PairDeviceScreen';
+import { useServerContext } from '@/contexts/ServerContext';
 import { fetchCriticalServerData, type CriticalServerData } from '@/lib/fetchServerData';
 import { StoreHydrator } from '@/components/providers/StoreHydrator';
 import ServerShell from '@/components/shell/ServerShell';
 import { setLastSelectedServerId } from '@/config/servers';
 import { mark } from '@/lib/perf';
 import { retryServerLoad } from '@/lib/retryServerLoad';
+import { learnAndRecordHost, resolveHostUrl } from '@/lib/hostRoutes';
 
 function ServerErrorComponent({
   error,
@@ -14,6 +18,21 @@ function ServerErrorComponent({
   reset: () => void;
 }) {
   const router = useRouter();
+  const { serverId } = useParams({ from: '/server/$serverId' });
+  const { servers, editServer } = useServerContext();
+  const server = servers.find((candidate) => candidate.id === serverId);
+
+  if (error instanceof AuthError && server) {
+    return (
+      <PairDeviceScreen
+        server={server}
+        onPaired={(token) => {
+          editServer(server.id, { token });
+          void router.invalidate();
+        }}
+      />
+    );
+  }
 
   const handleGoToServerSelection = () => {
     router.navigate({ to: '/', search: { select: true }, replace: true });
@@ -70,15 +89,22 @@ export const Route = createFileRoute('/server/$serverId')({
     }
     mark('server-loader:start');
     try {
+      // The same machine may answer at several addresses (LAN, Tailscale, proxy).
+      const url = await resolveHostUrl(server, abortController.signal);
       const data = await retryServerLoad(
-        signal => fetchCriticalServerData(server.url, server.token, signal),
+        signal => fetchCriticalServerData(url, server.token, signal),
         abortController.signal,
       );
       setLastSelectedServerId(params.serverId);
+      void learnAndRecordHost(server, url);
       mark('server-loader:all-ready');
       return data;
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
+        throw err;
+      }
+      // Unpaired or revoked: the error component offers pairing instead of a retry loop.
+      if (err instanceof AuthError) {
         throw err;
       }
       const message = err instanceof Error ? err.message : String(err);

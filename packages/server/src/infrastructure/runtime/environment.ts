@@ -80,7 +80,7 @@ export function getPort(): number {
 }
 
 export function getHost(): string {
-  return readEnv('HOST') || '0.0.0.0';
+  return readEnv('HOST') || '127.0.0.1';
 }
 
 export function getToolsPath(): string {

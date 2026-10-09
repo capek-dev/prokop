@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { useDockStore } from '@/stores/dockStore';
 import type { DockPosition } from '@/stores/dockStore';
 import { filterTree, mapTree, treeGroups, type SplitDirection, type ViewTree } from '@/stores/workspaceSplitLayout';
+import { randomUUID } from '@/lib/randomId';
 
 const LEGACY_VIEW_IDS = ['sessions', 'conversations', 'files', 'editor', 'terminals'] as const;
 export const REPOSITORY_VIEW_IDS = ['explorer', 'changes', 'branches', 'worktrees'] as const;
@@ -307,9 +308,9 @@ export const useWorkspaceViewStore = create<WorkspaceViewStore>((set, get) => {
       if (region !== 'center' && direction !== (region === 'bottom' ? 'right' : 'down')) return null;
       const visible = layout.groups[source].viewIds.filter((view) => available.includes(view) && !layout.hidden.includes(view));
       if (!visible.includes(id) || visible.length < 2 || Object.keys(layout.groups).length >= 64) return null;
-      const groupId = `group-${crypto.randomUUID()}`;
+      const groupId = `group-${randomUUID()}`;
       const root = mapTree(layout.roots[region], (node) => node.kind === 'group' && node.groupId === source
-        ? { kind: 'split', id: `split-${crypto.randomUUID()}`, direction, ratio: 0.5, first: node, second: { kind: 'group', groupId } } : node);
+        ? { kind: 'split', id: `split-${randomUUID()}`, direction, ratio: 0.5, first: node, second: { kind: 'group', groupId } } : node);
       const next = { ...layout, roots: { ...layout.roots, [region]: root }, groups: {
         ...layout.groups,
         [source]: { viewIds: layout.groups[source].viewIds.filter((view) => view !== id), activeId: visible.find((view) => view !== id)! },

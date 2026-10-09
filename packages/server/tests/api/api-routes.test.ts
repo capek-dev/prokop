@@ -101,6 +101,7 @@ describe('API Routes', () => {
       expect(body.features.preconfigs).toBe(true);
       expect(body.features.tools).toBe(true);
       expect(body.features.authentication).toBe(false);
+      expect(body.features.pairing).toBe(true);
     });
   });
 

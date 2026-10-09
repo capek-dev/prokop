@@ -18,6 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
+import { randomUUID } from '@/lib/randomId';
 
 export interface LearningPanelProps {
   workspace: Workspace;
@@ -87,7 +88,7 @@ export function LearningPanel({ workspace, preconfigs, value, allowPersonalLearn
     instructions: '',
     sources: { mode: 'all' },
   };
-  const createReviewer = (): LearningReviewer => ({ id: crypto.randomUUID(), preconfigId: initialId!, instructions: '', modelOverride: null, cadence: null });
+  const createReviewer = (): LearningReviewer => ({ id: randomUUID(), preconfigId: initialId!, instructions: '', modelOverride: null, cadence: null });
   const update = (id: string, change: Partial<LearningReviewer>) =>
     onChange({ ...settings, reviewers: settings.reviewers.map(item => item.id === id ? { ...item, ...change } : item) });
   const updateCadence = (item: LearningReviewer, key: keyof LearningCadence, raw: string) => {

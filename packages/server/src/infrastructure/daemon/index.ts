@@ -76,6 +76,14 @@ function readPidFile(): PidFileData | null {
   }
 }
 
+/** Called by the running server after it re-binds, so `prokop status` reports the live address. */
+export function updateDaemonPidHost(host: string): void {
+  const data = readPidFile();
+  if (data && data.pid === process.pid && data.host !== host) {
+    writeFileSync(getPidFilePath(), JSON.stringify({ ...data, host }, null, 2));
+  }
+}
+
 function writePidFile(data: { pid: number; port: number; host: string }): void {
   const pidFilePath = getPidFilePath();
   const dataWithTimestamp: PidFileData = {
@@ -112,7 +120,11 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonResult
   }
 
   const port = options?.port ?? getPort();
-  const host = options?.host ?? getHost();
+  // Only an explicit host is forwarded: otherwise the server picks its bind
+  // address from the remote-access setting, which a forwarded default would shadow.
+  const explicitHost = options?.host ?? readEnv('HOST');
+  const host = explicitHost ?? getHost();
+  const hostArgs = explicitHost ? ['--host', explicitHost] : [];
   const localHttp = readEnv('LOCAL_HTTP');
   const localHost = readEnv('LOCAL_HOST');
   const tlsPortEnv = readEnv('TLS_PORT');
@@ -127,9 +139,8 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonResult
     PROKOPAI_DATA_DIR: dataDir,
     JEAN2_DATA_DIR: dataDir,
     PROKOPAI_PORT: String(port),
-    PROKOPAI_HOST: host,
     JEAN2_PORT: String(port),
-    JEAN2_HOST: host,
+    ...(explicitHost && { PROKOPAI_HOST: explicitHost, JEAN2_HOST: explicitHost }),
     ...(getTlsEnabled() && {
       PROKOPAI_TLS_ENABLED: 'true',
       JEAN2_TLS_ENABLED: 'true',
@@ -153,7 +164,7 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonResult
   if (isCompiled) {
     const binaryPath = process.execPath;
     child = Bun.spawn(
-      [binaryPath, 'server', '--port', String(port), '--host', host],
+      [binaryPath, 'server', '--port', String(port), ...hostArgs],
       {
         detached: true,
         stdio: ['ignore', logFd, logFd],
@@ -163,7 +174,7 @@ export async function startDaemon(options?: DaemonOptions): Promise<DaemonResult
   } else {
     const scriptPath = process.argv[1] || join(process.cwd(), 'packages/server/src/index.ts');
     child = Bun.spawn(
-      ['bun', 'run', scriptPath, 'server', '--port', String(port), '--host', host],
+      ['bun', 'run', scriptPath, 'server', '--port', String(port), ...hostArgs],
       {
         detached: true,
         stdio: ['ignore', logFd, logFd],

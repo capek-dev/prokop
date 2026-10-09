@@ -1,4 +1,5 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import { GitPullRequest, SquarePen } from 'lucide-react';
 import { useWorkspaceViewStore } from '@/stores/workspaceViewStore';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
@@ -27,6 +28,9 @@ import { useMobileSessionSelection } from '@/hooks/useMobileSessionSelection';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
 import { getCreateSessionOptions } from '@/lib/sessionCreate';
 import { SidebarHeader } from '@/components/ui/sidebar';
+import { useServerContext } from '@/contexts/ServerContext';
+import { useHostWorkspaces } from '@/hooks/useHostWorkspaces';
+import { STORAGE_KEYS } from '@/lib/storage';
 
 export default function WorkspaceView() {
   const sessionManager = useSessionManager();
@@ -35,6 +39,17 @@ export default function WorkspaceView() {
   const activeWorkspace = useServerDataStore(s => s.activeWorkspace);
   const agents = useServerDataStore(s => s.agents);
   const allPreconfigs = useServerDataStore(s => s.preconfigs);
+  const navigate = useNavigate();
+  const { serverId } = useParams({ from: '/server/$serverId' });
+  const { servers } = useServerContext();
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const otherHosts = useHostWorkspaces(servers, serverId, switcherOpen);
+  const currentHostName = servers.find(server => server.id === serverId)?.name;
+  // Another machine's workspace: remember it, then open that machine; its loader restores the workspace.
+  const selectHostWorkspace = useCallback((targetServerId: string, workspace: { id: string } | null) => {
+    if (workspace) localStorage.setItem(STORAGE_KEYS.ACTIVE_WORKSPACE_ID, workspace.id);
+    void navigate({ to: '/server/$serverId/workspace', params: { serverId: targetServerId } });
+  }, [navigate]);
 
   // Sync board state with URL search params
   useBoardRouteSync({ scope: { kind: 'workspace', workspaceId: activeWorkspace?.id ?? null } });
@@ -141,6 +156,10 @@ export default function WorkspaceView() {
           agents={agents}
           activeWorkspace={sidebarData.activeWorkspace}
           onSelectWorkspace={selectWorkspace}
+          currentHostName={currentHostName}
+          otherHosts={otherHosts}
+          onSelectHostWorkspace={selectHostWorkspace}
+          onOpenChange={setSwitcherOpen}
           onCreateVirtualWorkspace={handleCreateVirtualWorkspace}
           onCreatePhysicalWorkspace={handleCreatePhysicalWorkspace}
           onDeleteWorkspace={deleteWorkspace}

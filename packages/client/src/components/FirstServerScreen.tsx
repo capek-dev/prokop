@@ -5,6 +5,8 @@ import { ArrowLeft } from 'lucide-react';
 import { normalizeServerUrl } from '@/config/auth';
 import { useServerContext } from '@/contexts/ServerContext';
 import { getDefaultServerUrl, validateServerAuth } from '@/lib/validateServerAuth';
+import { PairingError, readPairingLink, redeemPairingCode } from '@prokopai/sdk';
+import { describeThisDevice } from '@/lib/deviceIdentity';
 
 interface FirstServerScreenProps {
   error?: string;
@@ -51,6 +53,24 @@ export default function FirstServerScreen({ error }: FirstServerScreenProps) {
 
     setLocalError(null);
     setIsValidating(true);
+
+    // A pasted pairing link (`prokop pair` or Settings → Devices) pairs this device directly.
+    const pairingLink = readPairingLink(trimmedUrl);
+    if (pairingLink) {
+      try {
+        const { token: deviceToken } = await redeemPairingCode(pairingLink.serverUrl, {
+          code: pairingLink.code,
+          ...describeThisDevice(),
+        });
+        const pairedServer = addServer(trimmedName, normalizeServerUrl(pairingLink.serverUrl), deviceToken);
+        navigate({ to: '/server/$serverId', params: { serverId: pairedServer.id } });
+      } catch (err: unknown) {
+        setLocalError(err instanceof PairingError ? err.message : 'Could not reach the server in this pairing link.');
+      } finally {
+        setIsValidating(false);
+      }
+      return;
+    }
 
     const result = await validateServerAuth(trimmedUrl, trimmedToken || undefined);
 
@@ -128,7 +148,7 @@ export default function FirstServerScreen({ error }: FirstServerScreenProps) {
                   setUrl(e.target.value);
                   setLocalError(null);
                 }}
-                placeholder="localhost:8742"
+                placeholder="localhost:8742 or a pairing link"
                 className="w-full px-3 py-2 bg-background border border-input rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors"
               />
             </div>

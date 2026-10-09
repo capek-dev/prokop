@@ -5,15 +5,21 @@ import { join } from 'node:path';
 
 import {
   createClientAssetResponse,
+  getEmbeddedClientAssetsRoot,
   getClientAssetCacheControl,
   getClientAssetContentType,
   isClientSpaNavigation,
   resolveClientAssetPath,
 } from '@/infrastructure/runtime/client-assets';
+import { createApp } from '@/transport/http/app';
+import { setupTestDatabase, resetTestDatabase } from '#tests/db';
+import { setupTestDataDir, resetTestDataDir } from '#tests/test-dir';
 
 let root: string;
 
 beforeEach(() => {
+  setupTestDataDir();
+  setupTestDatabase();
   root = mkdtempSync(join(tmpdir(), 'prokop-client-assets-'));
   mkdirSync(join(root, 'assets'));
   writeFileSync(join(root, 'index.html'), '<html>Prokop</html>');
@@ -24,6 +30,8 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });
+  resetTestDatabase();
+  resetTestDataDir();
 });
 
 describe('embedded client assets', () => {
@@ -103,5 +111,42 @@ describe('embedded client assets', () => {
       new Request('http://localhost/data', { headers: { Accept: 'application/json' } }),
       '/data',
     )).toBe(false);
+  });
+});
+
+describe('built client in source development', () => {
+  const saved = process.env.PROKOPAI_CLIENT_DIR;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.PROKOPAI_CLIENT_DIR;
+    else process.env.PROKOPAI_CLIENT_DIR = saved;
+  });
+
+  test('PROKOPAI_CLIENT_DIR serves a built client so other devices can open /pair', async () => {
+    process.env.PROKOPAI_CLIENT_DIR = root;
+    expect(getEmbeddedClientAssetsRoot()).toBe(root);
+
+    const app = createApp(undefined, { clientAssetsRoot: getEmbeddedClientAssetsRoot() });
+    const pair = await app.request('/pair', { headers: { Accept: 'text/html' } });
+    expect(pair.status).toBe(200);
+    expect(await pair.text()).toBe('<html>Prokop</html>');
+  });
+
+  test('without it, source development serves no client and explains how to get one', async () => {
+    delete process.env.PROKOPAI_CLIENT_DIR;
+    expect(getEmbeddedClientAssetsRoot()).toBeNull();
+
+    const app = createApp(undefined, { clientAssetsRoot: null });
+    const pair = await app.request('/pair', { headers: { Accept: 'text/html' } });
+    expect(pair.status).toBe(404);
+    expect(pair.headers.get('content-type')).toContain('text/html');
+    expect(await pair.text()).toContain('bun run dev:remote');
+
+    const api = await app.request('/api/does-not-exist');
+    expect(await api.json()).toMatchObject({ error: 'Not Found' });
+  });
+
+  test('a folder without index.html is ignored', () => {
+    process.env.PROKOPAI_CLIENT_DIR = join(root, 'assets');
+    expect(getEmbeddedClientAssetsRoot()).toBeNull();
   });
 });

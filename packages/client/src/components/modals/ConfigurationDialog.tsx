@@ -1,6 +1,6 @@
 import { Suspense, lazy, useState } from 'react';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { Bell, Boxes, Cpu, FileText, Cog, GraduationCap, Shield, Bot, Braces, MonitorCog, Palette, Keyboard, CircuitBoard, Gauge } from 'lucide-react';
+import { Bell, Boxes, Cpu, FileText, Cog, GraduationCap, Shield, Bot, Braces, MonitorCog, Palette, Keyboard, CircuitBoard, Gauge, Smartphone } from 'lucide-react';
 import { getSelectableWorkspaces } from '@/lib/workspaceKind';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useServerUpdate } from '@/hooks/useServerUpdate';
@@ -23,6 +23,7 @@ const SystemPanel = lazy(() => import('./configuration/SystemPanel').then((m) =>
 const AppearancePanel = lazy(() => import('./configuration/AppearancePanel').then((m) => ({ default: m.AppearancePanel })));
 const NotificationsPanel = lazy(() => import('./configuration/NotificationsPanel').then((m) => ({ default: m.NotificationsPanel })));
 const KeybindsPanel = lazy(() => import('./configuration/KeybindsPanel').then((m) => ({ default: m.KeybindsPanel })));
+const DevicesPanel = lazy(() => import('./configuration/DevicesPanel').then((m) => ({ default: m.DevicesPanel })));
 
 interface ConfigurationDialogProps {
   open: boolean;
@@ -42,6 +43,7 @@ const SECTIONS: SettingsSection[] = [
   { value: 'mcp', label: 'MCP Servers', icon: Boxes, group: 'server' },
   { value: 'harnesses', label: 'Harnesses', icon: CircuitBoard, group: 'server' },
   { value: 'usage', label: 'Usage', icon: Gauge, group: 'server' },
+  { value: 'devices', label: 'Devices', icon: Smartphone, group: 'server' },
   { value: 'preconfigs', label: 'Agents', icon: Bot, group: 'server' },
   { value: 'prompts', label: 'Prompts', icon: FileText, group: 'server' },
   // Prokop runtime
@@ -135,6 +137,8 @@ export function ConfigurationDialog({
             return <HarnessesPanel sdkClient={sdkClient} />;
           case 'usage':
             return <UsagePanel sdkClient={sdkClient} />;
+          case 'devices':
+            return <DevicesPanel sdkClient={sdkClient} />;
           case 'preconfigs':
             return <PreconfigsPanel sdkClient={sdkClient} draft={agentDraft} onDraftChange={setAgentDraft} />;
           case 'providers-models':

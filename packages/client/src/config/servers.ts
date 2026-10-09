@@ -2,6 +2,7 @@
 
 import type { SavedServer, QuickConnection } from '@prokopai/sdk';
 import { normalizeServerUrl } from './auth';
+import { randomUUID } from '@/lib/randomId';
 
 const STORAGE_KEYS = {
   SERVERS: 'prokopai_servers',
@@ -94,7 +95,7 @@ export function getOrCreateServer(
 
   const normalizedUrl = normalizeServerUrl(url);
   const server: SavedServer = {
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     name: options.name || normalizedUrl,
     url: normalizedUrl,
     ...(options.token ? { token: options.token } : {}),
@@ -188,6 +189,68 @@ export function deleteServer(id: string): void {
   }
 }
 
+export const SERVERS_CHANGED_EVENT = 'prokopai:servers-changed';
+
+/** Lets React state follow storage writes made outside it (route loaders, host learning). */
+export function notifyServersChanged(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(SERVERS_CHANGED_EVENT));
+}
+
+/**
+ * Records a server's identity and learned routes, then folds other saved
+ * entries for the same installation into it (the same machine saved once via
+ * LAN and once via Tailscale). Quick connections move to the surviving entry.
+ * Returns the ids of merged entries so callers can move their own state.
+ */
+export function recordServerIdentity(
+  id: string,
+  learned: { installationId: string | null; routes: string[] },
+): string[] {
+  const servers = getSavedServers();
+  const target = servers.find((server) => server.id === id);
+  if (!target) return [];
+  const duplicates = learned.installationId
+    ? servers.filter((server) => server.id !== id && server.installationId === learned.installationId)
+    : [];
+  const ownUrl = normalizeServerUrl(target.url);
+  const routes = Array.from(new Set([
+    ...(target.routes ?? []),
+    ...learned.routes,
+    ...duplicates.flatMap((server) => [server.url, ...(server.routes ?? [])]),
+  ].map((route) => normalizeServerUrl(route)))).filter((route) => route !== ownUrl);
+  const token = target.token ?? duplicates.find((server) => server.token)?.token;
+  const merged: SavedServer = {
+    ...target,
+    ...(learned.installationId ? { installationId: learned.installationId } : {}),
+    ...(routes.length > 0 ? { routes } : {}),
+    ...(token ? { token } : {}),
+  };
+  const unchanged = duplicates.length === 0
+    && merged.installationId === target.installationId
+    && JSON.stringify(merged.routes ?? []) === JSON.stringify(target.routes ?? [])
+    && merged.token === target.token;
+  if (unchanged) return [];
+
+  const mergedIds = new Set(duplicates.map((server) => server.id));
+  try {
+    localStorage.setItem(STORAGE_KEYS.SERVERS, JSON.stringify(
+      servers.filter((server) => !mergedIds.has(server.id)).map((server) => (server.id === id ? merged : server)),
+    ));
+    if (mergedIds.size > 0) {
+      localStorage.setItem(STORAGE_KEYS.QUICK_CONNECTIONS, JSON.stringify(getQuickConnections().map((connection) => (
+        mergedIds.has(connection.serverId) ? { ...connection, serverId: id, serverName: merged.name } : connection
+      ))));
+      const lastId = getLastSelectedServerId();
+      if (lastId && mergedIds.has(lastId)) localStorage.setItem(STORAGE_KEYS.LAST_SERVER_ID, id);
+    }
+  } catch (error) {
+    console.error('Error recording server identity:', error);
+    return [];
+  }
+  notifyServersChanged();
+  return Array.from(mergedIds);
+}
+
 /**
  * Get all quick connections from localStorage
  */
@@ -224,7 +287,7 @@ export function addQuickConnection(
 
   const newConnection: QuickConnection = {
     ...conn,
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     order: maxOrder + 1,
   };
 

@@ -480,7 +480,7 @@ export type ServerMessage =
   | AskTimedOutMessage
   | AskResponseRejectedMessage
   | AskPendingSyncMessage
-  | PingMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage | GitChangedMessage | PullRequestChangedMessage | LearningChangedMessage | McpChangedMessage | WorkspaceConversationActivityMessage | FilesChangedMessage | GitStatusMessage | FileTreeMessage | SchedulerChangedMessage;
+  | PingMessage | WorktreeUpdatedMessage | WorktreeDeletedMessage | GitChangedMessage | PullRequestChangedMessage | LearningChangedMessage | McpChangedMessage | WorkspaceConversationActivityMessage | FilesChangedMessage | GitStatusMessage | FileTreeMessage | SchedulerChangedMessage | AccessChangedMessage;
 
 export interface WorktreeUpdatedMessage {
   type: 'worktree.updated';
@@ -548,4 +548,9 @@ export interface FileTreeMessage {
 export interface SchedulerChangedMessage {
   type: 'scheduler.changed';
   workspaceId: string;
+}
+
+/** Pending device approval requests or paired devices changed; admin clients refetch them. */
+export interface AccessChangedMessage {
+  type: 'access.changed';
 }

@@ -11,6 +11,7 @@
     "dev": "bun run dev:server & bun run dev:client",
     "dev:https": "bun run dev:server & bun run dev:client:https",
     "dev:be": "bun run dev:server",
+    "dev:remote": "cd packages/client && bun run build && cd ../server && PROKOPAI_CLIENT_ENABLED=true PROKOPAI_CLIENT_DIR=../client/dist bun --watch --env-file=../../.env src/index.ts",
     "dev:server": "cd packages/server && bun --watch --env-file=../../.env src/index.ts",
     "dev:client": "cd packages/client && bun run dev",
     "dev:client:https": "cd packages/client && bun --env-file=../../.env run dev",

@@ -11,6 +11,11 @@ import { readEnv } from '@/infrastructure/runtime/env-compat';
  * When not set, auth is disabled (all requests pass through).
  */
 
+/** PROKOPAI_AUTH=off trusts every request that passes the origin guard. */
+export function isAuthDisabled(): boolean {
+  return readEnv('AUTH') === 'off';
+}
+
 export function isAuthEnabled(): boolean {
   return !!readEnv('AUTH_TOKEN');
 }

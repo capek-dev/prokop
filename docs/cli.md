@@ -19,7 +19,7 @@ prokop start [-p|--port <port>] [-h|--host <host>]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-p`, `--port` | `8742` | Port to listen on |
-| `-h`, `--host` | `0.0.0.0` | Host to bind to |
+| `-h`, `--host` | (setting) | Fixed host to bind to. When omitted, `prokop remote on/off` decides |
 
 ### `prokop stop`
 
@@ -112,9 +112,29 @@ prokop update [options]
 
 Open the built-in client in your browser.
 
+### `prokop pair`
+
+Print a QR code, a pairing link, and a one-time code so another device can pair with the running server. The code expires after 5 minutes. Requires remote access (see `prokop remote`). See [Security & Authentication](./auth.md#using-prokop-from-another-device).
+
+### `prokop remote`
+
+Show and change how other devices reach the running server. Changes apply immediately.
+
+| Subcommand | Description |
+|------------|-------------|
+| (none) | Show listening state, addresses, and Tailscale status |
+| `on` / `off` | Listen on your network, or only on this computer |
+| `add <url>` | Add an address other devices use (VPN, proxy, tunnel) |
+| `remove <url>` | Remove an address |
+| `tailscale on` / `off` | Share over Tailscale HTTPS with `tailscale serve` |
+
 ### `prokop auth`
 
-Show authentication status and masked token.
+List devices paired with the running server.
+
+| Subcommand | Description |
+|------------|-------------|
+| `revoke <device-id>` | Remove a device's access and close its connections |
 
 ### `prokop version`
 

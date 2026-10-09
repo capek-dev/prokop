@@ -80,12 +80,17 @@ export class HttpClient {
       let errorDetails: unknown;
       let parsed = false;
       try {
-        const errorBody = await response.json() as { error?: string; message?: string; details?: unknown };
+        const errorBody = await response.json() as { error?: string; reason?: string; message?: string; details?: unknown };
+        // Another origin without a device token: this device must pair with that server.
+        if (response.status === 403 && errorBody.reason === 'foreign-origin') {
+          throw new AuthError(errorBody.message ?? 'This device is not paired with this server.');
+        }
         if (errorBody.message) errorMessage = errorBody.message;
         if (errorBody.error) errorCode = errorBody.error;
         if (errorBody.details !== undefined) errorDetails = errorBody.details;
         parsed = true;
-      } catch {
+      } catch (error: unknown) {
+        if (error instanceof AuthError) throw error;
         // Ignore parse error for error body
       }
 

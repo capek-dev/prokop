@@ -13,8 +13,11 @@ import { activityLabel, stallMonitor } from '@/utils/stall-monitor';
 import { prettyJSON } from 'hono/pretty-json';
 import { ZodError } from 'zod';
 
-import { requireAuth, isPublicRoute } from '@/transport/http/middleware/auth';
-import { isAuthEnabled } from '@/transport/http/middleware/token';
+import { createAuthMiddleware } from '@/transport/http/middleware/auth';
+import { registerDeviceAccessRoutes } from '@/transport/http/routes/device-access';
+import { registerRemoteAccessRoutes } from '@/transport/http/routes/remote-access';
+import type { RemoteAccessService } from '@/application/remote-access/service';
+import { isAuthDisabled, isAuthEnabled, validateToken } from '@/transport/http/middleware/token';
 import {
   createClientAssetResponse,
   getEmbeddedClientAssetsRoot,
@@ -46,6 +49,10 @@ import { registerNotificationRoutes } from '@/transport/http/routes/notification
 export interface CreateAppOptions {
   clientAssetsRoot?: string | null;
   installationId?: string;
+  /** Links another device can open to pair with a code; see registerDeviceAccessRoutes. */
+  pairingLinks?: (code: string) => string[];
+  /** Remote-access settings; composed with the listeners, so only the running server provides it. */
+  remoteAccess?: RemoteAccessService;
 }
 
 export function createApp(application?: WiredApplication, options?: CreateAppOptions) {
@@ -75,16 +82,12 @@ export function createApp(application?: WiredApplication, options?: CreateAppOpt
   app.use('*', (c, next) => c.req.path === '/api/mcp/oauth/callback' ? next() : requestLogger(c, next));
   app.use('*', prettyJSON());
 
-  // Authentication middleware for all API routes
-  app.use('/api/*', async (c, next) => {
-    // Skip auth for public routes
-    if (isPublicRoute(c.req.path)) {
-      return await next();
-    }
-    
-    // Require auth for all other API routes
-    return await requireAuth(c, next);
-  });
+  // Authentication for all API routes: same machine, paired device, or shared token
+  app.use('/api/*', createAuthMiddleware({
+    deviceAccess: wired.deviceAccess,
+    validateLegacyToken: validateToken,
+    isAuthDisabled,
+  }));
 
   // ============================================================================
   // Root and Health Endpoints
@@ -120,7 +123,9 @@ export function createApp(application?: WiredApplication, options?: CreateAppOpt
         sessions: true,
         preconfigs: true,
         tools: true,
+        // Legacy shared-token flag kept for older clients; new clients read /api/auth/status.
         authentication: isAuthEnabled(),
+        pairing: true,
         client: clientAssetsRoot !== null,
       },
       timestamp: new Date().toISOString()
@@ -135,9 +140,9 @@ export function createApp(application?: WiredApplication, options?: CreateAppOpt
     });
   });
 
-  // GET /api/auth/verify - Token verification
-  // Protected by requireAuth middleware (not in PUBLIC_ROUTES)
-  // Returns 200 if token is valid, 401 if invalid (handled by middleware)
+  // GET /api/auth/verify - Credential verification
+  // Protected by the auth middleware (not in PUBLIC_ROUTES)
+  // Returns 200 when the caller is authorized, 401 otherwise (handled by middleware)
   app.get('/api/auth/verify', (c) => {
     return c.json({ valid: true, timestamp: new Date().toISOString() });
   });
@@ -160,6 +165,11 @@ export function createApp(application?: WiredApplication, options?: CreateAppOpt
   registerAgentRoutes(app, wired.agents);
   registerMaintenanceRoutes(app, wired.maintenance);
   registerNotificationRoutes(app, wired.notifications);
+  registerDeviceAccessRoutes(app, wired.deviceAccess, {
+    pairingLinks: options?.pairingLinks,
+    addresses: options?.remoteAccess ? () => options.remoteAccess!.pairingBaseUrls() : undefined,
+  });
+  if (options?.remoteAccess) registerRemoteAccessRoutes(app, options.remoteAccess);
   if (readEnv('SANDBOX') === 'true') {
     registerSandboxRoutes(app);
   }
@@ -211,6 +221,18 @@ export function createApp(application?: WiredApplication, options?: CreateAppOpt
   // ============================================================================
 
   app.notFound((c) => {
+    // Source development without a built client: say how to get one instead of a bare 404.
+    if (clientAssetsRoot === null && c.req.method === 'GET' && !c.req.path.startsWith('/api') && !c.req.path.startsWith('/ws')) {
+      return c.html(
+        '<!doctype html><meta name="viewport" content="width=device-width"><title>Prokop</title>'
+        + '<body style="font-family:system-ui;max-width:32rem;margin:3rem auto;padding:0 1rem;line-height:1.5">'
+        + '<h1 style="font-size:1.2rem">This Prokop server has no web app</h1>'
+        + '<p>It is running from source, where the app is served by the Vite dev server instead.</p>'
+        + '<p>To open pages such as pairing links from other devices, run <code>bun run dev:remote</code> '
+        + 'from the repository root. It builds the app and serves it from this server.</p></body>',
+        404,
+      );
+    }
     return c.json(
       {
         error: 'Not Found',

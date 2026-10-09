@@ -45,6 +45,9 @@ function clearAppBadge(): void {
 }
 
 export function registerProkopServiceWorker(): void {
+  // Plain HTTP on a LAN or VPN address is not a secure context: no service
+  // worker, so no offline cache or install, but the app itself must still load.
+  if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
 
   const updateServiceWorker = registerSW({

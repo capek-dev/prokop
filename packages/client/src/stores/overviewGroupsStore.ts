@@ -5,6 +5,7 @@ import {
   loadOverviewGroups,
   persistDocument,
 } from '@/config/overviewGroupsStorage';
+import { randomUUID } from '@/lib/randomId';
 
 type HydrationStatus = 'idle' | 'loading' | 'ready' | 'unsupported';
 
@@ -24,6 +25,8 @@ interface OverviewGroupsActions {
   reorderWorkspace: (groupId: string, workspaceId: string, targetIndex: number) => void;
   removeWorkspaceFromAllGroups: (serverId: string, workspaceId: string) => void;
   removeServerGroups: (serverId: string) => void;
+  /** Moves groups from merged duplicate server entries to the surviving one. */
+  reassignServerGroups: (fromServerIds: string[], toServerId: string) => void;
 }
 
 const EMPTY_DOC: OverviewGroupsDocument = {
@@ -93,7 +96,7 @@ export const useOverviewGroupsStore = create<
       const doc = get().document;
       if (isNameTaken(doc, serverId, trimmed)) return null;
 
-      const groupId = crypto.randomUUID();
+      const groupId = randomUUID();
       const newGroup = {
         id: groupId,
         serverId,
@@ -241,6 +244,19 @@ export const useOverviewGroupsStore = create<
       const groups = doc.groups.filter((g) => g.serverId !== serverId);
       const activeMap = { ...doc.activeGroupIdByServer };
       delete activeMap[serverId];
+      commit({ version: 1, groups, activeGroupIdByServer: activeMap });
+    },
+
+    reassignServerGroups: (fromServerIds, toServerId) => {
+      if (get().hydrationStatus !== 'ready' || fromServerIds.length === 0) return;
+      const from = new Set(fromServerIds);
+      const doc = get().document;
+      const groups = doc.groups.map((g) => (from.has(g.serverId) ? { ...g, serverId: toServerId } : g));
+      const activeMap = { ...doc.activeGroupIdByServer };
+      for (const id of fromServerIds) {
+        if (activeMap[toServerId] === undefined && activeMap[id] !== undefined) activeMap[toServerId] = activeMap[id];
+        delete activeMap[id];
+      }
       commit({ version: 1, groups, activeGroupIdByServer: activeMap });
     },
   };

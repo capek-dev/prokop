@@ -50,6 +50,10 @@ bun run dev:be
 bun run dev:client
 bun run dev:client:https
 
+# Server that also serves a built client, for testing other devices
+# (pairing links, QR codes, Tailscale). Rebuilds the client on start only.
+bun run dev:remote
+
 # Sandbox CLI for simulated LLM responses
 bun run sandbox
 ```

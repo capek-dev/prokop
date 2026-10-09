@@ -1,0 +1,20 @@
+### Added
+
+- **Remote access in one place**: Settings → Devices → Remote access (or `prokop remote`) turns network access on or off, sets up Tailscale HTTPS in one click, and saves addresses for other VPNs, proxies, and tunnels. Changes apply immediately without restarting Prokop.
+- **One workspace list for all your machines**: With two or more machines saved, the workspace switcher lists every machine's workspaces. Picking one switches machines in one step, and offline machines show their last known workspaces.
+- **Addresses switch automatically**: After connecting once, the client learns each machine's addresses (such as LAN and Tailscale) and switches when one stops answering. Duplicate entries for the same machine are merged.
+- **Pair your phone or another computer**: Open Prokop on the other device and approve it from the prompt on your computer, matching a four-digit code. You can also scan a QR code from Settings → Devices or `prokop pair`. Paired devices stay signed in for 30 days after their last use, and you can remove any of them in Settings → Devices or with `prokop auth revoke`.
+
+### Changed
+
+- **Local only by default**: The server now listens on `127.0.0.1` instead of every network interface, so other devices on your Wi-Fi can no longer reach it unless you choose to share it. To use Prokop from another device, turn on remote access in Settings → Devices or with `prokop remote on`, then pair the device. Nothing changes when you use Prokop on the same machine.
+
+### Fixed
+
+- **Opening Prokop over plain HTTP from another device works**: The app no longer shows a blank page when opened at a LAN or VPN address without HTTPS. Installing the app and notifications still need HTTPS.
+
+### Security
+
+- **Websites can no longer drive your local server**: Other websites open in your browser, including DNS-rebinding pages, are refused when they try to call Prokop. The built-in client, local dev servers, the browser extension, and the CLI keep working without a login. A proxy or `tailscale serve` on the same machine works once its address is added in Remote access; the machine's own Tailscale name is recognized automatically.
+- **Other devices need pairing**: A server shared on the network no longer accepts other devices without pairing or `PROKOPAI_AUTH_TOKEN`. Set `PROKOPAI_AUTH=off` to keep open access on an isolated network.
+- **Tokens stay out of URLs**: WebSocket connections from paired devices use short-lived single-use tickets instead of a token in the URL.

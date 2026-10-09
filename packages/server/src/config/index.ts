@@ -121,7 +121,7 @@ function loadConfig(): { databasePath: string; toolsPath: string; port: number; 
       databasePath: config.databasePath || getDefaultDatabasePathFromPaths(),
       toolsPath: config.toolsPath || getToolsDir(),
       port: config.port || 8742,
-      host: config.host || '0.0.0.0',
+      host: config.host || '127.0.0.1',
     };
     return configCache;
   } catch {

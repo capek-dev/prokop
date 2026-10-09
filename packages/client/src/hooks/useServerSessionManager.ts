@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useParams, useRouterState } from '@tanstack/react-router';
+import { useParams, useRouter, useRouterState } from '@tanstack/react-router';
+import { resolveHostUrl, useEffectiveServerUrl } from '@/lib/hostRoutes';
 import type {
   Session,
   Workspace,
@@ -35,6 +36,7 @@ import { useConnectionLifecycle } from '@/hooks/useConnectionLifecycle';
 import { useSessionCommands } from '@/hooks/useSessionCommands';
 import type { CreateSessionOptions } from '@/lib/sessionCreate';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
+import { randomUUID } from '@/lib/randomId';
 
 export interface UseServerSessionManagerParams {
   serverId: string;
@@ -435,7 +437,7 @@ export function useServerSessionManager({
   }, [activeSessionId]);
 
   const apiToken = activeServer?.token ?? null;
-  const serverUrl = activeServer?.url ?? null;
+  const serverUrl = useEffectiveServerUrl(activeServer);
 
   const sdkClient = sdkClientRef.current;
 
@@ -477,7 +479,8 @@ export function useServerSessionManager({
 
 
 
-  const { removeServer } = useServerContext();
+  const { removeServer, editServer } = useServerContext();
+  const router = useRouter();
 
   const handleLogout = useCallback(() => {
     if (activeServer) {
@@ -488,12 +491,36 @@ export function useServerSessionManager({
     useConnectionStore.getState().resetConnection();
   }, [activeServer, removeServer, navigate, sdkClientRef]);
 
+  const handleAccessLost = useCallback(() => {
+    sdkClientRef.current?.dispose();
+    // An auth error stops automatic retries until a new token reconnects.
+    useConnectionStore.setState({
+      connected: false,
+      authError: 'This device is no longer paired with this server.',
+      connectionTimedOut: true,
+      nextRetryIn: 0,
+    });
+    if (activeServer) editServer(activeServer.id, { token: undefined });
+    // The server route reloads, gets 401, and shows the pairing screen.
+    void router.invalidate();
+  }, [activeServer, editServer, router, sdkClientRef]);
+
+  // Fail over between the machine's addresses (LAN at home, Tailscale away) when
+  // the current one stops answering. A changed URL reconnects the live client.
+  useEffect(() => {
+    if (!connectionTimedOut || !activeServer || !(activeServer.routes?.length)) return;
+    const controller = new AbortController();
+    void resolveHostUrl(activeServer, controller.signal);
+    return () => controller.abort();
+  }, [connectionTimedOut, activeServer]);
+
   const { retry } = useConnectionLifecycle({
     apiToken,
     serverUrl,
     currentSessionIdRef,
     handlerContextRef,
     handleLogout,
+    handleAccessLost,
     clientRef: sdkClientRef,
   });
 
@@ -696,7 +723,7 @@ export function useServerSessionManager({
 
   const handleCreateVirtualWorkspace = async () => {
     const name = `Workspace ${workspaces.length + 1}`;
-    const path = `~/.prokopai/workspaces/${crypto.randomUUID()}`;
+    const path = `~/.prokopai/workspaces/${randomUUID()}`;
     setIsCreatingWorkspace(true);
     try {
       await createWorkspace(name, path, true);

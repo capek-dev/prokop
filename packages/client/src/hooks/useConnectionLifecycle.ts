@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { ProkopaiClient, HttpClient } from '@prokopai/sdk';
+import { ACCESS_REVOKED_CLOSE_CODE, PairingError, ProkopaiClient, HttpClient } from '@prokopai/sdk';
 import type { ClientDescriptor } from '@prokopai/sdk';
 import type { SessionHandlersContext } from '@/handlers/serverMessage';
 import { useConnectionStore } from '@/stores/connectionStore';
@@ -10,6 +10,7 @@ import { useClientIdentityStore } from '@/stores/clientIdentityStore';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import { toast } from 'sonner';
 import { subscribeToServerEvents } from './subscribeToServerEvents';
+import { subscribeToAccessRequests } from '@/lib/accessRequestPrompts';
 import { refreshWorkspaceActivity } from '@/lib/refreshWorkspaceActivity';
 import { resolveClientDescriptor } from '@/config/client-identity';
 import {
@@ -24,6 +25,8 @@ export interface ConnectionLifecycleParams {
   currentSessionIdRef: RefObject<string | null>;
   handlerContextRef: RefObject<SessionHandlersContext | null>;
   handleLogout: () => void;
+  /** This device's pairing was revoked or expired; the server route shows pairing again. */
+  handleAccessLost: () => void;
   clientRef?: RefObject<ProkopaiClient | null>;
 }
 
@@ -38,6 +41,7 @@ export function useConnectionLifecycle({
   currentSessionIdRef,
   handlerContextRef,
   handleLogout,
+  handleAccessLost,
   clientRef: externalClientRef,
 }: ConnectionLifecycleParams): ConnectionLifecycleReturn {
   const internalClientRef = useRef<ProkopaiClient | null>(null);
@@ -72,6 +76,7 @@ export function useConnectionLifecycle({
 
     let cancelled = false;
     const controller = new AbortController();
+    let unsubscribeAccessRequests: (() => void) | null = null;
     let ownedClient: ProkopaiClient | null = null;
     const cancelAttempt = () => {
       cancelled = true;
@@ -158,7 +163,9 @@ export function useConnectionLifecycle({
           usePendingOperationsStore.setState({ operations: [] });
         }
 
-        if (payload.code === 1008 || payload.code === 401) {
+        if (payload.code === ACCESS_REVOKED_CLOSE_CODE) {
+          handleAccessLost();
+        } else if (payload.code === 1008 || payload.code === 401) {
           handleLogout();
         } else {
           useConnectionStore.getState().setConnectionTimedOut(true);
@@ -171,10 +178,17 @@ export function useConnectionLifecycle({
       });
 
       subscribeToServerEvents(client, handlerContextRef);
+      unsubscribeAccessRequests?.();
+      unsubscribeAccessRequests = subscribeToAccessRequests(client);
 
       client.connect().catch((err: unknown) => {
         if (cancelled || clientRef.current !== client) return;
         console.error('Connection failed:', err);
+        // The socket ticket is refused once a device is revoked or its pairing expires.
+        if (err instanceof PairingError && err.status === 401) {
+          handleAccessLost();
+          return;
+        }
         useConnectionStore.getState().setConnectionTimedOut(true);
       });
     };
@@ -186,11 +200,13 @@ export function useConnectionLifecycle({
       if (cancelled) return;
 
       if (!isValid) {
+        // Stops automatic retries; the server route then shows the pairing screen.
         useConnectionStore.setState({
           authError: 'Authentication failed. Your token may be invalid or expired.',
           connectionTimedOut: true,
           nextRetryIn: 0,
         });
+        handleAccessLost();
         return;
       }
 
@@ -217,6 +233,7 @@ export function useConnectionLifecycle({
     return () => {
       stopConnectionSupervisor();
       cancelAttempt();
+      unsubscribeAccessRequests?.();
     };
   }, [serverUrl, apiToken, clientDescriptor, reconnectAttempt]);
 
