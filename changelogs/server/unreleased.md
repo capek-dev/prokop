@@ -2,6 +2,7 @@
 
 - **Remote access in one place**: Settings → Devices → Remote access (or `prokop remote`) turns network access on or off, sets up Tailscale HTTPS in one click, and saves addresses for other VPNs, proxies, and tunnels. Changes apply immediately without restarting Prokop.
 - **One workspace list for all your machines**: With two or more machines saved, the workspace switcher lists every machine's workspaces. Picking one switches machines in one step, and offline machines show their last known workspaces.
+- **Never miss an approval on another machine**: While you work on one machine, Prokop tells you when a session on another machine needs an approval or an answer, or finishes. Open it from the prompt, or see the count in the workspace switcher.
 - **Addresses switch automatically**: After connecting once, the client learns each machine's addresses (such as LAN and Tailscale) and switches when one stops answering. Duplicate entries for the same machine are merged.
 - **Pair your phone or another computer**: Open Prokop on the other device and approve it from the prompt on your computer, matching a four-digit code. You can also scan a QR code from Settings → Devices or `prokop pair`. Paired devices stay signed in for 30 days after their last use, and you can remove any of them in Settings → Devices or with `prokop auth revoke`.
 

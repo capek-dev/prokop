@@ -45,6 +45,8 @@ interface WorkspaceSelectionProps {
   onSelectHostWorkspace?: (serverId: string, workspace: Workspace | null) => void;
   /** Lets the parent fetch other machines' workspaces only while the menu is open. */
   onOpenChange?: (open: boolean) => void;
+  /** Approvals and questions waiting on each other machine, by server id. */
+  waitingByHost?: Record<string, number>;
   sdkClient?: ProkopaiClient | null;
   isCreatingWorkspace?: boolean;
   deletingWorkspaceId?: string | null;
@@ -74,6 +76,7 @@ export function WorkspaceSwitcher({
   otherHosts = [],
   onSelectHostWorkspace,
   onOpenChange,
+  waitingByHost = {},
   onCreateVirtualWorkspace,
   onCreatePhysicalWorkspace,
   onDeleteWorkspace,
@@ -107,6 +110,12 @@ export function WorkspaceSwitcher({
     onOpenChange?.(nextOpen);
   };
   const multipleHosts = otherHosts.length > 0;
+  const waitingElsewhere = otherHosts.reduce((total, host) => total + (waitingByHost[host.server.id] ?? 0), 0);
+  const hostHeading = (host: HostWorkspaces) => {
+    const waiting = waitingByHost[host.server.id] ?? 0;
+    return [host.server.name, host.state === 'offline' ? 'offline' : null, waiting > 0 ? `${waiting} waiting` : null]
+      .filter(Boolean).join(' · ');
+  };
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [workspaceToMove, setWorkspaceToMove] = useState<Workspace | null>(null);
   const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(null);
@@ -165,6 +174,9 @@ export function WorkspaceSwitcher({
                 : 'Select workspace'}
             </span>
           </div>
+          {waitingElsewhere > 0 && (
+            <span className="size-1.5 shrink-0 rounded-full bg-amber-500" aria-label={`${waitingElsewhere} waiting on other machines`} role="status" />
+          )}
           <ChevronsUpDown className="size-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -310,7 +322,7 @@ export function WorkspaceSwitcher({
             {otherHosts.map(host => (
               <CommandGroup
                 key={host.server.id}
-                heading={host.state === 'offline' ? `${host.server.name} · offline` : host.server.name}
+                heading={hostHeading(host)}
               >
                 {host.state === 'unpaired' ? (
                   <CommandItem

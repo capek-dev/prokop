@@ -57,6 +57,13 @@ describe('subscribeToAccessRequests', () => {
     expect(toastMock.dismiss).toHaveBeenCalledWith('access-request-r1');
   });
 
+  test('ignores replies without a request list (older servers)', async () => {
+    const { client } = fakeClient(async () => ({}) as never);
+    subscribeToAccessRequests(client);
+    await flush();
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
   test('does nothing on paired devices, which cannot list requests', async () => {
     const { client } = fakeClient(async () => { throw new Error('Forbidden'); });
     subscribeToAccessRequests(client);

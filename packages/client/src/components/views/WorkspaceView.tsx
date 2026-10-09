@@ -30,6 +30,8 @@ import { getCreateSessionOptions } from '@/lib/sessionCreate';
 import { SidebarHeader } from '@/components/ui/sidebar';
 import { useServerContext } from '@/contexts/ServerContext';
 import { useHostWorkspaces } from '@/hooks/useHostWorkspaces';
+import { useAttentionStore } from '@/lib/attention';
+import { useShallow } from 'zustand/react/shallow';
 import { STORAGE_KEYS } from '@/lib/storage';
 
 export default function WorkspaceView() {
@@ -44,6 +46,9 @@ export default function WorkspaceView() {
   const { servers } = useServerContext();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const otherHosts = useHostWorkspaces(servers, serverId, switcherOpen);
+  const waitingByHost = useAttentionStore(useShallow(state => Object.fromEntries(
+    Object.entries(state.hosts).map(([id, host]) => [id, host.snapshot?.asks.length ?? 0]),
+  )));
   const currentHostName = servers.find(server => server.id === serverId)?.name;
   // Another machine's workspace: remember it, then open that machine; its loader restores the workspace.
   const selectHostWorkspace = useCallback((targetServerId: string, workspace: { id: string } | null) => {
@@ -160,6 +165,7 @@ export default function WorkspaceView() {
           otherHosts={otherHosts}
           onSelectHostWorkspace={selectHostWorkspace}
           onOpenChange={setSwitcherOpen}
+          waitingByHost={waitingByHost}
           onCreateVirtualWorkspace={handleCreateVirtualWorkspace}
           onCreatePhysicalWorkspace={handleCreatePhysicalWorkspace}
           onDeleteWorkspace={deleteWorkspace}

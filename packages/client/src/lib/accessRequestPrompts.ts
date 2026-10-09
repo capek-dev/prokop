@@ -1,4 +1,4 @@
-import type { ProkopaiClient } from '@prokopai/sdk';
+import type { PendingAccessRequest, ProkopaiClient } from '@prokopai/sdk';
 import { toast } from 'sonner';
 
 /**
@@ -18,9 +18,12 @@ export function subscribeToAccessRequests(client: ProkopaiClient): () => void {
   };
 
   const check = async () => {
-    let requests;
+    let requests: PendingAccessRequest[];
     try {
-      ({ requests } = await client.http.access.overview());
+      const overview = await client.http.access.overview();
+      // An older server (or any unexpected reply) has nothing to prompt for.
+      if (!Array.isArray(overview?.requests)) return;
+      requests = overview.requests;
     } catch {
       return;
     }

@@ -130,6 +130,8 @@ import { createHarnessSettingsApplication } from '@/application/harnesses/settin
 import { createServerSettingsRepository } from '@/infrastructure/sqlite/server-settings';
 import { createDeviceAccessRepository } from '@/infrastructure/sqlite/device-access';
 import { createDeviceAccessService, type DeviceAccessService } from '@/application/device-access/service';
+import { createAttentionFeed, type AttentionFeed } from '@/application/attention/feed';
+import { createAttentionSource } from '@/infrastructure/sqlite/attention-source';
 
 import { createWiredLearning } from './learning';
 
@@ -166,6 +168,8 @@ export interface WiredApplication {
   responseFormats: ResponseFormatsApplication;
   /** Device pairing, approval requests, and device sessions. */
   deviceAccess: DeviceAccessService;
+  /** Pending approvals, questions, and running sessions, streamed to every client. */
+  attention: AttentionFeed;
 }
 
 /**
@@ -484,6 +488,7 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   const deviceAccess = createDeviceAccessService({ repository: createDeviceAccessRepository(getDatabase) });
   // Admin clients refetch pending requests and devices on this event; it carries no secrets.
   deviceAccess.subscribe({ changed: () => broadcastEvent({ type: 'access.changed' }) });
+  const attention = createAttentionFeed({ source: createAttentionSource(getDatabase) });
 
   return { learning: createWiredLearning(agents, createProkopLearningRuntime({ agents }), {
     // Harness-pinned reviewers resolve their effort from the cached CLI
@@ -503,5 +508,5 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
       if (harness === 'codex-cli') saveCodexModelSelection(sessionId, { model, effort });
       else saveClaudeModelSelection(sessionId, { model, effort });
     },
-  }), session, control, http, scheduling, schedulerTicker, agents, workspaces, worktrees, tools, mcp, providers, notifications, permissions, files, pullRequests, configuration, maintenance, responseFormats, deviceAccess };
+  }), session, control, http, scheduling, schedulerTicker, agents, workspaces, worktrees, tools, mcp, providers, notifications, permissions, files, pullRequests, configuration, maintenance, responseFormats, deviceAccess, attention };
 }

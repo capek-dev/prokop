@@ -1,5 +1,6 @@
 import { getDatabase } from './database';
 import type { Ask } from '@prokopai/sdk';
+import { notifyAttentionChanged } from './attention-signals';
 
 // =============================================================================
 // Permission Request Lifecycle Status
@@ -97,6 +98,7 @@ export function createPendingAsk(record: Omit<PendingAskRecord, 'id'>): string {
       record.createdAt,
     ],
   );
+  notifyAttentionChanged();
   return id;
 }
 
@@ -123,11 +125,13 @@ export function getPermissionRequestByRequestId(requestId: string): PendingAskRe
 export function removePendingAsk(id: string): void {
   const db = getDatabase();
   db.run('DELETE FROM pending_asks WHERE id = ?', [id]);
+  notifyAttentionChanged();
 }
 
 export function removePendingAsksByToolCallId(toolCallId: string): void {
   const db = getDatabase();
   db.run('DELETE FROM pending_asks WHERE tool_call_id = ?', [toolCallId]);
+  notifyAttentionChanged();
 }
 
 export function listPendingAsksBySession(sessionId: string): PendingAskRecord[] {
@@ -238,6 +242,7 @@ export function resolvePermissionRequest(
      WHERE id = ? AND status = 'pending'`,
     [status, now, resolution ? JSON.stringify(resolution) : null, id],
   );
+  if (result.changes > 0) notifyAttentionChanged();
   return result.changes > 0;
 }
 
@@ -257,6 +262,7 @@ export function resolvePermissionRequestByRequestId(
      WHERE request_id = ? AND status = 'pending'`,
     [status, now, resolution ? JSON.stringify(resolution) : null, requestId],
   );
+  if (result.changes > 0) notifyAttentionChanged();
   return result.changes > 0;
 }
 
@@ -271,6 +277,7 @@ export function expirePermissionRequest(id: string): boolean {
     `UPDATE pending_asks SET status = 'expired', resolved_at = ? WHERE id = ? AND status = 'pending'`,
     [now, id],
   );
+  if (result.changes > 0) notifyAttentionChanged();
   return result.changes > 0;
 }
 
@@ -285,6 +292,7 @@ export function cancelPendingRequestsBySession(sessionId: string): number {
     `UPDATE pending_asks SET status = 'cancelled', resolved_at = ? WHERE session_id = ? AND status = 'pending'`,
     [now, sessionId],
   );
+  if (result.changes > 0) notifyAttentionChanged();
   return result.changes;
 }
 
@@ -300,6 +308,7 @@ export function expireOldPermissionRequests(maxAgeMs: number): number {
      WHERE status = 'pending' AND created_at < ?`,
     [Date.now(), cutoff],
   );
+  if (result.changes > 0) notifyAttentionChanged();
   return result.changes;
 }
 

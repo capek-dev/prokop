@@ -1237,8 +1237,10 @@ describe('server layer boundaries', () => {
         expect(specifiers).toEqual(['./claude-harness-migration', 'bun:sqlite']);
       } else if (path.endsWith('session-repository.ts')) {
         // S11.6: the session repository also attaches the server-derived
-        // harness state from the sessions domain.
+        // harness state from the sessions domain, and signals the attention
+        // feed when running state changes (same directory, no domain logic).
         expect(specifiers).toEqual([
+          './attention-signals',
           '@/application/ports/session-message',
           '@/domains/sessions/harness-state',
           '@prokopai/sdk',

@@ -38,6 +38,8 @@ export type {
   PendingAccessRequest,
 } from './pairing';
 export { AccessRestNamespace } from './rest/access';
+export { followAttention } from './attention';
+export type { AttentionAsk, AttentionRunningSession, AttentionSnapshot } from './attention';
 export type { AccessOverviewResponse, CreatePairingCodeResponse } from './rest/access';
 export { RemoteAccessRestNamespace } from './rest/remote-access';
 export type { RemoteAccessKind, RemoteAccessStatus } from './rest/remote-access';

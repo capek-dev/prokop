@@ -120,3 +120,15 @@ test('a single machine keeps the plain Workspaces heading', async () => {
   expect(screen.getByText('Workspaces')).toBeInTheDocument();
   expect(screen.queryByText('Studio')).not.toBeInTheDocument();
 });
+
+test('shows how many approvals wait on other machines', async () => {
+  const user = userEvent.setup();
+  const local: Workspace = { id: 'local', name: 'jean2', path: '/p', isVirtual: false, additionalPaths: [], settings: {}, createdAt: '', updatedAt: '' };
+  const laptop = { id: 'laptop', name: 'Laptop', url: 'laptop', createdAt: '' };
+  render(<WorkspaceSwitcher selectionOnly workspaces={[local]} agents={[]} activeWorkspace={local} onSelectWorkspace={vi.fn()}
+    otherHosts={[{ server: laptop, state: 'ready', workspaces: [] }]} waitingByHost={{ laptop: 2 }} />);
+
+  expect(screen.getByRole('status', { name: '2 waiting on other machines' })).toBeInTheDocument();
+  await user.click(screen.getByRole('combobox', { name: 'Select workspace' }));
+  expect(screen.getByText('Laptop · 2 waiting')).toBeInTheDocument();
+});

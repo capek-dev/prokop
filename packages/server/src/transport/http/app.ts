@@ -16,6 +16,7 @@ import { ZodError } from 'zod';
 import { createAuthMiddleware } from '@/transport/http/middleware/auth';
 import { registerDeviceAccessRoutes } from '@/transport/http/routes/device-access';
 import { registerRemoteAccessRoutes } from '@/transport/http/routes/remote-access';
+import { registerAttentionRoutes } from '@/transport/http/routes/attention';
 import type { RemoteAccessService } from '@/application/remote-access/service';
 import { isAuthDisabled, isAuthEnabled, validateToken } from '@/transport/http/middleware/token';
 import {
@@ -170,6 +171,7 @@ export function createApp(application?: WiredApplication, options?: CreateAppOpt
     addresses: options?.remoteAccess ? () => options.remoteAccess!.pairingBaseUrls() : undefined,
   });
   if (options?.remoteAccess) registerRemoteAccessRoutes(app, options.remoteAccess);
+  registerAttentionRoutes(app, wired.attention);
   if (readEnv('SANDBOX') === 'true') {
     registerSandboxRoutes(app);
   }
@@ -221,8 +223,10 @@ export function createApp(application?: WiredApplication, options?: CreateAppOpt
   // ============================================================================
 
   app.notFound((c) => {
-    // Source development without a built client: say how to get one instead of a bare 404.
-    if (clientAssetsRoot === null && c.req.method === 'GET' && !c.req.path.startsWith('/api') && !c.req.path.startsWith('/ws')) {
+    // A browser opening a page on a source-development server without a built
+    // client gets instructions; API callers keep the JSON 404.
+    const wantsPage = c.req.header('Accept')?.includes('text/html') ?? false;
+    if (clientAssetsRoot === null && wantsPage && c.req.method === 'GET' && !c.req.path.startsWith('/api') && !c.req.path.startsWith('/ws')) {
       return c.html(
         '<!doctype html><meta name="viewport" content="width=device-width"><title>Prokop</title>'
         + '<body style="font-family:system-ui;max-width:32rem;margin:3rem auto;padding:0 1rem;line-height:1.5">'

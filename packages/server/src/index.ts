@@ -310,6 +310,7 @@ async function startServer(options?: ServerOptions): Promise<ServerInstance> {
       attempt(() => stopProviderAccountLifecycle());
       attempt(() => listeners.stop());
       attempt(() => application.deviceAccess.dispose());
+      attempt(() => application.attention.dispose());
       attempt(() => getTerminalManager().destroyAllSessions());
       try {
         await disposeExecutionLifecycle();

@@ -24,6 +24,7 @@ import type {
   SessionStorePort,
   SessionUpdateInput,
 } from '@/application/ports/session-message';
+import { notifyAttentionChanged } from './attention-signals';
 
 export type SessionDatabaseAccessor = () => Database;
 
@@ -339,6 +340,8 @@ export function createSessionRepository(
     values.push(id);
 
     db.run(`UPDATE sessions SET ${setClauses.join(', ')} WHERE id = ?`, values as (string | number)[]);
+    // Running state and titles appear in the attention feed.
+    if (updates.runningAt !== undefined || updates.title !== undefined) notifyAttentionChanged();
     return getSession(id);
   }
 
@@ -356,6 +359,7 @@ export function createSessionRepository(
     if (deleted) {
       hooks.events.publish({ type: 'session.deleted', sessionId: id });
       hooks.cleanupSessionOutputDir(id);
+      notifyAttentionChanged();
     }
 
     return deleted;
@@ -369,6 +373,7 @@ export function createSessionRepository(
       hooks.deleteAttachmentsForWorkspace(workspaceId);
       db.run('DELETE FROM sessions WHERE workspace_id = ?', [workspaceId]);
     })();
+    notifyAttentionChanged();
 
     for (const session of sessions) {
       hooks.events.publish({ type: 'session.deleted', sessionId: session.id });
