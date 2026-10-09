@@ -60,6 +60,31 @@ describe('session tab routing', () => {
     expect(useSessionBoardStore.getState()).toMatchObject({ focusedSessionId: 'x1', openSessionIds: ['x1'] });
   });
 
+  test('a session list update before the route commits keeps the new focus', () => {
+    useSessionStore.setState({ sessions });
+    route.location.search.open = 's2,s7';
+    route.location.pathname = '/server/server/workspace/session/s2';
+    const { rerender } = renderHook(() => useBoardRouteSync({ scope: { kind: 'workspace', workspaceId: 'workspace' } }));
+    expect(useSessionBoardStore.getState().focusedSessionId).toBe('s2');
+
+    // Click s7: the board focuses at once; the URL still names s2.
+    act(() => useSessionBoardStore.getState().focusSession('s7'));
+    // A list update re-runs sync with a new valid set (here: one more session).
+    act(() => useSessionStore.setState({ sessions: [...sessions, { id: 's12', workspaceId: 'workspace' } as Session] }));
+    route.location.search.open = 's2,s7,s12';
+    rerender();
+    expect(useSessionBoardStore.getState().focusedSessionId).toBe('s7');
+
+    route.location.pathname = '/server/server/workspace/session/s7';
+    rerender();
+    expect(useSessionBoardStore.getState()).toMatchObject({ focusedSessionId: 's7', openSessionIds: ['s2', 's7', 's12'] });
+
+    // Once the route caught up, a later URL change (Back) wins again.
+    route.location.pathname = '/server/server/workspace/session/s2';
+    rerender();
+    expect(useSessionBoardStore.getState().focusedSessionId).toBe('s2');
+  });
+
   test('progressively fetched route sessions retain their dock placements', () => {
     useSessionStore.setState({ sessions: [sessions[7]] });
     renderHook(() => useBoardRouteSync({ scope: { kind: 'overview' } }));

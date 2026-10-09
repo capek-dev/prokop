@@ -21,6 +21,33 @@ function removeSessionView(sessionId: string): void {
   useForeignSessionsStore.getState().remove(sessionId);
 }
 
+/** How long a local focus may wait for its route before the route wins again. */
+const ROUTE_FOCUS_GRACE_MS = 2000;
+
+/**
+ * The session focused locally whose route has not committed yet. Opening a
+ * session focuses the board at once and navigates after; until the router
+ * commits, the URL still names an earlier session. Kept outside the store:
+ * nothing renders from it.
+ */
+let pendingRouteFocus: { sessionId: string; at: number } | null = null;
+
+function markLocalFocus(sessionId: string): void {
+  pendingRouteFocus = { sessionId, at: Date.now() };
+}
+
+/**
+ * True while the board holds a recent local focus that `routeFocusId` has
+ * not caught up with. Route sync must wait: hydrating from the stale URL
+ * would flash the previous session as selected for a frame.
+ */
+export function isRouteBehindLocalFocus(routeFocusId: string | null, now = Date.now()): boolean {
+  const pending = pendingRouteFocus;
+  if (!pending || now - pending.at > ROUTE_FOCUS_GRACE_MS) return false;
+  return pending.sessionId !== routeFocusId
+    && useSessionBoardStore.getState().focusedSessionId === pending.sessionId;
+}
+
 /** Legacy command intent remains accepted; both actions now open a session tab. */
 export interface PendingSessionCreateIntent {
   /** Id sent with session.create; only the matching session.created opens. */
@@ -64,6 +91,7 @@ export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
     }
     const views = ids.flatMap((id) => { const view = viewId(id); return view ? [view] : []; });
     useWorkspaceViewStore.getState().ensureViews(views);
+    pendingRouteFocus = null;
     set({ openSessionIds: ids, focusedSessionId });
     if (focusedSessionId && (previous.focusedSessionId !== focusedSessionId || !previous.openSessionIds.includes(focusedSessionId))) {
       revealSession(focusedSessionId);
@@ -73,11 +101,15 @@ export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
   focusSession: (sessionId) => {
     if (!get().openSessionIds.includes(sessionId)) return;
     revealSession(sessionId);
-    if (get().focusedSessionId !== sessionId) set({ focusedSessionId: sessionId });
+    if (get().focusedSessionId !== sessionId) {
+      markLocalFocus(sessionId);
+      set({ focusedSessionId: sessionId });
+    }
   },
 
   openInFocusedPane: (sessionId) => {
     const state = get();
+    if (state.focusedSessionId !== sessionId) markLocalFocus(sessionId);
     set({
       openSessionIds: state.openSessionIds.includes(sessionId) ? state.openSessionIds : [...state.openSessionIds, sessionId],
       focusedSessionId: sessionId,
@@ -133,6 +165,7 @@ export const useSessionBoardStore = create<SessionBoardStore>((set, get) => ({
 
   clearBoard: () => {
     for (const id of get().openSessionIds) removeSessionView(id);
+    pendingRouteFocus = null;
     set({ openSessionIds: [], focusedSessionId: null });
   },
 }));

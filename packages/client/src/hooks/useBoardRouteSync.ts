@@ -4,6 +4,7 @@ import { useSessionStore } from '@/stores/sessionStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import {
   useSessionBoardStore,
+  isRouteBehindLocalFocus,
   parseOpenSessionIds,
 } from '@/stores/sessionBoardStore';
 import { useForeignSessionsStore } from '@/stores/foreignSessionsStore';
@@ -75,16 +76,11 @@ export function useBoardRouteSync({ scope }: BoardRouteSyncOptions): void {
     // Sessions from other machines were opened deliberately; they are valid in any scope.
     for (const id of Object.keys(foreignById)) validIds.add(id);
 
-    // A cross-workspace open switches the workspace and focuses the board
-    // before the router commits the new URL. Until it does, the route still
-    // names a session of the previous workspace; hydrating from it would drop
-    // the new focus for a frame (the selected row twitches). Wait for the URL.
-    const boardFocus = useSessionBoardStore.getState().focusedSessionId;
-    if (scope.kind === 'workspace' && sessionIdFromUrl && !validIds.has(sessionIdFromUrl)
-      && sessions.some((session) => session.id === sessionIdFromUrl)
-      && boardFocus && boardFocus !== sessionIdFromUrl && validIds.has(boardFocus)) {
-      return;
-    }
+    // Opening a session focuses the board before the router commits the new
+    // URL. A session list update (or a workspace switch) in between re-runs
+    // this effect with the previous session still in the URL; hydrating from
+    // it would select that session for a frame. Wait for the URL to catch up.
+    if (isRouteBehindLocalFocus(sessionIdFromUrl ?? null)) return;
 
     // Parse open param
     let openIds = parseOpenSessionIds(searchOpen);
