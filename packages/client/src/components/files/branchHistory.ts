@@ -16,10 +16,23 @@ function startOfDay(time: number): number {
   return date.getTime();
 }
 
+// toLocale*String builds a new Intl formatter per call, which costs most of a
+// row render across hundreds of branches and commits; reuse one per style.
+const SHORT_DATE = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+const SHORT_DATE_WITH_YEAR = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+const TIMESTAMP = new Intl.DateTimeFormat(undefined, {
+  year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',
+});
+
 function shortDate(time: number, now: number): string {
-  const date = new Date(time);
-  const sameYear = date.getFullYear() === new Date(now).getFullYear();
-  return date.toLocaleDateString(undefined, sameYear ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'short', day: 'numeric' });
+  const sameYear = new Date(time).getFullYear() === new Date(now).getFullYear();
+  return (sameYear ? SHORT_DATE : SHORT_DATE_WITH_YEAR).format(time);
+}
+
+/** Full local date and time for tooltips, same output as `Date#toLocaleString()`. */
+export function timestampLabel(iso: string): string {
+  const time = Date.parse(iso);
+  return Number.isNaN(time) ? '' : TIMESTAMP.format(time);
 }
 
 /** Compact age for dense rows: "now", "5m", "2h", "3d", then a short date. */

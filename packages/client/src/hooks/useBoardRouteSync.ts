@@ -75,6 +75,17 @@ export function useBoardRouteSync({ scope }: BoardRouteSyncOptions): void {
     // Sessions from other machines were opened deliberately; they are valid in any scope.
     for (const id of Object.keys(foreignById)) validIds.add(id);
 
+    // A cross-workspace open switches the workspace and focuses the board
+    // before the router commits the new URL. Until it does, the route still
+    // names a session of the previous workspace; hydrating from it would drop
+    // the new focus for a frame (the selected row twitches). Wait for the URL.
+    const boardFocus = useSessionBoardStore.getState().focusedSessionId;
+    if (scope.kind === 'workspace' && sessionIdFromUrl && !validIds.has(sessionIdFromUrl)
+      && sessions.some((session) => session.id === sessionIdFromUrl)
+      && boardFocus && boardFocus !== sessionIdFromUrl && validIds.has(boardFocus)) {
+      return;
+    }
+
     // Parse open param
     let openIds = parseOpenSessionIds(searchOpen);
 

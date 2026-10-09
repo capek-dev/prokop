@@ -16,7 +16,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { cn } from '@/lib/utils';
 import { useGitStatusSubscription } from '@/hooks/queries/useFileQueries';
 import { branchLabelInGroup, groupBranchesByPrefix } from './branchGroups';
-import { branchSync, buildHistoryRows, fetchedLabel, isFetchStale, recentBranches, refLabel, refsByHead, relativeAge } from './branchHistory';
+import { branchSync, buildHistoryRows, fetchedLabel, isFetchStale, recentBranches, refLabel, refsByHead, relativeAge, timestampLabel } from './branchHistory';
 
 interface Props {
   sdkClient: ProkopaiClient | null;
@@ -154,7 +154,7 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
     <span className={cn('min-w-0 flex-1 truncate', indent && 'pl-4')}>{label}</span>
     {!!b.ahead && <span className="shrink-0 text-[10px] tabular-nums text-success" title={`${b.ahead} to push`}>↑{b.ahead}</span>}
     {!!b.behind && <span className="shrink-0 text-[10px] tabular-nums text-warning" title={`${b.behind} to pull`}>↓{b.behind}</span>}
-    {b.committedAt && <span className="min-w-8 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground/70" title={`Last commit ${new Date(b.committedAt).toLocaleString()}`}>{relativeAge(b.committedAt, now)}</span>}
+    {b.committedAt && <span className="min-w-8 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground/70" title={`Last commit ${timestampLabel(b.committedAt)}`}>{relativeAge(b.committedAt, now)}</span>}
     <span className="flex w-10 shrink-0 justify-end">{b.current ? <Check /> : b.checkedOut ? <span className="text-xs text-muted-foreground">In use</span> : null}</span>
   </CommandItem>;
 

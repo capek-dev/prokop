@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { X } from 'lucide-react';
 import type { WorkspaceViewId, WorkspaceToolViewId } from '@/stores/workspaceViewStore';
@@ -31,14 +31,19 @@ interface WorkspaceTabStripProps {
 export function WorkspaceTabStrip({ ids, activeId, tabs, label, onSelect, onClose, onMove, renderTabMenu }: WorkspaceTabStripProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const drag = useWorkspaceTabDrag(scrollerRef, onMove);
-  useLayoutEffect(() => {
-    const scroller = scrollerRef.current;
-    const selected = scroller?.querySelector<HTMLElement>('[aria-selected="true"]')?.parentElement;
-    if (!scroller || !selected) return;
-    const bounds = scroller.getBoundingClientRect();
-    const tabBounds = selected.getBoundingClientRect();
-    if (tabBounds.left < bounds.left) scroller.scrollLeft += tabBounds.left - bounds.left;
-    else if (tabBounds.right > bounds.right) scroller.scrollLeft += tabBounds.right - bounds.right;
+  // Measure in the next frame, not in the commit: a layout-effect read forces
+  // a synchronous layout of the whole freshly committed page (session switches).
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const scroller = scrollerRef.current;
+      const selected = scroller?.querySelector<HTMLElement>('[aria-selected="true"]')?.parentElement;
+      if (!scroller || !selected) return;
+      const bounds = scroller.getBoundingClientRect();
+      const tabBounds = selected.getBoundingClientRect();
+      if (tabBounds.left < bounds.left) scroller.scrollLeft += tabBounds.left - bounds.left;
+      else if (tabBounds.right > bounds.right) scroller.scrollLeft += tabBounds.right - bounds.right;
+    });
+    return () => cancelAnimationFrame(frame);
   }, [activeId, ids]);
 
   return (

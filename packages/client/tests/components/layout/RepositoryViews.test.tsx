@@ -35,6 +35,15 @@ vi.mock('@/components/worktrees/SessionCheckoutSelector', () => ({ CheckoutMenu:
 
 const workspace = { id: 'workspace', path: '/primary', name: 'Project', additionalPaths: ['/extra'] } as Workspace;
 
+/** Retained roots stay mounted hidden; read the visible one. */
+const activeTestId = (id: string) => {
+  const matches = screen.getAllByTestId(id).filter((element) => (
+    element.closest('[data-keep-alive-entry]')?.getAttribute('data-keep-alive-entry') === 'active'
+  ));
+  expect(matches).toHaveLength(1);
+  return matches[0];
+};
+
 describe('independent repository content', () => {
   beforeEach(() => {
     mocks.mobile = false;
@@ -71,17 +80,20 @@ describe('independent repository content', () => {
       useChatLayoutStore.getState().setFilesPanelRootPinned(true);
     });
     expect(screen.getByRole('textbox')).toHaveAttribute('data-root', '/extra');
-    expect(screen.getByTestId('changes')).toHaveAttribute('data-root', '/extra');
-    expect(screen.getByTestId('branches')).toHaveAttribute('data-root', '/extra');
-    // Root changes intentionally replace the tree; tool selection does not.
+    expect(activeTestId('changes')).toHaveAttribute('data-root', '/extra');
+    expect(activeTestId('branches')).toHaveAttribute('data-root', '/extra');
+    // A root change shows that root's tree; the previous root's tree stays
+    // mounted but hidden, so switching back reuses it. Tool selection does not.
     expect(screen.getByRole('textbox')).not.toBe(explorer);
+    expect(explorer.closest('[data-keep-alive-entry]')).toHaveAttribute('data-keep-alive-entry', 'hidden');
     const pinnedExplorer = screen.getByRole('textbox');
     act(() => useChatLayoutStore.getState().setFilesPanelTab('branches'));
     expect(screen.getByRole('textbox')).toBe(pinnedExplorer);
     act(() => useSessionBoardStore.setState({ focusedSessionId: 'other-session' }));
     expect(screen.getByRole('textbox')).toHaveAttribute('data-root', 'primary');
-    expect(screen.getByTestId('changes')).toHaveAttribute('data-root', 'primary');
-    expect(screen.getByTestId('branches')).toHaveAttribute('data-root', 'primary');
+    expect(screen.getByRole('textbox')).toBe(explorer);
+    expect(activeTestId('changes')).toHaveAttribute('data-root', 'primary');
+    expect(activeTestId('branches')).toHaveAttribute('data-root', 'primary');
   });
 
   test('all root-scoped views block an unavailable worktree without querying primary status', () => {

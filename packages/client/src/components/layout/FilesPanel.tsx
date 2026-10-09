@@ -41,6 +41,7 @@ import { WorktreesPanel } from '@/components/worktrees/WorktreesPanel';
 import { BranchesPanel } from '@/components/files/BranchesPanel';
 import { CheckoutMenu } from '@/components/worktrees/SessionCheckoutSelector';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { KeepAliveStack } from '@/components/app/KeepAliveStack';
 
 interface FilesPanelProps {
   sdkClient: ProkopaiClient | null;
@@ -461,39 +462,51 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
         </Alert>
       </div>
     ) : workspaceId ? (
-      filesPanelTab === 'project' ? (
-        <FileTree
-          ref={fileTreeRef}
-          key={workspaceId + selectedRoot}
-          workspaceId={workspaceId}
-          sdkClient={sdkClient}
-          root={isMainRoot ? undefined : selectedRoot}
-          onFileSelect={handleFileSelect}
-          activePath={activeEditorPath}
-          activeRoot={activeEditorRoot}
-          serverId={serverId}
-          isMobile={isMobile}
-          onOpenFileEdit={(path, name) =>
-            openFile({ entry: { name, type: 'file', path }, root: isMainRoot ? undefined : selectedRoot }, 'edit')
-          }
-        />
-      ) : filesPanelTab === 'branches' ? (
-        <BranchesPanel key={JSON.stringify([serverId, workspaceId, selectedRoot])} sdkClient={sdkClient} workspaceId={workspaceId} serverId={serverId} root={isMainRoot ? undefined : selectedRoot} />
-      ) : filesPanelTab === 'worktrees' ? (
+      filesPanelTab === 'worktrees' ? (
         <WorktreesPanel sdkClient={sdkClient} workspaceId={workspaceId} />
       ) : (
-        <GitChangesView
-          ref={gitChangesRef}
-          workspaceId={workspaceId}
-          sdkClient={sdkClient}
-          root={isMainRoot ? undefined : selectedRoot}
-          onFileSelect={handleFileSelect}
-          serverId={serverId}
-          isMobile={isMobile}
-          onOpenFileEdit={(path, name) =>
-            openFile({ entry: { name, type: 'file', path }, root: isMainRoot ? undefined : selectedRoot }, 'edit')
-          }
-        />
+        // Switching sessions across projects reuses the last few workspaces'
+        // trees instead of rebuilding them; only the active entry holds refs.
+        <KeepAliveStack
+          key={`${serverId ?? ''}:${filesPanelTab}`}
+          active={{ key: JSON.stringify([workspaceId, selectedRoot]), value: { workspaceId, root: isMainRoot ? undefined : selectedRoot } }}
+        >
+          {(target, active) => {
+            const openEdit = (path: string, name: string) =>
+              openFile({ entry: { name, type: 'file', path }, root: target.root }, 'edit');
+            if (filesPanelTab === 'project') {
+              return (
+                <FileTree
+                  ref={active ? fileTreeRef : undefined}
+                  workspaceId={target.workspaceId}
+                  sdkClient={sdkClient}
+                  root={target.root}
+                  onFileSelect={handleFileSelect}
+                  activePath={active ? activeEditorPath : undefined}
+                  activeRoot={active ? activeEditorRoot : undefined}
+                  serverId={serverId}
+                  isMobile={isMobile}
+                  onOpenFileEdit={openEdit}
+                />
+              );
+            }
+            if (filesPanelTab === 'branches') {
+              return <BranchesPanel sdkClient={sdkClient} workspaceId={target.workspaceId} serverId={serverId} root={target.root} />;
+            }
+            return (
+              <GitChangesView
+                ref={active ? gitChangesRef : undefined}
+                workspaceId={target.workspaceId}
+                sdkClient={sdkClient}
+                root={target.root}
+                onFileSelect={handleFileSelect}
+                serverId={serverId}
+                isMobile={isMobile}
+                onOpenFileEdit={openEdit}
+              />
+            );
+          }}
+        </KeepAliveStack>
       )
     ) : null;
 

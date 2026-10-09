@@ -5,8 +5,11 @@ import { useDockStore } from '@/stores/dockStore';
 import { DockRegion } from '@/components/layout/DockRegion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useServerDataStore } from '@/stores/serverDataStore';
+import { KeepAliveStack } from '@/components/app/KeepAliveStack';
 import type { TerminalPanelHandle } from '@/components/layout/TerminalPanel';
 import type { ProkopaiClient } from '@prokopai/sdk';
+
+const EMPTY_PATHS: string[] = [];
 
 const TerminalPanel = lazy(() =>
   import('@/components/layout/TerminalPanel').then((m) => ({ default: m.TerminalPanel })),
@@ -37,27 +40,36 @@ export function AppPanels({
   const setDockOpen = useDockStore((s) => s.setDockOpen);
   const activeWorkspace = useServerDataStore((s) => s.activeWorkspace);
 
-  const workspaceId = activeWorkspace?.id;
-  const workspacePath = activeWorkspace?.path;
-  const workspaceName = activeWorkspace?.name;
+  const open = embedded ? visible : bottomOpen;
+  const onClose = () => {
+    if (!embedded) setDockOpen('bottom', false);
+    else if (isMobile) useWorkspaceViewStore.getState().setMobileTerminalOpen(false);
+    else useWorkspaceViewStore.getState().hideView('terminals');
+  };
 
+  // One panel per recent workspace: switching back reuses its xterm
+  // instances and PTY connections instead of recreating them. Hidden panels
+  // stay connected only if they were started while active, and in the bottom
+  // dock only while it is open.
   const terminal = (
     <Suspense fallback={<TerminalLoadingFallback />}>
-      <TerminalPanel
-        ref={terminalPanelRef}
-        workspaceId={workspaceId}
-        workspacePath={workspacePath}
-        workspaceName={workspaceName}
-        additionalPaths={activeWorkspace?.additionalPaths ?? []}
-        sdkClient={sdkClient}
-        isOpen={embedded ? visible : bottomOpen}
-        keepAlive={embedded}
-        onClose={() => {
-          if (!embedded) setDockOpen('bottom', false);
-          else if (isMobile) useWorkspaceViewStore.getState().setMobileTerminalOpen(false);
-          else useWorkspaceViewStore.getState().hideView('terminals');
-        }}
-      />
+      <KeepAliveStack
+        active={{ key: activeWorkspace?.id ?? '', value: activeWorkspace }}
+      >
+        {(workspace, active) => (
+          <TerminalPanel
+            ref={active ? terminalPanelRef : undefined}
+            workspaceId={workspace?.id}
+            workspacePath={workspace?.path}
+            workspaceName={workspace?.name}
+            additionalPaths={workspace?.additionalPaths ?? EMPTY_PATHS}
+            sdkClient={sdkClient}
+            isOpen={open && active}
+            keepAlive={embedded || (!active && open)}
+            onClose={onClose}
+          />
+        )}
+      </KeepAliveStack>
     </Suspense>
   );
 

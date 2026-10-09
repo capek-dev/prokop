@@ -39,6 +39,27 @@ describe('session tab routing', () => {
     expect(useSessionBoardStore.getState().openSessionIds).toEqual([]);
   });
 
+  test('a cross-workspace open keeps the new focus until the route catches up', () => {
+    const other = { id: 'w2', name: 'Other', path: '/other' } as Workspace;
+    const foreign = { id: 'x1', workspaceId: 'w2', title: 'Other session' } as Session;
+    useServerDataStore.setState({ workspaces: [workspace, other] });
+    useSessionStore.setState({ sessions: [...sessions, foreign] });
+    route.location.search.open = '';
+    const { rerender } = renderHook(({ workspaceId }) => useBoardRouteSync({ scope: { kind: 'workspace', workspaceId } }), {
+      initialProps: { workspaceId: 'workspace' },
+    });
+    expect(useSessionBoardStore.getState().focusedSessionId).toBe('s7');
+
+    // resumeSession: workspace switches and the board focuses before the URL commits.
+    act(() => useSessionBoardStore.getState().openInFocusedPane('x1'));
+    rerender({ workspaceId: 'w2' });
+    expect(useSessionBoardStore.getState().focusedSessionId).toBe('x1');
+
+    route.location.pathname = '/server/server/workspace/session/x1';
+    rerender({ workspaceId: 'w2' });
+    expect(useSessionBoardStore.getState()).toMatchObject({ focusedSessionId: 'x1', openSessionIds: ['x1'] });
+  });
+
   test('progressively fetched route sessions retain their dock placements', () => {
     useSessionStore.setState({ sessions: [sessions[7]] });
     renderHook(() => useBoardRouteSync({ scope: { kind: 'overview' } }));

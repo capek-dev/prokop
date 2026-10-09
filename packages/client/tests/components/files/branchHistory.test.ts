@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { GitBranchInfo, GitHistoryEntry } from '@prokopai/sdk';
-import { branchSync, buildHistoryRows, dayLabel, fetchedLabel, isFetchStale, recentBranches, refLabel, refsByHead, relativeAge } from '@/components/files/branchHistory';
+import { branchSync, buildHistoryRows, dayLabel, fetchedLabel, isFetchStale, recentBranches, refLabel, refsByHead, relativeAge, timestampLabel } from '@/components/files/branchHistory';
 
 const now = new Date(2026, 9, 6, 12, 0, 0).getTime();
 const ago = (ms: number) => new Date(now - ms).toISOString();
@@ -27,6 +27,12 @@ describe('relativeAge', () => {
   test('future timestamps (clock skew) read as now', () => {
     expect(relativeAge(new Date(now + HOUR).toISOString(), now)).toBe('now');
   });
+});
+
+test('timestampLabel matches toLocaleString and tolerates bad input', () => {
+  const iso = ago(3 * DAY);
+  expect(timestampLabel(iso)).toBe(new Date(iso).toLocaleString());
+  expect(timestampLabel('garbage')).toBe('');
 });
 
 describe('dayLabel', () => {
