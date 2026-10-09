@@ -111,7 +111,7 @@ export function ThemeProvider({
 
     root.classList.add(resolved);
     root.classList.add(scheme);
-    syncThemeColor();
+    syncThemeColor(`${resolved}.${scheme}`);
 
     setResolvedMode(resolved);
   }, []);

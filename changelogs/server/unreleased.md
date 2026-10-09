@@ -18,6 +18,7 @@
 
 ### Fixed
 
+- **The installed app's title bar keeps the theme color after a reload**: Pressing F5 no longer turns the title bar back to the default gray.
 - **Opening Prokop over plain HTTP from another device works**: The app no longer shows a blank page when opened at a LAN or VPN address without HTTPS. Installing the app and notifications still need HTTPS.
 
 ### Security

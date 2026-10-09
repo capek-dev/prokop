@@ -1,5 +1,47 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDesktopChrome, requestPersistentStorage } from '@/lib/desktopChrome';
+import { installDesktopChrome, requestPersistentStorage, syncThemeColor, THEME_COLOR_STORAGE_KEY } from '@/lib/desktopChrome';
+
+/** happy-dom has no canvas; paint every color as the given RGBA pixel. */
+function stubCanvas(pixel: [number, number, number, number]) {
+  // happy-dom computes no styles; any non-empty background reaches the canvas.
+  vi.spyOn(window, 'getComputedStyle').mockReturnValue({ backgroundColor: 'oklch(0.165 0.014 265)' } as CSSStyleDeclaration);
+  const create = document.createElement.bind(document);
+  return vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => tag === 'canvas'
+    ? { getContext: () => ({ fillStyle: '', fillRect: () => {}, getImageData: () => ({ data: pixel }) }) }
+    : create(tag)) as typeof document.createElement);
+}
+
+describe('syncThemeColor', () => {
+  afterEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    localStorage.clear();
+    document.head.querySelector('meta[name="theme-color"]')?.remove();
+  });
+
+  it('sets the title bar color and saves it for the next load', () => {
+    const spy = stubCanvas([20, 22, 27, 255]);
+    try {
+      syncThemeColor('dark.neutral');
+      expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#14161b');
+      expect(JSON.parse(localStorage.getItem(THEME_COLOR_STORAGE_KEY)!)).toEqual({ key: 'dark.neutral', color: '#14161b' });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('waits a frame instead of saving a color for an unstyled page', () => {
+    const spy = stubCanvas([0, 0, 0, 0]);
+    const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+    try {
+      syncThemeColor('dark.neutral');
+      expect(frame).toHaveBeenCalledTimes(1);
+      expect(localStorage.getItem(THEME_COLOR_STORAGE_KEY)).toBeNull();
+    } finally {
+      spy.mockRestore();
+      frame.mockRestore();
+    }
+  });
+});
 
 describe('requestPersistentStorage', () => {
   it('asks once when storage is not yet persistent, and never when it is', async () => {

@@ -38,8 +38,17 @@
         var root = document.documentElement;
         root.classList.remove('light', 'dark', 'neutral', 'primary');
         root.classList.add(mode, scheme);
+        // Title bar color before first paint: the exact color saved by the app
+        // for this mode and scheme (lib/desktopChrome.ts), else a close default.
         var themeColor = document.querySelector('meta[name="theme-color"]');
-        if (themeColor && mode === 'light') themeColor.setAttribute('content', '#eff0f3');
+        if (themeColor) {
+          var color = mode === 'light' ? '#eff0f3' : '#1c1c1c';
+          try {
+            var saved = JSON.parse(localStorage.getItem('prokopai-theme-color') || 'null');
+            if (saved && saved.key === mode + '.' + scheme && /^#[0-9a-f]{6}$/i.test(saved.color)) color = saved.color;
+          } catch (_) {}
+          themeColor.setAttribute('content', color);
+        }
       })();
     </script>
   </head>

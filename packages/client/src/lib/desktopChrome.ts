@@ -37,6 +37,9 @@ export function allowsNativeContextMenu(event: MouseEvent): boolean {
   return hasSelectionAt(element);
 }
 
+/** Read by the inline script in index.html; keep the key in sync. */
+export const THEME_COLOR_STORAGE_KEY = 'prokopai-theme-color';
+
 /** Resolve any CSS color (theme tokens are oklch) to an sRGB hex string. */
 function toHex(color: string): string | null {
   const canvas = document.createElement('canvas');
@@ -45,7 +48,8 @@ function toHex(color: string): string | null {
   if (!context) return null;
   context.fillStyle = color;
   context.fillRect(0, 0, 1, 1);
-  const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+  const [r, g, b, alpha] = context.getImageData(0, 0, 1, 1).data;
+  if (alpha === 0) return null;
   return `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
 }
 
@@ -53,17 +57,28 @@ function toHex(color: string): string | null {
  * Point `<meta name="theme-color">` at the current app background so the
  * installed window's title bar and control overlay match the theme.
  */
-export function syncThemeColor(): void {
+export function syncThemeColor(themeKey: string, retry = true): void {
   const background = getComputedStyle(document.body).backgroundColor;
   const hex = background ? toHex(background) : null;
-  if (!hex) return;
+  if (!hex) {
+    // Stylesheet not applied yet (transparent body): measure again next frame.
+    if (retry) requestAnimationFrame(() => syncThemeColor(themeKey, false));
+    return;
+  }
   let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
   if (!meta) {
     meta = document.createElement('meta');
-    meta.name = 'theme-color';
+    meta.setAttribute('name', 'theme-color');
     document.head.appendChild(meta);
   }
-  meta.content = hex;
+  meta.setAttribute('content', hex);
+  // index.html reads this before first paint, so a reload starts with the
+  // right title bar instead of relying on this later update being picked up.
+  try {
+    localStorage.setItem(THEME_COLOR_STORAGE_KEY, JSON.stringify({ key: themeKey, color: hex }));
+  } catch {
+    // Storage unavailable: the title bar still updates for this page load.
+  }
 }
 
 /**
