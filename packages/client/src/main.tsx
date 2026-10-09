@@ -1,3 +1,5 @@
+// First: settles the launch URL (resume, shortcut action) before the router reads it.
+import { installLaunchQueue } from '@/lib/launchState';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
@@ -6,12 +8,12 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ThemedToaster } from '@/components/providers/ThemedToaster';
 import { PWAUpdateBanner } from '@/components/app/PWAUpdateBanner';
 import { TitleTooltipLayer } from '@/components/shared/TitleTooltipLayer';
-import { RouterApp } from './router';
+import { RouterApp, router } from './router';
 import { registerProkopServiceWorker } from '@/pwa/registerServiceWorker';
 import { startSessionCacheSync } from '@/lib/sessionCacheSync';
 import { isResizeObserverDeliveryWarning } from '@/lib/globalErrorHandling';
 import { preloadPierreDiffsHighlighter } from '@/lib/pierreDiffsPreload';
-import { installDesktopChrome } from '@/lib/desktopChrome';
+import { installDesktopChrome, requestPersistentStorage } from '@/lib/desktopChrome';
 import './index.css';
 
 // Warm the shared Pierre diffs highlighter before any code surface mounts,
@@ -34,6 +36,8 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 installDesktopChrome();
+void requestPersistentStorage();
+installLaunchQueue((href) => { void router.navigate({ href }); });
 
 registerProkopServiceWorker();
 

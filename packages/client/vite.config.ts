@@ -53,6 +53,15 @@ export default defineConfig({
         background_color: '#1c1c1c',
         orientation: 'any',
         categories: ['productivity', 'utilities'],
+        // Relaunching (Dock click, shortcut, link) focuses the open window;
+        // `src/lib/launchState.ts` receives the launch URL.
+        launch_handler: { client_mode: ['focus-existing', 'auto'] },
+        // Dock / taskbar right-click menu. No `id` or `start_url` here: adding
+        // either changes the installed app's identity for existing installs.
+        shortcuts: [
+          { name: 'New session', url: '/?action=new-session', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+          { name: 'Overview', url: '/?action=overview', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }] },
+        ],
         icons: [
           { src: '/favicon.ico', sizes: '48x48', type: 'image/x-icon' },
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },

@@ -1,4 +1,4 @@
-import {useCallback, useLayoutEffect, useRef} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useRef} from 'react';
 import {useRouter} from '@tanstack/react-router';
 import { isFileViewId, isWorkspaceViewId, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
 import { useDockStore, type DockPosition } from '@/stores/dockStore';
@@ -8,6 +8,8 @@ import {useServerDataStore} from '@/stores/serverDataStore';
 import type {AppSidebarHandle} from '@/components/layout/AppSidebar';
 import type {Preconfig, Workspace} from '@prokopai/sdk';
 import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
+import { subscribeLaunchActions, takeLaunchAction } from '@/lib/launchState';
+import { useConnectionStore } from '@/stores/connectionStore';
 import { useSessionPaneRegistry } from '@/contexts/SessionPaneRegistryContext';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useWorkspaceFocusStore } from '@/stores/workspaceFocusStore';
@@ -218,6 +220,20 @@ export function useAppKeyboardHandlers({
 
     onToggleAutoFollow?.();
   }, [onToggleAutoFollow, paneRegistry]);
+
+  // Dock/taskbar shortcuts ("New session", "Overview") run once the shell can
+  // act on them; a cold launch waits for the connection and workspace data.
+  const connected = useConnectionStore((s) => s.connected);
+  useEffect(() => {
+    const run = () => {
+      const action = takeLaunchAction((candidate) => connected && (candidate !== 'new-session'
+        || (!!activeWorkspace && !!getWorkspaceDefaultPreconfigId(activeWorkspace, primaryPreconfigs))));
+      if (action === 'new-session') handleNewSession();
+      else if (action === 'overview') void router.navigate({ to: '/server/$serverId/overview', params: { serverId } });
+    };
+    run();
+    return subscribeLaunchActions(run);
+  }, [connected, activeWorkspace, primaryPreconfigs, handleNewSession, router, serverId]);
 
   useKeyboardShortcuts({
     onFocusLeftDock: () => window.innerWidth < 640 ? focusSidebarSessionPanelRef.current() : focusDock('left'),

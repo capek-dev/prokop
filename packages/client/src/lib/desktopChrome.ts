@@ -66,6 +66,21 @@ export function syncThemeColor(): void {
   meta.content = hex;
 }
 
+/**
+ * Ask the browser to keep the app's storage (offline shell, settings, drafts)
+ * instead of evicting it under storage pressure like a website's. Installed
+ * apps are usually granted without a prompt.
+ */
+export async function requestPersistentStorage(): Promise<void> {
+  const storage = navigator.storage;
+  if (!storage?.persist || !storage.persisted) return;
+  try {
+    if (!(await storage.persisted())) await storage.persist();
+  } catch {
+    // Unsupported or denied: storage stays best-effort.
+  }
+}
+
 function hasFiles(event: DragEvent): boolean {
   return event.dataTransfer?.types.includes('Files') ?? false;
 }

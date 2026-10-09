@@ -16,6 +16,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 
 import { AppHeader } from '@/components/app/AppHeader';
 import { AppFrameSkeleton } from './AppFrameSkeleton';
+import { WindowTitle } from './WindowTitle';
 import { OfflineState } from '@/components/shared/OfflineState';
 import { Button } from '@/components/ui/button';
 import { AppKeyboardHandlersMount } from '@/hooks/useAppKeyboardHandlers';
@@ -211,6 +212,7 @@ export default function ServerShell() {
               </SessionCommandsProvider>
             </div>
 
+            <WindowTitle />
             <AppKeyboardHandlersMount
             sidebarRef={sidebarRef}
             terminalPanelRef={terminalPanelRef}

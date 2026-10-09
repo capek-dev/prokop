@@ -1,5 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installDesktopChrome } from '@/lib/desktopChrome';
+import { installDesktopChrome, requestPersistentStorage } from '@/lib/desktopChrome';
+
+describe('requestPersistentStorage', () => {
+  it('asks once when storage is not yet persistent, and never when it is', async () => {
+    const persist = vi.fn().mockResolvedValue(true);
+    const persisted = vi.fn().mockResolvedValue(false);
+    // happy-dom has no StorageManager; model the Chromium one.
+    Object.defineProperty(navigator, 'storage', { configurable: true, value: { persist, persisted } });
+    try {
+      await requestPersistentStorage();
+      expect(persist).toHaveBeenCalledTimes(1);
+      persisted.mockResolvedValue(true);
+      await requestPersistentStorage();
+      expect(persist).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (navigator as { storage?: unknown }).storage;
+    }
+  });
+});
 
 function rightClick(target: Element, init: MouseEventInit = {}): MouseEvent {
   const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, composed: true, ...init });
