@@ -97,7 +97,8 @@ export function startAttentionStream(
     while (!controller.signal.aborted) {
       update(server.id, { connection: 'connecting' });
       try {
-        const url = await resolveHostUrl(server, controller.signal);
+        // After a failure the known address may be the one that stopped answering.
+        const url = await resolveHostUrl(server, controller.signal, { reprobe: failures > 0 });
         await followAttention(url, server.token, (snapshot) => {
           failures = 0;
           update(server.id, { connection: 'live', snapshot });

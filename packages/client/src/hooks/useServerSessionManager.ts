@@ -510,7 +510,7 @@ export function useServerSessionManager({
   useEffect(() => {
     if (!connectionTimedOut || !activeServer || !(activeServer.routes?.length)) return;
     const controller = new AbortController();
-    void resolveHostUrl(activeServer, controller.signal);
+    void resolveHostUrl(activeServer, controller.signal, { reprobe: true });
     return () => controller.abort();
   }, [connectionTimedOut, activeServer]);
 

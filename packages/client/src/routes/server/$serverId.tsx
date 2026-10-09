@@ -77,7 +77,7 @@ export const Route = createFileRoute('/server/$serverId')({
   // server must not refetch it. router.invalidate() (configuration close) still reloads.
   staleTime: Infinity,
   shouldReload: false,
-  loader: async ({ params, context, abortController }): Promise<CriticalServerData> => {
+  loader: async ({ params, context, abortController, preload }): Promise<CriticalServerData> => {
     const server = context.serverRegistry.getServer(params.serverId);
     if (!server) {
       throw redirect({
@@ -95,8 +95,11 @@ export const Route = createFileRoute('/server/$serverId')({
         signal => fetchCriticalServerData(url, server.token, signal),
         abortController.signal,
       );
-      setLastSelectedServerId(params.serverId);
-      void learnAndRecordHost(server, url);
+      // A preload (opening the workspace switcher) must not change the startup server.
+      if (!preload) {
+        setLastSelectedServerId(params.serverId);
+        void learnAndRecordHost(server, url);
+      }
       mark('server-loader:all-ready');
       return data;
     } catch (err: unknown) {

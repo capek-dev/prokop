@@ -98,3 +98,41 @@ describe('recordServerIdentity', () => {
     window.removeEventListener('prokopai:servers-changed', changed);
   });
 });
+
+describe('fast switching', () => {
+  test('an address that worked in this session is reused without probing', async () => {
+    useHostRouteStore.getState().setUrl('s1', 'https://studio.ts.net');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await resolveHostUrl(server)).toBe('https://studio.ts.net');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('reprobe re-checks addresses after a failure', async () => {
+    useHostRouteStore.getState().setUrl('s1', '192.168.1.5:8742');
+    answer({ 'https://studio.ts.net': 'install-a' });
+    expect(await resolveHostUrl(server, undefined, { reprobe: true })).toBe('https://studio.ts.net');
+  });
+
+  test('a preferred address answering shortly after a fallback still wins', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('http://192.168.1.5:8742')) await new Promise((resolve) => setTimeout(resolve, 100));
+      return Response.json({ installationId: 'install-a' });
+    }));
+    expect(await resolveHostUrl(server)).toBe('192.168.1.5:8742');
+  });
+
+  test('an unreachable preferred address does not hold up the switch', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).startsWith('http://192.168.1.5:8742')) {
+        // Hangs like a LAN address away from home, until the probe timeout aborts it.
+        return new Promise<Response>((_, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+      }
+      return Promise.resolve(Response.json({ installationId: 'install-a' }));
+    }));
+    const started = Date.now();
+    expect(await resolveHostUrl(server)).toBe('https://studio.ts.net');
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+});

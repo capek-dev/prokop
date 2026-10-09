@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import { useNavigate, useParams } from '@tanstack/react-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams, useRouter } from '@tanstack/react-router';
 import { GitPullRequest, SquarePen } from 'lucide-react';
 import { useWorkspaceViewStore } from '@/stores/workspaceViewStore';
 import { useChatLayoutStore } from '@/stores/chatLayoutStore';
@@ -46,6 +46,16 @@ export default function WorkspaceView() {
   const { servers } = useServerContext();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const otherHosts = useHostWorkspaces(servers, serverId, switcherOpen);
+  const router = useRouter();
+  // Opening the switcher loads reachable machines' data in the background, so
+  // picking another machine's workspace renders at once (the router caches it).
+  const readyHostIds = otherHosts.filter(host => host.state === 'ready').map(host => host.server.id).join(',');
+  useEffect(() => {
+    if (!switcherOpen || !readyHostIds) return;
+    for (const targetServerId of readyHostIds.split(',')) {
+      void router.preloadRoute({ to: '/server/$serverId/workspace', params: { serverId: targetServerId } }).catch(() => {});
+    }
+  }, [switcherOpen, readyHostIds, router]);
   const waitingByHost = useAttentionStore(useShallow(state => Object.fromEntries(
     Object.entries(state.hosts).map(([id, host]) => [id, host.snapshot?.asks.length ?? 0]),
   )));

@@ -58,24 +58,59 @@ export async function probeInstallation(url: string, signal?: AbortSignal): Prom
   }
 }
 
+/** How long a less-preferred address that answered waits for better ones still probing. */
+const PREFERENCE_GRACE_MS = 300;
+
 /**
- * Picks the first candidate that answers as this server's installation. Probes
- * run in parallel; preference order decides among the ones that answer. When
+ * Picks the address to use for a server. An address that already worked in
+ * this page session is reused without probing; pass `reprobe` after a failure
+ * (the failover path). Otherwise all candidates are probed in parallel and the
+ * most preferred one that answers as this installation wins. A less-preferred
+ * answer waits at most PREFERENCE_GRACE_MS for better candidates, so an
+ * unreachable LAN address away from home does not delay every switch. When
  * nothing answers, the saved URL is returned so normal offline handling runs.
  */
 export async function resolveHostUrl(
   server: Pick<SavedServer, 'id' | 'url' | 'routes' | 'installationId'>,
   signal?: AbortSignal,
+  options: { reprobe?: boolean } = {},
 ): Promise<string> {
+  const known = useHostRouteStore.getState().urls[server.id];
+  if (known && !options.reprobe) return known;
   const candidates = routeCandidates(server);
   if (candidates.length <= 1) return candidates[0] ?? server.url;
-  const results = await Promise.all(candidates.map((url) => probeInstallation(url, signal)));
-  const chosen = candidates.find((_, index) => {
-    const result = results[index];
-    if (!result) return false;
-    return !server.installationId || result.installationId === server.installationId;
+
+  const url = await new Promise<string>((resolve) => {
+    const answered: Array<boolean | undefined> = candidates.map(() => undefined);
+    let settled = false;
+    let grace: ReturnType<typeof setTimeout> | undefined;
+    const finish = (chosen: string) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(grace);
+      resolve(chosen);
+    };
+    const bestAnswered = () => candidates[answered.indexOf(true)];
+    const evaluate = () => {
+      for (let index = 0; index < candidates.length; index++) {
+        if (answered[index] === true) return finish(candidates[index]!);
+        if (answered[index] === undefined) {
+          // A more preferred address is still probing; give it a short head start.
+          if (grace === undefined && answered.includes(true)) {
+            grace = setTimeout(() => finish(bestAnswered()!), PREFERENCE_GRACE_MS);
+          }
+          return;
+        }
+      }
+      finish(server.url);
+    };
+    candidates.forEach((candidate, index) => {
+      void probeInstallation(candidate, signal).then((result) => {
+        answered[index] = result !== null && (!server.installationId || result.installationId === server.installationId);
+        evaluate();
+      });
+    });
   });
-  const url = chosen ?? server.url;
   useHostRouteStore.getState().setUrl(server.id, url);
   return url;
 }
