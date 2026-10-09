@@ -26,6 +26,7 @@ import { useFilePreview } from '@/hooks/useFilePreview';
 import { useFileGitDiffQuery } from '@/hooks/queries';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import ImagePreview from './ImagePreview';
 
 interface FilePreviewOverlayProps {
   workspaceId: string | undefined;
@@ -92,6 +93,10 @@ export default function FilePreviewOverlay({
   if (!target) return null;
 
   const isMarkdown = data?.kind === 'markdown';
+  // SVG is text and edits like source; other images are preview only.
+  const isBinaryImage = data?.kind === 'image' && data.content === undefined;
+  // Markdown and SVG both have a rendered view and a source view.
+  const hasSourceTabs = isMarkdown || (data?.kind === 'image' && data.content !== undefined);
 
   const formatSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -176,6 +181,19 @@ export default function FilePreviewOverlay({
       );
     }
 
+    if (data.kind === 'image') {
+      const image = <ImagePreview key={target.path} src={data.dataUrl} name={target.name} />;
+      if (data.content === undefined) return image;
+      return (
+        <>
+          <TabsContent value="preview" className="mt-0 h-full">{image}</TabsContent>
+          <TabsContent value="source" className="mt-0 h-full">
+            <FileCodeView name={target.name} content={data.content} language="xml" diff={diffProp} />
+          </TabsContent>
+        </>
+      );
+    }
+
     // Code / text: unified code view with diff highlights
     if (hasContent(data)) {
       return (
@@ -230,7 +248,7 @@ export default function FilePreviewOverlay({
                   )}
                 </span>
               )}
-              {isMarkdown && (
+              {hasSourceTabs && (
                 <TabsList className="h-7">
                   <TabsTrigger value="preview" className="px-2 text-xs">
                     <Eye className="size-3" />
@@ -254,7 +272,8 @@ export default function FilePreviewOverlay({
               <Button
                 size="sm"
                 onClick={onOpenEdit}
-                disabled={!onOpenEdit || isDeletedFile}
+                disabled={!onOpenEdit || isDeletedFile || isBinaryImage}
+                title={isBinaryImage ? 'Images open in preview only' : undefined}
                 className="shrink-0"
               >
                 <FilePenLine data-icon="inline-start" />

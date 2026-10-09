@@ -1,6 +1,7 @@
 import type { FilePreviewResponse } from '@prokopai/sdk';
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 import FilePreviewCodeView from './FilePreviewCodeView';
+import ImagePreview from './ImagePreview';
 import { FileX2, FileQuestion, FileWarning } from 'lucide-react';
 
 interface FilePreviewContentProps {
@@ -57,6 +58,10 @@ export default function FilePreviewContent({ preview }: FilePreviewContentProps)
         showLineNumbers={false}
       />
     );
+  }
+
+  if (preview.kind === 'image') {
+    return <ImagePreview src={preview.dataUrl} name={preview.name} />;
   }
 
   if (preview.kind === 'binary') {

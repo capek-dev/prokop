@@ -42,6 +42,7 @@ import { BranchesPanel } from '@/components/files/BranchesPanel';
 import { CheckoutMenu } from '@/components/worktrees/SessionCheckoutSelector';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { KeepAliveStack } from '@/components/app/KeepAliveStack';
+import { isBinaryImagePath } from '@/lib/imageFiles';
 
 interface FilesPanelProps {
   sdkClient: ProkopaiClient | null;
@@ -254,7 +255,8 @@ export const FilesPanel = forwardRef<FilesPanelHandle, FilesPanelProps>(
       if (entry.type !== 'file') return;
       if (entry.git?.status === 'deleted' && mode === 'edit') return;
 
-      const effectiveMode = entry.git?.status === 'deleted'
+      // Deleted files and images have nothing to edit.
+      const effectiveMode = entry.git?.status === 'deleted' || isBinaryImagePath(entry.path)
         ? 'preview'
         : mode ?? defaultFileOpenMode;
 

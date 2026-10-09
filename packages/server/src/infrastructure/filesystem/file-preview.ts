@@ -11,6 +11,8 @@ import { basename, extname, isAbsolute, join, resolve } from 'path';
 import type { FilePreviewResponse } from '@prokopai/sdk';
 import {
   FILE_PREVIEW_MAX_BYTES,
+  IMAGE_PREVIEW_MAX_BYTES,
+  imageMimeType,
   isBinaryExtension,
   isBinaryFile,
 } from './binary-detection';
@@ -200,6 +202,34 @@ export function createFilePreview(containment: PreviewContainment) {
     }
 
     const size = stats.size;
+
+    const imageMime = imageMimeType(extension);
+    if (imageMime) {
+      if (size > IMAGE_PREVIEW_MAX_BYTES) {
+        return {
+          path: responseRelativePath,
+          name: fileName,
+          extension,
+          size,
+          kind: 'too_large',
+          readOnly: true as const,
+          reason: 'Image is too large for preview',
+          maxBytes: IMAGE_PREVIEW_MAX_BYTES,
+        };
+      }
+      const bytes = await readFile(fullPath);
+      return {
+        path: responseRelativePath,
+        name: fileName,
+        extension,
+        size,
+        kind: 'image',
+        readOnly: true as const,
+        mimeType: imageMime,
+        dataUrl: `data:${imageMime};base64,${bytes.toString('base64')}`,
+        ...(imageMime === 'image/svg+xml' && { content: bytes.toString('utf-8') }),
+      };
+    }
 
     if (size > FILE_PREVIEW_MAX_BYTES) {
       return {

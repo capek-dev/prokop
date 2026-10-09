@@ -35,7 +35,7 @@ function port(): WorkspacePathPolicyPort {
 }
 
 function textContent(preview: Awaited<ReturnType<typeof getFilePreview>>): string {
-  if ('content' in preview) return preview.content;
+  if ('content' in preview && preview.content !== undefined) return preview.content;
   throw new Error(`expected text preview, got kind ${preview.kind}`);
 }
 

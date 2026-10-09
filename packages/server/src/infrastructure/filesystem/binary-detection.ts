@@ -5,8 +5,14 @@ const BINARY_EXTENSIONS = new Set([
   '.gif',
   '.bmp',
   '.webp',
-  '.svg',
   '.ico',
+  '.cur',
+  '.apng',
+  '.avif',
+  '.tif',
+  '.tiff',
+  '.heic',
+  '.heif',
   '.zip',
   '.gz',
   '.tar',
@@ -62,6 +68,34 @@ const BINARY_EXTENSIONS = new Set([
 ]);
 
 export const FILE_PREVIEW_MAX_BYTES = 1_048_576;
+/** Screenshots and design exports routinely pass the text limit. */
+export const IMAGE_PREVIEW_MAX_BYTES = 10 * 1_048_576;
+
+/**
+ * Images the preview shows. TIFF and HEIC render only in some browsers;
+ * the client shows a notice when an image fails to decode.
+ */
+const IMAGE_MIME_TYPES: Record<string, string> = {
+  '.png': 'image/png',
+  '.apng': 'image/apng',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.bmp': 'image/bmp',
+  '.ico': 'image/x-icon',
+  '.cur': 'image/x-icon',
+  '.svg': 'image/svg+xml',
+  '.tif': 'image/tiff',
+  '.tiff': 'image/tiff',
+  '.heic': 'image/heic',
+  '.heif': 'image/heif',
+};
+
+export function imageMimeType(ext: string | undefined): string | undefined {
+  return ext ? IMAGE_MIME_TYPES[ext.toLowerCase()] : undefined;
+}
 export const FILE_PREVIEW_BINARY_SNIFF_BYTES = 4096;
 
 export function isBinaryExtension(ext: string | undefined): boolean {

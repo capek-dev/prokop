@@ -148,6 +148,23 @@ describe('fileMutations - readEditableFile', () => {
   });
 });
 
+describe('fileMutations - SVG', () => {
+  test('an SVG is text: it reads for editing and saves', async () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"><circle r="4"/></svg>\n';
+    writeFileSync(join(workspaceDir, 'icon.svg'), svg, 'utf-8');
+
+    const read = await readEditableFile({ path: workspaceDir, additionalPaths: [] }, 'icon.svg');
+    expect(read.content).toBe(svg);
+
+    const updated = svg.replace('r="4"', 'r="6"');
+    await saveFile(
+      { path: workspaceDir, additionalPaths: [] },
+      { path: 'icon.svg', content: updated, expectedRevision: read.revision },
+    );
+    expect(readFileSync(join(workspaceDir, 'icon.svg'), 'utf-8')).toBe(updated);
+  });
+});
+
 describe('fileMutations - saveFile', () => {
   test('saves content and returns a new revision on a fresh revision match', async () => {
     const filePath = join(workspaceDir, 'save.ts');

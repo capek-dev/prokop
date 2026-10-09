@@ -337,3 +337,39 @@ describe('FilePreviewOverlay - deleted-file detection', () => {
   });
 });
 
+
+describe('FilePreviewOverlay - images', () => {
+  let queryClient: QueryClient;
+  const PNG_URL = 'data:image/png;base64,iVBORw0KGgo=';
+
+  beforeEach(() => {
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    mockPreviewFn.mockReset();
+    mockGitDiffFn.mockReset();
+    mockGitDiffFn.mockResolvedValue({ diffAvailable: false });
+  });
+
+  test('a PNG renders as an image and cannot be opened in the editor', async () => {
+    mockPreviewFn.mockResolvedValue({ kind: 'image', mimeType: 'image/png', dataUrl: PNG_URL, size: 8, name: 'logo.png', path: 'logo.png' });
+
+    renderOverlay(queryClient, { onOpenEdit: vi.fn(), target: { workspaceId: 'ws-1', path: 'logo.png', name: 'logo.png' } });
+
+    expect(await screen.findByRole('img', { name: 'logo.png' })).toHaveAttribute('src', PNG_URL);
+    expect(screen.getByRole('button', { name: /Edit/ })).toBeDisabled();
+    expect(screen.queryByRole('tab', { name: /Source/ })).not.toBeInTheDocument();
+  });
+
+  test('an SVG offers Preview and Source tabs', async () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"/>';
+    mockPreviewFn.mockResolvedValue({ kind: 'image', mimeType: 'image/svg+xml',
+      dataUrl: 'data:image/svg+xml;base64,PHN2Zy8+', content: svg, size: 42, name: 'icon.svg', path: 'icon.svg' });
+
+    renderOverlay(queryClient, { onOpenEdit: vi.fn(), target: { workspaceId: 'ws-1', path: 'icon.svg', name: 'icon.svg' } });
+
+    expect(await screen.findByRole('img', { name: 'icon.svg' })).toBeInTheDocument();
+    // SVG is text, so it can be edited like source.
+    expect(screen.getByRole('button', { name: /Edit/ })).toBeEnabled();
+    await userEvent.click(screen.getByRole('tab', { name: /Source/ }));
+    expect(screen.getByText(svg)).toBeInTheDocument();
+  });
+});

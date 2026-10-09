@@ -32,6 +32,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { resolveKeybinding, resolvePlatformBinding } from '@/lib/keybindings';
 import { cn } from '@/lib/utils';
+import ImagePreview from '@/components/files/ImagePreview';
 import { useKeybindingStore } from '@/stores/keybindingStore';
 
 interface FileEditorSurfaceProps {
@@ -554,6 +555,7 @@ function ActiveFileBody({
 }: ActiveFileBodyProps) {
   const docId = buildDocId(doc.identity);
   const isMd = isMarkdownFile(doc.identity.path, doc.language);
+  const isSvg = doc.identity.path.toLowerCase().endsWith('.svg');
   const dirty = isDocDirty(doc);
   const saving = doc.status === 'saving';
   const [showGitDiff, setShowGitDiff] = useState(true);
@@ -654,7 +656,7 @@ function ActiveFileBody({
               )}
             </>
           )}
-          {isMd && (
+          {(isMd || isSvg) && (
             <Tabs value={mdView} onValueChange={(v) => setMdView(v as 'source' | 'preview')}>
               <TabsList className="h-7">
                 <TabsTrigger value="source" className="px-2 text-xs">
@@ -708,6 +710,12 @@ function ActiveFileBody({
           <div className="h-full overflow-auto p-4 chat-transcript-scrollbar">
             <MarkdownRenderer>{doc.content}</MarkdownRenderer>
           </div>
+        ) : isSvg && mdView === 'preview' ? (
+          // Unsaved edits included; <img> never runs the SVG's scripts.
+          <ImagePreview
+            src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(doc.content)}`}
+            name={doc.name}
+          />
         ) : (
           <PierreCodeEditor
             docId={docId}

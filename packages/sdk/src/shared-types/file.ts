@@ -57,6 +57,7 @@ export type FilePreviewKind =
   | 'code'
   | 'text'
   | 'markdown'
+  | 'image'
   | 'binary'
   | 'unsupported'
   | 'too_large';
@@ -77,6 +78,19 @@ export interface FilePreviewContentResponse extends FilePreviewBase {
   content: string;
 }
 
+/**
+ * An image as a data URL, so it renders through the same authenticated
+ * preview request. SVGs also carry their source for a Source view; they are
+ * shown through <img>, which never runs their scripts.
+ */
+export interface FilePreviewImageResponse extends FilePreviewBase {
+  kind: 'image';
+  mimeType: string;
+  dataUrl: string;
+  /** SVG source text. */
+  content?: string;
+}
+
 export interface FilePreviewBinaryResponse extends FilePreviewBase {
   kind: 'binary';
   reason: string;
@@ -95,6 +109,7 @@ export interface FilePreviewTooLargeResponse extends FilePreviewBase {
 
 export type FilePreviewResponse =
   | FilePreviewContentResponse
+  | FilePreviewImageResponse
   | FilePreviewBinaryResponse
   | FilePreviewUnsupportedResponse
   | FilePreviewTooLargeResponse;
