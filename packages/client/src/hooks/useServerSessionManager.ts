@@ -39,6 +39,7 @@ import { useSessionCommands } from '@/hooks/useSessionCommands';
 import type { CreateSessionOptions } from '@/lib/sessionCreate';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 import { randomUUID } from '@/lib/randomId';
+import type { SendChatOptions } from '@/stores/pendingSendStore';
 
 export interface UseServerSessionManagerParams {
   serverId: string;
@@ -95,7 +96,7 @@ export interface UseServerSessionManagerReturn {
   compactSession: (sessionId: string) => void;
   removeFromQueue: (queueId: string) => void;
   sendChatMessage: (content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }) => void;
-  sendChatMessageForSession: (sessionId: string, content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }) => void;
+  sendChatMessageForSession: (sessionId: string, content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }, options?: SendChatOptions) => void;
   handleAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   handleInterruptSession: () => void;
   handleInterruptSessionById: (sessionId: string) => void;

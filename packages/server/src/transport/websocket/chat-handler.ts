@@ -25,6 +25,7 @@ export async function handleChat<Origin>(
   goalCondition?: string,
   goalMaxTurns?: number,
   goalTokenBudget?: number,
+  clientMessageId?: string,
 ): Promise<void> {
   const wire = createWirePorts(ctx as unknown as RouterContext<ConnectionId>);
   await requireWireApplication().session.chat.sendMessage(
@@ -37,6 +38,7 @@ export async function handleChat<Origin>(
     goalCondition,
     goalMaxTurns,
     goalTokenBudget,
+    clientMessageId,
   );
 }
 

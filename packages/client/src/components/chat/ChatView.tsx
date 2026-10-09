@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { Lock, Eye, ArrowDown, ShieldOff, Shield } from 'lucide-react';
 import type { ProkopaiClient, Message } from '@prokopai/sdk';
-import type { Session, MessageWithParts, QueuedMessage, AttachmentKind, AskResponse } from '@prokopai/sdk';
+import type { Session, MessageWithParts, QueuedMessage, AttachmentKind, AskResponse, Part } from '@prokopai/sdk';
 import { MessageInput } from './MessageInput';
 import type { MessageInputHandle } from './MessageInput';
 import { Button } from '@/components/ui/button';
@@ -18,12 +18,55 @@ import { UserPromptMap } from './UserPromptMap';
 import { EmptySessionCheckout } from './EmptySessionCheckout';
 import { DeferredConversation } from './DeferredConversation';
 import type { TranscriptAnchor } from '@/lib/transcriptFollow';
+import { usePendingSendStore, type PendingSend } from '@/stores/pendingSendStore';
+import { useOptionalSessionCommands } from '@/contexts/SessionCommandsContext';
+import type { PendingSendActions } from './VirtualizedTranscript';
 
 export interface DisplayItem {
   message: import('@prokopai/sdk').Message;
   parts: import('@prokopai/sdk').Part[];
   isQueued?: boolean;
   queueId?: string;
+  pendingSend?: PendingSend;
+}
+
+const NO_PENDING_SENDS: PendingSend[] = [];
+
+function pendingTextParts(send: PendingSend, messageId: string): Part[] {
+  return [{ id: `${send.id}-text`, messageId, createdAt: send.createdAt, type: 'text', text: send.content }];
+}
+
+/**
+ * Prompts the server has not persisted yet, after everything else. An
+ * accepted prompt takes its persisted id as row key and lends its text to
+ * the persisted message until that message's own text arrives.
+ */
+export function mergePendingSends(items: DisplayItem[], pendingSends: PendingSend[]): DisplayItem[] {
+  if (pendingSends.length === 0) return items;
+  const indexById = new Map(items.map((item, index) => [item.message.id, index]));
+  const merged = [...items];
+  const pending: DisplayItem[] = [];
+
+  for (const send of pendingSends) {
+    const persistedIndex = indexById.get(send.messageId ?? send.queueId ?? send.id);
+    if (persistedIndex !== undefined) {
+      const persisted = merged[persistedIndex];
+      if (!persisted.isQueued && !persisted.parts.some(part => part.type === 'text')) {
+        merged[persistedIndex] = { ...persisted, parts: [...pendingTextParts(send, persisted.message.id), ...persisted.parts] };
+      }
+      continue;
+    }
+    const id = send.messageId ?? send.queueId ?? send.id;
+    pending.push({
+      message: { id, role: 'user', sessionId: send.sessionId, createdAt: send.createdAt },
+      parts: pendingTextParts(send, id),
+      isQueued: send.kind === 'queue' || send.queueId !== undefined,
+      queueId: send.queueId,
+      pendingSend: send,
+    });
+  }
+
+  return [...merged, ...pending.sort((a, b) => a.message.createdAt - b.message.createdAt)];
 }
 
 interface ChatViewProps {
@@ -249,16 +292,37 @@ function ChatViewContent({
     return unsub;
   }, [session.id, showRejectionNotice]);
 
+  const pendingSends = usePendingSendStore(s => s.bySession[session.id]) ?? NO_PENDING_SENDS;
   const displayItems = useMemo(
-    () => mergeMessagesWithQueue(
+    () => mergePendingSends(mergeMessagesWithQueue(
       messagesWithParts,
       queuedMessages,
       sdkClient?.http.attachments.getUrl ?? ((sessionId, attachmentId, key) =>
         `/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/content?key=${encodeURIComponent(key)}`
       )
-    ),
-    [messagesWithParts, queuedMessages, sdkClient]
+    ), pendingSends),
+    [messagesWithParts, queuedMessages, sdkClient, pendingSends]
   );
+
+  const commands = useOptionalSessionCommands();
+  const localInputRef = useRef<MessageInputHandle>(null);
+  const messageInputRef = inputRef ?? localInputRef;
+  const pendingSendActions = useMemo<PendingSendActions>(() => ({
+    // Same id on retry: the server answers a prompt it already has instead of sending it twice.
+    retry: commands ? (id) => {
+      const send = usePendingSendStore.getState().get(id);
+      if (!send) return;
+      commands.sendChatMessageForSession(send.sessionId, send.content, send.attachments, send.responseFormatId,
+        send.goal, { clientMessageId: id });
+    } : undefined,
+    edit: (id) => {
+      const send = usePendingSendStore.getState().get(id);
+      if (!send) return;
+      messageInputRef.current?.restoreText(send.content);
+      usePendingSendStore.getState().remove(id);
+    },
+    discard: (id) => usePendingSendStore.getState().remove(id),
+  }), [commands, messageInputRef]);
 
   // Free mode resumes at the saved reading position. Without one that is
   // still loaded there is nothing to return to, so the session follows.
@@ -334,6 +398,7 @@ function ChatViewContent({
           onClearCompactionSuccess={onClearCompactionSuccess}
           onNavigateToSubagent={onNavigateToSubagent}
           onRemoveFromQueue={onRemoveFromQueueForMode}
+          pendingSendActions={readOnlyTranscript ? undefined : pendingSendActions}
           onRevert={onRevertForMode}
           onFork={onForkForMode}
           assistantOnlyFork={harnessState?.fork.mode === 'assistant-only'}
@@ -411,7 +476,7 @@ function ChatViewContent({
 
       {session.status === 'active' && !session.parentId && !isObserver && (
         <MessageInput
-          ref={inputRef}
+          ref={messageInputRef}
           onSendMessage={onSendMessage}
           disabled={inputLocked}
           workspaceId={session.workspaceId}

@@ -57,6 +57,8 @@ export interface ChatMessage {
   goalCondition?: string;
   goalMaxTurns?: number;
   goalTokenBudget?: number;
+  /** Client-generated id; the server answers with `chat.accepted` or `chat.rejected`. */
+  clientMessageId?: string;
 }
 
 export interface SessionCloseMessage {
@@ -188,6 +190,8 @@ export interface QueueAddMessage {
   content: string;
   attachments?: ChatMessageAttachment[];
   responseFormatId?: string;
+  /** Client-generated id; the server answers with `chat.accepted` or `chat.rejected`. */
+  clientMessageId?: string;
 }
 
 export interface QueueRemoveMessage {

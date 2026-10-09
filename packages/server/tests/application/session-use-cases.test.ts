@@ -8,6 +8,7 @@ import { createSessionChatApplication } from '@/application/sessions/chat';
 import { createSessionLifecycleApplication } from '@/application/sessions/lifecycle';
 import { createSessionTranscriptApplication } from '@/application/sessions/transcript';
 import { createSessionQueueApplication } from '@/application/sessions/queue';
+import { createClientSendRegistry } from '@/application/sessions/client-sends';
 import type { SessionWirePorts } from '@/application/ports/delivery';
 import type { SessionRepositoryPort, PendingAskPort, AskAuthorityPort, PendingAskRecord } from '@/application/ports/session';
 import type { SessionExecutionPort } from '@/application/ports/execution';
@@ -188,6 +189,52 @@ function makeDeps(overrides: Partial<SessionApplicationDeps<Origin>> = {}): Sess
 }
 
 describe('application session use cases', () => {
+  describe('optimistic prompt ids', () => {
+    const clientMessageId = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+
+    test('the sender learns the persisted message id of its prompt', async () => {
+      const execution = makeExecution({
+        sendMessage: async (wire) => {
+          wire.delivery.broadcastToSession('sess-1', {
+            type: 'message.created', message: { id: 'm-1', sessionId: 'sess-1', role: 'user', createdAt: 1 },
+          });
+        },
+      });
+      const app = createSessionChatApplication({
+        repository: makeRepository(), execution, gate: noGate(), sends: createClientSendRegistry(),
+      });
+      const spy = makeSpy();
+
+      await app.sendMessage(makeWire(spy), origin, 'sess-1', 'hello', undefined, undefined, undefined, undefined, undefined, clientMessageId);
+
+      expect(spy.sent).toEqual([{ type: 'chat.accepted', sessionId: 'sess-1', clientMessageId, messageId: 'm-1' }]);
+      expect(spy.broadcastToSession).toHaveLength(1);
+    });
+
+    test('a controller rejection also rejects the prompt by id', async () => {
+      const app = createSessionChatApplication({
+        repository: makeRepository(), execution: makeExecution(), gate: rejectGate(), sends: createClientSendRegistry(),
+      });
+      const spy = makeSpy();
+
+      await app.sendMessage(makeWire(spy), origin, 'sess-1', 'hello', undefined, undefined, undefined, undefined, undefined, clientMessageId);
+
+      expect(spy.sent.map(message => message.type)).toEqual(['session.action_rejected', 'chat.rejected']);
+    });
+
+    test('a queued prompt is accepted with its queue id', () => {
+      const app = createSessionQueueApplication({
+        repository: makeRepository(), gate: noGate(), sends: createClientSendRegistry(),
+      });
+      const spy = makeSpy();
+
+      app.add(makeWire(spy), origin, { sessionId: 'sess-1', content: 'later', clientMessageId });
+
+      expect(spy.sent.map(message => message.type)).toEqual(['chat.accepted', 'queue.added']);
+      expect(spy.sent[0]).toMatchObject({ queueId: 'q-1' });
+    });
+  });
+
   describe('chat', () => {
     test('send passes the gate and delegates to execution with the same arguments', async () => {
       const calls: unknown[] = [];

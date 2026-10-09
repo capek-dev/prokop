@@ -53,6 +53,8 @@ interface PendingAttachmentData {
 
 export interface MessageInputHandle {
   focus: () => void;
+  /** Puts an unsent prompt back into the input for editing. */
+  restoreText: (text: string) => void;
 }
 
 function expandPromptContent(prompt: PromptInfo, userText: string): string {
@@ -112,7 +114,12 @@ export const MessageInput = forwardRef<MessageInputHandle, MessageInputProps>(fu
 
   useImperativeHandle(ref, () => ({
     focus: () => textareaRef.current?.focus(),
-  }), []);
+    // A draft already in the input stays below the restored text.
+    restoreText: (text: string) => {
+      setInput(input.trim() ? `${text}\n\n${input}` : text);
+      textareaRef.current?.focus();
+    },
+  }), [input, setInput]);
 
   const {
     query,

@@ -145,6 +145,28 @@ export interface ChatUsageMessage {
 export type ChatRetryStatus = 'scheduled' | 'started' | 'exhausted' | 'cancelled';
 export type ChatRetryErrorType = 'rate_limit' | 'server_error' | 'timeout' | 'network';
 
+/**
+ * Sent only to the client that sent a prompt with a `clientMessageId`,
+ * before the matching `message.created` or `queue.added` reaches it, so the
+ * optimistic prompt can take the persisted id without showing twice.
+ */
+export interface ChatAcceptedMessage {
+  type: 'chat.accepted';
+  sessionId: string;
+  clientMessageId: string;
+  messageId?: string;
+  queueId?: string;
+}
+
+/** The prompt with this `clientMessageId` was not persisted; it replaces the error the sender would have received. */
+export interface ChatRejectedMessage {
+  type: 'chat.rejected';
+  sessionId: string;
+  clientMessageId: string;
+  code: string;
+  message: string;
+}
+
 export interface ChatRetryMessage {
   type: 'chat.retry';
   sessionId: string;
@@ -450,6 +472,8 @@ export type ServerMessage =
   | SessionActionRejectedMessage
   | ChatUsageMessage
   | ChatRetryMessage
+  | ChatAcceptedMessage
+  | ChatRejectedMessage
   | ErrorMessage
   | SessionClosedMessage
   | SessionUpdatedMessage

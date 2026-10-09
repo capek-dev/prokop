@@ -26,6 +26,7 @@ import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 import { StructuredResponse } from '@/components/visualizations';
 import { splitStreamingText } from './streamingText';
 import { getToolPreviewCutoff } from '@/lib/toolPreviewPolicy';
+import type { PendingSend } from '@/stores/pendingSendStore';
 import {
   decideFollow,
   isUpwardScrollKey,
@@ -45,6 +46,15 @@ export interface DisplayItem {
   isQueued?: boolean;
   queueId?: string;
   collapseToolPreviews?: boolean;
+  /** Set while the prompt is shown ahead of the server persisting it. */
+  pendingSend?: PendingSend;
+}
+
+/** Actions on a prompt the server has not persisted; `retry` is absent without session commands. */
+export interface PendingSendActions {
+  retry?: (clientMessageId: string) => void;
+  edit: (clientMessageId: string) => void;
+  discard: (clientMessageId: string) => void;
 }
 
 interface VirtualizedTranscriptProps {
@@ -54,6 +64,7 @@ interface VirtualizedTranscriptProps {
   sessionStatus?: string;
   onNavigateToSubagent?: (sessionId: string) => void;
   onRemoveFromQueue?: (queueId: string) => void;
+  pendingSendActions?: PendingSendActions;
   onRevert?: (sessionId: string, stepPartId: string) => void;
   onFork?: (sessionId: string, messageId: string) => void;
   assistantOnlyFork?: boolean;
@@ -546,6 +557,7 @@ interface MessageRowProps {
   sessionId: string;
   onNavigateToSubagent?: (sessionId: string) => void;
   onRemoveFromQueue?: (queueId: string) => void;
+  pendingSendActions?: PendingSendActions;
   onRevert?: (sessionId: string, stepPartId: string) => void;
   onFork?: (sessionId: string, messageId: string) => void;
   assistantOnlyFork?: boolean;
@@ -567,6 +579,7 @@ const MessageRow = memo(function MessageRow({
   sessionId,
   onNavigateToSubagent,
   onRemoveFromQueue,
+  pendingSendActions,
   onRevert,
   onFork,
   assistantOnlyFork = false,
@@ -618,6 +631,7 @@ const MessageRow = memo(function MessageRow({
     (isAssistantMessage(item.message) && item.message.status === 'completed')
   );
   const isClearAll = revertMessageId === item.message.id;
+  const pending = item.pendingSend;
 
   return (
     <>
@@ -625,7 +639,13 @@ const MessageRow = memo(function MessageRow({
         message={item.message}
         textContent={getTextContent(item.parts)}
         isQueued={item.isQueued}
-        onRemove={item.isQueued && onRemoveFromQueue ? () => onRemoveFromQueue(item.queueId!) : undefined}
+        onRemove={item.isQueued && item.queueId && onRemoveFromQueue
+          ? () => onRemoveFromQueue(item.queueId!) : undefined}
+        sendStatus={item.pendingSend?.status}
+        sendError={item.pendingSend?.error}
+        onRetrySend={pending && pendingSendActions?.retry ? () => pendingSendActions.retry?.(pending.id) : undefined}
+        onEditSend={pending && pendingSendActions ? () => pendingSendActions.edit(pending.id) : undefined}
+        onDiscardSend={pending && pendingSendActions ? () => pendingSendActions.discard(pending.id) : undefined}
         canRevert={canRevert && revertMessageId !== null}
         onRevert={revertMessageId && onRevert ? () => onRevert(sessionId, revertMessageId) : undefined}
         canFork={canFork}
@@ -676,6 +696,8 @@ function areMessageRowPropsEqual(prev: MessageRowProps, next: MessageRowProps): 
     prev.item.isQueued === next.item.isQueued &&
     prev.item.queueId === next.item.queueId &&
     prev.item.collapseToolPreviews === next.item.collapseToolPreviews &&
+    prev.item.pendingSend === next.item.pendingSend &&
+    prev.pendingSendActions === next.pendingSendActions &&
     prev.revertMessageId === next.revertMessageId &&
     prev.sessionId === next.sessionId &&
     prev.onNavigateToSubagent === next.onNavigateToSubagent &&
@@ -720,6 +742,7 @@ export function VirtualizedTranscript({
   onClearCompactionSuccess,
   onNavigateToSubagent,
   onRemoveFromQueue,
+  pendingSendActions,
   onRevert,
   onFork,
   assistantOnlyFork = false,
@@ -1013,6 +1036,7 @@ export function VirtualizedTranscript({
         sessionId={sessionId}
         onNavigateToSubagent={onNavigateToSubagent}
         onRemoveFromQueue={onRemoveFromQueue}
+        pendingSendActions={pendingSendActions}
         onRevert={onRevert}
         onFork={onFork}
         assistantOnlyFork={assistantOnlyFork}
@@ -1045,6 +1069,7 @@ export function VirtualizedTranscript({
     sessionId,
     onNavigateToSubagent,
     onRemoveFromQueue,
+    pendingSendActions,
     onRevert,
     onFork,
     assistantOnlyFork,
@@ -1068,6 +1093,7 @@ export function VirtualizedTranscript({
     pinnedMessageIds,
     isPinningMessage,
     onRemoveFromQueue,
+    pendingSendActions,
     onRevert,
     onFork,
     onEditMessage,
@@ -1077,6 +1103,7 @@ export function VirtualizedTranscript({
     pinnedMessageIds,
     isPinningMessage,
     onRemoveFromQueue,
+    pendingSendActions,
     onRevert,
     onFork,
     onEditMessage,

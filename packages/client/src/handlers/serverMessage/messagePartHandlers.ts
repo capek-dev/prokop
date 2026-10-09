@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useChatRetryStore } from '@/stores/chatRetryStore';
+import { usePendingSendStore } from '@/stores/pendingSendStore';
 
 export const STREAM_FLUSH_INTERVAL_MS = 75;
 
@@ -32,6 +33,10 @@ export function handleMessageCreated(
 
   // Clear completion state when activity happens in this session
   clearCompletion(message.sessionId);
+
+  if (message.role === 'user') {
+    usePendingSendStore.getState().settleOldestInFlight(message.sessionId, 'chat', { messageId: message.id });
+  }
 
   // Write to any session that has content loaded (multi-pane safe)
   const hasContent = useSessionStore.getState().messagesBySession[message.sessionId] !== undefined;
@@ -148,6 +153,11 @@ export function handlePartCreated(
   const { setPartsBySession, partIdIndexRef, clearCompletion } = ctx;
 
   clearCompletion(sessionId);
+
+  // The optimistic prompt lends its text until the persisted text arrives.
+  if (part.type === 'text') {
+    usePendingSendStore.getState().removeWhere(sessionId, send => send.messageId === part.messageId);
+  }
 
   // Write to any session that has content loaded (multi-pane safe)
   const hasContent = useSessionStore.getState().partsBySession[sessionId] !== undefined;

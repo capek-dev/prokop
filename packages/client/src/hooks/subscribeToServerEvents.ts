@@ -1,4 +1,4 @@
-import type { ChatRetryMessage, CompactionCompleteMessage, FileTreeUpdate, GitStatusResponse, ManagedWorktree, ProkopaiClient, SessionInterruptResult, SessionControlState } from '@prokopai/sdk';
+import type { ChatAcceptedMessage, ChatRejectedMessage, ChatRetryMessage, CompactionCompleteMessage, FileTreeUpdate, GitStatusResponse, ManagedWorktree, ProkopaiClient, SessionInterruptResult, SessionControlState } from '@prokopai/sdk';
 import type { RefObject } from 'react';
 import type { Session, Message, Part, MessageWithParts, PermissionGrant, QueuedMessage, Ask } from '@prokopai/sdk';
 import type { SessionHandlersContext, SessionUsage } from '@/handlers/serverMessage';
@@ -16,6 +16,7 @@ import { handleSchedulerChanged } from '@/handlers/serverMessage/schedulerHandle
 import { handlePullRequestChanged } from '@/handlers/serverMessage/pullRequestHandlers';
 import { useChatRetryStore } from '@/stores/chatRetryStore';
 import { useConnectionStore } from '@/stores/connectionStore';
+import { markConnectionAcksPrompts, usePendingSendStore } from '@/stores/pendingSendStore';
 import { handleWorkspaceActivity } from '@/handlers/serverMessage/workspaceActivity';
 import { queryKeys } from '@/lib/queryKeys';
 
@@ -168,6 +169,21 @@ export function subscribeToServerEvents(
     } else {
       useConnectionStore.getState().removeStreamingSession(retryMessage.sessionId);
     }
+  });
+  add('chat.accepted', (message: unknown) => {
+    const { clientMessageId, messageId, queueId } = message as ChatAcceptedMessage;
+    markConnectionAcksPrompts(client);
+    usePendingSendStore.getState().accept(clientMessageId, { messageId, queueId });
+  });
+  add('chat.rejected', (message: unknown) => {
+    const { clientMessageId, message: reason } = message as ChatRejectedMessage;
+    markConnectionAcksPrompts(client);
+    usePendingSendStore.getState().fail(clientMessageId, reason);
+  });
+  // A prompt still in flight may or may not have arrived; retrying is safe
+  // because the server answers a known id instead of sending it twice.
+  add('disconnected', () => {
+    usePendingSendStore.getState().failInFlight(client, 'Connection lost before the prompt was confirmed.');
   });
   add('compaction.complete', (sessionId: unknown, tokensUsed: unknown) => {
     messagePartHandlers['compaction.complete']({ type: 'compaction.complete', sessionId: sessionId as string, tokensUsed: tokensUsed as CompactionCompleteMessage['tokensUsed'] }, ctx()!);

@@ -1,5 +1,6 @@
 import type { PermissionGrant, QueuedMessage } from '@prokopai/sdk';
 import type { SessionHandlersContext } from './types';
+import { usePendingSendStore } from '@/stores/pendingSendStore';
 
 export function handlePermissionList(
   msg: { type: 'permission.list'; workspaceId: string; grants: PermissionGrant[] },
@@ -50,6 +51,10 @@ export function handleQueueAdded(
   const { sessionId, message } = msg;
   const { addQueuedMessage } = ctx;
   addQueuedMessage(sessionId, message);
+  const pendingSends = usePendingSendStore.getState();
+  // An older engine may queue a prompt that was sent directly.
+  pendingSends.settleOldestInFlight(sessionId, 'any', { queueId: message.id });
+  pendingSends.removeWhere(sessionId, send => send.queueId === message.id);
 }
 
 export function handleQueueRemoved(

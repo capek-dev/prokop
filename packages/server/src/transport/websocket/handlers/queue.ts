@@ -18,6 +18,7 @@ export function handleQueueAdd(
     sessionId: msg.sessionId,
     content: msg.content,
     attachments: msg.attachments,
+    clientMessageId: msg.clientMessageId,
   });
 }
 

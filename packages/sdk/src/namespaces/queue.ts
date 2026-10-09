@@ -11,6 +11,7 @@ export class QueueNamespace {
       responseFormatId?: string;
       goalCondition?: string;
       goalMaxTurns?: number;
+      clientMessageId?: string;
     },
   ): void {
     this.send({
@@ -21,6 +22,7 @@ export class QueueNamespace {
       ...(options?.responseFormatId ? { responseFormatId: options.responseFormatId } : {}),
       ...(options?.goalCondition ? { goalCondition: options.goalCondition } : {}),
       ...(options?.goalMaxTurns ? { goalMaxTurns: options.goalMaxTurns } : {}),
+      ...(options?.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
     });
   }
 

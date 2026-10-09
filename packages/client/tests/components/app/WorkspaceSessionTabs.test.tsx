@@ -40,7 +40,7 @@ vi.mock('@/components/chat/ChatView', () => ({
   ChatView: function Chat(props: ComponentProps<typeof ChatView>) {
     const [draft, setDraft] = useState('');
     const input = useRef<HTMLInputElement>(null);
-    useImperativeHandle(props.inputRef, () => ({ focus: () => input.current?.focus() }), []);
+    useImperativeHandle(props.inputRef, () => ({ focus: () => input.current?.focus(), restoreText: setDraft }), []);
     useEffect(() => { mocks.mount(props.session.id); return () => mocks.unmount(props.session.id); }, [props.session.id]);
     return <div data-testid={`chat-${props.session.id}`}>
       <input ref={input} aria-label={`Draft ${props.session.id}`} value={draft} onChange={(event) => setDraft(event.target.value)} />

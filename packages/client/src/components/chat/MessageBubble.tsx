@@ -1,4 +1,4 @@
-import { Copy, Check, X, Clock, Undo2, GitBranch, Pin, PinOff, Pencil, X as XIcon, Loader2 } from 'lucide-react';
+import { Copy, Check, X, Clock, Undo2, GitBranch, Pin, PinOff, Pencil, X as XIcon, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { Message } from '@prokopai/sdk';
 import { isAssistantMessage } from '@prokopai/sdk';
@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import { getTurnMeta } from '@/lib/turnStats';
+import type { PendingSendStatus } from '@/stores/pendingSendStore';
 import { cn } from '@/lib/utils';
 
 interface MessageBubbleProps {
@@ -27,6 +28,62 @@ interface MessageBubbleProps {
   onTogglePin?: () => void;
   canPin?: boolean;
   isPinningMessage?: boolean;
+  /** Set for a prompt shown before the server persisted it. */
+  sendStatus?: PendingSendStatus;
+  sendError?: string;
+  onRetrySend?: () => void;
+  onEditSend?: () => void;
+  onDiscardSend?: () => void;
+}
+
+/**
+ * Under an unconfirmed prompt. "Sending" fades in only after a short delay,
+ * so a normal round trip shows nothing; a failure always shows with its
+ * actions, never only on hover.
+ */
+function SendStatus({ status, error, onRetry, onEdit, onDiscard }: {
+  status: PendingSendStatus;
+  error?: string;
+  onRetry?: () => void;
+  onEdit?: () => void;
+  onDiscard?: () => void;
+}) {
+  if (status === 'sending') {
+    return (
+      <div className="mr-1 flex items-center gap-1 text-[10px] text-muted-foreground/70 animate-in fade-in-0 [--tw-animation-delay:700ms] [--tw-animation-fill-mode:both]">
+        <Loader2 className="size-3 animate-spin" />
+        Sending
+      </div>
+    );
+  }
+  if (status !== 'failed') return null;
+  return (
+    <div role="alert" className="mr-1 flex max-w-[90%] flex-wrap items-center justify-end gap-x-2 gap-y-0.5 text-xs text-destructive">
+      <span className="flex min-w-0 items-center gap-1">
+        <AlertCircle className="size-3 shrink-0" />
+        <span className="truncate" title={error}>Not sent{error ? `: ${error}` : ''}</span>
+      </span>
+      <span className="flex items-center gap-1">
+        {onRetry && (
+          <Button variant="ghost" size="xs" className="h-5 px-1.5 text-xs" onClick={onRetry}>
+            <RotateCcw className="size-3" data-icon="inline-start" />
+            Retry
+          </Button>
+        )}
+        {onEdit && (
+          <Button variant="ghost" size="xs" className="h-5 px-1.5 text-xs" onClick={onEdit}>
+            <Pencil className="size-3" data-icon="inline-start" />
+            Edit
+          </Button>
+        )}
+        {onDiscard && (
+          <Button variant="ghost" size="xs" className="h-5 px-1.5 text-xs text-muted-foreground" onClick={onDiscard}>
+            Discard
+          </Button>
+        )}
+      </span>
+    </div>
+  );
 }
 
 export function MessageBubble({
@@ -47,6 +104,11 @@ export function MessageBubble({
   onTogglePin,
   canPin = false,
   isPinningMessage = false,
+  sendStatus,
+  sendError,
+  onRetrySend,
+  onEditSend,
+  onDiscardSend,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [showRevertConfirm, setShowRevertConfirm] = useState(false);
@@ -357,6 +419,16 @@ export function MessageBubble({
             {children}
           </div>
         </div>
+      )}
+
+      {isUser && sendStatus && (
+        <SendStatus
+          status={sendStatus}
+          error={sendError}
+          onRetry={onRetrySend}
+          onEdit={onEditSend}
+          onDiscard={onDiscardSend}
+        />
       )}
 
       {showAssistantFork && (

@@ -3,11 +3,14 @@ import type { SessionWirePorts } from '@/application/ports/delivery';
 import type { SessionExecutionPort } from '@/application/ports/execution';
 import type { ControllerGatePort, ControllerGateRejection } from '@/application/ports/control';
 import type { SessionRepositoryPort } from '@/application/ports/session';
+import { clientSends, type ClientSendRegistry } from './client-sends';
 
 export interface SessionChatDeps<Origin> {
   repository: SessionRepositoryPort;
   execution: SessionExecutionPort;
   gate: ControllerGatePort<Origin>;
+  /** Defaults to the process-wide registry shared with queue adds. */
+  sends?: ClientSendRegistry;
 }
 
 export interface SessionChatApplication<Origin> {
@@ -21,6 +24,7 @@ export interface SessionChatApplication<Origin> {
     goalCondition?: string,
     goalMaxTurns?: number,
     goalTokenBudget?: number,
+    clientMessageId?: string,
   ): Promise<void>;
   editMessage(
     wire: SessionWirePorts<Origin>,
@@ -52,6 +56,7 @@ export function sendGateRejection<Origin>(
 }
 
 export function createSessionChatApplication<Origin>(deps: SessionChatDeps<Origin>): SessionChatApplication<Origin> {
+  const sends = deps.sends ?? clientSends;
   // Capek fires its own auto-title for Prokop sessions right after
   // persisting the user message inside handleChat; external harnesses have
   // no such hook, so the universal server-side regeneration runs fire and
@@ -74,24 +79,31 @@ export function createSessionChatApplication<Origin>(deps: SessionChatDeps<Origi
       goalCondition,
       goalMaxTurns,
       goalTokenBudget,
+      clientMessageId,
     ): Promise<void> {
-      const gate = deps.gate.checkControllerGate(sessionId, 'chat.message', origin);
-      if (gate) {
-        sendGateRejection(wire, origin, gate);
-        return;
+      const tracked = sends.track(wire, origin, sessionId, clientMessageId);
+      if (!tracked) return;
+      try {
+        const gate = deps.gate.checkControllerGate(sessionId, 'chat.message', origin);
+        if (gate) {
+          sendGateRejection(tracked.wire, origin, gate);
+          return;
+        }
+        await deps.execution.sendMessage(
+          tracked.wire,
+          origin,
+          sessionId,
+          content,
+          attachments,
+          responseFormatId,
+          goalCondition,
+          goalMaxTurns,
+          goalTokenBudget,
+        );
+        autoTitleForExternalHarness(wire, origin, sessionId);
+      } finally {
+        tracked.finish();
       }
-      await deps.execution.sendMessage(
-        wire,
-        origin,
-        sessionId,
-        content,
-        attachments,
-        responseFormatId,
-        goalCondition,
-        goalMaxTurns,
-        goalTokenBudget,
-      );
-      autoTitleForExternalHarness(wire, origin, sessionId);
     },
 
     async editMessage(wire, origin, input): Promise<void> {

@@ -16,6 +16,7 @@ import { getWorkspaceDefaultPreconfigId } from '@/lib/workspacePreconfigs';
 import { getSessionCreateBoardAction } from '@/lib/sessionCreate';
 import type { CreateSessionOptions } from '@/lib/sessionCreate';
 import { randomUUID } from '@/lib/randomId';
+import { usePendingSendStore, type SendChatOptions } from '@/stores/pendingSendStore';
 import { foreignClientFor } from '@/lib/hostClientPool';
 import { foreignSession } from '@/stores/foreignSessionsStore';
 import { useAskStore } from '@/stores/askStore';
@@ -58,7 +59,7 @@ interface UseSessionCommandsReturn {
   addToQueue: (sessionId: string, content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>) => void;
   removeFromQueue: (queueId: string) => void;
   sendChatMessage: (content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number }) => void;
-  sendChatMessageForSession: (sessionId: string, content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number }) => void;
+  sendChatMessageForSession: (sessionId: string, content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }, options?: SendChatOptions) => void;
   handleAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   handleInterruptSession: () => void;
   handleInterruptSessionById: (sessionId: string) => void;
@@ -351,23 +352,36 @@ export function useSessionCommands({
     }
   }, [clientFor]);
 
-  const sendChatMessageForSession = useCallback((sessionId: string, content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }) => {
+  const sendChatMessageForSession = useCallback((sessionId: string, content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }, options?: SendChatOptions) => {
     const client = clientFor(sessionId);
     const session = sessionFor(sessionId);
-    if (!session || session.compacting) return;
-    if (session.runningAt || streamingSessionIds.has(sessionId)) {
-      addToQueue(sessionId, content, attachments, responseFormatId);
-    } else {
-      if (client && client.connected) {
-        client.chat.send(
-          sessionId,
-          content,
-          { attachments, responseFormatId, goalCondition: goal?.condition,
-            goalMaxTurns: goal?.maxTurns, goalTokenBudget: goal?.tokenBudget },
-        );
-      }
+    const queue = Boolean(session?.runningAt || streamingSessionIds.has(sessionId));
+    // The prompt shows at once; chat.accepted / chat.rejected settle it.
+    const clientMessageId = options?.clientMessageId ?? randomUUID();
+    const pendingSends = usePendingSendStore.getState();
+    pendingSends.begin({
+      id: clientMessageId, sessionId, content, attachments, responseFormatId, goal,
+      kind: queue ? 'queue' : 'chat', connection: client ?? undefined,
+    });
+    if (!session || session.compacting) {
+      pendingSends.fail(clientMessageId, 'This session cannot take a prompt right now.');
+      return;
     }
-  }, [clientFor, sessionFor, streamingSessionIds, addToQueue]);
+    if (!client?.connected) {
+      pendingSends.fail(clientMessageId, 'Not connected. Your prompt was not sent.');
+      return;
+    }
+    if (queue) {
+      client.queue.add(sessionId, content, { attachments, responseFormatId, clientMessageId });
+    } else {
+      client.chat.send(
+        sessionId,
+        content,
+        { attachments, responseFormatId, goalCondition: goal?.condition,
+          goalMaxTurns: goal?.maxTurns, goalTokenBudget: goal?.tokenBudget, clientMessageId },
+      );
+    }
+  }, [clientFor, sessionFor, streamingSessionIds]);
 
   const sendChatMessage = useCallback((content: string, attachments?: Array<{ id: string; kind: AttachmentKind }>, responseFormatId?: string, goal?: { condition: string; maxTurns?: number; tokenBudget?: number }) => {
     if (!currentSession) return;

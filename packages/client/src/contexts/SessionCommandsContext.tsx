@@ -6,6 +6,7 @@ import type {
   AskResponse,
 } from '@prokopai/sdk';
 import type { ResumeSessionOptions } from '@/stores/sessionStore';
+import type { SendChatOptions } from '@/stores/pendingSendStore';
 import type { CreateSessionOptions } from '@/lib/sessionCreate';
 
 /**
@@ -39,6 +40,7 @@ export interface SessionCommandsValue {
     attachments?: Array<{ id: string; kind: AttachmentKind }>,
     responseFormatId?: string,
     goal?: { condition: string; maxTurns?: number; tokenBudget?: number },
+    options?: SendChatOptions,
   ) => void;
   handleAskResponse: (toolCallId: string, response: AskResponse, requestId?: string) => void;
   handleInterruptSession: () => void;
@@ -73,6 +75,11 @@ export interface SessionCommandsValue {
 const SessionCommandsContext = createContext<SessionCommandsValue | null>(null);
 
 export const SessionCommandsProvider = SessionCommandsContext.Provider;
+
+/** For components that also render outside the app shell (stories, tests). */
+export function useOptionalSessionCommands(): SessionCommandsValue | null {
+  return useContext(SessionCommandsContext);
+}
 
 export function useSessionCommands(): SessionCommandsValue {
   const ctx = useContext(SessionCommandsContext);
