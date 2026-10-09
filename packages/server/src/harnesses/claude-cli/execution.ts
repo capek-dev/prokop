@@ -18,7 +18,7 @@ import { readClaudeGoalVerdict } from './goal-transcript';
 import { runClaudeCompact } from './compact';
 import { claudeApprovals, type ClaudeApprovals } from './approvals';
 import { ClaudeChildTimelines } from './child-timelines';
-import { resolveClaudeImages } from './images';
+import { loadClaudeImages, resolveClaudeImages } from './images';
 import type { ClaudeTurnUsage } from './usage';
 import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistoryPrefix, type ClaudeRollbackDependencies } from './rollback';
 import { forkClaudeSession } from './fork';
@@ -250,6 +250,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       const stderr = new StderrTail();
       let phase = 'setup';
       try {
+        const imageData = await loadClaudeImages(images);
         const workspace = getWorkspace(session.workspaceId);
         if (!cliWorkspaceAvailable(workspace)) throw new Error('Claude workspace unavailable');
         const path = session.workspaceRootId
@@ -390,7 +391,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
           }
           openSegment = { part: { ...openSegment.part, text: next }, text: next };
         };
-        for await (const event of runClaudeTurn({ cwd: root, prompt: content, images,
+        for await (const event of runClaudeTurn({ cwd: root, prompt: content, images: imageData,
           userMessageId: user.id, instructions: [developerInstructions, sessionTempInstructions(tempDirectory)].filter(Boolean).join('\n\n'), dynamicTools, workspaceMcp, tempDirectory,
           goalCondition, sessionId: nativeId, resume: !!binding,
           model: selection.model, effort: selection.effort,

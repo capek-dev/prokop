@@ -60,21 +60,25 @@ function makeRepository(overrides: Partial<SessionRepositoryPort> = {}): Session
       validateImageMime: () => true,
       getByKey: () => null,
       listForSession: () => [],
-      create: () => ({
-        id: 'att-1',
-        sessionId: 'sess-1',
-        workspaceId: 'ws-1',
-        kind: 'file',
-        filename: 'f.txt',
-        mimeType: 'text/plain',
-        sizeBytes: 3,
-        absolutePath: '/tmp/f',
-        createdAt: new Date().toISOString(),
-        accessKey: 'secret-key',
-      }),
-      readFileBuffer: () => Buffer.from('abc'),
+      create: async () => attachmentRecord(),
+      openFile: async () => new Blob(['abc']),
     },
     ...overrides,
+  };
+}
+
+function attachmentRecord() {
+  return {
+    id: 'att-1',
+    sessionId: 'sess-1',
+    workspaceId: 'ws-1',
+    kind: 'file' as const,
+    filename: 'f.txt',
+    mimeType: 'text/plain',
+    sizeBytes: 3,
+    absolutePath: '/tmp/f',
+    createdAt: new Date().toISOString(),
+    accessKey: 'secret-key',
   };
 }
 
@@ -615,7 +619,7 @@ describe('HTTP session route contract', () => {
           createdAt: new Date().toISOString(),
           accessKey: 'k',
         }),
-        readFileBuffer: () => null,
+        openFile: async () => null,
       },
     }).app;
     const missingFile = await missingFileApp.request('/api/sessions/sess-1/attachments/att-1/content?key=k');
@@ -627,8 +631,8 @@ describe('HTTP session route contract', () => {
     const { app } = makeApp({
       attachments: {
         ...makeRepository().attachments,
-        getByKey: () => ({ ...makeRepository().attachments.create({ sessionId: 'sess-1', workspaceId: 'ws', filename: 'f', mimeType: 'text/plain', sizeBytes: 3, data: new ArrayBuffer(0) }) }),
-        readFileBuffer: () => Buffer.from('abc'),
+        getByKey: () => attachmentRecord(),
+        openFile: async () => new Blob(['abc']),
       },
     });
 

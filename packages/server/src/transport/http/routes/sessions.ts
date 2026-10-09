@@ -352,7 +352,7 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
     }
 
     const buffer = await file.arrayBuffer();
-    const attachment = application.createAttachment({
+    const attachment = await application.createAttachment({
       sessionId,
       filename: file.name || 'unnamed',
       mimeType,
@@ -391,12 +391,13 @@ export function registerSessionRoutes(app: Hono, application: SessionHttpApplica
       throw new ForbiddenError('Session mismatch');
     }
 
-    const fileBuffer = application.readAttachmentFile(attachment);
-    if (!fileBuffer) {
+    // Streamed from disk instead of read into memory on the event loop.
+    const file = await application.openAttachmentFile(attachment);
+    if (!file) {
       throw new NotFoundError('Attachment file not found on disk');
     }
 
-    return new Response(fileBuffer, {
+    return new Response(file, {
       headers: {
         'Content-Type': attachment.mimeType,
         'Content-Length': String(attachment.sizeBytes),

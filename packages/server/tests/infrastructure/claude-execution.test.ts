@@ -104,7 +104,7 @@ test.each(['success', 'failure', 'stop'] as const)('Claude queue after %s', asyn
 
 test('Claude wakes an idle image-only queue and keeps rejected images queued', async () => {
   const { wire } = wireFixture();
-  const image = createAttachment({ sessionId: 'session', workspaceId: 'ws', filename: 'photo.png',
+  const image = await createAttachment({ sessionId: 'session', workspaceId: 'ws', filename: 'photo.png',
     mimeType: 'image/png', sizeBytes: 4, data: new Uint8Array([137, 80, 78, 71]).buffer });
   addMessageToQueue('session', '', [{ id: image.id, kind: 'image' }]);
   const invalid = addMessageToQueue('session', '', [{ id: 'missing', kind: 'image' }]);
@@ -692,7 +692,7 @@ test('child keeps working after parent result and finishes on native task notifi
 
 test('validated image sends an SDK image block and persists a reloadable image part', async () => {
   const { createAttachment } = await import('@/infrastructure/sqlite/attachments');
-  const image = createAttachment({ sessionId: 'session', workspaceId: 'ws', filename: 'photo.png',
+  const image = await createAttachment({ sessionId: 'session', workspaceId: 'ws', filename: 'photo.png',
     mimeType: 'image/png', sizeBytes: 4, data: new Uint8Array([137, 80, 78, 71]).buffer });
   const prompts: SDKUserMessage[] = [];
   const { wire } = wireFixture();

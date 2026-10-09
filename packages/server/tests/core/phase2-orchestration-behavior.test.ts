@@ -205,7 +205,7 @@ describe.serial('Phase 2 orchestration behavior', () => {
   });
 
   test('drains queued messages in FIFO order and passes queued attachments into the next turn', async () => {
-    const attachment = createAttachment({
+    const attachment = await createAttachment({
       sessionId,
       workspaceId,
       filename: 'queued.png',
@@ -237,7 +237,7 @@ describe.serial('Phase 2 orchestration behavior', () => {
   });
 
   test('sends queued follow-ups in FIFO order with attachments after interruption', async () => {
-    const attachment = createAttachment({
+    const attachment = await createAttachment({
       sessionId,
       workspaceId,
       filename: 'queued.png',

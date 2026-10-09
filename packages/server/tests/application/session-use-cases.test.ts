@@ -147,7 +147,7 @@ function makeRepository(overrides: Partial<SessionRepositoryPort> = {}): Session
       getByKey: () => null,
       listForSession: () => [],
       create: () => { throw new Error('not used'); },
-      readFileBuffer: () => null,
+      openFile: async () => null,
     },
     ...overrides,
   };

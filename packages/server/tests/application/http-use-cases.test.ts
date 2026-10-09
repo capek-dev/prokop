@@ -55,8 +55,8 @@ function makeRepository(overrides: Partial<SessionRepositoryPort> = {}): Session
       validateImageMime: () => true,
       getByKey: () => null,
       listForSession: () => [],
-      create: () => ({ id: 'att-1', sessionId: 'sess-1', workspaceId: 'ws-1', kind: 'file', filename: 'f.txt', mimeType: 'text/plain', sizeBytes: 3, absolutePath: '/tmp/f', createdAt: new Date().toISOString(), accessKey: 'k' }),
-      readFileBuffer: () => Buffer.from('abc'),
+      create: async () => ({ id: 'att-1', sessionId: 'sess-1', workspaceId: 'ws-1', kind: 'file', filename: 'f.txt', mimeType: 'text/plain', sizeBytes: 3, absolutePath: '/tmp/f', createdAt: new Date().toISOString(), accessKey: 'k' }),
+      openFile: async () => new Blob(['abc']),
     },
     ...overrides,
   };
@@ -146,13 +146,13 @@ describe('session HTTP application', () => {
     expect(events).toEqual([]);
   });
 
-  test('createAttachment resolves the workspace from the session and returns null when missing', () => {
+  test('createAttachment resolves the workspace from the session and returns null when missing', async () => {
     const createInputs: unknown[] = [];
     const repository = makeRepository({
       getSession: () => makeSession({ workspaceId: 'ws-42' }),
       attachments: {
         ...makeRepository().attachments,
-        create: (input) => {
+        create: async (input) => {
           createInputs.push(input);
           return { id: 'att-1', sessionId: input.sessionId, workspaceId: input.workspaceId, kind: 'file', filename: input.filename, mimeType: input.mimeType, sizeBytes: input.sizeBytes, absolutePath: '/tmp/f', createdAt: new Date().toISOString(), accessKey: 'k' };
         },
@@ -160,13 +160,13 @@ describe('session HTTP application', () => {
     });
     const app = createSessionHttpApplication(repository);
 
-    const attachment = app.createAttachment({ sessionId: 'sess-1', filename: 'f.txt', mimeType: 'text/plain', sizeBytes: 3, data: new ArrayBuffer(0) });
+    const attachment = await app.createAttachment({ sessionId: 'sess-1', filename: 'f.txt', mimeType: 'text/plain', sizeBytes: 3, data: new ArrayBuffer(0) });
 
     expect(createInputs).toEqual([expect.objectContaining({ workspaceId: 'ws-42', filename: 'f.txt' })]);
     expect(attachment?.workspaceId).toBe('ws-42');
 
     const missingApp = createSessionHttpApplication(makeRepository({ getSession: () => null }));
-    expect(missingApp.createAttachment({ sessionId: 'missing', filename: 'f', mimeType: 'text/plain', sizeBytes: 1, data: new ArrayBuffer(0) })).toBeNull();
+    expect(await missingApp.createAttachment({ sessionId: 'missing', filename: 'f', mimeType: 'text/plain', sizeBytes: 1, data: new ArrayBuffer(0) })).toBeNull();
   });
 
   test('transcript reads delegate to the repository paging functions', async () => {

@@ -209,9 +209,9 @@ test('Codex sends session images as localImage inputs and persists image-only th
   Paths.configure({ dataDir: dir });
   try {
     create();
-    const first = createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'first.png',
+    const first = await createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'first.png',
       mimeType: 'image/png', sizeBytes: 3, data: new Uint8Array([1, 2, 3]).buffer });
-    const second = createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'second.webp',
+    const second = await createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'second.webp',
       mimeType: 'image/webp', sizeBytes: 2, data: new Uint8Array([4, 5]).buffer });
     const processes: ReturnType<typeof fakeCodex>[] = [];
     const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => {
@@ -258,11 +258,11 @@ test('Codex rejects invalid image references before creating a turn', async () =
     create();
     createSession({ id: 'other', workspaceId: 'ws', title: 'Other', status: 'active',
       preconfigId: null, metadata: null, parentId: null, agentName: null, harness: 'codex-cli' });
-    const image = createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'valid.png',
+    const image = await createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'valid.png',
       mimeType: 'image/png', sizeBytes: 1, data: new Uint8Array([1]).buffer });
-    const foreign = createAttachment({ sessionId: 'other', workspaceId: 'ws', filename: 'foreign.png',
+    const foreign = await createAttachment({ sessionId: 'other', workspaceId: 'ws', filename: 'foreign.png',
       mimeType: 'image/png', sizeBytes: 1, data: new Uint8Array([1]).buffer });
-    const file = createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'note.txt',
+    const file = await createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'note.txt',
       mimeType: 'text/plain', sizeBytes: 1, data: new Uint8Array([1]).buffer });
     const messages: ServerMessage[] = [];
     const execution = createCodexExecution({ version: () => { throw new Error('must not start'); },
@@ -2099,7 +2099,7 @@ test('Codex edit keeps image parts and resends validated image inputs', async ()
   Paths.configure({ dataDir: dir });
   try {
     const { users, turns } = seedRollbackTurns(1);
-    const image = createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'photo.png',
+    const image = await createAttachment({ sessionId: 's', workspaceId: 'ws', filename: 'photo.png',
       mimeType: 'image/png', sizeBytes: 2, data: new Uint8Array([1, 2]).buffer });
     createPart({ id: 'image-part', messageId: users[0]!, type: 'image', mimeType: 'image/png',
       url: `/api/sessions/s/attachments/${image.id}/content?key=${image.accessKey}`, createdAt: 1 }, 's');

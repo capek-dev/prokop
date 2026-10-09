@@ -1,5 +1,5 @@
 import { getDatabase } from './database';
-import { mkdirSync, writeFileSync, unlinkSync, rmSync, existsSync } from 'fs';
+import { mkdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import type { AttachmentKind } from '@prokopai/sdk';
 import { getAttachmentDir } from '@/infrastructure/runtime/paths';
@@ -100,27 +100,27 @@ export function getAttachmentByKey(attachmentId: string, accessKey: string): Att
   return mapRowToAttachment(row);
 }
 
-export function createAttachment(params: {
+/** Writes asynchronously: uploads reach 20 MB and must not stall the event loop. */
+export async function createAttachment(params: {
   sessionId: string;
   workspaceId: string;
   filename: string;
   mimeType: string;
   sizeBytes: number;
   data: ArrayBuffer;
-}): Attachment {
+}): Promise<Attachment> {
   const db = getDatabase();
   const id = 'att_' + crypto.randomUUID();
   const accessKey = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('hex');
   const kind = determineKind(params.mimeType);
   const attachmentDir = getAttachmentDir(params.workspaceId, params.sessionId);
 
-  mkdirSync(attachmentDir, { recursive: true });
+  await mkdir(attachmentDir, { recursive: true });
 
   const safeFilename = params.filename.replace(/[^a-zA-Z0-9.\-_]/g, '_');
   const absolutePath = join(attachmentDir, `${id}-${safeFilename}`);
 
-  const buffer = Buffer.from(params.data);
-  writeFileSync(absolutePath, buffer);
+  await writeFile(absolutePath, new Uint8Array(params.data));
 
   const createdAt = new Date().toISOString();
 
@@ -155,31 +155,34 @@ export function createAttachment(params: {
   };
 }
 
+/**
+ * Deletes the rows now and the files in the background: callers delete
+ * sessions synchronously, and a recursive remove of large uploads would stall
+ * the event loop. A failed remove only leaves orphaned files, as before.
+ */
 export function deleteAttachmentsForSession(sessionId: string): void {
   const attachments = getAttachmentsForSession(sessionId);
   const workspaceId = attachments[0]?.workspaceId || '';
 
-  for (const attachment of attachments) {
+  const db = getDatabase();
+  db.run('DELETE FROM attachments WHERE session_id = ?', [sessionId]);
+
+  void removeAttachmentFiles(attachments, getAttachmentDir(workspaceId, sessionId));
+}
+
+async function removeAttachmentFiles(attachments: Attachment[], attachmentDir: string): Promise<void> {
+  await Promise.all(attachments.map(async (attachment) => {
     try {
-      if (existsSync(attachment.absolutePath)) {
-        unlinkSync(attachment.absolutePath);
-      }
+      await rm(attachment.absolutePath, { force: true });
     } catch (err) {
       console.warn(`[attachments] Failed to delete file ${attachment.absolutePath}:`, err);
     }
-  }
-
+  }));
   try {
-    const attachmentDir = getAttachmentDir(workspaceId, sessionId);
-    if (existsSync(attachmentDir)) {
-      rmSync(attachmentDir, { recursive: true, force: true });
-    }
+    await rm(attachmentDir, { recursive: true, force: true });
   } catch (err) {
     console.warn(`[attachments] Failed to remove attachment dir:`, err);
   }
-
-  const db = getDatabase();
-  db.run('DELETE FROM attachments WHERE session_id = ?', [sessionId]);
 }
 
 export function deleteAttachmentsForWorkspace(workspaceId: string): void {

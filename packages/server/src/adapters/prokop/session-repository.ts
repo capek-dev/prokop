@@ -51,7 +51,6 @@ import {
   listAllPendingAsks,
   listPendingRequestsByRootSession,
 } from '@/infrastructure/sqlite/pending-asks';
-import { existsSync, readFileSync } from 'fs';
 import { getCodexApprovalPort } from '@/application/ports/codex-approval';
 import { getClaudeApprovalPort } from '@/application/ports/claude-approval';
 import type {
@@ -322,12 +321,12 @@ export function createProkopSessionRepository(
       listForSession(sessionId: string): AttachmentRecord[] {
         return getAttachmentsForSession(sessionId).map(toAttachmentRecord);
       },
-      create(input): AttachmentRecord {
-        return toAttachmentRecord(createAttachment(input));
+      async create(input): Promise<AttachmentRecord> {
+        return toAttachmentRecord(await createAttachment(input));
       },
-      readFileBuffer(record: AttachmentRecord): Buffer | null {
-        if (!existsSync(record.absolutePath)) return null;
-        return readFileSync(record.absolutePath);
+      async openFile(record: AttachmentRecord): Promise<Blob | null> {
+        const file = Bun.file(record.absolutePath);
+        return await file.exists() ? file : null;
       },
     },
   };

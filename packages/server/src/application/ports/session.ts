@@ -200,8 +200,9 @@ export interface SessionRepositoryPort {
     validateImageMime(mimeType: string): boolean;
     getByKey(attachmentId: string, accessKey: string): AttachmentRecord | null;
     listForSession(sessionId: string): AttachmentRecord[];
-    create(input: AttachmentCreateInput): AttachmentRecord;
-    readFileBuffer(record: AttachmentRecord): Buffer | null;
+    create(input: AttachmentCreateInput): Promise<AttachmentRecord>;
+    /** The stored file as a lazily read Blob (streamed by the response), or null when missing. */
+    openFile(record: AttachmentRecord): Promise<Blob | null>;
   };
 }
 

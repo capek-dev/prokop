@@ -125,9 +125,9 @@ export interface SessionHttpApplication {
   ): ToolOutputArtifactPage | null;
 
   listAttachments(sessionId: string): AttachmentRecord[];
-  createAttachment(input: SessionHttpAttachmentCreateInput): AttachmentRecord | null;
+  createAttachment(input: SessionHttpAttachmentCreateInput): Promise<AttachmentRecord | null>;
   getAttachmentByKey(attachmentId: string, accessKey: string): AttachmentRecord | null;
-  readAttachmentFile(record: AttachmentRecord): Buffer | null;
+  openAttachmentFile(record: AttachmentRecord): Promise<Blob | null>;
 
   toolOutputLimits(): { defaultPageChars: number; maxPageChars: number };
   isToolOutputArtifactId(id: string): boolean;
@@ -336,7 +336,7 @@ export function createSessionHttpApplication(
       return repository.attachments.listForSession(sessionId);
     },
 
-    createAttachment(input) {
+    async createAttachment(input) {
       const session = repository.getSession(input.sessionId);
       if (!session) return null;
       return repository.attachments.create({
@@ -353,8 +353,8 @@ export function createSessionHttpApplication(
       return repository.attachments.getByKey(attachmentId, accessKey);
     },
 
-    readAttachmentFile(record) {
-      return repository.attachments.readFileBuffer(record);
+    openAttachmentFile(record) {
+      return repository.attachments.openFile(record);
     },
 
     toolOutputLimits() {
