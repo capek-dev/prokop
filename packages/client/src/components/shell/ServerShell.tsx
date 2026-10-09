@@ -17,6 +17,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppHeader } from '@/components/app/AppHeader';
 import { AppFrameSkeleton } from './AppFrameSkeleton';
 import { WindowTitle } from './WindowTitle';
+import { UnreadTracker } from './UnreadTracker';
 import { OfflineState } from '@/components/shared/OfflineState';
 import { Button } from '@/components/ui/button';
 import { AppKeyboardHandlersMount } from '@/hooks/useAppKeyboardHandlers';
@@ -213,6 +214,7 @@ export default function ServerShell() {
             </div>
 
             <WindowTitle />
+            <UnreadTracker />
             <AppKeyboardHandlersMount
             sidebarRef={sidebarRef}
             terminalPanelRef={terminalPanelRef}

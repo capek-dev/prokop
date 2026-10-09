@@ -21,7 +21,6 @@
   --animate-pulse-soft: pulse-soft 2s ease-in-out infinite;
   --animate-blink: blink 1s ease-in-out infinite;
   --animate-stream-cursor: stream-cursor 1s ease-in-out infinite;
-  --animate-completion-flash: completion-flash 5s ease-out forwards;
   /* Loading indicators stay invisible for fast loads, then fade in. */
   --animate-appear-late: fade-in 120ms ease-out 300ms both;
 }
@@ -66,18 +65,6 @@
 @keyframes stream-cursor {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
-}
-
-@keyframes completion-flash {
-  0% {
-    background-color: oklch(0.85 0.15 145 / 0.4);
-  }
-  20% {
-    background-color: oklch(0.85 0.12 145 / 0.25);
-  }
-  100% {
-    background-color: oklch(0.85 0.15 145 / 0.15);
-  }
 }
 
 @layer base {
@@ -1115,4 +1102,30 @@ main {
   height: env(titlebar-area-height, 0px);
   -webkit-app-region: drag;
   app-region: drag;
+}
+
+/* ==========================================================================
+   WORKTREE IDENTITY
+   One color per worktree (hue from `lib/worktreeTone.ts`); lightness and
+   chroma follow the theme so chips stay readable in light and dark.
+   ========================================================================== */
+
+.worktree-tone {
+  --wt-l: 0.52;
+  --wt-c: 0.13;
+  --wt: oklch(var(--wt-l) var(--wt-c) var(--wt-hue, 255));
+}
+
+.dark .worktree-tone {
+  --wt-l: 0.76;
+  --wt-c: 0.11;
+}
+
+.worktree-chip {
+  color: var(--wt);
+  background-color: color-mix(in oklch, var(--wt) 13%, transparent);
+}
+
+.worktree-lane {
+  background-color: var(--wt);
 }

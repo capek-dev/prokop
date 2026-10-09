@@ -111,8 +111,11 @@ export function handleMessageUpdated(
 
     if (isTopLevel) {
       const isError = 'error' in message && message.status === 'error';
-      const flashStartedAt = Date.now();
-      setCompletion(message.sessionId, { type: 'flash-only', flashStartedAt });
+      // Unread unless you are looking at it right now (focused pane, window in front).
+      const isLookedAt = useSessionBoardStore.getState().focusedSessionId === message.sessionId
+        && document.visibilityState === 'visible'
+        && document.hasFocus();
+      if (!isLookedAt) setCompletion(message.sessionId, { finishedAt: Date.now(), failed: isError });
       if (!isError && chatFinishSoundEnabledRef.current) {
         playChatFinishSound();
       }

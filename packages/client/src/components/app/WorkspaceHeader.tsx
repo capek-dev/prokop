@@ -7,6 +7,8 @@ import { useSessionStore, type SessionUsage } from '@/stores/sessionStore';
 import { useSessionBoardStore } from '@/stores/sessionBoardStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { getWorkspacePreconfigs } from '@/lib/workspacePreconfigs';
+import { getWorkspaceDisplayName } from '@/lib/workspaceKind';
+import { useRouterState } from '@tanstack/react-router';
 import { useScopedServerData } from '@/contexts/HostScopeContext';
 
 const EMPTY_USAGE: SessionUsage = {
@@ -50,6 +52,10 @@ export function WorkspaceHeader({ sessionId }: { sessionId?: string } = {}) {
 
   const preconfigs = getWorkspacePreconfigs(sessionWorkspace, allPreconfigs);
   const lockPreconfig = !!sessionWorkspace?.settings?.isAgentHome;
+  // Overview mixes sessions from every workspace; name the one this pane belongs to.
+  const inOverview = useRouterState({ select: (s) => s.location.pathname.includes('/overview') });
+  const agents = useScopedServerData(s => s.agents);
+  const workspaceLabel = inOverview && sessionWorkspace ? getWorkspaceDisplayName(sessionWorkspace, agents) : null;
 
   // Until the resume reply fills the per-session maps, show what the session
   // record already carries, so the header renders complete in the first frame.
@@ -114,6 +120,7 @@ export function WorkspaceHeader({ sessionId }: { sessionId?: string } = {}) {
               selectedVariant={selectedVariant}
               variants={currentModelInfo?.variants}
               lockPreconfig={lockPreconfig}
+              workspaceLabel={workspaceLabel}
             />
           )}
         </div>

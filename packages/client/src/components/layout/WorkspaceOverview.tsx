@@ -223,7 +223,8 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
                 className="group/collapsible"
               >
                 <SidebarGroup>
-                  <SidebarGroupLabel className="gap-1">
+                  {/* Pinned while this workspace's sessions scroll by; the next header pushes it off. */}
+                  <SidebarGroupLabel className="sticky top-0 z-10 gap-1 bg-sidebar">
                     <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-2">
                       <ChevronRight className="size-3 shrink-0 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                       {isAgentHomeWorkspace(workspace) ? (
@@ -259,7 +260,8 @@ export const WorkspaceOverview = React.memo(function WorkspaceOverview({
                     </TooltipProvider>
                   </SidebarGroupLabel>
                   <CollapsibleContent>
-                    <SidebarGroupContent>
+                    {/* Guide line: rows visibly hang off their workspace header. */}
+                    <SidebarGroupContent className="ml-3.5 w-auto border-l border-sidebar-border/70 pl-1">
                       {isWsOpen && (
                         <>
                           {activeSessions.length === 0 ? (

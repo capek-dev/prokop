@@ -20,7 +20,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { useCompletionStore, selectCompletionRecord, COMPLETION_FLASH_DURATION_MS } from '@/stores/completionStore';
+import { useCompletionStore, selectCompletionRecord } from '@/stores/completionStore';
+import { worktreeToneStyle } from '@/lib/worktreeTone';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
 import { useSdkClient } from '@/contexts/ServerClientContext';
 import { SessionLearningMenu } from './SessionLearningMenu';
@@ -54,6 +55,8 @@ export interface SessionMenuButtonProps {
   allWorkspaceTags?: string[];
   onAddTag?: (sessionId: string, tag: string) => void;
   onRemoveTag?: (sessionId: string, tag: string) => void;
+  /** The list already groups by checkout; keep the colored edge, drop the chip. */
+  hideWorktreeChip?: boolean;
 }
 
 const SessionActionsDropdown = React.memo(function SessionActionsDropdown({
@@ -261,23 +264,53 @@ const SessionActionsDropdown = React.memo(function SessionActionsDropdown({
   );
 });
 
-type SessionDotState = 'running' | 'error' | 'interrupted' | 'warning' | 'idle';
+type SessionDotState = 'running' | 'error' | 'interrupted' | 'warning' | 'unread' | 'idle';
 
+/**
+ * One glyph per state, distinguishable without color: a spinning ring while
+ * working, a solid dot for "needs you" and "finished, not seen", faint when idle.
+ */
 const SessionStatusDot = React.memo(function SessionStatusDot({ state }: { state: SessionDotState }) {
+  if (state === 'running') {
+    return (
+      <span
+        aria-hidden
+        className="size-2 shrink-0 animate-spin rounded-full border-[1.5px] border-primary border-t-transparent"
+      />
+    );
+  }
   return (
-    <span
-      aria-hidden
-      className={cn(
-        'size-1.5 shrink-0 rounded-full',
-        state === 'running' && 'animate-pulse bg-primary',
-        state === 'error' && 'bg-destructive',
-        state === 'interrupted' && 'bg-muted-foreground/50',
-        state === 'warning' && 'animate-pulse bg-warning',
-        state === 'idle' && 'bg-muted-foreground/25',
-      )}
-    />
+    <span aria-hidden className="flex size-2 shrink-0 items-center justify-center">
+      <span
+        className={cn(
+          'rounded-full',
+          state === 'unread' || state === 'warning' ? 'size-2' : 'size-1.5',
+          state === 'unread' && 'bg-primary',
+          state === 'error' && 'bg-destructive',
+          state === 'interrupted' && 'bg-muted-foreground/50',
+          state === 'warning' && 'bg-warning',
+          state === 'idle' && 'bg-muted-foreground/25',
+        )}
+      />
+    </span>
   );
 });
+
+/** Worktree chip on the title line; the main checkout shows none. */
+function WorktreeChip({ worktreeId, label, available }: { worktreeId: string; label: string; available: boolean }) {
+  return (
+    <span
+      className={cn(
+        'worktree-tone shrink-0 max-w-[7.5rem] truncate rounded px-1.5 text-[11px] leading-4',
+        available ? 'worktree-chip' : 'bg-destructive/10 text-destructive line-through',
+      )}
+      style={worktreeToneStyle(worktreeId)}
+      title={available ? `Worktree: ${label}` : `Worktree unavailable: ${label}`}
+    >
+      {label}
+    </span>
+  );
+}
 
 function relativeSessionTime(iso?: string | null): string | null {
   if (!iso) return null;
@@ -340,6 +373,7 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
   allWorkspaceTags,
   onAddTag,
   onRemoveTag,
+  hideWorktreeChip = false,
 }: SessionMenuButtonProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(session.title || '');
@@ -361,43 +395,8 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
     return childDerived?.hasPendingPermission;
   });
 
-  const completionRecord = useCompletionStore(selectCompletionRecord(session.id));
-  const clearCompletion = useCompletionStore((s) => s.clearCompletion);
-  const [isFlashing, setIsFlashing] = useState(false);
-
-  useEffect(() => {
-    if (!completionRecord) {
-      setIsFlashing(false);
-      return;
-    }
-
-    const remainingTime = COMPLETION_FLASH_DURATION_MS - (Date.now() - completionRecord.flashStartedAt);
-    if (remainingTime <= 0) {
-      setIsFlashing(false);
-      if (completionRecord.type === 'flash-only') {
-        clearCompletion(session.id);
-      }
-      return;
-    }
-
-    setIsFlashing(true);
-    const timer = setTimeout(() => {
-      setIsFlashing(false);
-      if (completionRecord.type === 'flash-only') {
-        clearCompletion(session.id);
-      }
-    }, remainingTime);
-
-    return () => clearTimeout(timer);
-  }, [completionRecord, session.id, clearCompletion]);
-
-  const isSticky = completionRecord?.type === 'flash-then-sticky';
-
-  const highlightClass = isFlashing
-    ? 'animate-completion-flash rounded-md'
-    : isSticky
-      ? 'bg-[oklch(0.85_0.15_145_/_0.15)] rounded-md'
-      : '';
+  // Finished while you were elsewhere; cleared when you look at it.
+  const unread = useCompletionStore(selectCompletionRecord(session.id));
 
   const hasFocusedRef = useRef(false);
 
@@ -479,6 +478,8 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
     ? 'warning'
     : derived.isRunning
       ? 'running'
+      : unread
+        ? unread.failed ? 'error' : 'unread'
       : session.subagentStatus === 'error'
         ? 'error'
         : session.subagentStatus === 'interrupted'
@@ -500,20 +501,22 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
     </span>
   );
   else if (derived.isRunning) metaParts.push(<span key="status" className="text-primary">Running</span>);
+  else if (unread?.failed) metaParts.push(<span key="status" className="text-destructive">Failed</span>);
+  else if (unread) metaParts.push(<span key="status" className="text-primary">Finished</span>);
   else if (session.subagentStatus === 'error') metaParts.push(<span key="status" className="text-destructive">Errored</span>);
   else if (session.subagentStatus === 'interrupted') metaParts.push(<span key="status">Interrupted</span>);
-  if (session.workspaceRootId && worktreeLabel) metaParts.push(
+  const worktreeId = session.workspaceRootId && worktreeLabel ? session.workspaceRootId : null;
+  const worktreeChip = worktreeId && !hideWorktreeChip ? (
+    <WorktreeChip worktreeId={worktreeId} label={worktreeLabel!} available={resolvedWorktree?.state === 'available'} />
+  ) : null;
+  // Thin colored edge: sessions of one worktree read as a group at a glance.
+  const worktreeLane = worktreeId ? (
     <span
-      key="worktree"
-      className={cn(
-        'inline-block max-w-32 truncate align-bottom',
-        resolvedWorktree?.state !== 'available' && 'text-destructive',
-      )}
-      title={worktreeLabel}
-    >
-      ⑂ {worktreeLabel}
-    </span>,
-  );
+      aria-hidden
+      className="worktree-tone worktree-lane pointer-events-none absolute inset-y-1.5 left-0 w-0.5 rounded-full"
+      style={worktreeToneStyle(worktreeId)}
+    />
+  ) : null;
   for (const tag of session.tags?.slice(0, 2) ?? []) metaParts.push(<span key={`tag-${tag}`}>#{tag}</span>);
   if (childSessions.length > 0) metaParts.push(<span key="runs">{childSessions.length} {childSessions.length === 1 ? 'run' : 'runs'}</span>);
   const timeLabel = relativeSessionTime(session.updatedAt ?? session.createdAt);
@@ -527,9 +530,10 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
     return (
       <SidebarMenuItem>
         <div
-          className={cn('relative flex w-full items-center rounded-md', rowClassName, highlightClass)}
+          className={cn('relative flex w-full items-center rounded-md', rowClassName)}
           onClick={selectionMode ? handleRowClick : undefined}
         >
+          {worktreeLane}
           {isEditing ? (
             <input
               ref={inputRef}
@@ -575,9 +579,13 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
                   <SessionStatusDot state={statusState} />
                 )}
                 {/* Plain title: the app tooltip layer renders it. A Radix tooltip per row cost more than the row. */}
-                <span className="min-w-0 flex-1 truncate text-sm" title={session.title || 'Untitled'}>
+                <span
+                  className={cn('min-w-0 flex-1 truncate text-sm', unread && 'font-semibold text-sidebar-foreground')}
+                  title={session.title || 'Untitled'}
+                >
                   {session.title || 'Untitled'}
                 </span>
+                {worktreeChip}
               </div>
               <div className="flex min-w-0 items-center gap-1.5 pl-3.5 text-[10px] leading-none text-muted-foreground/80">
                 {metaParts.map((part, index) => (
@@ -618,9 +626,10 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
     >
       <SidebarMenuItem>
         <div
-          className={cn('relative flex w-full items-center rounded-md', rowClassName, highlightClass)}
+          className={cn('relative flex w-full items-center rounded-md', rowClassName)}
           onClick={selectionMode ? handleRowClick : undefined}
         >
+          {worktreeLane}
           {isEditing ? (
             <input
               ref={inputRef}
@@ -666,9 +675,13 @@ export const SessionMenuButton = React.memo(function SessionMenuButton({
                   <SessionStatusDot state={statusState} />
                 )}
                 {/* Plain title: the app tooltip layer renders it. A Radix tooltip per row cost more than the row. */}
-                <span className="min-w-0 flex-1 truncate text-sm" title={session.title || 'Untitled'}>
+                <span
+                  className={cn('min-w-0 flex-1 truncate text-sm', unread && 'font-semibold text-sidebar-foreground')}
+                  title={session.title || 'Untitled'}
+                >
                   {session.title || 'Untitled'}
                 </span>
+                {worktreeChip}
                 {!selectionMode && (
                   <CollapsibleTrigger asChild>
                     <button

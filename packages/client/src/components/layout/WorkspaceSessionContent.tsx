@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { ChevronRight, CheckSquare, X, Archive, MoreHorizontal, Trash2, Tag } from 'lucide-react';
 import type { Session, ScheduledJob } from '@prokopai/sdk';
 import {
@@ -32,8 +32,16 @@ import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { SESSION_TAG_ORDERS, isSessionTagOrder, orderedSessionGroupNames, type SessionTagOrder } from '@/lib/sessionTagOrder';
 import { useTagCollapseState } from '@/hooks/useTagCollapseState';
 import { usePendingOperationsStore } from '@/stores/pendingOperationsStore';
+import { useSessionGrouping } from '@/hooks/useSessionGrouping';
+import { useWorktreesQuery } from '@/hooks/queries';
+import { useSdkClient } from '@/contexts/ServerClientContext';
+import { groupSessionsByCheckout } from '@/lib/sessionCheckoutGroups';
+import { worktreeToneStyle } from '@/lib/worktreeTone';
+import { cn } from '@/lib/utils';
 
 interface WorkspaceSessionContentProps {
+  /** Active workspace; its grouping choice and worktree names come from here. */
+  workspaceId?: string | null;
   categories?: SessionCategories;
   sessionTagOrder?: SessionTagOrder;
   onSessionTagOrderChange?: (order: SessionTagOrder) => void;
@@ -72,6 +80,7 @@ interface WorkspaceSessionContentProps {
 }
 
 export function WorkspaceSessionContent({
+  workspaceId,
   categories,
   sessionTagOrder = 'tagged-first',
   onSessionTagOrderChange,
@@ -109,6 +118,7 @@ export function WorkspaceSessionContent({
   onLoadMore,
 }: WorkspaceSessionContentProps) {
   const { isTagOpen, toggleTag } = useTagCollapseState();
+  const [grouping, setGrouping] = useSessionGrouping(workspaceId);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
@@ -189,6 +199,7 @@ export function WorkspaceSessionContent({
 
   const renderSessionButton = (session: Session) => (
     <SessionMenuButton
+      hideWorktreeChip={grouping === 'checkout'}
       key={session.id}
       session={session}
       childrenMap={childrenMap}
@@ -274,7 +285,21 @@ export function WorkspaceSessionContent({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-48" onClick={e => e.stopPropagation()}>
-                    {onSessionTagOrderChange && (
+                    {workspaceId && (
+                      <>
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel>Group by</DropdownMenuLabel>
+                          <DropdownMenuRadioGroup value={grouping} onValueChange={value => {
+                            if (value === 'tags' || value === 'checkout') setGrouping(value);
+                          }}>
+                            <DropdownMenuRadioItem value="tags">Tags</DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="checkout">Checkout</DropdownMenuRadioItem>
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
+                    {onSessionTagOrderChange && grouping === 'tags' && (
                       <>
                         <DropdownMenuGroup>
                           <DropdownMenuLabel>Session order</DropdownMenuLabel>
@@ -312,7 +337,16 @@ export function WorkspaceSessionContent({
         </SidebarGroupLabel>
         <CollapsibleContent>
           <SidebarGroupContent>
-            {hasTags ? (
+            {grouping === 'checkout' && workspaceId ? (
+              <CheckoutGroupedSessions
+                workspaceId={workspaceId}
+                sessions={activeSessions}
+                renderSession={renderSessionButton}
+                renderCount={renderCount}
+                isOpen={isTagOpen}
+                onOpenChange={toggleTag}
+              />
+            ) : hasTags ? (
               <>
                 {orderedSessionGroupNames(orderedTagNames, ungroupedSessions.length > 0, sessionTagOrder).map(tagName => {
                   const sessions = tagGroups.get(tagName) ?? [];
@@ -532,4 +566,50 @@ export function WorkspaceSessionContent({
       />
     </>
   );
+}
+
+interface CheckoutGroupedSessionsProps {
+  workspaceId: string;
+  sessions: Session[];
+  renderSession: (session: Session) => ReactNode;
+  renderCount: (count: number) => ReactNode;
+  isOpen: (key: string) => boolean;
+  onOpenChange: (key: string, open: boolean) => void;
+}
+
+/** Sessions under one header per checkout; mounted only when grouping by checkout. */
+function CheckoutGroupedSessions({ workspaceId, sessions, renderSession, renderCount, isOpen, onOpenChange }: CheckoutGroupedSessionsProps) {
+  const worktrees = useWorktreesQuery(useSdkClient(), workspaceId);
+  const groups = useMemo(() => groupSessionsByCheckout(sessions, worktrees.data ?? []), [sessions, worktrees.data]);
+
+  return groups.map(group => {
+    const collapseKey = `checkout:${group.worktreeId ?? 'main'}`;
+    return (
+      <Collapsible key={collapseKey} open={isOpen(collapseKey)} onOpenChange={(open) => onOpenChange(collapseKey, open)} className="group/tag-collapsible">
+        <div className="flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-muted-foreground">
+          <CollapsibleTrigger asChild>
+            <button className="flex min-w-0 items-center gap-1.5 transition-colors hover:text-foreground">
+              <ChevronRight className="size-3 shrink-0 transition-transform group-data-[state=open]/tag-collapsible:rotate-90" />
+              {group.worktreeId ? (
+                <span
+                  aria-hidden
+                  className={cn('worktree-tone size-2 shrink-0 rounded-sm', group.available ? 'worktree-lane' : 'bg-destructive')}
+                  style={worktreeToneStyle(group.worktreeId)}
+                />
+              ) : (
+                <span aria-hidden className="size-2 shrink-0 rounded-sm border border-muted-foreground/40" />
+              )}
+              <span className={cn('truncate normal-case tracking-normal', !group.available && 'text-destructive line-through')}>{group.name}</span>
+              {renderCount(group.sessions.length)}
+            </button>
+          </CollapsibleTrigger>
+        </div>
+        <CollapsibleContent>
+          <SidebarMenu>
+            {group.sessions.map(renderSession)}
+          </SidebarMenu>
+        </CollapsibleContent>
+      </Collapsible>
+    );
+  });
 }

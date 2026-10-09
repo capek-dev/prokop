@@ -260,6 +260,7 @@ function WorkspaceSidebar() {
   const sidebarContent = (
     <WorkspaceSessionContent
       key={sidebarData.activeWorkspace?.id}
+      workspaceId={sidebarData.activeWorkspace?.id}
       categories={categories}
       sessionTagOrder={sidebarData.activeWorkspace?.settings?.sessionTagOrder}
       isSavingSettings={!sidebarData.connected || Boolean(activeWorkspace && isUpdatingWorkspace[activeWorkspace.id])}

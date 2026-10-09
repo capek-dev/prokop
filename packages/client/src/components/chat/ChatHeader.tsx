@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useHarnessesQuery, isHarnessEnabled } from '@/hooks/queries';
 import { toast } from 'sonner';
-import { ArrowLeft, Archive, Minimize2, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Archive, ChevronRight, Minimize2, Loader2, AlertTriangle } from 'lucide-react';
 import type { Session, Preconfig, ProkopaiClient } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +52,8 @@ interface ChatHeaderProps {
   variants?: Record<string, { providerOptions: Record<string, unknown> }>;
   /** When true, locks the preconfig selector (e.g. agent-home workspaces). */
   lockPreconfig?: boolean;
+  /** Shown before the title where sessions from several workspaces mix (Overview). */
+  workspaceLabel?: string | null;
 }
 
 export function ChatHeader({
@@ -73,6 +75,7 @@ export function ChatHeader({
   selectedVariant,
   variants,
   lockPreconfig,
+  workspaceLabel,
 }: ChatHeaderProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(session.title || '');
@@ -244,6 +247,13 @@ export function ChatHeader({
                 <ArrowLeft className="size-4" data-icon="inline-start" />
                 Back
               </Button>
+            )}
+
+            {workspaceLabel && !isEditing && (
+              <span className="flex min-w-0 shrink items-center gap-1 text-sm text-muted-foreground" title={`Workspace: ${workspaceLabel}`}>
+                <span className="max-w-[10rem] truncate">{workspaceLabel}</span>
+                <ChevronRight aria-hidden className="size-3.5 shrink-0 text-muted-foreground/60" />
+              </span>
             )}
 
             {isEditing ? (

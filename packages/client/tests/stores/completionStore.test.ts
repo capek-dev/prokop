@@ -1,117 +1,44 @@
-import { describe, test, expect, beforeEach } from 'vitest';
-import {
-  useCompletionStore,
-  selectCompletionRecord,
-  selectIsFlashing,
-  selectIsSticky,
-  COMPLETION_FLASH_DURATION_MS,
-  type CompletionRecord,
-} from '@/stores/completionStore';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-describe('completionStore', () => {
+const STORAGE_KEY = 'prokopai_unread_sessions';
+
+async function freshStore() {
+  vi.resetModules();
+  return import('@/stores/completionStore');
+}
+
+describe('completionStore (finished, not seen)', () => {
   beforeEach(() => {
-    useCompletionStore.getState().clearAllCompletions();
+    localStorage.clear();
   });
 
-  test('starts with empty completion state', () => {
+  it('marks and clears a session', async () => {
+    const { useCompletionStore, selectCompletionRecord } = await freshStore();
+    useCompletionStore.getState().setCompletion('s1', { finishedAt: 1, failed: false });
+    expect(selectCompletionRecord('s1')(useCompletionStore.getState())).toEqual({ finishedAt: 1, failed: false });
+    useCompletionStore.getState().clearCompletion('s1');
+    expect(selectCompletionRecord('s1')(useCompletionStore.getState())).toBeUndefined();
+  });
+
+  it('keeps unread marks across reloads', async () => {
+    const first = await freshStore();
+    first.useCompletionStore.getState().setCompletion('s1', { finishedAt: 5, failed: true });
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual({ s1: { finishedAt: 5, failed: true } });
+
+    const reloaded = await freshStore();
+    expect(reloaded.useCompletionStore.getState().completionState.get('s1')).toEqual({ finishedAt: 5, failed: true });
+  });
+
+  it('ignores clearing a session that is not marked', async () => {
+    const { useCompletionStore } = await freshStore();
+    const before = useCompletionStore.getState();
+    useCompletionStore.getState().clearCompletion('missing');
+    expect(useCompletionStore.getState()).toBe(before);
+  });
+
+  it('survives corrupt storage', async () => {
+    localStorage.setItem(STORAGE_KEY, '{not json');
+    const { useCompletionStore } = await freshStore();
     expect(useCompletionStore.getState().completionState.size).toBe(0);
-  });
-
-  describe('setCompletion', () => {
-    test('sets completion record for a session', () => {
-      const record: CompletionRecord = { type: 'flash-only', flashStartedAt: Date.now() };
-      useCompletionStore.getState().setCompletion('s1', record);
-      expect(useCompletionStore.getState().completionState.get('s1')).toEqual(record);
-    });
-
-    test('overwrites existing completion', () => {
-      const r1: CompletionRecord = { type: 'flash-only', flashStartedAt: 1000 };
-      const r2: CompletionRecord = { type: 'flash-then-sticky', flashStartedAt: 2000 };
-      useCompletionStore.getState().setCompletion('s1', r1);
-      useCompletionStore.getState().setCompletion('s1', r2);
-      expect(useCompletionStore.getState().completionState.get('s1')).toEqual(r2);
-    });
-  });
-
-  describe('clearCompletion', () => {
-    test('removes completion for a session', () => {
-      const record: CompletionRecord = { type: 'flash-only', flashStartedAt: Date.now() };
-      useCompletionStore.getState().setCompletion('s1', record);
-      useCompletionStore.getState().clearCompletion('s1');
-      expect(useCompletionStore.getState().completionState.has('s1')).toBe(false);
-    });
-
-    test('does nothing if session has no completion', () => {
-      useCompletionStore.getState().clearCompletion('nonexistent');
-      expect(useCompletionStore.getState().completionState.size).toBe(0);
-    });
-  });
-
-  describe('clearAllCompletions', () => {
-    test('removes all completions', () => {
-      useCompletionStore.getState().setCompletion('s1', { type: 'flash-only', flashStartedAt: Date.now() });
-      useCompletionStore.getState().setCompletion('s2', { type: 'flash-then-sticky', flashStartedAt: Date.now() });
-      useCompletionStore.getState().clearAllCompletions();
-      expect(useCompletionStore.getState().completionState.size).toBe(0);
-    });
-  });
-
-  describe('selectors', () => {
-    describe('selectCompletionRecord', () => {
-      test('returns record for session', () => {
-        const record: CompletionRecord = { type: 'flash-only', flashStartedAt: 1000 };
-        useCompletionStore.getState().setCompletion('s1', record);
-        const result = selectCompletionRecord('s1')(useCompletionStore.getState());
-        expect(result).toEqual(record);
-      });
-
-      test('returns undefined for missing session', () => {
-        expect(selectCompletionRecord('missing')(useCompletionStore.getState())).toBeUndefined();
-      });
-    });
-
-    describe('selectIsFlashing', () => {
-      test('returns false when no record', () => {
-        expect(selectIsFlashing('s1')(useCompletionStore.getState())).toBe(false);
-      });
-
-      test('returns true when within flash duration', () => {
-        useCompletionStore.getState().setCompletion('s1', {
-          type: 'flash-only',
-          flashStartedAt: Date.now(),
-        });
-        expect(selectIsFlashing('s1')(useCompletionStore.getState())).toBe(true);
-      });
-
-      test('returns false when flash duration has elapsed', () => {
-        useCompletionStore.getState().setCompletion('s1', {
-          type: 'flash-only',
-          flashStartedAt: Date.now() - COMPLETION_FLASH_DURATION_MS - 100,
-        });
-        expect(selectIsFlashing('s1')(useCompletionStore.getState())).toBe(false);
-      });
-    });
-
-    describe('selectIsSticky', () => {
-      test('returns false when no record', () => {
-        expect(selectIsSticky('s1')(useCompletionStore.getState())).toBe(false);
-      });
-
-      test('returns true for flash-then-sticky type', () => {
-        useCompletionStore.getState().setCompletion('s1', {
-          type: 'flash-then-sticky',
-          flashStartedAt: Date.now(),
-        });
-        expect(selectIsSticky('s1')(useCompletionStore.getState())).toBe(true);
-      });
-
-      test('returns false for flash-only type', () => {
-        useCompletionStore.getState().setCompletion('s1', {
-          type: 'flash-only',
-          flashStartedAt: Date.now(),
-        });
-        expect(selectIsSticky('s1')(useCompletionStore.getState())).toBe(false);
-      });
-    });
   });
 });
