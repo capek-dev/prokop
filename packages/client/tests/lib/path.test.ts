@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { dirname, basename, join } from '@/lib/path';
+import { dirname, basename, join, toWorkspaceFileTarget } from '@/lib/path';
 
 describe('dirname', () => {
   test('returns parent directory of a file path', () => {
@@ -96,5 +96,30 @@ describe('join', () => {
 
   test('preserves double slashes in middle of segment', () => {
     expect(join('a//b', 'c')).toBe('a//b/c');
+  });
+});
+
+describe('toWorkspaceFileTarget', () => {
+  const workspace = { path: '/Users/dev/jean2', additionalPaths: ['/Users/dev/shared/', '/Users/dev/jean2/vendor/lib'] };
+
+  test('an absolute path in the main root becomes relative, like the file tree uses', () => {
+    expect(toWorkspaceFileTarget('/Users/dev/jean2/packages/client/src/main.tsx', workspace))
+      .toEqual({ path: 'packages/client/src/main.tsx' });
+  });
+
+  test('an absolute path in an additional root keeps that root', () => {
+    expect(toWorkspaceFileTarget('/Users/dev/shared/notes.md', workspace))
+      .toEqual({ path: 'notes.md', root: '/Users/dev/shared/' });
+  });
+
+  test('the most specific root wins when roots are nested', () => {
+    expect(toWorkspaceFileTarget('/Users/dev/jean2/vendor/lib/index.ts', workspace))
+      .toEqual({ path: 'index.ts', root: '/Users/dev/jean2/vendor/lib' });
+  });
+
+  test('relative paths, sibling prefixes and outside paths are left alone', () => {
+    expect(toWorkspaceFileTarget('src/app.ts', workspace)).toEqual({ path: 'src/app.ts' });
+    expect(toWorkspaceFileTarget('/Users/dev/jean2-other/a.ts', workspace)).toEqual({ path: '/Users/dev/jean2-other/a.ts' });
+    expect(toWorkspaceFileTarget('/etc/hosts', workspace)).toEqual({ path: '/etc/hosts' });
   });
 });

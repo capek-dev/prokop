@@ -7,6 +7,8 @@
 
 ### Fixed
 
+- **Edit opens files changed by Claude Code and Codex**: Opening a file from an edit or code preview in the conversation and choosing Edit failed for files changed in Claude Code and Codex sessions, while the preview itself worked. It now opens in the editor, in the same tab as when opened from the file tree.
+
 - **Prompts sent while disconnected are no longer lost**: Sending while the connection was down cleared the input and dropped the prompt without a word. It now stays in the conversation as Not sent, ready to retry.
 
 - **Hover hints appear in place**: Hints for buttons and icons no longer slide in from the top-left corner of the window; they fade in where they belong.

@@ -5,6 +5,7 @@ import { FileDiff, PatchDiff } from '@pierre/diffs/react';
 import type { DiffHunk } from '@/utils/diff';
 import { cn } from '@/lib/utils';
 import { pathBasename } from '@/lib/platform';
+import { toWorkspaceFileTarget } from '@/lib/path';
 import { useUIStore } from '@/stores/uiStore';
 import { useServerDataStore } from '@/stores/serverDataStore';
 import { useTheme } from '@/components/providers/ThemeProvider';
@@ -97,7 +98,7 @@ export const DiffViewer = memo(function DiffViewer({
     if (!activeWorkspace) return;
     openFilePreview({
       workspaceId: activeWorkspace.id,
-      path,
+      ...toWorkspaceFileTarget(path, activeWorkspace),
       name: pathBasename(path),
     });
   };
