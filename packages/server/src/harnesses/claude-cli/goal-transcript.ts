@@ -1,7 +1,6 @@
-import { createReadStream, realpathSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join, resolve, sep } from 'node:path';
+import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
+import { claudeTranscriptPath } from './transcript';
 
 interface GoalRecord {
   type?: unknown;
@@ -15,16 +14,8 @@ interface GoalRecord {
 export async function readClaudeGoalVerdict(input: {
   root: string; nativeId: string; condition: string; startedAt: number;
 }): Promise<number | null> {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.nativeId)) return null;
-  const config = resolve(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'));
-  const project = input.root.replace(/[^a-zA-Z0-9]/g, '-');
-  const expectedDir = join(config, 'projects', project);
-  const expected = join(expectedDir, `${input.nativeId}.jsonl`);
-  let path: string;
-  try {
-    path = realpathSync(expected);
-    if (!path.startsWith(realpathSync(expectedDir) + sep)) return null;
-  } catch { return null; }
+  const path = claudeTranscriptPath(input.root, input.nativeId);
+  if (!path) return null;
 
   let bytes = 0;
   let marker = false;

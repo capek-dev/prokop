@@ -6,9 +6,11 @@ export { createClaudeExecution } from './execution';
 export { claudeCliAvailable, claudeCliVersion } from './version';
 export { listClaudeModels, listCachedClaudeModels, getClaudeModelSelection, saveClaudeModelSelection } from './models';
 export { readCachedClaudeUsageLimits } from './usage-limits';
+export { readClaudeSessionTitle } from './title';
 
 /** Claude CLI owns turns and model choice; titles use the universal
- * server-side regeneration supplied by the composition root. */
+ * server-side regeneration supplied by the composition root, which falls
+ * back to the CLI's own title (readClaudeSessionTitle). */
 export function createClaudeCliHarness(
   execution: Pick<SessionExecutionPort, 'sendMessage' | 'drainQueue' | 'interruptSession' | 'isSessionActive' | 'compact' | 'editMessage' | 'revert' | 'fork'>,
   regenerateTitle: SessionExecutionPort['regenerateTitle'],

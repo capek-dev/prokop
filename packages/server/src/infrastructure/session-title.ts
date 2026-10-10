@@ -85,7 +85,7 @@ export async function generateSessionTitle(messages: MessageWithParts[]): Promis
   if (title) return title;
 
   console.warn('[session-title] Rejected generated title, using fallback if possible:', text.slice(0, 200));
-  return fallbackTitleFromMessages(messages);
+  return fallbackSessionTitle(messages);
 }
 
 function buildConversationText(messages: MessageWithParts[]): string {
@@ -117,7 +117,7 @@ function normalizeTitle(value: string): string | null {
   return null;
 }
 
-function fallbackTitleFromMessages(messages: MessageWithParts[]): string | null {
+export function fallbackSessionTitle(messages: MessageWithParts[]): string | null {
   const firstUserText = messages
     .find(item => item.message.role === 'user')
     ?.parts

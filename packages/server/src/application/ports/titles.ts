@@ -10,4 +10,6 @@ export interface TitleGenerationPort {
   isDefaultSessionTitle(title: string | null | undefined): boolean;
   hasManualSessionTitle(metadata: Record<string, unknown> | null | undefined): boolean;
   generateSessionTitle(messages: MessageWithParts[]): Promise<string | null>;
+  /** A title from the first prompt's words; needs no model. */
+  fallbackSessionTitle(messages: MessageWithParts[]): string | null;
 }
