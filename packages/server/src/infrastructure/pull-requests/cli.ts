@@ -87,15 +87,17 @@ export const runCli: RunCli = ({ command, args, cwd, input, classify }) =>
       const stderr = Buffer.concat(err).toString();
       const message =
         classify?.(stderr) ??
-        (/429|rate.limit|throttl/i.test(stderr)
-          ? 'Provider rate limit reached. Wait before refreshing.'
-          : /401|not logged|authentication|az login|gh auth login/i.test(stderr)
-            ? command === 'gh'
-              ? 'Sign in on the Prokop server with gh auth login.'
-              : 'Sign in on the Prokop server with az login.'
-            : /403|forbidden|permission|policy|protected/i.test(stderr)
-              ? 'The provider refused this operation. Check your permissions and repository policies.'
-              : 'Provider command failed. Check server CLI authentication and PR state. Refresh before retrying a write.');
+        (/HTTP 30[1278]\b/.test(stderr)
+          ? 'The repository moved on the provider. Update the git remote URL, then refresh.'
+          : /429|rate.limit|throttl/i.test(stderr)
+            ? 'Provider rate limit reached. Wait before refreshing.'
+            : /401|not logged|authentication|az login|gh auth login/i.test(stderr)
+              ? command === 'gh'
+                ? 'Sign in on the Prokop server with gh auth login.'
+                : 'Sign in on the Prokop server with az login.'
+              : /403|forbidden|permission|policy|protected/i.test(stderr)
+                ? 'The provider refused this operation. Check your permissions and repository policies.'
+                : 'Provider command failed. Check server CLI authentication and PR state. Refresh before retrying a write.');
       finish(new BadRequestError(message));
     });
     child.stdin.end(input);

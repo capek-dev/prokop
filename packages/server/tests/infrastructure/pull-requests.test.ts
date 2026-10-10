@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'bun:test';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { parsePullRequestRemote } from '@/infrastructure/pull-requests/repositories';
 import { createGitHubPullRequests } from '@/infrastructure/pull-requests/github';
 import { createAzurePullRequests } from '@/infrastructure/pull-requests/azure';
-import type { CliRequest, RunCli } from '@/infrastructure/pull-requests/cli';
+import { runCli, type CliRequest, type RunCli } from '@/infrastructure/pull-requests/cli';
 import {
   AzureSetupError,
   azureRest,
@@ -27,7 +30,7 @@ const ghPr = {
   state: 'open',
   draft: false,
   head: { ref: 'feature', sha: head },
-  base: { ref: 'main', sha: base },
+  base: { ref: 'main', sha: base, repo: { full_name: 'acme/project' } },
   updated_at: '2026-10-08T00:00:00Z',
   requested_reviewers: [],
   node_id: 'PR_7',
@@ -96,7 +99,7 @@ describe('GitHub CLI adapter', () => {
     const provider = createGitHubPullRequests(
       async (call) => {
         calls.push(call);
-        return JSON.stringify(ghPr);
+        return JSON.stringify(call.input ? ghPr : { full_name: 'acme/project' });
       },
       '/checkout',
       githubRepo,
@@ -110,8 +113,8 @@ describe('GitHub CLI adapter', () => {
       draft: true,
       accountId: '1',
     });
-    expect(calls[0].cwd).toBe('/checkout');
-    expect(calls[0].args).toEqual([
+    expect(calls[1].cwd).toBe('/checkout');
+    expect(calls[1].args).toEqual([
       'api',
       '--hostname',
       'github.com',
@@ -121,7 +124,53 @@ describe('GitHub CLI adapter', () => {
       '--input',
       '-',
     ]);
-    expect(JSON.parse(calls[0].input!)).toMatchObject({ body, head: 'alice:feature', draft: true });
+    expect(JSON.parse(calls[1].input!)).toMatchObject({ body, head: 'alice:feature', draft: true });
+  });
+  test('writes to a renamed or transferred repository target its canonical name', async () => {
+    // GitHub answers writes to the old name with a 307 that gh does not follow.
+    const calls: CliRequest[] = [];
+    const moved = { ...ghPr, base: { ...ghPr.base, repo: { full_name: 'new-org/renamed' } } };
+    const provider = createGitHubPullRequests(
+      async (call) => {
+        calls.push(call);
+        if (call.input) return JSON.stringify(call.args.includes('PUT') ? { merged: true } : moved);
+        return JSON.stringify(
+          call.args.includes('repos/acme/project') ? { full_name: 'new-org/renamed' } : moved,
+        );
+      },
+      '/checkout',
+      githubRepo,
+    );
+    await provider.action(7, { ...guard, action: 'merge', method: 'squash' });
+    expect(calls.map((c) => c.args[5])).toEqual([
+      'repos/acme/project/pulls/7',
+      'repos/new-org/renamed/pulls/7/merge',
+    ]);
+    calls.length = 0;
+    await provider.create({
+      title: 'Feature',
+      body: '',
+      sourceBranch: 'feature',
+      targetBranch: 'main',
+      draft: false,
+      accountId: '1',
+    });
+    expect(calls.map((c) => c.args[5])).toEqual(['repos/acme/project', 'repos/new-org/renamed/pulls']);
+  });
+  test('an invalid canonical repository name blocks the write', async () => {
+    const calls: CliRequest[] = [];
+    const provider = createGitHubPullRequests(
+      async (call) => {
+        calls.push(call);
+        return JSON.stringify({ ...ghPr, base: { ...ghPr.base, repo: { full_name: 'a/b/c' } } });
+      },
+      '/checkout',
+      githubRepo,
+    );
+    await expect(provider.action(7, { ...guard, action: 'close' })).rejects.toThrow(
+      'invalid repository name',
+    );
+    expect(calls).toHaveLength(1);
   });
   test('rejects a stale merge without executing any write', async () => {
     const calls: CliRequest[] = [];
@@ -217,6 +266,23 @@ describe('GitHub CLI adapter', () => {
       githubRepo,
     );
     expect(await provider.list('merged', 1)).toEqual({ items: [], nextPage: 2 });
+  });
+});
+
+describe('CLI error classification', () => {
+  test('a provider redirect explains the moved repository instead of a generic failure', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'prokop-gh-'));
+    writeFileSync(join(dir, 'gh'), '#!/bin/sh\necho "gh: HTTP 307" >&2\nexit 1\n', { mode: 0o755 });
+    const path = process.env.PATH;
+    process.env.PATH = `${dir}:${path}`;
+    try {
+      await expect(runCli({ command: 'gh', args: ['api'], cwd: dir })).rejects.toThrow(
+        'repository moved',
+      );
+    } finally {
+      process.env.PATH = path;
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

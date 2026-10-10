@@ -11,6 +11,8 @@
 
 ### Fixed
 
+- **GitHub pull requests in renamed or transferred repositories can be merged again**: When a checkout's remote still used the repository's old name or owner, the PR list and details loaded, but merging, closing, editing, reviewing, commenting and creating a PR failed with "Provider command failed", because GitHub sends writes to the old name a redirect that GitHub CLI does not follow. Writes now go to the repository's current name, which GitHub reports. If a provider still answers with a redirect, the error says the repository moved and to update the git remote URL.
+
 - **Worktree sessions use the workspace's memory and skills**: Sessions in a worktree read memory (MEMORY.md, USER.md) and workspace skills from the worktree folder. Memory there starts empty because it is not in Git, and new memories were saved there and lost with the worktree. Prokop, Claude Code and Codex sessions in a worktree now read and save the main workspace's memory, and Prokop sessions use its skills, so an edit made in any worktree applies to the whole workspace.
 
 - **Claude Code and Codex can be picked in agent homes and Prokop-created workspaces**: The model picker hid Claude Code and Codex in agent homes and in workspaces Prokop created for you (such as the first default workspace), and the server refused to switch them. These workspaces have a real folder, so both CLIs are now offered there like in any other workspace. They are only unavailable when the workspace folder no longer exists.

@@ -47,6 +47,15 @@ function comment(value: unknown): PullRequestComment {
   };
 }
 const PAGE = 30;
+const repoPath = (owner: string, name: string) =>
+  `repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
+/** REST path for a provider-reported `full_name`, the canonical name after renames or transfers. */
+function canonicalPath(value: unknown): string {
+  const parts = required(value).split('/');
+  if (parts.length !== 2 || !parts[0] || !parts[1])
+    throw new BadRequestError('GitHub returned an invalid repository name.');
+  return repoPath(parts[0], parts[1]);
+}
 
 export function createGitHubPullRequests(
   run: RunCli,
@@ -54,7 +63,10 @@ export function createGitHubPullRequests(
   repo: PullRequestRepository,
 ): PullRequestProviderPort {
   const api = githubApi(run, cwd);
-  const base = `repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}`;
+  const base = repoPath(repo.owner, repo.name);
+  // GitHub answers writes to a renamed or transferred repository with a 307 that gh does not
+  // follow (reads get a followed 301), so writes target the canonical name from a read first.
+  const writeBase = async () => canonicalPath(object(await api(base)).full_name);
   const raw = (number: number) => api(`${base}/pulls/${number}`).then(object);
   const graph = async (query: string, variables: Record<string, unknown>) => {
     const response = object(await api('graphql', 'POST', { query, variables }));
@@ -255,7 +267,7 @@ export function createGitHubPullRequests(
     },
     async create(input) {
       return summary(
-        await api(`${base}/pulls`, 'POST', {
+        await api(`${await writeBase()}/pulls`, 'POST', {
           title: input.title,
           body: input.body,
           head: input.sourceBranch,
@@ -266,13 +278,14 @@ export function createGitHubPullRequests(
     },
     async action(number, input) {
       const pr = await checked(number, input.expectedHead);
+      const target = canonicalPath(object(object(pr.base).repo).full_name);
       switch (input.action) {
         case 'edit':
-          await api(`${base}/pulls/${number}`, 'PATCH', { title: input.title, body: input.body });
+          await api(`${target}/pulls/${number}`, 'PATCH', { title: input.title, body: input.body });
           break;
         case 'close':
         case 'reopen':
-          await api(`${base}/pulls/${number}`, 'PATCH', {
+          await api(`${target}/pulls/${number}`, 'PATCH', {
             state: input.action === 'close' ? 'closed' : 'open',
           });
           break;
@@ -289,7 +302,7 @@ export function createGitHubPullRequests(
           if (input.method === 'rebase-merge')
             throw new BadRequestError('GitHub does not support this merge method.');
           const result = object(
-            await api(`${base}/pulls/${number}/merge`, 'PUT', {
+            await api(`${target}/pulls/${number}/merge`, 'PUT', {
               sha: input.expectedHead,
               merge_method: input.method,
             }),
@@ -316,7 +329,7 @@ export function createGitHubPullRequests(
         case 'review': {
           const events = { comment: 'COMMENT', approve: 'APPROVE', 'request-changes': 'REQUEST_CHANGES' };
           if (!(input.verdict in events)) throw new BadRequestError('Unsupported GitHub review verdict.');
-          await api(`${base}/pulls/${number}/reviews`, 'POST', {
+          await api(`${target}/pulls/${number}/reviews`, 'POST', {
             commit_id: input.expectedHead,
             body: input.body,
             event: events[input.verdict as keyof typeof events],
@@ -325,17 +338,17 @@ export function createGitHubPullRequests(
         }
         case 'comment':
           if (input.position)
-            await api(`${base}/pulls/${number}/comments`, 'POST', {
+            await api(`${target}/pulls/${number}/comments`, 'POST', {
               body: input.body,
               commit_id: input.expectedHead,
               path: input.position.path,
               line: input.position.line,
               side: input.position.side,
             });
-          else await api(`${base}/issues/${number}/comments`, 'POST', { body: input.body });
+          else await api(`${target}/issues/${number}/comments`, 'POST', { body: input.body });
           break;
         case 'reviewer':
-          await api(`${base}/pulls/${number}/requested_reviewers`, input.remove ? 'DELETE' : 'POST', {
+          await api(`${target}/pulls/${number}/requested_reviewers`, input.remove ? 'DELETE' : 'POST', {
             reviewers: [input.reviewer],
           });
           break;
@@ -345,7 +358,7 @@ export function createGitHubPullRequests(
           if (!thread) throw new BadRequestError('Conversation is not part of this pull request.');
           if (input.action === 'reply') {
             if (!thread.comments[0]) throw new BadRequestError('Conversation has no comment to reply to.');
-            await api(`${base}/pulls/${number}/comments/${thread.comments[0].id}/replies`, 'POST', {
+            await api(`${target}/pulls/${number}/comments/${thread.comments[0].id}/replies`, 'POST', {
               body: input.body,
             });
           } else {
