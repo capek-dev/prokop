@@ -11,6 +11,8 @@
 
 ### Fixed
 
+- **Worktree sessions use the workspace's memory and skills**: Sessions in a worktree read memory (MEMORY.md, USER.md) and workspace skills from the worktree folder. Memory there starts empty because it is not in Git, and new memories were saved there and lost with the worktree. Prokop, Claude Code and Codex sessions in a worktree now read and save the main workspace's memory, and Prokop sessions use its skills, so an edit made in any worktree applies to the whole workspace.
+
 - **Claude Code and Codex can be picked in agent homes and Prokop-created workspaces**: The model picker hid Claude Code and Codex in agent homes and in workspaces Prokop created for you (such as the first default workspace), and the server refused to switch them. These workspaces have a real folder, so both CLIs are now offered there like in any other workspace. They are only unavailable when the workspace folder no longer exists.
 
 - **Claude Code and Codex sessions get titles without a Prokop model**: Without a model set up in Prokop, every finished turn showed "Title generation failed" and the session stayed "New session". Claude Code sessions now use the title Claude Code writes for its own sessions, with no extra model call. When no title is available yet, the first words of your first prompt become the title, and a later turn replaces it once a better title exists. Sessions you renamed are never retitled. A configured Prokop model is still used first. Automatic titling no longer shows errors; only Regenerate title reports a failure.

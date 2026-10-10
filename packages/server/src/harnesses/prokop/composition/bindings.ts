@@ -8,7 +8,7 @@ import { installSkillsToolFallback } from '@/harnesses/prokop/composition/plugin
 import { installTaskToolFallback } from '@/harnesses/prokop/composition/plugins/subagent-domain';
 import { installWorkflowToolFallback } from '@/harnesses/prokop/composition/plugins/workflow-domain';
 import { setDefaultContextAssembler } from '@/harnesses/prokop/context/assembler';
-import { resolveWorkspaceMemoryDir } from '@/infrastructure/runtime/workspace-dirs';
+import { resolveWorkspaceMemoryDir, resolveWorkspaceSkillsDir } from '@/infrastructure/runtime/workspace-dirs';
 import { prokopDeliveryBindings } from '@/harnesses/prokop/host/delivery';
 import { prokopInteractionBindings } from '@/harnesses/prokop/host/interaction';
 import { prokopSandboxBindings } from '@/harnesses/prokop/host/sandbox';
@@ -27,7 +27,7 @@ export const prokopCompatibilityBindings = {
   sandbox: prokopSandboxBindings,
   layout: {
     workspaceMemoryDir: (workspacePath: string) => resolveWorkspaceMemoryDir(workspacePath),
-    workspaceSkillsDir: (workspacePath: string) => join(workspacePath, '.agents', 'skills'),
+    workspaceSkillsDir: (workspacePath: string) => resolveWorkspaceSkillsDir(workspacePath),
     agentSkillsDir: (agentDir: string) => join(agentDir, 'skills'),
     toolOutputTempRoot: () => join(tmpdir(), 'jean2'),
   },
