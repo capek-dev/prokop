@@ -42,11 +42,11 @@ export function checkHarnessCreate(
   }
   const workspaceId = input.workspaceId || '';
   if (harness === 'claude-cli' && !policy.claudeWorkspaceAvailable?.(workspaceId)) {
-    return { ok: false, code: 'invalid_session', message: 'Claude CLI requires a physical workspace' };
+    return { ok: false, code: 'invalid_session', message: 'Claude CLI requires a workspace folder on this host' };
   }
   if (harness === 'codex-cli' && !policy.codexWorkspaceAvailable(workspaceId)) {
     return { ok: false, code: 'invalid_session',
-      message: 'Codex CLI requires a physical workspace' };
+      message: 'Codex CLI requires a workspace folder on this host' };
   }
   if (harness === 'codex-cli' && (typeof input.preconfigId !== 'string' || !input.preconfigId.trim())) {
     return { ok: false, code: 'invalid_session', message: 'Codex CLI requires a preconfig' };

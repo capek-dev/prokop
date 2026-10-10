@@ -24,7 +24,7 @@ test('Codex availability and physical workspace fail closed while preconfigs are
     ok: false, message: 'Codex CLI 0.156.x is unavailable on this host',
   });
   expect(checkHarnessCreate({ ...request, workspaceId: 'virtual' }, policy)).toMatchObject({
-    ok: false, message: 'Codex CLI requires a physical workspace',
+    ok: false, message: 'Codex CLI requires a workspace folder on this host',
   });
   expect(checkHarnessCreate(request, policy)).toMatchObject({ ok: false, message: 'Codex CLI requires a preconfig' });
   expect(checkHarnessCreate({ ...request, preconfigId: ' ' }, policy)).toMatchObject({ ok: false });
@@ -45,7 +45,7 @@ test('Claude creation requires the local CLI and a physical workspace', () => {
   const available = { ...policy, claudeAvailable: () => true,
     claudeWorkspaceAvailable: (id: string) => id === 'physical' };
   expect(checkHarnessCreate({ ...request, workspaceId: 'virtual' }, available))
-    .toMatchObject({ ok: false, message: 'Claude CLI requires a physical workspace' });
+    .toMatchObject({ ok: false, message: 'Claude CLI requires a workspace folder on this host' });
   expect(checkHarnessCreate(request, available)).toEqual({ ok: true, harness: 'claude-cli' });
 });
 

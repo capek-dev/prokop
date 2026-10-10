@@ -6,11 +6,12 @@ function workspace(overrides: Partial<Workspace>): Workspace {
   return { id: 'ws', name: 'ws', path: '/tmp/ws', isVirtual: false, settings: {}, ...overrides } as unknown as Workspace;
 }
 
-test('CLI workspace check requires a real root, with agent homes exempt from the virtual block', () => {
+test('CLI workspace check requires a root folder, virtual or not', () => {
   expect(cliWorkspaceAvailable(null)).toBe(false);
   expect(cliWorkspaceAvailable(workspace({ path: undefined }))).toBe(false);
-  expect(cliWorkspaceAvailable(workspace({ isVirtual: true }))).toBe(false);
-  // Agent homes are virtual rows backed by a real directory: reviews run there.
+  expect(cliWorkspaceAvailable(workspace({ path: '' }))).toBe(false);
+  // Virtual workspaces and agent homes are backed by a Prokop-created folder.
+  expect(cliWorkspaceAvailable(workspace({ isVirtual: true }))).toBe(true);
   expect(cliWorkspaceAvailable(workspace({ isVirtual: true, settings: { isAgentHome: true } }))).toBe(true);
   expect(cliWorkspaceAvailable(workspace({}))).toBe(true);
 });

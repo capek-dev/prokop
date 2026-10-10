@@ -11,6 +11,8 @@
 
 ### Fixed
 
+- **Claude Code and Codex can be picked in agent homes and Prokop-created workspaces**: The model picker hid Claude Code and Codex in agent homes and in workspaces Prokop created for you (such as the first default workspace), and the server refused to switch them. These workspaces have a real folder, so both CLIs are now offered there like in any other workspace. They are only unavailable when the workspace folder no longer exists.
+
 - **Claude Code and Codex sessions get titles without a Prokop model**: Without a model set up in Prokop, every finished turn showed "Title generation failed" and the session stayed "New session". Claude Code sessions now use the title Claude Code writes for its own sessions, with no extra model call. When no title is available yet, the first words of your first prompt become the title, and a later turn replaces it once a better title exists. Sessions you renamed are never retitled. A configured Prokop model is still used first. Automatic titling no longer shows errors; only Regenerate title reports a failure.
 
 - **Branches pushed from a terminal no longer stay "Not published"**: A branch pushed outside the Branches tab (for example `git push origin feature` without `-u`, or from another clone) used to show Not published forever, and Fetch and Push could not fix it because there was nothing to push. When the remote has a branch with the same name, the Branches tab now shows "On origin/feature, not tracked" with a Track button. Push review offers Track too when the remote branch already exists. Tracking fetches that one branch first, so it works even if this checkout never fetched it, and it never replaces an upstream that is already set.

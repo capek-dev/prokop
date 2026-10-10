@@ -640,7 +640,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
           throw new Error('Claude session is unavailable or busy');
         }
         const workspace = getWorkspace(session.workspaceId);
-        if (!workspace?.path || workspace.isVirtual) throw new Error('Claude workspace is unavailable');
+        if (!cliWorkspaceAvailable(workspace)) throw new Error('Claude workspace is unavailable');
         const worktree = session.workspaceRootId
           ? createManagedWorktreeRepository(getDatabase).get(session.workspaceRootId) : null;
         if (session.workspaceRootId && (!worktree || worktree.workspaceId !== session.workspaceId
