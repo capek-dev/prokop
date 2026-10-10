@@ -31,30 +31,41 @@ interface TitleHarness {
   wire: SessionWirePorts<Origin>;
   state: {
     session: Session | null;
-    updateCalls: Array<{ id: string; title?: string }>;
+    updateCalls: Array<{ id: string; title?: string; metadata?: Record<string, unknown> | null }>;
     generatedFrom: MessageWithParts[][] | null;
     titleResult: string | null;
     error: Error | null;
+    harnessResult: string | null;
+    harnessCalls: string[];
+    fallbackResult: string | null;
+    /** Runs while the model generates, to simulate concurrent changes. */
+    duringGeneration: (() => void) | null;
     sent: ServerMessage[];
     broadcasts: ServerMessage[];
   };
 }
 
-function makeTitleHarness(session: Session | null = makeSession()): TitleHarness {
-  const state = {
+function makeTitleHarness(session: Session | null = makeSession(), options: { harness?: boolean } = {}): TitleHarness {
+  const state: TitleHarness['state'] = {
     session,
-    updateCalls: [] as Array<{ id: string; title?: string }>,
-    generatedFrom: null as MessageWithParts[][] | null,
-    titleResult: 'Login bug fix' as string | null,
-    error: null as Error | null,
-    sent: [] as ServerMessage[],
-    broadcasts: [] as ServerMessage[],
+    updateCalls: [],
+    generatedFrom: null,
+    titleResult: 'Login bug fix',
+    error: null,
+    harnessResult: null,
+    harnessCalls: [],
+    fallbackResult: 'help me fix the login',
+    duringGeneration: null,
+    sent: [],
+    broadcasts: [],
   };
   const repository = {
     getSession: () => state.session,
-    updateSession: (id: string, updates: { title?: string }) => {
-      state.updateCalls.push({ id, title: updates.title });
-      return state.session ? { ...state.session, title: updates.title ?? state.session.title } : null;
+    updateSession: (id: string, updates: { title?: string; metadata?: Record<string, unknown> | null }) => {
+      state.updateCalls.push({ id, ...updates });
+      if (!state.session) return null;
+      state.session = { ...state.session, ...updates } as Session;
+      return state.session;
     },
     listLatestMessagesWithPartsPage: () => ({
       messages: pageMessages,
@@ -66,9 +77,11 @@ function makeTitleHarness(session: Session | null = makeSession()): TitleHarness
     hasManualSessionTitle: metadata => metadata?.titleManuallyRenamed === true,
     async generateSessionTitle(messages) {
       state.generatedFrom = [...(state.generatedFrom ?? []), messages];
+      state.duringGeneration?.();
       if (state.error) throw state.error;
       return state.titleResult;
     },
+    fallbackSessionTitle: () => state.fallbackResult,
   };
   const wire = {
     delivery: {
@@ -78,7 +91,10 @@ function makeTitleHarness(session: Session | null = makeSession()): TitleHarness
     },
     actor: { attachOriginToSession: () => {} },
   } as unknown as SessionWirePorts<Origin>;
-  const regenerate = createSessionTitleRegeneration<Origin>({ repository, titles });
+  const harnessTitle = options.harness
+    ? async (sessionId: string) => { state.harnessCalls.push(sessionId); return state.harnessResult; }
+    : undefined;
+  const regenerate = createSessionTitleRegeneration<Origin>({ repository, titles, harnessTitle });
   return { regenerate, wire, state };
 }
 
@@ -113,24 +129,84 @@ describe('universal server-side session title regeneration', () => {
     expect(forced.state.updateCalls).toEqual([{ id: 'sess-1', title: 'Login bug fix' }]);
   });
 
-  test('reports title_generation_error to the origin when generation returns nothing', async () => {
+  test('without a Prokop model, uses the harness CLI title', async () => {
+    const { regenerate, wire, state } = makeTitleHarness(makeSession(), { harness: true });
+    state.error = new Error('No model configured');
+    state.harnessResult = 'Login bug investigation';
+    await regenerate(wire, origin, 'sess-1');
+    expect(state.harnessCalls).toEqual(['sess-1']);
+    expect(state.updateCalls).toEqual([{ id: 'sess-1', title: 'Login bug investigation' }]);
+    expect(state.sent).toEqual([]);
+  });
+
+  test('prefers the Prokop model over the harness CLI title', async () => {
+    const { regenerate, wire, state } = makeTitleHarness(makeSession(), { harness: true });
+    state.harnessResult = 'Login bug investigation';
+    await regenerate(wire, origin, 'sess-1');
+    expect(state.harnessCalls).toEqual([]);
+    expect(state.updateCalls).toEqual([{ id: 'sess-1', title: 'Login bug fix' }]);
+  });
+
+  test('without any title source, uses the first prompt and marks it replaceable, quietly', async () => {
+    const { regenerate, wire, state } = makeTitleHarness(makeSession({ metadata: { claudeGoal: null } }), { harness: true });
+    state.error = new Error('No model configured');
+    await regenerate(wire, origin, 'sess-1');
+    expect(state.updateCalls).toEqual([
+      { id: 'sess-1', title: 'help me fix the login', metadata: { claudeGoal: null, titleFallback: true } },
+    ]);
+    expect(state.broadcasts).toHaveLength(1);
+    expect(state.sent).toEqual([]);
+  });
+
+  test('a later turn replaces a first-prompt title and clears the mark', async () => {
+    const { regenerate, wire, state } = makeTitleHarness(makeSession(), { harness: true });
+    state.error = new Error('No model configured');
+    await regenerate(wire, origin, 'sess-1');
+    // Same first-prompt title again: nothing to persist or broadcast.
+    await regenerate(wire, origin, 'sess-1');
+    expect(state.updateCalls).toHaveLength(1);
+    expect(state.broadcasts).toHaveLength(1);
+
+    state.harnessResult = 'Login bug investigation';
+    await regenerate(wire, origin, 'sess-1');
+    expect(state.updateCalls.at(-1)).toEqual({ id: 'sess-1', title: 'Login bug investigation', metadata: {} });
+    expect(state.session?.metadata).toEqual({});
+
+    // A real title is final: later turns leave it alone.
+    state.harnessResult = 'Something else';
+    await regenerate(wire, origin, 'sess-1');
+    expect(state.session?.title).toBe('Login bug investigation');
+  });
+
+  test('a manual rename during generation wins', async () => {
+    const { regenerate, wire, state } = makeTitleHarness();
+    state.duringGeneration = () => {
+      state.session = { ...state.session!, title: 'My title', metadata: { titleManuallyRenamed: true } };
+    };
+    await regenerate(wire, origin, 'sess-1');
+    expect(state.updateCalls).toEqual([]);
+    expect(state.session?.title).toBe('My title');
+  });
+
+  test('automatic titling stays quiet when no title can be made', async () => {
     const { regenerate, wire, state } = makeTitleHarness();
     state.titleResult = null;
+    state.fallbackResult = null;
     await regenerate(wire, origin, 'sess-1');
+    expect(state.updateCalls).toEqual([]);
+    expect(state.broadcasts).toEqual([]);
+    expect(state.sent).toEqual([]);
+  });
+
+  test('a requested regeneration reports title_generation_error when no title can be made', async () => {
+    const { regenerate, wire, state } = makeTitleHarness();
+    state.error = new Error('model unavailable');
+    state.fallbackResult = null;
+    await regenerate(wire, origin, 'sess-1', { force: true });
     expect(state.updateCalls).toEqual([]);
     expect(state.broadcasts).toEqual([]);
     expect(state.sent).toEqual([
       { type: 'error', code: 'title_generation_error', message: 'Could not generate a title from the conversation.', sessionId: 'sess-1' },
-    ]);
-  });
-
-  test('reports title_generation_error to the origin when generation throws', async () => {
-    const { regenerate, wire, state } = makeTitleHarness();
-    state.error = new Error('model unavailable');
-    await regenerate(wire, origin, 'sess-1');
-    expect(state.updateCalls).toEqual([]);
-    expect(state.sent).toEqual([
-      { type: 'error', code: 'title_generation_error', message: 'Title generation failed: model unavailable', sessionId: 'sess-1' },
     ]);
   });
 

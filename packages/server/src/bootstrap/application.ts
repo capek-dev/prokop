@@ -124,8 +124,9 @@ import {
 import { createHarnessExecution, type HarnessRegistration } from '@/application/sessions/harness-execution';
 import { installHeadlessExecutionPort } from '@/application/ports/headless-execution';
 import { claudeCliAvailable, claudeCliVersion, createClaudeCliHarness, createClaudeExecution,
-  getClaudeModelSelection, listCachedClaudeModels, readCachedClaudeUsageLimits,
+  getClaudeModelSelection, listCachedClaudeModels, readCachedClaudeUsageLimits, readClaudeSessionTitle,
   saveClaudeModelSelection } from '@/harnesses/claude-cli';
+import { fallbackSessionTitle } from '@/infrastructure/session-title';
 import { createHarnessSettingsApplication } from '@/application/harnesses/settings';
 import { createServerSettingsRepository } from '@/infrastructure/sqlite/server-settings';
 import { createDeviceAccessRepository } from '@/infrastructure/sqlite/device-access';
@@ -211,8 +212,11 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
 
   const repository = createProkopSessionRepository(agents);
   // Universal server-side title generation shared by the external harnesses;
-  // the Prokop harness keeps its Capek implementation.
-  const sessionTitleRegeneration = createSessionTitleRegeneration({ repository, titles: prokopTitleBindings });
+  // the Prokop harness keeps its Capek implementation. Claude Code writes its
+  // own session title, so Claude sessions get one without a Prokop model.
+  const sessionTitles = { repository, titles: { ...prokopTitleBindings, fallbackSessionTitle } };
+  const codexTitleRegeneration = createSessionTitleRegeneration(sessionTitles);
+  const claudeTitleRegeneration = createSessionTitleRegeneration({ ...sessionTitles, harnessTitle: readClaudeSessionTitle });
   let refreshWorktreeAttachments: ((worktreeId: string) => void) | null = null;
   const worktreeAttachments = {
     changed: (worktreeId: string): void => refreshWorktreeAttachments?.(worktreeId),
@@ -263,8 +267,8 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
         }
       },
     }),
-    'codex-cli': createCodexCliHarness(codexExecution, sessionTitleRegeneration),
-    'claude-cli': createClaudeCliHarness(claudeExecution, sessionTitleRegeneration),
+    'codex-cli': createCodexCliHarness(codexExecution, codexTitleRegeneration),
+    'claude-cli': createClaudeCliHarness(claudeExecution, claudeTitleRegeneration),
   };
   const execution = createHarnessExecution(repository, harnessRegistrations);
   // Headless (scheduled) dispatch routes through the harness registry: the
