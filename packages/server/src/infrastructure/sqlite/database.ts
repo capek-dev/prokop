@@ -46,17 +46,27 @@ class DatabaseSingleton {
       const dbPath = resolveDatabasePath();
       mkdirSync(dirname(dbPath), { recursive: true });
       const db = new Database(dbPath);
-      db.run('PRAGMA journal_mode = WAL');
-      // WAL pairing: NORMAL keeps committed transactions process-crash-safe;
-      // only OS/power loss can lose the WAL tail (reconciliation + FTS
-      // backfill cover it). Single-writer invariant: only this process writes.
-      db.run('PRAGMA synchronous = NORMAL');
-      db.run('PRAGMA foreign_keys = ON');
+      configureConnection(db);
       initializeSchema(db);
       this.dbDefault = db;
     }
     return this.dbDefault;
   }
+}
+
+/** Milliseconds a write waits for another connection's lock before SQLITE_BUSY. */
+export const BUSY_TIMEOUT_MS = 5000;
+
+export function configureConnection(db: Database): void {
+  db.run('PRAGMA journal_mode = WAL');
+  // WAL pairing: NORMAL keeps committed transactions process-crash-safe;
+  // only OS/power loss can lose the WAL tail (reconciliation + FTS
+  // backfill cover it). Only this process writes by design, but outside
+  // readers or tools (sqlite3, a stray test run) can briefly hold the lock;
+  // waiting keeps a mid-turn write from failing and stranding the session.
+  db.run('PRAGMA synchronous = NORMAL');
+  db.run(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
+  db.run('PRAGMA foreign_keys = ON');
 }
 
 export const DB = new DatabaseSingleton();

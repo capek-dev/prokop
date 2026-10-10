@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **Busy database no longer breaks Claude Code sessions**: When another process briefly held the database (a `sqlite3` shell or a test run), a turn could fail with "database is locked" and leave the session refusing every later prompt with "requires reconciliation". The server now waits up to 5 seconds for the database instead of failing right away. Server tests now run against a temporary data folder and never open your real `~/.prokopai` database.
+
 - **Edit opens files changed by Claude Code and Codex**: Opening a file from an edit or code preview in the conversation and choosing Edit failed for files changed in Claude Code and Codex sessions, while the preview itself worked. It now opens in the editor, in the same tab as when opened from the file tree.
 
 - **Prompts sent while disconnected are no longer lost**: Sending while the connection was down cleared the input and dropped the prompt without a word. It now stays in the conversation as Not sent, ready to retry.
