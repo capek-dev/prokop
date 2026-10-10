@@ -127,6 +127,7 @@ import { claudeCliAvailable, claudeCliVersion, createClaudeCliHarness, createCla
   getClaudeModelSelection, listCachedClaudeModels, readCachedClaudeUsageLimits, readClaudeSessionTitle,
   saveClaudeModelSelection } from '@/harnesses/claude-cli';
 import { fallbackSessionTitle } from '@/infrastructure/session-title';
+import { cliWorkspaceAvailable } from '@/harnesses/shared/cli-workspace';
 import { createHarnessSettingsApplication } from '@/application/harnesses/settings';
 import { createServerSettingsRepository } from '@/infrastructure/sqlite/server-settings';
 import { createDeviceAccessRepository } from '@/infrastructure/sqlite/device-access';
@@ -293,9 +294,10 @@ export function createWiredApplication(existingAgents?: AgentsApplication): Wire
   const toolCatalog = createProkopToolCatalogPort();
   const managedWorktrees = createManagedWorktreeRepository(getDatabase);
   const harnessSettings = createHarnessSettingsApplication(createServerSettingsRepository(getDatabase));
+  // Shared by both CLI harnesses: the same rule their turns enforce, plus the folder must exist.
   const codexWorkspaceAvailable = (workspaceId: string): boolean => {
     const workspace = getWorkspace(workspaceId);
-    return Boolean(workspace && !workspace.isVirtual && workspace.path && existsSync(workspace.path));
+    return cliWorkspaceAvailable(workspace) && existsSync(workspace.path);
   };
   const workspaceRoots = {
     isAvailable(workspaceId: string, workspaceRootId: string): boolean {

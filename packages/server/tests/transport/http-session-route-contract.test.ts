@@ -320,7 +320,7 @@ describe('HTTP session route contract', () => {
     });
     expect(res.status).toBe(400);
     expect(await json(res)).toEqual({ error: 'bad_request',
-      message: 'Codex CLI requires a physical workspace' });
+      message: 'Codex CLI requires a workspace folder on this host' });
   });
 
   test('POST /api/sessions does not misreport an application refusal as a worktree error', async () => {

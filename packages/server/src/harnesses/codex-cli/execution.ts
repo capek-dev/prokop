@@ -121,7 +121,7 @@ function resolveImages(session: Session, references: Array<{ id: string; kind: s
 
 function workspaceRoot(session: Session): string {
   const workspace = getWorkspace(session.workspaceId);
-  if (!cliWorkspaceAvailable(workspace)) throw new Error('Codex requires a physical workspace');
+  if (!cliWorkspaceAvailable(workspace)) throw new Error('Codex requires a workspace folder on this host');
   let root = workspace.path;
   if (session.workspaceRootId) {
     const worktree = createManagedWorktreeRepository(getDatabase).get(session.workspaceRootId);

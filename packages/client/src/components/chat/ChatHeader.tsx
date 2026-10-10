@@ -99,7 +99,7 @@ export function ChatHeader({
     queryKey: ['claude-catalog', serverUrl],
     queryFn: () => sdkClient!.http.sessions.claudeCatalog(),
     enabled: !!sdkClient && !!serverUrl && emptyRoot && !claudeSession && claudeHarnessEnabled
-      && !!workspace && !workspace.isVirtual && !!workspace.path,
+      && !!workspace?.path,
     staleTime: 60_000,
     retry: false,
   });
@@ -112,7 +112,7 @@ export function ChatHeader({
     retry: false,
   });
   const claudeModels = claudeSession ? claudeSelection.data?.models ?? []
-    : emptyRoot && workspace && !workspace.isVirtual && claudeHarnessEnabled ? claudeCatalog.data?.models ?? [] : [];
+    : emptyRoot && !!workspace?.path && claudeHarnessEnabled ? claudeCatalog.data?.models ?? [] : [];
   const claudeModel = claudeSelection.data?.selection?.model ?? session.selectedModel;
   const claudeEffort = claudeSelection.data?.selection?.effort ?? null;
   const selectClaude = async (modelId: string, effort: string) => {
@@ -132,7 +132,7 @@ export function ChatHeader({
     queryKey: ['codex-catalog', serverUrl],
     queryFn: () => sdkClient!.http.sessions.codexCatalog(),
     enabled: !!sdkClient && !!serverUrl && emptyRoot && !codexSession && codexHarnessEnabled
-      && !!workspace && !workspace.isVirtual && !!workspace.path,
+      && !!workspace?.path,
     staleTime: 60_000,
     retry: false,
   });
@@ -145,7 +145,7 @@ export function ChatHeader({
     retry: false,
   });
   const codexModels = codexSession ? codexSelection.data?.models ?? []
-    : emptyRoot && workspace && !workspace.isVirtual && codexHarnessEnabled ? catalog.data?.models ?? [] : [];
+    : emptyRoot && !!workspace?.path && codexHarnessEnabled ? catalog.data?.models ?? [] : [];
   const codexModel = codexSelection.data?.selection?.model ?? session.selectedModel;
   const codexEffort = codexSelection.data?.selection?.effort ?? null;
   const selectCodex = async (modelId: string, effort: string) => {
