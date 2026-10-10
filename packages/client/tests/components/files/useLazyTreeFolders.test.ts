@@ -16,7 +16,13 @@ function fakeModel(paths: string[]) {
     getItem: (path) => (present.has(path) ? {} : null),
     getVisibleCount: () => present.size,
     getVisibleRows: (start, end) => rows().slice(start, end),
-    batch: (operations) => { operations.forEach((op) => present.add(op.path)); notify(); },
+    batch: (operations) => {
+      for (const op of operations) {
+        if (op.type === 'add') present.add(op.path);
+        else for (const path of [...present]) if (path === op.path || (op.recursive && path.startsWith(op.path))) present.delete(path);
+      }
+      notify();
+    },
     subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
   };
   return {
@@ -123,5 +129,30 @@ describe('useLazyTreeFolders', () => {
 
     expect(treeChildren).toHaveBeenCalledTimes(2);
     expect(tree.present.has('node_modules/react/')).toBe(true);
+  });
+
+  test('a refresh reloads open ignored folders: new files appear and deleted ones disappear', async () => {
+    const tree = fakeModel(['out/', 'src/', 'src/a.ts']);
+    const children: Record<string, string[]> = { out: ['out/hero.png', 'out/old/'], 'out/old': ['out/old/a.png'] };
+    const { client, treeChildren } = fakeClient(children);
+    const { result } = renderHook(() => useLazyTreeFolders({ model: tree.model, sdkClient: client, workspaceId: 'ws', ignored: ['out/'] }));
+    tree.expand('out/');
+    await flush();
+    tree.expand('out/old/');
+    await flush();
+    expect(tree.present.has('out/old/a.png')).toBe(true);
+
+    // On disk: new renders arrive, `out/old/` is deleted. The tree walk itself is unchanged.
+    // `out/old` still answers here, so its reload must not resurrect the removed folder.
+    children.out = ['out/hero.png', 'out/hero.dark.png', 'out/mobile.dark.png'];
+    act(() => result.current.reset());
+    await flush();
+
+    expect([...tree.present].filter((path) => path.startsWith('out/')).sort()).toEqual([
+      'out/', 'out/hero.dark.png', 'out/hero.png', 'out/mobile.dark.png',
+    ]);
+    expect(tree.present.has('src/a.ts')).toBe(true);
+    // Both open folders loaded twice: once on expand, once on refresh.
+    expect(treeChildren).toHaveBeenCalledTimes(4);
   });
 });

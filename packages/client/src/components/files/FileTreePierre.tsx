@@ -340,6 +340,8 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       refresh: async () => {
         const { sdkClient: client, root: liveRoot } = liveRef.current;
         if (client) await refreshFileTree(client, workspaceId, liveRoot);
+        // The walk skips ignored folders, so their open contents reload separately.
+        resetLazyFolders();
       },
       openCreateAtRoot: (kind: 'file' | 'directory') => {
         openCreate('', kind);
@@ -385,7 +387,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       focusSearch: () => {
         model.openSearch('');
       },
-    }), [model, workspaceId]);
+    }), [model, workspaceId, resetLazyFolders]);
 
     const retryRefetch = useCallback(() => {
       void refetch();

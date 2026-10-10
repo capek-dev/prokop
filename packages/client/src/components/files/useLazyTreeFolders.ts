@@ -6,7 +6,7 @@ export interface LazyTreeModel {
   getItem(path: string): unknown;
   getVisibleCount(): number;
   getVisibleRows(start: number, end: number): ReadonlyArray<{ kind: string; isExpanded?: boolean; path: string }>;
-  batch(operations: ReadonlyArray<{ type: 'add'; path: string }>): void;
+  batch(operations: ReadonlyArray<{ type: 'add'; path: string } | { type: 'remove'; path: string; recursive?: boolean }>): void;
   subscribe(listener: () => void): () => void;
 }
 
@@ -24,11 +24,22 @@ export function isLazyFolder(path: string, unwalked: readonly string[]): boolean
   return path.endsWith('/') && unwalked.some((folder) => path.startsWith(folder));
 }
 
+/** Direct children of `folder` among the visible rows (an expanded folder shows them all). */
+function visibleChildren(model: LazyTreeModel, folder: string): string[] {
+  const count = model.getVisibleCount();
+  if (count === 0) return [];
+  return model.getVisibleRows(0, count)
+    .map((row) => row.path)
+    .filter((path) => path.startsWith(folder) && path !== folder && !path.slice(folder.length, -1).includes('/'));
+}
+
 /**
  * Loads the folders the server lists without walking (node_modules, ignored
  * build output) one level at a time, when they are expanded, so nothing
  * below an open level is ever fetched. Call `reset` after the tree is
- * rebuilt with `resetPaths`, which drops the children added here.
+ * rebuilt with `resetPaths`, which drops the children added here, and after
+ * a refresh, which does not re-walk these folders: open ones load again and
+ * their children are reconciled with the server.
  */
 export function useLazyTreeFolders({ model, sdkClient, workspaceId, root, ignored }: LazyTreeFoldersOptions): { reset: () => void } {
   const loaded = useRef(new Set<string>());
@@ -47,8 +58,18 @@ export function useLazyTreeFolders({ model, sdkClient, workspaceId, root, ignore
     loading.current.add(folder);
     try {
       const { paths } = await client.http.files.treeChildren(liveWorkspaceId, folder.slice(0, -1), { root: liveRoot });
+      // A parent reload may have removed this folder meanwhile; adding its children would recreate it.
+      if (model.getItem(folder) == null) return;
+      const listed = new Set(paths);
+      // A reload after a refresh also drops children deleted since the last load.
+      const removed = visibleChildren(model, folder).filter((path) => !listed.has(path));
       const added = paths.filter((path) => model.getItem(path) == null);
-      if (added.length) model.batch(added.map((path) => ({ type: 'add' as const, path })));
+      if (removed.length || added.length) {
+        model.batch([
+          ...removed.map((path) => (path.endsWith('/') ? { type: 'remove' as const, path, recursive: true } : { type: 'remove' as const, path })),
+          ...added.map((path) => ({ type: 'add' as const, path })),
+        ]);
+      }
       loaded.current.add(folder);
     } catch {
       // Not marked loaded: collapsing and expanding the folder tries again.
