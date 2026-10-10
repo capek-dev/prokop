@@ -194,6 +194,31 @@ const escapeOnlyAsk = {
   metadata: { command: 'cat /etc/release', cwd: '/project', baseCommand: 'cat' },
 } satisfies ClassifiedPermissionAsk;
 
+// Highlighted pipeline: the flagged stage is marked, the rest recede.
+const highlightedPipelineCommand = 'grep -rl "TODO" src --include=\'*.ts\' | xargs rm -rf | head -20';
+const highlightedRm = highlightedPipelineCommand.indexOf('rm -rf');
+const highlightedPipelineAsk = {
+  type: 'permission',
+  question: 'Allow Claude to run this command?',
+  description: highlightedPipelineCommand,
+  resource: 'shell-command',
+  action: 'execute',
+  risk: 'high',
+  concerns: ['destructive', 'opaque'],
+  catastrophic: false,
+  evidence: ['under xargs: rm with a destructive flag', 'xargs runs a dangerous command'],
+  highlights: [
+    { start: highlightedRm, end: highlightedRm + 6, reason: 'deletes recursively or without confirmation' },
+  ],
+  commandSegments: [
+    { start: 0, end: highlightedPipelineCommand.indexOf(' |') },
+    { start: highlightedPipelineCommand.indexOf('xargs'), end: highlightedRm + 6 },
+    { start: highlightedPipelineCommand.indexOf('head'), end: highlightedPipelineCommand.length },
+  ],
+  allowedScopes: ['once'],
+  metadata: { command: highlightedPipelineCommand, cwd: '/project', baseCommand: 'grep' },
+} satisfies ClassifiedPermissionAsk;
+
 const meta = {
   title: 'Chat/AskQuestion',
   component: AskQuestion,
@@ -272,6 +297,12 @@ export const PermissionConcernChips: Story = {
 export const PermissionCatastrophic: Story = {
   args: {
     request: createAskRequest(catastrophicShellAsk, 'shell'),
+  },
+};
+
+export const PermissionHighlightedPipeline: Story = {
+  args: {
+    request: createAskRequest(highlightedPipelineAsk, 'claude-cli:Bash'),
   },
 };
 

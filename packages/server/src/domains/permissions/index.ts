@@ -12,6 +12,7 @@ export {
   decide,
   type Concern,
   type Finding,
+  type Highlight,
   type PermissionDecision,
   type PermissionMode,
 } from './concerns';
@@ -30,6 +31,7 @@ export {
 } from './command/tables';
 export {
   analyzeCommand,
+  commandSegmentSpans,
   type CommandAnalyzeContext,
 } from './command/analyze';
 export { unwrapShellCommand } from './command/shell-wrapper';

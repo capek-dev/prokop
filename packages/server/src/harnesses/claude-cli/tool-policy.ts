@@ -32,7 +32,8 @@ export function classifyClaudeTool(
     return { ...classification.ask,
       question: 'Allow Claude to run this command?',
       description: input.command.slice(0, 1000),
-      metadata: { command: input.command.slice(0, 1000), toolName } };
+      // The classified command: the ask's highlights and segments index it.
+      metadata: { ...classification.ask.metadata, toolName } };
   }
 
   let operation: FileOperation | undefined;

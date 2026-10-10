@@ -9,6 +9,8 @@
 // Destructive rules
 // ---------------------------------------------------------------------------
 
+/** `label` is the plain-language effect shown beside the highlighted command
+ * in a permission ask. */
 export type DestructiveRule =
   | {
       /** Destructive when a listed long flag or short flag char is present. */
@@ -17,29 +19,37 @@ export type DestructiveRule =
       sub?: string;
       long: readonly string[];
       chars: readonly string[];
+      label: string;
     }
-  | { /** Destructive on any invocation. */ kind: 'always'; base: string; sub?: string }
+  | { /** Destructive on any invocation. */ kind: 'always'; base: string; sub?: string; label: string }
   | {
       /** Needs operand analysis in analyze.ts (e.g. `git checkout .`). */
       kind: 'selector';
       base: string;
       sub?: string;
+      label: string;
     };
 
 export const DESTRUCTIVE_RULES: readonly DestructiveRule[] = [
-  { kind: 'flags', base: 'rm', long: ['--recursive', '--force'], chars: ['r', 'f'] },
-  { kind: 'flags', base: 'git', sub: 'reset', long: ['--hard'], chars: [] },
-  { kind: 'flags', base: 'git', sub: 'clean', long: ['--force'], chars: ['f'] },
-  { kind: 'flags', base: 'git', sub: 'push', long: ['--force'], chars: ['f'] },
-  { kind: 'selector', base: 'git', sub: 'checkout' },
-  { kind: 'selector', base: 'git', sub: 'restore' },
-  { kind: 'always', base: 'dd' },
-  { kind: 'always', base: 'shred' },
-  { kind: 'always', base: 'sudo' },
-  { kind: 'always', base: 'su' },
-  { kind: 'always', base: 'doas' },
-  { kind: 'flags', base: 'chmod', long: ['--recursive'], chars: ['r'] },
-  { kind: 'flags', base: 'chown', long: ['--recursive'], chars: ['r'] },
+  { kind: 'flags', base: 'rm', long: ['--recursive', '--force'], chars: ['r', 'f'],
+    label: 'deletes recursively or without confirmation' },
+  { kind: 'flags', base: 'git', sub: 'reset', long: ['--hard'], chars: [],
+    label: 'discards uncommitted changes' },
+  { kind: 'flags', base: 'git', sub: 'clean', long: ['--force'], chars: ['f'],
+    label: 'deletes untracked files' },
+  { kind: 'flags', base: 'git', sub: 'push', long: ['--force'], chars: ['f'],
+    label: 'overwrites remote history' },
+  { kind: 'selector', base: 'git', sub: 'checkout', label: 'discards uncommitted changes' },
+  { kind: 'selector', base: 'git', sub: 'restore', label: 'discards uncommitted changes' },
+  { kind: 'always', base: 'dd', label: 'writes raw bytes over its target' },
+  { kind: 'always', base: 'shred', label: 'destroys file contents' },
+  { kind: 'always', base: 'sudo', label: 'runs with administrator privileges' },
+  { kind: 'always', base: 'su', label: 'runs as another user' },
+  { kind: 'always', base: 'doas', label: 'runs with administrator privileges' },
+  { kind: 'flags', base: 'chmod', long: ['--recursive'], chars: ['r'],
+    label: 'changes permissions recursively' },
+  { kind: 'flags', base: 'chown', long: ['--recursive'], chars: ['r'],
+    label: 'changes ownership recursively' },
 ];
 
 /** The shape analyze.ts extracts from one command segment. */

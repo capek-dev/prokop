@@ -2,7 +2,12 @@ import React, { useState, useCallback } from 'react';
 import { HelpCircle, Shield, ShieldAlert, Monitor } from 'lucide-react';
 import type { HumanQuestion, FormQuestion, PermissionAsk, ClientCapabilityAsk, AskFormResponse, AskPermissionResponse, AskResponse } from '@prokopai/sdk';
 import type { SingleSelectQuestion, MultiSelectQuestion, TextQuestion, ConfirmQuestion } from '@prokopai/sdk';
-import { readPermissionAskDetails, type PermissionAskConcern } from '@prokopai/sdk';
+import {
+  readPermissionAskDetails,
+  type PermissionAskConcern,
+  type PermissionAskHighlight,
+  type PermissionAskSpan,
+} from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -464,9 +469,10 @@ function SubQuestionView({
 
 // --- PermissionAskView ---
 
-/** Permissions v2 concern chips (docs/plans/unified-permissions.md): calm
- * palette — amber for the high-severity concerns, neutral for the
- * informational ones; red is reserved for the catastrophic floor. */
+/** Permissions v2 concern chips (docs/plans/unified-permissions.md), shown
+ * when an ask has no command highlights to carry its reasons: amber for the
+ * high-severity concerns, neutral for the informational ones; red is
+ * reserved for the catastrophic floor. */
 const CONCERN_CHIPS: Record<PermissionAskConcern, { label: string; className: string }> = {
   destructive: { label: 'Destructive', className: 'text-warning' },
   sensitive: { label: 'Secrets', className: 'text-warning' },
@@ -484,6 +490,12 @@ const PERMISSION_SEVERITY_STYLES = {
   critical: { icon: ShieldAlert, borderClass: 'border-destructive/50 bg-destructive/10', iconClass: 'text-destructive' },
 } as const;
 
+/** Classified destructive or sensitive asks: the alert shield on amber, so red
+ *  stays reserved for the catastrophic floor. */
+const ELEVATED_PERMISSION_STYLE = {
+  icon: ShieldAlert, borderClass: 'border-warning/40 bg-warning/5', iconClass: 'text-warning',
+} as const;
+
 /** Card severity for a permission ask. Classified asks (permissions v2)
  *  derive severity from their concerns — mirroring the server's single
  *  riskOfConcerns mapping — because some ask builders pin a hard-coded legacy
@@ -496,13 +508,99 @@ function permissionSeverityStyle(ask: PermissionAsk) {
   if (details) {
     if (details.catastrophic) return PERMISSION_SEVERITY_STYLES.critical;
     if (details.concerns.includes('sensitive') || details.concerns.includes('destructive')) {
-      return PERMISSION_SEVERITY_STYLES.high;
+      return ELEVATED_PERMISSION_STYLE;
     }
     if (details.concerns.includes('escape')) return PERMISSION_SEVERITY_STYLES.medium;
     return PERMISSION_SEVERITY_STYLES.low;
   }
   if (ask.risk == null) return PERMISSION_SEVERITY_STYLES.unknown;
   return PERMISSION_SEVERITY_STYLES[ask.risk];
+}
+
+/** One line per pipeline stage, using the server's top-level segments when
+ *  they are ordered and in bounds; otherwise the whole command on one line.
+ *  The last line runs to the end so trailing operators stay visible. */
+function commandLines(command: string, segments: readonly PermissionAskSpan[]) {
+  const valid = segments.length > 0 && segments.every((segment, index) =>
+    segment.end <= command.length && (index === 0 || segment.start >= segments[index - 1]!.end));
+  if (!valid) return [{ operator: '', span: { start: 0, end: command.length } }];
+  return segments.map((segment, index) => ({
+    operator: index === 0 ? '' : command.slice(segments[index - 1]!.end, segment.start).trim(),
+    span: index === segments.length - 1 ? { start: segment.start, end: command.length } : segment,
+  }));
+}
+
+/** Splits a stage into plain and highlighted runs. */
+function markedRuns(command: string, span: PermissionAskSpan, marks: readonly PermissionAskSpan[]) {
+  const cuts = new Set([span.start, span.end]);
+  for (const mark of marks) {
+    for (const edge of [mark.start, mark.end]) {
+      if (edge > span.start && edge < span.end) cuts.add(edge);
+    }
+  }
+  const points = [...cuts].sort((a, b) => a - b);
+  return points.slice(1).map((to, index) => {
+    const from = points[index]!;
+    return { text: command.slice(from, to), marked: marks.some(mark => mark.start <= from && mark.end >= to) };
+  });
+}
+
+/** The command once, one pipeline stage per line, with the parts that need
+ *  review highlighted and their reasons listed underneath. Stages without a
+ *  highlight recede so the reviewed part is the first thing you see. */
+function ShellCommandView({
+  command,
+  highlights,
+  segments,
+  catastrophic,
+}: {
+  command: string;
+  highlights: readonly PermissionAskHighlight[];
+  segments: readonly PermissionAskSpan[];
+  catastrophic: boolean;
+}) {
+  const marks = highlights.filter(highlight => highlight.end <= command.length);
+  const markClass = catastrophic ? 'bg-destructive/20 decoration-destructive' : 'bg-warning/20 decoration-warning';
+  const reasons = [...new Map(marks.map(({ start, end, reason }) => {
+    const text = command.slice(start, end).trim();
+    return [`${text}\0${reason}`, { text, reason }] as const;
+  })).values()];
+
+  return (
+    <div className="flex flex-col gap-2">
+      <pre className="text-xs bg-muted/50 border rounded-md p-2 max-h-60 overflow-auto whitespace-pre-wrap break-all font-mono">
+        {commandLines(command, segments).map(({ operator, span }, index) => {
+          const runs = markedRuns(command, span, marks);
+          const quiet = marks.length > 0 && !runs.some(run => run.marked);
+          return (
+            <div key={index} className={quiet ? 'text-muted-foreground' : undefined}>
+              {operator && <span className="text-muted-foreground">{operator} </span>}
+              {runs.map((run, runIndex) => run.marked ? (
+                <mark
+                  key={runIndex}
+                  className={`rounded-sm text-foreground underline decoration-2 underline-offset-2 ${markClass}`}
+                >
+                  {run.text}
+                </mark>
+              ) : (
+                <React.Fragment key={runIndex}>{run.text}</React.Fragment>
+              ))}
+            </div>
+          );
+        })}
+      </pre>
+      {reasons.length > 0 && (
+        <ul className="flex flex-col gap-1 text-xs">
+          {reasons.map(({ text, reason }) => (
+            <li key={`${text}\0${reason}`} className="flex items-baseline gap-2 min-w-0">
+              <code className="font-mono max-w-[50%] truncate shrink-0">{text}</code>
+              <span className="text-muted-foreground">{reason}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function PermissionAskView({
@@ -520,17 +618,27 @@ function PermissionAskView({
     critical: 'text-destructive',
   };
 
-  // Permissions v2: classified asks show concern chips plus evidence;
-  // legacy asks (feature risks like memory writes) keep the risk label.
-  const details = readPermissionAskDetails(ask);
-  const evidenceLines = (details?.evidence ?? [])
-    .filter(line => line !== ask.description)
-    .slice(0, 2);
-
   // Extract intent info for better UX
   const primaryIntent = ask.intents?.[0];
   const effectiveAction = ask.action ?? primaryIntent?.action;
   const effectiveResource = ask.resource ?? primaryIntent?.resource ?? 'shell-command';
+
+  // Permissions v2: classified shell asks highlight the command and list
+  // reasons beside it; other classified asks show concern chips plus
+  // evidence; legacy asks (feature risks like memory writes) keep the risk
+  // label.
+  const details = readPermissionAskDetails(ask);
+  const command = effectiveResource === 'shell-command' && typeof ask.metadata?.command === 'string'
+    ? ask.metadata.command
+    : null;
+  const highlights = command ? details?.highlights ?? [] : [];
+  const evidenceLines = highlights.length > 0 ? [] : (details?.evidence ?? []).slice(0, 2);
+  // Harnesses often repeat the command or the first evidence line here.
+  const description = ask.description
+    && !command?.startsWith(ask.description)
+    && !details?.evidence.includes(ask.description)
+    ? ask.description
+    : undefined;
 
   // Determine operation label from action
   const operationLabel = effectiveAction === 'read'
@@ -585,21 +693,6 @@ function PermissionAskView({
     ? intentTargets.map(t => t.target.split('/').pop() || t.target)
     : [];
 
-  // Helper to render shell command
-  const renderShellCommand = (): React.ReactElement | null => {
-    if (effectiveResource !== 'shell-command' || typeof ask.metadata?.command !== 'string') {
-      return null;
-    }
-    return (
-      <div>
-        <div className="text-xs uppercase text-muted-foreground mb-1">Command</div>
-        <pre className="text-xs bg-muted/50 border rounded-md p-2 overflow-x-auto whitespace-pre-wrap break-all font-mono">
-          {ask.metadata.command}
-        </pre>
-      </div>
-    );
-  };
-
   // Helper to render file paths
   const renderFilePaths = (): React.ReactElement | null => {
     const paths = ask.paths as string[] | undefined;
@@ -649,25 +742,27 @@ function PermissionAskView({
 
   return (
     <div className="flex flex-col gap-3">
-      {ask.description && (
-        <p className="text-sm text-muted-foreground">{ask.description}</p>
+      {description && (
+        <p className="text-sm text-muted-foreground">{description}</p>
       )}
       {details ? (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex flex-wrap gap-1.5">
-            {details.catastrophic && (
-              <Badge variant="destructive">Catastrophic</Badge>
-            )}
-            {details.concerns.map(concern => (
-              <Badge key={concern} variant="outline" className={CONCERN_CHIPS[concern].className}>
-                {CONCERN_CHIPS[concern].label}
-              </Badge>
+        (details.catastrophic || highlights.length === 0) && (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
+              {details.catastrophic && (
+                <Badge variant="destructive">Catastrophic</Badge>
+              )}
+              {highlights.length === 0 && details.concerns.map(concern => (
+                <Badge key={concern} variant="outline" className={CONCERN_CHIPS[concern].className}>
+                  {CONCERN_CHIPS[concern].label}
+                </Badge>
+              ))}
+            </div>
+            {evidenceLines.map((line, index) => (
+              <p key={index} className="text-xs text-muted-foreground">{line}</p>
             ))}
           </div>
-          {evidenceLines.map((line, index) => (
-            <p key={index} className="text-xs text-muted-foreground">{line}</p>
-          ))}
-        </div>
+        )
       ) : ask.risk && (
         <div className="flex items-center gap-2">
           <span className={`text-xs font-medium uppercase ${riskColors[ask.risk ?? 'none'] ?? 'text-muted-foreground'}`}>
@@ -675,7 +770,14 @@ function PermissionAskView({
           </span>
         </div>
       )}
-      {renderShellCommand()}
+      {command !== null && (
+        <ShellCommandView
+          command={command}
+          highlights={highlights}
+          segments={details?.commandSegments ?? []}
+          catastrophic={details?.catastrophic ?? false}
+        />
+      )}
       {renderFilePaths()}
       {renderNetworkUrl()}
       {renderIntentTargets()}
@@ -687,24 +789,25 @@ function PermissionAskView({
           This command is too dynamic to save as a reusable permission ({nonPersistableReason}).
         </p>
       )}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => onRespond({ type: 'permission', grant: 'deny' })}
-        >
-          Block
-        </Button>
-        {allowedScopes.map((scope) => (
+      <div className="flex flex-wrap items-center gap-2">
+        {allowedScopes.map((scope, index) => (
           <Button
             key={scope}
-            variant={scope === 'workspace' ? 'default' : 'outline'}
+            variant={index === 0 ? 'default' : 'outline'}
             size="sm"
             onClick={() => onRespond({ type: 'permission', grant: scope })}
           >
             {getScopeLabel(scope)}
           </Button>
         ))}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="ml-auto text-muted-foreground hover:text-destructive"
+          onClick={() => onRespond({ type: 'permission', grant: 'deny' })}
+        >
+          Block
+        </Button>
       </div>
     </div>
   );
@@ -817,14 +920,10 @@ export function AskQuestion({ request, onRespond }: AskQuestionProps) {
 
   return (
     <div className={`border ${config.borderClass} rounded-lg p-4 flex flex-col gap-4`}>
-      <div className={`flex items-start gap-2 ${config.iconClass}`}>
-        <Icon className="size-4 mt-0.5 shrink-0" />
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-muted-foreground uppercase tracking-wide">
-            {toolName}
-          </span>
-          {'question' in ask && <p className="text-sm font-medium">{ask.question}</p>}
-        </div>
+      <div className="flex items-start gap-2">
+        <Icon className={`size-4 mt-0.5 shrink-0 ${config.iconClass}`} />
+        <p className="text-sm font-medium min-w-0 flex-1">{'question' in ask ? ask.question : null}</p>
+        <span className="text-xs text-muted-foreground shrink-0 mt-0.5">{toolName}</span>
       </div>
 
       {ask.type === 'single_select' && (

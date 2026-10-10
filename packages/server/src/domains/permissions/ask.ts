@@ -19,7 +19,7 @@
  */
 
 import type { PermissionAsk, PermissionRiskLevel } from '@prokopai/sdk';
-import { decide, type Concern, type Finding, type PermissionMode } from './concerns';
+import { decide, type Concern, type Finding, type Highlight, type PermissionMode } from './concerns';
 import { severityFromMode } from './legacy-severity';
 
 /** PermissionAsk extended with the permissions-v2 concern fields. */
@@ -27,6 +27,10 @@ export interface ConcernsPermissionAsk extends PermissionAsk {
   concerns?: readonly Concern[];
   evidence?: readonly string[];
   catastrophic?: boolean;
+  /** Shell asks: spans of `metadata.command` that need review, and the
+   * top-level pipeline stages for one-stage-per-line display. */
+  highlights?: readonly Highlight[];
+  commandSegments?: ReadonlyArray<{ start: number; end: number }>;
 }
 
 function riskOfConcerns(concerns: readonly Concern[], catastrophic: boolean): PermissionRiskLevel {

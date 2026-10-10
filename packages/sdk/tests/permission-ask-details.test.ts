@@ -24,7 +24,29 @@ describe('readPermissionAskDetails', () => {
       concerns: ['destructive', 'escape', 'sensitive'],
       catastrophic: false,
       evidence: ['rm with a destructive flag', 'path /etc is outside the allowed roots'],
+      highlights: [],
+      commandSegments: [],
     });
+  });
+
+  test('reads highlights and command segments, dropping malformed spans', () => {
+    const details = readPermissionAskDetails(ask({
+      concerns: ['destructive'],
+      catastrophic: false,
+      highlights: [
+        { start: 0, end: 9, reason: 'deletes recursively or without confirmation', extra: 1 },
+        { start: 4, end: 2, reason: 'reversed' },
+        { start: 1.5, end: 3, reason: 'fractional' },
+        { start: 0, end: 3, reason: '' },
+        { start: 0, end: 3 },
+        null,
+      ],
+      commandSegments: [{ start: 0, end: 9 }, { start: -1, end: 3 }, 'x'],
+    }));
+    expect(details?.highlights).toEqual([
+      { start: 0, end: 9, reason: 'deletes recursively or without confirmation' },
+    ]);
+    expect(details?.commandSegments).toEqual([{ start: 0, end: 9 }]);
   });
 
   test('returns null for legacy asks without concern fields', () => {
@@ -42,6 +64,8 @@ describe('readPermissionAskDetails', () => {
       concerns: ['destructive'],
       catastrophic: false,
       evidence: ['valid line'],
+      highlights: [],
+      commandSegments: [],
     });
   });
 

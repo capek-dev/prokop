@@ -23,11 +23,21 @@ export type Concern =
   | 'destructive'
   | 'opaque';
 
+/** A span of the analyzed command (string offsets) and a plain-language
+ * reason, so an ask can point at the exact part that needs review. */
+export interface Highlight {
+  readonly start: number;
+  readonly end: number;
+  readonly reason: string;
+}
+
 export interface Finding {
   readonly concerns: readonly Concern[];
   readonly catastrophic: boolean;
   readonly evidence: readonly string[];
   readonly resolvedPaths: readonly string[];
+  /** Display-only spans; never consulted by decide(). */
+  readonly highlights?: readonly Highlight[];
 }
 
 /** The single policy table. Empty concerns mean a clean finding. */

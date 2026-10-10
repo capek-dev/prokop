@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { analyzeCommand, decide, type CommandAnalyzeContext } from '@/domains/permissions';
+import { analyzeCommand, classifyShellCommand, commandSegmentSpans, decide, type CommandAnalyzeContext } from '@/domains/permissions';
 
 /**
  * Golden tests for the permissions v2 command pipeline
@@ -154,6 +154,24 @@ describe('golden: executing unknown code is destructive, not opaque', () => {
 
   test('xargs running a dangerous command', () => {
     expect(concernsOf('find . -name "*.log" | xargs rm')).toContain('destructive');
+    expect(concernsOf('ls | xargs -I {} sh -c \'rm {}\'')).toContain('destructive');
+    expect(isCatastrophic('ls | xargs -0 sh -c \'rm -rf /\'')).toBe(true);
+  });
+
+  test('xargs is judged by the command it runs, not its own name', () => {
+    const search = 'grep -rln "getDatabase\\|initializeSchema" tests src --include=\'*.test.ts\''
+      + ' | xargs grep -L "DB.configure\\|createTestDatabase\\|helpers/db" | head -20';
+    for (const command of [search, 'ls | xargs wc -l', 'ls | xargs echo', 'ls | xargs',
+      'find . -name "*.ts" -print0 | xargs -0 -n 1 -P 4 grep -l TODO']) {
+      expect(standardDecision(command)).toBe('auto');
+      expect(concernsOf(command)).not.toContain('destructive');
+    }
+    // Its command keeps every concern it would have on its own.
+    expect(concernsOf('ls | xargs rm -rf')).toContain('destructive');
+    expect(concernsOf('ls | xargs cat /etc/hosts')).toContain('escape');
+    expect(concernsOf('ls | xargs -n1 cat .env')).toContain('sensitive');
+    expect(concernsOf('xargs -a ~/.ssh/id_rsa echo')).toContain('sensitive');
+    expect(concernsOf('xargs --arg-file=.env echo')).toContain('sensitive');
   });
 
   test('dangerous tokens inside executed strings escalate', () => {
@@ -211,5 +229,66 @@ describe('golden: catastrophic floor holds in every mode', () => {
   test('dd to a file is destructive without the catastrophic floor', () => {
     expect(isCatastrophic('dd if=a of=b.img')).toBe(false);
     expect(concernsOf('dd if=a of=b.img')).toContain('destructive');
+  });
+});
+
+describe('highlights point at the part of the command that needs review', () => {
+  function marked(command: string): Array<[string, string]> {
+    return (analyzeCommand(command, ctx).highlights ?? [])
+      .map(({ start, end, reason }) => [command.slice(start, end), reason]);
+  }
+
+  test('destructive stages, not the whole pipeline', () => {
+    expect(marked('grep -rl foo src | xargs rm -rf | head')).toEqual([
+      ['rm -rf', 'deletes recursively or without confirmation'],
+      ['rm -rf', 'runs a dangerous command on every piped item'],
+    ]);
+    expect(marked('git status && git reset --hard HEAD~1')).toEqual([
+      ['git reset --hard HEAD~1', 'discards uncommitted changes'],
+    ]);
+  });
+
+  test('operands that escape or hold secrets', () => {
+    expect(marked('cat README.md /etc/hosts')).toEqual([['/etc/hosts', 'outside the workspace']]);
+    expect(marked('echo hi > .env')).toEqual([['.env', 'may contain secrets']]);
+  });
+
+  test('nested code maps back into the outer command', () => {
+    expect(marked("sh -c 'rm -rf build'")).toEqual([
+      ['rm -rf build', 'deletes recursively or without confirmation'],
+    ]);
+    expect(marked('echo "$(rm -rf build)"')).toEqual([
+      ['rm -rf build', 'deletes recursively or without confirmation'],
+    ]);
+    expect(marked("/bin/zsh -lc 'git push --force'")).toEqual([
+      ['git push --force', 'overwrites remote history'],
+    ]);
+  });
+
+  test('rebuilt nested text falls back to the whole segment', () => {
+    expect(marked('sudo rm -rf build').map(([text]) => text)).toEqual(
+      ['sudo rm -rf build', 'sudo rm -rf build']);
+  });
+
+  test('clean commands carry none', () => {
+    expect(marked('ls | xargs wc -l')).toEqual([]);
+  });
+
+  test('pipeline stages for display', () => {
+    const command = 'grep -l "a|b" src | xargs wc -l && echo done';
+    expect(commandSegmentSpans(command).map(({ start, end }) => command.slice(start, end)))
+      .toEqual(['grep -l "a|b" src', 'xargs wc -l', 'echo done']);
+  });
+});
+
+describe('shell asks carry highlights and pipeline stages', () => {
+  test('spans index the ask command', () => {
+    const command = 'ls | xargs rm -rf';
+    const { ask } = classifyShellCommand(command, '/ws', '/ws')!;
+    const shown = ask.metadata?.command as string;
+    expect(shown).toBe(command);
+    expect(ask.highlights?.map(({ start, end }) => shown.slice(start, end))).toContain('rm -rf');
+    expect(ask.commandSegments?.map(({ start, end }) => shown.slice(start, end)))
+      .toEqual(['ls', 'xargs rm -rf']);
   });
 });

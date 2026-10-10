@@ -17,7 +17,7 @@
 
 import { homedir } from 'node:os';
 import { isAbsolute, resolve } from 'node:path';
-import { analyzeCommand } from './command/analyze';
+import { analyzeCommand, commandSegmentSpans } from './command/analyze';
 import { unwrapShellCommand } from './command/shell-wrapper';
 import type { Concern, Finding } from './concerns';
 import {
@@ -132,6 +132,8 @@ export function classifyShellCommand(
     concerns: finding.concerns,
     evidence: finding.evidence,
     catastrophic: finding.catastrophic,
+    highlights: finding.highlights ?? [],
+    commandSegments: commandSegmentSpans(effective),
     allowedScopes: grantScopesForFinding(finding),
     metadata: { command: effective, cwd, baseCommand, resolvedPaths: finding.resolvedPaths },
   };

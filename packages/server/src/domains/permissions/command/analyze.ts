@@ -28,7 +28,7 @@ import { lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { effectivePath, isWithinRoot } from '../paths';
-import type { Concern, Finding } from '../concerns';
+import type { Concern, Finding, Highlight } from '../concerns';
 import { unwrapShellCommand } from './shell-wrapper';
 import {
   CATASTROPHIC_BASES,
@@ -63,6 +63,9 @@ interface Token {
   text: string;
   inner: string;
   joined?: boolean;
+  /** Offsets of `text` in the tokenized input. */
+  start: number;
+  end: number;
 }
 
 const OPERATOR_STARTS = new Set(['&', '|', ';', '<', '>']);
@@ -72,10 +75,11 @@ function tokenize(input: string): Token[] {
   const tokens: Token[] = [];
   const n = input.length;
   let i = 0;
-  const add = (token: Token): void => {
+  const add = (token: Pick<Token, 'kind' | 'text' | 'inner'>): void => {
     const previous = tokens.at(-1);
-    tokens.push({ ...token, joined: !!previous && previous.kind !== 'operator'
-      && token.kind !== 'operator' && i > 0 && !/\s/.test(input[i - 1]!) });
+    tokens.push({ ...token, start: i, end: i + token.text.length,
+      joined: !!previous && previous.kind !== 'operator'
+        && token.kind !== 'operator' && i > 0 && !/\s/.test(input[i - 1]!) });
   };
   while (i < n) {
     const ch = input[i]!;
@@ -141,9 +145,10 @@ function tokenize(input: string): Token[] {
   return tokens;
 }
 
-/** Command-substitution bodies inside an arbitrary string (`"$(date)"`). */
-function extractSubstitutionBodies(text: string): string[] {
-  const bodies: string[] = [];
+/** Command-substitution bodies inside an arbitrary string (`"$(date)"`),
+ * each with its offset in `text`. */
+function extractSubstitutionBodies(text: string): Array<{ body: string; offset: number }> {
+  const bodies: Array<{ body: string; offset: number }> = [];
   let i = 0;
   const n = text.length;
   while (i < n) {
@@ -155,14 +160,14 @@ function extractSubstitutionBodies(text: string): string[] {
         else if (text[j] === ')') depth -= 1;
         j += 1;
       }
-      bodies.push(text.slice(i + 2, depth === 0 ? j - 1 : j));
+      bodies.push({ body: text.slice(i + 2, depth === 0 ? j - 1 : j), offset: i + 2 });
       i = j;
       continue;
     }
     if (text[i] === '`') {
       const end = text.indexOf('`', i + 1);
       const stop = end === -1 ? n : end;
-      bodies.push(text.slice(i + 1, stop));
+      bodies.push({ body: text.slice(i + 1, stop), offset: i + 1 });
       i = stop + 1;
       continue;
     }
@@ -175,6 +180,15 @@ interface Segment {
   tokens: Token[];
   /** This segment is the target of a pipe (`a | this`). */
   pipedInto: boolean;
+}
+
+interface Span {
+  start: number;
+  end: number;
+}
+
+function segmentSpan(segment: Segment): Span {
+  return { start: segment.tokens[0]!.start, end: segment.tokens.at(-1)!.end };
 }
 
 function splitSegments(tokens: Token[]): Segment[] {
@@ -225,6 +239,13 @@ const EXEC_BASES = new Set([
 ]);
 
 const SHELL_BASES = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh', 'fish']);
+
+/** xargs options that take a separate value (GNU and BSD), so the command it
+ * runs starts after them. `-a`/`--arg-file` values are files xargs reads. */
+const XARGS_SHORT_VALUE_FLAGS = new Set(['-a', '-d', '-E', '-I', '-J', '-L', '-n', '-P', '-R', '-s', '-S']);
+const XARGS_LONG_VALUE_FLAGS = new Set([
+  '--arg-file', '--delimiter', '--max-args', '--max-procs', '--max-chars', '--process-slot-var',
+]);
 
 /** Destructive rules whose operands can destroy protected trees; those get
  * catastrophic-target confirmation. git reset/push have no local targets. */
@@ -285,20 +306,48 @@ interface SegmentResult {
   catastrophic: boolean;
   evidence: string[];
   resolvedPaths: string[];
+  highlights: Highlight[];
 }
 
 function emptyResult(): SegmentResult {
-  return { concerns: new Set(), catastrophic: false, evidence: [], resolvedPaths: [] };
+  return { concerns: new Set(), catastrophic: false, evidence: [], resolvedPaths: [], highlights: [] };
 }
 
 function baseNameOf(word: string): string {
   return word.replace(/.*\//, '').toLowerCase();
 }
 
-interface CommandWord {
+interface CommandWord extends Span {
   text: string;
   redirect: 'none' | 'write' | 'read';
   quoted: boolean;
+}
+
+/** Where xargs' own options end: the command it runs, and the files it reads
+ * its items from. No command means xargs runs `echo`. */
+function parseXargs(words: readonly CommandWord[]): { command: number | null; argFiles: CommandWord[] } {
+  const argFiles: CommandWord[] = [];
+  for (let i = 1; i < words.length; i += 1) {
+    const text = words[i]!.text;
+    if (text === '--') return { command: i + 1 < words.length ? i + 1 : null, argFiles };
+    if (!text.startsWith('-')) return { command: i, argFiles };
+    const long = text.startsWith('--');
+    const name = long ? text.split('=')[0]! : text.slice(0, 2);
+    const attached = long ? text.includes('=') : text.length > 2;
+    const takesValue = long ? XARGS_LONG_VALUE_FLAGS.has(name) : XARGS_SHORT_VALUE_FLAGS.has(name);
+    if (!takesValue) continue;
+    const isArgFile = name === '-a' || name === '--arg-file';
+    if (attached) {
+      if (isArgFile) {
+        const valueStart = long ? text.indexOf('=') + 1 : 2;
+        argFiles.push({ ...words[i]!, text: text.slice(valueStart) });
+      }
+      continue;
+    }
+    if (isArgFile && words[i + 1]) argFiles.push(words[i + 1]!);
+    i += 1;
+  }
+  return { command: null, argFiles };
 }
 
 function collectWords(tokens: Token[]): CommandWord[] {
@@ -318,10 +367,12 @@ function collectWords(tokens: Token[]): CommandWord[] {
     }
     if (token.joined && pending === 'none' && words.length) {
       words[words.length - 1]!.text += text;
+      words[words.length - 1]!.end = token.end;
       continue;
     }
     words.push({ text, redirect: pending === 'descriptor' ? 'write' : pending,
-      quoted: token.kind === 'single' || token.kind === 'double' });
+      quoted: token.kind === 'single' || token.kind === 'double',
+      start: token.start, end: token.end });
     pending = 'none';
   }
   return words;
@@ -340,6 +391,7 @@ function isSharedTempTarget(path: string): boolean {
 
 function analyzeSegment(
   segment: Segment,
+  source: string,
   ctx: CommandAnalyzeContext,
   cwdAtStart: string,
   depth: number,
@@ -347,21 +399,37 @@ function analyzeSegment(
   const result = emptyResult();
   let nextCwd: string | null = null;
   const words = collectWords(segment.tokens);
+  const span = segmentSpan(segment);
+  const mark = (at: Span, reason: string): void => {
+    result.highlights.push({ start: at.start, end: at.end, reason });
+  };
+  /** Unions a nested analysis into this segment. `offset` places its
+   * highlights in `source`; null (text rebuilt from words) pins them to the
+   * whole segment instead. */
+  const absorb = (nested: Finding, prefix: string, offset: number | null): void => {
+    for (const concern of nested.concerns) result.concerns.add(concern);
+    if (nested.catastrophic) result.catastrophic = true;
+    result.evidence.push(...nested.evidence.map(item => `${prefix}${item}`));
+    result.resolvedPaths.push(...nested.resolvedPaths);
+    for (const highlight of nested.highlights ?? []) {
+      mark(offset === null ? span
+        : { start: highlight.start + offset, end: highlight.end + offset }, highlight.reason);
+    }
+  };
 
   // Substitution bodies: analyzed recursively (word position and inside
   // double quotes). Their concerns union into this segment.
   if (depth < MAX_RECURSION_DEPTH) {
     for (const token of segment.tokens) {
-      const bodies = token.kind === 'substitution' ? [token.inner]
-        : token.kind === 'double' ? extractSubstitutionBodies(token.inner)
+      const bodies = token.kind === 'substitution'
+        ? [{ body: token.inner, offset: token.start + (token.text.startsWith('$(') ? 2 : 1) }]
+        : token.kind === 'double'
+          ? extractSubstitutionBodies(token.inner)
+            .map(({ body, offset }) => ({ body, offset: token.start + 1 + offset }))
           : [];
-      for (const body of bodies) {
+      for (const { body, offset } of bodies) {
         if (!body.trim()) continue;
-        const nested = analyzeCommand(body, ctx, cwdAtStart, depth + 1);
-        for (const concern of nested.concerns) result.concerns.add(concern);
-        if (nested.catastrophic) result.catastrophic = true;
-        result.evidence.push(...nested.evidence.map(item => `in substitution: ${item}`));
-        result.resolvedPaths.push(...nested.resolvedPaths);
+        absorb(analyzeCommand(body, ctx, cwdAtStart, depth + 1), 'in substitution: ', offset);
       }
     }
   }
@@ -382,8 +450,11 @@ function analyzeSegment(
   const redirectTargets = words.filter(word => word.redirect !== 'none');
 
   // Token screen on active text: bare words always; quoted strings only when
-  // the base executes its arguments as code.
-  const activeParts = words.filter(word => !word.quoted).map(word => word.text);
+  // the base executes its arguments as code. xargs is screened by the
+  // command it runs (analyzed below), never by its own name.
+  const activeParts = words
+    .filter(word => !word.quoted && !(base === 'xargs' && word === firstWord))
+    .map(word => word.text);
   const isExecBase = EXEC_BASES.has(base);
   if (isExecBase) {
     for (const token of segment.tokens) {
@@ -394,11 +465,7 @@ function analyzeSegment(
 
   // sudo / doas prefix: analyze the remainder as its own command.
   if ((base === 'sudo' || base === 'doas') && args.length > 0 && depth < MAX_RECURSION_DEPTH) {
-    const inner = analyzeCommand(args.join(' '), ctx, cwdAtStart, depth + 1);
-    for (const concern of inner.concerns) result.concerns.add(concern);
-    if (inner.catastrophic) result.catastrophic = true;
-    result.evidence.push(...inner.evidence.map(item => `under ${base}: ${item}`));
-    result.resolvedPaths.push(...inner.resolvedPaths);
+    absorb(analyzeCommand(args.join(' '), ctx, cwdAtStart, depth + 1), `under ${base}: `, null);
   }
 
   // Shell bases execute their quoted arguments as code (`sh -c '...'`), so
@@ -407,12 +474,21 @@ function analyzeSegment(
     for (const token of segment.tokens) {
       if (token.kind !== 'single' && token.kind !== 'double') continue;
       if (!token.inner.trim()) continue;
-      const inner = analyzeCommand(token.inner, ctx, cwdAtStart, depth + 1);
-      for (const concern of inner.concerns) result.concerns.add(concern);
-      if (inner.catastrophic) result.catastrophic = true;
-      result.evidence.push(...inner.evidence.map(item => `in ${base} code: ${item}`));
-      result.resolvedPaths.push(...inner.resolvedPaths);
+      absorb(analyzeCommand(token.inner, ctx, cwdAtStart, depth + 1), `in ${base} code: `, token.start + 1);
     }
+  }
+
+  // xargs runs a command with piped items appended: analyze that command as
+  // written; the appended operands are unseen, like a substitution's output.
+  const xargs = base === 'xargs' ? parseXargs(commandWords) : null;
+  const xargsCommand: Span = xargs?.command != null
+    ? { start: commandWords[xargs.command]!.start, end: commandWords.at(-1)!.end }
+    : span;
+  if (xargs?.command != null && depth < MAX_RECURSION_DEPTH) {
+    absorb(analyzeCommand(source.slice(xargsCommand.start, xargsCommand.end), ctx, cwdAtStart, depth + 1),
+      'under xargs: ', xargsCommand.start);
+    result.concerns.add('opaque');
+    result.evidence.push('xargs appends piped input as operands');
   }
 
   // Destructive rules. Selector matches (git checkout/restore) only count
@@ -422,7 +498,10 @@ function analyzeSegment(
   const destructive = matchDestructiveRule(invocation);
   const findDeletes = base === 'find' && args.includes('-delete');
   let destructiveConfirmed = findDeletes;
-  if (findDeletes) result.evidence.push('find deletes matching files');
+  if (findDeletes) {
+    result.evidence.push('find deletes matching files');
+    mark(span, 'deletes every matching file');
+  }
   if (destructive) {
     if (destructive.rule.kind === 'selector') {
       const operands = args.filter(arg => !arg.startsWith('-'));
@@ -430,25 +509,30 @@ function analyzeSegment(
       if (wholeTree) {
         destructiveConfirmed = true;
         result.evidence.push(`${base} ${sub} with a whole-tree target`);
+        mark(span, destructive.rule.label);
       }
     } else {
       destructiveConfirmed = true;
       result.evidence.push(destructive.reason);
+      mark(span, destructive.rule.label);
     }
   }
   if (base === 'xargs' && containsScreenedToken(args.join(' '))) {
     destructiveConfirmed = true;
     result.evidence.push('xargs runs a dangerous command');
+    mark(xargsCommand, 'runs a dangerous command on every piped item');
   }
   if (segment.pipedInto && SHELL_BASES.has(base)) {
     destructiveConfirmed = true;
     result.evidence.push('pipe into a shell executes unknown code');
+    mark(span, 'runs piped text as shell code');
   }
   if (isExecBase && screened && !destructiveConfirmed && !result.catastrophic) {
     // e.g. su -c 'rm -rf /': the dangerous token sits inside executed code we
     // cannot structurally confirm, so treat it as destructive, not opaque.
     destructiveConfirmed = true;
     result.evidence.push(`dangerous token inside executed ${base} arguments`);
+    mark(span, 'runs code containing a dangerous command');
   }
   if (destructiveConfirmed) result.concerns.add('destructive');
 
@@ -457,48 +541,56 @@ function analyzeSegment(
   if (CATASTROPHIC_BASES.some(prefix => base.startsWith(prefix))) {
     result.catastrophic = true;
     result.evidence.push(`${base} can destroy the system`);
+    mark(span, 'can wipe or shut down the system');
   }
   if (base === 'dd') {
-    const of = args.find(arg => arg.startsWith('of='));
-    if (of && of.slice(3).startsWith('/dev/')) {
+    const of = commandWords.slice(1).find(word => word.text.startsWith('of='));
+    if (of && of.text.slice(3).startsWith('/dev/')) {
       result.catastrophic = true;
       result.evidence.push('dd writes to a device');
+      mark(of, 'writes directly to a device');
     }
   }
   if (findDeletes || CATASTROPHIC_ELIGIBLE.has(base) && (destructiveConfirmed || base === 'rm')) {
-    const targets = args.filter(arg => !arg.startsWith('-'));
-    for (const raw of targets) {
-      const resolved = resolveOperand(raw, cwdAtStart, ctx.home);
+    const targets = commandWords.slice(1).filter(word => !word.text.startsWith('-'));
+    for (const target of targets) {
+      const resolved = resolveOperand(target.text, cwdAtStart, ctx.home);
       if (resolved === null) {
         result.catastrophic = true;
-        result.evidence.push(`unresolvable destructive target ${raw}`);
+        result.evidence.push(`unresolvable destructive target ${target.text}`);
+        mark(target, 'target is unknown until the command runs');
         continue;
       }
       const effective = toEffective(resolved);
       if (isProtectedTarget(effective, ctx.home) || isSharedTempTarget(effective)) {
         result.catastrophic = true;
         result.evidence.push(`destructive target ${effective} is protected`);
+        mark(target, 'targets a protected system or home path');
       }
     }
   }
 
-  // Path operands: escape, sensitive, unresolvable-opaque.
+  // Path operands: escape, sensitive, unresolvable-opaque. xargs operands
+  // were analyzed with its command; only its item files remain.
   const isFileCommand = FILE_ORIENTED_COMMANDS.has(base);
   // Read-only roots satisfy operands only when the whole invocation reads.
-  const operandAccess: 'read' | 'write' = READ_ONLY_COMMANDS.has(base)
+  const operandAccess: 'read' | 'write' = xargs || READ_ONLY_COMMANDS.has(base)
     && !(base === 'find' && args.some(arg => FIND_ACTIONS.has(arg))) ? 'read' : 'write';
-  const operandCandidates: Array<{ raw: string; resolved: string | null; access: 'read' | 'write' }> = [];
-  const pushOperand = (raw: string, access: 'read' | 'write'): void => {
+  const operandCandidates: Array<{
+    raw: string; resolved: string | null; access: 'read' | 'write'; at: Span;
+  }> = [];
+  const pushOperand = (word: CommandWord, access: 'read' | 'write'): void => {
+    const raw = word.text;
     if (raw === '' || raw.startsWith('-')) return;
     if (isLikelyUrl(raw)) return;
     const resolved = resolveOperand(raw, cwdAtStart, ctx.home);
-    operandCandidates.push({ raw, resolved, access });
+    operandCandidates.push({ raw, resolved, access, at: word });
   };
-  for (const word of commandWords.slice(1)) {
-    if (!word.quoted || isFileCommand || /^(?:\/|~|\$)/.test(word.text)) pushOperand(word.text, operandAccess);
+  for (const word of xargs ? xargs.argFiles : commandWords.slice(1)) {
+    if (xargs || !word.quoted || isFileCommand || /^(?:\/|~|\$)/.test(word.text)) pushOperand(word, operandAccess);
   }
   if (isFileCommand && operandCandidates.length === 0 && (base === 'ls' || base === 'find')) {
-    operandCandidates.push({ raw: cwdAtStart, resolved: resolve(cwdAtStart), access: operandAccess });
+    operandCandidates.push({ raw: cwdAtStart, resolved: resolve(cwdAtStart), access: operandAccess, at: firstWord! });
   }
   for (const target of redirectTargets) {
     const resolved = resolveOperand(target.text, cwdAtStart, ctx.home);
@@ -507,15 +599,18 @@ function analyzeSegment(
       if (target.redirect === 'write' && isWithinRoot(effective, '/dev') && !isNullDevice(resolved)) {
         result.catastrophic = true;
         result.evidence.push('redirect writes to a device');
+        mark(target, 'writes directly to a device');
       }
       if (isSensitiveFilename(effective) || isSensitiveFilename(target.text)) {
         result.concerns.add('sensitive');
         result.evidence.push(`${target.text} references sensitive material`);
+        mark(target, 'may contain secrets');
       }
       result.resolvedPaths.push(effective);
       if (!isNullDevice(resolved) && !isAllowedTarget(effective, ctx, target.redirect === 'read' ? 'read' : 'write')) {
         result.concerns.add('escape');
         result.evidence.push(`redirect target ${effective} is outside the allowed roots`);
+        mark(target, 'outside the workspace');
       }
     } else {
       result.concerns.add('opaque');
@@ -523,7 +618,7 @@ function analyzeSegment(
       if (/\$\{?(?:TMPDIR|TEMP|TMP)\b/.test(target.text)) result.concerns.add('escape');
     }
   }
-  for (const { raw, resolved, access } of operandCandidates) {
+  for (const { raw, resolved, access, at } of operandCandidates) {
     if (resolved === null) {
       if (raw.includes('$')) {
         result.concerns.add('opaque');
@@ -537,14 +632,17 @@ function analyzeSegment(
     if (access === 'write' && isWithinRoot(effective, '/dev')) {
       result.catastrophic = true;
       result.evidence.push('operation can replace or modify a device');
+      mark(at, 'can modify a device');
     }
     if (!(access === 'read' && isNullDevice(resolved)) && !isAllowedTarget(effective, ctx, access)) {
       result.concerns.add('escape');
       result.evidence.push(`path ${effective} is outside the allowed roots`);
+      mark(at, 'outside the workspace');
     }
     if (isSensitiveFilename(effective) || isSensitiveFilename(raw)) {
       result.concerns.add('sensitive');
       result.evidence.push(`${raw} references sensitive material`);
+      mark(at, 'may contain secrets');
     }
   }
 
@@ -577,11 +675,7 @@ function analyzeSegment(
           if (args[j] !== '{}') payload.push(args[j]);
         }
         if (payload.length === 0) continue;
-        const inner = analyzeCommand(payload.join(' '), ctx, cwdAtStart, depth + 1);
-        for (const concern of inner.concerns) result.concerns.add(concern);
-        if (inner.catastrophic) result.catastrophic = true;
-        result.evidence.push(...inner.evidence.map(item => `in find -exec: ${item}`));
-        result.resolvedPaths.push(...inner.resolvedPaths);
+        absorb(analyzeCommand(payload.join(' '), ctx, cwdAtStart, depth + 1), 'in find -exec: ', null);
       }
     }
   }
@@ -622,20 +716,29 @@ export function analyzeCommand(
   const concerns = new Set<Concern>();
   const evidence: string[] = [];
   const resolvedPaths: string[] = [];
+  const highlights = new Map<string, Highlight>();
   let catastrophic = false;
 
   const unwrapped = unwrapShellCommand(command) ?? command;
   if (!unwrapped.trim()) {
-    return { concerns: [], catastrophic: false, evidence: [], resolvedPaths: [] };
+    return { concerns: [], catastrophic: false, evidence: [], resolvedPaths: [], highlights: [] };
   }
+  // Highlights index `command`: an unwrapped script maps back when it appears
+  // verbatim (single-quoted), otherwise it covers the whole command.
+  const shift = unwrapped === command ? 0 : command.indexOf(unwrapped);
 
   let cwd = initialCwd ?? ctx.cwd;
   for (const segment of splitSegments(tokenize(unwrapped))) {
-    const result = analyzeSegment(segment, ctx, cwd, depth);
+    const result = analyzeSegment(segment, unwrapped, ctx, cwd, depth);
     for (const concern of result.concerns) concerns.add(concern);
     if (result.catastrophic) catastrophic = true;
     evidence.push(...result.evidence);
     resolvedPaths.push(...result.resolvedPaths);
+    for (const highlight of result.highlights) {
+      const mapped = shift < 0 ? { ...highlight, start: 0, end: command.length }
+        : { ...highlight, start: highlight.start + shift, end: highlight.end + shift };
+      highlights.set(`${mapped.start}:${mapped.end}:${mapped.reason}`, mapped);
+    }
     if (result.nextCwd !== null) cwd = result.nextCwd;
   }
 
@@ -644,5 +747,19 @@ export function analyzeCommand(
     catastrophic,
     evidence: [...new Set(evidence)].slice(0, 8),
     resolvedPaths: [...new Set(resolvedPaths)],
+    highlights: [...highlights.values()].slice(0, 8),
   };
+}
+
+/** Top-level command segments (`a | b && c`) as spans of `command`, so an
+ * ask can lay a pipeline out one stage per line. Empty when the command is
+ * a shell wrapper whose script does not appear verbatim. */
+export function commandSegmentSpans(command: string): Array<{ start: number; end: number }> {
+  const unwrapped = unwrapShellCommand(command) ?? command;
+  const shift = unwrapped === command ? 0 : command.indexOf(unwrapped);
+  if (shift < 0) return [];
+  return splitSegments(tokenize(unwrapped)).map(segment => {
+    const { start, end } = segmentSpan(segment);
+    return { start: start + shift, end: end + shift };
+  });
 }

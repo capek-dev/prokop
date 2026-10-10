@@ -46,11 +46,12 @@ describe('permission card severity chrome (classified asks)', () => {
     expect(classes).toContain('border-destructive/50');
   });
 
-  test('sensitive or destructive concerns read high severity red', () => {
+  test('sensitive or destructive concerns read amber, keeping red for catastrophic', () => {
     for (const concerns of [['sensitive'], ['destructive'], ['destructive', 'escape']]) {
       const classes = cardClasses(classifiedRequest(concerns));
-      expect(classes).toContain('bg-destructive/5');
-      expect(classes).toContain('border-destructive/30');
+      expect(classes).toContain('bg-warning/5');
+      expect(classes).toContain('border-warning/40');
+      expect(classes).not.toContain('destructive');
     }
   });
 
