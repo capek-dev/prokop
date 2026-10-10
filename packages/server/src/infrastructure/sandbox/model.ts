@@ -7,6 +7,7 @@ import type {
   LlmCallContext,
   SandboxResponse,
   SandboxToolDefinition,
+  SandboxUsage,
 } from '@/infrastructure/sandbox/types';
 
 const ERROR_TYPE_TO_STATUS: Record<NonNullable<ErrorResponse['errorType']>, number> = {
@@ -34,19 +35,44 @@ interface SandboxLanguageModelOptions {
   providerId: string;
 }
 
-const defaultGenerateUsage = {
-  inputTokens: {
-    total: 10,
-    noCache: 10,
-    cacheRead: undefined,
-    cacheWrite: undefined,
-  },
-  outputTokens: {
-    total: 20,
-    text: 20,
-    reasoning: undefined,
-  },
-} as const;
+interface SandboxModelUsage {
+  inputTokens: { total: number; noCache: number; cacheRead: undefined; cacheWrite: undefined };
+  outputTokens: { total: number; text: number; reasoning: undefined };
+}
+
+function toModelUsage(usage: SandboxUsage = { inputTokens: 10, outputTokens: 20 }): SandboxModelUsage {
+  return {
+    inputTokens: {
+      total: usage.inputTokens,
+      noCache: usage.inputTokens,
+      cacheRead: undefined,
+      cacheWrite: undefined,
+    },
+    outputTokens: {
+      total: usage.outputTokens,
+      text: usage.outputTokens,
+      reasoning: undefined,
+    },
+  };
+}
+
+function pushReasoning(chunks: unknown[], reasoning: string): void {
+  const id = randomUUID();
+  chunks.push(
+    { type: 'reasoning-start', id },
+    { type: 'reasoning-delta', id, delta: reasoning },
+    { type: 'reasoning-end', id },
+  );
+}
+
+function pushText(chunks: unknown[], text: string): void {
+  const id = randomUUID();
+  chunks.push(
+    { type: 'text-start', id },
+    { type: 'text-delta', id, delta: text },
+    { type: 'text-end', id },
+  );
+}
 
 function toTools(tools: unknown): SandboxToolDefinition[] {
   if (!tools) {
@@ -143,7 +169,7 @@ export class SandboxLanguageModel {
   async doGenerate(options: SandboxModelCallOptions): Promise<{
     content: Array<{ type: 'text'; text: string }>;
     finishReason: { unified: 'stop'; raw: undefined };
-    usage: typeof defaultGenerateUsage;
+    usage: SandboxModelUsage;
     warnings: [];
   }> {
     const context = await this.createContext(options, 'generate');
@@ -200,20 +226,14 @@ export class SandboxLanguageModel {
       }
 
       case 'reasoning': {
-        const reasoningId = randomUUID();
-        const textId = randomUUID();
-        chunks.push(
-          { type: 'reasoning-start', id: reasoningId },
-          { type: 'reasoning-delta', id: reasoningId, delta: response.reasoning },
-          { type: 'reasoning-end', id: reasoningId },
-          { type: 'text-start', id: textId },
-          { type: 'text-delta', id: textId, delta: response.text },
-          { type: 'text-end', id: textId },
-        );
+        pushReasoning(chunks, response.reasoning);
+        pushText(chunks, response.text);
         break;
       }
 
       case 'tool-call': {
+        if (response.reasoning) pushReasoning(chunks, response.reasoning);
+        if (response.text) pushText(chunks, response.text);
         chunks.push({
           type: 'tool-call',
           toolCallId: response.toolCallId ?? randomUUID(),
@@ -224,6 +244,8 @@ export class SandboxLanguageModel {
       }
 
       case 'multi-tool-call': {
+        if (response.reasoning) pushReasoning(chunks, response.reasoning);
+        if (response.text) pushText(chunks, response.text);
         for (const call of response.calls) {
           chunks.push({
             type: 'tool-call',
@@ -240,7 +262,7 @@ export class SandboxLanguageModel {
       type: 'finish',
       finishReason: { unified: 'stop' as const, raw: undefined },
       logprobs: undefined,
-      usage: defaultGenerateUsage,
+      usage: toModelUsage(response.usage),
     });
 
     return simulateReadableStream({ chunks });
@@ -249,7 +271,7 @@ export class SandboxLanguageModel {
   private responseToGenerateResult(response: SandboxResponse): {
     content: Array<{ type: 'text'; text: string }>;
     finishReason: { unified: 'stop'; raw: undefined };
-    usage: typeof defaultGenerateUsage;
+    usage: SandboxModelUsage;
     warnings: [];
   } {
     if (response.type === 'error') {
@@ -265,7 +287,7 @@ export class SandboxLanguageModel {
     return {
       content: [{ type: 'text', text }],
       finishReason: { unified: 'stop', raw: undefined },
-      usage: defaultGenerateUsage,
+      usage: toModelUsage(response.usage),
       warnings: [],
     };
   }

@@ -166,6 +166,30 @@ describe('SandboxLanguageModel', () => {
     ]);
   });
 
+  test('streams reasoning and a progress note before tool calls, with scripted usage', async () => {
+    const chunks = await collectStreamChunks({
+      type: 'tool-call',
+      reasoning: 'check the handler first',
+      text: 'Reading the handler.',
+      toolName: 'read-file',
+      args: { path: '/tmp/test.txt' },
+      toolCallId: 'tool-1',
+      usage: { inputTokens: 18_400, outputTokens: 210 },
+    }) as Array<Record<string, unknown>>;
+
+    expect(chunks.map((chunk) => chunk.type)).toEqual([
+      'reasoning-start', 'reasoning-delta', 'reasoning-end',
+      'text-start', 'text-delta', 'text-end',
+      'tool-call', 'finish',
+    ]);
+    expect(chunks[1]!.delta).toBe('check the handler first');
+    expect(chunks[4]!.delta).toBe('Reading the handler.');
+    expect(chunks[7]!.usage).toEqual({
+      inputTokens: { total: 18_400, noCache: 18_400, cacheRead: undefined, cacheWrite: undefined },
+      outputTokens: { total: 210, text: 210, reasoning: undefined },
+    });
+  });
+
   test('converts multi-tool-call responses into multiple tool-call deltas', async () => {
     const chunks = await collectStreamChunks({
       type: 'multi-tool-call',

@@ -1,0 +1,10 @@
+{
+  "name": "linkshelf",
+  "version": "0.4.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "test": "bun test"
+  }
+}

@@ -23,19 +23,33 @@ export interface LlmCallContext {
   parentCallId?: string;
 }
 
+/** Token counts reported for a scripted step; defaults stay tiny when omitted. */
+export interface SandboxUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export interface TextResponse {
   type: 'text';
   content: string;
+  usage?: SandboxUsage;
 }
 
-export interface ToolCallResponse {
+/** Optional reasoning and text stream before the tool calls, like a real model's progress note. */
+interface ToolCallPreamble {
+  reasoning?: string;
+  text?: string;
+  usage?: SandboxUsage;
+}
+
+export interface ToolCallResponse extends ToolCallPreamble {
   type: 'tool-call';
   toolName: string;
   args: Record<string, unknown>;
   toolCallId?: string;
 }
 
-export interface MultiToolCallResponse {
+export interface MultiToolCallResponse extends ToolCallPreamble {
   type: 'multi-tool-call';
   calls: Array<{
     toolName: string;
@@ -54,6 +68,7 @@ export interface ReasoningResponse {
   type: 'reasoning';
   reasoning: string;
   text: string;
+  usage?: SandboxUsage;
 }
 
 export type SandboxResponse =

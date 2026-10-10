@@ -34,6 +34,7 @@
     "test": "bun run test:engine && bun run test:server && bun test ./packages/sdk/tests && bun run test:browser && bun run test:client",
     "test:browser": "bun test ./packages/browser/src",
     "sandbox": "bun packages/sandbox-cli/src/cli.ts",
+    "screenshots": "bun scripts/screenshots/run.ts",
     "test:engine": "bun test ./packages/server/tests/engine"
   },
   "devDependencies": {
@@ -42,6 +43,7 @@
     "eslint": "^10.0.2",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
+    "playwright-core": "^1.63.0",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.56.1",
     "vite-plugin-pwa": "^1.3.0"
