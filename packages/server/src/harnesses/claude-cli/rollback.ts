@@ -19,8 +19,47 @@ export interface NativeTurn {
   /** Native message count consumed by this turn. */
   length: number;
   userText: string;
-  /** Text joined across the turn's assistant messages; thinking contributes nothing. */
+  /** Whether the CLI replied. A synthetic placeholder reply is no reply. */
+  answered: boolean;
+  /** Text joined across the turn's real assistant messages; thinking contributes nothing. */
   assistantText: string;
+}
+
+/**
+ * One local turn: a user prompt and its reply, if any. A prompt directly
+ * followed by another prompt is unanswered (a fork at a user message ends with
+ * one, and the next send continues after it).
+ */
+export interface LocalTurn {
+  /** Index of the user message in the local history. */
+  start: number;
+  user: MessageWithParts;
+  reply: MessageWithParts | null;
+}
+
+/** Groups local history into turns. Refuses a reply without a prompt or two replies in a row. */
+export function groupLocalTurns(local: MessageWithParts[]): LocalTurn[] {
+  const turns: LocalTurn[] = [];
+  for (let index = 0; index < local.length; index++) {
+    const user = local[index]!;
+    if (user.message.role !== 'user') throw new Error(UNAVAILABLE);
+    const next = local[index + 1];
+    const reply = next?.message.role === 'assistant' ? next : null;
+    turns.push({ start: index, user, reply });
+    if (reply) index++;
+  }
+  return turns;
+}
+
+/** Index one past a turn's last local message. */
+export function localTurnEnd(turn: LocalTurn): number {
+  return turn.start + (turn.reply ? 2 : 1);
+}
+
+/** Claude Code writes this placeholder when a prompt follows an unanswered prompt. */
+function syntheticReply(raw: SessionMessage): boolean {
+  const message = raw.message;
+  return !!message && typeof message === 'object' && 'model' in message && message.model === '<synthetic>';
 }
 
 export function nativeText(raw: SessionMessage): string | null {
@@ -67,34 +106,38 @@ export function groupClaudeTurns(native: SessionMessage[], nativeId: string,
     index++;
     const start = index;
     let assistantText = '';
+    let answered = false;
     while (index < native.length && native[index]!.type === 'assistant') {
       const entry = native[index]!;
       const text = entryInvalid(entry, nativeId, seen) ? null : nativeText(entry);
       if (text === null) throw new Error(UNAVAILABLE);
       seen.add(entry.uuid);
-      assistantText += text;
+      if (!syntheticReply(entry)) {
+        answered = true;
+        assistantText += text;
+      }
       index++;
     }
     if (index === start) {
       // A fork cutoff may keep a final user message without its reply; only ever the last turn.
       if (options?.allowTrailingUser && index === native.length) {
-        turns.push({ userId: user.uuid, assistantId: null, length: 1, userText, assistantText: '' });
+        turns.push({ userId: user.uuid, assistantId: null, length: 1, userText, answered: false, assistantText: '' });
         break;
       }
-      // A user message with no assistant reply, or a non-assistant entry mid-turn, is unverifiable.
+      // A user message with no assistant entry, or a non-assistant entry mid-turn, is unverifiable.
       throw new Error(UNAVAILABLE);
     }
     turns.push({ userId: user.uuid, assistantId: native[index - 1]!.uuid, length: index - start + 1,
-      userText, assistantText });
+      userText, answered, assistantText });
   }
   return turns;
 }
 
 /** Conservative mapping: never infer a cutoff from text, ordering alone, or tool-result messages. */
-export function matchClaudeHistory(local: MessageWithParts[], native: SessionMessage[], nativeId: string): NativeTurn[] {
-  if (!local.length || local.length % 2 !== 0) throw new Error(UNAVAILABLE);
+export function matchClaudeHistory(local: LocalTurn[], native: SessionMessage[], nativeId: string): NativeTurn[] {
+  if (!local.length) throw new Error(UNAVAILABLE);
   const turns = groupClaudeTurns(native, nativeId);
-  if (turns.length !== local.length / 2) throw new Error(UNAVAILABLE);
+  if (turns.length !== local.length) throw new Error(UNAVAILABLE);
   verifyLocalTurns(local, turns);
   return turns;
 }
@@ -104,31 +147,33 @@ export function matchClaudeHistory(local: MessageWithParts[], native: SessionMes
  * match. Later turns (an interrupted reply, tool output) are discarded with
  * the rollback and may be unverifiable without blocking it.
  */
-export function matchClaudeHistoryPrefix(local: MessageWithParts[], native: SessionMessage[], nativeId: string,
+export function matchClaudeHistoryPrefix(local: LocalTurn[], native: SessionMessage[], nativeId: string,
   turnCount: number): NativeTurn[] {
-  if (turnCount * 2 > local.length) throw new Error(UNAVAILABLE);
+  if (turnCount > local.length) throw new Error(UNAVAILABLE);
   if (turnCount === 0) return [];
   const turns = groupClaudeTurns(native, nativeId, { limit: turnCount });
   if (turns.length !== turnCount) throw new Error(UNAVAILABLE);
-  verifyLocalTurns(local.slice(0, turnCount * 2), turns);
+  verifyLocalTurns(local.slice(0, turnCount), turns);
   return turns;
 }
 
-function verifyLocalTurns(local: MessageWithParts[], turns: NativeTurn[]): void {
+/** A local turn matches its native turn by user identity, prompt text, and reply (or the lack of one). */
+function verifyLocalTurns(local: LocalTurn[], turns: NativeTurn[]): void {
   const inherited = getDatabase().query<{ native_user_id: string }, [string]>(
     'SELECT native_user_id FROM claude_inherited_user_ids WHERE message_id = ?',
   );
-  for (let turn = 0; turn < turns.length; turn++) {
-    const user = local[turn * 2]!;
-    const assistant = local[turn * 2 + 1]!;
-    const nativeTurn = turns[turn]!;
+  for (const [index, nativeTurn] of turns.entries()) {
+    const { user, reply } = local[index]!;
     const userText = user.parts.filter(part => part.type === 'text');
-    const assistantText = assistant.parts.filter(part => part.type === 'text');
-    if (user.message.role !== 'user' || assistant.message.role !== 'assistant'
-      || assistant.message.status !== 'completed' || user.parts.length !== 1 || userText.length !== 1
-      || assistant.parts.some(part => part.type !== 'text') || assistant.parts.length !== 1
+    if (user.parts.length !== 1 || userText.length !== 1
       || nativeTurn.userId !== (inherited.get(user.message.id)?.native_user_id ?? user.message.id)
-      || nativeTurn.userText !== userText[0]!.text || nativeTurn.assistantText !== assistantText[0]!.text) {
+      || nativeTurn.userText !== userText[0]!.text || nativeTurn.answered !== !!reply) {
+      throw new Error(UNAVAILABLE);
+    }
+    if (!reply) continue;
+    const replyText = reply.parts.filter(part => part.type === 'text');
+    if (reply.message.role !== 'assistant' || reply.message.status !== 'completed' || reply.parts.length !== 1 || replyText.length !== 1
+      || nativeTurn.assistantText !== replyText[0]!.text) {
       throw new Error(UNAVAILABLE);
     }
   }
@@ -170,9 +215,12 @@ export function applyClaudeRollback(input: {
       throw new Error('Claude rollback target changed');
     }
     const result = rollbackResult(local, input.firstRemoved, input.operation === 'edit');
-    if (input.inheritedUsers.length !== input.firstRemoved / 2
+    let kept: LocalTurn[];
+    try { kept = groupLocalTurns(local.slice(0, input.firstRemoved)); }
+    catch { throw new Error('Claude inherited history changed'); }
+    if (input.inheritedUsers.length !== kept.length
       || input.inheritedUsers.some((item, index) =>
-        local[index * 2]?.message.id !== item.messageId || !item.nativeId)) {
+        kept[index]!.user.message.id !== item.messageId || !item.nativeId)) {
       throw new Error('Claude inherited history changed');
     }
     if (input.operation === 'edit') {

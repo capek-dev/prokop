@@ -47,6 +47,12 @@ function fixture() {
         const content = typeof text === 'string' ? text : text.message.content;
         const userId = typeof text === 'string' ? crypto.randomUUID() : text.uuid!;
         const native = histories.get(sessionId) ?? [];
+        // Like Claude Code: a prompt after an unanswered prompt gets a synthetic placeholder reply first.
+        if (native.at(-1)?.type === 'user') {
+          native.push({ type: 'assistant', uuid: crypto.randomUUID(), session_id: sessionId, parent_tool_use_id: null,
+            parent_agent_id: null, message: { role: 'assistant', model: '<synthetic>',
+              content: [{ type: 'text', text: 'No response requested.' }] } });
+        }
         native.push({ type: 'user', uuid: userId, session_id: sessionId, parent_tool_use_id: null,
           parent_agent_id: null, message: { role: 'user', content } });
         native.push({ type: 'assistant', uuid: crypto.randomUUID(), session_id: sessionId, parent_tool_use_id: null,
@@ -211,4 +217,45 @@ test('goal, compact, rollback-locked, image, and errored-reply targets refuse fo
   expect(f.forkCalls).toEqual([]);
   expect(f.forkIntent()).toBeNull();
   expect(listMessagesWithParts('session')).toHaveLength(4);
+});
+
+async function forkAtPromptThenSend(f: ReturnType<typeof fixture>) {
+  const local = await twoTurns(f);
+  const { forkedSession } = await f.exec.fork({ sessionId: 'session', targetMessageId: local[2]!.message.id });
+  await f.exec.sendMessage(f.wire, 'origin', forkedSession.id, 'third');
+  const copy = listMessagesWithParts(forkedSession.id);
+  // first, reply, second (unanswered), third, reply
+  expect(copy.map(entry => entry.message.role)).toEqual(['user', 'assistant', 'user', 'user', 'assistant']);
+  return { forkId: forkedSession.id, copy };
+}
+
+test('edit after a fork at a user message resends the edited prompt', async () => {
+  const f = fixture();
+  const { forkId, copy } = await forkAtPromptThenSend(f);
+  await f.exec.editMessage(f.wire, 'origin', { sessionId: forkId, messageId: copy[3]!.message.id, content: 'third, edited' });
+  expect(f.events).not.toContainEqual(expect.objectContaining({ type: 'error' }));
+  const after = listMessagesWithParts(forkId);
+  expect(after.map(entry => entry.message.role)).toEqual(['user', 'assistant', 'user', 'user', 'assistant']);
+  expect(after[3]!.parts[0]).toMatchObject({ type: 'text', text: 'third, edited' });
+});
+
+test('the unanswered prompt itself can be edited', async () => {
+  const f = fixture();
+  const { forkId, copy } = await forkAtPromptThenSend(f);
+  await f.exec.editMessage(f.wire, 'origin', { sessionId: forkId, messageId: copy[2]!.message.id, content: 'second, edited' });
+  expect(f.events).not.toContainEqual(expect.objectContaining({ type: 'error' }));
+  const after = listMessagesWithParts(forkId);
+  expect(after.map(entry => entry.message.role)).toEqual(['user', 'assistant', 'user', 'assistant']);
+  expect(after[2]!.parts[0]).toMatchObject({ type: 'text', text: 'second, edited' });
+});
+
+test('undo and fork work across an unanswered prompt', async () => {
+  const f = fixture();
+  const { forkId, copy } = await forkAtPromptThenSend(f);
+  const nested = await f.exec.fork({ sessionId: forkId, targetMessageId: copy[4]!.message.id });
+  expect(listMessagesWithParts(nested.forkedSession.id).map(entry => entry.message.role))
+    .toEqual(['user', 'assistant', 'user', 'user', 'assistant']);
+  const result = await f.exec.revert({ sessionId: forkId, targetMessageId: copy[1]!.message.id });
+  expect(result.removed.messageIds).toEqual(copy.slice(2).map(entry => entry.message.id));
+  expect(listMessagesWithParts(forkId)).toHaveLength(2);
 });

@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **Edit, Undo and Fork work after forking a Claude Code conversation at a prompt**: A fork made at one of your prompts ends with that prompt unanswered. Sending another message there used to break Edit, Undo and Fork in that conversation with "Claude conversation cannot be edited at this point". They now work, and the unanswered prompt itself can be edited too. Forks already in that state work again too.
+
 - **Codex and Claude Code sessions keep working after a CLI update**: Updating Codex (for example with Homebrew) or Claude Code used to lock every existing session, with "Codex failed during CLI version check" or "Claude turn requires reconciliation or its workspace/CLI changed". Sessions now continue with the updated CLI, including edit, undo, compact, fork and child agents. A changed project folder or an unfinished turn still blocks as before. If the new Codex cannot reopen an older conversation, the error names both versions and suggests starting a new session. Sessions locked by an earlier update work again on their next message. New status notices from newer Claude Code releases (such as a session title change) no longer fail the turn with "Claude CLI event outside turn".
 
 - **Busy database no longer breaks Claude Code sessions**: When another process briefly held the database (a `sqlite3` shell or a test run), a turn could fail with "database is locked" and leave the session refusing every later prompt with "requires reconciliation". The server now waits up to 5 seconds for the database instead of failing right away. Server tests now run against a temporary data folder and never open your real `~/.prokopai` database.

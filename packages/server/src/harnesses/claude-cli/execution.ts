@@ -20,7 +20,7 @@ import { claudeApprovals, type ClaudeApprovals } from './approvals';
 import { ClaudeChildTimelines } from './child-timelines';
 import { loadClaudeImages, resolveClaudeImages } from './images';
 import type { ClaudeTurnUsage } from './usage';
-import { applyClaudeRollback, groupClaudeTurns, matchClaudeHistoryPrefix, type ClaudeRollbackDependencies } from './rollback';
+import { applyClaudeRollback, groupClaudeTurns, groupLocalTurns, matchClaudeHistoryPrefix, type ClaudeRollbackDependencies } from './rollback';
 import { forkClaudeSession } from './fork';
 import { claudeDeveloperInstructions, defaultClaudePreconfigId, type ClaudeInstructionSources } from './instructions';
 import { createClaudeMemoryTools, createClaudeSessionSearchTools, createClaudeSkillManageTools } from './dynamic-tools';
@@ -109,14 +109,21 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       const binding = getDatabase().query<Binding, [string]>(`SELECT native_session_id, workspace_root, cli_version, pending
         FROM claude_session_bindings WHERE session_id = ?`).get(sessionId);
       const local = listMessagesWithParts(sessionId);
-      const targetIndex = local.findIndex(entry => entry.message.id === targetId);
-      const firstRemoved = operation === 'edit' || targetIndex === 0 ? targetIndex : targetIndex + 1;
-      if (targetIndex < 0 || firstRemoved >= local.length || firstRemoved % 2 !== 0
-        || local[firstRemoved]?.message.role !== 'user'
-        || operation === 'revert' && targetIndex !== 0 && local[targetIndex]?.message.role !== 'assistant') {
+      let localTurns;
+      try { localTurns = groupLocalTurns(local); }
+      catch { throw new Error('Invalid Claude history target'); }
+      // Edit drops the edited prompt's turn and everything after it. Undo at the
+      // first prompt drops everything; Undo at a reply keeps that reply's turn.
+      const targetTurn = localTurns.findIndex(turn => turn.user.message.id === targetId
+        || turn.reply?.message.id === targetId);
+      const atUser = localTurns[targetTurn]?.user.message.id === targetId;
+      const turnCount = operation === 'edit' && atUser ? targetTurn
+        : operation === 'revert' && atUser && targetTurn === 0 ? 0
+          : operation === 'revert' && !atUser ? targetTurn + 1 : -1;
+      if (targetTurn < 0 || turnCount < 0 || turnCount >= localTurns.length) {
         throw new Error('Invalid Claude history target');
       }
-      const turnCount = firstRemoved / 2;
+      const firstRemoved = localTurns[turnCount]!.start;
       // Rolling back to the first message drops the native conversation entirely, so it
       // needs no native history and also clears a stuck turn or an unfinished edit.
       if (turnCount > 0) {
@@ -127,7 +134,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       }
       // Only the kept turns must match native history. Discarded turns may hold
       // tool output or a stopped or failed reply and never block the rollback.
-      const turns = turnCount === 0 || !binding ? [] : matchClaudeHistoryPrefix(local,
+      const turns = turnCount === 0 || !binding ? [] : matchClaudeHistoryPrefix(localTurns,
         await (deps.readHistory ?? getSessionMessages)(binding.native_session_id, { dir: root }),
         binding.native_session_id, turnCount);
       const cutoffTurn = turnCount === 0 ? null : turns[turnCount - 1]!;
@@ -158,11 +165,11 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
         catch { throw new Error('Claude fork history cannot be verified'); }
         if (forkedTurns.length !== turnCount || forkedTurns.some((turn, index) =>
           turn.length !== turns[index]!.length || turn.userText !== turns[index]!.userText
-          || turn.assistantText !== turns[index]!.assistantText)) {
+          || turn.answered !== turns[index]!.answered || turn.assistantText !== turns[index]!.assistantText)) {
           throw new Error('Claude fork history cannot be verified');
         }
         inheritedUsers = forkedTurns.map((turn, index) => ({
-          messageId: local[index * 2]!.message.id, nativeId: turn.userId,
+          messageId: localTurns[index]!.user.message.id, nativeId: turn.userId,
         }));
       }
       return applyClaudeRollback({ sessionId, operation, targetId, content,
@@ -664,7 +671,8 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
           messages: listMessagesWithParts(input.sessionId).slice(-50) });
         resubmitting.set(input.sessionId, input.messageId);
         await this.sendMessage(wire, origin, input.sessionId, input.content);
-      } catch {
+      } catch (error) {
+        logHarness('claude-cli', 'edit failed', { sessionId: input.sessionId, ...describeError(error) });
         const pending = intent(input.sessionId);
         wire.delivery.send(origin, { type: 'error', code: 'edit_error', sessionId: input.sessionId,
           message: pending ? recoveryHint(pending) : 'Claude conversation cannot be edited at this point' });
