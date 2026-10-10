@@ -29,6 +29,7 @@ export const queryKeys = {
   },
   harnesses: {
     all: ['harnesses'] as const,
+    usageAll: ['harnesses', 'usage'] as const,
     usage: (harness: string) => ['harnesses', 'usage', harness] as const,
   },
   config: {
@@ -38,6 +39,8 @@ export const queryKeys = {
     providers: {
       all: ['providers'] as const,
       credentials: ['providers', 'credentials'] as const,
+      /** Prefix of every provider and Codex account usage query. */
+      usageAll: ['providers', 'usage'] as const,
       usage: (provider: string) => ['providers', 'usage', provider] as const,
       codexAccountUsage: (accountId: string, connectionId: string, reauthRequired: boolean) =>
         ['providers', 'usage', 'codex', accountId, connectionId, reauthRequired] as const,

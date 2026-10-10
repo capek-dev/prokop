@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ProkopaiClient } from '@prokopai/sdk';
-import { UsagePanel, formatResetIn } from '@/components/modals/configuration/UsagePanel';
+import { UsagePanel, formatCheckedAgo, formatResetIn } from '@/components/modals/configuration/UsagePanel';
 import { WorkspaceUsageView } from '@/components/app/WorkspaceUsageView';
 import { WorkspaceViews } from '@/components/app/WorkspaceViews';
 import { createDefaultViewLayout, useWorkspaceViewStore } from '@/stores/workspaceViewStore';
@@ -154,6 +154,38 @@ test('shows every stored Codex account independently, even with no active accoun
   expect(providers.codexAccountUsage.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
   fireEvent.click(within(personal).getByRole('button', { name: 'Refresh Codex Personal usage' }));
   await waitFor(() => expect(providers.codexAccountUsage).toHaveBeenCalledTimes(3));
+});
+
+test('open cards poll on their own, CLI harnesses slower than provider probes', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    providers.listCredentials.mockResolvedValue({ providers: [{ provider: 'deepseek', configured: true }] });
+    providers.usage.mockResolvedValue({ usage: { provider: 'deepseek', checkedAt: '', plan: null,
+      balances: [{ currency: 'USD', remaining: '1.00' }], windows: [] } });
+    setup();
+    expect(await screen.findByText('1.00 USD remaining')).toBeInTheDocument();
+    expect(await screen.findByText('18% used')).toBeInTheDocument();
+    expect(providers.usage).toHaveBeenCalledTimes(1);
+    expect(sessions.harnessUsage).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByText('just now').length).toBeGreaterThan(0);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(providers.usage).toHaveBeenCalledTimes(2);
+    expect(sessions.harnessUsage).toHaveBeenCalledTimes(1);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(4 * 60_000); });
+    expect(sessions.harnessUsage).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('snapshot age reads coarse', () => {
+  const now = Date.parse('2026-10-03T12:00:00Z');
+  expect(formatCheckedAgo(now - 20_000, now)).toBe('just now');
+  expect(formatCheckedAgo(now + 5_000, now)).toBe('just now');
+  expect(formatCheckedAgo(now - 4 * 60_000, now)).toBe('4m ago');
+  expect(formatCheckedAgo(now - 130 * 60_000, now)).toBe('2h ago');
 });
 
 test('reset times read as coarse remaining durations', () => {

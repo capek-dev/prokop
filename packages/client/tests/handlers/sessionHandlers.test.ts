@@ -81,10 +81,24 @@ describe('session.updated keeps every list current without refetching on each ch
 
   test('a run starting, a rename, or a token update changes the row in place and refetches nothing', () => {
     const { context, list } = listContext([session()]);
-    handleSessionUpdated({ type: 'session.updated', session: session({ runningAt: '2026-10-06T10:01:00.000Z' }) }, context);
-    handleSessionUpdated({ type: 'session.updated', session: session({ title: 'Fix login', totalTokens: 900 }) }, context);
+    const runningAt = '2026-10-06T10:01:00.000Z';
+    handleSessionUpdated({ type: 'session.updated', session: session({ runningAt }) }, context);
+    handleSessionUpdated({ type: 'session.updated', session: session({ runningAt, title: 'Fix login', totalTokens: 900 }) }, context);
 
-    expect(list()).toEqual([session({ title: 'Fix login', totalTokens: 900 })]);
+    expect(list()).toEqual([session({ runningAt, title: 'Fix login', totalTokens: 900 })]);
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  test('a run finishing refreshes open usage cards, other idle updates do not', () => {
+    const { context } = listContext([session({ runningAt: '2026-10-06T10:01:00.000Z' })]);
+    handleSessionUpdated({ type: 'session.updated', session: session() }, context);
+
+    expect(refetched(['providers', 'usage'])).toBe(true);
+    expect(refetched(['harnesses', 'usage'])).toBe(true);
+    expect(refetched(listKey('ws'))).toBe(false);
+
+    invalidate.mockClear();
+    handleSessionUpdated({ type: 'session.updated', session: session({ title: 'Renamed' }) }, context);
     expect(invalidate).not.toHaveBeenCalled();
   });
 

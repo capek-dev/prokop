@@ -31,6 +31,9 @@ export function isHarnessEnabled(status: HarnessStatus | undefined): boolean {
   return status === undefined || status.enabled !== false;
 }
 
+/** Open cards poll slower than provider HTTP probes, since a read may spawn the CLI. */
+const HARNESS_USAGE_POLL_MS = 5 * 60_000;
+
 /** Plan usage for one native harness. Each uncached server read starts the CLI, so the panel only fetches while open. */
 export function useHarnessUsageQuery(sdkClient: ProkopaiClient | null, harness: HarnessUsageLimits['harness'], enabled: boolean) {
   return useQuery({
@@ -38,5 +41,7 @@ export function useHarnessUsageQuery(sdkClient: ProkopaiClient | null, harness: 
     queryFn: async (): Promise<HarnessUsageLimits> => (await sdkClient!.http.sessions.harnessUsage(harness)).usage,
     enabled: !!sdkClient && enabled,
     staleTime: 30_000,
+    refetchInterval: HARNESS_USAGE_POLL_MS,
+    refetchOnWindowFocus: true,
   });
 }

@@ -7,6 +7,7 @@
 - **SVG files can be edited**: SVGs open in the editor like other source files, with a Preview tab that shows unsaved changes, and the Changes view shows their text differences.
 - **The file tree shows ignored files**: Files and folders ignored by Git (and node_modules) appear on a faint tinted background with muted names, as in JetBrains IDEs. `node_modules`, `dist`, `build` and `.next` are visible again instead of hidden. Ignored folders are not scanned up front: their contents load one level at a time when you open them, so large dependency or build folders do not slow the tree down, and folders that only contain ignored files no longer look changed.
 - **Quieter tool rows**: Shell commands that succeed no longer show a `[0]` exit code; failing ones still show theirs.
+- **Usage stays current on its own**: While the Usage panel is open, Codex accounts and DeepSeek, Z.AI and MiniMax refresh every minute, and the Claude Code and Codex CLI cards every 5 minutes, so usage spent on another computer with a shared account shows up without clicking refresh. All cards also refresh when a session finishes and when you return to the window. Each card shows how old its numbers are ("just now", "4m ago"). Refreshing pauses while the window is hidden.
 
 ### Fixed
 

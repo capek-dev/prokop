@@ -371,6 +371,13 @@ export function handleSessionUpdated(
     usePendingOperationsStore.getState().acknowledgeOperation(session.id, 'compact');
   }
 
+  // A finished run spent plan usage. Only mounted usage cards refetch, and the
+  // server's short usage cache absorbs several runs finishing together.
+  if (previous?.runningAt && !session.runningAt) {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.config.providers.usageAll });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.harnesses.usageAll });
+  }
+
   const workspaceIds = [...new Set([session.workspaceId, previous?.workspaceId].filter(Boolean) as string[])];
   // A new root session changes counts and pages; a new child is not in any root list.
   const moved = previous ? listPlacement(previous) !== listPlacement(session) : !session.parentId;

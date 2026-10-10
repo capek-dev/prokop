@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { AnthropicMark, OpenAIMark } from '@/components/branding/BrandMarks';
 import { cn } from '@/lib/utils';
+import { useNow } from '@/hooks/useNow';
 import { SettingsLoading } from './SettingsPrimitives';
 
 interface UsagePanelProps {
@@ -61,24 +62,43 @@ function UsageWindowRow({ window, now }: { window: ProviderUsageWindow; now: num
   );
 }
 
-function UsageRefreshButton({ label, fetching, disabled = false, onRefresh }: {
+/** Coarse snapshot age: `just now`, `4m ago`, `2h ago`. */
+export function formatCheckedAgo(checkedAt: number, now: number): string {
+  const minutes = Math.floor((now - checkedAt) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.floor(minutes / 60)}h ago`;
+}
+
+function UsageRefreshButton({ label, fetching, disabled = false, onRefresh, updatedAt, now }: {
   label: string;
   fetching: boolean;
   disabled?: boolean;
   onRefresh: () => void;
+  /** When the shown numbers were read, 0 before the first read. */
+  updatedAt: number;
+  now: number;
 }) {
   return (
-    <Button variant="ghost" size="icon" className="ml-auto size-7 shrink-0 text-muted-foreground"
-      aria-label={label} disabled={fetching || disabled} onClick={onRefresh}>
-      <RefreshCw className={cn('size-3.5', fetching && 'animate-spin')} />
-    </Button>
+    <div className="ml-auto flex shrink-0 items-center gap-1">
+      {updatedAt > 0 && !disabled && (
+        <span className="text-[10px] text-muted-foreground tabular-nums" title={`Checked ${new Date(updatedAt).toLocaleString()}`}>
+          {formatCheckedAgo(updatedAt, now)}
+        </span>
+      )}
+      <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground"
+        aria-label={label} disabled={fetching || disabled} onClick={onRefresh}>
+        <RefreshCw className={cn('size-3.5', fetching && 'animate-spin')} />
+      </Button>
+    </div>
   );
 }
 
-function HarnessUsageCard({ sdkClient, harness, status }: {
+function HarnessUsageCard({ sdkClient, harness, status, now }: {
   sdkClient: ProkopaiClient | null;
   harness: (typeof USAGE_HARNESSES)[number];
   status: HarnessStatus | undefined;
+  now: number;
 }) {
   const ready = !!status?.available && isHarnessEnabled(status);
   const { data, isLoading, isFetching, isError, refetch, dataUpdatedAt } = useHarnessUsageQuery(sdkClient, harness.id, ready);
@@ -112,7 +132,7 @@ function HarnessUsageCard({ sdkClient, harness, status }: {
         )}
         {ready && (
           <UsageRefreshButton label={`Refresh ${harness.name} usage`} fetching={isFetching}
-            onRefresh={() => void refetch()} />
+            onRefresh={() => void refetch()} updatedAt={dataUpdatedAt} now={now} />
         )}
       </div>
       {body}
@@ -126,7 +146,7 @@ const USAGE_PROVIDERS: { id: UsageProvider; name: string }[] = [
   { id: 'minimax', name: 'MiniMax' },
 ];
 
-function ProviderUsageCard({ sdkClient, provider }: UsagePanelProps & { provider: (typeof USAGE_PROVIDERS)[number] }) {
+function ProviderUsageCard({ sdkClient, provider, now }: UsagePanelProps & { provider: (typeof USAGE_PROVIDERS)[number]; now: number }) {
   const { data, isLoading, isFetching, isError, refetch, dataUpdatedAt } = useProviderUsageQuery(sdkClient, provider.id);
   return (
     <div className="flex flex-col gap-2.5 rounded-lg border p-2.5">
@@ -134,7 +154,7 @@ function ProviderUsageCard({ sdkClient, provider }: UsagePanelProps & { provider
         <span className="text-sm font-medium">{provider.name}</span>
         {data?.plan && <Badge variant="secondary">{data.plan}</Badge>}
         <UsageRefreshButton label={`Refresh ${provider.name} usage`} fetching={isFetching}
-          onRefresh={() => void refetch()} />
+          onRefresh={() => void refetch()} updatedAt={dataUpdatedAt} now={now} />
       </div>
       {isLoading ? <Loader2 className="size-4 animate-spin text-muted-foreground" />
         : isError || !data ? <p className="text-xs text-muted-foreground">Could not read usage from the server.</p>
@@ -161,7 +181,7 @@ function ProviderUsageCard({ sdkClient, provider }: UsagePanelProps & { provider
   );
 }
 
-function CodexAccountUsageCard({ sdkClient, account, active }: UsagePanelProps & { account: ProviderAccountSummary; active: boolean }) {
+function CodexAccountUsageCard({ sdkClient, account, active, now }: UsagePanelProps & { account: ProviderAccountSummary; active: boolean; now: number }) {
   const { data, isLoading, isFetching, isError, refetch, dataUpdatedAt } = useCodexAccountUsageQuery(sdkClient, account);
   return (
     <section aria-label={`Codex · ${account.label}`} className="flex flex-col gap-2.5 rounded-lg border p-2.5">
@@ -171,7 +191,7 @@ function CodexAccountUsageCard({ sdkClient, account, active }: UsagePanelProps &
         {active && <Badge variant="outline">Active</Badge>}
         {data?.plan && !account.reauthRequired && <Badge variant="secondary">{data.plan}</Badge>}
         <UsageRefreshButton label={`Refresh Codex ${account.label} usage`} fetching={isFetching}
-          disabled={account.reauthRequired} onRefresh={() => void refetch()} />
+          disabled={account.reauthRequired} onRefresh={() => void refetch()} updatedAt={dataUpdatedAt} now={now} />
       </div>
       {account.reauthRequired ? <p className="text-xs text-muted-foreground">Reconnect this Codex account in Providers &amp; Models.</p>
         : isLoading ? <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -189,6 +209,7 @@ export function UsagePanel({ sdkClient }: UsagePanelProps) {
   const codex = providers.data?.providers.find(provider => provider.provider === 'codex');
   const configuredProviders = USAGE_PROVIDERS.filter(provider =>
     credentials.data?.providers.some(entry => entry.provider === provider.id && entry.configured));
+  const now = useNow(30_000);
 
   if (isLoading) {
     return <SettingsLoading />;
@@ -202,14 +223,15 @@ export function UsagePanel({ sdkClient }: UsagePanelProps) {
       {providers.isError && <p className="text-xs text-muted-foreground">Could not load Codex accounts.</p>}
       <div className="flex flex-col gap-2">
         {codex?.accounts?.map(account => <CodexAccountUsageCard key={`${account.id}:${account.connectionId}`} sdkClient={sdkClient}
-          account={account} active={codex.activeAccountId === account.id} />)}
-        {configuredProviders.map(provider => <ProviderUsageCard key={provider.id} sdkClient={sdkClient} provider={provider} />)}
+          account={account} active={codex.activeAccountId === account.id} now={now} />)}
+        {configuredProviders.map(provider => <ProviderUsageCard key={provider.id} sdkClient={sdkClient} provider={provider} now={now} />)}
         {USAGE_HARNESSES.map((harness) => (
           <HarnessUsageCard
             key={harness.id}
             sdkClient={sdkClient}
             harness={harness}
             status={data?.harnesses.find((entry) => entry.id === harness.id)}
+            now={now}
           />
         ))}
       </div>

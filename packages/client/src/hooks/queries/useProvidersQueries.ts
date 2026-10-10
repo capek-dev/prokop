@@ -3,12 +3,20 @@ import type { ProkopaiClient, ProviderAccountSummary, UsageProvider } from '@pro
 import { queryKeys } from '@/lib/queryKeys';
 import type { OAuthRedirectStrategy } from '@prokopai/sdk';
 
+/**
+ * Shared subscriptions spend usage on other machines, which this server never
+ * hears about. Open usage cards poll; hidden tabs pause until focus returns.
+ */
+const USAGE_POLL_MS = 60_000;
+
 export function useCodexAccountUsageQuery(sdkClient: ProkopaiClient | null, account: ProviderAccountSummary) {
   return useQuery({
     queryKey: queryKeys.config.providers.codexAccountUsage(account.id, account.connectionId, account.reauthRequired),
     queryFn: async ({ signal }) => (await sdkClient!.http.providers.codexAccountUsage(account.id, { signal })).usage,
     enabled: !!sdkClient && !account.reauthRequired,
     staleTime: 30_000,
+    refetchInterval: USAGE_POLL_MS,
+    refetchOnWindowFocus: true,
     retry: false,
   });
 }
@@ -19,6 +27,8 @@ export function useProviderUsageQuery(sdkClient: ProkopaiClient | null, provider
     queryFn: async ({ signal }) => (await sdkClient!.http.providers.usage(provider, { signal })).usage,
     enabled: !!sdkClient,
     staleTime: 30_000,
+    refetchInterval: USAGE_POLL_MS,
+    refetchOnWindowFocus: true,
     retry: false,
   });
 }
