@@ -14,5 +14,6 @@ export const gitBranchActionSchema = z.discriminatedUnion('action', [
   z.object({ root, action: z.literal('create'), name, startHead: head }).strict(),
   z.object({ root, action: z.literal('track'), remote, branch: name, name, expectedHead: head }).strict(),
   z.object({ root, action: z.literal('switch'), name, expectedBranch: name.nullable(), expectedHead: head.nullable(), targetHead: head }).strict(),
-  gitBranchPushReviewSchema.extend({ action: z.literal('push'), expectedRemoteHead: head.nullable(), force: z.boolean() }).strict(),
+  z.object({ root, action: z.literal('set-upstream'), name, remote, branch: name }).strict(),
+  gitBranchPushReviewSchema.extend({ action: z.literal('push'), expectedRemoteHead: head.nullable(), force: z.boolean(), runHooks: z.boolean().optional() }).strict(),
 ]);

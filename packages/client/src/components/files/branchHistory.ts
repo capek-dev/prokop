@@ -71,14 +71,23 @@ export function isFetchStale(lastFetchedAt: string | null, now: number): boolean
 export type BranchSync =
   | { kind: 'remote' }
   | { kind: 'unpublished' }
+  /** No upstream, but a same-named remote branch exists (published outside the workbench). */
+  | { kind: 'untracked'; remote: string; branch: string }
   | { kind: 'gone' }
   | { kind: 'up-to-date' }
   | { kind: 'ahead' | 'behind' | 'diverged'; ahead: number; behind: number };
 
-/** Plain-language relationship between a branch and its upstream. */
-export function branchSync(branch: GitBranchInfo): BranchSync {
+/**
+ * Plain-language relationship between a branch and its upstream. With the
+ * branch list and remotes, a branch without an upstream that a fetch found on
+ * a remote reads as untracked instead of unpublished.
+ */
+export function branchSync(branch: GitBranchInfo, branches: readonly GitBranchInfo[] = [], remotes: readonly string[] = []): BranchSync {
   if (branch.kind === 'remote') return { kind: 'remote' };
-  if (!branch.upstream) return { kind: 'unpublished' };
+  if (!branch.upstream) {
+    const remote = remotes.find((name) => branches.some((b) => b.kind === 'remote' && b.ref === `refs/remotes/${name}/${branch.name}`));
+    return remote ? { kind: 'untracked', remote, branch: branch.name } : { kind: 'unpublished' };
+  }
   if (branch.ahead === null || branch.behind === null) return { kind: 'gone' };
   const { ahead, behind } = branch;
   if (!ahead && !behind) return { kind: 'up-to-date' };

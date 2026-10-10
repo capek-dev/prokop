@@ -66,6 +66,13 @@ describe('branchSync', () => {
     expect(tracked(0, 1)).toEqual({ kind: 'behind', ahead: 0, behind: 1 });
     expect(tracked(2, 1)).toEqual({ kind: 'diverged', ahead: 2, behind: 1 });
   });
+
+  test('a branch without upstream that exists on a remote is untracked, not unpublished', () => {
+    const branches = [branch('feat/x'), remote('upstream/feat/x'), remote('origin/other')];
+    expect(branchSync(branch('feat/x'), branches, ['origin', 'upstream'])).toEqual({ kind: 'untracked', remote: 'upstream', branch: 'feat/x' });
+    expect(branchSync(branch('other'), branches, ['upstream'])).toEqual({ kind: 'unpublished' });
+    expect(branchSync(branch('feat/x'), branches)).toEqual({ kind: 'unpublished' });
+  });
 });
 
 test('refLabel strips heads and remotes prefixes', () => {

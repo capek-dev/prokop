@@ -60,5 +60,13 @@ export type GitBranchAction = { root?: string } & (
   | { action: 'create'; name: string; startHead: string }
   | { action: 'track'; remote: string; branch: string; name: string; expectedHead: string }
   | { action: 'switch'; name: string; expectedBranch: string | null; expectedHead: string | null; targetHead: string }
-  | ({ action: 'push'; expectedRemoteHead: string | null; force: boolean } & GitBranchPushTarget)
+  /** Adopt an existing remote branch as the upstream of a local branch that has none. */
+  | { action: 'set-upstream'; name: string; remote: string; branch: string }
+  /** `runHooks: false` pushes with --no-verify (skips pre-push). Defaults to true. */
+  | ({ action: 'push'; expectedRemoteHead: string | null; force: boolean; runHooks?: boolean } & GitBranchPushTarget)
 );
+/** `ApiError.details` of a failed push: why it failed and the end of Git's output (credentials masked). */
+export interface GitPushErrorDetails {
+  reason?: 'pre-push-hook' | 'timeout' | 'rejected' | 'remote-rejected';
+  output?: string;
+}

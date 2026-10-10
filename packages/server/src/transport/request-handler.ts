@@ -15,6 +15,11 @@ export interface RequestHandlerDeps {
   isKnownHostname(hostname: string): boolean;
 }
 
+const GIT_MUTATION_PATH = /^\/api\/workspaces\/[^/]+\/git\//;
+function isGitMutation(req: Request): boolean {
+  return req.method === 'POST' && GIT_MUTATION_PATH.test(new URL(req.url).pathname);
+}
+
 /**
  * Authenticates once per request (a socket ticket is single use), refuses
  * cross-site callers, then upgrades WebSockets or routes to the HTTP app.
@@ -44,8 +49,10 @@ export function createRequestHandler(deps: RequestHandlerDeps) {
     // Bun closes a response that sends nothing for 10 s, which cuts quiet
     // Server-Sent Event streams mid-body (browsers report
     // ERR_INCOMPLETE_CHUNKED_ENCODING and reconnect). Event streams stay open
-    // until the client aborts; every other request keeps the idle guard.
-    if (req.headers.get('Accept')?.includes('text/event-stream')) listener.timeout(req, 0);
+    // until the client aborts. Git mutations (pushes running pre-push hooks,
+    // fetches, commit hooks) stay silent until Git exits; the Git runner bounds
+    // them with its own timeout. Every other request keeps the idle guard.
+    if (req.headers.get('Accept')?.includes('text/event-stream') || isGitMutation(req)) listener.timeout(req, 0);
 
     return deps.app.fetch(req, { principal });
   };

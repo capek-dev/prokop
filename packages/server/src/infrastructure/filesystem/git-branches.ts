@@ -1,7 +1,7 @@
 import { lstat, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { GitBranchAction, GitBranchesResult, GitBranchPushTarget, GitBranchPushReview, GitHistoryEntry, GitHistoryResult, GitCommitDetails } from '@prokopai/sdk';
-import { git, getGitRepository, previewGitPush } from './git-operations';
+import { git, getGitRepository, gitOutputTail, GitOperationError, previewGitPush, runGitPush } from './git-operations';
 import { withGitActionLock } from './git-action-lock';
 
 const SHA = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
@@ -226,6 +226,25 @@ export async function runGitBranchAction(root: string, input: GitBranchAction): 
         await git(root, ['branch', '--track', '--', input.name, remoteRef]);
         break;
       }
+      case 'set-upstream': {
+        // For a branch published outside the workbench (a terminal push without
+        // -u, another clone): adopt the remote branch as its upstream.
+        await remoteName(root, input.remote);
+        await branchName(root, input.name);
+        await branchName(root, input.branch);
+        await git(root, ['rev-parse', '--verify', `refs/heads/${input.name}`]);
+        const configured = await Promise.all(['remote', 'merge'].map((key) => git(root, ['config', '--get', `branch.${input.name}.${key}`], { allowFailure: true })));
+        if (configured.some((entry) => entry.code === 0)) fail('branch already has an upstream. Refresh branches.');
+        if (configured.some((entry) => entry.code > 1)) fail('unable to read tracking configuration.');
+        // Fetch only this branch so the tracking ref exists and is current, even
+        // when it was published from another clone and never fetched here.
+        const tracking = `refs/remotes/${input.remote}/${input.branch}`;
+        const fetched = await git(root, ['fetch', '--no-tags', '--no-recurse-submodules', '--refmap=', '--', input.remote, `+refs/heads/${input.branch}:${tracking}`], { allowFailure: true });
+        if (fetched.code && /couldn't find remote ref/i.test(fetched.stderr)) fail(`${input.remote}/${input.branch} does not exist. Push to publish the branch.`);
+        if (fetched.code) throw new GitOperationError('fetch failed. Check credentials, permissions, and the network on the server.', { output: gitOutputTail(fetched.output) });
+        await git(root, ['branch', `--set-upstream-to=${tracking}`, '--', input.name]);
+        break;
+      }
       case 'switch': {
         await branchName(root, input.name);
         await commitExists(root, input.targetHead);
@@ -249,10 +268,7 @@ export async function runGitBranchAction(root: string, input: GitBranchAction): 
         if (input.expectedRemoteHead !== null && !SHA.test(input.expectedRemoteHead)) fail('invalid remote lease.');
         const preview = await previewGitPush(root, input);
         if (preview.remoteHead !== input.expectedRemoteHead) fail('remote changed. Review outgoing commits again.');
-        const args = ['-c', 'push.followTags=false', 'push', '--porcelain', '--no-follow-tags'];
-        if (input.force) args.push(`--force-with-lease=refs/heads/${input.branch}:${input.expectedRemoteHead ?? ''}`);
-        args.push('--', input.remote, `${input.expectedHead}:refs/heads/${input.branch}`);
-        await git(root, args);
+        await runGitPush(root, { remote: input.remote, head: input.expectedHead, branch: input.branch, lease: input.force ? input.expectedRemoteHead : undefined, runHooks: input.runHooks });
         // SHA-pinned pushes cannot use --set-upstream to identify the local
         // source branch. Configure it only after the remote push succeeds.
         try {

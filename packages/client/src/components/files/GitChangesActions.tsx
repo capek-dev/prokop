@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { EMPTY_GIT_DRAFT, gitDraftKey, selectedGitPaths, useGitCommitStore } from '@/stores/gitCommitStore';
 import { queryKeys } from '@/lib/queryKeys';
 import { cn } from '@/lib/utils';
+import { canRetryWithoutHooks, GitOutput, pushFailure, type PushFailure } from './GitPushFeedback';
 
 interface Props {
   sdkClient: ProkopaiClient;
@@ -35,7 +36,8 @@ export function GitChangesActions({ sdkClient, workspaceId, serverId, root, file
   const [mode, setMode] = useState<Mode>('commit');
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<PushFailure | null>(null);
+  const [runPushHooks, setRunPushHooks] = useState(true);
   const [remote, setRemote] = useState('');
   const [branch, setBranch] = useState('');
   const [filter, setFilter] = useState('');
@@ -75,7 +77,7 @@ export function GitChangesActions({ sdkClient, workspaceId, serverId, root, file
     setRetryPush(input);
     const result = await sdkClient.http.files.gitPush(workspaceId, input);
     setRetryPush(null);
-    if (result.warning) setError(result.warning);
+    if (result.warning) setError({ message: result.warning });
     else { toast.success('Committed and pushed'); setEditing(false); }
   }
   async function submit(reviewedForce?: GitPushInput): Promise<void> {
@@ -90,26 +92,26 @@ export function GitChangesActions({ sdkClient, workspaceId, serverId, root, file
       if (mode === 'force' && !reviewedForce) {
         if (!state.head) throw new Error('Use Commit & push to publish the first commit.');
         const preview = await sdkClient.http.files.gitPushPreview(workspaceId, { root, ...destination });
-        setConfirmation({ root, ...destination, expectedHead: state.head, expectedBranch: state.branch, force: true, expectedRemoteHead: preview.remoteHead, setUpstream: !state.upstream });
+        setConfirmation({ root, ...destination, expectedHead: state.head, expectedBranch: state.branch, force: true, expectedRemoteHead: preview.remoteHead, setUpstream: !state.upstream, runHooks: runPushHooks });
         return;
       }
       setPhase('Committing…');
       const result = await sdkClient.http.files.gitCommit(workspaceId, { root, paths: selected, message: draft.message, runHooks: draft.runHooks ?? true, expectedHead: state.head, expectedBranch: state.branch });
       useGitCommitStore.getState().clear(key);
-      if (result.warning) { setError(result.warning); return; }
+      if (result.warning) { setError({ message: result.warning }); return; }
       if (mode !== 'commit') {
-        await push({ ...(reviewedForce ?? { root, ...destination, expectedBranch: state.branch, setUpstream: !state.upstream }), expectedHead: result.head });
+        await push({ ...(reviewedForce ?? { root, ...destination, expectedBranch: state.branch, setUpstream: !state.upstream, runHooks: runPushHooks }), expectedHead: result.head });
       } else { toast.success(`Committed ${result.head.slice(0, 8)}`); setEditing(false); }
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : 'Git operation failed');
+      setError(pushFailure(cause));
     } finally { setBusy(false); setPhase(''); refresh(); }
   }
-  async function retry(): Promise<void> {
+  async function retry(runHooks = retryPush?.runHooks): Promise<void> {
     if (busy || !retryPush) return;
     setBusy(true);
     setError(null);
-    try { await push(retryPush); }
-    catch (cause: unknown) { setError(cause instanceof Error ? cause.message : 'Push failed'); }
+    try { await push({ ...retryPush, runHooks }); }
+    catch (cause: unknown) { setError(pushFailure(cause)); }
     finally { setBusy(false); setPhase(''); refresh(); }
   }
   // Build the selection view from the existing changed paths, with directory
@@ -190,17 +192,27 @@ export function GitChangesActions({ sdkClient, workspaceId, serverId, root, file
             <Input aria-label="Remote branch" className="h-7 flex-1 text-xs" value={destination.branch} disabled={busy} onChange={(event) => setBranch(event.target.value)} />
           </div>}
           <p className="text-xs text-muted-foreground" title="Push includes all unpushed branch commits, not only these files">{repository.data?.branch} → {destination.remote || 'remote'}/{destination.branch}</p>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Checkbox checked={runPushHooks} disabled={busy} onCheckedChange={(checked) => setRunPushHooks(checked === true)} />
+            Run pre-push hooks
+          </label>
         </>}
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">{selected.length} selected</span>
-          {retryPush ? <Button size="sm" disabled={busy} onClick={() => void retry()}>{busy ? phase : 'Retry push'}</Button> : <div className="flex items-center">
+          {retryPush ? <div className="flex items-center gap-1">
+            {canRetryWithoutHooks(error, retryPush.runHooks !== false) && <Button size="sm" variant="outline" disabled={busy} title="Push the same commit with --no-verify" onClick={() => void retry(false)}>Retry without hooks</Button>}
+            <Button size="sm" disabled={busy} onClick={() => void retry()}>{busy ? phase : 'Retry push'}</Button>
+          </div> : <div className="flex items-center">
             <Button size="sm" disabled={busy || !selected.length || !draft.message.trim()} onClick={() => void submit()}>{busy ? phase : labels[mode]}</Button>
             <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon-sm" variant="ghost" aria-label="Commit action" disabled={busy}><ChevronDown /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuGroup>{(['commit', 'push', 'force'] as const).map((value) => <DropdownMenuItem key={value} disabled={value !== 'commit' && !repository.data?.remotes.length} onSelect={() => setMode(value)}>{labels[value]}</DropdownMenuItem>)}</DropdownMenuGroup></DropdownMenuContent></DropdownMenu>
           </div>}
         </div>
       </div>
     </>}
-    {(error || repository.error) && <p role="alert" className="px-3 py-2 text-xs text-destructive">{error ?? repository.error?.message}</p>}
+    {(error || repository.error) && <div className="flex flex-col gap-1 px-3 py-2">
+      <p role="alert" className="text-xs text-destructive">{error?.message ?? repository.error?.message}</p>
+      <GitOutput output={error?.output} />
+    </div>}
     <ConfirmationDialog open={confirmation !== null} onOpenChange={(open) => { if (!open) setConfirmation(null); }} title="Commit and force push?" description={`Commit the selected files and replace ${confirmation?.remote}/${confirmation?.branch} at ${confirmation?.expectedRemoteHead?.slice(0, 8) ?? 'a missing branch'}. Remote commits can be removed. The push is rejected if the remote changes after this review.`} variant="destructive" confirmLabel="Commit & force push" onConfirm={() => { if (confirmation) void submit(confirmation); }} />
   </>;
 }

@@ -33,6 +33,8 @@ export interface GitPushInput extends GitPushPreviewInput {
   force?: boolean;
   expectedRemoteHead?: string | null;
   setUpstream?: boolean;
+  /** Run the pre-push hook. Defaults to true; false pushes with --no-verify. */
+  runHooks?: boolean;
 }
 
 export interface GitPushResult {

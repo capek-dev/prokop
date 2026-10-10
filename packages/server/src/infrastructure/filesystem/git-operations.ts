@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { copyFile, lstat, mkdtemp, open, readFile, realpath, rename, rm } from 'node:fs/promises';
+import { access, constants, copyFile, lstat, mkdtemp, open, readFile, realpath, rename, rm } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { GitCommitInput, GitCommitResult, GitPushInput, GitPushPreviewInput, GitPushResult, GitRepositoryState } from '@prokopai/sdk';
 import { clearGitStatusCache } from './git-status';
@@ -8,18 +8,56 @@ import { createSelectedCommitHooks } from './git-commit-hooks';
 const SHA = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 function fail(message: string): never { throw new Error(`Git operation: ${message}`); }
 
-export async function git(root: string, args: string[], options: { index?: string; input?: string | Buffer; allowFailure?: boolean } = {}): Promise<{ stdout: string; stdoutBytes: Buffer; code: number }> {
+const COMMAND_TIMEOUT_MS = 120_000;
+/** Pre-push hooks often run test suites; give them room before stopping Git. */
+export const PUSH_TIMEOUT_MS = 10 * 60_000;
+
+/** Why a push failed, so the client can offer a matching recovery. */
+export type GitPushFailure = 'pre-push-hook' | 'timeout' | 'rejected' | 'remote-rejected';
+
+/**
+ * A Git failure with the end of the command's output attached. The HTTP layer
+ * passes `details` to the client, so output must go through `gitOutputTail`.
+ */
+export class GitOperationError extends Error {
+  readonly details: { output?: string; reason?: GitPushFailure };
+  constructor(message: string, details: { output?: string; reason?: GitPushFailure } = {}) {
+    super(`Git operation: ${message}`);
+    this.details = details;
+  }
+}
+
+/**
+ * Last lines of Git output for display: credentials in URLs are masked, colour
+ * codes and carriage-return progress frames are dropped.
+ */
+export function gitOutputTail(output: string, maxLines = 60, maxChars = 8000): string {
+  const lines = output
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@'"]+@/gi, '$1***@')
+    .split('\n')
+    .map((line) => line.slice(line.lastIndexOf('\r') + 1).trimEnd());
+  while (lines.length && !lines.at(-1)) lines.pop();
+  const tail = lines.slice(-maxLines).join('\n');
+  return tail.length > maxChars ? tail.slice(-maxChars) : tail;
+}
+
+export async function git(root: string, args: string[], options: { index?: string; input?: string | Buffer; allowFailure?: boolean; timeoutMs?: number } = {}): Promise<{ stdout: string; stdoutBytes: Buffer; stderr: string; output: string; code: number }> {
   const env = { ...process.env };
   // A host's Git invocation must not redirect this operation to another repository/index.
   for (const key of Object.keys(env)) if (key.startsWith('GIT_')) delete env[key];
   Object.assign(env, { GIT_TERMINAL_PROMPT: '0', GIT_EDITOR: 'true', GIT_SEQUENCE_EDITOR: 'true', GIT_PAGER: 'cat', LC_ALL: 'C', GIT_SSH_COMMAND: 'ssh -oBatchMode=yes' });
   if (options.index) env.GIT_INDEX_FILE = options.index;
-  const { stdoutBytes, stderr, code } = await new Promise<{ stdoutBytes: Buffer; stderr: string; code: number }>((resolveResult, reject) => {
+  const timeoutMs = options.timeoutMs ?? COMMAND_TIMEOUT_MS;
+  const { stdoutBytes, stderr, output, code } = await new Promise<{ stdoutBytes: Buffer; stderr: string; output: string; code: number }>((resolveResult, reject) => {
     const proc = spawn('git', ['--literal-pathspecs', '-C', root, ...args], {
       env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: process.platform !== 'win32',
     });
     const out: Buffer[] = [];
     const err: Buffer[] = [];
+    // Both streams in arrival order: hook output interleaves stdout and stderr.
+    const all: Buffer[] = [];
     let bytes = 0;
     let failure: string | undefined;
     const stop = (message: string) => {
@@ -34,11 +72,11 @@ export async function git(root: string, args: string[], options: { index?: strin
       proc.stderr.destroy();
       proc.stdin.destroy();
     };
-    const timer = setTimeout(() => stop('command timed out. Refresh repository state before retrying.'), 120_000);
+    const timer = setTimeout(() => stop('timeout'), timeoutMs);
     const collect = (chunks: Buffer[]) => (chunk: Buffer) => {
       bytes += chunk.length;
       if (bytes > 2 * 1024 * 1024) stop('output limit exceeded. Refresh repository state before retrying.');
-      else chunks.push(chunk);
+      else { chunks.push(chunk); all.push(chunk); }
     };
     proc.stdout.on('data', collect(out));
     proc.stderr.on('data', collect(err));
@@ -46,8 +84,9 @@ export async function git(root: string, args: string[], options: { index?: strin
     proc.on('error', () => { clearTimeout(timer); reject(new Error('Git operation: could not start Git on the server.')); });
     proc.on('close', (exitCode) => {
       clearTimeout(timer);
-      if (failure) reject(new Error(`Git operation: ${failure}`));
-      else resolveResult({ stdoutBytes: Buffer.concat(out), stderr: Buffer.concat(err).toString(), code: exitCode ?? 1 });
+      if (failure === 'timeout') reject(new GitOperationError('command timed out. Refresh repository state before retrying.', { reason: 'timeout', output: gitOutputTail(Buffer.concat(all).toString()) }));
+      else if (failure) reject(new Error(`Git operation: ${failure}`));
+      else resolveResult({ stdoutBytes: Buffer.concat(out), stderr: Buffer.concat(err).toString(), output: Buffer.concat(all).toString(), code: exitCode ?? 1 });
     });
     proc.stdin.end(options.input);
   });
@@ -60,7 +99,50 @@ export async function git(root: string, args: string[], options: { index?: strin
     if (/non-fast-forward|stale info|fetch first|rejected/i.test(stderr + stdout)) fail('push rejected. The remote changed or is ahead; review it before retrying.');
     fail(`${args[0]} failed. Check Git hooks, credentials, permissions, and repository state on the server.`);
   }
-  return { stdout, stdoutBytes, code };
+  return { stdout, stdoutBytes, stderr, output, code };
+}
+
+/**
+ * The one way the workbench pushes: the reviewed SHA to an explicit branch,
+ * optionally leased, optionally without pre-push hooks. Failures carry the end
+ * of Git's output (hook output included) and a reason the client can act on.
+ */
+export async function runGitPush(root: string, push: { remote: string; head: string; branch: string; lease?: string | null; runHooks?: boolean }, timeoutMs = PUSH_TIMEOUT_MS): Promise<void> {
+  const runHooks = push.runHooks !== false;
+  const args = ['-c', 'push.followTags=false', 'push', '--porcelain', '--no-follow-tags'];
+  if (!runHooks) args.push('--no-verify');
+  if (push.lease !== undefined) args.push(`--force-with-lease=refs/heads/${push.branch}:${push.lease ?? ''}`);
+  args.push('--', push.remote, `${push.head}:refs/heads/${push.branch}`);
+  const hasHook = async () => {
+    if (!runHooks) return false;
+    const hook = (await git(root, ['rev-parse', '--path-format=absolute', '--git-path', 'hooks/pre-push'], { allowFailure: true })).stdout.replace(/\r?\n$/, '');
+    return !!hook && await access(hook, constants.X_OK).then(() => true, () => false);
+  };
+  let result: Awaited<ReturnType<typeof git>>;
+  try {
+    result = await git(root, args, { allowFailure: true, timeoutMs });
+  } catch (error: unknown) {
+    if (!(error instanceof GitOperationError) || error.details.reason !== 'timeout') throw error;
+    const minutes = Math.round(timeoutMs / 60_000);
+    const limit = minutes >= 1 ? `${minutes} minute${minutes === 1 ? '' : 's'}` : `${Math.round(timeoutMs / 1000)} seconds`;
+    throw new GitOperationError(await hasHook()
+      ? `push stopped after ${limit}. The pre-push hook was probably still running. Push without hooks to skip it, or run the hook on the server to see why it is slow.`
+      : `push stopped after ${limit}. Check the network and credentials on the server.`, error.details);
+  }
+  if (result.code === 0) return;
+  const output = gitOutputTail(result.output);
+  // Porcelain ref lines are "<flag>\t<from>:<to>\t<summary>"; "!" marks a rejected ref.
+  const refLines = result.stdout.split('\n').filter((line) => /^[ +\-*!=]\t[^\t]+:[^\t]+\t/.test(line));
+  const rejected = refLines.filter((line) => line.startsWith('!'));
+  const remoteRejected = rejected.find((line) => line.includes('[remote rejected]'));
+  if (remoteRejected) {
+    const reason = /\[remote rejected\]\s*\((.*)\)/.exec(remoteRejected)?.[1];
+    throw new GitOperationError(`the remote refused the push${reason ? `: ${reason}` : ''}.`, { output, reason: 'remote-rejected' });
+  }
+  if (rejected.length) throw new GitOperationError('push rejected. The remote changed or is ahead; review it before retrying.', { output, reason: 'rejected' });
+  // Git prints ref lines only after pre-push passes, so none plus a hook means the hook said no.
+  if (!refLines.length && await hasHook()) throw new GitOperationError('the pre-push hook failed. Fix what it reports, or push without hooks.', { output, reason: 'pre-push-hook' });
+  throw new GitOperationError('push failed. Check credentials, permissions, and the network on the server.', { output });
 }
 
 export async function getGitRepository(root: string): Promise<GitRepositoryState> {
@@ -287,11 +369,8 @@ export async function pushGitBranch(root: string, input: GitPushInput): Promise<
   await validateDestination(root, input);
   if (input.force && (input.expectedRemoteHead === undefined || (input.expectedRemoteHead !== null && !SHA.test(input.expectedRemoteHead)))) fail('force push requires an explicit reviewed remote commit.');
   if (input.force && (await previewGitPush(root, input)).remoteHead !== input.expectedRemoteHead) fail('push rejected. The remote changed since confirmation.');
-  const args = ['-c', 'push.followTags=false', 'push', '--porcelain', '--no-follow-tags'];
-  if (input.force) args.push(`--force-with-lease=refs/heads/${input.branch}:${input.expectedRemoteHead ?? ''}`);
   // Push the reviewed SHA, never a branch that could advance while credentials/hooks run.
-  args.push('--', input.remote, `${input.expectedHead}:refs/heads/${input.branch}`);
-  await git(root, args);
+  await runGitPush(root, { remote: input.remote, head: input.expectedHead, branch: input.branch, lease: input.force ? input.expectedRemoteHead : undefined, runHooks: input.runHooks });
   if (input.setUpstream) {
     try {
       await checkExpected(root, input);

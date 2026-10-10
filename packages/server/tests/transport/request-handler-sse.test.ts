@@ -35,6 +35,14 @@ describe('request handler idle timeout', () => {
     expect(timeout.mock.calls[0]).toEqual([req, 0]);
   });
 
+  test('Git mutations wait for Git instead of the idle timeout', async () => {
+    const { handle, listener, timeout } = setup();
+    const push = new Request('http://127.0.0.1/api/workspaces/ws-1/git/branch-action', { method: 'POST', headers: { Host: '127.0.0.1:8742' } });
+    await handle(push, listener);
+    await handle(new Request('http://127.0.0.1/api/workspaces/ws-1/git/branches', { headers: { Host: '127.0.0.1:8742' } }), listener);
+    expect(timeout.mock.calls).toEqual([[push, 0]]);
+  });
+
   test('ordinary requests keep the idle guard', async () => {
     const { handle, listener, timeout } = setup();
     const json = await handle(new Request('http://127.0.0.1/api/attention', { headers: { Host: '127.0.0.1:8742', Accept: 'application/json' } }), listener);

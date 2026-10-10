@@ -172,6 +172,7 @@ export const gitPushSchema = gitPushPreviewSchema.extend({
   force: z.boolean().optional(),
   expectedRemoteHead: gitHeadSchema.nullable().optional(),
   setUpstream: z.boolean().optional(),
+  runHooks: z.boolean().optional(),
 }).refine((value) => !value.force || value.expectedRemoteHead !== undefined, { message: 'Force push requires an explicit remote lease' });
 
 export const fileTreeQuerySchema = z.object({

@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { git } from '@/infrastructure/filesystem/git-operations';
+import { git, gitOutputTail, GitOperationError, runGitPush } from '@/infrastructure/filesystem/git-operations';
 import { listGitBranches, getGitHistory, getGitCommitDetails, runGitBranchAction, reviewGitBranchPush } from '@/infrastructure/filesystem/git-branches';
 let base: string;
 let root: string;
@@ -204,4 +204,79 @@ test('explicit source push preview, fetch and stale remote lease', async () => {
   expect((await reviewGitBranchPush(root, target)).outgoingCount).toBe(0);
   await expect(runGitBranchAction(root, { action: 'push', ...target, expectedRemoteHead: null, force: true })).rejects.toThrow('remote changed');
   await expect(runGitBranchAction(root, { action: 'fetch', remote: '--all' })).rejects.toThrow('configured remote');
+});
+
+test('set-upstream adopts a branch published outside the workbench, even before a fetch', async () => {
+  const remote = join(base, 'remote.git');
+  await git(root, ['init', '--bare', remote]);
+  await git(root, ['remote', 'add', 'origin', remote]);
+  await runGitBranchAction(root, { action: 'create', name: 'feature', startHead: head });
+  // A terminal push without -u: the remote has the branch, nothing tracks it.
+  await git(root, ['push', 'origin', 'feature']);
+  await git(root, ['update-ref', '-d', 'refs/remotes/origin/feature']);
+  const before = (await listGitBranches(root)).branches.find((b) => b.name === 'feature');
+  expect(before?.upstream).toBeNull();
+  expect((await reviewGitBranchPush(root, { sourceBranch: 'feature', expectedHead: head, remote: 'origin', branch: 'feature' })).outgoingCount).toBe(0);
+  expect(await runGitBranchAction(root, { action: 'set-upstream', name: 'feature', remote: 'origin', branch: 'feature' })).toEqual({});
+  expect((await listGitBranches(root)).branches.find((b) => b.name === 'feature')).toMatchObject({ upstream: 'refs/remotes/origin/feature', ahead: 0, behind: 0 });
+  await expect(runGitBranchAction(root, { action: 'set-upstream', name: 'feature', remote: 'origin', branch: 'feature' })).rejects.toThrow('already has an upstream');
+  await expect(runGitBranchAction(root, { action: 'set-upstream', name: 'main', remote: 'origin', branch: 'missing' })).rejects.toThrow('does not exist');
+  expect((await listGitBranches(root)).branches.find((b) => b.name === 'main')?.upstream).toBeNull();
+});
+
+describe('pre-push hooks', () => {
+  let remote: string;
+  const rejection = (pending: Promise<unknown>) => pending.then(() => { throw new Error('expected the push to fail'); }, (error: unknown) => error as GitOperationError);
+  const target = () => ({ action: 'push' as const, sourceBranch: 'main', expectedHead: head, remote: 'origin', branch: 'main', expectedRemoteHead: null, force: false });
+  const hook = async (body: string) => {
+    const hooks = join(base, 'hooks');
+    await mkdir(hooks, { recursive: true });
+    await writeFile(join(hooks, 'pre-push'), `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+    await git(root, ['config', 'core.hooksPath', hooks]);
+  };
+  beforeEach(async () => {
+    remote = join(base, 'remote.git');
+    await git(root, ['init', '--bare', remote]);
+    await git(root, ['remote', 'add', 'origin', remote]);
+  });
+
+  test('a failing hook reports its output, and runHooks false skips it', async () => {
+    // "rejected" in hook output must not read as a remote rejection.
+    await hook('echo "lint: 3 problems, push rejected"\necho "see https://user:hunter2@ci.example/run" >&2\nexit 1');
+    const failure = await rejection(runGitBranchAction(root, target()));
+    expect(failure).toBeInstanceOf(GitOperationError);
+    expect(failure.message).toContain('pre-push hook failed');
+    expect(failure.details.reason).toBe('pre-push-hook');
+    expect(failure.details.output).toContain('lint: 3 problems, push rejected');
+    expect(failure.details.output).toContain('https://***@ci.example/run');
+    expect(failure.details.output).not.toContain('hunter2');
+    expect((await git(root, ['ls-remote', remote])).stdout).toBe('');
+    expect(await runGitBranchAction(root, { ...target(), runHooks: false })).toEqual({});
+    expect((await git(root, ['ls-remote', remote, 'refs/heads/main'])).stdout).toContain(head);
+  });
+
+  test('a hook that outlives the push limit is stopped with its output so far', async () => {
+    await hook('echo "running 812 tests"\nsleep 5');
+    const failure = await rejection(runGitPush(root, { remote: 'origin', head, branch: 'main' }, 500));
+    expect(failure.details.reason).toBe('timeout');
+    expect(failure.message).toContain('pre-push hook was probably still running');
+    expect(failure.details.output).toContain('running 812 tests');
+    expect((await git(root, ['ls-remote', remote])).stdout).toBe('');
+  });
+
+  test('a remote rejection is told apart from a hook failure', async () => {
+    await hook('exit 0');
+    await runGitBranchAction(root, target());
+    await writeFile(join(root, 'file'), 'diverged');
+    await git(root, ['commit', '-am', 'Diverged', '--amend']);
+    const amended = (await git(root, ['rev-parse', 'HEAD'])).stdout.trim();
+    const failure = await rejection(runGitPush(root, { remote: 'origin', head: amended, branch: 'main' }));
+    expect(failure.details.reason).toBe('rejected');
+    expect(failure.message).toContain('push rejected');
+  });
+});
+
+test('git output tail drops colour codes and progress frames and keeps the last lines', () => {
+  expect(gitOutputTail('\x1b[31mred\x1b[0m\nCounting 10%\rCounting 100%\n\n')).toBe('red\nCounting 100%');
+  expect(gitOutputTail(Array.from({ length: 100 }, (_, i) => `line ${i}`).join('\n'), 3)).toBe('line 97\nline 98\nline 99');
 });

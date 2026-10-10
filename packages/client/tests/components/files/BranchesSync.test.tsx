@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ProkopaiClient } from '@prokopai/sdk';
+import { ApiError, type ProkopaiClient } from '@prokopai/sdk';
 import { gitStatusFeedStub } from '../../helpers';
 import { BranchesPanel } from '@/components/files/BranchesPanel';
 const head = 'a'.repeat(40);
@@ -101,4 +101,53 @@ test('history without upstream requests the plain walk', async () => {
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><BranchesPanel sdkClient={client} workspaceId="ws" serverId="server" root="/tree" /></QueryClientProvider>);
   await screen.findByText('No commits.');
   expect(gitHistory).toHaveBeenCalledWith('ws', { root: '/tree', head, offset: 0, upstream: null });
+});
+
+const untrackedBranches = () => ({
+  repository: { branch: 'feature', head, remotes: ['origin'], upstream: null },
+  branches: [
+    { ref: 'refs/heads/feature', name: 'feature', head, kind: 'local', current: true, checkedOut: true, upstream: null, ahead: null, behind: null, committedAt: null },
+    { ref: 'refs/remotes/origin/feature', name: 'origin/feature', head, kind: 'remote', current: false, checkedOut: false, upstream: null, ahead: null, behind: null, committedAt: null },
+  ],
+  lastFetchedAt: null,
+});
+
+test('a branch published outside the workbench offers Track instead of staying Not published', async () => {
+  branches.mockResolvedValue(untrackedBranches());
+  gitHistory.mockResolvedValue({ commits: [], nextOffset: null });
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><BranchesPanel sdkClient={client} workspaceId="ws" serverId="server" root="/tree" /></QueryClientProvider>);
+  expect(await screen.findByText('On origin/feature, not tracked')).toBeInTheDocument();
+  expect(screen.queryByText('Not published')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Track' }));
+  await waitFor(() => expect(action).toHaveBeenCalledWith('ws', { action: 'set-upstream', name: 'feature', remote: 'origin', branch: 'feature', root: '/tree' }));
+});
+
+test('push review with nothing to push tracks the existing remote branch', async () => {
+  branches.mockResolvedValue({ ...untrackedBranches(), branches: untrackedBranches().branches.slice(0, 1) });
+  gitHistory.mockResolvedValue({ commits: [], nextOffset: null });
+  gitBranchPushReview.mockResolvedValue({ remoteHead: head, outgoingCount: 0, remoteOnlyCount: 0, outgoing: [], remoteOnly: [] });
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><BranchesPanel sdkClient={client} workspaceId="ws" serverId="server" root="/tree" /></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: 'Not published' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Review push' }));
+  expect(await screen.findByText(/already exists, but feature does not track it/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Push commits' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Track' }));
+  await waitFor(() => expect(action).toHaveBeenCalledWith('ws', { action: 'set-upstream', root: '/tree', name: 'feature', remote: 'origin', branch: 'feature' }));
+  await screen.findByRole('button', { name: 'Push…' });
+});
+
+test('a failed pre-push hook shows its output and can be skipped for the same commit', async () => {
+  gitHistory.mockResolvedValue({ commits: [], nextOffset: null });
+  gitBranchPushReview.mockResolvedValue({ remoteHead: 'b'.repeat(40), outgoingCount: 1, remoteOnlyCount: 0, outgoing: [], remoteOnly: [] });
+  action.mockRejectedValueOnce(new ApiError('Git operation: the pre-push hook failed. Fix what it reports, or push without hooks.', 409, 'conflict', { details: { reason: 'pre-push-hook', output: 'lint: 3 problems' } }));
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><BranchesPanel sdkClient={client} workspaceId="ws" serverId="server" root="/tree" /></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: 'Push…' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Review push' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Push commits' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('pre-push hook failed');
+  expect(screen.getByText('lint: 3 problems')).toBeInTheDocument();
+  expect(action.mock.calls[0][1]).toMatchObject({ action: 'push', runHooks: true });
+  fireEvent.click(screen.getByRole('button', { name: 'Push without hooks' }));
+  await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+  expect(action.mock.calls[1][1]).toMatchObject({ action: 'push', runHooks: false, expectedRemoteHead: 'b'.repeat(40) });
 });

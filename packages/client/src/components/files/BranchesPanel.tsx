@@ -5,6 +5,7 @@ import { CommitPatch } from './CommitPatch';
 import { RebasePanel, rebaseKey } from './RebasePanel';
 import type { GitBranchAction, GitBranchInfo, GitBranchPushReview, GitBranchPushTarget, GitHistoryEntry, ProkopaiClient } from '@prokopai/sdk';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -17,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { useGitStatusSubscription } from '@/hooks/queries/useFileQueries';
 import { branchLabelInGroup, groupBranchesByPrefix } from './branchGroups';
 import { branchSync, buildHistoryRows, fetchedLabel, isFetchStale, recentBranches, refLabel, refsByHead, relativeAge, timestampLabel } from './branchHistory';
+import { canRetryWithoutHooks, GitOutput, pushFailure, PushProgress } from './GitPushFeedback';
 
 interface Props {
   sdkClient: ProkopaiClient | null;
@@ -95,6 +97,7 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
       input: entry.state.variables as PushAction,
       error: entry.state.error,
       result: entry.state.data as { warning?: string } | undefined,
+      submittedAt: entry.state.submittedAt,
     }),
   });
   const pendingPush = pushes.find((entry) => entry.status === 'pending');
@@ -158,7 +161,7 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
     <span className="flex w-10 shrink-0 justify-end">{b.current ? <Check /> : b.checkedOut ? <span className="text-xs text-muted-foreground">In use</span> : null}</span>
   </CommandItem>;
 
-  const sync = selected ? branchSync(selected) : null;
+  const sync = selected && data ? branchSync(selected, data.branches, data.repository.remotes) : null;
   const stale = isFetchStale(data?.lastFetchedAt ?? null, now);
   const fetched = fetchedLabel(data?.lastFetchedAt ?? null, now);
   const countClass = 'shrink-0 rounded-sm font-medium tabular-nums enabled:hover:text-foreground disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
@@ -170,6 +173,10 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
       case 'unpublished': return canPush
         ? <button type="button" className={cn(countClass, 'text-foreground/80')} disabled={busy} title="Review and push this branch" onClick={openPush}>Not published</button>
         : <span className="truncate text-muted-foreground">{data?.repository.remotes.length ? 'Not published' : 'Local only'}</span>;
+      case 'untracked': return <span className="flex min-w-0 items-baseline gap-1.5">
+        <span className="truncate text-muted-foreground" title={`${sync.remote}/${sync.branch} exists, but ${selected?.name} does not track it, so ahead and behind are unknown`}>On {sync.remote}/{sync.branch}, not tracked</span>
+        <button type="button" className={cn(countClass, 'text-foreground/80')} disabled={busy || !selected} title={`Track ${sync.remote}/${sync.branch} as the upstream of ${selected?.name}`} onClick={() => { if (selected) mutation.mutate({ action: 'set-upstream', name: selected.name, remote: sync.remote, branch: sync.branch }); }}>Track</button>
+      </span>;
       case 'gone': return <span className="truncate text-warning" title="The upstream branch no longer exists on the remote">Upstream gone</span>;
       case 'up-to-date': return <span className={cn('flex items-center gap-1 truncate text-muted-foreground', stale && 'opacity-60')} title={syncTitle}><Check className="size-3" />Up to date</span>;
       default: return <span className={cn('flex min-w-0 items-baseline gap-1.5', stale && 'opacity-60')} title={sync.kind === 'diverged' ? `${syncTitle}. Pull is fast-forward only; rebase to reconcile.` : syncTitle}>
@@ -226,11 +233,11 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
       <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
       <span className="min-w-0 flex-1 truncate">Rebase in progress — resolve conflicts, continue, or abort</span>
     </button>}
-    {pendingPush && <p role="status" className="flex shrink-0 items-center gap-2 px-3 pb-2 text-xs text-muted-foreground">
-      <Loader2 className="size-3.5 shrink-0 animate-spin" />
-      <span className="min-w-0 break-words">Pushing {pendingPush.input.sourceBranch} to {pendingPush.input.remote}/{pendingPush.input.branch}… Waiting for Git, including pre-push hooks.</span>
-    </p>}
-    {!pushBranch && lastPush?.status === 'error' && <p role="alert" className="px-3 pb-2 text-xs text-destructive">Push failed: {lastPush.error?.message}</p>}
+    {pendingPush && <PushProgress label={`Pushing ${pendingPush.input.sourceBranch} to ${pendingPush.input.remote}/${pendingPush.input.branch}`} startedAt={pendingPush.submittedAt} runHooks={pendingPush.input.runHooks !== false} />}
+    {!pushBranch && lastPush?.status === 'error' && (() => {
+      const failure = pushFailure(lastPush.error);
+      return <div className="flex flex-col gap-1 px-3 pb-2"><p role="alert" className="text-xs text-destructive">Push failed: {failure.message}</p><GitOutput output={failure.output} /></div>;
+    })()}
     {!pushBranch && lastPush?.result?.warning && <p role="alert" className="px-3 pb-2 text-xs text-destructive">{lastPush.result.warning}</p>}
     {rebase.error && <p role="alert" className="px-3 pb-1 text-xs text-destructive">Unable to read rebase state. <button type="button" className="underline underline-offset-2" onClick={() => void rebase.refetch()}>Retry</button></p>}
     {branches.isPending && <div className="flex flex-col gap-2 p-3">{[0, 1, 2, 3, 4].map((i) => <Skeleton className="h-9 w-full" key={i} />)}</div>}
@@ -264,7 +271,10 @@ export function BranchesPanel({ sdkClient, serverId, workspaceId, root }: Props)
         <Button type="submit" size="sm" className="shrink-0" disabled={busy || !name.trim()}>Create</Button>
       </div>
     </form>}
-    {mutation.error && <p role="alert" className="px-3 py-2 text-xs text-destructive">{mutation.error.message}</p>}
+    {mutation.error && (() => {
+      const failure = pushFailure(mutation.error);
+      return <div className="flex flex-col gap-1 px-3 py-2"><p role="alert" className="text-xs text-destructive">{mutation.error.message}</p><GitOutput output={failure.output} /></div>;
+    })()}
     {mutation.data?.warning && <p role="alert" className="px-3 py-2 text-xs text-destructive">{mutation.data.warning}</p>}
     {pushBranch && data ? <BranchPush key={`${pushBranch.ref}:${pushBranch.head}`} sdkClient={sdkClient} serverId={serverId} workspaceId={workspaceId} root={root} source={pushBranch} remotes={data.repository.remotes} onClose={() => setPushBranch(null)} onChanged={refresh} /> : commit ? <CommitDetails key={commit.head} sdkClient={sdkClient} workspaceId={workspaceId} serverId={serverId} root={root} entry={commit} onBack={() => setCommit(null)} /> : selected && data ? <BranchHistory key={selected.head} sdkClient={sdkClient} workspaceId={workspaceId} serverId={serverId} root={root} head={selected.head} upstream={selected.upstream} branches={data.branches} selected={selected} now={now} onSelect={setCommit} /> : data && <p className="p-3 text-xs text-muted-foreground">{selectedRef ? 'This branch no longer exists. Choose another branch.' : 'No commits yet. Create the first commit in Changes.'}</p>}
   </div>;
@@ -365,6 +375,7 @@ function BranchPush({ sdkClient, serverId, workspaceId, root, source, remotes, o
   const [branch, setBranch] = useState(upstreamRemote ? upstream!.slice(upstreamRemote.length + 1) : source.name);
   const [review, setReview] = useState<{ target: GitBranchPushTarget; result: GitBranchPushReview } | null>(null);
   const [confirm, setConfirm] = useState(false);
+  const [runHooks, setRunHooks] = useState(true);
   const inspect = useMutation({
     mutationFn: async (target: GitBranchPushTarget) => ({ target, result: await sdkClient.http.files.gitBranchPushReview(workspaceId, target) }),
     onSuccess: setReview, retry: false,
@@ -374,11 +385,19 @@ function BranchPush({ sdkClient, serverId, workspaceId, root, source, remotes, o
     mutationFn: (input: PushAction) => sdkClient.http.files.gitBranchAction(workspaceId, input), retry: false,
     onSuccess: onClose, onSettled: () => { setReview(null); onChanged(); },
   });
-  const busy = inspect.isPending || push.isPending;
+  const track = useMutation({
+    mutationFn: (target: GitBranchPushTarget) => sdkClient.http.files.gitBranchAction(workspaceId, { action: 'set-upstream', root, name: target.sourceBranch, remote: target.remote, branch: target.branch }),
+    retry: false, onSuccess: onClose, onSettled: onChanged,
+  });
+  const busy = inspect.isPending || push.isPending || track.isPending;
   const submit = (force: boolean) => {
     if (!review || busy) return;
-    push.mutate({ ...review.target, action: 'push', force, expectedRemoteHead: review.result.remoteHead });
+    push.mutate({ ...review.target, action: 'push', force, expectedRemoteHead: review.result.remoteHead, runHooks });
   };
+  const failure = push.error ? pushFailure(push.error) : null;
+  const error = inspect.error ?? track.error;
+  // Already on the remote but not tracked: tracking is what the user wants, with or without commits to push.
+  const canTrack = !!review && !source.upstream && review.result.remoteHead !== null;
   return <div className="dialog-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-2">
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between gap-2">
@@ -395,16 +414,29 @@ function BranchPush({ sdkClient, serverId, workspaceId, root, source, remotes, o
       <div className="flex justify-end">
         <Button variant="outline" size="sm" disabled={busy || !remote || !branch.trim()} onClick={() => { setReview(null); inspect.mutate({ root, sourceBranch: source.name, expectedHead: source.head, remote, branch: branch.trim() }); }}>{inspect.isPending ? 'Reviewing…' : 'Review push'}</Button>
       </div>
-      {(inspect.error || push.error) && <p role="alert" className="text-xs text-destructive">{inspect.error?.message ?? push.error?.message}</p>}
+      {error && <p role="alert" className="text-xs text-destructive">{error.message}</p>}
+      {!error && failure && <div className="flex flex-col gap-1.5">
+        <p role="alert" className="text-xs text-destructive">{failure.message}</p>
+        <GitOutput output={failure.output} />
+        {push.variables && canRetryWithoutHooks(failure, push.variables.runHooks !== false) && <div className="flex justify-end">
+          <Button size="sm" variant="outline" disabled={busy} title="Push the same reviewed commit with --no-verify" onClick={() => { if (push.variables) push.mutate({ ...push.variables, runHooks: false }); }}>Push without hooks</Button>
+        </div>}
+      </div>}
       {review && <div className="flex flex-col gap-2 border-t border-border/60 pt-2.5">
         <p className="font-mono text-xs text-muted-foreground">{source.name} → {review.target.remote}/{review.target.branch}</p>
         <p className="text-xs text-muted-foreground">{review.result.outgoingCount} outgoing · {review.result.remoteOnlyCount} remote-only{review.result.outgoingCount === 0 && review.result.remoteOnlyCount === 0 ? ' · Nothing to push' : ''}</p>
         {review.result.outgoing.length > 0 && <ul className="text-xs">{review.result.outgoing.map((entry) => <li className="truncate py-0.5" key={entry.head} title={entry.subject}><span className="font-mono text-muted-foreground">{entry.head.slice(0, 8)}</span> {entry.subject}</li>)}</ul>}
         {review.result.remoteOnlyCount > 0 && <details className="text-xs"><summary className="text-muted-foreground">Remote commits that force push removes</summary><ul>{review.result.remoteOnly.map((entry) => <li className="truncate py-1" key={entry.head}>{entry.head.slice(0, 8)} {entry.subject}</li>)}</ul></details>}
         {(review.result.outgoingCount > 50 || review.result.remoteOnlyCount > 50) && <p className="text-xs text-muted-foreground">Showing the first 50 commits in each list.</p>}
+        {canTrack && <p className="text-xs text-muted-foreground">{review.target.remote}/{review.target.branch} already exists, but {source.name} does not track it.</p>}
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Checkbox checked={runHooks} disabled={busy} onCheckedChange={(checked) => setRunHooks(checked === true)} />
+          Run pre-push hooks
+        </label>
         <div className="flex flex-wrap justify-end gap-1">
+          {canTrack && <Button size="sm" variant={review.result.outgoingCount ? 'ghost' : 'default'} disabled={busy} title={`Set ${review.target.remote}/${review.target.branch} as the upstream without pushing`} onClick={() => track.mutate(review.target)}>{track.isPending ? 'Tracking…' : review.result.outgoingCount ? 'Track only' : 'Track'}</Button>}
           <Button size="sm" variant="ghost" disabled={busy || (!review.result.outgoingCount && !review.result.remoteOnlyCount)} onClick={() => setConfirm(true)}>Force with lease…</Button>
-          <Button size="sm" disabled={busy || !review.result.outgoingCount || review.result.remoteOnlyCount > 0} onClick={() => submit(false)}>{push.isPending ? 'Pushing…' : 'Push commits'}</Button>
+          {(review.result.outgoingCount > 0 || !canTrack) && <Button size="sm" disabled={busy || !review.result.outgoingCount || review.result.remoteOnlyCount > 0} onClick={() => submit(false)}>{push.isPending ? 'Pushing…' : 'Push commits'}</Button>}
         </div>
       </div>}
     </div>

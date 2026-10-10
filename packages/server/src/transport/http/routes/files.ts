@@ -40,7 +40,8 @@ function mapApplicationError(err: unknown): never {
   if (message === 'Workspace not found' || message === 'Path not found') {
     throw new NotFoundError(message);
   }
-  if (message.startsWith('Git operation:')) throw new ConflictError(message);
+  // GitOperationError carries a reason and redacted output tail for the client.
+  if (message.startsWith('Git operation:')) throw new ConflictError(message, (err as { details?: unknown }).details);
   if (message === 'Only untracked files can be added to Git') {
     throw new ConflictError(message);
   }
