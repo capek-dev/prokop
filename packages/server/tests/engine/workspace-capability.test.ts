@@ -182,6 +182,63 @@ describe('tool executor workspace behavior', () => {
     expect(contextAborted).toBe(true);
   });
 
+  test('the timeout pauses while a permission ask waits on a person, then resumes with the time left', async () => {
+    const workspace = createWorkspaceCapability(host());
+    const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
+    // The person takes 60ms to approve; the tool itself only has 40ms.
+    const createAskApi = () => (async () => { await sleep(60); return true; }) as unknown as ToolContext['ask'];
+
+    const approved = await executeTool({
+      tool: loadedTool(async (ctx) => {
+        await sleep(10);
+        const allowed: unknown = await ctx.ask({ type: 'permission', question: 'Allow?', resource: 'shell-command', action: 'execute' } as never);
+        await sleep(10);
+        return { success: allowed === true };
+      }),
+      args: {},
+      workspace,
+      sessionId: 'ask-pause-session',
+      timeout: 40,
+      createAskApi,
+    });
+    expect(approved).toEqual({ success: true });
+
+    // Work after the answer still counts against the time that was left.
+    const slowAfterAsk = await executeTool({
+      tool: loadedTool(async (ctx) => {
+        await sleep(20);
+        await ctx.ask({ type: 'permission', question: 'Allow?', resource: 'shell-command', action: 'execute' } as never);
+        await sleep(40);
+        return { success: true };
+      }),
+      args: {},
+      workspace,
+      sessionId: 'ask-resume-session',
+      timeout: 40,
+      createAskApi,
+    });
+    expect(slowAfterAsk).toEqual({ success: false, error: 'Tool execution timed out after 40ms' });
+  });
+
+  test('client capability asks are work and keep counting against the timeout', async () => {
+    const workspace = createWorkspaceCapability(host());
+    const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
+    const createAskApi = () => (async () => { await sleep(60); return {}; }) as unknown as ToolContext['ask'];
+
+    const result = await executeTool({
+      tool: loadedTool(async (ctx) => {
+        await ctx.ask({ type: 'client-capability', target: 'client' } as never);
+        return { success: true };
+      }),
+      args: {},
+      workspace,
+      sessionId: 'client-ask-session',
+      timeout: 20,
+      createAskApi,
+    });
+    expect(result).toEqual({ success: false, error: 'Tool execution timed out after 20ms' });
+  });
+
   test('uses the tool definition timeout when no override is supplied', async () => {
     const workspace = createWorkspaceCapability(host());
     const tool = loadedTool((ctx) => new Promise((resolveResult) => {

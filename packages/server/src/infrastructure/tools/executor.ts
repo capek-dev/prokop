@@ -167,6 +167,63 @@ function createLogger(toolName: string, sessionId: string): ToolLogger {
   };
 }
 
+interface PausableDeadline {
+  pause(): void;
+  resume(): void;
+  clear(): void;
+}
+
+/** A one-shot timer that can be paused (nested) and resumes with the time that was left. */
+function pausableDeadline(ms: number, onExpire: () => void): PausableDeadline {
+  let remaining = ms;
+  let startedAt = Date.now();
+  let pauses = 0;
+  let done = false;
+  const expire = () => {
+    done = true;
+    onExpire();
+  };
+  let timer: ReturnType<typeof setTimeout> | undefined = setTimeout(expire, ms);
+  return {
+    pause() {
+      pauses += 1;
+      if (pauses > 1 || done || timer === undefined) return;
+      clearTimeout(timer);
+      timer = undefined;
+      remaining -= Date.now() - startedAt;
+    },
+    resume() {
+      pauses = Math.max(0, pauses - 1);
+      if (pauses > 0 || done || timer !== undefined) return;
+      startedAt = Date.now();
+      timer = setTimeout(expire, Math.max(0, remaining));
+    },
+    clear() {
+      done = true;
+      clearTimeout(timer);
+      timer = undefined;
+    },
+  };
+}
+
+/**
+ * A tool's timeout bounds its own work, not a person deciding. While a
+ * permission or human ask is open the deadline pauses (asks have their own,
+ * much longer timeout); client capability asks are work and keep counting.
+ */
+function pauseDeadlineDuringAsks(ask: AskApi, deadline: PausableDeadline | null): AskApi {
+  if (!deadline) return ask;
+  return (async (request: Parameters<AskApi>[0]) => {
+    const waitsOnPerson = (request as { target?: string }).target !== 'client';
+    if (waitsOnPerson) deadline.pause();
+    try {
+      return await ask(request);
+    } finally {
+      if (waitsOnPerson) deadline.resume();
+    }
+  }) as AskApi;
+}
+
 export async function executeTool(options: ExecuteToolOptions): Promise<ToolResult> {
   const {
     tool,
@@ -192,6 +249,22 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
     abortSignal?.addEventListener('abort', forwardAbort, { once: true });
   }
 
+  // `timeout === null` is the tool's explicit "no deadline": the executor
+  // arms no timer and the tool runs until it settles or is interrupted.
+  let rejectTimeout: ((error: Error) => void) | undefined;
+  const timeoutPromise = timeout === null
+    ? null
+    : new Promise<never>((_, reject) => {
+        rejectTimeout = reject;
+      });
+  const deadline = timeout === null
+    ? null
+    : pausableDeadline(timeout, () => {
+        const error = new Error(`Tool execution timed out after ${timeout}ms`);
+        toolAbortController.abort(error);
+        rejectTimeout?.(error);
+      });
+
   const ctx: ToolContext = {
     sessionId,
     workspacePath: workspace.effectiveRoot,
@@ -200,7 +273,9 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
     allowedPaths: workspace.allowedRoots,
     fs: createFileSystemApi(workspace),
     llm: createLlmApi ? createLlmApi() : createThrowingStub<LlmApi>('llm'),
-    ask: createAskApi ? createAskApi(options.toolCallId ?? '') : createThrowingStub<AskApi>('ask'),
+    ask: createAskApi
+      ? pauseDeadlineDuringAsks(createAskApi(options.toolCallId ?? ''), deadline)
+      : createThrowingStub<AskApi>('ask'),
     env: createEnvApi(workspace),
     logger: createLogger(tool.definition.name, sessionId),
     fetch: globalThis.fetch.bind(globalThis),
@@ -214,18 +289,6 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
   };
 
   const executePromise = tool.execute(args, ctx);
-
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  // `timeout === null` is the tool's explicit "no deadline": the executor
-  // arms no timer and the tool runs until it settles or is interrupted.
-  const timeoutPromise = timeout === null
-    ? null
-    : new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(() => {
-          toolAbortController.abort(new Error(`Tool execution timed out after ${timeout}ms`));
-          reject(new Error(`Tool execution timed out after ${timeout}ms`));
-        }, timeout);
-      });
 
   // Abort must settle the race even when the tool ignores its abort signal
   // (for example a tool blocked on ctx.ask()). Promise.race keeps handlers
@@ -264,6 +327,6 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
     };
   } finally {
     abortSignal?.removeEventListener('abort', forwardAbort);
-    clearTimeout(timeoutId);
+    deadline?.clear();
   }
 }
