@@ -483,6 +483,9 @@ test('content-free CLI notices before init do not fail the turn', async () => {
     canUseTool: async () => ({ behavior: 'deny', message: 'denied' }),
     start: async function* () {
       yield event({ type: 'system', subtype: 'commands_changed', session_id: base.sessionId });
+      // Notices added by newer CLI releases, unknown to the SDK types.
+      yield event({ type: 'system', subtype: 'session_title_changed', session_id: base.sessionId });
+      yield event({ type: 'system', subtype: 'some_future_notice', session_id: base.sessionId });
       // A resumed process reports background Bash tasks orphaned by the previous process.
       yield event({ type: 'system', subtype: 'task_notification', session_id: base.sessionId,
         task_id: 'old-bash', status: 'stopped', reason: 'worker_restart', output_file: '', summary: '' });

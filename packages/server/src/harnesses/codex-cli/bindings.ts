@@ -41,6 +41,11 @@ export function bindCodexThread(binding: Pick<CodexBinding, 'sessionId' | 'threa
   if (!getCodexBinding(binding.sessionId)) throw new Error('Codex session no longer exists');
 }
 
+/** Records the CLI that last resumed the thread. Upgrades never strand a session. */
+export function recordCodexCliVersion(sessionId: string, version: string): void {
+  getDatabase().run('UPDATE codex_session_bindings SET cli_version = ? WHERE session_id = ?', [version, sessionId]);
+}
+
 export function markCodexTurnPending(sessionId: string, userId: string, assistantId: string): void {
   const result = getDatabase().run(`UPDATE codex_session_bindings
     SET pending_turn = 1, pending_user_id = ?, pending_assistant_id = ?, pending_turn_id = NULL,

@@ -94,8 +94,7 @@ export class CodexChildTimelines {
       const candidate = getSession(bound.session_id);
       if (!candidate || candidate.parentId !== parentId || candidate.workspaceId !== this.parent.workspaceId
         || candidate.workspaceRootId !== this.parent.workspaceRootId || candidate.harness !== 'codex-cli'
-        || getCodexBinding(candidate.id)?.workspaceRoot !== this.root
-        || getCodexBinding(candidate.id)?.cliVersion !== this.version) return null;
+        || getCodexBinding(candidate.id)?.workspaceRoot !== this.root) return null;
       session = candidate;
     } else {
       session = getDatabase().transaction(() => {

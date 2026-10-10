@@ -15,7 +15,7 @@ import { getDatabase } from '@/infrastructure/sqlite/database';
 import { getAttachment, MAX_ATTACHMENT_SIZE, validateImageMime, type Attachment } from '@/infrastructure/sqlite/attachments';
 import { getAttachmentDir } from '@/infrastructure/runtime/paths';
 import { CodexAppServer, CodexRequestError, codexObject, type CodexConnection, type CodexNotification } from './app-server';
-import { bindCodexThread, getCodexBinding, markCodexTurnPending, markCodexTurnStarted, markCodexGoalRequested, markCodexGoalUncertain, markCodexTurnCompleted, type CodexBinding } from './bindings';
+import { bindCodexThread, getCodexBinding, recordCodexCliVersion, markCodexTurnPending, markCodexTurnStarted, markCodexGoalRequested, markCodexGoalUncertain, markCodexTurnCompleted, type CodexBinding } from './bindings';
 import { getCodexModelSelection } from './models';
 import { codexDeveloperInstructions, defaultCodexPreconfigId, type CodexInstructionSources } from './instructions';
 import { codexApprovals } from './approvals';
@@ -323,9 +323,8 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
       throw new Error('Codex edit requires nonempty text');
     }
     const root = workspaceRoot(session);
-    const version = deps.version();
     const binding = getCodexBinding(sessionId);
-    if (!binding || binding.workspaceRoot !== root || binding.cliVersion !== version) {
+    if (!binding || binding.workspaceRoot !== root) {
       throw new Error('Codex thread binding is unavailable or changed');
     }
     const metadata = codexObject(session.metadata);
@@ -557,6 +556,7 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
       let toolItems: CodexToolItems | undefined;
       let idleTimer: ReturnType<typeof setTimeout> | undefined;
       let phase = 'workspace validation';
+      let cliVersion: string | undefined;
       let succeeded = false;
       const startedAt = Date.now();
       const streamText = new StreamingTextWriter();
@@ -601,14 +601,14 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
             agentId: agentDir ? preconfigId : null });
           if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'session.updated', session: updated });
         }
-        phase = 'CLI version check';
+        phase = 'workspace root check';
         const version = deps.version();
+        cliVersion = version;
         const binding = getCodexBinding(sessionId);
-        if (binding && (binding.workspaceRoot !== root || binding.cliVersion !== version)) {
-          logHarness('codex-cli', 'thread binding blocks turn', { sessionId,
-            workspaceChanged: binding.workspaceRoot !== root, cliChanged: binding.cliVersion !== version,
-            boundCli: binding.cliVersion, currentCli: version });
-          throw new Error('Codex session root or CLI version changed; reopen with the original host');
+        // A CLI upgrade does not block: the CLI resumes its own older threads.
+        if (binding && binding.workspaceRoot !== root) {
+          logHarness('codex-cli', 'thread binding blocks turn', { sessionId, workspaceChanged: true });
+          throw new Error('Codex session root changed; reopen with the original host');
         }
         connection = connections.get(sessionId);
         if (connection && (connection.root !== root || connection.version !== version
@@ -1022,6 +1022,10 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
         const threadId = id(codexObject(threadResponse?.thread)?.id);
         if (!threadId || (binding && binding.threadId !== threadId)) throw new Error('Invalid Codex thread');
         if (!binding) bindCodexThread({ sessionId, threadId, cliVersion: version, workspaceRoot: root });
+        else if (binding.cliVersion !== version) {
+          recordCodexCliVersion(sessionId, version);
+          logHarness('codex-cli', 'cli upgraded', { sessionId, from: binding.cliVersion, to: version }, 'info');
+        }
         if (!connection.children) connection.children = new CodexChildTimelines(session, threadId, root, version,
           wire.delivery, turnId => active.get(sessionId)?.turnId === turnId
             && active.get(sessionId)?.stopRequested === false,
@@ -1148,10 +1152,13 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
           if (updated) wire.delivery.broadcastToSession(sessionId, { type: 'message.updated', message: updated });
           notifyHarnessTurnFinished(updated);
         }
+        const failedBinding = getCodexBinding(sessionId);
         wire.delivery.send(origin, { type: 'error', code: 'invalid_session',
-          message: getCodexBinding(sessionId)?.pendingTurn
+          message: failedBinding?.pendingTurn
             ? `Codex failed during ${phase}${rpcCode}. The turn may have run; it will not be resent until reconciled.`
-            : `Codex failed during ${phase}${rpcCode}. Check the host CLI setup.`, sessionId });
+            : phase === 'thread resume' && cliVersion && failedBinding && failedBinding.cliVersion !== cliVersion
+              ? `${cliVersion} could not reopen this conversation (started with ${failedBinding.cliVersion}). Start a new session to continue.`
+              : `Codex failed during ${phase}${rpcCode}. Check the host CLI setup.`, sessionId });
       } finally {
         clearTimeout(idleTimer);
         codexApprovals.cancelSession(sessionId);
@@ -1194,9 +1201,8 @@ export function createCodexExecution(deps: CodexExecutionDependencies): QueuedCl
       starting.add(sessionId);
       try {
         const root = workspaceRoot(session);
-        const version = deps.version();
         const binding = getCodexBinding(sessionId);
-        if (!binding || binding.workspaceRoot !== root || binding.cliVersion !== version) {
+        if (!binding || binding.workspaceRoot !== root) {
           return { ok: false, skipped: true, error: 'Codex thread binding is unavailable or changed' };
         }
         if (binding.pendingTurn || binding.goalRequested || codexObject(session.metadata)?.codexGoalPending

@@ -25,7 +25,7 @@ export async function forkCodexSession(
   const root = deps.root(session.id);
   const version = deps.version();
   const binding = getCodexBinding(session.id);
-  if (!binding || binding.workspaceRoot !== root || binding.cliVersion !== version) {
+  if (!binding || binding.workspaceRoot !== root) {
     throw new Error('Codex thread binding is unavailable or changed');
   }
   const metadata = codexObject(session.metadata);

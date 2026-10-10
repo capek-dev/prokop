@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, expect, spyOn, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { setupTestDatabase, resetTestDatabase } from '#tests/db';
 import { seedWorkspace } from '#tests/seed';
@@ -1237,4 +1237,37 @@ test('Claude mounts host MCP tools for the workspace and closes execution access
     expect(await client.callTool({ name: 'fixture_read', arguments: {} })).toMatchObject({ isError: true });
     expect(calls).toBe(1);
   } finally { await client.close(); await server?.close(); }
+});
+
+function bindClaude(cliVersion: string, pending: 0 | 1, root = realpathSync(process.cwd())): string {
+  const nativeId = crypto.randomUUID();
+  getDatabase().run(`INSERT INTO claude_session_bindings
+    (session_id, native_session_id, workspace_root, cli_version, pending) VALUES (?, ?, ?, ?, ?)`,
+  ['session', nativeId, root, cliVersion, pending]);
+  return nativeId;
+}
+
+test('an upgraded Claude CLI resumes an idle session and records the new version', async () => {
+  const nativeId = bindClaude('2.1.270', 0);
+  const { wire, events } = wireFixture();
+  const calls: Options[] = [];
+  const exec = createClaudeExecution({ version: () => '2.1.274', start: (prompt, options) => fakeTurn(prompt, options, calls) });
+  await exec.sendMessage(wire, 'origin', 'session', 'after upgrade');
+  expect(events.filter(event => (event as { type: string }).type === 'error')).toEqual([]);
+  expect(calls.map(options => options.resume)).toEqual([nativeId]);
+  expect(getDatabase().query<{ cli_version: string; pending: number }, []>(
+    'SELECT cli_version, pending FROM claude_session_bindings').get()).toEqual({ cli_version: '2.1.274', pending: 0 });
+});
+
+test.each([
+  ['a changed workspace root', 0, '/elsewhere'],
+  ['an unfinished turn', 1, undefined],
+] as const)('a Claude CLI upgrade still blocks on %s', async (_label, pending, root) => {
+  bindClaude('2.1.270', pending, root);
+  const { wire, events } = wireFixture();
+  const exec = createClaudeExecution({ version: () => '2.1.274', start: () => { throw new Error('must not launch'); } });
+  await exec.sendMessage(wire, 'origin', 'session', 'after upgrade');
+  expect(events).toContainEqual(expect.objectContaining({ type: 'error',
+    message: 'Claude turn requires reconciliation or its workspace changed; edit the first message to start over' }));
+  expect(getDatabase().query<{ cli_version: string }, []>('SELECT cli_version FROM claude_session_bindings').get()?.cli_version).toBe('2.1.270');
 });

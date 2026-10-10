@@ -106,7 +106,6 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       if (session.workspaceRootId && (!worktree || worktree.workspaceId !== session.workspaceId
         || worktree.state !== 'available')) throw new Error('Claude workspace is unavailable');
       const root = realpathSync(worktree?.path ?? workspace.path);
-      const version = (deps.version ?? claudeCliVersion)();
       const binding = getDatabase().query<Binding, [string]>(`SELECT native_session_id, workspace_root, cli_version, pending
         FROM claude_session_bindings WHERE session_id = ?`).get(sessionId);
       const local = listMessagesWithParts(sessionId);
@@ -122,7 +121,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
       // needs no native history and also clears a stuck turn or an unfinished edit.
       if (turnCount > 0) {
         if (intent(sessionId)) throw new Error('Claude history change requires recovery; do not retry');
-        if (!binding || binding.pending || binding.workspace_root !== root || binding.cli_version !== version) {
+        if (!binding || binding.pending || binding.workspace_root !== root) {
           throw new Error('Claude native history is unavailable');
         }
       }
@@ -312,11 +311,14 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
         const db = getDatabase();
         const binding = db.query<Binding, [string]>(`SELECT native_session_id, workspace_root, cli_version, pending
           FROM claude_session_bindings WHERE session_id = ?`).get(sessionId);
-        if (binding && (binding.workspace_root !== root || binding.cli_version !== version || binding.pending)) {
+        // A CLI upgrade does not block: the CLI resumes its own older sessions.
+        if (binding && (binding.workspace_root !== root || binding.pending)) {
           logHarness('claude-cli', 'native binding blocks turn', { sessionId,
-            pendingFromEarlierTurn: !!binding.pending, workspaceChanged: binding.workspace_root !== root,
-            cliChanged: binding.cli_version !== version, boundCli: binding.cli_version, currentCli: version });
-          throw new Error('Claude turn requires reconciliation or its workspace/CLI changed; edit the first message to start over');
+            pendingFromEarlierTurn: !!binding.pending, workspaceChanged: binding.workspace_root !== root });
+          throw new Error('Claude turn requires reconciliation or its workspace changed; edit the first message to start over');
+        }
+        if (binding && binding.cli_version !== version) {
+          logHarness('claude-cli', 'cli upgraded', { sessionId, from: binding.cli_version, to: version }, 'info');
         }
         controller.signal.throwIfAborted();
         if (queued && !queued.isPending()) return 'drainable';
@@ -328,7 +330,7 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
         children = new ClaudeChildTimelines(session, nativeId, wire.delivery);
         // Lock the native identity before writing to the process. A lost result never triggers replay.
         db.transaction(() => {
-          if (binding) db.run('UPDATE claude_session_bindings SET pending = 1 WHERE session_id = ?', [sessionId]);
+          if (binding) db.run('UPDATE claude_session_bindings SET pending = 1, cli_version = ? WHERE session_id = ?', [version, sessionId]);
           else db.run(`INSERT INTO claude_session_bindings
             (session_id, native_session_id, workspace_root, cli_version, pending) VALUES (?, ?, ?, ?, 1)`,
           [sessionId, nativeId, root, version]);
@@ -693,11 +695,10 @@ export function createClaudeExecution(deps: ClaudeExecutionDependencies = {}): Q
         if (session.workspaceRootId && (!worktree || worktree.workspaceId !== session.workspaceId
           || worktree.state !== 'available')) throw new Error('Selected worktree unavailable');
         const root = realpathSync(worktree?.path ?? workspace.path);
-        const version = (deps.version ?? claudeCliVersion)();
         const selection = getClaudeModelSelection(sessionId);
         const binding = getDatabase().query<Binding, [string]>(`SELECT native_session_id, workspace_root, cli_version, pending
           FROM claude_session_bindings WHERE session_id = ?`).get(sessionId);
-        if (!binding || binding.pending || binding.workspace_root !== root || binding.cli_version !== version
+        if (!binding || binding.pending || binding.workspace_root !== root
           || !selection) return { ok: false, skipped: true, error: 'Claude turn requires reconciliation before compaction' };
         if (!deps.start && !Bun.which('claude')) {
           return { ok: false, skipped: true, error: 'Claude CLI is unavailable on this host' };

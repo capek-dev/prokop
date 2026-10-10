@@ -30,7 +30,7 @@ export async function forkClaudeSession(
     || deps.busy(session.id)) throw new Error('Claude session is unavailable or busy');
   const binding = getDatabase().query<Binding, [string]>(`SELECT native_session_id, workspace_root, cli_version, pending
     FROM claude_session_bindings WHERE session_id = ?`).get(session.id);
-  if (!binding || binding.pending || binding.workspace_root !== deps.root || binding.cli_version !== deps.version()) {
+  if (!binding || binding.pending || binding.workspace_root !== deps.root) {
     throw new Error('Claude native history is unavailable');
   }
   if (session.metadata?.claudeCompactPending || session.metadata?.claudeGoal || session.metadata?.claudeCompactedAt) {

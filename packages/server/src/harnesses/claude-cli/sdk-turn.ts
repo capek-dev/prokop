@@ -54,14 +54,18 @@ function record(value: unknown): Record<string, unknown> | null {
 }
 
 /**
- * CLI notices that carry no turn content. The CLI watches its own config,
- * commands, and plugins, so activity elsewhere (another Claude Code window)
- * can surface one before this turn's init. A resumed process also reports
+ * System events that only occur inside a running turn. Before init they mean
+ * the stream is out of order, so they fail closed. Every other system event
+ * before init is a content-free CLI notice: the CLI watches its own config,
+ * commands, plugins and session title, and new CLI releases add notices
+ * (session_title_changed in 2.1.285). A resumed process also reports
  * background tasks orphaned by the previous process (task_notification with
  * reason worker_restart) before init; no task of this turn exists yet.
  */
-const PRE_INIT_NOTICES = new Set(['commands_changed', 'background_tasks_changed', 'session_state_changed',
-  'status', 'notification', 'informational', 'plugin_install', 'files_persisted', 'task_notification']);
+const TURN_ONLY_EVENTS = new Set(['task_started', 'task_progress', 'task_updated', 'compact_boundary',
+  'local_command_output', 'api_retry', 'hook_started', 'hook_progress', 'hook_response', 'memory_recall',
+  'permission_denied', 'thinking_tokens', 'model_refusal_fallback', 'model_refusal_no_fallback',
+  'elicitation_complete']);
 
 function outsideTurn(message: SDKMessage): Error {
   // Only expose SDK event discriminants, never message content or arbitrary subtype text.
@@ -243,7 +247,7 @@ export async function* runClaudeTurn(input: ClaudeTurnInput): AsyncGenerator<Cla
       continue;
     }
     if (!initialized) {
-      if (message.type === 'system' && PRE_INIT_NOTICES.has(message.subtype)) continue;
+      if (message.type === 'system' && !TURN_ONLY_EVENTS.has(message.subtype)) continue;
       throw outsideTurn(message);
     }
     if (message.type === 'system' && message.subtype === 'task_started'

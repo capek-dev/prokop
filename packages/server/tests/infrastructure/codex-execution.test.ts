@@ -2490,3 +2490,45 @@ test('Codex registers workspace MCP entrypoints and routes current policy on res
   }
   expect(calls).toBe(1);
 });
+
+function bindUpgradedThread(workspaceRoot = realpathSync(process.cwd())): void {
+  create();
+  bindCodexThread({ sessionId: 's', threadId: 'thread-1', cliVersion: 'codex-cli 0.156.0', workspaceRoot });
+}
+
+test('an upgraded Codex CLI resumes an idle thread and records the new version', async () => {
+  bindUpgradedThread();
+  const fake = fakeCodex();
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1', connect: () => fake.connection });
+  const messages: ServerMessage[] = [];
+  const turn = execution.sendMessage(wire(messages), 'origin', 's', 'after upgrade');
+  await waitFor(() => fake.sent.some(message => message.method === 'turn/start'));
+  expect(fake.sent.find(message => message.method === 'thread/resume')?.params).toMatchObject({ threadId: 'thread-1' });
+  expect(getCodexBinding('s')?.cliVersion).toBe('codex-cli 0.156.1');
+  fake.send({ method: 'turn/started', params: { threadId: 'thread-1', turn: { id: 'turn-1' } } });
+  fake.send({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } } });
+  await turn;
+  expect(messages.filter(message => message.type === 'error')).toEqual([]);
+});
+
+test('a Codex CLI that cannot reopen an older thread names both versions', async () => {
+  bindUpgradedThread();
+  const messages: ServerMessage[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => fakeCodex(undefined, 'thread/resume').connection });
+  await execution.sendMessage(wire(messages), 'origin', 's', 'after upgrade');
+  expect(messages.find(message => message.type === 'error')).toMatchObject({ message:
+    'codex-cli 0.156.1 could not reopen this conversation (started with codex-cli 0.156.0). Start a new session to continue.' });
+  expect(getCodexBinding('s')?.cliVersion).toBe('codex-cli 0.156.0');
+});
+
+test('a Codex CLI upgrade still blocks a changed workspace root', async () => {
+  bindUpgradedThread('/elsewhere');
+  const messages: ServerMessage[] = [];
+  const execution = createCodexExecution({ version: () => 'codex-cli 0.156.1',
+    connect: () => { throw new Error('must not start'); } });
+  await execution.sendMessage(wire(messages), 'origin', 's', 'after upgrade');
+  expect(messages.find(message => message.type === 'error')).toMatchObject({
+    message: 'Codex failed during workspace root check. Check the host CLI setup.' });
+  expect(getCodexBinding('s')?.cliVersion).toBe('codex-cli 0.156.0');
+});
